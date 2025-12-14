@@ -1,0 +1,48 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+
+# Dependency directories
+node_modules/
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environment variables
+.env
+.env.*
+
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS specific
+.DS_Store
+
+# Build artifacts
+dist/
+build/
+coverage/
+
+# Taskmaster
+.taskmaster/reports/
+
+# Frontend
+ghc-platform/frontend/node_modules/
+
+# Python packaging
+*.pyc
+*.pyo
+*.egg-info/

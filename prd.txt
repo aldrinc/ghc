@@ -1,0 +1,2697 @@
+Cool, let’s reframe everything around:
+
+* **Backend:** Python (FastAPI)
+* **Workflows:** Temporal.io (Python SDK)
+* **Auth:** Clerk.dev (React SDK + manual JWT verification in Python)
+* **DB:** Postgres
+* **Frontend:** Vanilla React SPA (Vite or CRA), with Clerk React
+
+And we’ll add:
+
+1. **Client swipe files** (per-client swipes, from your team)
+2. **Company swipe library** (internal/global ad repo)
+
+Plus *definition files* (Pydantic + TS types) so devs know exactly what to implement.
+
+---
+
+## 0. High‑level architecture
+
+**Monorepo-ish layout (suggested)**
+
+```text
+/ghc-platform
+  /backend      # FastAPI + Temporal + SQLAlchemy + Pydantic
+  /frontend     # React SPA + Clerk
+  /infra        # docker-compose, migrations, etc.
+```
+
+**Key services**
+
+* **FastAPI app** (REST API)
+* **Temporal worker** (Python, same codebase, separate process)
+* **Postgres**
+* **React SPA** (served by Nginx or via separate dev server)
+* **Clerk** hosted auth (sign‑in, session tokens, user profiles)
+
+---
+
+## 1. Postgres schema (updated, Python-friendly)
+
+### 1.1 Base & enums
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TYPE user_role AS ENUM (
+  'partner',
+  'strategy',
+  'creative',
+  'performance',
+  'ops',
+  'data',
+  'experiment',
+  'admin'
+);
+
+CREATE TYPE client_status AS ENUM ('active', 'paused', 'archived');
+
+CREATE TYPE campaign_status AS ENUM ('draft', 'planning', 'running', 'completed', 'cancelled');
+
+CREATE TYPE artifact_type AS ENUM (
+  'client_canon',
+  'metric_schema',
+  'strategy_sheet',
+  'experiment_spec',
+  'asset_brief',
+  'qa_report',
+  'experiment_report',
+  'playbook'
+);
+
+CREATE TYPE workflow_kind AS ENUM (
+  'client_onboarding',
+  'campaign_planning',
+  'creative_production',
+  'experiment_cycle',
+  'playbook_update',
+  'test_campaign'
+);
+
+CREATE TYPE workflow_status AS ENUM ('running', 'completed', 'failed', 'cancelled');
+
+CREATE TYPE asset_status AS ENUM ('draft', 'qa_passed', 'approved', 'rejected');
+
+CREATE TYPE asset_source_type AS ENUM ('generated', 'historical', 'competitor_example');
+```
+
+---
+
+### 1.2 Orgs & users (multi‑tenant)
+
+```sql
+CREATE TABLE orgs (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE users (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id     UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  clerk_user_id TEXT NOT NULL,         -- from Clerk
+  email      CITEXT NOT NULL,
+  role       user_role NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(org_id, email)
+);
+```
+
+---
+
+### 1.3 Clients & offers
+
+```sql
+CREATE TABLE clients (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id            UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  industry          TEXT,
+  primary_markets   TEXT[] NOT NULL DEFAULT '{}',
+  primary_languages TEXT[] NOT NULL DEFAULT '{}',
+  status            client_status NOT NULL DEFAULT 'active',
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_clients_org ON clients(org_id);
+
+CREATE TABLE product_offers (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id                  UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  client_id               UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  name                    TEXT NOT NULL,
+  description             TEXT,
+  business_model          TEXT NOT NULL, -- 'one_off'|'subscription'|'hybrid'
+  differentiation_bullets TEXT[] NOT NULL DEFAULT '{}',
+  guarantee_text          TEXT,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE product_offer_price_points (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  offer_id     UUID NOT NULL REFERENCES product_offers(id) ON DELETE CASCADE,
+  label        TEXT NOT NULL,
+  amount_cents INTEGER NOT NULL,
+  currency     CHAR(3) NOT NULL
+);
+```
+
+---
+
+### 1.4 Campaigns
+
+```sql
+CREATE TABLE campaigns (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id          UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  client_id       UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  status          campaign_status NOT NULL DEFAULT 'draft',
+  goal_description TEXT,
+  objective_type  TEXT,
+  numeric_target  NUMERIC,
+  baseline        NUMERIC,
+  timeframe_days  INTEGER,
+  budget_min      NUMERIC,
+  budget_max      NUMERIC,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_campaigns_client ON campaigns(client_id);
+```
+
+---
+
+### 1.5 Artifacts (all the AI “documents”)
+
+Single table + JSONB:
+
+```sql
+CREATE TABLE artifacts (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id          UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  client_id       UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  campaign_id     UUID REFERENCES campaigns(id) ON DELETE SET NULL,
+  type            artifact_type NOT NULL,
+  version         INTEGER NOT NULL DEFAULT 1,
+  data            JSONB NOT NULL,
+  created_by_user UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_artifacts_org_client_type ON artifacts(org_id, client_id, type);
+CREATE INDEX idx_artifacts_campaign_type   ON artifacts(campaign_id, type);
+CREATE INDEX idx_artifacts_gin_data        ON artifacts USING GIN (data);
+```
+
+This will store:
+
+* `ClientCanon`
+* `MetricSchema`
+* `StrategySheet`
+* `ExperimentSpec`
+* `AssetBrief`
+* `QAReport`
+* `ExperimentReport`
+* `Playbook`
+
+We’ll define Pydantic + TS types for each in §2 / §3.
+
+---
+
+### 1.6 Experiments
+
+```sql
+CREATE TABLE experiments (
+  id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id                      UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  client_id                   UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  campaign_id                 UUID NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  name                        TEXT NOT NULL,
+  experiment_spec_artifact_id UUID NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+  status                      TEXT NOT NULL DEFAULT 'planned', -- 'planned','running','completed','cancelled'
+  created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  started_at                  TIMESTAMPTZ,
+  completed_at                TIMESTAMPTZ
+);
+
+CREATE INDEX idx_experiments_campaign ON experiments(campaign_id);
+```
+
+---
+
+### 1.7 Asset library (creative assets)
+
+```sql
+CREATE TABLE assets (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id                 UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  client_id              UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  campaign_id            UUID REFERENCES campaigns(id) ON DELETE SET NULL,
+  experiment_id          UUID REFERENCES experiments(id) ON DELETE SET NULL,
+  asset_brief_artifact_id UUID REFERENCES artifacts(id) ON DELETE SET NULL,
+  variant_id             TEXT,
+
+  source_type            asset_source_type NOT NULL,
+  status                 asset_status NOT NULL DEFAULT 'draft',
+
+  channel_id             TEXT NOT NULL,  -- 'meta','google_search','email',...
+  format                 TEXT NOT NULL,  -- 'video_30s','static_1080x1080','lp_section','email_html'
+
+  icp_id                 TEXT,
+  funnel_stage_id        TEXT,
+  concept_id             TEXT,
+  angle_type             TEXT,
+
+  content                JSONB NOT NULL, -- script/headline/html/sections/etc.
+
+  created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_assets_client_campaign ON assets(client_id, campaign_id);
+CREATE INDEX idx_assets_experiment      ON assets(experiment_id);
+CREATE INDEX idx_assets_gin_content     ON assets USING GIN (content);
+```
+
+Performance snapshots:
+
+```sql
+CREATE TABLE asset_performance_snapshots (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asset_id      UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
+  experiment_id UUID REFERENCES experiments(id) ON DELETE SET NULL,
+  time_from     TIMESTAMPTZ NOT NULL,
+  time_to       TIMESTAMPTZ NOT NULL,
+  metrics       JSONB NOT NULL,
+  segments      JSONB NOT NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_asset_perf_asset      ON asset_performance_snapshots(asset_id);
+CREATE INDEX idx_asset_perf_experiment ON asset_performance_snapshots(experiment_id);
+```
+
+---
+
+### 1.8 Swipe libraries (new)
+
+We’ll separate:
+
+* **company_swipe_assets** – your internal/global library
+* **company_swipe_media** – media per swipe
+* **company_swipe_brands** – brand metadata (if imported)
+* **client_swipe_assets** – a client linking to a swipe + notes/labels
+
+#### 1.8.1 Company swipe brands
+
+```sql
+CREATE TABLE company_swipe_brands (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id            UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  external_brand_id TEXT,          -- e.g. "101832735934413"
+  name              TEXT NOT NULL,
+  slug              TEXT,
+  ad_library_link   TEXT,
+  brand_page_link   TEXT,
+  logo_url          TEXT,
+  categories        JSONB,         -- [{id,title}]
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(org_id, external_brand_id)
+);
+```
+
+#### 1.8.2 Company swipe assets
+
+Maps directly to the example you gave:
+
+```sql
+CREATE TABLE company_swipe_assets (
+  id                      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id                  UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  external_ad_id          TEXT,      -- "64658534"
+  external_platform_ad_id TEXT,      -- "3265105363664183"
+  brand_id                UUID REFERENCES company_swipe_brands(id) ON DELETE SET NULL,
+
+  title                   TEXT,
+  body                    TEXT,
+  platforms               TEXT,      -- "FACEBOOK, INSTAGRAM, ..."
+  cta_type                TEXT,
+  cta_text                TEXT,
+  display_format          TEXT,      -- 'VIDEO','IMAGE','CAROUSEL'
+  landing_page            TEXT,
+  link_description        TEXT,
+  ad_source_link          TEXT,
+
+  start_date              DATE,
+  end_date                DATE,
+  days_active             INTEGER,
+  active_in_library       BOOLEAN,
+  active                  BOOLEAN,
+
+  used_count              INTEGER,
+  saved_count             INTEGER,
+  likes                   INTEGER,
+
+  winning_score           INTEGER,
+  winning_score_data      JSONB,
+  performance_score       INTEGER,
+  performance_score_data  JSONB,
+
+  age_audience_min        INTEGER,
+  age_audience_max        INTEGER,
+  gender_audience         TEXT,
+  eu_total_reach          NUMERIC,
+  ad_spend_range_score    INTEGER,
+  ad_spend_range_score_data JSONB,
+
+  added_human_time        TEXT,
+  added_by_user_human_time TEXT,
+  saved_by_this_user      BOOLEAN,
+  share_url               TEXT,
+  embed_url               TEXT,
+  is_aaa_eligible         BOOLEAN,
+
+  is_saved                BOOLEAN,
+  is_used                 BOOLEAN,
+  is_liked                BOOLEAN,
+
+  ad_script               JSONB,
+  ad_reach_by_location    JSONB,
+  ad_spend                JSONB,
+  ad_library_object       JSONB,
+
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_company_swipe_org ON company_swipe_assets(org_id);
+CREATE INDEX idx_company_swipe_brand ON company_swipe_assets(brand_id);
+```
+
+#### 1.8.3 Company swipe media
+
+```sql
+CREATE TABLE company_swipe_media (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id          UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  swipe_asset_id  UUID NOT NULL REFERENCES company_swipe_assets(id) ON DELETE CASCADE,
+
+  external_media_id TEXT,           -- "216237332"
+  path            TEXT,
+  url             TEXT,
+  thumbnail_path  TEXT,
+  thumbnail_url   TEXT,
+  disk            TEXT,
+  type            TEXT,             -- 'video','image'
+  mime_type       TEXT,
+  size_bytes      BIGINT,
+  video_length    INTEGER,          -- seconds
+  download_url    TEXT,
+
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_company_swipe_media_swipe ON company_swipe_media(swipe_asset_id);
+```
+
+#### 1.8.4 Client-level swipe links
+
+Option A: clients can attach global swipes + their own notes/tags.
+
+```sql
+CREATE TABLE client_swipe_assets (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id             UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  client_id          UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  company_swipe_id   UUID REFERENCES company_swipe_assets(id) ON DELETE SET NULL,
+
+  -- If they upload their own swipe unrelated to company_swipe_assets:
+  custom_title       TEXT,
+  custom_body        TEXT,
+  custom_channel     TEXT,
+  custom_format      TEXT,
+  custom_landing_page TEXT,
+  custom_media       JSONB,       -- optional, keep simple here (or store as assets)
+
+  tags               TEXT[] NOT NULL DEFAULT '{}',
+  notes              TEXT,
+  is_good_example    BOOLEAN,     -- for ClientCanon contentPatterns
+  is_bad_example     BOOLEAN,
+
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_client_swipe_client ON client_swipe_assets(client_id);
+```
+
+Now **ClientCanon.contentPatterns.goodAssetIds/badAssetIds** can reference `client_swipe_assets.id` (or `assets.id` if you prefer). We’ll encode those IDs inside `ClientCanon.data` JSON.
+
+---
+
+### 1.9 Workflow tracking (Temporal runs)
+
+```sql
+CREATE TABLE workflow_runs (
+  id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id             UUID NOT NULL REFERENCES orgs(id) ON DELETE CASCADE,
+  client_id          UUID REFERENCES clients(id) ON DELETE SET NULL,
+  campaign_id        UUID REFERENCES campaigns(id) ON DELETE SET NULL,
+  temporal_workflow_id TEXT NOT NULL,
+  temporal_run_id    TEXT NOT NULL,
+  kind               workflow_kind NOT NULL,
+  status             workflow_status NOT NULL DEFAULT 'running',
+  started_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  finished_at        TIMESTAMPTZ
+);
+
+CREATE INDEX idx_workflow_runs_client   ON workflow_runs(client_id);
+CREATE INDEX idx_workflow_runs_campaign ON workflow_runs(campaign_id);
+
+CREATE TABLE activity_logs (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  workflow_run_id UUID NOT NULL REFERENCES workflow_runs(id) ON DELETE CASCADE,
+  step           TEXT NOT NULL,
+  status         TEXT NOT NULL,  -- 'started','succeeded','failed'
+  payload_in     JSONB,
+  payload_out    JSONB,
+  error          TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_activity_logs_workflow ON activity_logs(workflow_run_id);
+```
+
+---
+
+## 2. Backend implementation (Python + FastAPI + Temporal)
+
+### 2.1 Backend tech stack
+
+* **Framework:** FastAPI
+* **DB:** SQLAlchemy 2.x + Alembic
+* **Validation:** Pydantic v2 models for artifacts & swipes
+* **Auth:** Clerk session token as Bearer header → manual JWT verification using Clerk JWKS or PEM public key
+* **LLM agents:** your choice (OpenAI etc.) in `app/llm/`
+* **Workflows:** Temporal Python SDK (`temporalio`)
+
+---
+
+### 2.2 Directory structure
+
+```text
+/backend
+  pyproject.toml
+  alembic.ini
+  /alembic
+    /versions
+  /app
+    __init__.py
+    config.py
+    main.py
+    /db
+      base.py         # engine + session
+      models/         # SQLAlchemy ORM
+      repositories/   # CRUD helpers
+    /schemas          # Pydantic models (artifacts + swipes)
+    /auth
+      clerk.py        # Clerk JWT verification
+      dependencies.py # FastAPI Depends
+    /llm
+      client.py
+      client_brain.py
+      campaign_architect.py
+      media_experiment_architect.py
+      execution_studio.py
+      brand_critic.py
+      compliance_critic.py
+      signal_keeper.py
+      learning_synth.py
+    /temporal
+      worker.py
+      workflows/
+        client_onboarding.py
+        campaign_planning.py
+        experiment_design.py
+        creative_production.py
+        experiment_cycle.py
+        playbook_update.py
+        test_campaign.py
+      activities/
+        client_onboarding_activities.py
+        metric_schema_activities.py
+        strategy_activities.py
+        experiment_activities.py
+        asset_activities.py
+        qa_activities.py
+        signal_activities.py
+        playbook_activities.py
+    /routers
+      clients.py
+      campaigns.py
+      artifacts.py
+      assets.py
+      swipes.py
+      experiments.py
+      workflows.py
+```
+
+---
+
+### 2.3 Config
+
+`app/config.py`
+
+```python
+from pydantic import BaseSettings, AnyUrl
+
+class Settings(BaseSettings):
+    DATABASE_URL: AnyUrl
+    CLERK_JWT_ISSUER: str  # e.g. "https://clerk.<your-domain>.com"
+    CLERK_JWKS_URL: str    # Clerk JWKS endpoint
+    CLERK_AUDIENCE: str    # your frontend origin or token aud
+    TEMPORAL_NAMESPACE: str = "default"
+    TEMPORAL_TASK_QUEUE: str = "growth-agency"
+
+    OPENAI_API_KEY: str | None = None
+
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+```
+
+---
+
+### 2.4 DB base & models
+
+`app/db/base.py`
+
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, DeclarativeBase
+from app.config import settings
+
+engine = create_engine(str(settings.DATABASE_URL), future=True, pool_pre_ping=True)
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+
+class Base(DeclarativeBase):
+    pass
+```
+
+Example model (client):
+
+`app/db/models/client.py`
+
+```python
+from sqlalchemy import Column, String, Enum, ARRAY, ForeignKey
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.types import DateTime
+from uuid import uuid4
+from datetime import datetime
+from app.db.base import Base
+from app.db.enums import ClientStatusEnum  # you create SQLAlchemy enums mirroring DB
+
+class Client(Base):
+    __tablename__ = "clients"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id = Column(UUID(as_uuid=True), ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String, nullable=False)
+    industry = Column(String)
+    primary_markets = Column(ARRAY(String), default=list, nullable=False)
+    primary_languages = Column(ARRAY(String), default=list, nullable=False)
+    status = Column(Enum(ClientStatusEnum), nullable=False, default=ClientStatusEnum.active)
+    created_at = Column(DateTime, default=datetime.utcnow)
+```
+
+(You’ll mirror this for campaigns, artifacts, experiments, assets, swipe tables, etc.)
+
+---
+
+### 2.5 Pydantic schemas (definition files, backend)
+
+Create a file per artifact for clarity:
+
+* `app/schemas/client_canon.py`
+* `app/schemas/metric_schema.py`
+* `app/schemas/strategy_sheet.py`
+* `app/schemas/experiment_spec.py`
+* `app/schemas/asset_brief.py`
+* `app/schemas/qa_report.py`
+* `app/schemas/experiment_report.py`
+* `app/schemas/playbook.py`
+* `app/schemas/swipe_assets.py`
+
+#### 2.5.1 ClientCanon (simplified but concrete)
+
+`app/schemas/client_canon.py`
+
+```python
+from pydantic import BaseModel, AnyUrl
+from typing import List, Optional, Dict, Any
+
+class CanonVisualStyleRefs(BaseModel):
+    logoUrl: Optional[AnyUrl] = None
+    palette: Optional[List[str]] = None
+    docUrls: List[AnyUrl] = []
+
+class CanonToneExamples(BaseModel):
+    good: List[str] = []
+    bad: List[str] = []
+
+class CanonToneOfVoice(BaseModel):
+    do: List[str]
+    dont: List[str]
+    examples: CanonToneExamples = CanonToneExamples()
+
+class CanonBrand(BaseModel):
+    story: str
+    manifesto: Optional[str] = None
+    values: List[str]
+    mission: Optional[str] = None
+    toneOfVoice: CanonToneOfVoice
+    visualStyleRefs: CanonVisualStyleRefs = CanonVisualStyleRefs()
+
+class CanonFunnelAssetPerf(BaseModel):
+    cvr: Optional[float] = None
+    epc: Optional[float] = None
+    bounceRate: Optional[float] = None
+    sampleSize: Optional[int] = None
+
+class CanonFunnelAsset(BaseModel):
+    id: str
+    type: str  # 'pre_sale'|'sales_page'|'checkout'|'upsell'|'thank_you'|'quiz'
+    label: str
+    url: Optional[AnyUrl] = None
+    storageKey: Optional[str] = None
+    context: str  # 'cold'|'warm'|'email'|'organic'|'unknown'
+    lastKnownPerformance: Optional[CanonFunnelAssetPerf] = None
+
+class CanonOffer(BaseModel):
+    offerId: str
+    primary: bool
+    positioning: str
+    keyBenefits: List[str]
+    pricePoints: List[Dict[str, Any]]  # or define dedicated type
+    guarantees: Optional[List[str]] = None
+    funnelAssets: List[CanonFunnelAsset]
+
+class CanonICP(BaseModel):
+    id: str
+    name: str
+    description: str
+    demographics: Dict[str, Any]
+    psychographics: Dict[str, List[str]]
+    jobsToBeDone: List[str]
+    commonObjections: List[str]
+
+class CanonVoCSnippet(BaseModel):
+    id: str
+    source: str
+    text: str
+    extra: Dict[str, Any] = {}
+
+class CanonVoiceOfCustomer(BaseModel):
+    supportSnippets: List[CanonVoCSnippet] = []
+    salesCallSnippets: List[CanonVoCSnippet] = []
+    surveySnippets: List[CanonVoCSnippet] = []
+    reviews: List[CanonVoCSnippet] = []
+
+class CanonConstraintsLegal(BaseModel):
+    forbiddenPhrases: List[str] = []
+    requiredDisclaimers: List[str] = []
+    regulatedClaimsNotes: List[str] = []
+
+class CanonConstraintsPlatform(BaseModel):
+    metaRedLines: List[str] = []
+    googleRedLines: List[str] = []
+    tiktokRedLines: List[str] = []
+    pastViolations: List[Dict[str, Any]] = []
+
+class CanonConstraints(BaseModel):
+    legal: CanonConstraintsLegal = CanonConstraintsLegal()
+    platform: CanonConstraintsPlatform = CanonConstraintsPlatform()
+
+class CanonContentPatterns(BaseModel):
+    goodAssetIds: List[str] = []   # client_swipe_assets.id or assets.id
+    badAssetIds: List[str] = []
+
+class ClientCanon(BaseModel):
+    clientId: str
+    brand: CanonBrand
+    offers: List[CanonOffer]
+    icps: List[CanonICP]
+    voiceOfCustomer: CanonVoiceOfCustomer
+    constraints: CanonConstraints
+    contentPatterns: CanonContentPatterns
+```
+
+Do similar detail for the rest (MetricSchema, StrategySheet, etc.). They don’t all need to be *fully* implemented before dev starts; you can expand fields as needed, but this gives your team a concrete starting point.
+
+#### 2.5.2 Swipe schemas (for company + client)
+
+`app/schemas/swipe_assets.py`
+
+```python
+from pydantic import BaseModel, AnyUrl
+from typing import Optional, List, Dict, Any
+from datetime import date, datetime
+
+class CompanySwipeBrand(BaseModel):
+    id: str
+    org_id: str
+    external_brand_id: Optional[str]
+    name: str
+    slug: Optional[str]
+    ad_library_link: Optional[AnyUrl]
+    brand_page_link: Optional[AnyUrl]
+    logo_url: Optional[AnyUrl]
+    categories: Optional[List[Dict[str, Any]]] = None
+
+class CompanySwipeMedia(BaseModel):
+    id: str
+    org_id: str
+    swipe_asset_id: str
+    external_media_id: Optional[str]
+    path: Optional[str]
+    url: Optional[AnyUrl]
+    thumbnail_url: Optional[AnyUrl]
+    type: Optional[str]
+    video_length: Optional[int]
+    download_url: Optional[AnyUrl]
+
+class CompanySwipeAsset(BaseModel):
+    id: str
+    org_id: str
+    external_ad_id: Optional[str]
+    external_platform_ad_id: Optional[str]
+    brand_id: Optional[str]
+
+    title: Optional[str]
+    body: Optional[str]
+    platforms: Optional[str]
+    cta_type: Optional[str]
+    cta_text: Optional[str]
+    display_format: Optional[str]
+    landing_page: Optional[AnyUrl]
+    link_description: Optional[str]
+    ad_source_link: Optional[AnyUrl]
+
+    start_date: Optional[date]
+    end_date: Optional[date]
+    days_active: Optional[int]
+    active_in_library: Optional[bool]
+    active: Optional[bool]
+
+    used_count: Optional[int]
+    saved_count: Optional[int]
+    likes: Optional[int]
+
+    winning_score: Optional[int]
+    winning_score_data: Optional[Dict[str, Any]]
+    performance_score: Optional[int]
+    performance_score_data: Optional[Dict[str, Any]]
+
+    age_audience_min: Optional[int]
+    age_audience_max: Optional[int]
+    gender_audience: Optional[str]
+
+    ad_spend_range_score: Optional[int]
+    ad_spend_range_score_data: Optional[Dict[str, Any]]
+
+    is_aaa_eligible: Optional[bool]
+    is_saved: Optional[bool]
+    is_used: Optional[bool]
+    is_liked: Optional[bool]
+
+    share_url: Optional[AnyUrl]
+    embed_url: Optional[AnyUrl]
+
+    ad_script: Optional[List[Any]] = None
+    ad_reach_by_location: Optional[List[Any]] = None
+    ad_spend: Optional[List[Any]] = None
+    ad_library_object: Optional[Dict[str, Any]] = None
+
+    created_at: Optional[datetime]
+    updated_at: Optional[datetime]
+
+    media: List[CompanySwipeMedia] = []
+    brand: Optional[CompanySwipeBrand] = None
+
+class ClientSwipeAsset(BaseModel):
+    id: str
+    org_id: str
+    client_id: str
+    company_swipe_id: Optional[str]
+    custom_title: Optional[str]
+    custom_body: Optional[str]
+    custom_channel: Optional[str]
+    custom_format: Optional[str]
+    custom_landing_page: Optional[AnyUrl]
+    custom_media: Optional[Dict[str, Any]]
+
+    tags: List[str] = []
+    notes: Optional[str]
+    is_good_example: bool = False
+    is_bad_example: bool = False
+```
+
+---
+
+### 2.6 Auth: Clerk + FastAPI
+
+Frontend will send session token as `Authorization: Bearer <token>`.
+
+You manually verify JWT with Clerk’s JWKS or PEM key (similar to their manual verification docs for JS/Go).
+
+`app/auth/clerk.py` (simplified):
+
+```python
+import httpx
+from jose import jwt
+from functools import lru_cache
+from app.config import settings
+
+@lru_cache(maxsize=1)
+def get_jwks():
+    resp = httpx.get(settings.CLERK_JWKS_URL, timeout=5.0)
+    resp.raise_for_status()
+    return resp.json()
+
+def verify_clerk_token(token: str) -> dict:
+    jwks = get_jwks()
+    unverified_header = jwt.get_unverified_header(token)
+    key = None
+    for k in jwks["keys"]:
+        if k["kid"] == unverified_header["kid"]:
+            key = k
+            break
+    if not key:
+        raise ValueError("No matching JWK kid")
+
+    public_key = jwt.algorithms.RSAAlgorithm.from_jwk(key)
+    decoded = jwt.decode(
+        token,
+        public_key,
+        algorithms=[unverified_header["alg"]],
+        audience=settings.CLERK_AUDIENCE,
+        issuer=settings.CLERK_JWT_ISSUER,
+    )
+    return decoded
+```
+
+FastAPI dependency:
+
+`app/auth/dependencies.py`
+
+```python
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from app.auth.clerk import verify_clerk_token
+from pydantic import BaseModel
+
+security = HTTPBearer()
+
+class AuthContext(BaseModel):
+    user_id: str
+    org_id: str | None = None   # you can add org from custom claims later
+
+async def get_current_user(
+    creds: HTTPAuthorizationCredentials = Depends(security),
+) -> AuthContext:
+    token = creds.credentials
+    try:
+        claims = verify_clerk_token(token)
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    return AuthContext(user_id=claims["sub"], org_id=claims.get("org_id"))
+```
+
+Use in routes:
+
+```python
+from fastapi import APIRouter, Depends
+from app.auth.dependencies import get_current_user, AuthContext
+
+router = APIRouter(prefix="/clients", tags=["clients"])
+
+@router.get("/")
+async def list_clients(auth: AuthContext = Depends(get_current_user)):
+    # auth.user_id, auth.org_id available
+    ...
+```
+
+---
+
+### 2.7 Temporal (Python SDK)
+
+Install: `pip install temporalio`
+
+`app/temporal/worker.py`:
+
+```python
+from temporalio.worker import Worker
+from temporalio.client import Client
+from app.config import settings
+from app.temporal import workflows, activities  # packages
+
+async def main():
+    client = await Client.connect("localhost:7233", namespace=settings.TEMPORAL_NAMESPACE)
+    worker = Worker(
+        client,
+        task_queue=settings.TEMPORAL_TASK_QUEUE,
+        workflows=[
+            workflows.client_onboarding.client_onboarding_workflow,
+            workflows.test_campaign.test_campaign_workflow,
+            # ... add others
+        ],
+        activities=[
+            activities.client_onboarding_activities.build_client_canon_activity,
+            activities.metric_schema_activities.build_metric_schema_activity,
+            # ...
+        ],
+    )
+    await worker.run()
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+```
+
+Example workflow (client onboarding):
+
+`app/temporal/workflows/client_onboarding.py`
+
+```python
+from temporalio import workflow
+from temporalio.workflow import signal, condition
+from app.temporal.activities.client_onboarding_activities import (
+    build_client_canon_activity,
+    build_metric_schema_activity,
+    save_artifacts_activity,
+)
+
+class ClientOnboardingInput(workflow.TypedDict):
+    org_id: str
+    client_id: str
+    onboarding_payload_id: str
+
+@workflow.defn
+class ClientOnboardingWorkflow:
+    def __init__(self) -> None:
+        self.canon = None
+        self.metric_schema = None
+        self._canon_approved = False
+        self._metric_approved = False
+
+    @signal
+    def approve_canon(self, approved: bool, updated_canon: dict | None = None) -> None:
+        if approved and updated_canon:
+            self.canon = updated_canon
+        self._canon_approved = approved
+
+    @signal
+    def approve_metric_schema(self, approved: bool, updated_schema: dict | None = None) -> None:
+        if approved and updated_schema:
+            self.metric_schema = updated_schema
+        self._metric_approved = approved
+
+    @workflow.run
+    async def run(self, input: ClientOnboardingInput) -> None:
+        self.canon = await workflow.execute_activity(
+            build_client_canon_activity,
+            input,
+            schedule_to_close_timeout=timedelta(minutes=5),
+        )
+        await condition(lambda: self._canon_approved)
+
+        self.metric_schema = await workflow.execute_activity(
+            build_metric_schema_activity,
+            {"org_id": input["org_id"], "client_id": input["client_id"], "canon": self.canon},
+            schedule_to_close_timeout=timedelta(minutes=5),
+        )
+        await condition(lambda: self._metric_approved)
+
+        await workflow.execute_activity(
+            save_artifacts_activity,
+            {
+                "org_id": input["org_id"],
+                "client_id": input["client_id"],
+                "canon": self.canon,
+                "metric_schema": self.metric_schema,
+            },
+            schedule_to_close_timeout=timedelta(minutes=2),
+        )
+```
+
+Activities are plain Python functions that call your LLM agents and DB repositories.
+
+---
+
+## 3. Frontend implementation (React SPA + Clerk)
+
+### 3.1 Stack
+
+* **Bundler:** Vite + React + TypeScript (recommended)
+* **Routing:** `react-router-dom`
+* **Auth:** `@clerk/clerk-react`
+* **HTTP:** `fetch` + a small wrapper that injects Clerk token
+* **State/query:** optional but nice: React Query / TanStack Query
+
+### 3.2 Project structure
+
+```text
+/frontend
+  package.json
+  vite.config.ts
+  tsconfig.json
+  /src
+    main.tsx
+    App.tsx
+    router.tsx
+    /auth
+      ClerkProviderWrapper.tsx
+      ProtectedRoute.tsx
+    /components
+      Layout.tsx
+      Nav.tsx
+      ...
+    /pages
+      Dashboard/
+        DashboardPage.tsx
+      Clients/
+        ClientsListPage.tsx
+        ClientSetupWizardPage.tsx
+        ClientMeasurementPage.tsx
+      Campaigns/
+        NewCampaignPage.tsx
+        CampaignOverviewPage.tsx
+        ExperimentsPage.tsx
+        AssetsPage.tsx
+        ResultsPage.tsx
+        PlaybookPage.tsx
+      CreativeInbox/
+        CreativeInboxPage.tsx
+      Swipes/
+        CompanySwipesPage.tsx
+        ClientSwipesPage.tsx
+    /api
+      client.ts           # fetchWithAuth
+      clients.ts
+      campaigns.ts
+      artifacts.ts
+      assets.ts
+      swipes.ts
+    /types
+      artifacts.ts
+      swipes.ts
+      common.ts
+```
+
+---
+
+### 3.3 Clerk integration (frontend)
+
+Install:
+
+```bash
+npm install @clerk/clerk-react
+```
+
+`src/main.tsx`:
+
+```tsx
+import React from 'react';
+import ReactDOM from 'react-dom/client';
+import { ClerkProvider } from '@clerk/clerk-react';
+import { BrowserRouter } from 'react-router-dom';
+import App from './App';
+
+const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY!;
+
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <ClerkProvider publishableKey={clerkPubKey}>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </ClerkProvider>
+  </React.StrictMode>
+);
+```
+
+`src/auth/ProtectedRoute.tsx`:
+
+```tsx
+import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react';
+import { ReactNode } from 'react';
+
+export function ProtectedRoute({ children }: { children: ReactNode }) {
+  return (
+    <>
+      <SignedIn>{children}</SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
+  );
+}
+```
+
+---
+
+### 3.4 API client with Clerk token
+
+`src/api/client.ts`
+
+```tsx
+import { useAuth } from '@clerk/clerk-react';
+
+export function useApiClient() {
+  const { getToken } = useAuth();
+
+  async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const token = await getToken();
+    const res = await fetch(import.meta.env.VITE_API_BASE_URL + path, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    if (!res.ok) {
+      // handle errors better in real code
+      throw new Error(`API error ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  }
+
+  return { request };
+}
+```
+
+Everything else (clients, campaigns, etc.) uses `useApiClient()`.
+
+---
+
+### 3.5 Shared TS types (definition files, frontend)
+
+Mirror Pydantic models:
+
+`src/types/artifacts.ts`
+
+```ts
+export interface CanonVisualStyleRefs {
+  logoUrl?: string;
+  palette?: string[];
+  docUrls: string[];
+}
+
+export interface CanonToneExamples {
+  good: string[];
+  bad: string[];
+}
+
+export interface CanonToneOfVoice {
+  do: string[];
+  dont: string[];
+  examples: CanonToneExamples;
+}
+
+export interface CanonBrand {
+  story: string;
+  manifesto?: string;
+  values: string[];
+  mission?: string;
+  toneOfVoice: CanonToneOfVoice;
+  visualStyleRefs: CanonVisualStyleRefs;
+}
+
+// ... (ICP, offers, constraints, etc.)
+
+export interface ClientCanon {
+  clientId: string;
+  brand: CanonBrand;
+  offers: any[];          // or more detailed types
+  icps: any[];
+  voiceOfCustomer: any;
+  constraints: any;
+  contentPatterns: {
+    goodAssetIds: string[];
+    badAssetIds: string[];
+  };
+}
+```
+
+`src/types/swipes.ts` for company/client swipes based on `CompanySwipeAsset` and `ClientSwipeAsset`.
+
+---
+
+### 3.6 Screen responsibilities (high‑level)
+
+**1) Client Setup Wizard (`/clients/:clientId/setup`)**
+
+* Steps:
+
+  1. Basics
+  2. Brand (story, tone, visual refs)
+  3. Offers & funnels (urls + performance)
+  4. ICPs & VoC (upload, paste)
+  5. Constraints (legal/platform)
+  6. Good/Bad swipes (select from `ClientSwipesPage` or direct uploads)
+  7. Review & “Generate Canon”
+
+* Final step:
+
+  * `POST /api/clients/:clientId/onboarding` → starts Temporal `clientOnboardingWorkflow`.
+  * Poll `GET /api/artifacts?type=client_canon&clientId=...&latest=true` to show AI‑generated Canon.
+  * “Approve Canon” → `POST /api/workflows/:workflowRunId/signals/approveCanon`.
+
+**2) Measurement Setup (`/clients/:clientId/measurement`)**
+
+* Form to define:
+
+  * Analytics, CRM, ad platforms, billing…
+  * Events & funnel mapping
+  * Metrics & KPIs
+* “Generate MetricSchema with AI” or manual only.
+* Approve similar to Canon.
+
+**3) Campaign Builder (`/clients/:clientId/campaigns/new`)**
+
+* Set goal object.
+* `POST /api/campaigns` → `campaignId`.
+* `POST /api/campaigns/:id/plan` → start `campaignPlanningWorkflow`.
+* Fetch `StrategySheet` → show sections with inline editing.
+* Approve strategy.
+
+**4) Experiments Page (`/campaigns/:id/experiments`)**
+
+* Config controls for resource constraints.
+* “Generate Experiments” → backend `Media & Experiment Architect`.
+* List `ExperimentSpecs` (Hypothesis, channel, variant count, metrics).
+* Approve / edit each.
+
+**5) Assets Page (`/campaigns/:id/assets`)**
+
+* List `AssetBrief`s per experiment.
+* For each brief:
+
+  * Show details (ICP, angle, messages, references / swipes).
+  * Button: “Generate Variants”.
+* Show generated variants with status & QA scores.
+
+**6) Creative Inbox (`/creative/inbox`)**
+
+* For Creative Director & Legal:
+
+  * List assets needing review with Brand/Compliance scores.
+  * Approve/Reject/Comment actions.
+
+**7) Swipes**
+
+* `/swipes/company`:
+
+  * Table view of `company_swipe_assets` with search (title, brand, platform, format).
+  * Detail view showing media previews (video thumbnail, etc.).
+  * “Mark as favorite” / “Tag for vertical”.
+
+* `/clients/:clientId/swipes`:
+
+  * Shows client_swipe_assets and allows:
+
+    * Linking existing company_swipe_assets.
+    * Marking as good/bad examples for this client.
+    * Tagging per ICP, funnel stage, angle.
+
+These swipes are then referenced by:
+
+* `ClientCanon.contentPatterns.goodAssetIds/badAssetIds`
+* `AssetBrief.references.assetExamples`
+
+---
+
+## 4. How that example ad maps into DB & objects
+
+Your example JSON:
+
+```json
+{
+  "id": 64658534,
+  "external_id": "3265105363664183",
+  "brand_id": 46527,
+  "title": "...",
+  "body": "...",
+  "platform": "FACEBOOK, INSTAGRAM, ...",
+  "cta_type": "SHOP_NOW",
+  "display_format": "VIDEO",
+  "landing_page": "https://manclub.com.br/products/desmatador2",
+  "media": [
+    {
+      "id": 216237332,
+      "path": "ads_media/64658534/media-9972adf15483.mp4",
+      "url": "https://static-gp....mp4",
+      "thumbnail_url": "https://static-gp....jpg",
+      "type": "video",
+      "video_length": 40,
+      "download_url": "..."
+    }
+  ],
+  "brand": {
+    "id": 46527,
+    "external_id": "101832735934413",
+    "name": "ManClub",
+    "ad_library_link": "...",
+    "brand_page_link": "...",
+    "logo_url": "..."
+  },
+  ...
+}
+```
+
+**Import pipeline into DB:**
+
+* `company_swipe_brands`:
+
+  * `external_brand_id = "101832735934413"`
+  * `name = "ManClub"`
+  * `logo_url`, `ad_library_link`, etc.
+
+* `company_swipe_assets`:
+
+  * `external_ad_id = "64658534"`
+  * `external_platform_ad_id = "3265105363664183"`
+  * `title`, `body`, `platforms = platform`, `cta_type`, `cta_text`, `display_format`, `landing_page`, `link_description`, scores, etc.
+
+* `company_swipe_media` (one row per `media[]` element):
+
+  * `external_media_id = "216237332"`
+  * `path`, `url`, `thumbnail_url`, `type`, `video_length`, `download_url`.
+
+When a strategist adds this as a “good example” for Client X:
+
+* Create `client_swipe_assets` row:
+
+  * `org_id`, `client_id`
+  * `company_swipe_id = <uuid of company_swipe_assets row>`
+  * `tags = ['male grooming', 'BR', 'video', 'humor']`
+  * `is_good_example = true`.
+
+Later:
+
+* `ClientCanon.contentPatterns.goodAssetIds` might include this `client_swipe_assets.id`.
+* `AssetBrief.references.assetExamples` can include this ID so Execution Studio can query the backend for swipe content and re‑use its structure.
+
+---
+
+## 5. “Definition files” checklist
+
+### Backend (Python / Pydantic)
+
+Create these under `app/schemas/`:
+
+* `client_canon.py` → `ClientCanon` + nested models
+* `metric_schema.py` → `MetricSchema` + funnel/events/metrics
+* `strategy_sheet.py` → `StrategySheet` + concepts, channel roles
+* `experiment_spec.py` → `ExperimentSpec`
+* `asset_brief.py` → `AssetBrief`
+* `qa_report.py` → `QAReport`
+* `experiment_report.py` → `ExperimentReport`
+* `playbook.py` → `Playbook`
+* `swipe_assets.py` → `CompanySwipeBrand`, `CompanySwipeMedia`, `CompanySwipeAsset`, `ClientSwipeAsset`
+
+Plus simple Pydantic wrappers for API DTOs (`ClientCreate`, `CampaignCreate`, etc.)
+
+### Frontend (TypeScript)
+
+Under `src/types/`:
+
+* `artifacts.ts` – `ClientCanon`, `MetricSchema`, `StrategySheet`, `ExperimentSpec`, `AssetBrief`, `QAReport`, `ExperimentReport`, `Playbook`
+* `swipes.ts` – `CompanySwipeBrand`, `CompanySwipeMedia`, `CompanySwipeAsset`, `ClientSwipeAsset`
+* `common.ts` – `Client`, `Campaign`, `Experiment`, `Asset`, `WorkflowRun`, etc.
+
+Keep names + fields aligned with Pydantic models for pain‑free JSON (no mapping layer).
+
+---
+
+If you’d like next, I can:
+
+* Flesh out one artifact end‑to‑end (say `ExperimentSpec`) with:
+
+  * Postgres JSON shape
+  * Pydantic model
+  * TS type
+  * Example value
+  * Example Temporal activity that creates it from LLM output.
+
+
+...
+
+I want you to outline all the temporal workflow code as well so you can have the temporal workflow and code also in our repository. That needs to be clear in here. In addition, I want to use ShadCN UI for our front end.
+
+...
+
+
+Here’s a concrete backend + Temporal + ShadCN UI plan you can drop into a repo and hand to a dev.
+
+I’ll focus on:
+
+1. **Repo layout (Python backend + Temporal + React+Vite+ShadCN)**
+2. **Temporal integration**
+
+   * client + worker
+   * all core workflows (code skeletons)
+   * activity modules (signatures, where LLM + DB calls live)
+3. **FastAPI endpoints that start/signal workflows**
+4. **Frontend with ShadCN UI (Vite)** – how it plugs into the workflows
+
+I’ll keep the code as real as possible (copy‑pasteable skeletons) and mark TODOs where you’ll plug in LLM or DB logic.
+
+---
+
+## 1. Repo layout
+
+```text
+ghc-platform/
+  backend/
+    pyproject.toml
+    alembic.ini
+    alembic/
+    app/
+      __init__.py
+      config.py
+      main.py                # FastAPI app
+      db/
+        base.py
+        models/
+          org.py
+          user.py
+          client.py
+          product_offer.py
+          campaign.py
+          artifact.py
+          asset.py
+          experiment.py
+          swipe_company.py
+          swipe_client.py
+          workflow_run.py
+        repositories/
+          clients.py
+          campaigns.py
+          artifacts.py
+          assets.py
+          experiments.py
+          swipes.py
+          workflows.py
+          onboarding_payloads.py
+      schemas/
+        client_canon.py
+        metric_schema.py
+        strategy_sheet.py
+        experiment_spec.py
+        asset_brief.py
+        qa_report.py
+        experiment_report.py
+        playbook.py
+        swipe_assets.py
+        common.py
+      auth/
+        clerk.py
+        dependencies.py
+      llm/
+        client_brain.py
+        metric_schema_builder.py
+        campaign_architect.py
+        media_experiment_architect.py
+        execution_studio.py
+        brand_critic.py
+        compliance_critic.py
+        signal_keeper.py
+        learning_synth.py
+      temporal/
+        client.py
+        worker.py
+        workflows/
+          client_onboarding.py
+          campaign_planning.py
+          experiment_design.py
+          creative_production.py
+          experiment_cycle.py
+          playbook_update.py
+          test_campaign.py
+        activities/
+          client_onboarding_activities.py
+          metric_schema_activities.py
+          strategy_activities.py
+          experiment_activities.py
+          asset_activities.py
+          qa_activities.py
+          signal_activities.py
+          playbook_activities.py
+      routers/
+        clients.py
+        campaigns.py
+        artifacts.py
+        assets.py
+        swipes.py
+        experiments.py
+        workflows.py
+
+  frontend/
+    package.json
+    vite.config.ts
+    index.html
+    tsconfig.json
+    tailwind.config.ts
+    postcss.config.cjs
+    components.json          # shadcn
+    src/
+      main.tsx
+      App.tsx
+      routes.tsx
+      lib/
+        utils.ts
+      components/
+        layout/
+        ui/                  # shadcn/ui components
+      pages/
+        dashboard/
+        clients/
+        campaigns/
+        experiments/
+        assets/
+        creative-inbox/
+        swipes/
+```
+
+---
+
+## 2. Temporal: client, worker, and **all core workflows**
+
+### 2.1 Temporal client helper
+
+`backend/app/temporal/client.py`
+
+```python
+import asyncio
+from temporalio.client import Client
+from app.config import settings
+
+_client: Client | None = None
+
+async def get_temporal_client() -> Client:
+    global _client
+    if _client is None:
+        _client = await Client.connect(
+            "localhost:7233",
+            namespace=settings.TEMPORAL_NAMESPACE,
+        )
+    return _client
+```
+
+---
+
+### 2.2 Worker entrypoint
+
+We’ll register all workflows + activities here.
+Temporal Python SDK pattern is: define workflows with `@workflow.defn` and activities with `@activity.defn`, then pass them to `Worker`. ([GitHub][1])
+
+`backend/app/temporal/worker.py`
+
+```python
+import asyncio
+import concurrent.futures
+from temporalio.worker import Worker
+from app.config import settings
+from app.temporal.client import get_temporal_client
+
+# Import workflows
+from app.temporal.workflows.client_onboarding import ClientOnboardingWorkflow
+from app.temporal.workflows.campaign_planning import CampaignPlanningWorkflow
+from app.temporal.workflows.experiment_design import ExperimentDesignWorkflow
+from app.temporal.workflows.creative_production import CreativeProductionWorkflow
+from app.temporal.workflows.experiment_cycle import ExperimentCycleWorkflow
+from app.temporal.workflows.playbook_update import PlaybookUpdateWorkflow
+from app.temporal.workflows.test_campaign import TestCampaignWorkflow
+
+# Import activities
+from app.temporal.activities.client_onboarding_activities import (
+    build_client_canon_activity,
+    build_metric_schema_activity,
+    persist_client_onboarding_artifacts_activity,
+)
+from app.temporal.activities.metric_schema_activities import (
+    infer_events_and_metrics_activity,
+)
+from app.temporal.activities.strategy_activities import (
+    build_strategy_sheet_activity,
+)
+from app.temporal.activities.experiment_activities import (
+    build_experiment_specs_activity,
+)
+from app.temporal.activities.asset_activities import (
+    generate_assets_for_brief_activity,
+    persist_assets_activity,
+)
+from app.temporal.activities.qa_activities import (
+    run_brand_qa_activity,
+    run_compliance_qa_activity,
+)
+from app.temporal.activities.signal_activities import (
+    ensure_experiment_configured_activity,
+    fetch_experiment_results_activity,
+    build_experiment_report_activity,
+)
+from app.temporal.activities.playbook_activities import (
+    update_playbook_from_reports_activity,
+)
+
+async def main() -> None:
+    client = await get_temporal_client()
+
+    # Use a thread pool executor for blocking DB/HTTP calls if you want sync activities.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=64) as activity_executor:
+        worker = Worker(
+            client,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+            workflows=[
+                ClientOnboardingWorkflow,
+                CampaignPlanningWorkflow,
+                ExperimentDesignWorkflow,
+                CreativeProductionWorkflow,
+                ExperimentCycleWorkflow,
+                PlaybookUpdateWorkflow,
+                TestCampaignWorkflow,
+            ],
+            activities=[
+                build_client_canon_activity,
+                build_metric_schema_activity,
+                persist_client_onboarding_artifacts_activity,
+                infer_events_and_metrics_activity,
+                build_strategy_sheet_activity,
+                build_experiment_specs_activity,
+                generate_assets_for_brief_activity,
+                persist_assets_activity,
+                run_brand_qa_activity,
+                run_compliance_qa_activity,
+                ensure_experiment_configured_activity,
+                fetch_experiment_results_activity,
+                build_experiment_report_activity,
+                update_playbook_from_reports_activity,
+            ],
+            activity_executor=activity_executor,
+        )
+        await worker.run()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+---
+
+### 2.3 Workflow 1 – **ClientOnboardingWorkflow**
+
+Goal: take raw onboarding payload → `ClientCanon` + `MetricSchema`, with human approvals.
+
+`backend/app/temporal/workflows/client_onboarding.py`
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Optional, Dict, Any
+
+from temporalio import workflow
+
+# Pass activities through the sandbox (Temporal Python requirement)
+# :contentReference[oaicite:1]{index=1}
+with workflow.unsafe.imports_passed_through():
+    from app.temporal.activities.client_onboarding_activities import (
+        build_client_canon_activity,
+        build_metric_schema_activity,
+        persist_client_onboarding_artifacts_activity,
+    )
+
+@dataclass
+class ClientOnboardingInput:
+    org_id: str
+    client_id: str
+    onboarding_payload_id: str  # DB id for raw intake data
+
+@workflow.defn
+class ClientOnboardingWorkflow:
+    def __init__(self) -> None:
+        self.canon: Optional[Dict[str, Any]] = None
+        self.metric_schema: Optional[Dict[str, Any]] = None
+        self._canon_approved: bool = False
+        self._metric_approved: bool = False
+
+    # === Signals from FastAPI / React ===
+
+    @workflow.signal
+    def approve_canon(self, approved: bool, updated_canon: Optional[Dict[str, Any]] = None) -> None:
+        if approved and updated_canon:
+            self.canon = updated_canon
+        self._canon_approved = approved
+
+    @workflow.signal
+    def approve_metric_schema(
+        self,
+        approved: bool,
+        updated_schema: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if approved and updated_schema:
+            self.metric_schema = updated_schema
+        self._metric_approved = approved
+
+    # === Main run ===
+
+    @workflow.run
+    async def run(self, input: ClientOnboardingInput) -> None:
+        # 1) Build ClientCanon (uses LLM + intake data)
+        self.canon = await workflow.execute_activity(
+            build_client_canon_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "onboarding_payload_id": input.onboarding_payload_id,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        # 2) Wait for Canon approval (from UI)
+        await workflow.wait_condition(lambda: self._canon_approved)
+
+        # 3) Build MetricSchema using canon + tooling
+        self.metric_schema = await workflow.execute_activity(
+            build_metric_schema_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        # 4) Wait for MetricSchema approval
+        await workflow.wait_condition(lambda: self._metric_approved)
+
+        # 5) Persist final artifacts + update DB
+        await workflow.execute_activity(
+            persist_client_onboarding_artifacts_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "canon": self.canon,
+                "metric_schema": self.metric_schema,
+            },
+            schedule_to_close_timeout=timedelta(minutes=5),
+        )
+```
+
+---
+
+### 2.4 Workflow 2 – **CampaignPlanningWorkflow**
+
+Goal: Business goal → StrategySheet (with human approval).
+
+`backend/app/temporal/workflows/campaign_planning.py`
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Optional, Dict, Any
+
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    from app.temporal.activities.strategy_activities import build_strategy_sheet_activity
+
+@dataclass
+class CampaignPlanningInput:
+    org_id: str
+    client_id: str
+    campaign_id: str
+    business_goal_id: str  # DB row describing goal
+
+@workflow.defn
+class CampaignPlanningWorkflow:
+    def __init__(self) -> None:
+        self.strategy_sheet: Optional[Dict[str, Any]] = None
+        self._strategy_approved: bool = False
+
+    @workflow.signal
+    def approve_strategy_sheet(
+        self,
+        approved: bool,
+        updated_strategy_sheet: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if approved and updated_strategy_sheet:
+            self.strategy_sheet = updated_strategy_sheet
+        self._strategy_approved = approved
+
+    @workflow.run
+    async def run(self, input: CampaignPlanningInput) -> None:
+        # 1) Build StrategySheet from Canon + MetricSchema + business goal + Playbook
+        self.strategy_sheet = await workflow.execute_activity(
+            build_strategy_sheet_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": input.campaign_id,
+                "business_goal_id": input.business_goal_id,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        # 2) Wait for StrategyLead/CreativeDirector approval
+        await workflow.wait_condition(lambda: self._strategy_approved)
+        # No further actions here; StrategySheet is written to artifacts in the activity.
+```
+
+---
+
+### 2.5 Workflow 3 – **ExperimentDesignWorkflow**
+
+Goal: StrategySheet + MetricSchema + Playbook → ExperimentSpecs + channel plan.
+
+`backend/app/temporal/workflows/experiment_design.py`
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Optional, Dict, Any, List
+
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    from app.temporal.activities.experiment_activities import build_experiment_specs_activity
+
+@dataclass
+class ExperimentDesignInput:
+    org_id: str
+    client_id: str
+    campaign_id: str
+    resource_constraints_id: str  # DB row with max concurrent, budgets, etc.
+
+@workflow.defn
+class ExperimentDesignWorkflow:
+    def __init__(self) -> None:
+        self.experiment_specs: List[Dict[str, Any]] = []
+        self._approved_experiment_ids: List[str] = []
+        self._rejected_experiment_ids: List[str] = []
+
+    @workflow.signal
+    def approve_experiments(
+        self,
+        approved_ids: List[str],
+        rejected_ids: List[str],
+        edited_specs: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> None:
+        """
+        edited_specs: mapping experiment_id -> updated ExperimentSpec dict
+        """
+        self._approved_experiment_ids = approved_ids
+        self._rejected_experiment_ids = rejected_ids
+
+        if edited_specs:
+            for spec in self.experiment_specs:
+                exp_id = spec.get("id")
+                if exp_id in edited_specs:
+                    spec.update(edited_specs[exp_id])
+
+    @workflow.run
+    async def run(self, input: ExperimentDesignInput) -> None:
+        # 1) Generate ExperimentSpecs
+        result = await workflow.execute_activity(
+            build_experiment_specs_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": input.campaign_id,
+                "resource_constraints_id": input.resource_constraints_id,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+        # result should contain experiment_specs list
+        self.experiment_specs = result["experiment_specs"]
+
+        # 2) Wait for approval/rejection from UI
+        await workflow.wait_condition(lambda: len(self._approved_experiment_ids) > 0 or len(self._rejected_experiment_ids) > 0)
+
+        # Activity already persisted ExperimentSpec artifacts; at this point, experiments with
+        # approved_ids can be created in the DB by that activity or a follow-up.
+```
+
+---
+
+### 2.6 Workflow 4 – **CreativeProductionWorkflow**
+
+Goal: For each approved ExperimentSpec → create AssetBriefs → generate assets → QA → human approval.
+
+We’ll let AssetBrief creation live in an activity (derivable from StrategySheet + ExperimentSpec).
+
+`backend/app/temporal/workflows/creative_production.py`
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Dict, Any, List, Optional, Set
+
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    from app.temporal.activities.asset_activities import (
+        generate_assets_for_brief_activity,
+        persist_assets_activity,
+    )
+    from app.temporal.activities.qa_activities import (
+        run_brand_qa_activity,
+        run_compliance_qa_activity,
+    )
+    from app.temporal.activities.experiment_activities import (
+        create_asset_briefs_for_experiments_activity,
+    )
+
+@dataclass
+class CreativeProductionInput:
+    org_id: str
+    client_id: str
+    campaign_id: str
+    experiment_ids: List[str]
+
+@workflow.defn
+class CreativeProductionWorkflow:
+    def __init__(self) -> None:
+        self.asset_brief_ids: List[str] = []
+        self.assets_by_brief: Dict[str, List[Dict[str, Any]]] = {}
+        self._approved_asset_ids: Set[str] = set()
+        self._rejected_asset_ids: Set[str] = set()
+
+    @workflow.signal
+    def approve_assets(
+        self,
+        approved_ids: List[str],
+        rejected_ids: Optional[List[str]] = None,
+    ) -> None:
+        self._approved_asset_ids.update(approved_ids)
+        if rejected_ids:
+            self._rejected_asset_ids.update(rejected_ids)
+
+    @workflow.run
+    async def run(self, input: CreativeProductionInput) -> None:
+        # 1) Create AssetBrief artifacts from ExperimentSpecs + StrategySheet
+        briefs_result = await workflow.execute_activity(
+            create_asset_briefs_for_experiments_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": input.campaign_id,
+                "experiment_ids": input.experiment_ids,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+        self.asset_brief_ids = briefs_result["asset_brief_ids"]
+
+        # 2) For each AssetBrief, generate assets and run QA
+        for brief_id in self.asset_brief_ids:
+            assets = await workflow.execute_activity(
+                generate_assets_for_brief_activity,
+                {
+                    "org_id": input.org_id,
+                    "client_id": input.client_id,
+                    "campaign_id": input.campaign_id,
+                    "asset_brief_id": brief_id,
+                },
+                schedule_to_close_timeout=timedelta(minutes=10),
+            )
+
+            brand_qa = await workflow.execute_activity(
+                run_brand_qa_activity,
+                {
+                    "org_id": input.org_id,
+                    "client_id": input.client_id,
+                    "campaign_id": input.campaign_id,
+                    "asset_brief_id": brief_id,
+                    "assets": assets,
+                },
+                schedule_to_close_timeout=timedelta(minutes=5),
+            )
+
+            compliance_qa = await workflow.execute_activity(
+                run_compliance_qa_activity,
+                {
+                    "org_id": input.org_id,
+                    "client_id": input.client_id,
+                    "campaign_id": input.campaign_id,
+                    "asset_brief_id": brief_id,
+                    "assets": assets,
+                },
+                schedule_to_close_timeout=timedelta(minutes=5),
+            )
+
+            # Persist assets + QA reports, return final asset IDs.
+            persisted = await workflow.execute_activity(
+                persist_assets_activity,
+                {
+                    "org_id": input.org_id,
+                    "client_id": input.client_id,
+                    "campaign_id": input.campaign_id,
+                    "asset_brief_id": brief_id,
+                    "assets": assets,
+                    "brand_qa": brand_qa,
+                    "compliance_qa": compliance_qa,
+                },
+                schedule_to_close_timeout=timedelta(minutes=10),
+            )
+
+            self.assets_by_brief[brief_id] = persisted["assets"]
+
+        # 3) Wait for human approvals on selected assets
+        await workflow.wait_condition(lambda: len(self._approved_asset_ids) > 0)
+        # Additional behavior (e.g., mark only approved assets as active) already done in persist_assets_activity.
+```
+
+---
+
+### 2.7 Workflow 5 – **ExperimentCycleWorkflow**
+
+Goal: Take approved experiments + assets → ensure platform configs exist → wait for enough data → build ExperimentReport.
+
+`backend/app/temporal/workflows/experiment_cycle.py`
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import List, Dict, Any, Optional
+
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    from app.temporal.activities.signal_activities import (
+        ensure_experiment_configured_activity,
+        fetch_experiment_results_activity,
+        build_experiment_report_activity,
+    )
+
+@dataclass
+class ExperimentCycleInput:
+    org_id: str
+    client_id: str
+    campaign_id: str
+    experiment_ids: List[str]
+
+@workflow.defn
+class ExperimentCycleWorkflow:
+    def __init__(self) -> None:
+        self._should_stop: bool = False
+
+    @workflow.signal
+    def stop(self) -> None:
+        """Allow operator to stop this experiment cycle early."""
+        self._should_stop = True
+
+    @workflow.run
+    async def run(self, input: ExperimentCycleInput) -> None:
+        # 1) Ensure configs (ads, LP experiments, etc.) exist in platforms
+        await workflow.execute_activity(
+            ensure_experiment_configured_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": input.campaign_id,
+                "experiment_ids": input.experiment_ids,
+            },
+            schedule_to_close_timeout=timedelta(minutes=15),
+        )
+
+        # 2) Poll for results periodically until data is sufficient or stopped
+        while not self._should_stop:
+            # Sleep some time between polling cycles
+            await workflow.sleep(60 * 60)  # 1 hour; temporal's virtual time makes this efficient. :contentReference[oaicite:2]{index=2}
+
+            results = await workflow.execute_activity(
+                fetch_experiment_results_activity,
+                {
+                    "org_id": input.org_id,
+                    "client_id": input.client_id,
+                    "campaign_id": input.campaign_id,
+                    "experiment_ids": input.experiment_ids,
+                },
+                schedule_to_close_timeout=timedelta(minutes=10),
+            )
+
+            if results["all_experiments_ready"]:
+                break
+
+        # 3) Build and persist ExperimentReport artifacts
+        await workflow.execute_activity(
+            build_experiment_report_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": input.campaign_id,
+                "experiment_ids": input.experiment_ids,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+```
+
+---
+
+### 2.8 Workflow 6 – **PlaybookUpdateWorkflow**
+
+Goal: Periodically consolidate ExperimentReports + QA + AssetLibrary → Playbook.
+
+`backend/app/temporal/workflows/playbook_update.py`
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Optional, Dict, Any, List
+
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    from app.temporal.activities.playbook_activities import (
+        update_playbook_from_reports_activity,
+    )
+
+@dataclass
+class PlaybookUpdateInput:
+    org_id: str
+    client_id: Optional[str] = None
+    vertical_key: Optional[str] = None  # for cross-client vertical playbook
+
+@workflow.defn
+class PlaybookUpdateWorkflow:
+    def __init__(self) -> None:
+        self._run_once: bool = False
+
+    @workflow.signal
+    def run_now(self) -> None:
+        """Force an immediate playbook update."""
+        self._run_once = True
+
+    @workflow.run
+    async def run(self, input: PlaybookUpdateInput) -> None:
+        """
+        You can run this on a schedule (Temporal's schedule/cron) for regular updates.
+        """
+        # For now, simple one-shot: update on start OR when signaled
+        await workflow.wait_condition(lambda: self._run_once)
+        await workflow.execute_activity(
+            update_playbook_from_reports_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "vertical_key": input.vertical_key,
+            },
+            schedule_to_close_timeout=timedelta(minutes=15),
+        )
+```
+
+---
+
+### 2.9 Workflow 7 – **TestCampaignWorkflow** (end‑to‑end smoke test)
+
+This is your “single button” to test Canon → Strategy → Experiments → Assets → QA in one go.
+
+`backend/app/temporal/workflows/test_campaign.py`
+
+```python
+from __future__ import annotations
+from dataclasses import dataclass
+from datetime import timedelta
+from typing import Dict, Any
+
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    from app.temporal.activities.client_onboarding_activities import build_client_canon_activity
+    from app.temporal.activities.metric_schema_activities import build_metric_schema_activity
+    from app.temporal.activities.strategy_activities import build_strategy_sheet_activity
+    from app.temporal.activities.experiment_activities import build_experiment_specs_activity, create_asset_briefs_for_experiments_activity
+    from app.temporal.activities.asset_activities import generate_assets_for_brief_activity
+    from app.temporal.activities.qa_activities import run_brand_qa_activity, run_compliance_qa_activity
+
+@dataclass
+class TestCampaignInput:
+    org_id: str
+    client_id: str
+    onboarding_payload_id: str
+    business_goal_id: str
+
+@workflow.defn
+class TestCampaignWorkflow:
+    @workflow.run
+    async def run(self, input: TestCampaignInput) -> Dict[str, Any]:
+        # 1) Canon + MetricSchema
+        canon = await workflow.execute_activity(
+            build_client_canon_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "onboarding_payload_id": input.onboarding_payload_id,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        metric_schema = await workflow.execute_activity(
+            build_metric_schema_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        # 2) Strategy
+        strategy_sheet = await workflow.execute_activity(
+            build_strategy_sheet_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "business_goal_id": input.business_goal_id,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        # 3) ExperimentSpecs
+        experiments = await workflow.execute_activity(
+            build_experiment_specs_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "resource_constraints_id": None,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        experiment_specs = experiments["experiment_specs"]
+        # Just take the first experiment and create briefs
+        first_exp_id = experiment_specs[0]["id"]
+        briefs = await workflow.execute_activity(
+            create_asset_briefs_for_experiments_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "experiment_ids": [first_exp_id],
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        brief_id = briefs["asset_brief_ids"][0]
+        assets = await workflow.execute_activity(
+            generate_assets_for_brief_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "asset_brief_id": brief_id,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
+
+        brand_qa = await workflow.execute_activity(
+            run_brand_qa_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "asset_brief_id": brief_id,
+                "assets": assets,
+            },
+            schedule_to_close_timeout=timedelta(minutes=5),
+        )
+
+        compliance_qa = await workflow.execute_activity(
+            run_compliance_qa_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "asset_brief_id": brief_id,
+                "assets": assets,
+            },
+            schedule_to_close_timeout=timedelta(minutes=5),
+        )
+
+        return {
+            "canon": canon,
+            "metric_schema": metric_schema,
+            "strategy_sheet": strategy_sheet,
+            "experiment_specs": experiment_specs,
+            "asset_brief_id": brief_id,
+            "assets": assets,
+            "brand_qa": brand_qa,
+            "compliance_qa": compliance_qa,
+        }
+```
+
+---
+
+## 3. Activities skeleton (where LLM + DB live)
+
+I’ll show one full file; the others follow the same pattern.
+
+### 3.1 Client onboarding activities
+
+`backend/app/temporal/activities/client_onboarding_activities.py`
+
+```python
+from __future__ import annotations
+from typing import Dict, Any
+
+from temporalio import activity
+
+from app.db.repositories.onboarding_payloads import get_onboarding_payload
+from app.db.repositories.artifacts import insert_client_canon_artifact, insert_metric_schema_artifact
+from app.schemas.client_canon import ClientCanon
+from app.schemas.metric_schema import MetricSchema
+from app.llm.client_brain import run_client_brain
+from app.llm.metric_schema_builder import run_metric_schema_builder
+
+@activity.defn
+def build_client_canon_activity(params: Dict[str, Any]) -> Dict[str, Any]:
+    """LLM-powered Canon builder + artifact insert."""
+    org_id = params["org_id"]
+    client_id = params["client_id"]
+    onboarding_payload_id = params["onboarding_payload_id"]
+
+    payload = get_onboarding_payload(org_id=org_id, client_id=client_id, payload_id=onboarding_payload_id)
+
+    canon_model: ClientCanon = run_client_brain(
+        org_id=org_id,
+        client_id=client_id,
+        intake_form=payload.intake_form,
+        brand_docs=payload.brand_docs,
+        funnel_pages=payload.funnel_pages,
+        voc_sources=payload.voc_sources,
+        constraints_docs=payload.constraints_docs,
+    )
+
+    insert_client_canon_artifact(org_id, client_id, canon_model)
+    # Return dict, not Pydantic, since Temporal default data converter will JSON-ify. :contentReference[oaicite:3]{index=3}
+    return canon_model.model_dump()
+
+@activity.defn
+def build_metric_schema_activity(params: Dict[str, Any]) -> Dict[str, Any]:
+    org_id = params["org_id"]
+    client_id = params["client_id"]
+
+    metric_schema_model: MetricSchema = run_metric_schema_builder(
+        org_id=org_id,
+        client_id=client_id,
+    )
+
+    insert_metric_schema_artifact(org_id, client_id, metric_schema_model)
+    return metric_schema_model.model_dump()
+
+@activity.defn
+def persist_client_onboarding_artifacts_activity(params: Dict[str, Any]) -> None:
+    """
+    Optional: here you’d update any denormalized fields on Client, etc.
+    We’ve already inserted artifacts in build_* activities, so you may not need this.
+    """
+    return None
+```
+
+You’ll create analogous activity modules:
+
+* `metric_schema_activities.py` – if you want extra inference steps
+* `strategy_activities.py` – call `run_campaign_architect` → StrategySheet → artifact
+* `experiment_activities.py` – generate ExperimentSpecs + create AssetBriefs
+* `asset_activities.py` – ExecutionStudio + persist assets
+* `qa_activities.py` – BrandCritic + ComplianceCritic + persist QAReports
+* `signal_activities.py` – configure ad platforms, fetch metrics, build ExperimentReports
+* `playbook_activities.py` – LearningSynth → Playbook artifact
+
+Each activity:
+
+1. Loads inputs from DB (client, canon, metric_schema, experiments, etc).
+2. Calls your LLM agent (OpenAI/Anthropic) with Pydantic schemas.
+3. Saves result into `artifacts` or `assets` tables.
+4. Returns plain `dict`/`list` to Temporal.
+
+---
+
+## 4. FastAPI ↔ Temporal glue
+
+Example: start onboarding workflow + approve Canon.
+
+### 4.1 Start client onboarding
+
+`backend/app/routers/clients.py`
+
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from temporalio.client import Client as TemporalClient
+from app.auth.dependencies import get_current_user, AuthContext
+from app.temporal.client import get_temporal_client
+from app.db.repositories.workflows import create_workflow_run
+from app.db.repositories.onboarding_payloads import create_onboarding_payload
+
+from app.temporal.workflows.client_onboarding import ClientOnboardingWorkflow, ClientOnboardingInput
+
+router = APIRouter(prefix="/clients", tags=["clients"])
+
+@router.post("/{client_id}/onboarding")
+async def start_client_onboarding(
+    client_id: str,
+    payload: dict,  # intakeForm, brandDocs, funnelPages, vocSources, constraintsDocs
+    auth: AuthContext = Depends(get_current_user),
+):
+    # 1) Persist raw onboarding payload
+    onboarding_payload_id = create_onboarding_payload(
+        org_id=auth.org_id,
+        client_id=client_id,
+        payload=payload,
+    )
+
+    # 2) Start Temporal workflow
+    temporal: TemporalClient = await get_temporal_client()
+    handle = await temporal.start_workflow(
+        ClientOnboardingWorkflow.run,
+        ClientOnboardingInput(
+            org_id=auth.org_id,
+            client_id=client_id,
+            onboarding_payload_id=str(onboarding_payload_id),
+        ),
+        id=f"client-onboarding-{auth.org_id}-{client_id}",
+        task_queue="growth-agency",
+    )
+
+    # 3) Track in workflow_runs table
+    workflow_run = create_workflow_run(
+        org_id=auth.org_id,
+        client_id=client_id,
+        temporal_workflow_id=handle.id,
+        temporal_run_id=handle.first_execution_run_id,
+        kind="client_onboarding",
+    )
+
+    return {"workflow_run_id": str(workflow_run.id)}
+```
+
+### 4.2 Approve Canon from UI
+
+`backend/app/routers/workflows.py`
+
+```python
+from fastapi import APIRouter, Depends, HTTPException
+from temporalio.client import Client as TemporalClient
+from app.temporal.client import get_temporal_client
+from app.db.repositories.workflows import get_workflow_run_by_id
+from app.auth.dependencies import get_current_user, AuthContext
+
+router = APIRouter(prefix="/workflows", tags=["workflows"])
+
+@router.post("/{workflow_run_id}/signals/approve-canon")
+async def signal_approve_canon(
+    workflow_run_id: str,
+    body: dict,
+    auth: AuthContext = Depends(get_current_user),
+):
+    workflow_run = get_workflow_run_by_id(workflow_run_id)
+    if workflow_run.org_id != auth.org_id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    approved: bool = body.get("approved", False)
+    updated_canon: dict | None = body.get("updatedCanon")
+
+    temporal: TemporalClient = await get_temporal_client()
+    handle = temporal.get_workflow_handle(workflow_run.temporal_workflow_id)
+
+    await handle.signal("approve_canon", approved, updated_canon)
+    return {"ok": True}
+```
+
+You’ll have similar routes:
+
+* `approve-metric-schema`
+* `approve-strategy-sheet`
+* `approve-experiments`
+* `approve-assets`
+* `stop-experiment-cycle`
+
+---
+
+## 5. Frontend: React + Vite + **ShadCN UI**
+
+ShadCN now has an official Vite flow – you’re choosing the “Vite” or “React Manual” path in their docs. ([Shadcn UI][2])
+
+### 5.1 Setup (high level)
+
+From `frontend/`:
+
+```bash
+npm create vite@latest ghc-frontend -- --template react-ts
+cd ghc-frontend
+
+# Tailwind + PostCSS + Autoprefixer
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init -p
+
+# shadcn/ui CLI
+npm install -D shadcn-ui@latest
+npx shadcn-ui init
+```
+
+Follow `shadcn/ui` “Vite” guide for:
+
+* `tailwind.config.ts`
+* `postcss.config.cjs`
+* `src/index.css` injecting `@tailwind base; @tailwind components; @tailwind utilities;` etc. ([shadcn.io][3])
+
+Your `components.json` in the root of `frontend` will be created by `npx shadcn-ui init` (or you can copy the canonical config from their docs).
+
+### 5.2 Example UI wiring
+
+You re‑use the overall page structure we discussed earlier, but build all forms/tables/dialogs with ShadCN primitives (`<Button>`, `<Input>`, `<Textarea>`, `<Dialog>`, `<Sheet>`, `<Table>` etc.).
+
+**Example:** Canon Review modal using ShadCN components.
+
+`frontend/src/pages/clients/ClientCanonReview.tsx`
+
+```tsx
+import { useEffect, useState } from "react";
+import { useApiClient } from "@/api/client";
+import { ClientCanon } from "@/types/artifacts";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+
+interface Props {
+  clientId: string;
+  workflowRunId: string;
+  open: boolean;
+  onClose: () => void;
+}
+
+export function ClientCanonReview({ clientId, workflowRunId, open, onClose }: Props) {
+  const { request } = useApiClient();
+  const [canon, setCanon] = useState<ClientCanon | null>(null);
+  const [canonJson, setCanonJson] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const data = await request<ClientCanon>(
+        `/artifacts?clientId=${clientId}&type=client_canon&latest=true`
+      );
+      setCanon(data);
+      setCanonJson(JSON.stringify(data, null, 2));
+    })();
+  }, [open, clientId, request]);
+
+  const handleApprove = async () => {
+    setSubmitting(true);
+    try {
+      const updatedCanon = JSON.parse(canonJson);
+      await request(`/workflows/${workflowRunId}/signals/approve-canon`, {
+        method: "POST",
+        body: JSON.stringify({ approved: true, updatedCanon }),
+      });
+      onClose();
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!canon) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
+      <DialogContent className="max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Review Client Canon</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Edit the AI-generated Canon if needed, then approve to continue onboarding.
+          </p>
+          <Textarea
+            className="font-mono text-xs h-[400px]"
+            value={canonJson}
+            onChange={(e) => setCanonJson(e.target.value)}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={handleApprove} disabled={submitting}>
+            {submitting ? "Approving..." : "Approve Canon"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+```
+
+You’ll reuse the same pattern for:
+
+* MetricSchema review (ShadCN `Tabs` + `Table` for events/funnel).
+* StrategySheet review (cards + `Textarea`/`Input`).
+* Experiment list (ShadCN `Table` with checkboxes for approve/reject).
+* Creative inbox (cards with badges for Brand/Compliance scores, `Sheet`/`Dialog` for full asset view).
+
+Because ShadCN is just a set of headless+styled components on top of Tailwind, you’re basically wrapping the same workflow API calls we defined above with nicer UI.
+
+---
+
+## 6. Definition files recap (so devs know what’s “canonical”)
+
+You already have the **shapes** for the artifacts; the important bit is:
+
+* **Backend Pydantic** in `app/schemas/*.py`
+* **Frontend TS types** in `frontend/src/types/*.ts`
+* Both must mirror the JSON that lives in the `artifacts.data` column.
+
+Examples (already started above):
+
+* `ClientCanon` → `client_canon.py` + `ClientCanon` TS interface
+* `MetricSchema` → `metric_schema.py` + TS
+* `StrategySheet`, `ExperimentSpec`, `AssetBrief`, `QAReport`, `ExperimentReport`, `Playbook`
+* Swipe assets:
+
+  * `CompanySwipeAsset` / `CompanySwipeMedia` / `ClientSwipeAsset` in both Python + TS
+
+As long as you keep those in sync, Temporal will just see them as JSON, and your LLM agents + UI can treat them as strongly typed objects.
+
+---
+
+If you want, next step we can take **one concrete path** (e.g. “Create new client → run ClientOnboardingWorkflow → approve Canon/MetricSchema from a ShadCN page”) and I can write those specific files end‑to‑end (FastAPI route + workflow start + ShadCN page + hook).
+
+[1]: https://github.com/temporalio/sdk-python "GitHub - temporalio/sdk-python: Temporal Python SDK"
+[2]: https://ui.shadcn.com/docs/installation/vite?utm_source=chatgpt.com "Vite - Shadcn UI"
+[3]: https://www.shadcn.io/ui/installation/vite?utm_source=chatgpt.com "Install shadcn/ui Vite"
