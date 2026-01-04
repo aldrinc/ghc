@@ -1,21 +1,22 @@
-import { forwardRef } from "react";
-import { Input as BaseInput, type InputProps as BaseInputProps } from "@base-ui/react/input";
-import { cn } from "@/lib/utils";
+import * as React from "react"
 
-export type InputProps = BaseInputProps;
+import { cn } from "@/lib/utils"
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(function Input({ className, ...props }, ref) {
-  return (
-    <BaseInput
-      ref={ref}
-      className={cn(
-        "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-content shadow-sm transition",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
-        "data-[invalid]:border-danger data-[invalid]:ring-danger/30 data-[invalid]:ring-2 data-[invalid]:ring-offset-2",
-        "disabled:cursor-not-allowed disabled:opacity-60 placeholder:text-content-muted",
-        className
-      )}
-      {...props}
-    />
-  );
-});
+const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <input
+        type={type}
+        className={cn(
+          "flex h-10 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-base ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-slate-950 placeholder:text-slate-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-950 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm dark:border-slate-800 dark:bg-slate-950 dark:ring-offset-slate-950 dark:file:text-slate-50 dark:placeholder:text-slate-400 dark:focus-visible:ring-slate-300",
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Input.displayName = "Input"
+
+export { Input }

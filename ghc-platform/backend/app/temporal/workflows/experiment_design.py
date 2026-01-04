@@ -45,6 +45,7 @@ class ExperimentDesignWorkflow:
 
     @workflow.run
     async def run(self, input: ExperimentDesignInput) -> None:
+        idea_workspace_id = workflow.info().workflow_id
         result = await workflow.execute_activity(
             build_experiment_specs_activity,
             {
@@ -52,6 +53,7 @@ class ExperimentDesignWorkflow:
                 "client_id": input.client_id,
                 "campaign_id": input.campaign_id,
                 "resource_constraints_id": input.resource_constraints_id,
+                "idea_workspace_id": idea_workspace_id,
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import logging
 import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
@@ -22,10 +23,7 @@ class LLMClientConfigError(Exception):
     pass
 
 
-_STUB_OUTPUT = (
-    "<SUMMARY>Stub summary generated locally for testing.</SUMMARY>"
-    "<CONTENT>Stub content generated locally for testing.</CONTENT>"
-)
+logger = logging.getLogger(__name__)
 _DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL") or "gpt-5.2-2025-12-11"
 _DEFAULT_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", "120"))
 _MAX_RETRIES = int(os.getenv("LLM_REQUEST_RETRIES", "2"))
@@ -45,8 +43,8 @@ class LLMGenerationParams:
 
 class LLMClient:
     """
-    Lightweight stub/wrapper for LLM calls used by activities.
-    Replace the generate_text implementation with a provider client as needed.
+    Lightweight wrapper for LLM calls used by activities.
+    Routes to the appropriate provider client based on the requested model.
     """
 
     def __init__(self, default_model: Optional[str] = None) -> None:
@@ -66,16 +64,41 @@ class LLMClient:
 
     def _is_openai_model(self, model: str) -> bool:
         lower = model.lower()
-        prefixes = ("gpt-", "chatgpt-", "o1", "o3", "omni-")
+        prefixes = ("gpt-", "chatgpt-", "o", "omni-")
         return any(lower.startswith(prefix) for prefix in prefixes)
+
+    def _extract_response_text(self, response: Any) -> Optional[str]:
+        text = getattr(response, "output_text", None)
+        if text:
+            return text
+        maybe_output = getattr(response, "output", None)
+        if not maybe_output:
+            return None
+        try:
+            parts: list[str] = []
+            for item in maybe_output:
+                content = getattr(item, "content", None)
+                if not content:
+                    continue
+                for chunk in content:
+                    chunk_text = getattr(chunk, "text", None)
+                    if chunk_text:
+                        parts.append(chunk_text)
+            return "".join(parts) if parts else None
+        except Exception:
+            return None
 
     def _generate_with_openai(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> str:
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            return _STUB_OUTPUT
+            raise LLMClientConfigError("OPENAI_API_KEY not configured")
 
         if not self._openai_client:
-            client_kwargs = {"api_key": api_key}
+            client_kwargs = {
+                "api_key": api_key,
+                "timeout": float(_DEFAULT_TIMEOUT),
+                "max_retries": _MAX_RETRIES,
+            }
             base_url = os.getenv("OPENAI_BASE_URL")
             if base_url:
                 client_kwargs["base_url"] = base_url
@@ -89,62 +112,90 @@ class LLMClient:
         temperature = params.temperature if params else 0.2
         use_reasoning = bool(params.use_reasoning) if params else False
         use_web_search = bool(params.use_web_search) if params else False
+        model_lower = model.lower()
+        if use_web_search and "o3-mini" in model_lower:
+            raise RuntimeError(f"Model {model} does not support web_search tools; choose a tool-capable model.")
         should_use_responses = use_reasoning or use_web_search or model.lower().startswith("o")
 
-        # Try the Responses API first when reasoning/web search is requested or for o-models.
+        # Use the Responses API for reasoning/web-search/o-models. Do NOT fall back; surface errors directly.
         if should_use_responses:
-            try:
-                request_kwargs = {
+            logger.warning(
+                "OpenAI responses request",
+                extra={
                     "model": model,
-                    "input": prompt,
-                    "temperature": temperature,
-                }
-                if max_tokens:
-                    request_kwargs["max_output_tokens"] = max_tokens
-                if use_web_search:
-                    request_kwargs["tools"] = [{"type": "web_search"}]
-                if use_reasoning:
-                    request_kwargs["reasoning"] = {"effort": "medium"}
+                    "use_web_search": use_web_search,
+                    "use_reasoning": use_reasoning,
+                },
+            )
+            include = ["web_search_call.action.sources"] if use_web_search else None
+            request_kwargs = {
+                "model": model,
+                "input": prompt,
+                # Background mode prevents long-running calls from exhausting the HTTP timeout; we poll below.
+                "background": True,
+            }
+            if max_tokens:
+                request_kwargs["max_output_tokens"] = max_tokens
+            if use_web_search:
+                request_kwargs["tools"] = [{"type": "web_search"}]
+                request_kwargs["include"] = include  # include sources per docs
+            if use_reasoning:
+                request_kwargs["reasoning"] = {"effort": "medium"}
 
-                response = self._openai_client.responses.create(**request_kwargs)
-                text = getattr(response, "output_text", None)
-                if not text and getattr(response, "output", None):
-                    try:
-                        parts = []
-                        for item in response.output:
-                            content = getattr(item, "content", None)
-                            if not content:
-                                continue
-                            for chunk in content:
-                                maybe_text = getattr(chunk, "text", None)
-                                if maybe_text:
-                                    parts.append(maybe_text)
-                        if parts:
-                            text = "".join(parts)
-                    except Exception:
-                        text = None
+            response = self._openai_client.responses.create(**request_kwargs)
+            status = getattr(response, "status", None)
+            response_id = getattr(response, "id", None)
+            text = self._extract_response_text(response)
+            start = time.monotonic()
+            while status in ("queued", "in_progress") and (time.monotonic() - start) < _POLL_TIMEOUT_SECONDS:
+                time.sleep(_POLL_INTERVAL_SECONDS)
+                if include:
+                    response = self._openai_client.responses.retrieve(response_id, include=include)
+                else:
+                    response = self._openai_client.responses.retrieve(response_id)
+                status = getattr(response, "status", None)
+                text = self._extract_response_text(response)
                 if text:
-                    return text
-            except Exception:
-                # Fall back to chat completions when Responses API is unavailable.
-                text = None
+                    break
+            if text:
+                return text
+            error_msg = f"OpenAI responses API returned no content (status={status}, response_id={response_id})"
+            logger.error(error_msg, extra={"model": model, "response_id": response_id, "status": status})
+            raise RuntimeError(error_msg)
+
+        logger.warning(
+            "OpenAI chat completion request",
+            extra={
+                "model": model,
+                "use_web_search": use_web_search,
+                "use_reasoning": use_reasoning,
+            },
+        )
+        completion_kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if temperature is not None:
+            completion_kwargs["temperature"] = temperature
+        if max_tokens:
+            completion_kwargs["max_tokens"] = max_tokens
 
         try:
-            completion = self._openai_client.chat.completions.create(
-                model=model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-            if completion and completion.choices:
-                message = completion.choices[0].message
-                text = getattr(message, "content", None)
-            else:
-                text = None
+            completion = self._openai_client.chat.completions.create(**completion_kwargs)
         except Exception:
+            logger.exception("OpenAI chat completion failed", extra={"model": model})
+            raise
+
+        if completion and completion.choices:
+            message = completion.choices[0].message
+            text = getattr(message, "content", None)
+        else:
             text = None
 
-        return text or _STUB_OUTPUT
+        if text:
+            return text
+
+        raise RuntimeError(f"OpenAI chat completion returned no content for model {model}")
 
     def _generate_openai_deep_research(
         self, prompt: str, model: str, params: Optional[LLMGenerationParams]
@@ -154,8 +205,16 @@ class LLMClient:
         This avoids long-lived streams timing out and enables reasoning summaries + source capture.
         """
         max_output_tokens = params.max_tokens if params and params.max_tokens else _O3_MAX_OUTPUT_TOKENS
-        use_web_search = bool(params.use_web_search) if params else False
+        use_web_search = bool(params.use_web_search) if params else True
         reasoning_effort = "medium"
+
+        tools = [{"type": "web_search"}] if use_web_search else []
+        include = ["web_search_call.action.sources"] if use_web_search else None
+        if not tools:
+            raise ValueError(
+                "Deep research requires at least one data source tool (e.g., web_search, file_search, or MCP). "
+                "Enable use_web_search or supply another tool."
+            )
 
         request_kwargs = {
             "model": model,
@@ -164,9 +223,9 @@ class LLMClient:
             "max_output_tokens": max_output_tokens,
             "reasoning": {"summary": "auto", "effort": reasoning_effort},
         }
-        if use_web_search:
-            request_kwargs["tools"] = [{"type": "web_search"}]
-            request_kwargs["include"] = ["web_search_call.action.sources"]
+        request_kwargs["tools"] = tools
+        if include:
+            request_kwargs["include"] = include
 
         response = self._openai_client.responses.create(**request_kwargs)
         status = getattr(response, "status", None)
@@ -175,25 +234,27 @@ class LLMClient:
         start = time.monotonic()
         while status in ("queued", "in_progress") and (time.monotonic() - start) < _POLL_TIMEOUT_SECONDS:
             time.sleep(_POLL_INTERVAL_SECONDS)
-            response = self._openai_client.responses.retrieve(response_id)
+            if include:
+                response = self._openai_client.responses.retrieve(response_id, include=include)
+            else:
+                response = self._openai_client.responses.retrieve(response_id)
             status = getattr(response, "status", None)
 
-        # If we still don't have a terminal status, fall back to whatever we have.
-        if status not in ("completed", "failed", "incomplete", "cancelled"):
-            return getattr(response, "output_text", "") or _STUB_OUTPUT
+        text = getattr(response, "output_text", None)
+        if status != "completed":
+            logger.warning(
+                "OpenAI deep research response ended without completed status",
+                extra={"status": status, "response_id": response_id},
+            )
+        if text:
+            return text
 
-        # Prefer the returned text even if the job is incomplete (e.g., hit max_output_tokens).
-        text = getattr(response, "output_text", "") or ""
-        if status == "completed":
-            return text or _STUB_OUTPUT
-
-        # If incomplete/failed/cancelled, return partial text when available to salvage work.
-        return text or _STUB_OUTPUT
+        raise RuntimeError(f"OpenAI deep research returned no content (status={status})")
 
     def _generate_with_gemini(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> str:
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            return _STUB_OUTPUT
+            raise LLMClientConfigError("GEMINI_API_KEY not configured")
 
         if not self._gemini_configured:
             genai.configure(api_key=api_key)
@@ -218,15 +279,19 @@ class LLMClient:
                         text = parts[0].text
             if not text and hasattr(result, "text"):
                 text = result.text
-        except Exception:
-            text = None
+        except Exception as exc:
+            logger.exception("Gemini generation failed", extra={"model": model})
+            raise
 
-        return text or _STUB_OUTPUT
+        if text:
+            return text
+
+        raise RuntimeError(f"Gemini returned no content for model {model}")
 
     def _generate_with_anthropic(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> str:
         api_key = os.getenv("ANTHROPIC_API_KEY")
         if not api_key:
-            return _STUB_OUTPUT
+            raise LLMClientConfigError("ANTHROPIC_API_KEY not configured")
 
         if not self._anthropic_client:
             self._anthropic_client = Anthropic(api_key=api_key)
@@ -249,7 +314,11 @@ class LLMClient:
                 text = "".join(text_parts) if text_parts else None
                 if text:
                     break
-            except Exception:
+            except Exception as exc:
+                logger.exception("Anthropic generation attempt failed", extra={"model": model})
                 text = None
 
-        return text or _STUB_OUTPUT
+        if text:
+            return text
+
+        raise RuntimeError(f"Anthropic returned no content for model {model}")

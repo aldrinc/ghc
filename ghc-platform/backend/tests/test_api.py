@@ -35,9 +35,6 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal):
             "business_type": "new",
             "brand_story": "Brand story for testing",
             "offers": ["A"],
-            "constraints": ["none"],
-            "primary_markets": ["US"],
-            "primary_languages": ["en"],
             "goals": ["grow"],
         },
     )
@@ -67,7 +64,10 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal):
         json={"approved": True},
     )
     assert approve_resp.status_code == 200
-    assert ("approve_strategy_sheet", (True, None)) in fake_temporal.signals
+    assert (
+        "approve_strategy_sheet",
+        ({"approved": True, "updated_strategy_sheet": None},),
+    ) in fake_temporal.signals
 
     logs_resp = api_client.get(f"/workflows/{onboarding_run}/logs")
     assert logs_resp.status_code == 200

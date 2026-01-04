@@ -8,6 +8,7 @@
 - Structured context JSON: {{BUSINESS_CONTEXT_JSON}}  
 - Category / niche label: {{CATEGORY_NICHE}}  
 - Deep research summary (bounded): {{STEP4_SUMMARY}}  
+- Deep research content (full): {{STEP4_CONTENT}}  
 - Ads context (if any): {{ADS_CONTEXT}}
 
 **🔍 Demographic & General Information:**

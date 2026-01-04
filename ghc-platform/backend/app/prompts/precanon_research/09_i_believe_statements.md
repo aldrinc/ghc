@@ -9,6 +9,10 @@
 - Avatar brief summary (bounded): {{STEP6_SUMMARY}}  
 - Offer brief summary (bounded): {{STEP7_SUMMARY}}  
 - Necessary beliefs doc (bounded): {{STEP8_SUMMARY}}  
+- Deep research content (full): {{STEP4_CONTENT}}  
+- Avatar brief content (full): {{STEP6_CONTENT}}  
+- Offer brief content (full): {{STEP7_CONTENT}}  
+- Necessary beliefs content (full): {{STEP8_CONTENT}}  
 - Ads context (if any): {{ADS_CONTEXT}}
 
 **Your task**  

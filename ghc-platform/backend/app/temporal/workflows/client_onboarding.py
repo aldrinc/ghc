@@ -102,6 +102,8 @@ class ClientOnboardingWorkflow:
                 "canon": self.canon,
                 "metric_schema": self.metric_schema,
                 "research_artifacts": precanon_artifacts,
+                "temporal_workflow_id": workflow.info().workflow_id,
+                "temporal_run_id": workflow.info().run_id,
             },
             schedule_to_close_timeout=timedelta(minutes=2),
         )

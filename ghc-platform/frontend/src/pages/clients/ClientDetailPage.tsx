@@ -21,11 +21,11 @@ export function ClientDetailPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title={client?.name || "Client detail"}
+        title={client?.name || "Workspace detail"}
         description={client ? `Industry: ${client.industry || "Not set"}` : "Overview, onboarding, and workflows."}
       />
 
-      <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+      <div className="ds-card ds-card--md shadow-none">
         <Tabs defaultValue="overview">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -77,8 +77,8 @@ export function ClientDetailPage() {
                 <span className="font-semibold text-content">Recent workflows</span>
                 <span className="text-xs text-content-muted">{clientWorkflows.length} total</span>
               </div>
-              <div className="overflow-hidden rounded-lg border border-border shadow-sm">
-                <Table>
+              <div className="overflow-hidden">
+                <Table variant="ghost">
                   <TableHeader>
                     <TableRow>
                       <TableHeadCell>Kind</TableHeadCell>

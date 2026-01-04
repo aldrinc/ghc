@@ -7,6 +7,9 @@
 - Deep research summary (bounded): {{STEP4_SUMMARY}}  
 - Avatar brief summary (bounded): {{STEP6_SUMMARY}}  
 - Offer brief summary (bounded): {{STEP7_SUMMARY}}  
+- Deep research content (full): {{STEP4_CONTENT}}  
+- Avatar brief content (full): {{STEP6_CONTENT}}  
+- Offer brief content (full): {{STEP7_CONTENT}}  
 - Ads context (if any): {{ADS_CONTEXT}}
 
 **Your role**  

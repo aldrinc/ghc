@@ -1,0 +1,40 @@
+# Deployment Runbook (GHC Platform)
+
+This doc captures what is required to ship the current stack (FastAPI + Temporal worker + Vite/React frontend).
+
+## Services & Prereqs
+- Postgres 16 reachable by the API and worker (migrations live in `ghc-platform/backend/alembic`).
+- Temporal server/UI reachable by the worker and API; default dev compose exposes `temporal:7233` inside the network and `localhost:7234` on the host.
+- Clerk instance with an org-bearing JWT template (used by backend auth and frontend).
+- LLM providers: OpenAI (required), Anthropic/Gemini (optional but used by several activities).
+- Google Drive access for research artifacts (service account or OAuth) and Apify token for ads ingestion.
+
+## Environment configuration
+- Backend core: `DATABASE_URL`, `CLERK_JWT_ISSUER`, `CLERK_JWKS_URL`, `CLERK_AUDIENCE`, `BACKEND_CORS_ORIGINS`, `TEMPORAL_NAMESPACE`, `TEMPORAL_TASK_QUEUE`, `OPENAI_API_KEY`, `OPENAI_WEBHOOK_SECRET`.
+- LLM/research tuning: `LLM_DEFAULT_MODEL`, `LLM_REQUEST_TIMEOUT`, `LLM_REQUEST_RETRIES`, `LLM_POLL_INTERVAL_SECONDS`, `LLM_POLL_TIMEOUT_SECONDS`, `DEEP_RESEARCH_POLL_TIMEOUT_SECONDS`, `O3_DEEP_RESEARCH_MAX_OUTPUT_TOKENS`, `PRECANON_STEP04_MODEL`, `PRECANON_STEP04_MAX_TOKENS`, `PRECANON_STEP04_START_TO_CLOSE_MINUTES`, `PRECANON_STEP04_SCHEDULE_TO_CLOSE_MINUTES`, `PRECANON_STEP0{1,3,6,7,8,9}_MODEL`.
+- Google/Drive: `GOOGLE_APPLICATION_CREDENTIALS` (preferred) or `GOOGLE_CLIENT_EMAIL`/`GOOGLE_PRIVATE_KEY`; optional OAuth `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_REFRESH_TOKEN`; `RESEARCH_DRIVE_PARENT_FOLDER_ID` or `PARENT_FOLDER_ID`.
+- Ads ingestion: `APIFY_API_TOKEN`, optional `APIFY_META_ACTOR_ID`, `APIFY_META_ACTIVE_STATUS`, `APIFY_META_COUNTRY_CODE`, and tuning knobs `ADS_CONTEXT_MAX_MEDIA_ASSETS`, `ADS_CONTEXT_MAX_BREAKDOWN_ADS`, `ADS_CONTEXT_MAX_HIGHLIGHT_ADS`, `ADS_CONTEXT_MAX_ADS_PER_BRAND`, `ADS_CONTEXT_PRIMARY_TEXT_LIMIT`, `ADS_CONTEXT_HEADLINE_LIMIT`.
+- LLM providers: `ANTHROPIC_API_KEY`, `ANTHROPIC_API_BASE_URL` (optional), `GEMINI_API_KEY`, `OPENAI_BASE_URL` (optional).
+- Frontend: set `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (point to deployed backend), and `VITE_CLERK_JWT_TEMPLATE` (defaults to `backend`).
+- Secrets live in `.env` locally; move them to your deployment secret manager and keep `.env` files out of images/artifacts.
+
+## Build and release
+- Database: `cd ghc-platform/backend && .venv/bin/alembic upgrade head` (applies migrations up to `0013_ad_scores.py`).
+- Backend API (Python 3.11): `cd ghc-platform/backend && .venv/bin/pip install . && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+- Temporal worker: `cd ghc-platform/backend && .venv/bin/python -m app.temporal.worker` (shares the same env/secrets as the API).
+- Frontend: `cd ghc-platform/frontend && npm ci && npm run build`; serve `ghc-platform/frontend/dist` via a static server (e.g., nginx, Vercel, S3+CloudFront). Use `.env.production` to inject deploy-time `VITE_*` values.
+- Local infra helper: `cd ghc-platform/infra && docker compose up -d` brings up Postgres (5433), Temporal (7234), Temporal UI (8234), and PgAdmin (8081). Swap to managed services for production.
+- Containerization: build backend image `docker build -t ghc-backend -f ghc-platform/backend/Dockerfile ghc-platform/backend` (override command to run the worker: `docker run ... python -m app.temporal.worker`); build frontend image `docker build -t ghc-frontend -f ghc-platform/frontend/Dockerfile ghc-platform/frontend --build-arg VITE_API_BASE_URL=https://api.example.com --build-arg VITE_CLERK_PUBLISHABLE_KEY=... --build-arg VITE_CLERK_JWT_TEMPLATE=backend`.
+- CI: `.github/workflows/docker-images.yml` builds/pushes backend and frontend images to GHCR on `main`; adjust registry/creds as needed.
+
+## Verification checklist
+- Health: `curl -i https://<backend>/health` and `/health/db`.
+- Tests: `cd ghc-platform/backend && .venv/bin/pytest` (currently passing); `cd ghc-platform/frontend && npm run build` (passing, with a chunk-size warning).
+- Migrations: `cd ghc-platform/backend && .venv/bin/alembic current` should report head.
+- Temporal: confirm namespace/task queue reachable and workflows visible in Temporal UI.
+- API smoke: follow `ghc-platform/backend/SMOKE_TESTS.md` with a real Clerk JWT to exercise clients, campaigns, workflows, artifacts, assets, and swipes.
+- Frontend: sign in via Clerk, create a client, start onboarding, run campaign planning, and verify workflow detail/approvals and library tabs against the deployed API.
+
+## Known gaps / follow-ups
+- Frontend bundle emits a >500 kB chunk; consider code-splitting or adjusting `build.chunkSizeWarningLimit` if this impacts your hosting limits.
+- Taskmaster task 28 (“run frontend against local backend/Temporal with Clerk auth”) is still pending; complete it as a final pre-deploy validation pass.

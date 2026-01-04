@@ -76,13 +76,6 @@ async def start_client_onboarding(
         data=payload.model_dump(),
     )
 
-    clients_repo.update(
-        org_id=auth.org_id,
-        client_id=client_id,
-        primary_markets=payload.primary_markets,
-        primary_languages=payload.primary_languages,
-    )
-
     temporal = await get_temporal_client()
     handle = await temporal.start_workflow(
         ClientOnboardingWorkflow.run,

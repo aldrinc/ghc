@@ -42,6 +42,7 @@ class CreativeProductionWorkflow:
 
     @workflow.run
     async def run(self, input: CreativeProductionInput) -> None:
+        idea_workspace_id = workflow.info().workflow_id
         briefs_result = await workflow.execute_activity(
             create_asset_briefs_for_experiments_activity,
             {
@@ -49,6 +50,7 @@ class CreativeProductionWorkflow:
                 "client_id": input.client_id,
                 "campaign_id": input.campaign_id,
                 "experiment_ids": input.experiment_ids,
+                "idea_workspace_id": idea_workspace_id,
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )

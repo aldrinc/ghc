@@ -1,0 +1,103 @@
+@layer components {
+  /* Container: readable defaults */
+  .markdown {
+    @apply text-[15px] sm:text-base leading-7 text-content antialiased;
+    @apply [&>*]:min-w-0;
+  }
+
+  /* Headings */
+  .markdown h1 {
+    @apply mt-0 mb-6 text-3xl font-semibold tracking-tight;
+  }
+
+  .markdown h2 {
+    @apply mt-10 mb-4 scroll-mt-24 text-2xl font-semibold tracking-tight;
+  }
+
+  .markdown h3 {
+    @apply mt-8 mb-3 scroll-mt-24 text-xl font-semibold tracking-tight;
+  }
+
+  .markdown h4 {
+    @apply mt-6 mb-2 scroll-mt-24 text-lg font-semibold tracking-tight;
+  }
+
+  /* Paragraphs + lists */
+  .markdown p {
+    @apply my-4;
+  }
+
+  .markdown ul {
+    @apply my-4 ml-6 list-disc;
+  }
+
+  .markdown ol {
+    @apply my-4 ml-6 list-decimal;
+  }
+
+  .markdown li {
+    @apply my-2;
+  }
+
+  .markdown li > ul,
+  .markdown li > ol {
+    @apply my-2;
+  }
+
+  /* Links */
+  .markdown a {
+    @apply font-medium text-primary underline underline-offset-4;
+  }
+
+  .markdown a:hover {
+    @apply opacity-80;
+  }
+
+  /* Blockquotes */
+  .markdown blockquote {
+    @apply my-6 rounded-lg border border-border bg-surface-2 px-4 py-3 text-content-muted;
+    @apply [&>p]:my-0;
+  }
+
+  /* Horizontal rule */
+  .markdown hr {
+    @apply my-10 border-border;
+  }
+
+  /* Inline code */
+  .markdown :not(pre) > code {
+    @apply rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-[0.95em];
+    @apply break-words;
+  }
+
+  /* Code blocks */
+  .markdown pre {
+    @apply my-6 overflow-x-auto rounded-xl border border-border bg-surface-2 p-4;
+  }
+
+  .markdown pre code {
+    @apply bg-transparent p-0 text-sm leading-6 whitespace-pre;
+  }
+
+  /* Tables */
+  .markdown table {
+    @apply w-full border-separate border-spacing-0 text-sm;
+  }
+
+  .markdown thead th {
+    @apply sticky top-0 z-10 border-b border-border bg-surface-2 px-3 py-2 text-left font-semibold;
+  }
+
+  .markdown tbody td {
+    @apply border-b border-border px-3 py-2 align-top;
+  }
+
+  .markdown tbody tr:nth-child(even) td {
+    @apply bg-muted;
+  }
+
+  /* Images */
+  .markdown img {
+    @apply my-6 h-auto max-w-full rounded-xl border border-border;
+  }
+}

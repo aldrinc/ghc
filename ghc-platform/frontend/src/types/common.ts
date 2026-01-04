@@ -56,6 +56,17 @@ export interface ResearchArtifactRef {
   content?: string;
 }
 
+export interface Experiment {
+  id: string;
+  org_id: string;
+  client_id: string;
+  campaign_id: string;
+  name: string;
+  status?: string;
+  experiment_spec_artifact_id?: string;
+  created_at?: string;
+}
+
 export interface WorkflowDetail {
   run: WorkflowRun;
   logs: ActivityLog[];

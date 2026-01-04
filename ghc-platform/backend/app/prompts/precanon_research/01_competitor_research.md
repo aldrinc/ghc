@@ -280,6 +280,8 @@ Use columns such as (expand if helpful):
 
 * **Primary acquisition channels** (inferred: SEO / paid ads / outbound / partnerships / PLG, etc.)
 
+* **Facebook Page URL** (if exists, the comapny's Facebook page URL)
+
 Make sure the table is **machine-usable** (e.g., Markdown table or clearly structured so it can be exported to a spreadsheet).
 
 ---

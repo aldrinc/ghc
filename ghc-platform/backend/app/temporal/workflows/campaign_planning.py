@@ -40,6 +40,7 @@ class CampaignPlanningWorkflow:
 
     @workflow.run
     async def run(self, input: CampaignPlanningInput) -> None:
+        idea_workspace_id = workflow.info().workflow_id
         self.strategy_sheet = await workflow.execute_activity(
             build_strategy_sheet_activity,
             {
@@ -47,6 +48,7 @@ class CampaignPlanningWorkflow:
                 "client_id": input.client_id,
                 "campaign_id": input.campaign_id,
                 "business_goal_id": input.business_goal_id,
+                "idea_workspace_id": idea_workspace_id,
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
@@ -60,6 +62,7 @@ class CampaignPlanningWorkflow:
                 "org_id": input.org_id,
                 "client_id": input.client_id,
                 "campaign_id": input.campaign_id,
+                "idea_workspace_id": idea_workspace_id,
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
@@ -72,6 +75,7 @@ class CampaignPlanningWorkflow:
                 "client_id": input.client_id,
                 "campaign_id": input.campaign_id,
                 "experiment_specs": experiment_specs,
+                "idea_workspace_id": idea_workspace_id,
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )

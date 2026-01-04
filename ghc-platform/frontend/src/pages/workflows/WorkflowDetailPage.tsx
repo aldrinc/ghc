@@ -61,15 +61,15 @@ export function WorkflowDetailPage() {
       />
 
       {isLoading ? (
-        <div className="rounded-lg border border-border bg-surface p-4 text-sm text-content-muted">Loading workflow…</div>
+        <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading workflow…</div>
       ) : isError || !run ? (
-        <div className="rounded-lg border border-border bg-surface p-4 text-sm text-danger">
+        <div className="ds-card ds-card--md text-sm text-danger shadow-none">
           Workflow not found or failed to load.
         </div>
       ) : (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+            <div className="ds-card ds-card--md shadow-none">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-content">Run overview</div>
@@ -83,7 +83,7 @@ export function WorkflowDetailPage() {
                   <div className="font-semibold">{run.kind}</div>
                 </div>
                 <div>
-                  <div className="text-content-muted">Client</div>
+                  <div className="text-content-muted">Workspace</div>
                   <div className="font-mono text-[11px] text-content-muted">{run.client_id || "—"}</div>
                 </div>
                 <div>
@@ -96,14 +96,14 @@ export function WorkflowDetailPage() {
                 </div>
               </div>
               {canonStory ? (
-                <div className="mt-3 rounded border border-border bg-white/50 p-2 text-xs text-content">
+                <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs">
                   <div className="mb-1 font-semibold text-content">Canon story</div>
                   <p className="text-content-muted">{truncate(canonStory, 220)}</p>
                 </div>
               ) : null}
             </div>
 
-            <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+            <div className="ds-card ds-card--md shadow-none">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-semibold text-content">Review & approvals</div>
@@ -153,7 +153,7 @@ export function WorkflowDetailPage() {
                   ) : null}
                 </div>
               ) : (
-                <div className="mt-3 rounded border border-border bg-white/50 p-2 text-xs text-content-muted">
+                <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
                   This workflow type has no manual approvals.
                 </div>
               )}
@@ -161,7 +161,7 @@ export function WorkflowDetailPage() {
           </div>
 
           {researchArtifacts?.length ? (
-            <div className="rounded-lg border border-border bg-surface shadow-sm">
+            <div className="ds-card ds-card--md p-0 shadow-none">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
                   <div className="text-sm font-semibold text-content">Pre-canon research artifacts</div>
@@ -169,7 +169,7 @@ export function WorkflowDetailPage() {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <Table>
+                <Table variant="ghost">
                   <TableHeader>
                     <TableRow>
                       <TableHeadCell>Step</TableHeadCell>
@@ -202,7 +202,7 @@ export function WorkflowDetailPage() {
           ) : null}
 
           {isCampaignPlanning && experimentArtifacts?.length ? (
-            <div className="rounded-lg border border-border bg-surface shadow-sm">
+            <div className="ds-card ds-card--md p-0 shadow-none">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
                   <div className="text-sm font-semibold text-content">Experiment specs</div>
@@ -213,7 +213,7 @@ export function WorkflowDetailPage() {
                 {experimentArtifacts.map((art) => {
                   const specs = (art.data as any)?.experimentSpecs || [];
                   return specs.map((exp: any) => (
-                    <div key={`${art.id}-${exp.id}`} className="rounded border border-border bg-white/60 p-3">
+                    <div key={`${art.id}-${exp.id}`} className="ds-card ds-card--sm bg-surface-2">
                       <div className="flex items-center justify-between">
                         <div className="text-sm font-semibold text-content">{exp.name || exp.id}</div>
                         <span className="text-xs text-content-muted font-mono">{exp.id}</span>
@@ -230,7 +230,7 @@ export function WorkflowDetailPage() {
           ) : null}
 
           {isCampaignPlanning && assetBriefArtifacts?.length ? (
-            <div className="rounded-lg border border-border bg-surface shadow-sm">
+            <div className="ds-card ds-card--md p-0 shadow-none">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
                   <div className="text-sm font-semibold text-content">Asset briefs</div>
@@ -243,7 +243,7 @@ export function WorkflowDetailPage() {
                   return briefs.map((brief: any) => {
                     const requirements = brief.requirements || [];
                     return (
-                      <div key={brief.id} className="rounded border border-border bg-white/60 p-3">
+                      <div key={brief.id} className="ds-card ds-card--sm bg-surface-2">
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-semibold text-content">{brief.creativeConcept || brief.id}</div>
                           <span className="text-xs text-content-muted font-mono">{brief.id}</span>
@@ -269,7 +269,7 @@ export function WorkflowDetailPage() {
           ) : null}
 
           {isCampaignPlanning ? (
-            <div className="rounded-lg border border-border bg-surface shadow-sm">
+            <div className="ds-card ds-card--md p-0 shadow-none">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
                   <div className="text-sm font-semibold text-content">Strategy sheet</div>
@@ -288,7 +288,7 @@ export function WorkflowDetailPage() {
                 <div>
                   <div className="text-xs font-semibold text-content-muted uppercase mb-1">Channel plan</div>
                   {channelPlan.length ? (
-                    <Table>
+                    <Table variant="ghost">
                       <TableHeader>
                         <TableRow>
                           <TableHeadCell>Channel</TableHeadCell>
@@ -319,7 +319,7 @@ export function WorkflowDetailPage() {
                   {messaging.length ? (
                     <div className="grid gap-2 md:grid-cols-2">
                       {messaging.map((m, idx) => (
-                        <div key={idx} className="rounded border border-border bg-white/60 p-3">
+                        <div key={idx} className="ds-card ds-card--sm bg-surface-2">
                           <div className="text-sm font-semibold text-content">{m.title}</div>
                           <div className="mt-1 text-xs text-content-muted">
                             Proof points: {(m.proofPoints || []).join("; ") || "—"}
@@ -353,11 +353,11 @@ export function WorkflowDetailPage() {
           ) : null}
 
           {Object.keys(stepSummaries).length ? (
-            <div className="rounded-lg border border-border bg-surface p-4 shadow-sm">
+            <div className="ds-card ds-card--md shadow-none">
               <div className="text-sm font-semibold text-content">Step summaries</div>
               <div className="mt-2 grid gap-2 md:grid-cols-2">
                 {Object.entries(stepSummaries).map(([step, summary]) => (
-                  <div key={step} className="rounded border border-border bg-white/60 p-3">
+                  <div key={step} className="ds-card ds-card--sm bg-surface-2">
                     <div className="text-xs font-semibold text-content">Step {step}</div>
                     <div className="text-xs text-content-muted mt-1">{truncate(summary as string, 240)}</div>
                   </div>
@@ -366,7 +366,7 @@ export function WorkflowDetailPage() {
             </div>
           ) : null}
 
-          <div className="rounded-lg border border-border bg-surface shadow-sm">
+          <div className="ds-card ds-card--md p-0 shadow-none">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div>
                 <div className="text-sm font-semibold text-content">Activity log</div>
@@ -374,7 +374,7 @@ export function WorkflowDetailPage() {
               </div>
             </div>
             <div className="overflow-x-auto">
-              <Table>
+              <Table variant="ghost">
                 <TableHeader>
                   <TableRow>
                     <TableHeadCell>Step</TableHeadCell>

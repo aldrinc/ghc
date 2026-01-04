@@ -11,8 +11,13 @@ from app.routers import (
     assets,
     campaigns,
     clients,
+    explore,
+    deep_research,
     experiments,
+    openai_webhooks,
     swipes,
+    teardowns,
+    ads,
     workflows,
 )
 
@@ -46,8 +51,13 @@ def create_app() -> FastAPI:
     app.include_router(artifacts.router)
     app.include_router(assets.router)
     app.include_router(experiments.router)
+    app.include_router(explore.router)
     app.include_router(swipes.router)
+    app.include_router(teardowns.router)
+    app.include_router(ads.router)
     app.include_router(workflows.router)
+    app.include_router(deep_research.router)
+    app.include_router(openai_webhooks.router)
 
     return app
 

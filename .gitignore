@@ -37,7 +37,11 @@ build/
 coverage/
 
 # Taskmaster
-.taskmaster/reports/
+.taskmaster/
+
+# Archives and backups
+archive/
+backups/
 
 # Frontend
 ghc-platform/frontend/node_modules/

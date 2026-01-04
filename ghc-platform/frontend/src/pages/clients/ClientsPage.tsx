@@ -18,14 +18,14 @@ export function ClientsPage() {
   return (
     <div className="space-y-4">
       <PageHeader
-        title="Clients"
-        description="Create clients and drill into onboarding/campaigns."
-        actions={<OnboardingWizard triggerLabel="New client" />}
+        title="Workspaces"
+        description="Create workspaces and drill into onboarding/campaigns."
+        actions={<OnboardingWizard triggerLabel="New workspace" />}
       />
 
-      <div className="rounded-lg border border-border bg-white shadow-sm">
+      <div className="ds-card ds-card--md p-0 shadow-none">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div className="text-sm font-semibold text-content">Client list</div>
+          <div className="text-sm font-semibold text-content">Workspace list</div>
           <div className="text-xs text-content-muted">{clients?.length || 0} total</div>
         </div>
         {isLoading ? (

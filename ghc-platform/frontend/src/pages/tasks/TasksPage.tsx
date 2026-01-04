@@ -24,7 +24,7 @@ export function TasksPage() {
         description="Workflows that are running, failed, or awaiting review."
       />
 
-      <div className="rounded-lg border border-border bg-white shadow-sm">
+      <div className="ds-card ds-card--md p-0 shadow-none">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <div className="text-sm font-semibold text-content">Needs attention</div>

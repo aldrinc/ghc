@@ -26,6 +26,7 @@ class TestCampaignInput:
 class TestCampaignWorkflow:
     @workflow.run
     async def run(self, input: TestCampaignInput) -> Dict[str, Any]:
+        idea_workspace_id = workflow.info().workflow_id
         canon = await workflow.execute_activity(
             build_client_canon_activity,
             {
@@ -49,20 +50,31 @@ class TestCampaignWorkflow:
                 "client_id": input.client_id,
                 "campaign_id": None,
                 "business_goal_id": input.business_goal_id,
+                "idea_workspace_id": idea_workspace_id,
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
 
         experiments = await workflow.execute_activity(
             build_experiment_specs_activity,
-            {"org_id": input.org_id, "client_id": input.client_id, "campaign_id": None},
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "idea_workspace_id": idea_workspace_id,
+            },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
-        exp_ids = [spec.get("id", "exp-1") for spec in experiments.get("experiment_specs", [])] or ["exp-1"]
 
         briefs = await workflow.execute_activity(
             create_asset_briefs_for_experiments_activity,
-            {"org_id": input.org_id, "client_id": input.client_id, "campaign_id": None, "experiment_ids": exp_ids},
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "experiment_specs": experiments.get("experiment_specs", []),
+                "idea_workspace_id": idea_workspace_id,
+            },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
         brief_id = briefs.get("asset_brief_ids", [None])[0]

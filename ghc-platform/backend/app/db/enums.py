@@ -26,6 +26,51 @@ class CampaignStatusEnum(str, Enum):
     cancelled = "cancelled"
 
 
+class AdChannelEnum(str, Enum):
+    META_ADS_LIBRARY = "META_ADS_LIBRARY"
+    TIKTOK_CREATIVE_CENTER = "TIKTOK_CREATIVE_CENTER"
+    GOOGLE_ADS_TRANSPARENCY = "GOOGLE_ADS_TRANSPARENCY"
+
+
+class BrandRoleEnum(str, Enum):
+    client = "client"
+    peer = "peer"
+
+
+class BrandChannelVerificationStatusEnum(str, Enum):
+    unverified = "unverified"
+    verified = "verified"
+    mismatch = "mismatch"
+
+
+class AdIngestStatusEnum(str, Enum):
+    RUNNING = "RUNNING"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+
+
+class AdStatusEnum(str, Enum):
+    active = "active"
+    inactive = "inactive"
+    unknown = "unknown"
+
+
+class MediaAssetTypeEnum(str, Enum):
+    IMAGE = "IMAGE"
+    VIDEO = "VIDEO"
+    TEXT = "TEXT"
+    HTML = "HTML"
+    SCREENSHOT = "SCREENSHOT"
+    OTHER = "OTHER"
+
+
+class MediaMirrorStatusEnum(str, Enum):
+    pending = "pending"
+    succeeded = "succeeded"
+    failed = "failed"
+    partial = "partial"
+
+
 class ArtifactTypeEnum(str, Enum):
     client_canon = "client_canon"
     metric_schema = "metric_schema"
@@ -53,6 +98,17 @@ class WorkflowStatusEnum(str, Enum):
     cancelled = "cancelled"
 
 
+class ResearchJobStatusEnum(str, Enum):
+    created = "created"
+    queued = "queued"
+    in_progress = "in_progress"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+    incomplete = "incomplete"
+    errored = "errored"
+
+
 class AssetStatusEnum(str, Enum):
     draft = "draft"
     qa_passed = "qa_passed"
@@ -64,3 +120,9 @@ class AssetSourceEnum(str, Enum):
     generated = "generated"
     historical = "historical"
     competitor_example = "competitor_example"
+
+
+class ClaudeContextFileStatusEnum(str, Enum):
+    ready = "ready"
+    failed = "failed"
+    deleted = "deleted"

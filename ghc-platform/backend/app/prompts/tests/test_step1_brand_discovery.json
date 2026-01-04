@@ -1,0 +1,85 @@
+{
+  "brands": [
+    {
+      "name": "Ancient Remedies",
+      "website": "https://ancientremedies.com",
+      "role": "client",
+      "channels": {
+        "META_ADS_LIBRARY": {
+          "facebook_page_urls": [
+            "https://www.facebook.com/ancientremediesbooks"
+          ],
+          "facebook_page_ids": ["100093289608624"]
+        }
+      }
+    },
+    {
+      "name": "The Lost Remedies",
+      "website": "https://www.thelostremedies.com",
+      "role": "peer",
+      "channels": {
+        "META_ADS_LIBRARY": {
+          "facebook_page_urls": [
+            "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&media_type=all&q=lost%20book%20of%20herbal%20remedies&search_type=keyword_unordered"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Home Doctor Book",
+      "website": "https://www.homedoctorthebook.com",
+      "role": "peer",
+      "channels": {
+        "META_ADS_LIBRARY": {
+          "facebook_page_urls": [
+            "https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&media_type=all&q=home%20doctor%20book&search_type=keyword_unordered"
+          ]
+        }
+      }
+    },
+    {
+      "name": "The Herbal Academy",
+      "website": "https://theherbalacademy.com",
+      "role": "peer",
+      "channels": {
+        "META_ADS_LIBRARY": {
+          "facebook_page_urls": ["https://www.facebook.com/theherbalacademy"],
+          "facebook_page_ids": ["274302752658165"]
+        }
+      }
+    },
+    {
+      "name": "Rosemary Gladstar's Medicinal Herbs",
+      "website": "https://rosemarygladstar.com",
+      "role": "peer",
+      "channels": {
+        "META_ADS_LIBRARY": {
+          "facebook_page_urls": ["https://www.facebook.com/RosemaryGladstar"],
+          "facebook_page_ids": ["132814756766952"]
+        }
+      }
+    },
+    {
+      "name": "Mountain Rose Herbs",
+      "website": "https://mountainroseherbs.com",
+      "role": "peer",
+      "channels": {
+        "META_ADS_LIBRARY": {
+          "facebook_page_urls": ["https://www.facebook.com/MountainRoseHerbs"],
+          "facebook_page_ids": ["16352069036"]
+        }
+      }
+    },
+    {
+      "name": "Gaia Herbs",
+      "website": "https://gaiaherbs.com",
+      "role": "peer",
+      "channels": {
+        "META_ADS_LIBRARY": {
+          "facebook_page_urls": ["https://www.facebook.com/GaiaHerbs"],
+          "facebook_page_ids": ["10150138648355273"]
+        }
+      }
+    }
+  ]
+}

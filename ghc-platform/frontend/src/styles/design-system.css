@@ -1,0 +1,74 @@
+@layer components {
+  .ds-card {
+    --ds-card-padding: var(--space-5, 1.25rem);
+    border-radius: var(--radius-card, var(--radius-panel, var(--radius-lg)));
+    background-color: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-1);
+    padding: var(--ds-card-padding);
+  }
+
+  .ds-card--ghost {
+    background-color: transparent;
+    border-color: transparent;
+    box-shadow: none;
+  }
+
+  .ds-card--classic {
+    background-color: var(--panel-elevated);
+    box-shadow: var(--shadow-2);
+  }
+
+  .ds-card--empty {
+    background-color: var(--surface-2);
+    border-style: dashed;
+    color: var(--text-muted);
+    box-shadow: none;
+  }
+
+  .ds-card--sm {
+    --ds-card-padding: var(--space-4, 1rem);
+  }
+
+  .ds-card--md {
+    --ds-card-padding: var(--space-5, 1.25rem);
+  }
+
+  .ds-card--lg {
+    --ds-card-padding: var(--space-6, 1.5rem);
+  }
+
+  .ds-card--interactive {
+    transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
+
+  .ds-card--interactive:hover {
+    background-color: var(--surface-hover, var(--surface-2));
+    box-shadow: var(--shadow-2);
+    transform: translateY(-1px);
+  }
+
+  .ds-card--interactive:focus-within {
+    outline: 2px solid var(--focus-outline);
+    outline-offset: var(--focus-outline-offset, 2px);
+  }
+
+  .ds-card__header {
+    margin-left: calc(-1 * var(--ds-card-padding));
+    margin-right: calc(-1 * var(--ds-card-padding));
+    margin-top: calc(-1 * var(--ds-card-padding));
+    margin-bottom: calc(var(--ds-card-padding) * 0.5);
+    padding: calc(var(--ds-card-padding) * 0.75) var(--ds-card-padding);
+    border-bottom: 1px solid var(--divider);
+  }
+
+  .ds-card__footer {
+    margin-left: calc(-1 * var(--ds-card-padding));
+    margin-right: calc(-1 * var(--ds-card-padding));
+    margin-top: calc(var(--ds-card-padding) * 0.75);
+    margin-bottom: calc(-1 * var(--ds-card-padding));
+    padding: calc(var(--ds-card-padding) * 0.75) var(--ds-card-padding);
+    border-top: 1px solid var(--divider);
+  }
+}

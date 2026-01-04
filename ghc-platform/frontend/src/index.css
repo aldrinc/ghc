@@ -1,6 +1,8 @@
 @import "./styles/fonts.css";
 @import "./styles/theme.css";
 @import "./styles/globals.css";
+@import "./styles/markdown.css";
+@import "./styles/design-system.css";
 
 @tailwind base;
 @tailwind components;

@@ -52,7 +52,7 @@ export function CampaignsPage() {
   return (
     <div className="space-y-3">
       <h2 className="text-xl font-semibold text-content">Campaigns</h2>
-      <form onSubmit={handleCreate} className="flex flex-col gap-3 rounded-lg border border-border bg-white p-4 shadow-sm">
+      <form onSubmit={handleCreate} className="ds-card ds-card--md flex flex-col gap-3">
         <div className="text-sm font-semibold text-content">Create campaign</div>
         <div className="flex flex-col gap-3 sm:flex-row">
           <Select
@@ -75,7 +75,7 @@ export function CampaignsPage() {
       {message && <div className="text-sm text-success">{message}</div>}
       <ul className="space-y-2">
         {campaigns.map((c) => (
-          <li key={c.id} className="rounded-lg border border-border bg-white px-3 py-2 shadow-sm">
+          <li key={c.id} className="ds-card ds-card--sm">
             <div className="flex items-center justify-between gap-2">
               <div className="space-y-1">
                 <div className="font-semibold text-content">{c.name}</div>

@@ -25,11 +25,37 @@ From this context, you must:
 
 1. Infer the niche, product type, core promise, and likely target customer (avatar).
 
-2. Use that understanding to generate a tailored Deep Research prompt that:
+2. If ADS_CONTEXT is present, condense it into a compact, non-JSON ads intelligence block:
+
+   * Quick cross-brand snapshot (CTA distribution, top destination domains).
+
+   * For each major brand (prioritize the highest ad_count/active_share; cap brands so the section stays lean), include the brand name, ad volume/share, dominant CTA types, top destinations, and the **top 3 ads** with CTA, destination, headline, and a short primary text snippet. Ignore broken/missing creatives and strip IDs or noisy metadata.
+
+   * Keep tokens tight: bullets/indented lines instead of raw JSON.
+
+3. Use that understanding to generate a tailored Deep Research prompt that:
 
    * Encodes a sophisticated research plan.
 
-   * Uses the customer‑research structure described below.
+   * Uses the customer-research structure described below.
+
+---
+
+### **Step 0 – Normalize Ads Context (if provided)**
+
+If `{{ADS_CONTEXT}}` is present:
+
+* Parse the ads data and produce a **human-readable, non-JSON** block.
+
+* Include:
+
+  * A short cross-brand view (CTA mix, top destinations).
+
+  * Per-brand mini-summaries (for the largest brands only): brand name, ad_count/active_share, dominant CTA types, top destination domains.
+
+  * Top 3 ads per brand (or fewer if unavailable) with: CTA type, destination domain, headline, and a succinct primary text snippet. Drop IDs, timestamps, and any failed/error entries.
+
+* This block will be embedded in the Deep Research prompt so the Research Agent can see current ad angles without excess tokens.
 
 ---
 
@@ -66,6 +92,8 @@ That Deep Research prompt must:
    * Who we *suspect* the avatar is.
 
    * What big promise and mechanism they lean on.
+
+   * A compact **Ads Context** section from Step 0 (cross-brand snapshot + top 3 creatives per major brand). Keep it lean—no JSON, just concise bullets.
 
 2. **State the research goals**, for example:
 
@@ -203,12 +231,14 @@ That Deep Research prompt must:
 
     * For each section:
 
-      * A short synthesized summary (3–8 bullets).
+      * A synthesized highly descriptive summary
 
-      * A **“Quote Bank”** with at least 5–15 representative verbatim quotes, each tagged with the source (forum/Amazon/Reddit/etc.).
+      * A **“Quote Bank”** with at least 5–15 verbatim quotes, each tagged with the source (forum/Amazon/Reddit/etc.). I do not want any quotes from competitors. All quotes should be from real forums/communities. Quotes should match the voice of the customer.
 
     * At the end, a **1–3 sentence “Core Avatar Belief Summary”** that captures who this person is, what they believe about life/love/money/health in this niche, and how they see the problem.
 
+   * Emphasize emotional realism (examples include fear, sadness, frustration, and identity). Maintain authenticity in language including but not limited to grammary/slang.
+   
 12. **Tone & constraints for the Research Agent**:
 
     * Be explicit: the Research Agent should avoid guessing and rely on actual discovered language.

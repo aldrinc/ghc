@@ -5,12 +5,12 @@ from typing import Any, Dict, List
 from temporalio import activity
 
 from app.db.repositories.assets import AssetsRepository
-from app.db.base import SessionLocal
+from app.db.base import session_scope
 from app.db.enums import AssetStatusEnum, AssetSourceEnum
 
 
-def _repo() -> AssetsRepository:
-    return AssetsRepository(SessionLocal())
+def _repo(session) -> AssetsRepository:
+    return AssetsRepository(session)
 
 
 @activity.defn
@@ -33,17 +33,18 @@ def persist_assets_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     client_id = params["client_id"]
     campaign_id = params.get("campaign_id")
     assets = params.get("assets", [])
-    repo = _repo()
     created = []
-    for asset in assets:
-        created_asset = repo.create(
-            org_id=org_id,
-            client_id=client_id,
-            campaign_id=campaign_id,
-            channel_id=asset["channel_id"],
-            format=asset["format"],
-            content=asset["content"],
-            source_type=asset.get("source_type", AssetSourceEnum.generated),
-        )
-        created.append(str(created_asset.id))
+    with session_scope() as session:
+        repo = _repo(session)
+        for asset in assets:
+            created_asset = repo.create(
+                org_id=org_id,
+                client_id=client_id,
+                campaign_id=campaign_id,
+                channel_id=asset["channel_id"],
+                format=asset["format"],
+                content=asset["content"],
+                source_type=asset.get("source_type", AssetSourceEnum.generated),
+            )
+            created.append(str(created_asset.id))
     return {"assets": created}

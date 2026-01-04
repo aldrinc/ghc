@@ -14,7 +14,7 @@ SUMMARY_BLOCK_TAG = "SUMMARY"
 CONTENT_BLOCK_TAG = "CONTENT"
 STEP4_PROMPT_BLOCK_TAG = "STEP4_PROMPT"
 
-# Stub ads context step key (not a document-producing step)
+# Ads context step key (not a document-producing step)
 ADS_CONTEXT_STEP_KEY = "02"
 
 # Ordered list of research steps that produce artifacts
@@ -34,7 +34,7 @@ STEP_DEFINITIONS: Dict[str, StepDefinition] = {
         title="Deep research prompt",
         summary_max_chars=1200,
         handoff_field="step4_prompt",
-        handoff_max_chars=1800,
+        handoff_max_chars=20000,
     ),
     "04": StepDefinition(
         key="04",

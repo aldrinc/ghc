@@ -20,7 +20,7 @@ Primary goal: understand the UI surface area for refactor. Each UI block lists i
   - Onboarding Wizard submit: (a) if no existing client id, POST `/clients` `{ name, industry? }`; (b) POST `/clients/{clientId}/onboarding` with wizard payload; invalidates `workflows`.
 
 ### Onboarding Wizard modal (launched from Clients page or Client detail)
-- **UI**: 6-step dialog: Basics, Markets, Offers, Constraints, Funnel, Review. Required fields: client name (if creating), brand story, markets, languages, offers. Back/Next navigation, Cancel closes and resets, Review is read-only summary. “Start onboarding” submits.
+- **UI**: 5-step dialog: Basics, Markets, Offers, Funnel, Review. Required fields: client name (if creating), brand story, markets, languages, offers. Back/Next navigation, Cancel closes and resets, Review is read-only summary. “Start onboarding” submits.
 - **API**:
   - POST `/clients` when creating a new client inline.
   - POST `/clients/{clientId}/onboarding` with arrays parsed from comma-separated inputs.

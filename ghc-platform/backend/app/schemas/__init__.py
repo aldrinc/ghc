@@ -1,3 +1,11 @@
+from app.schemas.ads_ingestion import BrandDiscovery, DiscoveredBrand
+from app.schemas.competitors import (
+    CompetitorRow,
+    ExtractCompetitorsRequest,
+    ExtractCompetitorsResult,
+    ResolveFacebookRequest,
+    ResolveFacebookResult,
+)
 from app.schemas.client_canon import ClientCanon
 from app.schemas.metric_schema import MetricSchema
 from app.schemas.strategy_sheet import StrategySheet
@@ -17,4 +25,11 @@ __all__ = [
     "QAReport",
     "ExperimentReport",
     "Playbook",
+    "BrandDiscovery",
+    "DiscoveredBrand",
+    "CompetitorRow",
+    "ExtractCompetitorsRequest",
+    "ExtractCompetitorsResult",
+    "ResolveFacebookRequest",
+    "ResolveFacebookResult",
 ]

@@ -1,4 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
+import { useCallback, useMemo } from "react";
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
@@ -27,31 +28,34 @@ async function parseError(resp: Response): Promise<ApiError> {
 export function useApiClient(baseUrl: string = defaultBaseUrl) {
   const { getToken } = useAuth();
 
-  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-    const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
-    const headers = new Headers(init.headers || {});
-    if (token) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
-    headers.set("Content-Type", "application/json");
+  const request = useCallback(
+    async <T>(path: string, init: RequestInit = {}): Promise<T> => {
+      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const headers = new Headers(init.headers || {});
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+      headers.set("Content-Type", "application/json");
 
-    const resp = await fetch(`${baseUrl}${path}`, { ...init, headers });
-    if (!resp.ok) {
-      throw await parseError(resp);
-    }
-    if (resp.status === 204) {
-      return undefined as T;
-    }
-    return resp.json() as Promise<T>;
-  }
+      const resp = await fetch(`${baseUrl}${path}`, { ...init, headers });
+      if (!resp.ok) {
+        throw await parseError(resp);
+      }
+      if (resp.status === 204) {
+        return undefined as T;
+      }
+      return resp.json() as Promise<T>;
+    },
+    [baseUrl, getToken],
+  );
 
-  function get<T>(path: string): Promise<T> {
-    return request<T>(path, { method: "GET" });
-  }
+  const get = useCallback(<T,>(path: string): Promise<T> => request<T>(path, { method: "GET" }), [request]);
 
-  function post<T>(path: string, body?: unknown): Promise<T> {
-    return request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined });
-  }
+  const post = useCallback(
+    <T,>(path: string, body?: unknown): Promise<T> =>
+      request<T>(path, { method: "POST", body: body ? JSON.stringify(body) : undefined }),
+    [request],
+  );
 
-  return { request, get, post };
+  return useMemo(() => ({ request, get, post }), [get, post, request]);
 }

@@ -8,16 +8,13 @@ from temporalio import activity
 
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.artifacts import ArtifactsRepository
-from app.db.base import SessionLocal
+from app.db.base import session_scope
 from app.schemas.strategy_sheet import StrategySheet
 from app.llm import LLMClient, LLMGenerationParams
+from app.services.claude_files import ensure_uploaded_to_claude
 
 
 DEFAULT_LLM_MODEL = os.getenv("LLM_DEFAULT_MODEL", "gpt-5.2-2025-12-11")
-
-
-def _repo() -> ArtifactsRepository:
-    return ArtifactsRepository(SessionLocal())
 
 
 def _load_artifact(repo: ArtifactsRepository, org_id: str, client_id: str, kind: ArtifactTypeEnum) -> Optional[Dict]:
@@ -31,14 +28,12 @@ def _build_prompt(canon: Dict[str, Any], metric: Dict[str, Any], campaign_id: Op
     step_summaries = research.get("step_summaries") if isinstance(research, dict) else {}
     icps = (canon.get("icps") or []) if isinstance(canon, dict) else []
     markets = metric.get("primaryMarkets") or metric.get("primary_markets") or []
-    languages = metric.get("primaryLanguages") or metric.get("primary_languages") or []
 
     return f"""
 You are a performance marketing strategist. Create a concise campaign strategy JSON for this client.
 
 Brand story: {story}
 Primary markets: {markets}
-Languages: {languages}
 ICP (if any): {icps}
 Research summaries: {step_summaries}
 Campaign ID: {campaign_id}
@@ -66,10 +61,44 @@ def build_strategy_sheet_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     org_id = params["org_id"]
     client_id = params["client_id"]
     campaign_id = params.get("campaign_id")
+    idea_workspace_id = (
+        params.get("idea_workspace_id")
+        or params.get("workflow_id")
+        or params.get("campaign_id")
+        or params.get("client_id")
+    )
+    if not idea_workspace_id:
+        idea_workspace_id = f"client-{client_id}"
+    allow_claude_stub = bool(params.get("allow_claude_stub", False))
 
-    repo = _repo()
-    canon = _load_artifact(repo, org_id, client_id, ArtifactTypeEnum.client_canon) or {}
-    metric = _load_artifact(repo, org_id, client_id, ArtifactTypeEnum.metric_schema) or {}
+    with session_scope() as session:
+        repo = ArtifactsRepository(session)
+        canon = _load_artifact(repo, org_id, client_id, ArtifactTypeEnum.client_canon) or {}
+        metric = _load_artifact(repo, org_id, client_id, ArtifactTypeEnum.metric_schema) or {}
+
+    def _upload_context(doc: Dict[str, Any], *, doc_key: str, title: str, source_kind: str) -> Optional[str]:
+        if not doc:
+            return None
+        content_bytes = json.dumps(doc, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        return ensure_uploaded_to_claude(
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id or "",
+            client_id=client_id,
+            campaign_id=campaign_id,
+            doc_key=doc_key,
+            doc_title=title,
+            source_kind=source_kind,
+            step_key=None,
+            filename=f"{doc_key}.json",
+            mime_type="text/plain",
+            content_bytes=content_bytes,
+            drive_doc_id=None,
+            drive_url=None,
+            allow_stub=allow_claude_stub,
+        )
+
+    canon_file_id = _upload_context(canon, doc_key="client_canon", title="Client Canon", source_kind="client_canon")
+    metric_file_id = _upload_context(metric, doc_key="metric_schema", title="Metric Schema", source_kind="metric_schema")
 
     llm = LLMClient()
     prompt = _build_prompt(canon, metric, campaign_id)
@@ -132,11 +161,40 @@ def build_strategy_sheet_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     }
     data_out["rawPrompt"] = prompt
 
-    repo.insert(
+    with session_scope() as session:
+        repo = ArtifactsRepository(session)
+        repo.insert(
+            org_id=org_id,
+            client_id=client_id,
+            campaign_id=campaign_id,
+            artifact_type=ArtifactTypeEnum.strategy_sheet,
+            data=data_out,
+        )
+
+    strategy_bytes = json.dumps(data_out, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    strategy_doc_key = f"strategy_sheet:{campaign_id or 'none'}"
+    strategy_file_id = ensure_uploaded_to_claude(
         org_id=org_id,
+        idea_workspace_id=idea_workspace_id or "",
         client_id=client_id,
         campaign_id=campaign_id,
-        artifact_type=ArtifactTypeEnum.strategy_sheet,
-        data=data_out,
+        doc_key=strategy_doc_key,
+        doc_title="Campaign Strategy Sheet",
+        source_kind="strategy_sheet",
+        step_key=None,
+        filename=f"{strategy_doc_key}.json",
+        mime_type="text/plain",
+        content_bytes=strategy_bytes,
+        drive_doc_id=None,
+        drive_url=None,
+        allow_stub=allow_claude_stub,
     )
+
+    data_out["claudeFileId"] = strategy_file_id
+    data_out["claudeContext"] = {
+        "idea_workspace_id": idea_workspace_id,
+        "canon_file_id": canon_file_id,
+        "metric_file_id": metric_file_id,
+        "strategy_file_id": strategy_file_id,
+    }
     return data_out

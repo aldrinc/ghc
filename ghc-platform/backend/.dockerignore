@@ -1,0 +1,15 @@
+.venv
+.env
+.env.*
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.coverage
+backups
+docs
+tests
+.taskmaster
+*.sql
+*.log
+*.tmp

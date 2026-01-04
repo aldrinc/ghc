@@ -128,13 +128,13 @@ export function WorkflowsPage() {
         }
       />
 
-      <div className="rounded-lg border border-border bg-surface shadow-sm">
+      <div className="ds-card ds-card--md p-0 shadow-none">
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
-            <div className="text-sm font-semibold text-content">Workflow runs</div>
-            <div className="text-xs text-content-muted">
-              {filteredWorkflows.length} shown · {workflows?.length || 0} total
-            </div>
+          <div className="text-sm font-semibold text-content">Workflow runs</div>
+          <div className="text-xs text-content-muted">
+            {filteredWorkflows.length} shown · {workflows?.length || 0} total
+          </div>
           </div>
         </div>
 
@@ -152,7 +152,7 @@ export function WorkflowsPage() {
             )}
             {renderFilter(
               "client",
-              "Client",
+              "Workspace",
               clientOptions.map((value) => ({ value: value as string, label: clientLookup[value as string] || (value as string) }))
             )}
             {renderFilter(
@@ -167,12 +167,12 @@ export function WorkflowsPage() {
           <div className="p-4 text-sm text-content-muted">Loading workflows…</div>
         ) : (
           <div className="overflow-x-auto">
-            <Table>
+            <Table variant="ghost">
               <TableHeader>
                 <TableRow>
                   <TableHeadCell>Kind</TableHeadCell>
                   <TableHeadCell>Status</TableHeadCell>
-                  <TableHeadCell>Client</TableHeadCell>
+                  <TableHeadCell>Workspace</TableHeadCell>
                   <TableHeadCell>Campaign</TableHeadCell>
                   <TableHeadCell>Started</TableHeadCell>
                   <TableHeadCell>Current step</TableHeadCell>

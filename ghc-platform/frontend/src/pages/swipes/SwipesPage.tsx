@@ -1,27 +1,91 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useApiClient } from "@/api/client";
+import { LibraryCard } from "@/components/library/LibraryCard";
+import { normalizeSwipeToLibraryItem } from "@/lib/library";
 import type { CompanySwipeAsset } from "@/types/swipes";
+
+function LoadingGrid() {
+  return (
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-3 sm:gap-4">
+      {Array.from({ length: 6 }).map((_, idx) => (
+        <div
+          key={idx}
+          className="ds-card ds-card--md flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none animate-pulse"
+        >
+          <div className="relative">
+            <div className="aspect-[4/5] w-full bg-muted" />
+            <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="h-5 w-24 rounded-full bg-black/20" />
+                <div className="h-5 w-16 rounded-full bg-black/20" />
+              </div>
+              <div className="h-4 w-20 rounded-full bg-black/20" />
+            </div>
+          </div>
+          <div className="space-y-2 px-3 pb-3 pt-3">
+            <div className="h-3 w-3/4 rounded bg-muted" />
+            <div className="h-3 w-5/6 rounded bg-muted" />
+            <div className="h-3 w-1/2 rounded bg-muted" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function SwipesPage() {
   const { request } = useApiClient();
   const [swipes, setSwipes] = useState<CompanySwipeAsset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    request<CompanySwipeAsset[]>("/swipes/company").then(setSwipes).catch(() => setSwipes([]));
+    let cancelled = false;
+    setLoading(true);
+    request<CompanySwipeAsset[]>("/swipes/company")
+      .then((data) => {
+        if (cancelled) return;
+        setSwipes(data);
+        setError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setSwipes([]);
+        setError(err?.message || "Failed to load swipes");
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [request]);
+
+  const items = useMemo(() => swipes.map(normalizeSwipeToLibraryItem), [swipes]);
 
   return (
     <div className="space-y-3">
-      <h2 className="text-xl font-semibold text-content">Company Swipes</h2>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {swipes.map((s) => (
-          <div key={s.id} className="rounded-lg border border-border bg-white p-3 shadow-sm">
-            <div className="font-medium text-content">{s.title || "Untitled"}</div>
-            <div className="text-sm text-content-muted">{s.platforms}</div>
-          </div>
-        ))}
-        {swipes.length === 0 && <p className="text-sm text-content-muted">No swipes loaded.</p>}
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-content">Saved swipes</h2>
+          <p className="text-sm text-content-muted">Manually curated references saved by your team.</p>
+        </div>
       </div>
+      {error && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</div>}
+      {loading && <LoadingGrid />}
+      {!loading && items.length > 0 && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-3 sm:gap-4">
+          {items.map((item) => (
+            <LibraryCard key={item.id} item={item} />
+          ))}
+        </div>
+      )}
+      {!loading && items.length === 0 && !error && (
+        <div className="ds-card ds-card--md ds-card--empty text-sm">
+          No swipes loaded. Save swipes from ad cards to see them here.
+        </div>
+      )}
     </div>
   );
 }

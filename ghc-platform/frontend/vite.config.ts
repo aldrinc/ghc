@@ -6,5 +6,6 @@ export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   server: {
     port: 5173,
+    allowedHosts: ["alba-unintermittent-overnormally.ngrok-free.dev"],
   },
 });
