@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.db.enums import ClaudeContextFileStatusEnum
@@ -184,4 +184,37 @@ class ClaudeContextFilesRepository(Repository):
             stmt = stmt.where(
                 (ClaudeContextFile.campaign_id == campaign_id) | (ClaudeContextFile.campaign_id.is_(None))
             )
+        return list(self.session.scalars(stmt).all())
+
+    def list_for_workspace_or_client(
+        self,
+        *,
+        org_id: str,
+        idea_workspace_id: Optional[str],
+        client_id: Optional[str],
+        campaign_id: Optional[str],
+    ) -> List[ClaudeContextFile]:
+        """
+        Broader fetch used for UI: return ready Claude files that match the workspace id
+        OR the client/campaign when legacy records used workflow ids as idea_workspace_id.
+        """
+        clauses = []
+        if idea_workspace_id:
+            clauses.append(ClaudeContextFile.idea_workspace_id == idea_workspace_id)
+        if client_id:
+            clauses.append(ClaudeContextFile.client_id == client_id)
+        if campaign_id:
+            clauses.append(ClaudeContextFile.campaign_id == campaign_id)
+        if not clauses:
+            return []
+
+        stmt = (
+            select(ClaudeContextFile)
+            .where(
+                ClaudeContextFile.org_id == org_id,
+                ClaudeContextFile.status == ClaudeContextFileStatusEnum.ready,
+                or_(*clauses),
+            )
+            .order_by(ClaudeContextFile.created_at)
+        )
         return list(self.session.scalars(stmt).all())

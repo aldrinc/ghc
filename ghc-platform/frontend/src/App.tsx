@@ -4,7 +4,6 @@ import { Navigate, Route, Routes, BrowserRouter } from "react-router-dom";
 import { AppShell } from "@/app/AppShell";
 import { DocumentsPage } from "@/pages/research/DocumentsPage";
 import { CompetitorsPage } from "@/pages/research/CompetitorsPage";
-import { AdLibraryPage } from "@/pages/research/AdLibraryPage";
 import { FunnelsPage } from "@/pages/research/FunnelsPage";
 import { FunnelDetailPage } from "@/pages/research/funnels/FunnelDetailPage";
 import { FunnelPageEditorPage } from "@/pages/research/funnels/FunnelPageEditorPage";
@@ -22,6 +21,7 @@ import { ResearchDetailPage } from "@/pages/workflows/ResearchDetailPage";
 import { CampaignsPage } from "@/pages/campaigns/CampaignsPage";
 import { CampaignDetailPage } from "@/pages/campaigns/CampaignDetailPage";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
+import { ClaudeChatPage } from "@/pages/claude/ClaudeChatPage";
 import { PublicFunnelEntryRedirectPage } from "@/pages/public/PublicFunnelEntryRedirectPage";
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 
@@ -73,7 +73,7 @@ function App() {
           <Route path="workspaces/overview" element={<WorkspaceOverviewPage />} />
           <Route path="research/documents" element={<DocumentsPage />} />
           <Route path="research/competitors" element={<CompetitorsPage />} />
-          <Route path="research/ad-library" element={<AdLibraryPage />} />
+          <Route path="research/ad-library" element={<Navigate to="/explore/ads" replace />} />
           <Route path="research/funnels" element={<FunnelsPage />} />
           <Route path="research/funnels/:funnelId" element={<FunnelDetailPage />} />
           <Route path="research/funnels/:funnelId/pages/:pageId" element={<FunnelPageEditorPage />} />
@@ -82,6 +82,7 @@ function App() {
           <Route path="strategy-sheet" element={<StrategySheetPage />} />
           <Route path="experiments" element={<ExperimentsPage />} />
           <Route path="creative-library" element={<CreativeLibraryPage />} />
+          <Route path="claude-chat" element={<ClaudeChatPage />} />
           <Route path="workflows" element={<WorkflowsPage />} />
           <Route path="workflows/:workflowId" element={<WorkflowDetailPage />} />
           <Route path="workflows/:workflowId/research/:stepKey" element={<ResearchDetailPage />} />

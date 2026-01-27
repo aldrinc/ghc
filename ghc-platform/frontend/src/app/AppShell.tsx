@@ -41,7 +41,6 @@ import {
 import {
   FileText,
   Globe2,
-  GalleryVerticalEnd,
   Funnel,
   NotepadText,
   FlaskConical,
@@ -58,6 +57,7 @@ import {
   LayoutDashboard,
   ListChecks,
   Target,
+  MessageSquare,
 } from "lucide-react";
 import { appRoutes } from "./routes";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -94,14 +94,7 @@ const RESEARCH_NAV: NavSection = {
   items: [
     { title: "Documents", path: "/research/documents", icon: FileText },
     { title: "Competitors", path: "/research/competitors", icon: Globe2 },
-    { title: "Ad Library", path: "/research/ad-library", icon: GalleryVerticalEnd },
     { title: "Funnels", path: "/research/funnels", icon: Funnel },
-  ],
-};
-
-const EXPLORE_NAV: NavSection = {
-  label: "Explore",
-  items: [
     { title: "Explore Ads", path: "/explore/ads", icon: Sparkles },
     { title: "Explore Brands", path: "/explore/brands", icon: Folder },
   ],
@@ -119,6 +112,11 @@ const EXECUTION_NAV: NavSection = {
 const ASSETS_NAV: NavSection = {
   label: "Assets",
   items: [{ title: "Creative Library", path: "/creative-library", icon: Palette }],
+};
+
+const AI_NAV: NavSection = {
+  label: "AI",
+  items: [{ title: "Claude Chat", path: "/claude-chat", icon: MessageSquare }],
 };
 
 function NavigationMenu({ label, items }: NavSection) {
@@ -290,8 +288,8 @@ export function AppShell() {
         <SidebarContent>
           <NavigationMenu {...WORKSPACE_NAV} />
           <NavigationMenu {...RESEARCH_NAV} />
-          <NavigationMenu {...EXPLORE_NAV} />
           <NavigationMenu {...EXECUTION_NAV} />
+          <NavigationMenu {...AI_NAV} />
 
           <SidebarSeparator className="mx-2" />
           <NavigationMenu {...ASSETS_NAV} />
@@ -378,7 +376,7 @@ export function AppShell() {
       </Sidebar>
 
       <SidebarInset className="bg-white dark:bg-slate-950">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-white px-4 pr-4 text-sm md:px-6 dark:bg-slate-950">
+        <header className="flex h-16 shrink-0 items-center border-b border-border bg-white px-4 pr-4 text-sm md:px-6 dark:bg-slate-950">
           <div className="flex items-center gap-3">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="h-5" />
@@ -395,12 +393,6 @@ export function AppShell() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="hidden md:inline-flex items-center gap-2">
-              <Sparkles className="size-4 text-accent" />
-              <span>{workspace?.name || "No workspace selected"}</span>
-            </span>
           </div>
         </header>
         <div className="flex flex-1 flex-col overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-6 dark:bg-slate-950">

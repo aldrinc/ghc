@@ -9,6 +9,7 @@ from app.db.base import engine
 from app.routers import (
     artifacts,
     assets,
+    claude,
     campaigns,
     clients,
     funnels,
@@ -62,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(workflows.router)
     app.include_router(deep_research.router)
     app.include_router(openai_webhooks.router)
+    app.include_router(claude.router)
 
     return app
 
