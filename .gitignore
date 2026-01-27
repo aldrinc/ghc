@@ -50,3 +50,8 @@ ghc-platform/frontend/node_modules/
 *.pyc
 *.pyo
 *.egg-info/
+
+# Local data artifacts
+ghc-platform/backend/*.csv
+ghc-platform/backend/app/*.zip
+ghc-platform/backend/app/**/Archive.zip
