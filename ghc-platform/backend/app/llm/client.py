@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 import logging
 import os
 import time
@@ -39,6 +40,7 @@ class LLMGenerationParams:
     temperature: float = 0.2
     use_reasoning: bool = False
     use_web_search: bool = False
+    response_format: Optional[dict[str, Any]] = None
 
 
 class LLMClient:
@@ -61,6 +63,19 @@ class LLMClient:
         if model.startswith("claude"):
             return self._generate_with_anthropic(prompt, model, params)
         return self._generate_with_gemini(prompt, model, params)
+
+    def stream_text(self, prompt: str, params: Optional[LLMGenerationParams] = None) -> Iterator[str]:
+        model = params.model if params and params.model else self.default_model
+        model = model or _DEFAULT_MODEL
+        if self._is_openai_model(model):
+            yield from self._stream_with_openai(prompt, model, params)
+            return
+        if model.startswith("claude"):
+            yield from self._stream_with_anthropic(prompt, model, params)
+            return
+
+        # Other providers: fallback to a single non-streamed chunk for now.
+        yield self.generate_text(prompt, params)
 
     def _is_openai_model(self, model: str) -> bool:
         lower = model.lower()
@@ -112,6 +127,7 @@ class LLMClient:
         temperature = params.temperature if params else 0.2
         use_reasoning = bool(params.use_reasoning) if params else False
         use_web_search = bool(params.use_web_search) if params else False
+        response_format = params.response_format if params else None
         model_lower = model.lower()
         if use_web_search and "o3-mini" in model_lower:
             raise RuntimeError(f"Model {model} does not support web_search tools; choose a tool-capable model.")
@@ -141,6 +157,8 @@ class LLMClient:
                 request_kwargs["include"] = include  # include sources per docs
             if use_reasoning:
                 request_kwargs["reasoning"] = {"effort": "medium"}
+            if response_format:
+                request_kwargs["text"] = {"format": response_format}
 
             response = self._openai_client.responses.create(**request_kwargs)
             status = getattr(response, "status", None)
@@ -179,6 +197,8 @@ class LLMClient:
             completion_kwargs["temperature"] = temperature
         if max_tokens:
             completion_kwargs["max_tokens"] = max_tokens
+        if response_format:
+            completion_kwargs["response_format"] = response_format
 
         try:
             completion = self._openai_client.chat.completions.create(**completion_kwargs)
@@ -196,6 +216,100 @@ class LLMClient:
             return text
 
         raise RuntimeError(f"OpenAI chat completion returned no content for model {model}")
+
+    def _stream_with_openai(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> Iterator[str]:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise LLMClientConfigError("OPENAI_API_KEY not configured")
+
+        if not self._openai_client:
+            client_kwargs = {
+                "api_key": api_key,
+                "timeout": float(_DEFAULT_TIMEOUT),
+                "max_retries": _MAX_RETRIES,
+            }
+            base_url = os.getenv("OPENAI_BASE_URL")
+            if base_url:
+                client_kwargs["base_url"] = base_url
+            self._openai_client = OpenAI(**client_kwargs)
+
+        if model.lower().startswith("o3-deep-research"):
+            # Deep research is long-running; keep the more reliable polling flow.
+            yield self._generate_openai_deep_research(prompt, model, params)
+            return
+
+        max_tokens = params.max_tokens if params and params.max_tokens else None
+        temperature = params.temperature if params else 0.2
+        use_reasoning = bool(params.use_reasoning) if params else False
+        use_web_search = bool(params.use_web_search) if params else False
+        response_format = params.response_format if params else None
+        model_lower = model.lower()
+        if use_web_search and "o3-mini" in model_lower:
+            raise RuntimeError(f"Model {model} does not support web_search tools; choose a tool-capable model.")
+
+        should_use_responses = use_reasoning or use_web_search or model_lower.startswith("o")
+
+        if should_use_responses:
+            include = ["web_search_call.action.sources"] if use_web_search else None
+            request_kwargs = {
+                "model": model,
+                "input": prompt,
+            }
+            if max_tokens:
+                request_kwargs["max_output_tokens"] = max_tokens
+            if temperature is not None:
+                request_kwargs["temperature"] = temperature
+            if use_web_search:
+                request_kwargs["tools"] = [{"type": "web_search"}]
+                request_kwargs["include"] = include
+            if use_reasoning:
+                request_kwargs["reasoning"] = {"effort": "medium"}
+            if response_format:
+                request_kwargs["text"] = {"format": response_format}
+
+            saw_delta = False
+            with self._openai_client.responses.stream(**request_kwargs) as stream:
+                for event in stream:
+                    event_type = getattr(event, "type", None)
+                    if event_type == "response.output_text.delta":
+                        delta = getattr(event, "delta", None)
+                        if delta:
+                            saw_delta = True
+                            yield delta
+                        continue
+                    if event_type == "response.output_text.done":
+                        if not saw_delta:
+                            text = getattr(event, "text", None)
+                            if text:
+                                yield text
+                        continue
+                    if event_type == "response.refusal.delta":
+                        delta = getattr(event, "delta", None)
+                        if delta:
+                            yield delta
+                        continue
+                    if event_type == "response.error":
+                        error = getattr(event, "error", None)
+                        raise RuntimeError(str(error or "OpenAI streaming error"))
+            return
+
+        completion_kwargs = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if temperature is not None:
+            completion_kwargs["temperature"] = temperature
+        if max_tokens:
+            completion_kwargs["max_tokens"] = max_tokens
+        if response_format:
+            completion_kwargs["response_format"] = response_format
+
+        with self._openai_client.chat.completions.stream(**completion_kwargs) as stream:
+            for event in stream:
+                if getattr(event, "type", None) == "content.delta":
+                    delta = getattr(event, "delta", None)
+                    if delta:
+                        yield delta
 
     def _generate_openai_deep_research(
         self, prompt: str, model: str, params: Optional[LLMGenerationParams]
@@ -322,3 +436,32 @@ class LLMClient:
             return text
 
         raise RuntimeError(f"Anthropic returned no content for model {model}")
+
+    def _stream_with_anthropic(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> Iterator[str]:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise LLMClientConfigError("ANTHROPIC_API_KEY not configured")
+
+        if not self._anthropic_client:
+            self._anthropic_client = Anthropic(api_key=api_key)
+
+        max_tokens = params.max_tokens if params and params.max_tokens else 4096
+        temperature = params.temperature if params else 0.2
+        timeout = _DEFAULT_TIMEOUT
+
+        try:
+            with self._anthropic_client.messages.stream(
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=[{"role": "user", "content": prompt}],
+                timeout=timeout,
+            ) as stream:
+                for text in stream.text_stream:
+                    if text:
+                        yield text
+        except Exception:
+            logger.exception("Anthropic streaming failed; falling back to non-stream", extra={"model": model})
+            text = self._generate_with_anthropic(prompt, model, params)
+            if text:
+                yield text

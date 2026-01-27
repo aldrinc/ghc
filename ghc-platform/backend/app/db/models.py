@@ -34,6 +34,15 @@ from app.db.enums import (
     ClaudeContextFileStatusEnum,
     CampaignStatusEnum,
     ClientStatusEnum,
+    FunnelAssetKindEnum,
+    FunnelAssetSourceEnum,
+    FunnelAssetStatusEnum,
+    FunnelDomainStatusEnum,
+    FunnelEventTypeEnum,
+    FunnelPageVersionSourceEnum,
+    FunnelPageVersionStatusEnum,
+    FunnelPublicationLinkKindEnum,
+    FunnelStatusEnum,
     MediaAssetTypeEnum,
     MediaMirrorStatusEnum,
     ResearchJobStatusEnum,
@@ -140,6 +149,293 @@ class Campaign(Base):
     budget_max: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class Funnel(Base):
+    __tablename__ = "funnels"
+    __table_args__ = (
+        UniqueConstraint("public_id", name="uq_funnels_public_id"),
+        sa.Index("idx_funnels_org_client", "org_id", "client_id"),
+        sa.Index("idx_funnels_client_campaign", "client_id", "campaign_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[FunnelStatusEnum] = mapped_column(
+        Enum(FunnelStatusEnum, name="funnel_status"),
+        nullable=False,
+        server_default=FunnelStatusEnum.draft.value,
+    )
+    public_id: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False, default=uuid4)
+    entry_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="SET NULL"), nullable=True
+    )
+    active_publication_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnel_publications.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class FunnelPage(Base):
+    __tablename__ = "funnel_pages"
+    __table_args__ = (
+        UniqueConstraint("funnel_id", "slug", name="uq_funnel_pages_funnel_slug"),
+        sa.Index("idx_funnel_pages_funnel", "funnel_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    slug: Mapped[str] = mapped_column(Text, nullable=False)
+    ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class FunnelPageVersion(Base):
+    __tablename__ = "funnel_page_versions"
+    __table_args__ = (sa.Index("idx_funnel_page_versions_page_status", "page_id", "status"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    page_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[FunnelPageVersionStatusEnum] = mapped_column(
+        Enum(FunnelPageVersionStatusEnum, name="funnel_page_version_status"),
+        nullable=False,
+        server_default=FunnelPageVersionStatusEnum.draft.value,
+    )
+    puck_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    source: Mapped[FunnelPageVersionSourceEnum] = mapped_column(
+        Enum(FunnelPageVersionSourceEnum, name="funnel_page_version_source"),
+        nullable=False,
+        server_default=FunnelPageVersionSourceEnum.human.value,
+    )
+    ai_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class FunnelPublication(Base):
+    __tablename__ = "funnel_publications"
+    __table_args__ = (sa.Index("idx_funnel_publications_funnel", "funnel_id"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    entry_page_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_by: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class FunnelPublicationPage(Base):
+    __tablename__ = "funnel_publication_pages"
+    __table_args__ = (
+        sa.Index("idx_funnel_publication_pages_pub", "publication_id"),
+        sa.Index(
+            "uq_funnel_publication_pages_pub_slug",
+            "publication_id",
+            "slug_at_publish",
+            unique=True,
+        ),
+    )
+
+    publication_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_publications.id", ondelete="CASCADE"), primary_key=True
+    )
+    page_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="CASCADE"), primary_key=True
+    )
+    page_version_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_page_versions.id", ondelete="RESTRICT"), nullable=False
+    )
+    slug_at_publish: Mapped[str] = mapped_column(Text, nullable=False)
+    title_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description_at_publish: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    og_image_asset_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnel_assets.id", ondelete="SET NULL"), nullable=True
+    )
+
+
+class FunnelPublicationLink(Base):
+    __tablename__ = "funnel_publication_links"
+    __table_args__ = (sa.Index("idx_funnel_publication_links_pub_from", "publication_id", "from_page_id"),)
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    publication_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_publications.id", ondelete="CASCADE"), nullable=False
+    )
+    from_page_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    to_page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="SET NULL"), nullable=True
+    )
+    kind: Mapped[FunnelPublicationLinkKindEnum] = mapped_column(
+        Enum(FunnelPublicationLinkKindEnum, name="funnel_publication_link_kind"),
+        nullable=False,
+        server_default=FunnelPublicationLinkKindEnum.cta.value,
+    )
+    label: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class FunnelPageSlugRedirect(Base):
+    __tablename__ = "funnel_page_slug_redirects"
+    __table_args__ = (
+        UniqueConstraint("funnel_id", "from_slug", name="uq_funnel_slug_redirect_from"),
+        sa.Index("idx_funnel_slug_redirect_funnel", "funnel_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    page_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    from_slug: Mapped[str] = mapped_column(Text, nullable=False)
+    to_slug: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class FunnelDomain(Base):
+    __tablename__ = "funnel_domains"
+    __table_args__ = (
+        UniqueConstraint("hostname", name="uq_funnel_domains_hostname"),
+        sa.Index("idx_funnel_domains_funnel", "funnel_id"),
+        sa.Index("idx_funnel_domains_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    hostname: Mapped[str] = mapped_column(CITEXT(), nullable=False)
+    status: Mapped[FunnelDomainStatusEnum] = mapped_column(
+        Enum(FunnelDomainStatusEnum, name="funnel_domain_status"),
+        nullable=False,
+        server_default=FunnelDomainStatusEnum.pending.value,
+    )
+    verification_token: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class FunnelAsset(Base):
+    __tablename__ = "funnel_assets"
+    __table_args__ = (
+        UniqueConstraint("public_id", name="uq_funnel_assets_public_id"),
+        sa.Index("idx_funnel_assets_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    public_id: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False, default=uuid4)
+    kind: Mapped[FunnelAssetKindEnum] = mapped_column(
+        Enum(FunnelAssetKindEnum, name="funnel_asset_kind"), nullable=False
+    )
+    storage_key: Mapped[str] = mapped_column(Text, nullable=False)
+    content_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    width: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    height: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    alt: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source: Mapped[FunnelAssetSourceEnum] = mapped_column(
+        Enum(FunnelAssetSourceEnum, name="funnel_asset_source"),
+        nullable=False,
+        server_default=FunnelAssetSourceEnum.upload.value,
+    )
+    ai_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    status: Mapped[FunnelAssetStatusEnum] = mapped_column(
+        Enum(FunnelAssetStatusEnum, name="funnel_asset_status"),
+        nullable=False,
+        server_default=FunnelAssetStatusEnum.pending.value,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class FunnelEvent(Base):
+    __tablename__ = "funnel_events"
+    __table_args__ = (
+        sa.Index("idx_funnel_events_occurred_at", "occurred_at"),
+        sa.Index("idx_funnel_events_funnel_pub", "funnel_id", "publication_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    funnel_id: Mapped[str] = mapped_column(
+        ForeignKey("funnels.id", ondelete="CASCADE"), nullable=False
+    )
+    publication_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_publications.id", ondelete="CASCADE"), nullable=False
+    )
+    page_id: Mapped[str] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="CASCADE"), nullable=False
+    )
+    event_type: Mapped[FunnelEventTypeEnum] = mapped_column(
+        Enum(FunnelEventTypeEnum, name="funnel_event_type"), nullable=False
+    )
+    visitor_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    session_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    host: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    path: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    referrer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    utm: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    props: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
     )
 
 

@@ -11,6 +11,8 @@ from app.routers import (
     assets,
     campaigns,
     clients,
+    funnels,
+    public_funnels,
     explore,
     deep_research,
     experiments,
@@ -50,6 +52,8 @@ def create_app() -> FastAPI:
     app.include_router(campaigns.router)
     app.include_router(artifacts.router)
     app.include_router(assets.router)
+    app.include_router(funnels.router)
+    app.include_router(public_funnels.router)
     app.include_router(experiments.router)
     app.include_router(explore.router)
     app.include_router(swipes.router)

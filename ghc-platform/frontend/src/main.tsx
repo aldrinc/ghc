@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { queryClient } from "@/lib/queryClient";
 import App from "./App";
 import "./index.css";
+import "@measured/puck/puck.css";
 
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "pk_test_placeholder";
 

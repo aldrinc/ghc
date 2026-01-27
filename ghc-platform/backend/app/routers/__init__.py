@@ -1,4 +1,4 @@
-from app.routers import clients, campaigns, artifacts, assets, swipes, experiments, workflows
+from app.routers import clients, campaigns, artifacts, assets, funnels, public_funnels, swipes, experiments, workflows
 from app.routers import deep_research, explore, openai_webhooks, teardowns, ads
 
 __all__ = [
@@ -6,6 +6,8 @@ __all__ = [
     "campaigns",
     "artifacts",
     "assets",
+    "funnels",
+    "public_funnels",
     "swipes",
     "experiments",
     "workflows",

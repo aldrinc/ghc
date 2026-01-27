@@ -6,6 +6,8 @@ import { DocumentsPage } from "@/pages/research/DocumentsPage";
 import { CompetitorsPage } from "@/pages/research/CompetitorsPage";
 import { AdLibraryPage } from "@/pages/research/AdLibraryPage";
 import { FunnelsPage } from "@/pages/research/FunnelsPage";
+import { FunnelDetailPage } from "@/pages/research/funnels/FunnelDetailPage";
+import { FunnelPageEditorPage } from "@/pages/research/funnels/FunnelPageEditorPage";
 import { ExploreAdsPage } from "@/pages/explore/ExploreAdsPage";
 import { ExploreBrandsPage } from "@/pages/explore/ExploreBrandsPage";
 import { StrategySheetPage } from "@/pages/strategy/StrategySheetPage";
@@ -20,6 +22,8 @@ import { ResearchDetailPage } from "@/pages/workflows/ResearchDetailPage";
 import { CampaignsPage } from "@/pages/campaigns/CampaignsPage";
 import { CampaignDetailPage } from "@/pages/campaigns/CampaignDetailPage";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
+import { PublicFunnelEntryRedirectPage } from "@/pages/public/PublicFunnelEntryRedirectPage";
+import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   return (
@@ -38,6 +42,8 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/f/:publicId" element={<PublicFunnelEntryRedirectPage />} />
+        <Route path="/f/:publicId/:slug" element={<PublicFunnelPage />} />
         <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />
         <Route
           path="/workspaces"
@@ -69,6 +75,8 @@ function App() {
           <Route path="research/competitors" element={<CompetitorsPage />} />
           <Route path="research/ad-library" element={<AdLibraryPage />} />
           <Route path="research/funnels" element={<FunnelsPage />} />
+          <Route path="research/funnels/:funnelId" element={<FunnelDetailPage />} />
+          <Route path="research/funnels/:funnelId/pages/:pageId" element={<FunnelPageEditorPage />} />
           <Route path="explore/ads" element={<ExploreAdsPage />} />
           <Route path="explore/brands" element={<ExploreBrandsPage />} />
           <Route path="strategy-sheet" element={<StrategySheetPage />} />

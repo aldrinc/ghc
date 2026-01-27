@@ -126,3 +126,57 @@ class ClaudeContextFileStatusEnum(str, Enum):
     ready = "ready"
     failed = "failed"
     deleted = "deleted"
+
+
+class FunnelStatusEnum(str, Enum):
+    draft = "draft"
+    published = "published"
+    disabled = "disabled"
+    archived = "archived"
+
+
+class FunnelPageVersionStatusEnum(str, Enum):
+    draft = "draft"
+    approved = "approved"
+
+
+class FunnelPageVersionSourceEnum(str, Enum):
+    human = "human"
+    ai = "ai"
+    duplicate = "duplicate"
+
+
+class FunnelPublicationLinkKindEnum(str, Enum):
+    cta = "cta"
+    back = "back"
+    default = "default"
+    auto = "auto"
+
+
+class FunnelDomainStatusEnum(str, Enum):
+    pending = "pending"
+    verified = "verified"
+    active = "active"
+    disabled = "disabled"
+
+
+class FunnelAssetKindEnum(str, Enum):
+    image = "image"
+
+
+class FunnelAssetSourceEnum(str, Enum):
+    upload = "upload"
+    ai = "ai"
+
+
+class FunnelAssetStatusEnum(str, Enum):
+    pending = "pending"
+    ready = "ready"
+    failed = "failed"
+
+
+class FunnelEventTypeEnum(str, Enum):
+    page_view = "page_view"
+    cta_click = "cta_click"
+    funnel_enter = "funnel_enter"
+    funnel_exit = "funnel_exit"
