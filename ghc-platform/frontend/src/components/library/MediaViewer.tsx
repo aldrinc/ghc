@@ -26,16 +26,6 @@ export function MediaTile({
     );
   }
 
-  if (asset.status === "pending") {
-    return (
-      <div
-        className={`flex h-40 animate-pulse items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-500 ${className}`}
-      >
-        Processing media…
-      </div>
-    );
-  }
-
   if (asset.status === "failed") {
     return (
       <div
@@ -62,6 +52,12 @@ export function MediaTile({
       ) : (
         <div className="flex h-40 items-center justify-center text-sm text-slate-500">
           {asset.type === "video" ? "Video" : "Image"}
+        </div>
+      )}
+
+      {asset.status === "pending" && (
+        <div className="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-1 text-xs font-semibold text-white">
+          Processing…
         </div>
       )}
 
@@ -141,10 +137,8 @@ export function MediaViewer({
         </div>
 
         <div className="mt-3 overflow-hidden rounded-xl bg-black">
-          {!asset || asset.status === "pending" ? (
-            <div className="flex h-[50vh] items-center justify-center text-white/70">
-              Processing media…
-            </div>
+          {!asset ? (
+            <div className="flex h-[50vh] items-center justify-center text-white/70">No media</div>
           ) : asset.status === "failed" ? (
             <div className="flex h-[50vh] items-center justify-center text-white/70">
               Media unavailable
@@ -166,6 +160,11 @@ export function MediaViewer({
             />
           ) : (
             <div className="flex h-[50vh] items-center justify-center text-white/70">No media</div>
+          )}
+          {asset?.status === "pending" && (
+            <div className="absolute left-4 top-4 rounded-md bg-white/80 px-2 py-1 text-xs font-semibold text-slate-800">
+              Processing…
+            </div>
           )}
         </div>
 

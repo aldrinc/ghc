@@ -17,11 +17,19 @@ async function parseError(resp: Response): Promise<ApiError> {
   } catch {
     raw = await resp.text();
   }
-  const message =
-    (raw as { detail?: string; message?: string })?.detail ||
-    (raw as { message?: string })?.message ||
-    resp.statusText ||
-    "Request failed";
+  const detail = (raw as { detail?: unknown })?.detail;
+  let message: string | undefined;
+  if (typeof detail === "string") {
+    message = detail;
+  } else if (Array.isArray(detail)) {
+    const first = detail[0] as { msg?: string } | undefined;
+    message = first?.msg;
+  } else if (typeof (raw as { message?: unknown })?.message === "string") {
+    message = (raw as { message?: string }).message;
+  }
+  if (!message || typeof message !== "string") {
+    message = resp.statusText || "Request failed";
+  }
   return { message, status: resp.status, raw };
 }
 

@@ -185,9 +185,13 @@ class MediaMirrorService:
                 return existing
             raise
         except Exception as exc:  # noqa: BLE001
-            logger.warning(
+            logger.exception(
                 "media_mirror.failed",
-                extra={"media_asset_id": str(getattr(media, "id", "")), "error": str(exc)},
+                extra={
+                    "media_asset_id": str(getattr(media, "id", "")),
+                    "source_url": getattr(media, "source_url", None),
+                    "asset_type": getattr(media, "asset_type", None),
+                },
             )
             # Keep the session clean for callers.
             self.session.rollback()
@@ -207,7 +211,16 @@ class MediaMirrorService:
         self._assert_public_hostname(parsed.hostname)
 
         timeout = httpx.Timeout(self.timeout_seconds, read=self.timeout_seconds)
-        headers = {"User-Agent": "ghc-mirror/1.0"}
+        # Facebook CDN occasionally rejects atypical UAs; use a common browser UA to reduce 403s.
+        headers = {
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/123.0.0.0 Safari/537.36"
+            ),
+            "Accept": "*/*",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
         with httpx.stream("GET", url, headers=headers, follow_redirects=True, timeout=timeout) as resp:
             resp.raise_for_status()
             hasher = hashlib.sha256()

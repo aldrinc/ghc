@@ -1,20 +1,188 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from functools import lru_cache
 from datetime import date
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, literal, or_, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
 from app.db.enums import AdChannelEnum, AdStatusEnum
-from app.db.models import Ad, AdFacts, AdAssetLink, AdScore, Brand, BrandUserPreference, MediaAsset
+from app.db.models import (
+    Ad,
+    AdFacts,
+    AdAssetLink,
+    AdScore,
+    Brand,
+    BrandUserPreference,
+    MediaAsset,
+    ResearchRun,
+    ResearchRunBrand,
+)
+from app.db.repositories.ads import AdsRepository
+from app.services.media_storage import MediaStorage
 
 router = APIRouter(prefix="/explore", tags=["explore"])
+
+# Cache storage client to avoid rebuilding per request.
+@lru_cache()
+def _media_storage() -> MediaStorage:
+    return MediaStorage()
+
+
+@router.get("/brands")
+def explore_brands(
+    q: str | None = None,
+    client_id: str | None = Query(default=None, alias="clientId"),
+    research_run_id: str | None = Query(default=None, alias="researchRunId"),
+    include_hidden: bool = Query(default=False, alias="includeHidden"),
+    limit: int = Query(default=100, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    sort: str = Query(default="last_seen"),
+    direction: str = Query(default="desc"),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = AdsRepository(session)
+
+    scoped_brand_ids: set[str] | None = None
+    run: ResearchRun | None = None
+    if research_run_id:
+        run = session.get(ResearchRun, research_run_id)
+        if not run or str(run.org_id) != auth.org_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Research run not found")
+    elif client_id:
+        run = repo.latest_research_run_for_client(org_id=auth.org_id, client_id=client_id)
+        if not run:
+            return jsonable_encoder({"items": [], "count": 0, "limit": limit, "offset": offset})
+
+    if run:
+        scoped_brand_ids = {
+            str(row[0])
+            for row in session.execute(
+                select(ResearchRunBrand.brand_id).where(ResearchRunBrand.research_run_id == run.id)
+            ).all()
+        }
+        if not scoped_brand_ids:
+            return jsonable_encoder({"items": [], "count": 0, "limit": limit, "offset": offset})
+
+    hidden_brand_ids = {
+        str(row[0])
+        for row in session.execute(
+            select(BrandUserPreference.brand_id).where(
+                BrandUserPreference.org_id == auth.org_id,
+                BrandUserPreference.user_external_id == auth.user_id,
+                BrandUserPreference.hidden.is_(True),
+            )
+        ).all()
+    }
+
+    filters = [Brand.org_id == auth.org_id]
+    if scoped_brand_ids:
+        filters.append(Brand.id.in_(scoped_brand_ids))
+    if not include_hidden and hidden_brand_ids:
+        filters.append(~Brand.id.in_(hidden_brand_ids))
+    if q:
+        pattern = f"%{q}%"
+        filters.append(
+            or_(
+                Brand.canonical_name.ilike(pattern),
+                Brand.normalized_name.ilike(pattern),
+                Brand.primary_domain.ilike(pattern),
+                Brand.primary_website_url.ilike(pattern),
+            )
+        )
+
+    brand_stats = (
+        select(
+            Ad.brand_id.label("brand_id"),
+            func.count().label("ad_count"),
+            func.count().filter(Ad.ad_status == AdStatusEnum.active).label("active_count"),
+            func.count().filter(Ad.ad_status == AdStatusEnum.inactive).label("inactive_count"),
+            func.count().filter(Ad.ad_status == AdStatusEnum.unknown).label("unknown_count"),
+            func.max(Ad.last_seen_at).label("last_seen_at"),
+            func.min(Ad.first_seen_at).label("first_seen_at"),
+            func.array_agg(func.distinct(Ad.channel)).label("channels"),
+        )
+        .join(Brand, Brand.id == Ad.brand_id)
+        .where(*filters)
+        .group_by(Ad.brand_id)
+        .subquery()
+    )
+
+    hidden_expr = Brand.id.in_(hidden_brand_ids) if hidden_brand_ids else literal(False)
+
+    base_query = (
+        select(
+            Brand.id.label("brand_id"),
+            Brand.canonical_name.label("brand_name"),
+            Brand.primary_domain.label("primary_domain"),
+            Brand.primary_website_url.label("primary_website_url"),
+            func.coalesce(brand_stats.c.ad_count, 0).label("ad_count"),
+            func.coalesce(brand_stats.c.active_count, 0).label("active_count"),
+            func.coalesce(brand_stats.c.inactive_count, 0).label("inactive_count"),
+            func.coalesce(brand_stats.c.unknown_count, 0).label("unknown_count"),
+            brand_stats.c.channels.label("channels"),
+            brand_stats.c.first_seen_at.label("first_seen_at"),
+            brand_stats.c.last_seen_at.label("last_seen_at"),
+            hidden_expr.label("hidden"),
+        )
+        .select_from(Brand)
+        .outerjoin(brand_stats, brand_stats.c.brand_id == Brand.id)
+        .where(*filters)
+    )
+
+    direction = (direction or "desc").lower()
+    desc_first = direction != "asc"
+
+    def order(col):
+        return col.desc().nulls_last() if desc_first else col.asc().nulls_last()
+
+    if sort in ("ad_count", "ads"):
+        order_expr = order(brand_stats.c.ad_count)
+    elif sort in ("active", "active_count"):
+        order_expr = order(brand_stats.c.active_count)
+    elif sort in ("first_seen", "first_seen_at"):
+        order_expr = order(brand_stats.c.first_seen_at)
+    elif sort == "name":
+        order_expr = order(Brand.canonical_name)
+    else:
+        order_expr = order(brand_stats.c.last_seen_at)
+
+    total_count = session.execute(select(func.count()).select_from(base_query.subquery())).scalar_one()
+
+    rows = (
+        session.execute(
+            base_query.order_by(order_expr, Brand.canonical_name.asc()).limit(limit).offset(offset)
+        ).all()
+    )
+
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        channels = [getattr(c, "value", str(c)) for c in (row.channels or [])]
+        items.append(
+            {
+                "brand_id": str(row.brand_id),
+                "brand_name": row.brand_name,
+                "primary_domain": row.primary_domain,
+                "primary_website_url": row.primary_website_url,
+                "ad_count": row.ad_count or 0,
+                "active_count": row.active_count or 0,
+                "inactive_count": row.inactive_count or 0,
+                "unknown_count": row.unknown_count or 0,
+                "channels": channels,
+                "first_seen_at": row.first_seen_at.isoformat() if row.first_seen_at else None,
+                "last_seen_at": row.last_seen_at.isoformat() if row.last_seen_at else None,
+                "hidden": bool(row.hidden),
+            }
+        )
+
+    return jsonable_encoder({"items": items, "count": total_count, "limit": limit, "offset": offset})
 
 
 def _order_clauses(
@@ -59,17 +227,18 @@ def _order_clauses(
 
 
 def _serialize_media_rows(ad_id: str, media_rows: list[tuple[MediaAsset, str | None]]) -> list[dict[str, Any]]:
+    storage = _media_storage()
     assets: list[dict[str, Any]] = []
     for media, role in media_rows:
         metadata = getattr(media, "metadata_json", {}) or {}
         asset_type = getattr(media, "asset_type", None)
         asset_type_value = getattr(asset_type, "value", None) if asset_type is not None else None
-        preview_url = (
-            f"/ads/{ad_id}/media/{media.id}/preview"
-            if getattr(media, "preview_storage_key", None) or getattr(media, "storage_key", None)
-            else None
-        )
-        media_url = f"/ads/{ad_id}/media/{media.id}" if getattr(media, "storage_key", None) else None
+        preview_key = getattr(media, "preview_storage_key", None) or getattr(media, "storage_key", None)
+        media_key = getattr(media, "storage_key", None)
+        preview_bucket = getattr(media, "preview_bucket", None) or getattr(media, "bucket", None) or storage.preview_bucket
+        media_bucket = getattr(media, "bucket", None) or storage.bucket
+        preview_url = storage.presign_get(bucket=preview_bucket, key=preview_key) if preview_key else None
+        media_url = storage.presign_get(bucket=media_bucket, key=media_key) if media_key else None
         assets.append(
             {
                 "id": str(getattr(media, "id", "")),
@@ -98,6 +267,9 @@ def explore_ads(
     q: str | None = None,
     channels: list[AdChannelEnum] = Query(default_factory=list),
     status: list[AdStatusEnum] = Query(default_factory=list),
+    brand_ids: list[str] = Query(default_factory=list, alias="brandIds"),
+    client_id: str | None = Query(default=None, alias="clientId"),
+    research_run_id: str | None = Query(default=None, alias="researchRunId"),
     country_codes: list[str] = Query(default_factory=list, alias="countryCodes"),
     language_codes: list[str] = Query(default_factory=list, alias="languageCodes"),
     min_days_active: int | None = Query(default=None, ge=0),
@@ -114,6 +286,29 @@ def explore_ads(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
+    repo = AdsRepository(session)
+
+    scoped_brand_ids: set[str] | None = None
+    run: ResearchRun | None = None
+    if research_run_id:
+        run = session.get(ResearchRun, research_run_id)
+        if not run or str(run.org_id) != auth.org_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Research run not found")
+    elif client_id:
+        run = repo.latest_research_run_for_client(org_id=auth.org_id, client_id=client_id)
+        if not run:
+            return jsonable_encoder({"items": [], "count": 0, "limit": limit, "offset": offset})
+
+    if run:
+        scoped_brand_ids = {
+            str(row[0])
+            for row in session.execute(
+                select(ResearchRunBrand.brand_id).where(ResearchRunBrand.research_run_id == run.id)
+            ).all()
+        }
+        if not scoped_brand_ids:
+            return jsonable_encoder({"items": [], "count": 0, "limit": limit, "offset": offset})
+
     hidden_brand_ids = {
         str(row[0])
         for row in session.execute(
@@ -126,8 +321,12 @@ def explore_ads(
     }
 
     filters = [Brand.org_id == auth.org_id]
+    if scoped_brand_ids:
+        filters.append(Brand.id.in_(scoped_brand_ids))
     if hidden_brand_ids:
         filters.append(~Ad.brand_id.in_(hidden_brand_ids))
+    if brand_ids:
+        filters.append(Ad.brand_id.in_(brand_ids))
     if q:
         pattern = f"%{q}%"
         filters.append(

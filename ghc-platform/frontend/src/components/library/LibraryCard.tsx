@@ -1,6 +1,8 @@
 import { useMemo, useState, type KeyboardEvent } from "react";
 import { MediaViewer } from "@/components/library/MediaViewer";
 import { SwipeMedia } from "@/components/library/SwipeMedia";
+import { Badge } from "@/components/ui/badge";
+import { channelDisplayName } from "@/lib/channels";
 import type { LibraryItem } from "@/types/library";
 
 type LibraryCardProps = {
@@ -14,7 +16,6 @@ type LibraryCardProps = {
 export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: LibraryCardProps) {
   const [open, setOpen] = useState(false);
   const primary = item.media[0];
-  const platformLabel = item.platform?.length ? item.platform.join(", ") : "Unknown platform";
   const score = item.scores;
 
   const starLabel = useMemo(() => {
@@ -84,9 +85,11 @@ export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: L
             </div>
             <div className="flex flex-wrap items-center gap-1 text-[11px]">
               {formatLabel && <span className="rounded-full bg-black/55 px-2 py-0.5">{formatLabel}</span>}
-              {item.platform?.length ? (
-                <span className="rounded-full bg-black/45 px-2 py-0.5">{platformLabel}</span>
-              ) : null}
+              {item.platform?.map((platform) => (
+                <span key={platform} className="rounded-full bg-black/45 px-2 py-0.5">
+                  {channelDisplayName(platform)}
+                </span>
+              ))}
               {starLabel ? <span className="rounded-full bg-black/45 px-2 py-0.5 font-mono">{starLabel}</span> : null}
             </div>
           </div>
@@ -144,9 +147,13 @@ export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: L
           )}
           {item.body && <p className="line-clamp-3 text-sm text-slate-600">{item.body}</p>}
           <div className="mt-auto flex items-center justify-between text-xs text-slate-500">
-            <span className="truncate">
-              {platformLabel}
-              {statusLabel ? ` • ${statusLabel}` : ""}
+            <span className="flex flex-wrap items-center gap-1">
+              {item.platform?.map((platform) => (
+                <Badge key={`${item.id}-${platform}`} className="text-[11px]">
+                  {channelDisplayName(platform)}
+                </Badge>
+              ))}
+              {statusLabel ? <span className="text-slate-600">{statusLabel}</span> : null}
             </span>
             <span className="flex items-center gap-1 font-medium text-slate-700">
               {score?.performanceScore ? `P ${score.performanceScore}` : ""}

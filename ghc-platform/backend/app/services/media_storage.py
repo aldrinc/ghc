@@ -99,3 +99,11 @@ class MediaStorage:
             Params={"Bucket": bucket, "Key": key},
             ExpiresIn=ttl,
         )
+
+    def download_bytes(self, *, key: str, bucket: Optional[str] = None) -> tuple[bytes, Optional[str]]:
+        bucket_name = bucket or self.bucket
+        obj = self.client.get_object(Bucket=bucket_name, Key=key)
+        body = obj.get("Body")
+        content_type = obj.get("ContentType")
+        data = body.read() if body else b""
+        return data, content_type

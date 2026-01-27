@@ -13,6 +13,19 @@ export function unixSecondsToIso(sec?: number | null) {
   return new Date(sec * 1000).toISOString();
 }
 
+const apiBaseUrl =
+  (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL) || undefined;
+
+function toAbsoluteUrl(url?: string | null): string | undefined {
+  if (!url) return undefined;
+  if (/^(https?:)?\/\//i.test(url) || url.startsWith("data:") || url.startsWith("blob:")) return url;
+  const base =
+    apiBaseUrl?.replace(/\/$/, "") ||
+    (typeof window !== "undefined" ? window.location.origin.replace(/\/$/, "") : "");
+  if (!base) return url;
+  return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
 function guessAssetType(input: any): MediaAsset["type"] {
   const assetType = (input?.asset_type || input?.type || "").toString().toLowerCase();
   const mime = (input?.mime_type || input?.mimeType || "").toString().toLowerCase();
@@ -36,13 +49,14 @@ export function mapMediaAssets(rawAssets: any[] | undefined | null): MediaAsset[
   if (!rawAssets || !Array.isArray(rawAssets)) return [];
   return rawAssets
     .map((asset) => {
-      const previewUrl =
+      const previewUrl = toAbsoluteUrl(
         asset?.preview_url ||
-        asset?.thumbnail_url ||
-        asset?.stored_url ||
-        asset?.source_url ||
-        asset?.url;
-      const fullUrl = asset?.media_url || asset?.stored_url || asset?.source_url || asset?.url;
+          asset?.thumbnail_url ||
+          asset?.stored_url ||
+          asset?.source_url ||
+          asset?.url,
+      );
+      const fullUrl = toAbsoluteUrl(asset?.media_url || asset?.stored_url || asset?.source_url || asset?.url);
       const status = (asset?.mirror_status || asset?.status || "").toString().toLowerCase();
       const normalizedStatus = ["pending", "succeeded", "failed", "partial"].includes(status) ? (status as MediaAsset["status"]) : undefined;
 

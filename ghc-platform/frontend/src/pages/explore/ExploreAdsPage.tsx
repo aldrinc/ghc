@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { LibraryCard } from "@/components/library/LibraryCard";
 import { useExploreApi } from "@/api/explore";
 import { normalizeExploreAdToLibraryItem } from "@/lib/library";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import type { LibraryItem } from "@/types/library";
+
+const PAGE_SIZE = 60;
 
 const channelOptions = [
   { value: "", label: "All channels" },
@@ -49,53 +52,199 @@ function LoadingGrid() {
 }
 
 export function ExploreAdsPage() {
-  const { listAds } = useExploreApi();
+  const { listAds, listBrands } = useExploreApi();
+  const { workspace } = useWorkspace();
   const [query, setQuery] = useState("");
   const [channel, setChannel] = useState("");
   const [status, setStatus] = useState("");
-  const [limitPerBrand, setLimitPerBrand] = useState<number | undefined>(3);
+  const [brandId, setBrandId] = useState("");
+  const [brandOptions, setBrandOptions] = useState<{ value: string; label: string }[]>([]);
+  const [brandsLoading, setBrandsLoading] = useState(false);
+  const [brandError, setBrandError] = useState<string | null>(null);
+  const [limitPerBrand, setLimitPerBrand] = useState<number | undefined>(undefined);
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [count, setCount] = useState(0);
+  const [scope, setScope] = useState<"workspace" | "global">(workspace ? "workspace" : "global");
+  const [hasMore, setHasMore] = useState(false);
+  const [nextOffset, setNextOffset] = useState(0);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const filtersKeyRef = useRef<string>("");
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    listAds({
+    if (!workspace && scope === "workspace") {
+      setScope("global");
+    }
+  }, [scope, workspace]);
+
+  const errorMessage = useCallback((err: any, fallback: string) => {
+    const msg = err?.message;
+    return typeof msg === "string" ? msg : fallback;
+  }, []);
+
+  const scopedClientId = scope === "workspace" ? workspace?.id : undefined;
+
+  const baseParams = useMemo(
+    () => ({
       q: query || undefined,
       channels: channel ? [channel] : undefined,
       status: status ? [status] : undefined,
+      brandIds: brandId ? [brandId] : undefined,
+      clientId: scopedClientId,
       limitPerBrand: limitPerBrand || undefined,
-      limit: 60,
       sort: "last_seen",
+    }),
+    [brandId, channel, limitPerBrand, query, scopedClientId, status],
+  );
+
+  const filtersKey = useMemo(
+    () =>
+      JSON.stringify({
+        ...baseParams,
+        scope,
+      }),
+    [baseParams, scope],
+  );
+
+  useEffect(() => {
+    filtersKeyRef.current = filtersKey;
+  }, [filtersKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setBrandsLoading(true);
+    listBrands({
+      clientId: scopedClientId,
+      includeHidden: false,
+      sort: "name",
+      direction: "asc",
+      limit: 200,
     })
       .then((resp) => {
         if (cancelled) return;
-        const normalized = (resp?.items ?? []).map(normalizeExploreAdToLibraryItem);
-        setItems(normalized);
-        setCount(resp?.count ?? normalized.length);
-        setError(null);
+        const options =
+          (resp?.items ?? []).map((brand) => {
+            const name =
+              brand.brand_name || brand.primary_domain || brand.primary_website_url || "Unknown brand";
+            const domain = brand.primary_domain || brand.primary_website_url;
+            const label = domain && domain !== name ? `${name} (${domain})` : name;
+            return { value: brand.brand_id, label };
+          }) || [];
+        setBrandOptions(options);
+        setBrandError(null);
       })
       .catch((err) => {
         if (cancelled) return;
-        setItems([]);
-        setCount(0);
-        setError(err?.message || "Failed to load ads");
+        setBrandOptions([]);
+        setBrandError(errorMessage(err, "Failed to load competitors"));
       })
       .finally(() => {
-        if (cancelled) return;
+        if (!cancelled) {
+          setBrandsLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [listBrands, scopedClientId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    filtersKeyRef.current = filtersKey;
+    setItems([]);
+    setCount(0);
+    setHasMore(false);
+    setNextOffset(0);
+    setLoading(true);
+    setError(null);
+    setLoadingMore(false);
+    listAds({
+      ...baseParams,
+      limit: PAGE_SIZE,
+      offset: 0,
+    })
+      .then((resp) => {
+        if (cancelled || filtersKeyRef.current !== filtersKey) return;
+        const normalized = (resp?.items ?? []).map(normalizeExploreAdToLibraryItem);
+        setError(null);
+        const totalCount = resp?.count ?? normalized.length;
+        setItems(normalized);
+        setCount(totalCount);
+        setHasMore(normalized.length < totalCount);
+        setNextOffset(normalized.length);
+      })
+      .catch((err) => {
+        if (cancelled || filtersKeyRef.current !== filtersKey) return;
+        setItems([]);
+        setCount(0);
+        setHasMore(false);
+        setError(errorMessage(err, "Failed to load ads"));
+      })
+      .finally(() => {
+        if (cancelled || filtersKeyRef.current !== filtersKey) return;
         setLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [channel, listAds, limitPerBrand, query, status]);
+  }, [baseParams, filtersKey, listAds]);
+
+  const loadMore = useCallback(() => {
+    if (loading || loadingMore || !hasMore) return;
+    const currentKey = filtersKeyRef.current;
+    setLoadingMore(true);
+    listAds({
+      ...baseParams,
+      limit: PAGE_SIZE,
+      offset: nextOffset,
+    })
+      .then((resp) => {
+        if (filtersKeyRef.current !== currentKey) return;
+        const normalized = (resp?.items ?? []).map(normalizeExploreAdToLibraryItem);
+        const totalCount = resp?.count ?? count;
+        setItems((prev) => {
+          const nextItems = [...prev, ...normalized];
+          const resolvedCount = totalCount ?? nextItems.length;
+          setCount(resolvedCount);
+          setHasMore(normalized.length > 0 && nextItems.length < resolvedCount);
+          setNextOffset(nextItems.length);
+          return nextItems;
+        });
+        setError(null);
+      })
+      .catch((err) => {
+        if (filtersKeyRef.current !== currentKey) return;
+        setError(errorMessage(err, "Failed to load ads"));
+      })
+      .finally(() => {
+        if (filtersKeyRef.current !== currentKey) return;
+        setLoadingMore(false);
+      });
+  }, [baseParams, count, hasMore, listAds, loading, loadingMore, nextOffset]);
+
+  useEffect(() => {
+    const node = loadMoreRef.current;
+    if (!node || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: "240px 0px 240px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   const filtersActive = useMemo(
-    () => Boolean(channel || status || (limitPerBrand && limitPerBrand > 0) || query),
-    [channel, limitPerBrand, query, status],
+    () => Boolean(channel || status || brandId || (limitPerBrand && limitPerBrand > 0) || query),
+    [brandId, channel, limitPerBrand, query, status],
   );
 
   return (
@@ -106,6 +255,16 @@ export function ExploreAdsPage() {
       />
 
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <select
+          value={scope}
+          onChange={(e) => setScope(e.target.value as "workspace" | "global")}
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+        >
+          <option value="workspace" disabled={!workspace}>
+            Workspace only{workspace?.name ? ` (${workspace.name})` : ""}
+          </option>
+          <option value="global">All org ads (global)</option>
+        </select>
         <input
           type="search"
           value={query}
@@ -113,6 +272,20 @@ export function ExploreAdsPage() {
           placeholder="Search copy, domains, brands"
           className="min-w-[200px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
         />
+        <select
+          value={brandId}
+          onChange={(e) => setBrandId(e.target.value)}
+          disabled={brandsLoading && !brandOptions.length}
+          aria-label="Filter by competitor"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+        >
+          <option value="">{brandsLoading ? "Loading competitors..." : "All competitors"}</option>
+          {brandOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <select
           value={channel}
           onChange={(e) => setChannel(e.target.value)}
@@ -155,7 +328,8 @@ export function ExploreAdsPage() {
               setQuery("");
               setChannel("");
               setStatus("");
-              setLimitPerBrand(3);
+              setBrandId("");
+              setLimitPerBrand(undefined);
             }}
             className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
@@ -163,12 +337,20 @@ export function ExploreAdsPage() {
           </button>
         ) : null}
       </div>
+      {brandError && (
+        <div className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{brandError}</div>
+      )}
 
-      <div className="flex items-center justify-between text-xs text-slate-600">
+      <div className="flex flex-col gap-1 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
         <span>
           Showing {items.length} of {count || items.length} ads
         </span>
-        <span className="text-slate-500">Phase 1 filters: channel, status, per-brand cap, search</span>
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+          <span className="text-slate-500">
+            Scope: {scope === "workspace" ? workspace?.name || "Workspace" : "Global"}
+          </span>
+          <span className="text-slate-500">Phase 1 filters: competitor, channel, status, per-brand cap, search</span>
+        </div>
       </div>
 
       {error && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</div>}
@@ -178,6 +360,15 @@ export function ExploreAdsPage() {
           {items.map((item) => (
             <LibraryCard key={item.id} item={item} />
           ))}
+          {(hasMore || loadingMore) && (
+            <div ref={loadMoreRef} className="col-span-full flex items-center justify-center py-4">
+              {loadingMore ? (
+                <span className="text-sm text-slate-500">Loading more ads…</span>
+              ) : (
+                <span className="text-sm text-slate-400">Keep scrolling to load more</span>
+              )}
+            </div>
+          )}
         </div>
       )}
       {!loading && items.length === 0 && !error && (

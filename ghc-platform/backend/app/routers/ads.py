@@ -20,18 +20,19 @@ def _serialize_media(repo: AdsRepository, ad_id: str) -> list[dict]:
     """
     Attach media assets linked to this ad.
     """
+    storage = _media_storage()
     _, media_rows = repo.ad_with_media(ad_id)
     assets = []
     for media, role in media_rows:
         metadata = getattr(media, "metadata_json", {}) or {}
         asset_type = getattr(media, "asset_type", None)
         asset_type_value = getattr(asset_type, "value", None) if asset_type is not None else None
-        preview_url = (
-            f"/ads/{ad_id}/media/{media.id}/preview"
-            if getattr(media, "preview_storage_key", None) or getattr(media, "storage_key", None)
-            else None
-        )
-        media_url = f"/ads/{ad_id}/media/{media.id}" if getattr(media, "storage_key", None) else None
+        preview_key = getattr(media, "preview_storage_key", None) or getattr(media, "storage_key", None)
+        media_key = getattr(media, "storage_key", None)
+        preview_bucket = getattr(media, "preview_bucket", None) or getattr(media, "bucket", None) or storage.preview_bucket
+        media_bucket = getattr(media, "bucket", None) or storage.bucket
+        preview_url = storage.presign_get(bucket=preview_bucket, key=preview_key) if preview_key else None
+        media_url = storage.presign_get(bucket=media_bucket, key=media_key) if media_key else None
         assets.append(
             {
                 "id": str(getattr(media, "id", "")),
