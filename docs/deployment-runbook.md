@@ -25,7 +25,8 @@ This doc captures what is required to ship the current stack (FastAPI + Temporal
 - Frontend: `cd ghc-platform/frontend && npm ci && npm run build`; serve `ghc-platform/frontend/dist` via a static server (e.g., nginx, Vercel, S3+CloudFront). Use `.env.production` to inject deploy-time `VITE_*` values.
 - Local infra helper: `cd ghc-platform/infra && docker compose up -d` brings up Postgres (5433), Temporal (7234), Temporal UI (8234), and PgAdmin (8081). Swap to managed services for production.
 - Containerization: build backend image `docker build -t ghc-backend -f ghc-platform/backend/Dockerfile ghc-platform/backend` (override command to run the worker: `docker run ... python -m app.temporal.worker`); build frontend image `docker build -t ghc-frontend -f ghc-platform/frontend/Dockerfile ghc-platform/frontend --build-arg VITE_API_BASE_URL=https://api.example.com --build-arg VITE_CLERK_PUBLISHABLE_KEY=... --build-arg VITE_CLERK_JWT_TEMPLATE=backend`.
-- CI: `.github/workflows/docker-images.yml` builds/pushes backend and frontend images to GHCR on `main`; adjust registry/creds as needed.
+- CI/CD: `.github/workflows/docker-images.yml` runs backend pytest + alembic against Postgres, builds the frontend, then builds/pushes images to GHCR (main only). Deploy job (guarded by `ENABLE_PRODUCTION_CD` repo var or manual dispatch) SSHes to a target host and runs `docker compose -f ghc-platform/infra/docker-compose.deploy.yml up -d`; requires `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_SSH_KEY`, `DEPLOY_PATH`, `GHCR_USERNAME`, and `GHCR_TOKEN` secrets plus a `.env.production` file on the host.
+- Deploy compose: `ghc-platform/infra/docker-compose.deploy.yml` expects `.env.production` two directories up (repo root) with all backend/worker env vars. Set `IMAGE_REGISTRY`/`IMAGE_TAG` to point at GHCR images.
 
 ## Verification checklist
 - Health: `curl -i https://<backend>/health` and `/health/db`.

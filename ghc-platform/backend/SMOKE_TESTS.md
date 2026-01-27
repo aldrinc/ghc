@@ -2,6 +2,12 @@
 
 Run these against the local stack on http://localhost:8000 with a real Clerk dev JWT (copy the `Authorization: Bearer ...` header from the frontend after signing in, or use a dev session token from the Clerk dashboard for your dev instance). The JWT must include `org_id` matching a row in the `orgs` table.
 
+Before running the smoke tests, ensure your database schema is up to date (from the repo root):
+
+```bash
+./scripts/migrate-backend-db.sh
+```
+
 ```bash
 export API_BASE=${API_BASE:-http://localhost:8000}
 export CLERK_BEARER="paste_dev_jwt_here"

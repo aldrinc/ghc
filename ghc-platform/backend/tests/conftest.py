@@ -3,6 +3,8 @@ import uuid
 from pathlib import Path
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import event
 from sqlalchemy.orm import sessionmaker
@@ -33,6 +35,13 @@ from app.routers import workflows as workflows_router
 
 
 TEST_ORG_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def apply_migrations() -> None:
+    alembic_cfg = Config(str(ROOT_DIR / "alembic.ini"))
+    alembic_cfg.set_main_option("script_location", str(ROOT_DIR / "alembic"))
+    command.upgrade(alembic_cfg, "head")
 
 
 class FakeTemporalHandle:

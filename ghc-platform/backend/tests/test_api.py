@@ -1,5 +1,9 @@
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
+from app.auth import dependencies as auth_dependencies
+from app.db.deps import get_session
+from app.db.models import Org
 from app.main import app
 
 
@@ -19,6 +23,37 @@ def test_health_endpoints():
     assert health.json() == {"ok": True}
     assert db_health.status_code == 200
     assert "db" in db_health.json()
+
+
+def test_auth_creates_org_and_allows_client_create(db_session, monkeypatch):
+    app.dependency_overrides.clear()
+
+    def get_session_override():
+        try:
+            yield db_session
+        finally:
+            pass
+
+    app.dependency_overrides[get_session] = get_session_override
+    monkeypatch.setattr(
+        auth_dependencies,
+        "verify_clerk_token",
+        lambda _token: {"sub": "test-user", "org_id": "org_test_123"},
+    )
+
+    try:
+        with TestClient(app) as client:
+            resp = client.post(
+                "/clients",
+                headers={"Authorization": "Bearer test-token"},
+                json={"name": "Auth Client", "industry": "SaaS"},
+            )
+        assert resp.status_code == 201
+
+        created_org = db_session.scalars(select(Org).where(Org.external_id == "org_test_123")).first()
+        assert created_org is not None
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_clients_campaigns_and_workflows(api_client, fake_temporal):
