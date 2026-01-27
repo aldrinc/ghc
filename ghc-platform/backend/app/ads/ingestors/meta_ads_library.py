@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Tuple
 
 from app.ads.apify_client import ApifyClient
 from app.ads.ingestors.base import ChannelIngestor
+from app.ads.normalization import normalize_facebook_page_url
 from app.ads.types import IngestRequest, NormalizedAdWithAssets, NormalizedAsset, RawAdItem, NormalizeContext
 from app.db.enums import AdChannelEnum, AdStatusEnum, MediaAssetTypeEnum
 from app.db.models import BrandChannelIdentity
@@ -31,55 +32,55 @@ class MetaAdsLibraryIngestor(ChannelIngestor):
 
     def build_requests(self, identity: BrandChannelIdentity, *, results_limit: int | None = None) -> List[IngestRequest]:
         """
-        Prefer a direct Ads Library URL when a page ID is available; otherwise fall back to the page URL.
-        We stash both the page_id and original URL in request metadata for later retries.
+        Build ingestion requests using canonical Facebook Page URLs only.
+        Numeric page IDs are ignored; the scraper derives them internally.
         """
-        page_id = None
-        if identity.external_id:
-            page_id = str(identity.external_id).strip()
-        elif identity.metadata_json:
-            ids = identity.metadata_json.get("facebook_page_ids") or []
-            if ids:
-                page_id = str(ids[0]).strip()
+        candidate_urls: List[str] = []
+        if identity.external_url:
+            candidate_urls.append(identity.external_url)
+        if identity.metadata_json:
+            for url in identity.metadata_json.get("facebook_page_urls") or []:
+                candidate_urls.append(url)
 
-        ads_library_url = self._ads_library_url(page_id) if page_id else None
+        normalized: List[str] = []
+        for url in candidate_urls:
+            canonical = normalize_facebook_page_url(url)
+            if canonical and canonical not in normalized:
+                normalized.append(canonical)
 
-        fallback_page_url = identity.external_url
-        if not fallback_page_url and identity.external_id:
-            fallback_page_url = f"https://www.facebook.com/{identity.external_id}"
+        if not normalized:
+            raise RuntimeError("Missing Facebook page URL for Meta Ads ingestion")
 
-        url = ads_library_url or fallback_page_url
-        if not url:
-            raise RuntimeError("Missing Facebook page URL or ID for Meta Ads ingestion")
-        metadata = {
-            "identity_id": identity.id,
-            "page_id": page_id,
-            "page_url": fallback_page_url,
-            "ads_library_url_used": bool(ads_library_url),
-        }
-        return [IngestRequest(url=url, limit=results_limit or None, metadata=metadata)]
+        requests: List[IngestRequest] = []
+        for url in normalized:
+            metadata = {
+                "identity_id": identity.id,
+                "page_url": url,
+            }
+            requests.append(IngestRequest(url=url, limit=results_limit or None, metadata=metadata))
+        return requests
 
     def run(self, request: IngestRequest) -> list[RawAdItem]:
-        # First attempt: whatever URL we were given (Ads Library URL when we have a page_id, otherwise the page URL).
-        items, meta = self._run_actor(request.url, request.limit)
+        active_status = os.getenv("APIFY_META_ACTIVE_STATUS", "active")
+        items, meta = self._run_actor(request.url, request.limit, active_status=active_status)
 
         has_ads = self._has_ad_payload(items)
-        page_id_from_request = request.metadata.get("page_id") if isinstance(request.metadata, dict) else None
-        page_id_from_error = self._page_id_from_items(items)
-        page_id = page_id_from_request or page_id_from_error
+        combined_meta = {**meta, **(request.metadata or {}), "requested_url": request.url, "active_status": active_status}
 
-        # Retry once with an Ads Library URL if the first attempt produced no ads or PAGE_PRIVATE/ADS_NOT_FOUND.
-        # This helps when the raw page is private but the Ads Library page_id still works.
-        if (not has_ads) and page_id and not (request.metadata or {}).get("ads_library_url_used"):
-            retry_url = self._ads_library_url(page_id)
-            if retry_url and retry_url != request.url:
-                retry_items, retry_meta = self._run_actor(retry_url, request.limit)
-                # Prefer the retry results; even error payloads should carry provider IDs for debugging.
+        # Fallback: if nothing came back and we asked for active ads only, retry once with all statuses.
+        if not has_ads and active_status.lower() == "active":
+            retry_status = "all"
+            retry_items, retry_meta = self._run_actor(request.url, request.limit, active_status=retry_status)
+            retry_has_ads = self._has_ad_payload(retry_items)
+            if retry_has_ads or not items:
                 items, meta = retry_items, retry_meta
+                combined_meta.update(meta)
+                combined_meta["active_status"] = retry_status
+            else:
+                combined_meta.update(retry_meta)
 
         # Always return at least one RawAdItem so provider_run_id/dataset_id are preserved even when no ads.
         wrapped: List[RawAdItem] = []
-        combined_meta = {**meta, **(request.metadata or {}), "requested_url": request.url}
         if items:
             for item in items:
                 wrapped.append(RawAdItem(payload=item, metadata=combined_meta))
@@ -92,17 +93,18 @@ class MetaAdsLibraryIngestor(ChannelIngestor):
             )
         return wrapped
 
-    def _run_actor(self, url: str, limit: int | None) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    def _run_actor(self, url: str, limit: int | None, *, active_status: str) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        limit_per_source = limit or int(os.getenv("APIFY_META_LIMIT_PER_SOURCE", "50"))
         payload: Dict[str, Any] = {
-            "startUrls": [{"url": url}],
             "urls": [{"url": url}],
-            "count": limit or 100,
-            "maxItems": limit or 100,
-            "period": "",
             "scrapeAdDetails": True,
-            "scrapePageAds.activeStatus": os.getenv("APIFY_META_ACTIVE_STATUS", "active"),
+            "scrapePageAds.activeStatus": active_status,
             "scrapePageAds.countryCode": os.getenv("APIFY_META_COUNTRY_CODE", "ALL"),
         }
+        if limit_per_source:
+            payload["limitPerSource"] = limit_per_source
+            payload["count"] = limit_per_source
+            payload["maxItems"] = limit_per_source
         run = self.apify_client.start_actor_run(self.actor_id, input_payload=payload)
         run_id = run.get("id") or run.get("runId")
         if not run_id:
@@ -113,7 +115,7 @@ class MetaAdsLibraryIngestor(ChannelIngestor):
         if dataset_id:
             items = self.apify_client.fetch_dataset_items(dataset_id, limit=limit)
 
-        meta = {"provider_run_id": run_id, "dataset_id": dataset_id, "actor_id": self.actor_id}
+        meta = {"provider_run_id": run_id, "dataset_id": dataset_id, "actor_id": self.actor_id, "actor_input": payload}
         return items, meta
 
     def normalize(self, raw: RawAdItem, ctx: NormalizeContext) -> NormalizedAdWithAssets | None:
@@ -143,6 +145,47 @@ class MetaAdsLibraryIngestor(ChannelIngestor):
             or data.get("url")
         )
         assets: List[NormalizedAsset] = []
+        for idx, card in enumerate(snapshot.get("cards") or []):
+            if not isinstance(card, dict):
+                continue
+            # Prefer video when present; otherwise fall back to the card image.
+            video_src = (
+                card.get("video_hd_url")
+                or card.get("video_sd_url")
+                or card.get("watermarked_video_hd_url")
+                or card.get("watermarked_video_sd_url")
+            )
+            image_src = (
+                card.get("resized_image_url")
+                or card.get("original_image_url")
+                or card.get("watermarked_resized_image_url")
+                or card.get("watermarked_original_image_url")
+            )
+            thumb = (
+                card.get("video_preview_image_url")
+                or card.get("thumbnail_url")
+                or card.get("resized_image_url")
+                or card.get("watermarked_resized_image_url")
+                or card.get("original_image_url")
+            )
+            if video_src:
+                assets.append(
+                    NormalizedAsset(
+                        asset_type=MediaAssetTypeEnum.VIDEO,
+                        source_url=video_src,
+                        metadata={"source": "meta_card_video", "raw": card, "preview_url": thumb},
+                        role="PRIMARY",
+                    )
+                )
+            if image_src:
+                assets.append(
+                    NormalizedAsset(
+                        asset_type=MediaAssetTypeEnum.IMAGE,
+                        source_url=image_src,
+                        metadata={"source": "meta_card_image", "raw": card, "preview_url": thumb},
+                        role="PRIMARY",
+                    )
+                )
         for img in snapshot.get("images") or []:
             url = None
             if isinstance(img, dict):
@@ -214,30 +257,6 @@ class MetaAdsLibraryIngestor(ChannelIngestor):
         if text == "inactive":
             return AdStatusEnum.inactive
         return AdStatusEnum.unknown
-
-    @staticmethod
-    def _ads_library_url(page_id: str | None) -> str | None:
-        if not page_id:
-            return None
-        pid = str(page_id).strip()
-        if not pid:
-            return None
-        return (
-            "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=ALL"
-            "&is_targeted_country=false&media_type=all&search_type=page&view_all_page_id="
-            f"{pid}"
-        )
-
-    @staticmethod
-    def _page_id_from_items(items: List[Dict[str, Any]]) -> str | None:
-        for item in items or []:
-            if not isinstance(item, dict):
-                continue
-            page_info = item.get("pageInfo") or {}
-            pid = page_info.get("page_id") or item.get("page_id")
-            if pid:
-                return str(pid)
-        return None
 
     @staticmethod
     def _has_ad_payload(items: List[Dict[str, Any]]) -> bool:

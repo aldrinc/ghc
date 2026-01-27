@@ -182,6 +182,8 @@ class PreCanonMarketResearchWorkflow:
         step4_prompt: Optional[str] = None
         ads_research_run_id: Optional[str] = None
         ads_creative_analysis: Optional[Dict[str, Any]] = None
+        ads_ingestion_status: Optional[str] = None
+        ads_ingestion_reason: Optional[str] = None
 
         generation_activities = {
             "01": generate_step01_output_activity,
@@ -428,9 +430,23 @@ class PreCanonMarketResearchWorkflow:
             )
             ads_research_run_id = ads_run.get("research_run_id") if isinstance(ads_run, dict) else None
             ads_creative_analysis = ads_run.get("creative_analysis") if isinstance(ads_run, dict) else None
+            ads_ingestion_status = ads_run.get("ingest_status") if isinstance(ads_run, dict) else None
+            ads_ingestion_reason = ads_run.get("ingest_reason") if isinstance(ads_run, dict) else None
             ads_ctx_value = ads_run.get("ads_context") if isinstance(ads_run, dict) else None
             if not ads_ctx_value:
-                raise RuntimeError("Ads ingestion completed without returning ads_context data.")
+                logger.warning(
+                    "Ads ingestion returned empty context; continuing with stub.",
+                    extra={
+                        "workflow_id": workflow.info().workflow_id,
+                        "ads_ingestion_status": ads_ingestion_status,
+                        "ads_ingestion_reason": ads_ingestion_reason,
+                        "ads_research_run_id": ads_research_run_id,
+                    },
+                )
+                ads_ctx_value = {
+                    "status": ads_ingestion_status or "empty",
+                    "reason": ads_ingestion_reason or "ads_context_missing",
+                }
             ads_context = {"ads_context": ads_ctx_value}
             base_vars["ADS_CONTEXT"] = _safe_json_dump(ads_ctx_value)
         else:
@@ -524,6 +540,8 @@ class PreCanonMarketResearchWorkflow:
             "ads_context": base_vars.get("ADS_CONTEXT", ""),
             "ads_research_run_id": ads_research_run_id,
             "ads_creative_analysis": ads_creative_analysis,
+            "ads_ingestion_status": ads_ingestion_status,
+            "ads_ingestion_reason": ads_ingestion_reason,
             "idea_folder_id": base_context.idea_folder_id,
             "idea_folder_url": base_context.idea_folder_url,
             "onboarding_context": {

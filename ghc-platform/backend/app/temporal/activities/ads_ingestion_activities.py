@@ -70,17 +70,14 @@ def upsert_brands_and_identities_activity(params: Dict[str, Any]) -> Dict[str, A
             repo.add_research_run_brand(research_run_id=run.id, brand_id=brand_row.id, role=brand.role)
 
             for channel, channel_identity in brand.channels.as_dict().items():
-                external_id = None
                 external_url = None
                 if channel == AdChannelEnum.META_ADS_LIBRARY:
-                    if channel_identity.facebook_page_ids:
-                        external_id = channel_identity.facebook_page_ids[0]
                     if channel_identity.facebook_page_urls:
                         external_url = channel_identity.facebook_page_urls[0]
                 identity_row = repo.upsert_brand_channel_identity(
                     brand_id=brand_row.id,
                     channel=channel,
-                    external_id=external_id,
+                    external_id=None,
                     external_url=external_url,
                     metadata=channel_identity.model_dump(mode="json"),
                 )
@@ -126,6 +123,8 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
 
         ingest_runs: List[Dict[str, Any]] = []
         ingested_ad_ids: set[str] = set()
+        seen_page_urls: set[str] = set()
+        skipped_duplicates: List[Dict[str, Any]] = []
         for identity in identities:
             ingestor = registry.get(identity.channel)
             requests: List[Any] = []
@@ -154,6 +153,26 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
                     },
                 )
                 continue
+            deduped_requests: List[Any] = []
+            for request in requests:
+                page_url = None
+                if isinstance(getattr(request, "metadata", None), dict):
+                    page_url = request.metadata.get("page_url")
+                if not page_url:
+                    page_url = getattr(request, "url", None)
+                if page_url and page_url in seen_page_urls:
+                    skipped_duplicates.append(
+                        {
+                            "brand_channel_identity_id": identity.id,
+                            "page_url": page_url,
+                        }
+                    )
+                    continue
+                if page_url:
+                    seen_page_urls.add(page_url)
+                deduped_requests.append(request)
+
+            requests = deduped_requests
             if not requests:
                 ingest_run = repo.start_ingest_run(
                     research_run_id=research_run_id,
@@ -187,6 +206,7 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
             items_count = 0
             provider_run_id: Optional[str] = None
             provider_dataset_id: Optional[str] = None
+            actor_input: Optional[Dict[str, Any]] = None
             activity.logger.info(
                 "ads_ingestion.ingest.start",
                 extra={
@@ -202,6 +222,7 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
                         meta = raw.metadata or {}
                         provider_run_id = provider_run_id or meta.get("provider_run_id")
                         provider_dataset_id = provider_dataset_id or meta.get("dataset_id")
+                        actor_input = actor_input or meta.get("actor_input")
                         ctx = NormalizeContext(
                             brand_id=identity.brand_id,
                             brand_channel_identity_id=identity.id,
@@ -239,6 +260,8 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
                         "items_count": items_count,
                         "provider_run_id": provider_run_id,
                         "provider_dataset_id": provider_dataset_id,
+                        "requested_url": requests[0].url if requests else None,
+                        "actor_input": actor_input,
                     }
                 )
             except Exception as exc:  # noqa: BLE001
@@ -255,14 +278,27 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 raise
 
         total_items = sum(run.get("items_count", 0) for run in ingest_runs)
+        status = "ok"
+        reason = None
         if total_items == 0:
-            activity.logger.error(
+            status = "empty"
+            reason = "no_ads_returned"
+            activity.logger.warning(
                 "ads_ingestion.ingest.no_ads",
-                extra={"research_run_id": research_run_id, "identity_count": len(identities)},
+                extra={
+                    "research_run_id": research_run_id,
+                    "identity_count": len(identities),
+                    "skipped_duplicates": len(skipped_duplicates),
+                },
             )
-            raise RuntimeError(f"No ads ingested for research run {research_run_id}")
 
-        return {"ad_ingest_runs": ingest_runs, "ad_ids": sorted(ingested_ad_ids)}
+        return {
+            "ad_ingest_runs": ingest_runs,
+            "ad_ids": sorted(ingested_ad_ids),
+            "status": status,
+            "reason": reason,
+            "skipped_duplicates": skipped_duplicates,
+        }
 
 
 @activity.defn

@@ -8,8 +8,7 @@
         "META_ADS_LIBRARY": {
           "facebook_page_urls": [
             "https://www.facebook.com/ancientremediesbooks"
-          ],
-          "facebook_page_ids": ["100093289608624"]
+          ]
         }
       }
     },
@@ -44,8 +43,7 @@
       "channels": {
         "META_ADS_LIBRARY": {
           "facebook_page_urls": ["https://www.facebook.com/theherbalacademy"],
-          "facebook_page_ids": ["274302752658165"]
-        }
+          }
       }
     },
     {
@@ -55,8 +53,7 @@
       "channels": {
         "META_ADS_LIBRARY": {
           "facebook_page_urls": ["https://www.facebook.com/RosemaryGladstar"],
-          "facebook_page_ids": ["132814756766952"]
-        }
+          }
       }
     },
     {
@@ -66,8 +63,7 @@
       "channels": {
         "META_ADS_LIBRARY": {
           "facebook_page_urls": ["https://www.facebook.com/MountainRoseHerbs"],
-          "facebook_page_ids": ["16352069036"]
-        }
+          }
       }
     },
     {
@@ -77,8 +73,7 @@
       "channels": {
         "META_ADS_LIBRARY": {
           "facebook_page_urls": ["https://www.facebook.com/GaiaHerbs"],
-          "facebook_page_ids": ["10150138648355273"]
-        }
+          }
       }
     }
   ]

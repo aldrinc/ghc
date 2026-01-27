@@ -61,9 +61,11 @@ class AdsIngestionWorkflow:
         )
 
         ad_ids = ingest_result.get("ad_ids") if isinstance(ingest_result, dict) else None
+        ingest_status = ingest_result.get("status") if isinstance(ingest_result, dict) else None
+        ingest_reason = ingest_result.get("reason") if isinstance(ingest_result, dict) else None
 
         creative_analysis = None
-        if input.run_creative_analysis:
+        if input.run_creative_analysis and ad_ids:
             handle = await workflow.start_child_workflow(
                 AdsCreativeAnalysisWorkflow.run,
                 AdsCreativeAnalysisInput(
@@ -93,5 +95,7 @@ class AdsIngestionWorkflow:
         return {
             "research_run_id": upsert_result["research_run_id"],
             "ads_context": context_result.get("ads_context"),
+            "ingest_status": ingest_status,
+            "ingest_reason": ingest_reason,
             "creative_analysis": creative_analysis,
         }

@@ -2,41 +2,16 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 from typing import Any, Dict, List, Optional
-from urllib.parse import urlparse
 
 from temporalio import activity
 
+from app.ads.normalization import normalize_facebook_page_url
 from app.llm import LLMClient, LLMGenerationParams
 from app.schemas.competitors import CompetitorRow, ResolveFacebookRequest, ResolveFacebookResult
 
 
 logger = logging.getLogger(__name__)
-
-FACEBOOK_URL_RE = re.compile(r"^https?://(www\.)?facebook\.com/", re.IGNORECASE)
-INVALID_FACEBOOK_PATH_TOKENS = [
-    "/sharer",
-    "/share",
-    "/dialog/",
-    "/story.php",
-    "/photo.php",
-    "/permalink.php",
-    "/posts/",
-]
-
-
-def _is_valid_facebook_page_url(url: str) -> bool:
-    if not url:
-        return False
-    if not FACEBOOK_URL_RE.match(url.strip()):
-        return False
-    parsed = urlparse(url)
-    path_lower = (parsed.path or "").lower()
-    for token in INVALID_FACEBOOK_PATH_TOKENS:
-        if token in path_lower:
-            return False
-    return True
 
 
 def _shorten(text: str, max_len: int = 4000) -> str:
@@ -71,22 +46,20 @@ def resolve_competitor_facebook_pages_activity(request: ResolveFacebookRequest) 
             {
                 "name": c.name,
                 "website": c.website,
-                "example_ads_library_url": "https://www.facebook.com/ads/library/?view_all_page_id=<PAGE_ID>",
             }
         )
 
     system_instructions = (
-        "You are resolving *official brand Facebook pages* for a list of competitors.\n"
-        "You must return ONLY a JSON array with one object per input competitor, in the *same order*.\n"
-        "Each object must have: name, website, facebook_page_url, facebook_page_id (string, numeric if available), "
-        "confidence (0-1 float), notes, evidence_urls (array of strings).\n"
+        "You are resolving *official brand Facebook pages* for competitors. Return ONLY a JSON array with one object "
+        "per input competitor, in the same order. No prose outside the array.\n"
+        "Each object must include: name, website, facebook_page_url (canonical Page URL or null), facebook_page_name "
+        "(string or null), confidence (0-1 float), notes, evidence_links (array of strings).\n"
         "Rules:\n"
-        "- facebook_page_url must be the canonical brand page (not posts/shares/ads); must start with https://www.facebook.com/.\n"
-        "- Extract the numeric page ID if present (from page URL, Ads Library view_all_page_id, or page_id parameter). "
-        "If you cannot find a numeric ID, set facebook_page_id to null.\n"
+        "- facebook_page_url MUST be a Page URL starting with https://www.facebook.com/<page>. Do NOT return Ads "
+        "Library URLs, posts, groups, events, reels, or query parameters.\n"
+        "- Do NOT guess or return numeric page IDs; omit them entirely.\n"
         "- Prefer the official brand/business page in the relevant market.\n"
         "- If uncertain, set facebook_page_url to null and explain in notes.\n"
-        "- Do not include any explanation outside the JSON array.\n"
     )
 
     context_bits: List[str] = []
@@ -126,24 +99,38 @@ def resolve_competitor_facebook_pages_activity(request: ResolveFacebookRequest) 
         if parsed_json is not None:
             error = "Parsed JSON was not a list of objects."
 
+    def _safe_confidence(value: Any) -> Optional[float]:
+        try:
+            num = float(value)
+        except Exception:
+            return None
+        if num < 0 or num > 1:
+            return None
+        return num
+
     updated_competitors: List[CompetitorRow] = []
     for idx, competitor in enumerate(competitors):
         fb_url: Optional[str] = None
-        fb_id: Optional[str] = None
+        confidence: Optional[float] = None
+        evidence_links: Optional[List[str]] = None
         if idx < len(results_list):
             candidate = results_list[idx]
             candidate_url = candidate.get("facebook_page_url")
-            candidate_id = candidate.get("facebook_page_id")
-            if isinstance(candidate_url, str) and _is_valid_facebook_page_url(candidate_url):
-                fb_url = candidate_url.strip()
-            if isinstance(candidate_id, str) and candidate_id.strip():
-                fb_id = candidate_id.strip()
+            normalized = normalize_facebook_page_url(candidate_url) if isinstance(candidate_url, str) else None
+            fb_url = normalized
+            confidence = _safe_confidence(candidate.get("confidence"))
+            maybe_links = candidate.get("evidence_links") or candidate.get("evidence_urls")
+            if isinstance(maybe_links, list):
+                evidence_links = [str(link) for link in maybe_links if str(link).strip()]
+
         updated_competitors.append(
             CompetitorRow(
                 name=competitor.name,
                 website=competitor.website,
                 facebook_page_url=fb_url,
-                facebook_page_id=fb_id,
+                facebook_page_url_source="llm_web_search" if fb_url else None,
+                facebook_page_url_confidence=confidence,
+                facebook_page_url_evidence=evidence_links,
             )
         )
 

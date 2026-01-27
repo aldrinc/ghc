@@ -78,3 +78,57 @@ def derive_primary_domain(url: Optional[str]) -> Optional[str]:
     if hostname.startswith("www."):
         hostname = hostname[4:]
     return hostname
+
+
+def normalize_facebook_page_url(url: Optional[str]) -> Optional[str]:
+    """
+    Canonicalize Facebook Page URLs for ingestion.
+
+    Rules:
+    - Require https and host facebook.com; normalize host to www.facebook.com.
+    - Strip query params/fragments and collapse duplicate slashes.
+    - Remove trailing slash.
+    - Reject obvious non-page paths (ads library, groups, events, watch, reels, photos).
+    """
+    if not url:
+        return None
+    candidate = url.strip()
+    if not candidate:
+        return None
+    if not _SCHEME_RE.match(candidate):
+        candidate = f"https://{candidate}"
+    try:
+        parsed = urlparse(candidate)
+    except Exception:
+        return None
+
+    host = (parsed.hostname or "").lower()
+    if not host.endswith("facebook.com"):
+        return None
+    host = "www.facebook.com"
+
+    path = parsed.path or ""
+    path = re.sub(r"/{2,}", "/", path)
+    invalid_tokens = (
+        "/ads/library",
+        "/groups/",
+        "/events/",
+        "/watch/",
+        "/reel",
+        "/reels",
+        "/photo",
+        "/photos",
+    )
+    path_lower = path.lower()
+    for token in invalid_tokens:
+        if token in path_lower:
+            return None
+
+    if path and not path.startswith("/"):
+        path = f"/{path}"
+    if path != "/" and path.endswith("/"):
+        path = path.rstrip("/")
+    if not path or path == "/":
+        return None
+
+    return urlunparse(("https", host, path, "", "", ""))

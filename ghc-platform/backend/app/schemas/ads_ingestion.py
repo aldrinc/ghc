@@ -4,13 +4,17 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.ads.normalization import derive_primary_domain, normalize_brand_name, normalize_url
+from app.ads.normalization import (
+    derive_primary_domain,
+    normalize_brand_name,
+    normalize_facebook_page_url,
+    normalize_url,
+)
 from app.db.enums import AdChannelEnum, BrandRoleEnum
 
 
 class MetaAdsLibraryIdentity(BaseModel):
     facebook_page_urls: List[str] = []
-    facebook_page_ids: List[str] = []
 
     model_config = ConfigDict(extra="ignore")
 
@@ -19,20 +23,10 @@ class MetaAdsLibraryIdentity(BaseModel):
     def _normalize_urls(cls, urls: List[str]) -> List[str]:
         normalized: List[str] = []
         for url in urls or []:
-            canonical = normalize_url(url)
+            canonical = normalize_facebook_page_url(url)
             if canonical and canonical not in normalized:
                 normalized.append(canonical)
         return normalized
-
-    @field_validator("facebook_page_ids", mode="after")
-    @classmethod
-    def _normalize_ids(cls, ids: List[str]) -> List[str]:
-        deduped: List[str] = []
-        for value in ids or []:
-            cleaned = (value or "").strip()
-            if cleaned and cleaned not in deduped:
-                deduped.append(cleaned)
-        return deduped
 
 
 class BrandChannels(BaseModel):
