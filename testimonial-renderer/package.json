@@ -1,0 +1,17 @@
+{
+  "name": "testimonial-renderer",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "node src/render.mjs",
+    "render:nano": "node src/nano-banana-flow.mjs",
+    "server": "node src/server.mjs"
+  },
+  "dependencies": {
+    "@google/genai": "^1.21.0",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "playwright": "^1.50.0",
+    "sharp": "^0.33.5"
+  }
+}

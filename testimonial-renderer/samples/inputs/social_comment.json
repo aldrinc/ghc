@@ -1,0 +1,31 @@
+{
+  "template": "social_comment",
+  "header": {
+    "title": "All comments",
+    "showSortIcon": true
+  },
+  "comments": [
+    {
+      "name": "Harper Lane",
+      "text": "These have been a game-changer for late-night accidents. Easy to rinse and they dry quickly.",
+      "avatarUrl": "../assets/avatar-harper.svg",
+      "meta": {
+        "time": "2d",
+        "followLabel": "Follow"
+      },
+      "reactionCount": 12,
+      "replies": [
+        {
+          "name": "Quinn Park",
+          "text": "@Harper Lane same here. We keep one in every room now.",
+          "avatarUrl": "../assets/avatar-quinn.svg",
+          "meta": {
+            "time": "2d"
+          },
+          "reactionCount": 2
+        }
+      ],
+      "viewRepliesText": "View 1 reply"
+    }
+  ]
+}

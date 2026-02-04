@@ -1,0 +1,136 @@
+{
+  "model": "gemini-2.5-flash-image",
+  "outputDir": "../generated/nano-banana",
+  "avatarRequests": [
+    {
+      "id": "harper",
+      "prompt": "A casual, unposed smartphone photo of Harper Lane in the living room, holding a warm mug and looking toward a window, taken by a family member from a normal standing height. Slightly off-center framing, a tiny bit of motion blur, natural skin texture with small imperfections, hair slightly messy, clothes lightly wrinkled. Mixed indoor lighting (warm lamp + daylight spill), auto white balance, auto exposure, mild digital noise and JPEG compression, soft focus (not razor sharp), realistic colors, ordinary home background with a little clutter. No flash. 4:3 aspect ratio. No products or books visible.",
+      "output": "avatars/harper.png",
+      "imageConfig": {
+        "aspectRatio": "4:3"
+      }
+    },
+    {
+      "id": "quinn",
+      "prompt": "A casual, unposed smartphone photo of Quinn Park in a home office, writing a quick note on a small notepad, taken by a family member from a normal standing height. Slightly off-center framing, a tiny bit of motion blur, natural skin texture with small imperfections, hair slightly messy, clothes lightly wrinkled. Mixed indoor lighting (warm lamp + daylight spill), auto white balance, auto exposure, mild digital noise and JPEG compression, soft focus (not razor sharp), realistic colors, ordinary home background with a little clutter. No flash. 4:3 aspect ratio. No products or books visible.",
+      "output": "avatars/quinn.png",
+      "imageConfig": {
+        "aspectRatio": "4:3"
+      }
+    }
+  ],
+  "contentRequests": [
+    {
+      "id": "book_shot_kitchen",
+      "prompt": "A casual smartphone photo of the natural remedies book sitting on a kitchen counter at home, photographed quickly by hand. Natural indoor lighting mixed with a little window light, auto white balance, auto exposure. Slightly imperfect framing (not centered), mild digital noise, light JPEG compression, soft focus (not razor sharp), realistic shadows, subtle clutter in the background (everyday household items like a mug, fruit bowl, dish towel). No studio setup, no seamless backdrop, no dramatic lighting. 4:3 aspect ratio. Keep the book cover legible and match the reference.",
+      "referenceImages": ["../assets/sample_book.png"],
+      "referenceFirst": true,
+      "output": "content/book-shot-kitchen.png",
+      "imageConfig": {
+        "aspectRatio": "4:3"
+      }
+    },
+    {
+      "id": "book_shot_bedside",
+      "prompt": "A casual smartphone photo of the natural remedies book resting on a bedside table at home, photographed quickly by hand. Natural indoor lighting mixed with a little window light, auto white balance, auto exposure. Slightly imperfect framing (not centered), mild digital noise, light JPEG compression, soft focus (not razor sharp), realistic shadows, subtle clutter in the background (lamp base, reading glasses, small plant). No studio setup, no seamless backdrop, no dramatic lighting. 4:3 aspect ratio. Keep the book cover legible and match the reference.",
+      "referenceImages": ["../assets/sample_book.png"],
+      "referenceFirst": true,
+      "output": "content/book-shot-bedside.png",
+      "imageConfig": {
+        "aspectRatio": "4:3"
+      }
+    },
+    {
+      "id": "book_shot_desk",
+      "prompt": "A casual smartphone photo of the natural remedies book on a home office desk, photographed quickly by hand. Natural indoor lighting mixed with a little window light, auto white balance, auto exposure. Slightly imperfect framing (not centered), mild digital noise, light JPEG compression, soft focus (not razor sharp), realistic shadows, subtle clutter in the background (notebook, pen, small stack of papers). No studio setup, no seamless backdrop, no dramatic lighting. 4:3 aspect ratio. Keep the book cover legible and match the reference.",
+      "referenceImages": ["../assets/sample_book.png"],
+      "referenceFirst": true,
+      "output": "content/book-shot-desk.png",
+      "imageConfig": {
+        "aspectRatio": "4:3"
+      }
+    }
+  ],
+  "renders": [
+    {
+      "output": "../output/social_comment_nano.png",
+      "payload": {
+        "template": "social_comment",
+        "header": {
+          "title": "All comments",
+          "showSortIcon": true
+        },
+        "comments": [
+          {
+            "name": "Harper Lane",
+            "text": "The textures on these are impressive. They rinse quickly and the backing stays put on tile.",
+            "avatarUrl": "{{avatar:harper}}",
+            "meta": {
+              "time": "1d",
+              "followLabel": "Follow"
+            },
+            "reactionCount": 9,
+            "attachmentUrl": "{{content:book_shot_kitchen}}",
+            "replies": [
+              {
+                "name": "Quinn Park",
+                "text": "@Harper Lane same here. We keep one in every room now.",
+                "avatarUrl": "{{avatar:quinn}}",
+                "meta": {
+                  "time": "1d"
+                },
+                "reactionCount": 2
+              }
+            ],
+            "viewRepliesText": "View 1 reply"
+          }
+        ]
+      }
+    },
+    {
+      "output": "../output/review_card_nano_kitchen.png",
+      "payload": {
+        "template": "review_card",
+        "name": "Harper Lane",
+        "verified": true,
+        "rating": 5,
+        "review": "Loved this natural remedies guide. The layout is clear and the home tips are easy to follow.",
+        "heroImageUrl": "{{content:book_shot_kitchen}}",
+        "meta": {
+          "location": "Portland, OR",
+          "date": "2026-02-01"
+        }
+      }
+    },
+    {
+      "output": "../output/review_card_nano_bedside.png",
+      "payload": {
+        "template": "review_card",
+        "name": "Quinn Park",
+        "verified": true,
+        "rating": 5,
+        "review": "Great read before bed. Simple recipes and remedies that feel realistic for everyday life.",
+        "heroImageUrl": "{{content:book_shot_bedside}}",
+        "meta": {
+          "location": "Madison, WI",
+          "date": "2026-02-02"
+        }
+      }
+    },
+    {
+      "output": "../output/review_card_nano_desk.png",
+      "payload": {
+        "template": "review_card",
+        "name": "Dylan Reyes",
+        "verified": true,
+        "rating": 5,
+        "review": "I keep this on my desk for quick reference. Clear chapters and helpful checklists.",
+        "heroImageUrl": "{{content:book_shot_desk}}",
+        "meta": {
+          "location": "Boulder, CO",
+          "date": "2026-02-03"
+        }
+      }
+    }
+  ]
+}

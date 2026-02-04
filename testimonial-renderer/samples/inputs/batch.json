@@ -1,0 +1,78 @@
+[
+  {
+    "output": "review_card_vicki.png",
+    "template": "review_card",
+    "name": "Vicki Cospar",
+    "verified": true,
+    "rating": 5,
+    "review": "The puppy pads work great. I use them in our whelping box and they clean up quickly. No leaks, no lingering smell, and they hold up after multiple washes.",
+    "heroImageUrl": "../assets/hero-puppies.svg",
+    "meta": {
+      "location": "Savannah, GA",
+      "date": "2026-01-15"
+    }
+  },
+  {
+    "output": "review_card_maria.png",
+    "template": "review_card",
+    "name": "Maria Fig",
+    "verified": true,
+    "rating": 5,
+    "review": "These pads are a lifesaver for nighttime accidents. They absorb fast and keep the floor clean. I ordered a second set so I always have a fresh one ready.",
+    "heroImageUrl": "../assets/hero-pads.svg",
+    "meta": {
+      "location": "Austin, TX",
+      "date": "2026-01-08"
+    }
+  },
+  {
+    "output": "social_comment_elaine.png",
+    "template": "social_comment",
+    "header": {
+      "title": "All comments",
+      "showSortIcon": true
+    },
+    "comments": [
+      {
+        "name": "Harper Lane",
+        "text": "These have been a game-changer for late-night accidents. Easy to rinse and they dry quickly.",
+        "avatarUrl": "../assets/avatar-harper.svg",
+        "meta": {
+          "time": "2d",
+          "followLabel": "Follow"
+        },
+        "reactionCount": 12,
+        "replies": [
+          {
+            "name": "Quinn Park",
+            "text": "@Harper Lane same here. We keep one in every room now.",
+            "avatarUrl": "../assets/avatar-quinn.svg",
+            "meta": {
+              "time": "2d"
+            },
+            "reactionCount": 2
+          }
+        ],
+        "viewRepliesText": "View 1 reply"
+      }
+    ]
+  },
+  {
+    "output": "social_comment_tina.png",
+    "template": "social_comment",
+    "header": {
+      "title": "All comments",
+      "showSortIcon": false
+    },
+    "comments": [
+      {
+        "name": "Dylan Reyes",
+        "text": "Surprisingly soft and the backing doesn't slide around. Big help for our senior dog.",
+        "avatarUrl": "../assets/avatar-omar.svg",
+        "meta": {
+          "time": "5d"
+        }
+      }
+    ]
+  }
+]

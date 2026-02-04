@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#f0e4d6"/>
+  <g fill="#d9c7b4" opacity="0.6">
+    <circle cx="140" cy="140" r="18"/>
+    <circle cx="190" cy="120" r="12"/>
+    <circle cx="170" cy="170" r="12"/>
+    <circle cx="240" cy="150" r="12"/>
+    <circle cx="200" cy="190" r="26"/>
+
+    <circle cx="980" cy="160" r="18"/>
+    <circle cx="1030" cy="140" r="12"/>
+    <circle cx="1010" cy="190" r="12"/>
+    <circle cx="1080" cy="170" r="12"/>
+    <circle cx="1040" cy="210" r="26"/>
+
+    <circle cx="320" cy="560" r="18"/>
+    <circle cx="370" cy="540" r="12"/>
+    <circle cx="350" cy="590" r="12"/>
+    <circle cx="420" cy="570" r="12"/>
+    <circle cx="380" cy="610" r="26"/>
+  </g>
+
+  <g fill="#f9f5ef" stroke="#c9b8a8" stroke-width="6">
+    <ellipse cx="360" cy="360" rx="180" ry="120"/>
+    <ellipse cx="780" cy="380" rx="200" ry="130"/>
+    <ellipse cx="560" cy="520" rx="220" ry="140"/>
+  </g>
+
+  <g fill="#c9b8a8">
+    <circle cx="310" cy="320" r="20"/>
+    <circle cx="420" cy="330" r="20"/>
+    <circle cx="730" cy="350" r="22"/>
+    <circle cx="840" cy="360" r="22"/>
+    <circle cx="520" cy="500" r="24"/>
+    <circle cx="600" cy="500" r="24"/>
+  </g>
+
+  <text x="60" y="740" font-family="Manrope, sans-serif" font-size="36" fill="#b59e8d">Puppies at rest</text>
+</svg>

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <rect width="1200" height="800" fill="#efe6db"/>
+  <g stroke="#d6c7b7" stroke-width="2">
+    <path d="M0 200H1200" />
+    <path d="M0 400H1200" />
+    <path d="M0 600H1200" />
+    <path d="M200 0V800" />
+    <path d="M400 0V800" />
+    <path d="M600 0V800" />
+    <path d="M800 0V800" />
+    <path d="M1000 0V800" />
+  </g>
+
+  <rect x="260" y="220" width="680" height="360" rx="28" fill="#f7f7f9" stroke="#cbd5e1" stroke-width="6"/>
+  <g fill="#94a3b8" opacity="0.5">
+    <circle cx="340" cy="300" r="10"/>
+    <circle cx="380" cy="280" r="8"/>
+    <circle cx="360" cy="330" r="8"/>
+    <circle cx="420" cy="310" r="8"/>
+    <circle cx="390" cy="350" r="14"/>
+
+    <circle cx="700" cy="340" r="10"/>
+    <circle cx="740" cy="320" r="8"/>
+    <circle cx="720" cy="370" r="8"/>
+    <circle cx="780" cy="350" r="8"/>
+    <circle cx="750" cy="390" r="14"/>
+  </g>
+
+  <text x="80" y="740" font-family="Manrope, sans-serif" font-size="34" fill="#b7a99a">Washable pad in place</text>
+</svg>

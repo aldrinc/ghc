@@ -1,0 +1,12 @@
+{
+  "template": "review_card",
+  "name": "Vicki Cospar",
+  "verified": true,
+  "rating": 5,
+  "review": "The puppy pads work great. I use them in our whelping box and they clean up quickly. No leaks, no lingering smell, and they hold up after multiple washes.",
+  "heroImageUrl": "../assets/hero-puppies.svg",
+  "meta": {
+    "location": "Savannah, GA",
+    "date": "2026-01-15"
+  }
+}
