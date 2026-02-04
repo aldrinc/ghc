@@ -37,6 +37,10 @@ build/
 coverage/
 *.tsbuildinfo
 
+# Local archives/artifacts
+clerk-clerk-js-*.tgz
+mos/backend/reports/
+
 # Taskmaster
 .taskmaster/
 
