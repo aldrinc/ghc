@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INFRA_DIR="$ROOT/ghc-platform/infra"
+INFRA_DIR="$ROOT/mos/infra"
 
 if docker compose version >/dev/null 2>&1; then
   DOCKER_COMPOSE=(docker compose)

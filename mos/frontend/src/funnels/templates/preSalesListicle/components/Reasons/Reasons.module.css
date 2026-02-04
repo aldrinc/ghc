@@ -1,0 +1,117 @@
+.section {
+  padding: var(--section-pad-y) 0;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  display: grid;
+  gap: var(--listicle-card-gap);
+}
+
+/*
+  Listicle record (matches PuppyPad)
+  - image on the left
+  - number badge overlays image
+  - bordered card on off-white background
+*/
+.card {
+  border: var(--listicle-card-border);
+  border-radius: var(--listicle-card-radius);
+  background: var(--color-bg);
+  overflow: hidden;
+
+  display: grid;
+  grid-template-columns: var(--listicle-media-width) minmax(0, 1fr);
+  align-items: start;
+}
+
+.media {
+  position: relative;
+  min-height: var(--listicle-media-min-height);
+  aspect-ratio: 1 / 1;
+  align-self: start;
+}
+
+.image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.placeholder {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--listicle-media-placeholder-bg);
+}
+
+.number {
+  position: absolute;
+  top: var(--listicle-number-offset);
+  left: var(--listicle-number-offset);
+
+  width: var(--listicle-number-size);
+  height: var(--listicle-number-size);
+  border-radius: 999px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  background: var(--listicle-number-bg);
+  color: var(--listicle-number-fg);
+
+  font-family: var(--font-sans);
+  font-weight: 900;
+  font-size: var(--listicle-number-font-size);
+  line-height: 1;
+}
+
+.content {
+  padding: var(--listicle-content-pad-y) var(--listicle-content-pad-x);
+}
+
+.title {
+  margin: 0 0 var(--listicle-title-margin-bottom);
+  font-family: var(--listicle-title-font);
+  font-size: var(--listicle-title-size);
+  line-height: var(--listicle-title-line);
+  font-weight: var(--heading-weight);
+  letter-spacing: var(--listicle-title-letter-spacing);
+  color: var(--listicle-title-color);
+}
+
+.body {
+  margin: var(--listicle-body-gap) 0 0;
+  font-family: var(--font-sans);
+  font-size: var(--listicle-body-size);
+  line-height: var(--listicle-body-line);
+  color: var(--color-text);
+}
+
+.endSentinel {
+  width: 100%;
+  height: 1px;
+}
+
+@media (max-width: 860px) {
+  .card {
+    grid-template-columns: 1fr;
+  }
+
+  .media {
+    min-height: var(--listicle-media-min-height-mobile);
+  }
+
+  .content {
+    padding: var(--listicle-content-pad-y-mobile) var(--listicle-content-pad-x-mobile);
+  }
+
+  .title {
+    font-size: var(--listicle-title-size-mobile);
+  }
+}

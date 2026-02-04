@@ -1,0 +1,62 @@
+/* Minimal reset + sensible defaults */
+
+@font-face {
+  font-family: "AwesomeSerif";
+  src: url("https://cdn.shopify.com/s/files/1/0433/0510/7612/files/AwesomeSerif-MediumExtraTall.woff?v=1754230282")
+    format("woff");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Offset for the floating header when jumping to anchors */
+  scroll-padding-top: 110px;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--line);
+  color: var(--color-text);
+  background: var(--color-page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+img,
+video {
+  max-width: 100%;
+  display: block;
+}
+
+button {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-outline);
+  outline-offset: 3px;
+}

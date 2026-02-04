@@ -1,0 +1,21 @@
+services:
+  backend:
+    image: ${IMAGE_REGISTRY:-ghcr.io/aldrinc}/mos-backend:${IMAGE_TAG:-latest}
+    env_file:
+      - ../../.env.production
+    ports:
+      - "8008:8008"
+    restart: unless-stopped
+
+  worker:
+    image: ${IMAGE_REGISTRY:-ghcr.io/aldrinc}/mos-backend:${IMAGE_TAG:-latest}
+    env_file:
+      - ../../.env.production
+    command: ["python", "-m", "app.temporal.worker"]
+    restart: unless-stopped
+
+  frontend:
+    image: ${IMAGE_REGISTRY:-ghcr.io/aldrinc}/mos-frontend:${IMAGE_TAG:-latest}
+    ports:
+      - "8080:80"
+    restart: unless-stopped

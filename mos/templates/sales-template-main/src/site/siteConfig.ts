@@ -1,0 +1,492 @@
+import type { SiteConfig } from './types'
+
+/**
+ * PuppyPad PDP template configuration
+ *
+ * ✅ Goal: keep *all copy* (headings, labels, paragraphs, FAQ content, etc.)
+ * in this single object so you can swap text/assets without touching components.
+ *
+ * NOTE: Images here are placeholders (SVGs) so the project runs out of the box.
+ * Replace the `src` values with your real CDN URLs or files in /public.
+ */
+export const siteConfig: SiteConfig = {
+  meta: {
+    title: 'PuppyPad PDP Template',
+    description: 'A React + Vite template that recreates the PuppyPad PDP layout.',
+    lang: 'en',
+  },
+
+  theme: {
+    tokens: {
+      // You can override any token from src/theme/tokens.css here.
+      // '--color-brand': '#061a70',
+    },
+  },
+
+  copy: {
+    common: {
+      starsAriaLabelTemplate: '{rating} out of 5 stars',
+    },
+    modal: {
+      closeAriaLabel: 'Close dialog',
+      dialogAriaLabel: 'Dialog window',
+    },
+    // The rest is kept for compatibility with other components in the repo
+    reviews: {
+      sectionAriaLabel: 'Customer reviews',
+      prevButtonAriaLabel: 'Previous review',
+      nextButtonAriaLabel: 'Next review',
+      dotsAriaLabel: 'Review navigation',
+      goToReviewAriaLabelTemplate: 'Go to review {index}',
+    },
+    reviewWall: {
+      verifiedLabel: 'Verified',
+    },
+  },
+
+  page: {
+    marquee: {
+      items: [
+        'SUPER STRONG',
+        'COMFY',
+        'ANTI-SLIP',
+        'FAST ABSORPTION',
+        'NO TRAINING REQUIRED',
+        'REUSABLE',
+        'NO SMELLS',
+      ],
+      repeat: 2,
+    },
+
+    hero: {
+      header: {
+        logo: {
+          src: '/assets/puppypad-logo.svg',
+          alt: 'PuppyPad',
+          href: '#top',
+        },
+        nav: [
+          { label: 'How It Works', href: '#how-it-works' },
+          { label: 'Guarantee', href: '#guarantee' },
+          { label: 'FAQ', href: '#faq' },
+          { label: 'Reviews', href: '#reviews' },
+        ],
+        cta: {
+          label: 'CHOOSE BUNDLE',
+          href: '#top',
+        },
+      },
+
+      gallery: {
+        freeGifts: {
+          icon: { src: '/assets/ph-square.svg', alt: 'Free gifts' },
+          title: '3 Free Gifts Today Only',
+          body: 'For today only, get 3 free books (instant download). Click to see a preview',
+          ctaLabel: 'Preview',
+        },
+        slides: [
+          { src: '/assets/Product-IMG-3-Gray.webp', alt: 'PuppyPad in a home' },
+          { src: '/assets/Attraction.webp', alt: 'Dog on PuppyPad' },
+          { src: '/assets/ph-4x3.svg', alt: 'Placeholder slide' },
+          { src: '/assets/ph-4x3.svg', alt: 'Placeholder slide' },
+          { src: '/assets/ph-4x3.svg', alt: 'Placeholder slide' },
+          { src: '/assets/ph-4x3.svg', alt: 'Placeholder slide' },
+        ],
+        watchInAction: {
+          label: 'WATCH IN ACTION',
+        },
+      },
+
+      purchase: {
+        faqPills: [
+          {
+            label: 'How does it work?',
+            answer:
+              "Our patented pheromone technology naturally attracts dogs to the pad - no training needed. The 4-layer system instantly absorbs and locks in moisture while the antimicrobial layer prevents odors.",
+          },
+          {
+            label: 'Will my dog use it?',
+            answer:
+              "Most dogs naturally recognize PuppyPad as a bathroom spot thanks to our pheromone scent signals. Place it where your dog usually goes and they'll quickly learn it's their designated area.",
+          },
+          {
+            label: 'How long does it last?',
+            answer:
+              'One PuppyPad is built to last 300+ washes (often more than a year) with normal use and proper care.',
+          },
+          {
+            label: 'Will the pee not make it smell?',
+            answer:
+              "No — PuppyPad's antimicrobial core traps and neutralizes odor at the source, so your home stays fresh between washes.",
+          },
+          {
+            label: 'How strong is it?',
+            answer:
+              'It uses military-grade, chew-resistant fabric designed to withstand scratching, digging, and typical chewing much better than disposables.',
+          },
+          {
+            label: 'How quick does it absorb?',
+            answer:
+              'The multi-layer core absorbs quickly and locks in moisture so liquid does not pool or spread across the surface.',
+          },
+          {
+            label: 'How do I wash it?',
+            answer:
+              'Machine wash on a regular cycle. Tumble dry low or hang dry. The pad is designed to maintain performance across hundreds of washes.',
+          },
+          {
+            label: 'Is it slippery?',
+            answer:
+              'No — the anti-slip backing is designed to stay in place on common floor types to help prevent slips and shifting.',
+          },
+          {
+            label: "What if I don't like it?",
+            answer:
+              'You are covered by the risk-free guarantee. If you are not satisfied, you can request a refund according to the guarantee terms.',
+          },
+        ],
+        title: "PuppyPad - The Last Pee Pad You'll Get",
+        benefits: [
+          { text: 'No Training Required' },
+          { text: 'Easy To Clean & Reuse' },
+          { text: 'Leak & Odor Proof' },
+          { text: 'Save Your Money & The Planet' },
+        ],
+
+        size: {
+          title: '1. Select Your Size:',
+          helpLinkLabel: 'Unsure What Size To Get?',
+          shippingDelayLabel: 'Please Allow An Additional 5 Days For Shipping This Color & Size Due To High Demand',
+          options: [
+            {
+              id: 'small',
+              label: 'Small',
+              sizeIn: '16x24 Inches',
+              sizeCm: '(40x60cm)',
+            },
+            {
+              id: 'medium',
+              label: 'Medium',
+              sizeIn: '28x32 Inches',
+              sizeCm: '(70x80cm)',
+            },
+            {
+              id: 'large',
+              label: 'Large',
+              sizeIn: '32x35 Inches',
+              sizeCm: '(80x90cm)',
+            },
+          ],
+        },
+
+        color: {
+          title: '2. Select Your Color:',
+          outOfStockTitle: 'This color in this size is currently out of stock.',
+          outOfStockBody: 'Please try a different color or size.',
+          options: [
+            { id: 'gray', label: 'Gray', swatch: '#9CA3AF' },
+            { id: 'beige', label: 'Beige', swatch: '#D6C3A6' },
+            { id: 'brave-beige', label: 'Brave Beige', swatch: '#E3D2B8' },
+            { id: 'white', label: 'White', swatch: '#FFFFFF' },
+          ],
+        },
+
+        offer: {
+          title: '3. Select Your Offer:',
+          helperText: 'Most customers go for the Buy 3 Get 3 Free offer.',
+          seeWhyLabel: 'Click to see why.',
+          options: [
+            {
+              id: '1',
+              title: '1 PuppyPad',
+              image: { src: '/assets/ph-square.svg', alt: 'Bundle: 1 PuppyPad' },
+              price: 50,
+              compareAt: 0,
+              saveLabel: '',
+            },
+            {
+              id: '6',
+              title: 'Buy 3 Get 3 Free',
+              image: { src: '/assets/ph-square.svg', alt: 'Bundle: Buy 3 Get 3 Free' },
+              price: 149,
+              compareAt: 300,
+              saveLabel: 'SAVE $151',
+            },
+            {
+              id: '3',
+              title: 'Buy 2 Get 1 Free',
+              image: { src: '/assets/ph-square.svg', alt: 'Bundle: Buy 2 Get 1 Free' },
+              price: 99,
+              compareAt: 150,
+              saveLabel: 'SAVE $51',
+            },
+          ],
+        },
+
+        outOfStock: [
+          // Example rule: medium + white => out of stock
+          { sizeId: 'medium', colorId: 'white' },
+        ],
+        shippingDelay: [
+          // Example rule: medium + brave-beige => delay
+          { sizeId: 'medium', colorId: 'brave-beige' },
+        ],
+
+        cta: {
+          labelTemplate: 'ADD TO CART - {price}',
+          subBullets: ['90 DAY RISK FREE GUARANTEE', 'FREE 2-5 DAY SHIPPING FROM WISCONSIN'],
+          urgency: {
+            message: 'We are selling out more than expected. Order now before we run out again.',
+            rows: [
+              { label: 'DECEMBER', value: 'Sold Out (4,780 PuppyPads Were Sold)', tone: 'muted' },
+              { label: 'JANUARY', value: '99% Sold (5,346 out of 5,400 PuppyPads)', tone: 'highlight' },
+            ],
+          },
+        },
+      },
+    },
+
+    videos: {
+      badge: '37,000+ DOG PARENTS LOVE US!',
+      title: "See Why We're The Most Shared Pee Pad On Facebook",
+      videos: [
+        { id: 'v1', thumbnail: { src: '/assets/ph-3x4.svg', alt: 'Video testimonial 1' } },
+        { id: 'v2', thumbnail: { src: '/assets/ph-3x4.svg', alt: 'Video testimonial 2' } },
+        { id: 'v3', thumbnail: { src: '/assets/ph-3x4.svg', alt: 'Video testimonial 3' } },
+        { id: 'v4', thumbnail: { src: '/assets/ph-3x4.svg', alt: 'Video testimonial 4' } },
+      ],
+    },
+
+    story: {
+      problem: {
+        id: 'how-it-works',
+        bg: 'peach',
+        badge: 'THE PROBLEM',
+        title: "The Truth About Your Dog's Accidents",
+        paragraphs: [
+          'Your dog needs scent signals to know where to pee.',
+          "Disposable pads don't have them. They smell like plastic and chemicals. To your dog's 300 million scent receptors, that's not a bathroom. It's just a weird mat on your floor.",
+          'So even when your dog DOES use them, you throw them away after one use.',
+          "That's the trap: Pads that rarely work + single-use design = You spending $80-$100 every single month.",
+          'The disposable pad industry makes $2 billion a year from pet parents stuck in this cycle. Buy. Hope. Fail. Repeat.',
+        ],
+        emphasisLine: 'What if one pad could last all year AND actually attract your dog to use it?',
+        image: { src: '/assets/ph-4x3.svg', alt: 'Kitchen mess comparison image' },
+        layout: 'textLeft',
+      },
+
+      solution: {
+        id: 'solution',
+        bg: 'blue',
+        badge: 'THE SOLUTION',
+        title: 'The Only Pad Dogs Are Naturally Drawn To',
+        paragraphs: [
+          "PuppyPad isn't just another pee pad. It's engineered to fix everything disposables get wrong.",
+        ],
+        bullets: [
+          {
+            title: 'Pheromone Technology',
+            body: "Our patented pheromones trigger your dog's natural instinct to pee here. Dogs instantly recognize it as their bathroom spot.",
+          },
+          {
+            title: 'Military-Grade Durability',
+            body: "Can't be torn, shredded, or destroyed. Even by the most determined chewers.",
+          },
+          {
+            title: '4-Layer Leak Protection',
+            body: 'Absorbs 10x more than disposables. Nothing reaches your floors. Ever.',
+          },
+          {
+            title: 'Antimicrobial Technology',
+            body: 'Eliminates odor at the source. Stays fresh between washes.',
+          },
+          {
+            title: '300+ Washes',
+            body: 'One pad replaces a thousand disposables. Machine washable. Lasts for more than a year.',
+          },
+          {
+            title: 'Anti-Slip Safety Base',
+            body: "Secure grip protects your dog's joints from slips and falls. Stays perfectly in place on any floor.",
+          },
+        ],
+        image: { src: '/assets/Attraction.webp', alt: 'Dog resting near PuppyPad' },
+        layout: 'textRight',
+        callout: {
+          leftTitle: 'Disposable Pads Fail At All Of These...',
+          leftBody: "They tear. They leak. They smell. Dogs won't use them. And you buy them forever.",
+          rightTitle: 'PuppyPad Succeeds At All Of Them.',
+          rightBody: 'Dogs use it. Floors stay dry. No odors. One purchase. Problems solved.',
+        },
+      },
+    },
+
+    comparison: {
+      id: 'comparison',
+      badge: 'VOTED #1 PEE PAD BY DOGS TODAY',
+      title: 'PuppyPad Vs. Disposable Pee Pads',
+      swipeHint: 'Swipe Right To See Comparison →',
+      columns: {
+        pup: 'THE PUPPYPAD',
+        disposable: 'DISPOSABLE PEE PADS',
+      },
+      rows: [
+        {
+          label: 'NO TRAINING REQUIRED',
+          pup: 'Pheromone technology, built-in',
+          disposable: 'No scent technology',
+        },
+        {
+          label: 'DURABILITY',
+          pup: 'Chew-proof, tear-proof',
+          disposable: 'Destroyed in seconds',
+        },
+        {
+          label: 'LEAK PROTECTION',
+          pup: '4-layer 100% leak-proof',
+          disposable: 'Leaks through to floor',
+        },
+        {
+          label: 'ODOR CONTROL',
+          pup: 'No smell due to antimicrobial technology',
+          disposable: 'Smell lingers',
+        },
+        {
+          label: 'MONTHLY COST',
+          pup: '$0 after purchase',
+          disposable: '$80-$100 forever',
+        },
+        {
+          label: 'LIFESPAN',
+          pup: '300+ washes over a year',
+          disposable: 'Single use',
+        },
+        {
+          label: 'SUCCESS RATE',
+          pup: 'Works immediately',
+          disposable: 'Hit or miss',
+        },
+      ],
+    },
+
+    reviewSlider: {
+      title: 'Over 37,000 — 5 Star Reviews',
+      body: 'Tap a review to enlarge. Toggle auto/manual to control the slideshow.',
+      hint: 'Click Reviews to Enlarge',
+      toggle: { auto: 'Auto', manual: 'Manual' },
+      slides: [
+        { src: '/assets/reviews-preview.webp', alt: 'Review collage' },
+        { src: '/assets/ph-16x9.svg', alt: 'Placeholder review slide' },
+        { src: '/assets/ph-16x9.svg', alt: 'Placeholder review slide' },
+      ],
+    },
+
+    guarantee: {
+      id: 'guarantee',
+      badge: 'NO RISK PROMISE',
+      title: 'Try PuppyPad Risk-Free for 90 Days',
+      paragraphs: [
+        'Use PuppyPad for a full 90 days. Wash it. Test it. Let your dog use it hundreds of times.',
+        "If you don't see immediate results - if your dog doesn't naturally use it, if it doesn't eliminate accidents, if you're not completely thrilled - we'll refund you.",
+        'No hoops. No hassles. No questions.',
+        "Just email us, send it back, and we'll process your refund immediately.",
+      ],
+      whyTitle: 'Why can we make this guarantee?',
+      whyBody:
+        "Because out of 150,000 orders, less than 0.5% have been returned. PuppyPad simply works. But we want you to feel completely confident. You've wasted enough money on solutions that don't work. This time is different.",
+      closingLine: 'You have nothing to lose except a clean, pee-free home.',
+      right: {
+        image: { src: '/assets/ph-4x3.svg', alt: 'Customer photo' },
+        reviewCard: {
+          name: 'Maria Fig',
+          rating: 5,
+          verifiedLabel: 'Verified Customer',
+          text: 'My dog finally chose the pad on her own. No drips, no smell, and it’s much easier to clean.',
+        },
+        commentThread: {
+          label: 'You Can Manually Scroll',
+          comments: [
+            { name: 'Terri Applegate Johnson', text: 'I got 4 and I love them. Added surprise, one of my cats uses them!' },
+            { name: 'Mary Lou Samuel', text: 'They work great!!!!!' },
+            { name: 'Lynda Hartwick', text: 'My gracie likes to pee on one and poo on the other. Still going strong.' },
+          ],
+        },
+      },
+    },
+
+    faq: {
+      id: 'faq',
+      title: 'Frequently Asked Questions',
+      items: [
+        {
+          question: 'How does the pheromone technology work?',
+          answer: 'Built-in scent cues help guide dogs toward the pad — similar to how dogs follow scent markers outside.',
+        },
+        {
+          question: 'Is the PuppyPad really chew-proof?',
+          answer: 'The layers are designed for durability. For heavy chewers, supervision is still recommended.',
+        },
+        {
+          question: 'How do I wash the PuppyPad?',
+          answer: 'Rinse, then machine wash cold. Tumble dry low or hang dry. Avoid fabric softener for best performance.',
+        },
+        {
+          question: 'Will my house smell like dog pee?',
+          answer: 'The pad is designed to lock in liquid and help prevent lingering odors when cleaned regularly.',
+        },
+        {
+          question: 'How many PuppyPads do I actually need?',
+          answer: 'Most households like having 2–6 so one can be in use while others are being washed/dried.',
+        },
+        {
+          question: "What if my dog doesn't use it?",
+          answer: 'Try moving the pad to the accident spot, reward correct use, and keep the pad accessible. You’re covered by the guarantee.',
+        },
+      ],
+    },
+
+    reviewWall: {
+      id: 'reviews',
+      badge: 'VET RECOMMENDED',
+      title: 'What Our Customers Are Saying',
+      ratingLabel: '37,893 - 5 STAR REVIEWS',
+      showMoreLabel: 'Show more reviews',
+      tiles: Array.from({ length: 14 }).map((_, i) => ({
+        id: `tile-${i + 1}`,
+        image: {
+          src: i % 3 === 0 ? '/assets/reason5.webp' : '/assets/ph-3x4.svg',
+          alt: `Customer review ${i + 1}`,
+        },
+      })),
+    },
+
+    footer: {
+      logo: { src: '/assets/puppypad-logo.svg', alt: 'PuppyPad' },
+      copyright: '© 2026 PuppyPad',
+    },
+
+    modals: {
+      sizeChart: {
+        title: 'Size Comparison Chart',
+        sizes: [
+          { label: 'SMALL', size: '16x24 in (40x60 cm)', idealFor: 'Puppies, small breeds', weight: 'Up to ~15 lbs' },
+          { label: 'MEDIUM', size: '28x32 in (70x80 cm)', idealFor: 'Most dogs, apartments', weight: '~15–55 lbs' },
+          { label: 'LARGE', size: '32x35 in (80x90 cm)', idealFor: 'Large breeds, multiple pets', weight: '55+ lbs' },
+        ],
+        note: 'Tip: if you’re between sizes, choose the larger size for more coverage.',
+      },
+      whyBundle: {
+        title: 'Why Get 6 PuppyPads?',
+        body: 'Families often choose a larger bundle so they can rotate pads while washing/drying.',
+        quotes: [
+          { text: 'We love having extras so we can swap and wash without stress.', author: 'A. Customer' },
+          { text: 'One in the laundry, one on the floor — it just works.', author: 'B. Customer' },
+          { text: 'The savings made sense for our two dogs.', author: 'C. Customer' },
+        ],
+      },
+      freeGifts: {
+        title: 'Your Free Gifts',
+        body: 'Drop your downloadable gift links or preview images here.',
+      },
+    },
+  },
+}

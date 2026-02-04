@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKEND_DIR="$ROOT/ghc-platform/backend"
+BACKEND_DIR="$ROOT/mos/backend"
 TASK_QUEUE="${TEMPORAL_TASK_QUEUE:-growth-agency}"
 SKIP_PIP_INSTALL="${SKIP_PIP_INSTALL:-}"
 

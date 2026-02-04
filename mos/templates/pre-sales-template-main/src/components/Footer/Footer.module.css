@@ -1,0 +1,23 @@
+.footer {
+  background: var(--footer-bg);
+  border-top: var(--footer-border);
+  padding: var(--footer-pad-y) 0;
+  /* Extra bottom space so the fixed CTA doesn't cover the logo. */
+  padding-bottom: calc(
+    var(--footer-pad-y) + var(--cta-height-lg) + var(--cta-shell-pad) + var(--cta-shell-pad) +
+      var(--floating-cta-bottom) + env(safe-area-inset-bottom)
+  );
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.logo {
+  height: var(--footer-logo-height);
+  width: auto;
+  max-width: 100%;
+  display: block;
+}

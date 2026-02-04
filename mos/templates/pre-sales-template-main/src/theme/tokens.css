@@ -1,0 +1,320 @@
+/*
+  Design Tokens
+  -------------
+  This file is the single best place to change the look & feel of the template.
+  Override any variable in a later-loaded CSS file to re-theme without touching
+  component styles.
+*/
+
+:root {
+  /* Typography */
+  --font-sans: 'Poppins', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial,
+    'Apple Color Emoji', 'Segoe UI Emoji';
+  --font-heading: AwesomeSerif-MediumExtraTall, serif;
+  --font-cta: "Schibsted Grotesk", Arial, sans-serif;
+
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 22px;
+  --h1: clamp(35px, 5.2vw, 50px);
+  --h2: clamp(35px, 4vw, 40px);
+  --h3: 20px;
+  --line: 1.6;
+  --heading-size: clamp(35px, 4.5vw, 50px);
+  --heading-size-mobile: clamp(30px, 4.5vw, 35px);
+  --heading-line: 1.4;
+  --heading-weight: 500;
+
+  /* Colors */
+  --color-page-bg: #fef9f5;
+  --color-brand: #061a70;
+  --color-bg: #ffffff;
+
+  --color-text: var(--color-brand);
+  --color-muted: rgba(6, 26, 112, 0.76);
+
+  --color-border: rgba(6, 26, 112, 0.18);
+  --color-soft: rgba(6, 26, 112, 0.06);
+
+  /* Focus */
+  --focus-outline-color: rgba(6, 26, 112, 0.35);
+  --focus-outline-color-soft: rgba(6, 26, 112, 0.25);
+  --focus-outline: 3px solid var(--focus-outline-color);
+  --focus-outline-soft: 3px solid var(--focus-outline-color-soft);
+
+  /* CTA Colors */
+  --color-cta: #3b8c33;
+  --color-cta-text: #ffffff;
+  --color-cta-shell: #ffffff;
+  --color-cta-icon: #2f6f29;
+
+  /* Layout */
+  --container-max: 1240px;
+  --container-pad: 24px;
+  --section-pad-y: 80px;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  /* Radius & Shadow */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.06), 0 10px 30px rgba(0, 0, 0, 0.05);
+
+  /* Hero */
+  --hero-bg: #e9fbff;
+  --hero-min-height: 520px;
+  --hero-pad-x: clamp(24px, 6vw, 92px);
+  --hero-pad-y: clamp(28px, 5vw, 70px);
+  --hero-title-max: none;
+  --hero-subtitle-max: none;
+  --hero-title-size: var(--heading-size);
+  --hero-title-weight: var(--heading-weight);
+  --hero-title-letter-spacing: 0;
+  --hero-title-line: 1.1;
+  --hero-subtitle-size: clamp(18px, 2.6vw, 25px);
+  --hero-subtitle-weight: 500;
+  --hero-subtitle-line: 1.2;
+  --hero-subtitle-gap: 16px;
+  --hero-media-placeholder-bg: rgba(0, 0, 0, 0.06);
+
+  /* Badge strip (under hero) */
+  --badge-strip-bg: var(--hero-bg);
+  --badge-strip-border: 1px solid var(--color-border);
+  --badge-strip-pad-y: clamp(30px, 4vw, 40px);
+  --badge-strip-gap: clamp(22px, 4vw, 64px);
+
+  --badge-icon-size: 60px;
+  --badge-text-color: var(--color-brand);
+  --badge-text-weight: 600;
+  --badge-value-size: clamp(14px, 1.7vw, 25px);
+  --badge-label-size: clamp(14px, 1.7vw, 25px);
+  --badge-text-size: var(--badge-label-size);
+  --badge-letter-spacing: 0;
+
+  /* Marquee (full-width sliding text band) */
+  --marquee-height: clamp(56px, 7vw, 70px);
+  --marquee-speed: 50s;
+  --marquee-bg: #f7f1d0;
+  --marquee-border: var(--color-brand);
+  --marquee-text: var(--color-brand);
+  --marquee-font-size: clamp(20px, 3.5vw, 30px);
+  --marquee-font-weight: 900;
+  --marquee-letter-spacing: 0.03em;
+  --marquee-gap: clamp(50px, 8vw, 80px);
+  --marquee-pad-x: 0px;
+
+  /* Listicle (Reasons) */
+  --listicle-card-gap: 40px;
+  --listicle-card-radius: 5px;
+  --listicle-card-border: 0.5px solid var(--color-brand);
+
+  --listicle-media-width: 320px;
+  --listicle-media-min-height: 300px;
+  --listicle-media-min-height-mobile: 220px;
+  --listicle-media-placeholder-bg: rgba(6, 26, 112, 0.08);
+
+  --listicle-number-size: 50px;
+  --listicle-number-offset: 16px;
+  --listicle-number-bg: var(--color-brand);
+  --listicle-number-fg: #ffffff;
+  --listicle-number-font-size: 32px;
+
+  --listicle-content-pad-x: 40px;
+  --listicle-content-pad-y: 40px;
+  --listicle-content-pad-x-mobile: 20px;
+  --listicle-content-pad-y-mobile: 30px;
+
+  --listicle-title-font: AwesomeSerif-MediumExtraTall, serif;
+  --listicle-title-size: 40px;
+  --listicle-title-size-mobile: 40px;
+  --listicle-title-line: 1.2;
+  --listicle-title-color: rgb(0, 27, 116);
+  --listicle-title-margin-bottom: 20px;
+  --listicle-title-letter-spacing: 0;
+
+  --listicle-body-size: clamp(16px, 2.3vw, 20px);
+  --listicle-body-line: 1.5;
+  --listicle-body-gap: 18px;
+
+  /* Reviews carousel (under listicle) */
+  --reviews-pad-y: 64px;
+  --reviews-gap: 34px;
+  --reviews-height: 440px;
+  --reviews-card-width: 460px;
+  --reviews-card-radius: 36px;
+  --reviews-card-bg: #f3ece6;
+  --reviews-card-pad: 46px 44px 38px;
+
+  --reviews-quote-size: 64px;
+  --reviews-quote-color: #7b6a5d;
+  --reviews-quote-top: 18px;
+  --reviews-quote-left: 34px;
+  --reviews-stars-top: 22px;
+
+  --reviews-star-size: 22px;
+  --reviews-star-color: #f59a3b;
+
+  --reviews-text-size: 22px;
+  --reviews-text-line: 1.45;
+  --reviews-text-color: rgba(11, 11, 11, 0.72);
+
+  --reviews-author-color: rgba(11, 11, 11, 0.8);
+  --reviews-verified-bg: rgba(0, 0, 0, 0.08);
+  --reviews-verified-border: 0;
+  --reviews-verified-color: rgba(0, 0, 0, 0.75);
+
+  --reviews-media-main-width: 1fr;
+  --reviews-media-slim-width: 140px;
+  --reviews-media-gap: 16px;
+  --reviews-media-radius: 26px;
+  --reviews-media-placeholder-bg: rgba(0, 0, 0, 0.06);
+
+  --reviews-nav-size: 40px;
+  --reviews-nav-offset: 10px;
+  --reviews-nav-bg: #ffffff;
+  --reviews-nav-border: 1px solid rgba(6, 26, 112, 0.18);
+  --reviews-nav-color: var(--color-brand);
+  --reviews-nav-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
+
+  --reviews-dots-top: 18px;
+  --reviews-dot-gap: 10px;
+  --reviews-dot-size: 6px;
+  --reviews-dot-bg: rgba(0, 0, 0, 0.14);
+  --reviews-dot-active-width: 24px;
+  --reviews-dot-active-bg: #7b6a5d;
+
+  /* Pitch section (under marquee) */
+  --pitch-bg: #e9fbff;
+  --pitch-pad-y: 80px;
+  --pitch-gap: 60px;
+  --pitch-content-max: 560px;
+  --pitch-title-size: clamp(35px, 2.2vw, 50px);
+  --pitch-title-line: var(--heading-line);
+  --pitch-title-color: var(--color-brand);
+  --pitch-title-letter-spacing: 0;
+  --pitch-title-weight: var(--heading-weight);
+  --pitch-bullets-top: 28px;
+  --pitch-bullets-bottom: 30px;
+  --pitch-bullet-gap: 18px;
+  --pitch-bullet-size: 16px;
+  --pitch-bullet-line: 1.4;
+  --pitch-bullet-strong-weight: 600;
+  --pitch-text-color: var(--color-brand);
+
+  --pitch-check-size: 22px;
+  --pitch-check-gap: 14px;
+  --pitch-check-bg: transparent;
+  --pitch-check-border: 2px solid var(--color-brand);
+  --pitch-check-icon-size: 14px;
+  --pitch-check-color: var(--color-brand);
+
+  --pitch-media-max: 560px;
+  --pitch-media-radius: 4px;
+  --pitch-media-border: 1px solid rgba(6, 26, 112, 0.55);
+  --pitch-media-bg: rgba(255, 255, 255, 0.25);
+  --pitch-media-shadow: 0 18px 42px rgba(0, 0, 0, 0.12);
+
+  /* Shop Now button */
+  --cta-shell-pad: 10px;
+  --cta-shell-shadow: 0 16px 44px rgba(0, 0, 0, 0.16);
+
+  /* Base (overridden per size in Button.module.css) */
+  --cta-icon-size: var(--cta-icon-size-lg);
+
+  --cta-height-lg: 62px;
+  --cta-height-md: 58px;
+  --cta-height-sm: 48px;
+
+  --cta-min-width-lg: 420px;
+  --cta-min-width-md: 360px;
+  --cta-min-width-sm: 260px;
+
+  --cta-pad-x-lg: 34px;
+  --cta-pad-x-md: 30px;
+  --cta-pad-x-sm: 22px;
+
+  --cta-font-size-lg: 18px;
+  --cta-font-size-md: 17px;
+  --cta-font-size-sm: 15px;
+
+  --cta-letter-spacing: 0.06em;
+  --cta-font-weight: 900;
+
+  --cta-circle-size-lg: 40px;
+  --cta-circle-size-md: 38px;
+  --cta-circle-size-sm: 34px;
+
+  --cta-icon-size-lg: 18px;
+  --cta-icon-size-md: 18px;
+  --cta-icon-size-sm: 16px;
+
+  /* Review wall */
+  --wall-pad-y: 80px;
+  --wall-pad-top: var(--wall-pad-y);
+  --wall-title-size: var(--hero-title-size);
+  --wall-title-line: var(--hero-title-line);
+  --wall-title-weight: var(--hero-title-weight);
+  --wall-title-letter-spacing: var(--hero-title-letter-spacing);
+  --wall-button-bg: #f7f1d0;
+  --wall-button-text: var(--color-brand);
+  --wall-button-font-size: 12px;
+  --wall-button-weight: 700;
+  --wall-button-letter-spacing: 0;
+  --wall-button-pad: 8px 20px;
+  --wall-button-radius: 999px;
+
+  --wall-height: clamp(500px, 70vh, 600px);
+  --wall-scroll-duration: 60s;
+  --wall-gap: clamp(8px, 1.2vw, 15px);
+  --wall-pad-x: clamp(8px, 1.1vw, 10px);
+  --wall-fade-height: 150px;
+
+  --wall-card-radius: 0px;
+  --wall-card-bg: #ffffff;
+  --wall-card-border: 1px solid rgba(0, 0, 0, 0.06);
+  --wall-card-shadow: 0 18px 44px rgba(0, 0, 0, 0.08);
+
+  --wall-card-pad: 16px 16px 14px;
+  --wall-author-size: 15px;
+  --wall-text-size: 14px;
+  --wall-muted: rgba(0, 0, 0, 0.44);
+  --wall-author-color: rgba(0, 0, 0, 0.72);
+  --wall-verified-color: rgba(0, 0, 0, 0.56);
+  --wall-check-color: rgba(0, 0, 0, 0.45);
+  --wall-text-color: rgba(0, 0, 0, 0.66);
+
+  /* Modal */
+  --modal-overlay-bg: rgba(2, 10, 18, 0.62);
+  --modal-shadow: 0 18px 60px rgba(0, 0, 0, 0.45);
+  --modal-z: 100;
+
+  /* Footer (logo + big CTA) */
+  --footer-bg: var(--pitch-bg);
+  --footer-border: 1px solid var(--color-brand);
+  --footer-pad-y: 48px;
+  --footer-logo-height: 54px;
+  --footer-gap: 18px;
+
+  /* Floating CTA */
+  --floating-cta-bottom: 18px;
+  --floating-cta-z: 50;
+}
+
+/* Example alternate theme (enable by setting <html data-theme="dark">) */
+:root[data-theme='dark'] {
+  --color-bg: #07111d;
+  --color-text: #e7f0ff;
+  --color-muted: #b2c4dd;
+  --color-border: rgba(231, 240, 255, 0.18);
+  --color-soft: rgba(231, 240, 255, 0.06);
+  --shadow-sm: 0 2px 18px rgba(0, 0, 0, 0.45);
+}

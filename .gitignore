@@ -35,6 +35,7 @@ __pycache__/
 dist/
 build/
 coverage/
+*.tsbuildinfo
 
 # Taskmaster
 .taskmaster/
@@ -44,7 +45,7 @@ archive/
 backups/
 
 # Frontend
-ghc-platform/frontend/node_modules/
+mos/frontend/node_modules/
 
 # Python packaging
 *.pyc
@@ -52,6 +53,6 @@ ghc-platform/frontend/node_modules/
 *.egg-info/
 
 # Local data artifacts
-ghc-platform/backend/*.csv
-ghc-platform/backend/app/*.zip
-ghc-platform/backend/app/**/Archive.zip
+mos/backend/*.csv
+mos/backend/app/*.zip
+mos/backend/app/**/Archive.zip

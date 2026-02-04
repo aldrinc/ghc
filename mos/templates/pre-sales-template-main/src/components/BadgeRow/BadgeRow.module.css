@@ -1,0 +1,53 @@
+.row {
+  width: 100%;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: var(--badge-strip-pad-y) var(--container-pad);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--badge-strip-gap);
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.icon {
+  width: var(--badge-icon-size);
+  height: var(--badge-icon-size);
+  flex: 0 0 auto;
+}
+
+.text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+
+  font-family: var(--font-sans);
+  font-weight: var(--badge-text-weight);
+  letter-spacing: var(--badge-letter-spacing);
+  text-transform: uppercase;
+  color: var(--color-brand);
+  white-space: nowrap;
+}
+
+.value {
+  font-size: var(--badge-value-size);
+  line-height: 1;
+}
+
+.label {
+  font-size: var(--badge-text-size);
+  line-height: 1;
+}
+
+@media (max-width: 720px) {
+  .row {
+    flex-direction: column;
+    gap: 16px;
+  }
+}

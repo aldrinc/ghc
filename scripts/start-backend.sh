@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BACKEND_DIR="$ROOT/ghc-platform/backend"
+BACKEND_DIR="$ROOT/mos/backend"
 
 cd "$BACKEND_DIR"
 
@@ -15,5 +15,5 @@ fi
 echo "[backend] Installing/updating dependencies from pyproject.toml..."
 .venv/bin/pip install -e .
 
-echo "[backend] Starting uvicorn on http://localhost:8000"
-exec .venv/bin/uvicorn app.main:app --port 8000 --reload
+echo "[backend] Starting uvicorn on http://localhost:8008"
+exec .venv/bin/uvicorn app.main:app --port 8008 --reload

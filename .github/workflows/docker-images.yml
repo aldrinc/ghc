@@ -36,7 +36,7 @@ jobs:
       DATABASE_URL: postgresql+psycopg://app:app@localhost:5432/app
       CLERK_JWT_ISSUER: https://example.com/issuer
       CLERK_JWKS_URL: https://example.com/.well-known/jwks.json
-      CLERK_AUDIENCE: ghc-platform
+      CLERK_AUDIENCE: mos
       BACKEND_CORS_ORIGINS: http://localhost:5173
       TEMPORAL_ADDRESS: localhost:7234
     steps:
@@ -48,27 +48,27 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: ghc-platform/backend/pyproject.toml
+          cache-dependency-path: mos/backend/pyproject.toml
 
       - name: Install backend dependencies
-        working-directory: ghc-platform/backend
+        working-directory: mos/backend
         run: |
           pip install --upgrade pip
           pip install ".[dev]"
 
       - name: Run migrations
-        working-directory: ghc-platform/backend
+        working-directory: mos/backend
         run: alembic upgrade head
 
       - name: Run backend tests
-        working-directory: ghc-platform/backend
+        working-directory: mos/backend
         run: pytest
 
   frontend-build:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ghc-platform/frontend
+        working-directory: mos/frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -113,12 +113,12 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v6
         with:
-          context: ./ghc-platform/backend
-          file: ./ghc-platform/backend/Dockerfile
+          context: ./mos/backend
+          file: ./mos/backend/Dockerfile
           push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
           tags: |
-            ${{ env.REGISTRY }}/ghc-backend:${{ env.IMAGE_TAG }}
-            ${{ env.REGISTRY }}/ghc-backend:latest
+            ${{ env.REGISTRY }}/mos-backend:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/mos-backend:latest
 
   frontend-image:
     needs: [backend-tests, frontend-build]
@@ -148,16 +148,16 @@ jobs:
       - name: Build and push frontend image
         uses: docker/build-push-action@v6
         with:
-          context: ./ghc-platform/frontend
-          file: ./ghc-platform/frontend/Dockerfile
+          context: ./mos/frontend
+          file: ./mos/frontend/Dockerfile
           push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
           build-args: |
             VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
             VITE_CLERK_PUBLISHABLE_KEY=${{ env.VITE_CLERK_PUBLISHABLE_KEY }}
             VITE_CLERK_JWT_TEMPLATE=${{ env.VITE_CLERK_JWT_TEMPLATE }}
           tags: |
-            ${{ env.REGISTRY }}/ghc-frontend:${{ env.IMAGE_TAG }}
-            ${{ env.REGISTRY }}/ghc-frontend:latest
+            ${{ env.REGISTRY }}/mos-frontend:${{ env.IMAGE_TAG }}
+            ${{ env.REGISTRY }}/mos-frontend:latest
 
   deploy:
     needs: [backend-image, frontend-image]
@@ -207,5 +207,5 @@ jobs:
 
             cd "$DEPLOY_PATH"
             docker login "$IMAGE_REGISTRY" -u "${{ secrets.GHCR_USERNAME }}" -p "${{ secrets.GHCR_TOKEN }}"
-            IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f ghc-platform/infra/docker-compose.deploy.yml pull
-            IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f ghc-platform/infra/docker-compose.deploy.yml up -d
+            IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml pull
+            IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml up -d

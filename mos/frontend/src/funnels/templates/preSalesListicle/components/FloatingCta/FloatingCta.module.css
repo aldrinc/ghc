@@ -1,0 +1,21 @@
+.wrap {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--floating-cta-bottom) + env(safe-area-inset-bottom));
+  transform: translateX(-50%) translateY(12px);
+  z-index: var(--floating-cta-z);
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.button {
+  /* Hook for additional styling overrides if needed */
+}

@@ -1,0 +1,1188 @@
+{
+  "schema_version": "1.0.0",
+  "generated_at": "2026-01-29T16:51:13Z",
+  "type_definitions": {
+    "shared": {
+      "ImageAsset": {
+        "type": "object",
+        "required": ["src", "alt"],
+        "fields": {
+          "src": { "type": "string", "required": true },
+          "alt": { "type": "string", "required": true }
+        }
+      },
+      "MetaConfig": {
+        "type": "object",
+        "required": ["title"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "description": { "type": "string", "required": false },
+          "lang": { "type": "string", "required": false }
+        }
+      },
+      "ThemeTokens": {
+        "type": "object",
+        "required": false,
+        "additionalProperties": { "type": ["string", "number"] }
+      },
+      "ThemeConfig": {
+        "type": "object",
+        "required": false,
+        "fields": {
+          "dataTheme": { "type": "string", "required": false },
+          "tokens": { "type_ref": "shared.ThemeTokens", "required": false }
+        }
+      },
+      "UiCopy": {
+        "type": "object",
+        "required": ["common", "modal", "reviews", "reviewWall"],
+        "fields": {
+          "common": {
+            "type": "object",
+            "required": ["starsAriaLabelTemplate"],
+            "fields": {
+              "starsAriaLabelTemplate": { "type": "string", "required": true }
+            }
+          },
+          "modal": {
+            "type": "object",
+            "required": ["closeAriaLabel", "dialogAriaLabel"],
+            "fields": {
+              "closeAriaLabel": { "type": "string", "required": true },
+              "dialogAriaLabel": { "type": "string", "required": true }
+            }
+          },
+          "reviews": {
+            "type": "object",
+            "required": [
+              "sectionAriaLabel",
+              "prevButtonAriaLabel",
+              "nextButtonAriaLabel",
+              "dotsAriaLabel",
+              "goToReviewAriaLabelTemplate"
+            ],
+            "fields": {
+              "sectionAriaLabel": { "type": "string", "required": true },
+              "prevButtonAriaLabel": { "type": "string", "required": true },
+              "nextButtonAriaLabel": { "type": "string", "required": true },
+              "dotsAriaLabel": { "type": "string", "required": true },
+              "goToReviewAriaLabelTemplate": { "type": "string", "required": true }
+            }
+          },
+          "reviewWall": {
+            "type": "object",
+            "required": ["verifiedLabel"],
+            "fields": {
+              "verifiedLabel": { "type": "string", "required": true }
+            }
+          }
+        }
+      }
+    },
+    "pre_sales_listicle": {
+      "HeroMedia": {
+        "one_of": [
+          {
+            "type": "object",
+            "required": ["type", "src", "alt"],
+            "fields": {
+              "type": { "type": "string", "const": "image", "required": true },
+              "src": { "type": "string", "required": true },
+              "alt": { "type": "string", "required": true }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["type", "srcMp4"],
+            "fields": {
+              "type": { "type": "string", "const": "video", "required": true },
+              "srcMp4": { "type": "string", "required": true },
+              "poster": { "type": "string", "required": false },
+              "alt": { "type": "string", "required": false }
+            }
+          }
+        ]
+      },
+      "HeroConfig": {
+        "type": "object",
+        "required": ["title", "subtitle"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "subtitle": { "type": "string", "required": true },
+          "media": { "type_ref": "pre_sales_listicle.HeroMedia", "required": false }
+        }
+      },
+      "Badge": {
+        "type": "object",
+        "required": ["iconSrc", "iconAlt", "label"],
+        "fields": {
+          "iconSrc": { "type": "string", "required": true },
+          "iconAlt": { "type": "string", "required": true },
+          "value": { "type": "string", "required": false },
+          "label": { "type": "string", "required": true }
+        }
+      },
+      "Reason": {
+        "type": "object",
+        "required": ["number", "title", "body"],
+        "fields": {
+          "number": { "type": "number", "required": true },
+          "title": { "type": "string", "required": true },
+          "body": { "type": "string", "required": true },
+          "image": { "type_ref": "shared.ImageAsset", "required": false }
+        }
+      },
+      "PitchCta": {
+        "type": "object",
+        "required": ["label", "href"],
+        "fields": {
+          "label": { "type": "string", "required": true },
+          "href": { "type": "string", "required": true }
+        }
+      },
+      "Pitch": {
+        "type": "object",
+        "required": ["title", "bullets", "image"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "bullets": {
+            "type": "array",
+            "required": true,
+            "items": { "type": "string" }
+          },
+          "image": { "type_ref": "shared.ImageAsset", "required": true },
+          "cta": { "type_ref": "pre_sales_listicle.PitchCta", "required": false }
+        }
+      },
+      "ReviewSlide": {
+        "type": "object",
+        "required": ["text", "author", "images"],
+        "fields": {
+          "rating": { "type": "number", "required": false, "notes": "1-5" },
+          "text": { "type": "string", "required": true },
+          "author": { "type": "string", "required": true },
+          "verified": { "type": "boolean", "required": false },
+          "images": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "shared.ImageAsset" },
+            "notes": "Up to 3 images recommended for layout"
+          }
+        }
+      },
+      "Reviews": {
+        "type": "object",
+        "required": ["slides"],
+        "fields": {
+          "slides": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "pre_sales_listicle.ReviewSlide" }
+          },
+          "autoAdvanceMs": { "type": "number", "required": false }
+        }
+      },
+      "WallReview": {
+        "type": "object",
+        "required": ["author", "text"],
+        "fields": {
+          "author": { "type": "string", "required": true },
+          "rating": { "type": "number", "required": false },
+          "verified": { "type": "boolean", "required": false },
+          "text": { "type": "string", "required": true },
+          "image": { "type_ref": "shared.ImageAsset", "required": false },
+          "imagePosition": {
+            "type": "string",
+            "required": false,
+            "enum": ["top", "bottom"]
+          }
+        }
+      },
+      "ReviewsWall": {
+        "type": "object",
+        "required": ["title", "buttonLabel", "columns"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "buttonLabel": { "type": "string", "required": true },
+          "columns": {
+            "type": "array",
+            "required": true,
+            "items": {
+              "type": "array",
+              "items": { "type_ref": "pre_sales_listicle.WallReview" }
+            }
+          }
+        }
+      },
+      "Footer": {
+        "type": "object",
+        "required": ["logo"],
+        "fields": {
+          "logo": { "type_ref": "shared.ImageAsset", "required": true }
+        }
+      },
+      "FloatingCta": {
+        "type": "object",
+        "required": ["label", "href"],
+        "fields": {
+          "label": { "type": "string", "required": true },
+          "href": { "type": "string", "required": true },
+          "showAfterReason": { "type": "number", "required": false },
+          "showAfterId": { "type": "string", "required": false }
+        }
+      },
+      "ListicleConfig": {
+        "type": "object",
+        "required": [
+          "hero",
+          "badges",
+          "reasons",
+          "marquee",
+          "pitch",
+          "reviews",
+          "reviewsWall",
+          "footer",
+          "floatingCta"
+        ],
+        "fields": {
+          "hero": { "type_ref": "pre_sales_listicle.HeroConfig", "required": true },
+          "badges": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "pre_sales_listicle.Badge" }
+          },
+          "reasons": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "pre_sales_listicle.Reason" }
+          },
+          "marquee": {
+            "type": "array",
+            "required": true,
+            "items": { "type": "string" }
+          },
+          "pitch": { "type_ref": "pre_sales_listicle.Pitch", "required": true },
+          "reviews": { "type_ref": "pre_sales_listicle.Reviews", "required": true },
+          "reviewsWall": { "type_ref": "pre_sales_listicle.ReviewsWall", "required": true },
+          "footer": { "type_ref": "pre_sales_listicle.Footer", "required": true },
+          "floatingCta": { "type_ref": "pre_sales_listicle.FloatingCta", "required": true }
+        }
+      }
+    },
+    "sales_pdp": {
+      "NavItem": {
+        "type": "object",
+        "required": ["label", "href"],
+        "fields": {
+          "label": { "type": "string", "required": true },
+          "href": { "type": "string", "required": true }
+        }
+      },
+      "HeaderLogo": {
+        "type": "object",
+        "required": ["src", "alt"],
+        "fields": {
+          "src": { "type": "string", "required": true },
+          "alt": { "type": "string", "required": true },
+          "href": { "type": "string", "required": false }
+        }
+      },
+      "HeaderConfig": {
+        "type": "object",
+        "required": ["logo", "nav", "cta"],
+        "fields": {
+          "logo": { "type_ref": "sales_pdp.HeaderLogo", "required": true },
+          "nav": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.NavItem" }
+          },
+          "cta": { "type_ref": "sales_pdp.NavItem", "required": true }
+        }
+      },
+      "MarqueeConfig": {
+        "type": "object",
+        "required": ["items"],
+        "fields": {
+          "items": {
+            "type": "array",
+            "required": true,
+            "items": { "type": "string" }
+          },
+          "repeat": { "type": "number", "required": false }
+        }
+      },
+      "GallerySlide": {
+        "type": "object",
+        "required": ["src", "alt"],
+        "fields": {
+          "src": { "type": "string", "required": true },
+          "alt": { "type": "string", "required": true },
+          "thumbSrc": { "type": "string", "required": false }
+        }
+      },
+      "FreeGiftsConfig": {
+        "type": "object",
+        "required": ["icon", "title", "body", "ctaLabel"],
+        "fields": {
+          "icon": { "type_ref": "shared.ImageAsset", "required": true },
+          "title": { "type": "string", "required": true },
+          "body": { "type": "string", "required": true },
+          "ctaLabel": { "type": "string", "required": true }
+        }
+      },
+      "GalleryConfig": {
+        "type": "object",
+        "required": ["watchInAction", "slides"],
+        "fields": {
+          "freeGifts": { "type_ref": "sales_pdp.FreeGiftsConfig", "required": false },
+          "watchInAction": {
+            "type": "object",
+            "required": ["label"],
+            "fields": {
+              "label": { "type": "string", "required": true }
+            }
+          },
+          "slides": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.GallerySlide" }
+          }
+        }
+      },
+      "FaqPill": {
+        "type": "object",
+        "required": ["label", "answer"],
+        "fields": {
+          "label": { "type": "string", "required": true },
+          "answer": { "type": "string", "required": true }
+        }
+      },
+      "BenefitItem": {
+        "type": "object",
+        "required": ["text"],
+        "fields": {
+          "text": { "type": "string", "required": true }
+        }
+      },
+      "SizeOption": {
+        "type": "object",
+        "required": ["id", "label", "sizeIn", "sizeCm"],
+        "fields": {
+          "id": { "type": "string", "required": true },
+          "label": { "type": "string", "required": true },
+          "sizeIn": { "type": "string", "required": true },
+          "sizeCm": { "type": "string", "required": true }
+        }
+      },
+      "ColorOption": {
+        "type": "object",
+        "required": ["id", "label"],
+        "fields": {
+          "id": { "type": "string", "required": true },
+          "label": { "type": "string", "required": true },
+          "swatch": { "type": "string", "required": false },
+          "swatchImageSrc": { "type": "string", "required": false }
+        }
+      },
+      "OfferOption": {
+        "type": "object",
+        "required": ["id", "title", "image", "price"],
+        "fields": {
+          "id": { "type": "string", "required": true },
+          "productOfferId": { "type": "string", "required": false },
+          "title": { "type": "string", "required": true },
+          "image": { "type_ref": "shared.ImageAsset", "required": true },
+          "price": { "type": "number", "required": true },
+          "compareAt": { "type": "number", "required": false },
+          "saveLabel": { "type": "string", "required": false }
+        }
+      },
+      "InventoryRule": {
+        "type": "object",
+        "required": ["sizeId", "colorId"],
+        "fields": {
+          "sizeId": { "type": "string", "required": true },
+          "colorId": { "type": "string", "required": true }
+        }
+      },
+      "PurchaseSizeConfig": {
+        "type": "object",
+        "required": ["title", "helpLinkLabel", "options", "shippingDelayLabel"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "helpLinkLabel": { "type": "string", "required": true },
+          "options": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.SizeOption" }
+          },
+          "shippingDelayLabel": { "type": "string", "required": true }
+        }
+      },
+      "PurchaseColorConfig": {
+        "type": "object",
+        "required": ["title", "options", "outOfStockTitle", "outOfStockBody"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "options": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.ColorOption" }
+          },
+          "outOfStockTitle": { "type": "string", "required": true },
+          "outOfStockBody": { "type": "string", "required": true }
+        }
+      },
+      "PurchaseOfferConfig": {
+        "type": "object",
+        "required": ["title", "helperText", "seeWhyLabel", "options"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "helperText": { "type": "string", "required": true },
+          "seeWhyLabel": { "type": "string", "required": true },
+          "options": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.OfferOption" }
+          }
+        }
+      },
+      "CtaUrgencyRow": {
+        "type": "object",
+        "required": ["label", "value"],
+        "fields": {
+          "label": { "type": "string", "required": true },
+          "value": { "type": "string", "required": true },
+          "tone": {
+            "type": "string",
+            "required": false,
+            "enum": ["muted", "highlight"]
+          }
+        }
+      },
+      "PurchaseCta": {
+        "type": "object",
+        "required": ["labelTemplate", "subBullets", "urgency"],
+        "fields": {
+          "labelTemplate": { "type": "string", "required": true },
+          "subBullets": {
+            "type": "array",
+            "required": true,
+            "items": { "type": "string" }
+          },
+          "urgency": {
+            "type": "object",
+            "required": ["message", "rows"],
+            "fields": {
+              "message": { "type": "string", "required": true },
+              "rows": {
+                "type": "array",
+                "required": true,
+                "items": { "type_ref": "sales_pdp.CtaUrgencyRow" }
+              }
+            }
+          }
+        }
+      },
+      "PurchaseConfig": {
+        "type": "object",
+        "required": ["faqPills", "title", "benefits", "size", "color", "offer", "cta"],
+        "fields": {
+          "faqPills": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.FaqPill" }
+          },
+          "title": { "type": "string", "required": true },
+          "benefits": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.BenefitItem" }
+          },
+          "size": { "type_ref": "sales_pdp.PurchaseSizeConfig", "required": true },
+          "color": { "type_ref": "sales_pdp.PurchaseColorConfig", "required": true },
+          "offer": { "type_ref": "sales_pdp.PurchaseOfferConfig", "required": true },
+          "cta": { "type_ref": "sales_pdp.PurchaseCta", "required": true },
+          "outOfStock": {
+            "type": "array",
+            "required": false,
+            "items": { "type_ref": "sales_pdp.InventoryRule" }
+          },
+          "shippingDelay": {
+            "type": "array",
+            "required": false,
+            "items": { "type_ref": "sales_pdp.InventoryRule" }
+          }
+        }
+      },
+      "HeroConfig": {
+        "type": "object",
+        "required": ["header", "gallery", "purchase"],
+        "fields": {
+          "header": { "type_ref": "sales_pdp.HeaderConfig", "required": true },
+          "gallery": { "type_ref": "sales_pdp.GalleryConfig", "required": true },
+          "purchase": { "type_ref": "sales_pdp.PurchaseConfig", "required": true }
+        }
+      },
+      "VideoItem": {
+        "type": "object",
+        "required": ["id", "thumbnail"],
+        "fields": {
+          "id": { "type": "string", "required": true },
+          "thumbnail": { "type_ref": "shared.ImageAsset", "required": true }
+        }
+      },
+      "VideoSectionConfig": {
+        "type": "object",
+        "required": ["badge", "title", "videos"],
+        "fields": {
+          "badge": { "type": "string", "required": true },
+          "title": { "type": "string", "required": true },
+          "videos": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.VideoItem" }
+          }
+        }
+      },
+      "StoryBullet": {
+        "type": "object",
+        "required": ["title", "body"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "body": { "type": "string", "required": true }
+        }
+      },
+      "StorySectionConfig": {
+        "type": "object",
+        "required": ["bg", "badge", "title", "paragraphs", "image"],
+        "fields": {
+          "id": { "type": "string", "required": false },
+          "bg": {
+            "type": "string",
+            "required": true,
+            "enum": ["peach", "blue"]
+          },
+          "badge": { "type": "string", "required": true },
+          "title": { "type": "string", "required": true },
+          "paragraphs": {
+            "type": "array",
+            "required": true,
+            "items": { "type": "string" }
+          },
+          "emphasisLine": { "type": "string", "required": false },
+          "bullets": {
+            "type": "array",
+            "required": false,
+            "items": { "type_ref": "sales_pdp.StoryBullet" }
+          },
+          "image": { "type_ref": "shared.ImageAsset", "required": true },
+          "layout": {
+            "type": "string",
+            "required": false,
+            "enum": ["textLeft", "textRight"]
+          }
+        }
+      },
+      "CalloutConfig": {
+        "type": "object",
+        "required": ["leftTitle", "leftBody", "rightTitle", "rightBody"],
+        "fields": {
+          "leftTitle": { "type": "string", "required": true },
+          "leftBody": { "type": "string", "required": true },
+          "rightTitle": { "type": "string", "required": true },
+          "rightBody": { "type": "string", "required": true }
+        }
+      },
+      "StorySolutionConfig": {
+        "type": "object",
+        "required": ["bg", "badge", "title", "paragraphs", "image", "callout"],
+        "fields": {
+          "id": { "type": "string", "required": false },
+          "bg": {
+            "type": "string",
+            "required": true,
+            "enum": ["peach", "blue"]
+          },
+          "badge": { "type": "string", "required": true },
+          "title": { "type": "string", "required": true },
+          "paragraphs": {
+            "type": "array",
+            "required": true,
+            "items": { "type": "string" }
+          },
+          "emphasisLine": { "type": "string", "required": false },
+          "bullets": {
+            "type": "array",
+            "required": false,
+            "items": { "type_ref": "sales_pdp.StoryBullet" }
+          },
+          "image": { "type_ref": "shared.ImageAsset", "required": true },
+          "layout": {
+            "type": "string",
+            "required": false,
+            "enum": ["textLeft", "textRight"]
+          },
+          "callout": { "type_ref": "sales_pdp.CalloutConfig", "required": true }
+        }
+      },
+      "ComparisonRow": {
+        "type": "object",
+        "required": ["label", "pup", "disposable"],
+        "fields": {
+          "label": { "type": "string", "required": true },
+          "pup": { "type": "string", "required": true },
+          "disposable": { "type": "string", "required": true }
+        }
+      },
+      "ComparisonConfig": {
+        "type": "object",
+        "required": ["badge", "title", "swipeHint", "columns", "rows"],
+        "fields": {
+          "id": { "type": "string", "required": false },
+          "badge": { "type": "string", "required": true },
+          "title": { "type": "string", "required": true },
+          "swipeHint": { "type": "string", "required": true },
+          "columns": {
+            "type": "object",
+            "required": ["pup", "disposable"],
+            "fields": {
+              "pup": { "type": "string", "required": true },
+              "disposable": { "type": "string", "required": true }
+            }
+          },
+          "rows": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.ComparisonRow" }
+          }
+        }
+      },
+      "ReviewSliderConfig": {
+        "type": "object",
+        "required": ["title", "body", "hint", "toggle", "slides"],
+        "fields": {
+          "title": { "type": "string", "required": true },
+          "body": { "type": "string", "required": true },
+          "hint": { "type": "string", "required": true },
+          "toggle": {
+            "type": "object",
+            "required": ["auto", "manual"],
+            "fields": {
+              "auto": { "type": "string", "required": true },
+              "manual": { "type": "string", "required": true }
+            }
+          },
+          "slides": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "shared.ImageAsset" }
+          }
+        }
+      },
+      "GuaranteeReviewCard": {
+        "type": "object",
+        "required": ["name", "verifiedLabel", "rating", "text"],
+        "fields": {
+          "name": { "type": "string", "required": true },
+          "verifiedLabel": { "type": "string", "required": true },
+          "rating": { "type": "number", "required": true },
+          "text": { "type": "string", "required": true }
+        }
+      },
+      "GuaranteeComment": {
+        "type": "object",
+        "required": ["name", "text"],
+        "fields": {
+          "name": { "type": "string", "required": true },
+          "text": { "type": "string", "required": true }
+        }
+      },
+      "GuaranteeConfig": {
+        "type": "object",
+        "required": ["badge", "title", "paragraphs", "whyTitle", "whyBody", "closingLine", "right"],
+        "fields": {
+          "id": { "type": "string", "required": false },
+          "badge": { "type": "string", "required": true },
+          "title": { "type": "string", "required": true },
+          "paragraphs": {
+            "type": "array",
+            "required": true,
+            "items": { "type": "string" }
+          },
+          "whyTitle": { "type": "string", "required": true },
+          "whyBody": { "type": "string", "required": true },
+          "closingLine": { "type": "string", "required": true },
+          "right": {
+            "type": "object",
+            "required": ["image", "reviewCard", "commentThread"],
+            "fields": {
+              "image": { "type_ref": "shared.ImageAsset", "required": true },
+              "reviewCard": { "type_ref": "sales_pdp.GuaranteeReviewCard", "required": true },
+              "commentThread": {
+                "type": "object",
+                "required": ["label", "comments"],
+                "fields": {
+                  "label": { "type": "string", "required": true },
+                  "comments": {
+                    "type": "array",
+                    "required": true,
+                    "items": { "type_ref": "sales_pdp.GuaranteeComment" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "FaqItem": {
+        "type": "object",
+        "required": ["question", "answer"],
+        "fields": {
+          "question": { "type": "string", "required": true },
+          "answer": { "type": "string", "required": true }
+        }
+      },
+      "FaqConfig": {
+        "type": "object",
+        "required": ["title", "items"],
+        "fields": {
+          "id": { "type": "string", "required": false },
+          "title": { "type": "string", "required": true },
+          "items": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.FaqItem" }
+          }
+        }
+      },
+      "ReviewTile": {
+        "type": "object",
+        "required": ["id", "image"],
+        "fields": {
+          "id": { "type": "string", "required": true },
+          "image": { "type_ref": "shared.ImageAsset", "required": true }
+        }
+      },
+      "ReviewWallConfig": {
+        "type": "object",
+        "required": ["badge", "title", "ratingLabel", "tiles", "showMoreLabel"],
+        "fields": {
+          "id": { "type": "string", "required": false },
+          "badge": { "type": "string", "required": true },
+          "title": { "type": "string", "required": true },
+          "ratingLabel": { "type": "string", "required": true },
+          "tiles": {
+            "type": "array",
+            "required": true,
+            "items": { "type_ref": "sales_pdp.ReviewTile" }
+          },
+          "showMoreLabel": { "type": "string", "required": true }
+        }
+      },
+      "FooterConfig": {
+        "type": "object",
+        "required": ["logo", "copyright"],
+        "fields": {
+          "logo": { "type_ref": "shared.ImageAsset", "required": true },
+          "copyright": { "type": "string", "required": true },
+          "company": { "type": "string", "required": false }
+        }
+      },
+      "SizeChartRow": {
+        "type": "object",
+        "required": ["label", "size", "idealFor", "weight"],
+        "fields": {
+          "label": { "type": "string", "required": true },
+          "size": { "type": "string", "required": true },
+          "idealFor": { "type": "string", "required": true },
+          "weight": { "type": "string", "required": true }
+        }
+      },
+      "WhyBundleQuote": {
+        "type": "object",
+        "required": ["text", "author"],
+        "fields": {
+          "text": { "type": "string", "required": true },
+          "author": { "type": "string", "required": true }
+        }
+      },
+      "ModalsConfig": {
+        "type": "object",
+        "required": ["sizeChart", "whyBundle", "freeGifts"],
+        "fields": {
+          "sizeChart": {
+            "type": "object",
+            "required": ["title", "sizes", "note"],
+            "fields": {
+              "title": { "type": "string", "required": true },
+              "sizes": {
+                "type": "array",
+                "required": true,
+                "items": { "type_ref": "sales_pdp.SizeChartRow" }
+              },
+              "note": { "type": "string", "required": true }
+            }
+          },
+          "whyBundle": {
+            "type": "object",
+            "required": ["title", "body", "quotes"],
+            "fields": {
+              "title": { "type": "string", "required": true },
+              "body": { "type": "string", "required": true },
+              "quotes": {
+                "type": "array",
+                "required": true,
+                "items": { "type_ref": "sales_pdp.WhyBundleQuote" }
+              }
+            }
+          },
+          "freeGifts": {
+            "type": "object",
+            "required": ["title", "body"],
+            "fields": {
+              "title": { "type": "string", "required": true },
+              "body": { "type": "string", "required": true }
+            }
+          }
+        }
+      },
+      "PdpConfig": {
+        "type": "object",
+        "required": [
+          "hero",
+          "videos",
+          "marquee",
+          "story",
+          "comparison",
+          "reviewSlider",
+          "guarantee",
+          "faq",
+          "reviewWall",
+          "footer",
+          "modals"
+        ],
+        "fields": {
+          "hero": { "type_ref": "sales_pdp.HeroConfig", "required": true },
+          "videos": { "type_ref": "sales_pdp.VideoSectionConfig", "required": true },
+          "marquee": { "type_ref": "sales_pdp.MarqueeConfig", "required": true },
+          "story": {
+            "type": "object",
+            "required": ["problem", "solution"],
+            "fields": {
+              "problem": { "type_ref": "sales_pdp.StorySectionConfig", "required": true },
+              "solution": { "type_ref": "sales_pdp.StorySolutionConfig", "required": true }
+            }
+          },
+          "comparison": { "type_ref": "sales_pdp.ComparisonConfig", "required": true },
+          "reviewSlider": { "type_ref": "sales_pdp.ReviewSliderConfig", "required": true },
+          "guarantee": { "type_ref": "sales_pdp.GuaranteeConfig", "required": true },
+          "faq": { "type_ref": "sales_pdp.FaqConfig", "required": true },
+          "reviewWall": { "type_ref": "sales_pdp.ReviewWallConfig", "required": true },
+          "footer": { "type_ref": "sales_pdp.FooterConfig", "required": true },
+          "modals": { "type_ref": "sales_pdp.ModalsConfig", "required": true }
+        }
+      }
+    }
+  },
+  "templates": [
+    {
+      "blueprint_name": "PreSales_Listicle",
+      "blueprint_id": "pre-sales-listicle",
+      "template_root": "mos/templates/pre-sales-template-main",
+      "source_files": [
+        "mos/templates/pre-sales-template-main/src/pages/ListiclePage/types.ts",
+        "mos/templates/pre-sales-template-main/src/site/types.ts",
+        "mos/templates/pre-sales-template-main/src/site/siteConfig.ts"
+      ],
+      "page_goal": "Listicle-style pre-sales layout with hero, reasons, reviews, pitch, proof wall, and floating CTA.",
+      "required_order": [
+        "hero",
+        "reasons",
+        "reviews",
+        "marquee",
+        "pitch",
+        "review_wall",
+        "footer",
+        "floating_cta"
+      ],
+      "inputs_required": {
+        "meta": { "type_ref": "shared.MetaConfig", "required": true },
+        "theme": { "type_ref": "shared.ThemeConfig", "required": false },
+        "copy": { "type_ref": "shared.UiCopy", "required": true },
+        "page": { "type_ref": "pre_sales_listicle.ListicleConfig", "required": true }
+      },
+      "modules": [
+        {
+          "id": "hero",
+          "component": "PreSalesHero",
+          "config_path": "page.hero + page.badges",
+          "type": "hero_section",
+          "fields": {
+            "hero": { "type_ref": "pre_sales_listicle.HeroConfig", "required": true },
+            "badges": {
+              "type": "array",
+              "required": true,
+              "items": { "type_ref": "pre_sales_listicle.Badge" }
+            }
+          }
+        },
+        {
+          "id": "reasons",
+          "component": "PreSalesReasons",
+          "config_path": "page.reasons",
+          "type": "listicle_section",
+          "fields": {
+            "reasons": {
+              "type": "array",
+              "required": true,
+              "items": { "type_ref": "pre_sales_listicle.Reason" }
+            }
+          }
+        },
+        {
+          "id": "reviews",
+          "component": "PreSalesReviews",
+          "config_path": "page.reviews",
+          "type": "carousel_section",
+          "dependencies": ["copy.common", "copy.reviews"],
+          "fields": {
+            "reviews": { "type_ref": "pre_sales_listicle.Reviews", "required": true }
+          }
+        },
+        {
+          "id": "marquee",
+          "component": "PreSalesMarquee",
+          "config_path": "page.marquee",
+          "type": "marquee_section",
+          "fields": {
+            "items": {
+              "type": "array",
+              "required": true,
+              "items": { "type": "string" }
+            }
+          }
+        },
+        {
+          "id": "pitch",
+          "component": "PreSalesPitch",
+          "config_path": "page.pitch",
+          "type": "pitch_section",
+          "fields": {
+            "pitch": { "type_ref": "pre_sales_listicle.Pitch", "required": true }
+          }
+        },
+        {
+          "id": "review_wall",
+          "component": "PreSalesReviewWall",
+          "config_path": "page.reviewsWall",
+          "type": "proof_grid_section",
+          "dependencies": ["copy.common", "copy.reviewWall", "copy.modal"],
+          "fields": {
+            "reviewsWall": { "type_ref": "pre_sales_listicle.ReviewsWall", "required": true }
+          }
+        },
+        {
+          "id": "footer",
+          "component": "PreSalesFooter",
+          "config_path": "page.footer",
+          "type": "footer_section",
+          "fields": {
+            "footer": { "type_ref": "pre_sales_listicle.Footer", "required": true }
+          }
+        },
+        {
+          "id": "floating_cta",
+          "component": "PreSalesFloatingCta",
+          "config_path": "page.floatingCta",
+          "type": "floating_cta",
+          "fields": {
+            "floatingCta": { "type_ref": "pre_sales_listicle.FloatingCta", "required": true }
+          }
+        }
+      ],
+      "optional_modules": [],
+      "qa_checklist": [
+        "Hero title and subtitle are provided.",
+        "If hero media is used, image/video source and alt text are set.",
+        "Each badge includes iconSrc, iconAlt, and label.",
+        "Each reason includes number, title, and body.",
+        "Review slides include text, author, and image alt text.",
+        "Review wall entries include text and author.",
+        "Floating CTA has label and href."
+      ],
+      "render_hints": {
+        "reasons_anchor": "Reason numbers are used to build anchors like reason-<number>.",
+        "review_images": "Review slides render best with up to 3 images (1 large, 2 slim).",
+        "pitch_bullets": "Pitch bullets support simple **bold** markup.",
+        "floating_cta_trigger": "Floating CTA can be triggered by showAfterReason or showAfterId."
+      }
+    },
+    {
+      "blueprint_name": "Sales_PDP",
+      "blueprint_id": "sales-pdp",
+      "template_root": "mos/templates/sales-template-main",
+      "source_files": [
+        "mos/templates/sales-template-main/src/pages/PdpPage/types.ts",
+        "mos/templates/sales-template-main/src/site/types.ts",
+        "mos/templates/sales-template-main/src/site/siteConfig.ts"
+      ],
+      "page_goal": "Sales PDP layout with hero purchase flow, story sections, comparison, guarantee, FAQ, reviews, and footer.",
+      "required_order": [
+        "header",
+        "hero",
+        "videos",
+        "marquee",
+        "story_problem",
+        "story_solution",
+        "comparison",
+        "guarantee",
+        "faq",
+        "review_wall",
+        "footer"
+      ],
+      "inputs_required": {
+        "meta": { "type_ref": "shared.MetaConfig", "required": true },
+        "theme": { "type_ref": "shared.ThemeConfig", "required": false },
+        "copy": { "type_ref": "shared.UiCopy", "required": true },
+        "page": { "type_ref": "sales_pdp.PdpConfig", "required": true }
+      },
+      "modules": [
+        {
+          "id": "header",
+          "component": "SalesPdpHeader",
+          "config_path": "page.hero.header",
+          "type": "header",
+          "fields": {
+            "header": { "type_ref": "sales_pdp.HeaderConfig", "required": true }
+          }
+        },
+        {
+          "id": "hero",
+          "component": "SalesPdpHero",
+          "config_path": "page.hero",
+          "type": "hero_section",
+          "dependencies": ["page.modals", "copy"],
+          "fields": {
+            "hero": { "type_ref": "sales_pdp.HeroConfig", "required": true },
+            "modals": { "type_ref": "sales_pdp.ModalsConfig", "required": true },
+            "copy": { "type_ref": "shared.UiCopy", "required": true }
+          }
+        },
+        {
+          "id": "videos",
+          "component": "SalesPdpVideos",
+          "config_path": "page.videos",
+          "type": "video_section",
+          "fields": {
+            "videos": { "type_ref": "sales_pdp.VideoSectionConfig", "required": true }
+          }
+        },
+        {
+          "id": "marquee",
+          "component": "SalesPdpMarquee",
+          "config_path": "page.marquee",
+          "type": "marquee_section",
+          "fields": {
+            "marquee": { "type_ref": "sales_pdp.MarqueeConfig", "required": true }
+          }
+        },
+        {
+          "id": "story_problem",
+          "component": "SalesPdpStoryProblem",
+          "config_path": "page.story.problem",
+          "type": "story_section",
+          "fields": {
+            "problem": { "type_ref": "sales_pdp.StorySectionConfig", "required": true }
+          }
+        },
+        {
+          "id": "story_solution",
+          "component": "SalesPdpStorySolution",
+          "config_path": "page.story.solution",
+          "type": "story_section",
+          "fields": {
+            "solution": { "type_ref": "sales_pdp.StorySolutionConfig", "required": true }
+          }
+        },
+        {
+          "id": "comparison",
+          "component": "SalesPdpComparison",
+          "config_path": "page.comparison",
+          "type": "comparison_section",
+          "fields": {
+            "comparison": { "type_ref": "sales_pdp.ComparisonConfig", "required": true }
+          }
+        },
+        {
+          "id": "guarantee",
+          "component": "SalesPdpGuarantee",
+          "config_path": "page.guarantee",
+          "type": "guarantee_section",
+          "fields": {
+            "guarantee": { "type_ref": "sales_pdp.GuaranteeConfig", "required": true }
+          }
+        },
+        {
+          "id": "faq",
+          "component": "SalesPdpFaq",
+          "config_path": "page.faq",
+          "type": "faq_section",
+          "fields": {
+            "faq": { "type_ref": "sales_pdp.FaqConfig", "required": true }
+          }
+        },
+        {
+          "id": "review_wall",
+          "component": "SalesPdpReviewWall",
+          "config_path": "page.reviewWall",
+          "type": "review_wall",
+          "fields": {
+            "reviewWall": { "type_ref": "sales_pdp.ReviewWallConfig", "required": true }
+          }
+        },
+        {
+          "id": "footer",
+          "component": "SalesPdpFooter",
+          "config_path": "page.footer",
+          "type": "footer_section",
+          "fields": {
+            "footer": { "type_ref": "sales_pdp.FooterConfig", "required": true }
+          }
+        }
+      ],
+      "optional_modules": [
+        {
+          "id": "review_slider",
+          "component": "SalesPdpReviewSlider",
+          "config_path": "page.reviewSlider",
+          "type": "review_slider",
+          "fields": {
+            "reviewSlider": { "type_ref": "sales_pdp.ReviewSliderConfig", "required": true }
+          },
+          "notes": "Component exists but is not rendered in SalesPdpTemplate by default."
+        }
+      ],
+      "qa_checklist": [
+        "Header nav hrefs match section ids (e.g., #faq, #reviews).",
+        "Hero purchase options include at least one size, color, and offer.",
+        "CTA label template includes {price} if price should render in the button.",
+        "Story sections include paragraphs and image alt text.",
+        "Comparison rows include label, pup, and disposable values.",
+        "FAQ items include both question and answer.",
+        "Review wall tiles include image alt text.",
+        "Modal content (size chart, why bundle, free gifts) is filled when used."
+      ],
+      "render_hints": {
+        "cta_price_placeholder": "CTA labelTemplate supports {price} replacement.",
+        "story_backgrounds": "Story section bg supports peach or blue.",
+        "story_layout": "Story layout supports textLeft or textRight.",
+        "urgency_tone": "Urgency row tone supports muted or highlight.",
+        "color_swatches": "Color options can use swatch (color) or swatchImageSrc (pattern).",
+        "review_wall_feed": "Guarantee section can use review wall tile images as a feed source.",
+        "hero_modals": "Hero interactions open sizeChart, whyBundle, and freeGifts modals."
+      }
+    }
+  ]
+}
