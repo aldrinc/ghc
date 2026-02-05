@@ -5,7 +5,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
 export default defineConfig({
   plugins: [react(), tsconfigPaths()],
   server: {
-    port: 5275,
-    allowedHosts: ["alba-unintermittent-overnormally.ngrok-free.dev"],
+    port: 5173,
+    allowedHosts: ["moshq.app", "www.moshq.app"],
   },
 });
