@@ -44,7 +44,7 @@ services:
       temporal:
         condition: service_started
     ports:
-      - "8234:8080"
+      - "127.0.0.1:8234:8080"
 
   pgadmin:
     image: dpage/pgadmin4:8
