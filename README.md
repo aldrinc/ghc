@@ -35,6 +35,15 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
 - [x] 29. Workflow triggers in UI — priority: high — deps: 28 — status: done
 - [x] 30. Workflow approvals UI — priority: high — deps: 29 — status: done
 
+# Default AI Models
+
+- **LLM_DEFAULT_MODEL:** gpt-5-nano-2025-08-07
+- **PRECANON_STEP04_MODEL:** o3-deep-research-2025-06-26
+- **CLAUDE_DEFAULT_MODEL:** claude-sonnet-4-5
+- **CLAUDE_FALLBACK_MODEL:** claude-haiku-4-5
+- **TESTIMONIAL_RENDERER_IMAGE_MODEL:** gemini-2.5-flash-image
+- **NANO_BANANA_MODEL:** gemini-2.5-flash-image
+
 ## Notes
 
 - Provider/model: `openai` / `gpt-5` (no gpt-4o-mini).
