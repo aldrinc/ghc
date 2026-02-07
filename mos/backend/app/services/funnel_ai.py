@@ -78,6 +78,44 @@ def _walk_json_with_path(node: Any, path: str) -> Iterator[tuple[str, Any]]:
             yield from _walk_json_with_path(item, next_path)
 
 
+def _count_component_types(puck_data: dict[str, Any]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        if not isinstance(comp_type, str) or not comp_type:
+            continue
+        counts[comp_type] = counts.get(comp_type, 0) + 1
+    return counts
+
+
+def _required_template_component_types(
+    base_puck_data: dict[str, Any],
+    *,
+    template_kind: str | None,
+) -> set[str]:
+    if template_kind == "sales-pdp":
+        candidates = {
+            "SalesPdpPage",
+            "SalesPdpReviewWall",
+            "SalesPdpReviewSlider",
+            "SalesPdpTemplate",
+        }
+    elif template_kind == "pre-sales-listicle":
+        candidates = {
+            "PreSalesPage",
+            "PreSalesReviews",
+            "PreSalesReviewWall",
+            "PreSalesTemplate",
+        }
+    else:
+        return set()
+
+    base_counts = _count_component_types(base_puck_data)
+    return {comp_type for comp_type in candidates if base_counts.get(comp_type, 0) > 0}
+
+
 def _collect_config_json_contexts_all(puck_data: dict[str, Any]) -> list[_ConfigJsonContext]:
     contexts: list[_ConfigJsonContext] = []
     for obj in walk_json(puck_data):
@@ -1982,7 +2020,8 @@ def generate_funnel_page_draft(
         attachment_guidance = "\n".join(lines) + "\n\n"
     template_guidance = (
         f"Template guidance:\n- Template id: {template.template_id}\n"
-        "- Do not introduce new component types not listed below\n"
+        "- Do not introduce new component types not listed below.\n"
+        "- Do not remove or rename existing template components in the current page puckData; only edit their props/config/copy fields.\n"
         if template_mode
         else ""
     )
@@ -2299,6 +2338,23 @@ def generate_funnel_page_draft(
             for key, value in list(zones.items()):
                 zones[key] = _sanitize_component_tree(value, allowed_types)
         _ensure_block_ids(puck_data)
+
+    if template_mode and isinstance(base_puck, dict):
+        required_types = _required_template_component_types(base_puck, template_kind=template_kind)
+        if required_types:
+            generated_counts = _count_component_types(puck_data)
+            missing_types = sorted(
+                comp_type for comp_type in required_types if generated_counts.get(comp_type, 0) == 0
+            )
+            if missing_types:
+                missing_str = ", ".join(missing_types)
+                required_str = ", ".join(sorted(required_types))
+                raise ValueError(
+                    "AI generation removed required template components from puckData "
+                    f"(templateKind={template_kind}). Missing: {missing_str}. "
+                    f"Required (based on the template input): {required_str}. "
+                    "The model must preserve template structure and only edit props/config/copy fields."
+                )
 
     wants_header, wants_footer = _prompt_wants_header_footer(prompt)
     if template_mode:
@@ -2619,7 +2675,8 @@ def stream_funnel_page_draft(
         )
         template_guidance = (
             f"Template guidance:\n- Template id: {template.template_id}\n"
-            "- Do not introduce new component types not listed below\n"
+            "- Do not introduce new component types not listed below.\n"
+            "- Do not remove or rename existing template components in the current page puckData; only edit their props/config/copy fields.\n"
             if template_mode
             else ""
         )
@@ -2913,6 +2970,23 @@ def stream_funnel_page_draft(
                 for key, value in list(zones.items()):
                     zones[key] = _sanitize_component_tree(value, allowed_types)
             _ensure_block_ids(puck_data)
+
+        if template_mode and isinstance(base_puck, dict):
+            required_types = _required_template_component_types(base_puck, template_kind=template_kind)
+            if required_types:
+                generated_counts = _count_component_types(puck_data)
+                missing_types = sorted(
+                    comp_type for comp_type in required_types if generated_counts.get(comp_type, 0) == 0
+                )
+                if missing_types:
+                    missing_str = ", ".join(missing_types)
+                    required_str = ", ".join(sorted(required_types))
+                    raise ValueError(
+                        "AI generation removed required template components from puckData "
+                        f"(templateKind={template_kind}). Missing: {missing_str}. "
+                        f"Required (based on the template input): {required_str}. "
+                        "The model must preserve template structure and only edit props/config/copy fields."
+                    )
 
         wants_header, wants_footer = _prompt_wants_header_footer(prompt)
         if template_mode:

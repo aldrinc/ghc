@@ -310,7 +310,30 @@ def _collect_testimonial_targets(
                 groups.extend(_collect_pre_sales_targets({"reviewsWall": config}, context=ctx))
 
     if not groups:
-        raise TestimonialGenerationError("No testimonial image slots found for this template.")
+        expected: set[str] = set()
+        if template_kind == "sales-pdp":
+            expected = {"SalesPdpReviewWall", "SalesPdpReviewSlider", "SalesPdpTemplate"}
+        elif template_kind == "pre-sales-listicle":
+            expected = {"PreSalesReviews", "PreSalesReviewWall", "PreSalesTemplate"}
+        counts = {key: 0 for key in expected}
+        for obj in walk_json(puck_data):
+            if not isinstance(obj, dict):
+                continue
+            comp_type = obj.get("type")
+            if comp_type in counts:
+                counts[comp_type] += 1
+        found_summary = ", ".join(
+            f"{comp_type}={count}" for comp_type, count in sorted(counts.items()) if count
+        )
+        if not found_summary:
+            found_summary = "none"
+        expected_summary = ", ".join(sorted(expected)) if expected else "unknown"
+        raise TestimonialGenerationError(
+            "No testimonial image slots found for this template. "
+            f"templateKind={template_kind}. "
+            f"Expected at least one of: {expected_summary}. "
+            f"Found: {found_summary}."
+        )
     for group in groups:
         for render in group.renders:
             image_id = id(render.image)
