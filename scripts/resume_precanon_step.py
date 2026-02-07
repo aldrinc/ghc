@@ -40,7 +40,9 @@ from app.temporal.workflows.precanon_market_research import (  # noqa: E402
 from temporalio.client import Client  # noqa: E402
 
 
-async def _fetch_temporal_input(workflow_id: str, run_id: Optional[str]) -> Tuple[Dict[str, Any], Optional[str]]:
+async def _fetch_temporal_input(
+    workflow_id: str, run_id: Optional[str]
+) -> Tuple[Dict[str, Any], Optional[str], Optional[str], Optional[str]]:
     client = await Client.connect(settings.TEMPORAL_ADDRESS, namespace=settings.TEMPORAL_NAMESPACE)
     handle = client.get_workflow_handle(workflow_id, run_id=run_id)
     desc = await handle.describe()
@@ -51,6 +53,12 @@ async def _fetch_temporal_input(workflow_id: str, run_id: Optional[str]) -> Tupl
     started = history.events[0].workflow_execution_started_event_attributes
     if not started or not getattr(started, "input", None) or not started.input.payloads:
         raise RuntimeError(f"Workflow {workflow_id} has no start input payloads")
+    parent_workflow_id = None
+    parent_run_id = None
+    maybe_parent = getattr(started, "parent_workflow_execution", None)
+    if maybe_parent:
+        parent_workflow_id = getattr(maybe_parent, "workflow_id", None)
+        parent_run_id = getattr(maybe_parent, "run_id", None)
     payload = started.input.payloads[0]
     raw_data = payload.data
     if isinstance(raw_data, (bytes, bytearray)):
@@ -59,7 +67,7 @@ async def _fetch_temporal_input(workflow_id: str, run_id: Optional[str]) -> Tupl
         input_data = json.loads(raw_data)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Failed to decode workflow input JSON for {workflow_id}: {exc}") from exc
-    return input_data, resolved_run_id
+    return input_data, resolved_run_id, parent_workflow_id, parent_run_id
 
 
 def _load_json_file(path_str: str) -> Dict[str, Any]:
@@ -99,6 +107,8 @@ def main() -> None:
     parser.add_argument("--step-key", required=True, help="Precanon step key (e.g., 01, 015, 03, 04).")
     parser.add_argument("--workflow-id", help="Temporal workflow_id for precanon workflow.")
     parser.add_argument("--workflow-run-id", help="Temporal workflow run_id for precanon workflow.")
+    parser.add_argument("--parent-workflow-id", help="Temporal parent workflow_id (root workflow to attach artifacts to).")
+    parser.add_argument("--parent-run-id", help="Temporal parent run_id (root run to attach artifacts to).")
     parser.add_argument("--org-id", help="Org id (overrides workflow input).")
     parser.add_argument("--client-id", help="Client id (overrides workflow input).")
     parser.add_argument("--product-id", help="Product id (overrides workflow input).")
@@ -117,8 +127,15 @@ def main() -> None:
 
     workflow_input: Dict[str, Any] = {}
     resolved_run_id: Optional[str] = None
+    detected_parent_workflow_id: Optional[str] = None
+    detected_parent_run_id: Optional[str] = None
     if args.workflow_id:
-        workflow_input, resolved_run_id = asyncio.run(_fetch_temporal_input(args.workflow_id, args.workflow_run_id))
+        (
+            workflow_input,
+            resolved_run_id,
+            detected_parent_workflow_id,
+            detected_parent_run_id,
+        ) = asyncio.run(_fetch_temporal_input(args.workflow_id, args.workflow_run_id))
 
     org_id = args.org_id or workflow_input.get("org_id")
     client_id = args.client_id or workflow_input.get("client_id")
@@ -126,6 +143,8 @@ def main() -> None:
     onboarding_payload_id = args.onboarding_payload_id or workflow_input.get("onboarding_payload_id")
     workflow_id = args.workflow_id or workflow_input.get("workflow_id")
     workflow_run_id = args.workflow_run_id or resolved_run_id
+    parent_workflow_id = args.parent_workflow_id or detected_parent_workflow_id
+    parent_run_id = args.parent_run_id or detected_parent_run_id
 
     if args.org_id and workflow_input.get("org_id") and args.org_id != workflow_input.get("org_id"):
         raise RuntimeError("Provided org_id does not match workflow input org_id.")
@@ -227,6 +246,7 @@ def main() -> None:
             PersistArtifactRequest(
                 step_key=args.step_key,
                 title=definition.title,
+                summary=parsed.summary,
                 content=parsed.content,
                 prompt_sha256=prompt_result.prompt_sha256,
                 org_id=org_id,
@@ -236,6 +256,8 @@ def main() -> None:
                 idea_workspace_id=workflow_id,
                 workflow_id=workflow_id or "",
                 workflow_run_id=effective_run_id,
+                parent_workflow_id=parent_workflow_id,
+                parent_run_id=parent_run_id,
                 parent_folder_id=args.parent_folder_id,
                 idea_folder_id=folder_result.idea_folder_id,
                 idea_folder_url=folder_result.idea_folder_url,
