@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } fro
 import { Badge } from "@/components/ui/badge";
 import { channelDisplayName } from "@/lib/channels";
 import type { LibraryItem } from "@/types/library";
+import { AdsIngestionRetryCallout } from "@/components/ads/AdsIngestionRetryCallout";
 
 const PAGE_SIZE = 60;
 
@@ -561,6 +562,7 @@ export function ResearchPage() {
         title="Research"
         description={`Ads and competitor brands for ${product.name}.`}
       />
+      <AdsIngestionRetryCallout clientId={workspace?.id} productId={product?.id} />
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="w-full justify-start">

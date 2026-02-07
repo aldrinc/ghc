@@ -6,6 +6,7 @@ import { normalizeExploreAdToLibraryItem } from "@/lib/library";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import type { LibraryItem } from "@/types/library";
+import { AdsIngestionRetryCallout } from "@/components/ads/AdsIngestionRetryCallout";
 
 const PAGE_SIZE = 60;
 
@@ -260,6 +261,9 @@ export function ExploreAdsPage() {
         title="Explore Ads"
         description="Browse ingested ads with basic filters and per-brand capping."
       />
+      {scope === "workspace" ? (
+        <AdsIngestionRetryCallout clientId={workspace?.id} productId={product?.id} />
+      ) : null}
       {workspace && !product ? (
         <div className="ds-card ds-card--md ds-card--empty text-sm">
           Select a product to scope explore results to your workspace.

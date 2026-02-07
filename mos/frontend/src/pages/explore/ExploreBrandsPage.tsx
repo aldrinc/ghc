@@ -6,6 +6,7 @@ import { useProductContext } from "@/contexts/ProductContext";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { channelDisplayName } from "@/lib/channels";
+import { AdsIngestionRetryCallout } from "@/components/ads/AdsIngestionRetryCallout";
 
 const sortOptions = [
   { value: "last_seen", label: "Last seen" },
@@ -131,6 +132,9 @@ export function ExploreBrandsPage() {
         title="Explore Brands"
         description="Org-wide brand inventory with ad counts, channels, and visibility controls."
       />
+      {scope === "workspace" ? (
+        <AdsIngestionRetryCallout clientId={workspace?.id} productId={product?.id} />
+      ) : null}
       {workspace && !product ? (
         <div className="ds-card ds-card--md ds-card--empty text-sm">
           Select a product to scope explore results to your workspace.

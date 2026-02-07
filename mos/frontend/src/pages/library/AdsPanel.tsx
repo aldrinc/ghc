@@ -6,6 +6,7 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import type { LibraryItem } from "@/types/library";
 import { useAdsApi } from "@/api/ads";
+import { AdsIngestionRetryCallout } from "@/components/ads/AdsIngestionRetryCallout";
 
 function LoadingGrid() {
   return (
@@ -173,6 +174,7 @@ export function AdsPanel() {
           <p className="text-sm text-content-muted">Raw ads you’ve ingested (with full media + metadata).</p>
         </div>
       </div>
+      <AdsIngestionRetryCallout clientId={workspace?.id} productId={product?.id} />
       {!workspace && (
         <div className="ds-card ds-card--md ds-card--empty text-sm">
           Select a workspace to view ingested ads.
