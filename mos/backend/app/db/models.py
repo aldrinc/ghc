@@ -585,6 +585,33 @@ class Artifact(Base):
     )
 
 
+class ResearchArtifact(Base):
+    __tablename__ = "research_artifacts"
+    __table_args__ = (
+        UniqueConstraint("org_id", "workflow_run_id", "step_key", name="uq_research_artifacts_run_step"),
+        sa.Index("idx_research_artifacts_run", "org_id", "workflow_run_id"),
+        sa.Index("idx_research_artifacts_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    workflow_run_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    step_key: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    doc_id: Mapped[str] = mapped_column(Text, nullable=False)
+    doc_url: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_sha256: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ClaudeContextFile(Base):
     __tablename__ = "claude_context_files"
     __table_args__ = (
