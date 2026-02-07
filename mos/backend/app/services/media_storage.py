@@ -14,6 +14,15 @@ logger = logging.getLogger(__name__)
 IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
 
 
+class MediaStorageConfigurationError(RuntimeError):
+    """
+    Raised when media storage is not configured.
+
+    We fail loudly (no silent fallbacks) because uploads/presigned URLs are core
+    app capabilities.
+    """
+
+
 class MediaStorage:
     """
     Thin wrapper around S3-compatible storage (Hetzner) for uploads + presigned GETs.
@@ -23,11 +32,13 @@ class MediaStorage:
 
     def __init__(self) -> None:
         if not settings.MEDIA_STORAGE_BUCKET:
-            raise RuntimeError("MEDIA_STORAGE_BUCKET is required")
+            raise MediaStorageConfigurationError("MEDIA_STORAGE_BUCKET is required")
         if not settings.MEDIA_STORAGE_ENDPOINT:
-            raise RuntimeError("MEDIA_STORAGE_ENDPOINT is required")
+            raise MediaStorageConfigurationError("MEDIA_STORAGE_ENDPOINT is required")
         if not settings.MEDIA_STORAGE_ACCESS_KEY or not settings.MEDIA_STORAGE_SECRET_KEY:
-            raise RuntimeError("MEDIA_STORAGE_ACCESS_KEY and MEDIA_STORAGE_SECRET_KEY are required")
+            raise MediaStorageConfigurationError(
+                "MEDIA_STORAGE_ACCESS_KEY and MEDIA_STORAGE_SECRET_KEY are required"
+            )
 
         addressing_style = "path" if settings.MEDIA_STORAGE_FORCE_PATH_STYLE else "auto"
         self.bucket = settings.MEDIA_STORAGE_BUCKET
