@@ -65,7 +65,7 @@ class FakeTemporalClient:
         self.started.append(workflow_id)
         return handle
 
-    def get_workflow_handle(self, workflow_id: str) -> FakeTemporalHandle:
+    def get_workflow_handle(self, workflow_id: str, **_kwargs) -> FakeTemporalHandle:
         return FakeTemporalHandle(workflow_id, self.signals)
 
 
