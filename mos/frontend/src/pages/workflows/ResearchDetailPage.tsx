@@ -7,6 +7,14 @@ import { useWorkflowDetail } from "@/api/workflows";
 import type { ResearchArtifactRef } from "@/types/common";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 
+type CanonArtifactRef = Pick<ResearchArtifactRef, "step_key" | "doc_url" | "doc_id">;
+
+function isCanonArtifactRef(value: unknown): value is CanonArtifactRef {
+  if (!value || typeof value !== "object") return false;
+  const v = value as Record<string, unknown>;
+  return typeof v.step_key === "string" && typeof v.doc_url === "string" && typeof v.doc_id === "string";
+}
+
 export function ResearchDetailPage() {
   const { workflowId, stepKey } = useParams();
   const navigate = useNavigate();
@@ -19,13 +27,20 @@ export function ResearchDetailPage() {
     return list.find((a) => a.step_key === stepKey);
   }, [data?.research_artifacts, stepKey]);
 
+  const canonArtifactRef = useMemo(() => {
+    const raw = (data?.precanon_research as Record<string, unknown> | null)?.artifact_refs;
+    if (!Array.isArray(raw)) return undefined;
+    const match = raw.find((item) => isCanonArtifactRef(item) && item.step_key === stepKey);
+    return isCanonArtifactRef(match) ? match : undefined;
+  }, [data?.precanon_research, stepKey]);
+
   const stepSummaries = (data?.precanon_research?.step_summaries as Record<string, string> | undefined) || {};
   const stepContents = (data?.precanon_research?.step_contents as Record<string, string> | undefined) || {};
 
   const resolvedStepKey = stepKey || "";
   const summary = artifact?.summary || stepSummaries[resolvedStepKey] || "";
   const content = artifact?.content || stepContents[resolvedStepKey] || "";
-  const docUrl = artifact?.doc_url;
+  const docUrl = artifact?.doc_url || canonArtifactRef?.doc_url;
 
   const hasContent = Boolean(content?.trim());
   const displayContent = hasContent ? content : summary;
