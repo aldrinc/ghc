@@ -143,6 +143,7 @@ async def get_workflow_run(
     research_artifacts = [
         {
             "step_key": row.step_key,
+            "title": row.title,
             "doc_url": row.doc_url,
             "doc_id": row.doc_id,
             "summary": row.summary,

@@ -349,6 +349,7 @@ class PreCanonMarketResearchWorkflow:
 
             ref = {
                 "step_key": step_key,
+                "title": definition.title,
                 "doc_url": persist_result.doc_url,
                 "doc_id": persist_result.doc_id,
                 "summary": parsed.summary,
@@ -453,6 +454,7 @@ class PreCanonMarketResearchWorkflow:
         artifacts.append(
             {
                 "step_key": "02",
+                "title": "Competitor Facebook Page Resolution",
                 "doc_url": resolution_persist_result.doc_url,
                 "doc_id": resolution_persist_result.doc_id,
                 "summary": f"Resolved Facebook pages for {len(resolve_result.competitors)} competitors.",
@@ -613,7 +615,13 @@ class PreCanonMarketResearchWorkflow:
             "step_summaries": step_summaries,
             "step_contents": step_contents,
             "artifact_refs": [
-                {"step_key": a["step_key"], "doc_url": a["doc_url"], "doc_id": a["doc_id"]} for a in artifacts
+                {
+                    "step_key": a["step_key"],
+                    "title": a["title"],
+                    "doc_url": a["doc_url"],
+                    "doc_id": a["doc_id"],
+                }
+                for a in artifacts
             ],
             "prompt_shas": prompt_shas,
             "ads_context": base_vars.get("ADS_CONTEXT", ""),
