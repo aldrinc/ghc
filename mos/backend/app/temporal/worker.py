@@ -23,6 +23,7 @@ from app.temporal.workflows.ad_creative_analysis import AdsCreativeAnalysisWorkf
 from app.temporal.activities import placeholders as placeholder_activities
 from app.temporal.activities.client_onboarding_activities import (
     build_client_canon_activity,
+    build_design_system_activity,
     build_metric_schema_activity,
     persist_client_onboarding_artifacts_activity,
 )
@@ -100,6 +101,7 @@ async def main() -> None:
             activities=[
                 placeholder_activities.noop_activity,
                 build_client_canon_activity,
+                build_design_system_activity,
                 build_metric_schema_activity,
                 persist_client_onboarding_artifacts_activity,
                 fetch_onboarding_payload_activity,

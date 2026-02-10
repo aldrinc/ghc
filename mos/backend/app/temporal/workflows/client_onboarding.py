@@ -9,6 +9,7 @@ from temporalio import workflow
 with workflow.unsafe.imports_passed_through():
     from app.temporal.activities.client_onboarding_activities import (
         build_client_canon_activity,
+        build_design_system_activity,
         build_metric_schema_activity,
         persist_client_onboarding_artifacts_activity,
     )
@@ -97,6 +98,19 @@ class ClientOnboardingWorkflow:
         )
 
         await workflow.wait_condition(lambda: self._metric_approved)
+
+        await workflow.execute_activity(
+            build_design_system_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "product_id": input.product_id,
+                "onboarding_payload_id": input.onboarding_payload_id,
+                "canon": self.canon,
+                "precanon_research": precanon_ctx,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+        )
 
         await workflow.execute_activity(
             persist_client_onboarding_artifacts_activity,
