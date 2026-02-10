@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useWorkflowDetail, useWorkflowSignal } from "@/api/workflows";
@@ -96,44 +97,47 @@ export function WorkflowDetailPage() {
       ) : (
         <div className="space-y-4">
           {run.status === "running" ? (
-            <div className="ds-card ds-card--md bg-amber-50 text-amber-900 text-sm shadow-none">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-amber-700" />
-                  <span className="font-semibold">Workflow running</span>
-                </div>
-                <span className="text-xs text-amber-800/80">Auto-refreshing every 15s</span>
-              </div>
+            <Callout
+              variant="warning"
+              title="Workflow running"
+              icon={<Loader2 className="h-4 w-4 animate-spin" />}
+              actions={<span className="text-xs text-content-muted">Auto-refreshing every 15s</span>}
+            >
               {latestLog ? (
-                <div className="mt-2 text-xs text-amber-800">
+                <>
                   Latest activity: {formatStepLabel(latestLog.step)} ({latestLog.status}) |{" "}
                   {formatDate(latestLog.created_at)}
-                </div>
+                </>
               ) : (
-                <div className="mt-2 text-xs text-amber-800">Waiting for the first activity update...</div>
+                <>Waiting for the first activity update...</>
               )}
-            </div>
+            </Callout>
           ) : null}
           {run?.product_id && product?.id && run.product_id !== product.id ? (
-            <div className="ds-card ds-card--md bg-amber-50 text-amber-900 text-sm shadow-none flex items-center justify-between">
-              <div>
+            <Callout
+              variant="warning"
+              title="This workflow is scoped to a different product"
+              actions={
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    selectProduct(run.product_id || "", {
+                      name: runProduct?.name,
+                      client_id: run.client_id || undefined,
+                    })
+                  }
+                >
+                  Switch product
+                </Button>
+              }
+            >
+              <>
                 This workflow is scoped to{" "}
-                <span className="font-semibold">{runProduct?.name || run.product_id}</span>. Switch product to review
-                artifacts in context.
-              </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() =>
-                  selectProduct(run.product_id || "", {
-                    name: runProduct?.name,
-                    client_id: run.client_id || undefined,
-                  })
-                }
-              >
-                Switch product
-              </Button>
-            </div>
+                <span className="font-semibold text-content">{runProduct?.name || run.product_id}</span>. Switch product
+                to review artifacts in context.
+              </>
+            </Callout>
           ) : null}
           <div className="grid gap-4 md:grid-cols-2">
             <div className="ds-card ds-card--md shadow-none">

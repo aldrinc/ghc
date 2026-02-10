@@ -1,0 +1,39 @@
+{
+  "meta": {
+    "generatedAt": "2026-02-09T22:02:33.573Z",
+    "patterns": [
+      {
+        "id": "tailwind_dark_variant",
+        "source": "(^|[\\s\"'`])dark:",
+        "flags": "g"
+      },
+      {
+        "id": "tailwind_slate_palette",
+        "source": "\\bslate-\\d{2,3}\\b",
+        "flags": "g"
+      },
+      {
+        "id": "tailwind_other_neutral_palettes",
+        "source": "\\b(?:gray|zinc|neutral|stone)-\\d{2,3}\\b",
+        "flags": "g"
+      },
+      {
+        "id": "tailwind_status_palettes",
+        "source": "\\b(?:amber|yellow|orange|red|rose|emerald|green|lime)-\\d{2,3}\\b",
+        "flags": "g"
+      },
+      {
+        "id": "tailwind_bg_white",
+        "source": "\\bbg-white\\b",
+        "flags": "g"
+      },
+      {
+        "id": "tailwind_ring_offset_white",
+        "source": "\\bring-offset-white\\b",
+        "flags": "g"
+      }
+    ],
+    "scannedRoot": "src"
+  },
+  "baseline": {}
+}

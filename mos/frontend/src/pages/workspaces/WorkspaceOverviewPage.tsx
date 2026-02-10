@@ -8,6 +8,7 @@ import { useWorkflows, useWorkflowDetail } from "@/api/workflows";
 import { useLatestArtifact } from "@/api/artifacts";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -141,21 +142,22 @@ export function WorkspaceOverviewPage() {
                 Open workflow
               </Button>
               {isRunning ? (
-                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-700" />
-                    <span className="font-semibold">Workflow running</span>
-                    <span className="text-amber-800/80">Auto-refreshing every 15s</span>
-                  </div>
+                <Callout
+                  variant="warning"
+                  size="sm"
+                  title="Workflow running"
+                  icon={<Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  actions={<span className="text-xs text-content-muted">Auto-refreshing every 15s</span>}
+                >
                   {latestLog ? (
-                    <div className="mt-1 text-amber-800">
+                    <>
                       Latest activity: {formatStepLabel(latestLog.step)} ({latestLog.status}) |{" "}
                       {formatDate(latestLog.created_at)}
-                    </div>
+                    </>
                   ) : (
-                    <div className="mt-1 text-amber-800">Waiting for the first activity update...</div>
+                    <>Waiting for the first activity update...</>
                   )}
-                </div>
+                </Callout>
               ) : null}
             </div>
           ) : (

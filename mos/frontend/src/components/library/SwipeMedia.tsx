@@ -18,7 +18,7 @@ function aspectToClass(aspect: "1/1" | "4/5" | "9/16" | "16/9") {
 function MediaContent({ asset }: { asset?: MediaAsset }) {
   if (!asset) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-slate-500">
+      <div className="flex h-full items-center justify-center text-sm text-content-muted">
         No media
       </div>
     );
@@ -26,7 +26,7 @@ function MediaContent({ asset }: { asset?: MediaAsset }) {
 
   if (asset.status === "pending") {
     return (
-      <div className="flex h-full animate-pulse items-center justify-center text-sm text-slate-500">
+      <div className="flex h-full animate-pulse items-center justify-center text-sm text-content-muted">
         Processing media…
       </div>
     );
@@ -34,7 +34,7 @@ function MediaContent({ asset }: { asset?: MediaAsset }) {
 
   if (asset.status === "failed") {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-slate-500">
+      <div className="flex h-full items-center justify-center text-sm text-content-muted">
         Media unavailable
       </div>
     );
@@ -47,7 +47,7 @@ function MediaContent({ asset }: { asset?: MediaAsset }) {
 
   if (!thumb) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-slate-500">
+      <div className="flex h-full items-center justify-center text-sm text-content-muted">
         No media
       </div>
     );
@@ -87,7 +87,7 @@ export function SwipeCarousel({
 
   if (!media.length) {
     return (
-      <div className={`relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 ${aspectClass}`}>
+      <div className={`relative overflow-hidden rounded-xl border border-border bg-surface-2 ${aspectClass}`}>
         <MediaContent />
       </div>
     );
@@ -99,7 +99,7 @@ export function SwipeCarousel({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 ${aspectClass}`}
+      className={`group relative overflow-hidden rounded-xl border border-border bg-surface-2 ${aspectClass}`}
       onClick={onClick}
       role="presentation"
     >
@@ -140,7 +140,7 @@ export function SwipeCarousel({
             }}
             className={[
               "h-2 w-2 rounded-full transition",
-              idx === index ? "bg-white" : "bg-white/60",
+              idx === index ? "bg-foreground" : "bg-foreground/60",
             ].join(" ")}
           />
         ))}
@@ -163,7 +163,7 @@ export function SwipeMedia({
 
   if (assets.length === 0) {
     return (
-      <div className={`flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-500 ${aspectClass}`}>
+      <div className={`flex items-center justify-center rounded-xl border border-border bg-surface-2 text-sm text-content-muted ${aspectClass}`}>
         No media
       </div>
     );
@@ -172,7 +172,7 @@ export function SwipeMedia({
   if (assets.length === 1) {
     return (
       <div
-        className={`relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50 ${aspectClass}`}
+        className={`relative overflow-hidden rounded-xl border border-border bg-surface-2 ${aspectClass}`}
         onClick={onOpen}
         role="presentation"
       >

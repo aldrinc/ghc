@@ -13,12 +13,13 @@ type DocumentRow = {
   key: string;
   workflowId: string;
   stepKey: string;
+  title: string;
   summary: string;
   docUrl?: string;
   source?: "workflow" | "canon" | "mixed";
 };
 
-type CanonArtifactRef = Pick<ResearchArtifactRef, "step_key" | "doc_url" | "doc_id">;
+type CanonArtifactRef = Pick<ResearchArtifactRef, "step_key" | "title" | "doc_url" | "doc_id">;
 
 function EmptyState({ title, description }: { title: string; description: string }) {
   return (
@@ -39,7 +40,12 @@ function getErrorMessage(error: unknown) {
 function isCanonArtifactRef(value: unknown): value is CanonArtifactRef {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return typeof v.step_key === "string" && typeof v.doc_url === "string" && typeof v.doc_id === "string";
+  return (
+    typeof v.step_key === "string" &&
+    typeof v.title === "string" &&
+    typeof v.doc_url === "string" &&
+    typeof v.doc_id === "string"
+  );
 }
 
 export function DocumentsPage() {
@@ -76,50 +82,64 @@ export function DocumentsPage() {
     return raw.filter(isCanonArtifactRef);
   }, [workflowDetail?.precanon_research]);
 
-  const rows: DocumentRow[] = useMemo(() => {
-    if (!latestWorkflow?.id) return [];
-    const workflowArtifacts = (workflowDetail?.research_artifacts || []) as ResearchArtifactRef[];
-    const canonByStep = new Map<string, CanonArtifactRef>();
-    canonArtifactRefs.forEach((ref) => {
-      canonByStep.set(ref.step_key, ref);
-    });
-
-    const out: DocumentRow[] = [];
-    const seenSteps = new Set<string>();
-
-    workflowArtifacts.forEach((art) => {
-      const stepKey = art.step_key;
-      if (!stepKey) return;
-      if (seenSteps.has(stepKey)) return;
-      seenSteps.add(stepKey);
-
-      const canonRef = canonByStep.get(stepKey);
-      out.push({
-        key: `${latestWorkflow.id}:${stepKey}`,
-        workflowId: latestWorkflow.id,
-        stepKey,
-        summary: art.summary || stepSummaries[stepKey] || "",
-        docUrl: art.doc_url || canonRef?.doc_url || undefined,
-        source: canonRef ? "mixed" : "workflow",
+  const { rows, rowsError } = useMemo(() => {
+    try {
+      if (!latestWorkflow?.id) return { rows: [] as DocumentRow[], rowsError: "" };
+      const workflowArtifacts = (workflowDetail?.research_artifacts || []) as ResearchArtifactRef[];
+      const canonByStep = new Map<string, CanonArtifactRef>();
+      canonArtifactRefs.forEach((ref) => {
+        canonByStep.set(ref.step_key, ref);
       });
-    });
 
-    canonArtifactRefs.forEach((ref) => {
-      const stepKey = ref.step_key;
-      if (!stepKey) return;
-      if (seenSteps.has(stepKey)) return;
-      seenSteps.add(stepKey);
-      out.push({
-        key: `${latestWorkflow.id}:${stepKey}`,
-        workflowId: latestWorkflow.id,
-        stepKey,
-        summary: stepSummaries[stepKey] || "",
-        docUrl: ref.doc_url || undefined,
-        source: "canon",
+      const out: DocumentRow[] = [];
+      const seenSteps = new Set<string>();
+
+      workflowArtifacts.forEach((art) => {
+        const stepKey = art.step_key;
+        if (!stepKey) return;
+        if (seenSteps.has(stepKey)) return;
+        seenSteps.add(stepKey);
+
+        const canonRef = canonByStep.get(stepKey);
+        const title = typeof art.title === "string" ? art.title.trim() : "";
+        if (!title) {
+          throw new Error(`Missing title for research artifact step ${stepKey} in workflow ${latestWorkflow.id}`);
+        }
+        out.push({
+          key: `${latestWorkflow.id}:${stepKey}`,
+          workflowId: latestWorkflow.id,
+          stepKey,
+          title,
+          summary: art.summary || stepSummaries[stepKey] || "",
+          docUrl: art.doc_url || canonRef?.doc_url || undefined,
+          source: canonRef ? "mixed" : "workflow",
+        });
       });
-    });
 
-    return out;
+      canonArtifactRefs.forEach((ref) => {
+        const stepKey = ref.step_key;
+        if (!stepKey) return;
+        if (seenSteps.has(stepKey)) return;
+        seenSteps.add(stepKey);
+        const title = typeof ref.title === "string" ? ref.title.trim() : "";
+        if (!title) {
+          throw new Error(`Missing title for canon research artifact step ${stepKey} in workflow ${latestWorkflow.id}`);
+        }
+        out.push({
+          key: `${latestWorkflow.id}:${stepKey}`,
+          workflowId: latestWorkflow.id,
+          stepKey,
+          title,
+          summary: stepSummaries[stepKey] || "",
+          docUrl: ref.doc_url || undefined,
+          source: "canon",
+        });
+      });
+
+      return { rows: out, rowsError: "" };
+    } catch (error) {
+      return { rows: [] as DocumentRow[], rowsError: getErrorMessage(error) };
+    }
   }, [canonArtifactRefs, latestWorkflow?.id, stepSummaries, workflowDetail?.research_artifacts]);
 
   const isLoading = isWorkflowsLoading || isWorkflowDetailLoading;
@@ -160,6 +180,29 @@ export function DocumentsPage() {
         <PageHeader title="Documents" description={`Research docs captured during onboarding for ${product.name}.`} />
         <div className="max-w-6xl mx-auto space-y-3">
           <EmptyState title="Failed to load documents" description={message} />
+          <div className="flex justify-center">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                refetchWorkflows();
+                if (latestWorkflow?.id) refetchWorkflowDetail();
+              }}
+            >
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (rowsError) {
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Documents" description={`Research docs captured during onboarding for ${product.name}.`} />
+        <div className="max-w-6xl mx-auto space-y-3">
+          <EmptyState title="Failed to build document list" description={rowsError} />
           <div className="flex justify-center">
             <Button
               variant="secondary"
@@ -230,7 +273,7 @@ export function DocumentsPage() {
               <Table variant="ghost">
                 <TableHeader>
                   <TableRow>
-                    <TableHeadCell>Step</TableHeadCell>
+                    <TableHeadCell>Document</TableHeadCell>
                     <TableHeadCell>Summary</TableHeadCell>
                     <TableHeadCell className="text-right">Actions</TableHeadCell>
                   </TableRow>
@@ -245,7 +288,10 @@ export function DocumentsPage() {
                     >
                       <TableCell className="font-semibold text-content">
                         <div className="flex items-center gap-2">
-                          <span>Step {row.stepKey}</span>
+                          <div className="min-w-0">
+                            <div className="truncate">{row.title}</div>
+                            <div className="text-xs font-normal text-content-muted">Step {row.stepKey}</div>
+                          </div>
                           {row.source === "canon" ? <Badge>Canon</Badge> : null}
                           {row.source === "mixed" ? <Badge tone="accent">Canon + Workflow</Badge> : null}
                         </div>

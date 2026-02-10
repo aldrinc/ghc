@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
@@ -461,25 +462,30 @@ export function CampaignDetailPage() {
       </PageHeader>
 
       {productMismatch || productMissing ? (
-        <div className="flex items-center justify-between gap-4 border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-900">
-          <div>
+        <Callout
+          variant="warning"
+          title="This campaign is scoped to a different product"
+          actions={
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() =>
+                selectProduct(campaign.product_id || "", {
+                  name: campaignProduct?.name,
+                  client_id: campaign.client_id,
+                })
+              }
+            >
+              Switch product
+            </Button>
+          }
+        >
+          <>
             This campaign is scoped to{" "}
-            <span className="font-semibold">{campaignProductLabel || "a product"}</span>. Switch products to review
-            artifacts and planning in context.
-          </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() =>
-              selectProduct(campaign.product_id || "", {
-                name: campaignProduct?.name,
-                client_id: campaign.client_id,
-              })
-            }
-          >
-            Switch product
-          </Button>
-        </div>
+            <span className="font-semibold text-content">{campaignProductLabel || "a product"}</span>. Switch products to
+            review artifacts and planning in context.
+          </>
+        </Callout>
       ) : null}
 
       <Tabs defaultValue="overview">

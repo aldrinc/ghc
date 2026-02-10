@@ -1,79 +1,94 @@
 import type { Config } from "tailwindcss";
 
+function tokenColor(cssVar: string) {
+  return ({ opacityValue }: { opacityValue?: string } = {}) => {
+    // Tailwind will usually pass a CSS variable expression like `var(--tw-bg-opacity, 1)`
+    // (or a literal like `0.5` for `/50` modifiers). We normalize this to a percentage
+    // for `color-mix(...)`.
+    if (opacityValue === undefined) return `var(${cssVar})`;
+    return `color-mix(in srgb, var(${cssVar}) calc(${opacityValue} * 100%), transparent)`;
+  };
+}
+
 const config: Config = {
+  // Dark mode is opt-in via `data-theme="dark"` on an ancestor (we set it on <html>).
+  // We intentionally avoid `media` so system dark mode doesn't unexpectedly flip
+  // the UI without user intent.
+  darkMode: ["class", '[data-theme="dark"]'],
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        background: "var(--background)",
-        foreground: "var(--foreground)",
-        canvas: "var(--bg)",
-        surface: "var(--surface)",
-        "surface-2": "var(--surface-2)",
-        "surface-hover": "var(--surface-hover)",
-        border: "var(--border)",
-        "border-strong": "var(--border-strong)",
-        divider: "var(--divider)",
+        background: tokenColor("--background"),
+        foreground: tokenColor("--foreground"),
+        canvas: tokenColor("--bg"),
+        surface: tokenColor("--surface"),
+        "surface-2": tokenColor("--surface-2"),
+        "surface-hover": tokenColor("--surface-hover"),
+        border: tokenColor("--border"),
+        "border-strong": tokenColor("--border-strong"),
+        divider: tokenColor("--divider"),
         muted: {
-          DEFAULT: "var(--muted)",
-          foreground: "var(--muted-foreground)",
+          DEFAULT: tokenColor("--muted"),
+          foreground: tokenColor("--muted-foreground"),
         },
         card: {
-          DEFAULT: "var(--card)",
-          foreground: "var(--card-foreground)",
+          DEFAULT: tokenColor("--card"),
+          foreground: tokenColor("--card-foreground"),
         },
         popover: {
-          DEFAULT: "var(--popover)",
-          foreground: "var(--popover-foreground)",
+          DEFAULT: tokenColor("--popover"),
+          foreground: tokenColor("--popover-foreground"),
         },
         primary: {
-          DEFAULT: "var(--primary)",
-          foreground: "var(--primary-foreground)",
+          DEFAULT: tokenColor("--primary"),
+          foreground: tokenColor("--primary-foreground"),
         },
         secondary: {
-          DEFAULT: "var(--secondary)",
-          foreground: "var(--secondary-foreground)",
+          DEFAULT: tokenColor("--secondary"),
+          foreground: tokenColor("--secondary-foreground"),
         },
         accent: {
-          DEFAULT: "var(--accent)",
-          hover: "var(--accent-hover)",
-          active: "var(--accent-active)",
-          foreground: "var(--accent-contrast)",
+          DEFAULT: tokenColor("--accent"),
+          hover: tokenColor("--accent-hover"),
+          active: tokenColor("--accent-active"),
+          foreground: tokenColor("--accent-contrast"),
         },
         selection: {
-          DEFAULT: "var(--selection)",
-          foreground: "var(--selection-foreground)",
+          DEFAULT: tokenColor("--selection"),
+          foreground: tokenColor("--selection-foreground"),
         },
-        hover: "var(--hover)",
-        active: "var(--active)",
+        hover: tokenColor("--hover"),
+        active: tokenColor("--active"),
         disabled: {
-          DEFAULT: "var(--disabled)",
-          foreground: "var(--disabled-foreground)",
+          DEFAULT: tokenColor("--disabled"),
+          foreground: tokenColor("--disabled-foreground"),
         },
         input: {
-          DEFAULT: "var(--input)",
-          border: "var(--input-border)",
-          "border-focus": "var(--input-border-focus)",
+          DEFAULT: tokenColor("--input"),
+          border: tokenColor("--input-border"),
+          "border-focus": tokenColor("--input-border-focus"),
         },
         sidebar: {
-          DEFAULT: "var(--sidebar)",
-          foreground: "var(--sidebar-foreground)",
-          accent: "var(--sidebar-accent)",
-          "accent-foreground": "var(--sidebar-accent-foreground)",
-          border: "var(--sidebar-border)",
-          primary: "var(--sidebar-primary)",
-          "primary-foreground": "var(--sidebar-primary-foreground)",
-          ring: "var(--sidebar-ring)",
+          DEFAULT: tokenColor("--sidebar"),
+          foreground: tokenColor("--sidebar-foreground"),
+          accent: tokenColor("--sidebar-accent"),
+          "accent-foreground": tokenColor("--sidebar-accent-foreground"),
+          border: tokenColor("--sidebar-border"),
+          primary: tokenColor("--sidebar-primary"),
+          "primary-foreground": tokenColor("--sidebar-primary-foreground"),
+          ring: tokenColor("--sidebar-ring"),
         },
-        content: "var(--text)",
-        "content-muted": "var(--text-muted)",
-        "subtle-foreground": "var(--subtle-foreground)",
-        "accent-contrast": "var(--accent-contrast)",
-        danger: "var(--danger)",
-        success: "var(--success)",
-        overlay: "var(--overlay)",
-        "shadow-color": "var(--shadow-color)",
-        focus: "var(--focus-outline)",
+        content: tokenColor("--text"),
+        "content-muted": tokenColor("--text-muted"),
+        "subtle-foreground": tokenColor("--subtle-foreground"),
+        "accent-contrast": tokenColor("--accent-contrast"),
+        danger: tokenColor("--danger"),
+        success: tokenColor("--success"),
+        warning: tokenColor("--warning"),
+        overlay: tokenColor("--overlay"),
+        "shadow-color": tokenColor("--shadow-color"),
+        focus: tokenColor("--focus-outline"),
         manus: {
           ink: "#34322D",
           mist: "#F8F8F8",

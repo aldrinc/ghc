@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "check:semantic-ui": "node scripts/check-semantic-ui.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "echo \"add lint tooling\""

@@ -10,6 +10,10 @@ import { useProductContext } from "@/contexts/ProductContext";
 import { LibraryCard } from "@/components/library/LibraryCard";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
+import { Input } from "@/components/ui/input";
+import { FilterBar } from "@/components/layout/FilterBar";
 import { channelDisplayName } from "@/lib/channels";
 import type { LibraryItem } from "@/types/library";
 import { AdsIngestionRetryCallout } from "@/components/ads/AdsIngestionRetryCallout";
@@ -58,7 +62,7 @@ function LoadingGrid() {
       {Array.from({ length: 6 }).map((_, idx) => (
         <div
           key={idx}
-          className="ds-card ds-card--md flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none animate-pulse"
+          className="ds-card ds-card--md flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-none animate-pulse"
         >
           <div className="relative">
             <div className="aspect-[4/5] w-full bg-muted" />
@@ -277,18 +281,18 @@ function ResearchAdsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <input
+      <FilterBar>
+        <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search ads"
-          className="min-w-[180px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="min-w-[180px] flex-1 shadow-none"
         />
         <select
           value={channel}
           onChange={(e) => setChannel(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           {channelOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -299,7 +303,7 @@ function ResearchAdsTab() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           {statusOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -310,7 +314,7 @@ function ResearchAdsTab() {
         <select
           value={brandId}
           onChange={(e) => setBrandId(e.target.value)}
-          className="min-w-[200px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 min-w-[200px] rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
           aria-label="Filter by brand"
         >
           <option value="">{brandsLoading ? "Loading brands..." : "All brands"}</option>
@@ -323,17 +327,25 @@ function ResearchAdsTab() {
         <select
           value={limitPerBrand ?? ""}
           onChange={(e) => setLimitPerBrand(e.target.value ? Number(e.target.value) : undefined)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           <option value="">All per brand</option>
           <option value="5">Max 5 / brand</option>
           <option value="10">Max 10 / brand</option>
           <option value="20">Max 20 / brand</option>
         </select>
-      </div>
+      </FilterBar>
 
-      {brandError && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{brandError}</div>}
-      {error && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</div>}
+      {brandError ? (
+        <Callout variant="danger" size="sm" title="Failed to load brands">
+          {brandError}
+        </Callout>
+      ) : null}
+      {error ? (
+        <Callout variant="danger" size="sm" title="Failed to load ads">
+          {error}
+        </Callout>
+      ) : null}
 
       {loading ? (
         <LoadingGrid />
@@ -419,18 +431,18 @@ function ResearchBrandsTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-        <input
+      <FilterBar>
+        <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search brands or domains"
-          className="min-w-[200px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="min-w-[200px] flex-1 shadow-none"
         />
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           {sortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -438,25 +450,29 @@ function ResearchBrandsTab() {
             </option>
           ))}
         </select>
-        <button
+        <Button
           type="button"
           onClick={() => setDirection((d) => (d === "asc" ? "desc" : "asc"))}
-          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          variant="secondary"
         >
           {direction === "asc" ? "Ascending" : "Descending"}
-        </button>
-      </div>
+        </Button>
+      </FilterBar>
 
-      <div className="flex flex-col gap-1 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-1 text-xs text-content-muted sm:flex-row sm:items-center sm:justify-between">
         <span>
           Showing {brands.length} of {count || brands.length} brands
         </span>
-        <div className="flex flex-wrap items-center gap-3 text-slate-500">
+        <div className="flex flex-wrap items-center gap-3 text-content-muted">
           <span>Sorting: {sortLabel} ({direction})</span>
         </div>
       </div>
 
-      {error && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</div>}
+      {error ? (
+        <Callout variant="danger" size="sm" title="Failed to load brands">
+          {error}
+        </Callout>
+      ) : null}
 
       {loading ? (
         <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading brands…</div>

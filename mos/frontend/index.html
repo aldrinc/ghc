@@ -1,8 +1,22 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <script>
+      (() => {
+        // Set the theme as early as possible to avoid a flash before CSS loads.
+        try {
+          const stored = localStorage.getItem("mos_theme");
+          if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+          }
+        } catch {
+          // Ignore storage errors; the app will default to `data-theme="light"`.
+        }
+      })();
+    </script>
     <title>mOS Frontend</title>
   </head>
   <body>

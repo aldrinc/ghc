@@ -2,6 +2,9 @@
 
 Primary goal: understand the UI surface area for refactor. Each UI block lists its behavior and then the backend calls it drives.
 
+Style rules: see `docs/ui-style-guide.md` (semantic tokens, dark mode approach, and CI enforcement).
+Next standardization work: see `docs/prd-ui-standardization-phase2.md`.
+
 ## Global Shell
 - **Layout**: `Sidebar` (links to `/tasks`, `/clients`, `/campaigns`, `/library`, `/workflows`), `Header` (derived title + Clerk `UserButton`), `AppShell` wraps all authenticated routes.
 - **Auth**: `/sign-in` renders Clerk `<SignIn>`; everything else behind `RequireAuth` (Clerk session check).

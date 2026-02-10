@@ -63,7 +63,7 @@ export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: L
         tabIndex={0}
         onClick={handleCardActivate}
         onKeyDown={handleKeyDown}
-        className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-300"
+        className="flex h-full w-full flex-col overflow-hidden rounded-2xl border border-border bg-surface text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         <div className="relative">
           <SwipeMedia media={item.media} aspect="4/5" onOpen={handleCardActivate} />
@@ -73,12 +73,12 @@ export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: L
                 {item.brandName}
               </span>
               {score?.winningScore ? (
-                <span className="rounded-full bg-emerald-500/85 px-2.5 py-1 text-[11px] uppercase tracking-wide">
+                <span className="rounded-full bg-success/85 px-2.5 py-1 text-[11px] uppercase tracking-wide">
                   {score.winningScore}
                 </span>
               ) : null}
               {item.ctaText ? (
-                <span className="rounded-full bg-emerald-500/80 px-2.5 py-1 text-[11px] uppercase tracking-wide">
+                <span className="rounded-full bg-success/80 px-2.5 py-1 text-[11px] uppercase tracking-wide">
                   {item.ctaText}
                 </span>
               ) : null}
@@ -107,8 +107,8 @@ export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: L
                 className={[
                   "rounded-full border px-3 py-1 text-xs font-medium transition",
                   saved
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-slate-50 hover:bg-slate-100",
+                    ? "border-success/30 bg-success/10 text-success"
+                    : "border-border bg-muted text-content hover:bg-hover",
                 ].join(" ")}
               >
                 {saved ? "Saved" : "Save"}
@@ -121,7 +121,7 @@ export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: L
                   e.stopPropagation();
                   onOpenSource?.(item);
                 }}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium transition hover:bg-slate-100"
+                className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-content transition hover:bg-hover"
               >
                 Open source
               </button>
@@ -133,7 +133,7 @@ export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: L
                   e.stopPropagation();
                   onCopyLink?.(item);
                 }}
-                className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium transition hover:bg-slate-100"
+                className="rounded-full border border-border bg-muted px-3 py-1 text-xs font-medium text-content transition hover:bg-hover"
               >
                 Copy link
               </button>
@@ -143,22 +143,22 @@ export function LibraryCard({ item, saved, onSave, onOpenSource, onCopyLink }: L
 
         <div className="flex flex-1 flex-col gap-1 px-3 pb-3 pt-3">
           {item.headline && (
-            <div className="line-clamp-2 text-sm font-semibold text-slate-900">{item.headline}</div>
+            <div className="line-clamp-2 text-sm font-semibold text-content">{item.headline}</div>
           )}
-          {item.body && <p className="line-clamp-3 text-sm text-slate-600">{item.body}</p>}
-          <div className="mt-auto flex items-center justify-between text-xs text-slate-500">
+          {item.body && <p className="line-clamp-3 text-sm text-content-muted">{item.body}</p>}
+          <div className="mt-auto flex items-center justify-between text-xs text-content-muted">
             <span className="flex flex-wrap items-center gap-1">
               {item.platform?.map((platform) => (
                 <Badge key={`${item.id}-${platform}`} className="text-[11px]">
                   {channelDisplayName(platform)}
                 </Badge>
               ))}
-              {statusLabel ? <span className="text-slate-600">{statusLabel}</span> : null}
+              {statusLabel ? <span className="text-content-muted">{statusLabel}</span> : null}
             </span>
-            <span className="flex items-center gap-1 font-medium text-slate-700">
+            <span className="flex items-center gap-1 font-medium text-content">
               {score?.performanceScore ? `P ${score.performanceScore}` : ""}
               {confidenceDisplay ? (
-                <span className="text-[11px] text-slate-500">c{confidenceDisplay}</span>
+                <span className="text-[11px] text-content-muted">c{confidenceDisplay}</span>
               ) : null}
               {item.funnelStage || formatLabel || ""}
             </span>

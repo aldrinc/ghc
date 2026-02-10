@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApiClient } from "@/api/client";
 import { LibraryCard } from "@/components/library/LibraryCard";
+import { Callout } from "@/components/ui/callout";
 import { normalizeSwipeToLibraryItem } from "@/lib/library";
 import type { CompanySwipeAsset } from "@/types/swipes";
 
@@ -10,7 +11,7 @@ function LoadingGrid() {
       {Array.from({ length: 6 }).map((_, idx) => (
         <div
           key={idx}
-          className="ds-card ds-card--md flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none animate-pulse"
+          className="ds-card ds-card--md flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-none animate-pulse"
         >
           <div className="relative">
             <div className="aspect-[4/5] w-full bg-muted" />
@@ -72,7 +73,11 @@ export function SwipesPage() {
           <p className="text-sm text-content-muted">Manually curated references saved by your team.</p>
         </div>
       </div>
-      {error && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</div>}
+      {error ? (
+        <Callout variant="danger" size="sm" title="Failed to load swipes">
+          {error}
+        </Callout>
+      ) : null}
       {loading && <LoadingGrid />}
       {!loading && items.length > 0 && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-3 sm:gap-4">

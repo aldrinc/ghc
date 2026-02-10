@@ -35,7 +35,7 @@ export function ClientDetailPage() {
 
           <TabsContent value="overview">
             {isLoading ? (
-              <div className="text-sm text-slate-500">Loading client…</div>
+              <div className="text-sm text-content-muted">Loading client…</div>
             ) : client ? (
               <div className="space-y-2 text-sm text-content">
                 <div>

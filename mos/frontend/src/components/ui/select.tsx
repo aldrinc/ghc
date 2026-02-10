@@ -21,8 +21,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         onValueChange?.(e.target.value);
       }}
       className={cn(
-        "w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-content shadow-sm transition",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-white",
+        "w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus",
         "disabled:cursor-not-allowed disabled:opacity-60",
         className
       )}

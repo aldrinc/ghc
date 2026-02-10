@@ -56,6 +56,7 @@ export interface Artifact {
 
 export interface ResearchArtifactRef {
   step_key: string;
+  title?: string;
   doc_url: string;
   doc_id: string;
   summary?: string;

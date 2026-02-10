@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { useLatestArtifact } from "@/api/artifacts";
 import { useAdsApi } from "@/api/ads";
+import { Callout } from "@/components/ui/callout";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/toast";
 
@@ -69,12 +70,11 @@ export function AdsIngestionRetryCallout({
   const subtitle = !canRetry ? "Missing ads research run id; cannot retry from UI." : ingestionError || ingestionReason;
 
   return (
-    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="font-semibold">Ads ingestion failed during onboarding</div>
-          {subtitle ? <div className="mt-0.5 truncate text-xs text-amber-900/80">{subtitle}</div> : null}
-        </div>
+    <Callout
+      variant="warning"
+      size="sm"
+      title="Ads ingestion failed during onboarding"
+      actions={
         <Button
           type="button"
           variant="secondary"
@@ -84,7 +84,9 @@ export function AdsIngestionRetryCallout({
         >
           {retrying ? "Retrying..." : "Retry ingestion"}
         </Button>
-      </div>
-    </div>
+      }
+    >
+      {subtitle}
+    </Callout>
   );
 }

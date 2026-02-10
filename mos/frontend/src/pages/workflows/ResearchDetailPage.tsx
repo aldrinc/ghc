@@ -7,12 +7,17 @@ import { useWorkflowDetail } from "@/api/workflows";
 import type { ResearchArtifactRef } from "@/types/common";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 
-type CanonArtifactRef = Pick<ResearchArtifactRef, "step_key" | "doc_url" | "doc_id">;
+type CanonArtifactRef = Pick<ResearchArtifactRef, "step_key" | "title" | "doc_url" | "doc_id">;
 
 function isCanonArtifactRef(value: unknown): value is CanonArtifactRef {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
-  return typeof v.step_key === "string" && typeof v.doc_url === "string" && typeof v.doc_id === "string";
+  return (
+    typeof v.step_key === "string" &&
+    typeof v.title === "string" &&
+    typeof v.doc_url === "string" &&
+    typeof v.doc_id === "string"
+  );
 }
 
 export function ResearchDetailPage() {
@@ -38,6 +43,8 @@ export function ResearchDetailPage() {
   const stepContents = (data?.precanon_research?.step_contents as Record<string, string> | undefined) || {};
 
   const resolvedStepKey = stepKey || "";
+  const resolvedTitle = (artifact?.title || canonArtifactRef?.title || "").trim();
+  const hasTitle = Boolean(resolvedTitle);
   const summary = artifact?.summary || stepSummaries[resolvedStepKey] || "";
   const content = artifact?.content || stepContents[resolvedStepKey] || "";
   const docUrl = artifact?.doc_url || canonArtifactRef?.doc_url;
@@ -46,6 +53,7 @@ export function ResearchDetailPage() {
   const displayContent = hasContent ? content : summary;
   const hasDisplayContent = Boolean(displayContent?.trim());
   const exists = Boolean(artifact || hasContent || summary?.trim() || docUrl);
+  const missingTitle = Boolean(!isLoading && exists && !hasTitle);
 
   useEffect(() => {
     return () => {
@@ -82,8 +90,12 @@ export function ResearchDetailPage() {
         </button>
 
         <PageHeader
-          title={`Research Step ${resolvedStepKey || "—"}`}
-          description="Full research output captured during pre-canon."
+          title={hasTitle ? resolvedTitle : "Research document"}
+          description={
+            missingTitle
+              ? `Missing title for step ${resolvedStepKey || "—"}.`
+              : `Step ${resolvedStepKey || "—"} • Full research output captured during pre-canon.`
+          }
           actions={
             hasDisplayContent || docUrl ? (
               <div className="flex items-center gap-2">
@@ -131,6 +143,10 @@ export function ResearchDetailPage() {
         ) : isError || !exists ? (
           <div className="ds-card ds-card--md text-sm text-danger">
             Research artifact not found for this step.
+          </div>
+        ) : missingTitle ? (
+          <div className="ds-card ds-card--md text-sm text-danger">
+            Missing research document title for step {resolvedStepKey || "—"}.
           </div>
         ) : (
           <div className="space-y-4">

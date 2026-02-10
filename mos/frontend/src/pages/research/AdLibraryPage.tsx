@@ -5,6 +5,7 @@ import { useProductContext } from "@/contexts/ProductContext";
 import { useLatestArtifact } from "@/api/artifacts";
 import { useClientSwipes } from "@/api/swipes";
 import { LibraryCard } from "@/components/library/LibraryCard";
+import { Callout } from "@/components/ui/callout";
 import { normalizeBreakdownAdToLibraryItem, normalizeFacebookAdToLibraryItem } from "@/lib/library";
 import type { LibraryItem } from "@/types/library";
 import { useAdsApi } from "@/api/ads";
@@ -15,21 +16,21 @@ function LoadingGrid() {
       {Array.from({ length: 6 }).map((_, idx) => (
         <div
           key={idx}
-          className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm animate-pulse"
+          className="flex flex-col gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm animate-pulse"
         >
           <div className="flex items-start justify-between gap-2">
-            <div className="h-3 w-24 rounded bg-slate-200" />
-            <div className="h-4 w-10 rounded-full bg-slate-200" />
+            <div className="h-3 w-24 rounded bg-muted" />
+            <div className="h-4 w-10 rounded-full bg-muted" />
           </div>
-          <div className="h-40 w-full rounded-lg bg-slate-200" />
+          <div className="h-40 w-full rounded-lg bg-muted" />
           <div className="space-y-2">
-            <div className="h-3 w-3/4 rounded bg-slate-200" />
-            <div className="h-3 w-full rounded bg-slate-200" />
-            <div className="h-3 w-2/3 rounded bg-slate-200" />
+            <div className="h-3 w-3/4 rounded bg-muted" />
+            <div className="h-3 w-full rounded bg-muted" />
+            <div className="h-3 w-2/3 rounded bg-muted" />
           </div>
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <div className="h-3 w-20 rounded bg-slate-200" />
-            <div className="h-3 w-12 rounded bg-slate-200" />
+          <div className="flex items-center justify-between text-xs text-content-muted">
+            <div className="h-3 w-20 rounded bg-muted" />
+            <div className="h-3 w-12 rounded bg-muted" />
           </div>
         </div>
       ))}
@@ -169,11 +170,11 @@ export function AdLibraryPage() {
         description={`Ads ingested during onboarding for ${product.name}, plus saved swipes for this workspace.`}
       />
 
-      {(apiError) && (
-        <div className="ds-card ds-card--md bg-amber-50 text-amber-900 text-sm shadow-none">
+      {apiError ? (
+        <Callout variant="danger" size="sm" title="Failed to load ads">
           {apiError}
-        </div>
-      )}
+        </Callout>
+      ) : null}
 
       {(apiLoading || isLoading) && <LoadingGrid />}
       {!apiLoading && !isLoading && !creativeBreakdowns && !items.length ? (
