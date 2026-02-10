@@ -2,7 +2,7 @@ name: Self Deploy
 
 on:
   push:
-    branches: ["auggie-mos-deploy"]
+    branches: ["main"]
   workflow_dispatch:
 
 concurrency:
