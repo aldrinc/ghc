@@ -16,6 +16,7 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.db.enums import (
     AssetSourceEnum,
     AssetStatusEnum,
@@ -160,6 +161,20 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
         ).first()
         if not version:
             raise ValueError(f"Page '{page.name}' is not approved")
+        # Compliance gate: prevent publishing synthetic testimonials in production.
+        if settings.ENVIRONMENT.lower() in {"prod", "production"} and not settings.ALLOW_SYNTHETIC_TESTIMONIALS_IN_PRODUCTION:
+            md = version.ai_metadata if isinstance(version.ai_metadata, dict) else {}
+            is_synthetic = False
+            if md.get("kind") == "testimonial_generation" and md.get("synthetic") is True:
+                is_synthetic = True
+            prov = md.get("testimonialsProvenance")
+            if isinstance(prov, dict) and prov.get("source") == "synthetic":
+                is_synthetic = True
+            if is_synthetic:
+                raise ValueError(
+                    f"Page '{page.name}' contains synthetic testimonials and cannot be published in production. "
+                    "Replace with production testimonials or remove testimonials before publishing."
+                )
         approved_by_page[str(page.id)] = version
 
     publication = FunnelPublication(

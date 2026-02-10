@@ -14,7 +14,8 @@ RUN apt-get update \
 COPY . .
 
 RUN pip install --upgrade pip \
-    && pip install --no-cache-dir .
+    && pip install --no-cache-dir . \
+    && python -m playwright install --with-deps chromium
 
 EXPOSE 8008
 

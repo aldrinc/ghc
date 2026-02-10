@@ -20,6 +20,9 @@ def _coerce_json(value: str):
 
 
 class Settings(BaseSettings):
+    ENVIRONMENT: str = "development"
+    ALLOW_SYNTHETIC_TESTIMONIALS_IN_PRODUCTION: bool = False
+
     DATABASE_URL: AnyUrl
     CLERK_JWT_ISSUER: str
     CLERK_JWKS_URL: str
@@ -65,7 +68,6 @@ class Settings(BaseSettings):
     MEDIA_MIRROR_PREVIEW_MAX_DIMENSION: int = 512
 
     PUBLIC_ASSET_BASE_URL: str | None = None
-    TESTIMONIAL_RENDERER_URL: str | None = None
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

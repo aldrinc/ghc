@@ -1,0 +1,48 @@
+@font-face {
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('../assets/fonts/Manrope-Variable.woff2') format('woff2');
+}
+
+:root {
+  --page-bg: linear-gradient(180deg, #e6f9ff 0%, #f4fcff 45%, #ffffff 100%);
+  --card-bg: #ffffff;
+  --text-primary: #1f2933;
+  --text-muted: #6b7280;
+  --star: #f5b43a;
+  --shadow: 0 16px 40px rgba(15, 23, 42, 0.14);
+  --radius-lg: 18px;
+  --radius-md: 14px;
+  --fb-font: 'Helvetica Neue', Helvetica, Arial, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol';
+  --fb-blue: #1877f2;
+  --fb-muted: #64748b;
+  --fb-surface: #ffffff;
+  --fb-bubble: #f0f2f5;
+  --fb-avatar: 36px;
+  --fb-gap: 8px;
+  --fb-meta-size: 12px;
+  --fb-bubble-radius: 18px;
+  --fb-scale: 1;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--page-bg);
+  font-family: 'Manrope', 'Segoe UI', 'Helvetica Neue', sans-serif;
+  color: var(--text-primary);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 28px;
+}
+
+img {
+  display: block;
+}
