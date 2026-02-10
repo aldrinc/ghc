@@ -1,0 +1,36 @@
+name: Self Deploy
+
+on:
+  push:
+    branches: ["auggie-mos-deploy"]
+  workflow_dispatch:
+
+concurrency:
+  group: self-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required secrets
+        env:
+          CLOUDHAND_API_KEY: ${{ secrets.CLOUDHAND_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDHAND_API_KEY:-}" ]; then
+            echo "CLOUDHAND_API_KEY secret is required." >&2
+            exit 1
+          fi
+
+      - name: Apply deployment plan
+        env:
+          CLOUDHAND_API_KEY: ${{ secrets.CLOUDHAND_API_KEY }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            --request POST "https://self-deploy.moshq.app/api/applications/plans/apply" \
+            --header "Content-Type: application/json" \
+            --header "X-API-Key: ${CLOUDHAND_API_KEY}" \
+            --data '{}' \
+            --write-out "\nHTTP %{http_code}\n"
