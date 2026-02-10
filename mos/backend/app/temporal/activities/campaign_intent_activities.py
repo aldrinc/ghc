@@ -14,7 +14,7 @@ from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
 from app.services.funnels import generate_unique_slug
 from app.services.funnel_templates import get_funnel_template, apply_template_assets
-from app.services.funnel_ai import generate_funnel_page_draft
+from app.agent.funnel_objectives import run_generate_page_draft
 from app.services.funnel_testimonials import generate_funnel_page_testimonials
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum
@@ -245,7 +245,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     },
                 )
                 try:
-                    _, draft_version, _, generated_images = generate_funnel_page_draft(
+                    result = run_generate_page_draft(
                         session=session,
                         org_id=org_id,
                         user_id=str(actor_user_id),
@@ -258,6 +258,10 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         generate_images=True,
                         max_images=0,
                     )
+                    draft_version_id = result.get("draftVersionId") or ""
+                    generated_images = result.get("generatedImages") or []
+                    if not draft_version_id:
+                        raise RuntimeError("AI draft generation returned no draftVersionId.")
                     image_errors = [
                         item for item in generated_images if isinstance(item, dict) and item.get("error")
                     ]
@@ -284,7 +288,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         "completed",
                         payload_out={
                             "page_id": str(page.id),
-                            "draft_version_id": str(draft_version.id),
+                            "draft_version_id": draft_version_id,
                             "funnel_id": str(funnel.id),
                         },
                     )
@@ -301,7 +305,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         user_id=str(actor_user_id),
                         funnel_id=str(funnel.id),
                         page_id=str(page.id),
-                        draft_version_id=str(draft_version.id),
+                        draft_version_id=draft_version_id,
                         template_id=template_id,
                         idea_workspace_id=idea_workspace_id,
                         synthetic=True,

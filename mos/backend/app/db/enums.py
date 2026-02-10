@@ -161,6 +161,12 @@ class FunnelPageVersionSourceEnum(str, Enum):
     duplicate = "duplicate"
 
 
+class FunnelPageReviewStatusEnum(str, Enum):
+    draft = "draft"
+    review = "review"
+    approved = "approved"
+
+
 class FunnelPublicationLinkKindEnum(str, Enum):
     cta = "cta"
     back = "back"
@@ -196,3 +202,17 @@ class FunnelEventTypeEnum(str, Enum):
     funnel_enter = "funnel_enter"
     funnel_exit = "funnel_exit"
     order_completed = "order_completed"
+
+
+class AgentRunStatusEnum(str, Enum):
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class AgentToolCallStatusEnum(str, Enum):
+    running = "running"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"

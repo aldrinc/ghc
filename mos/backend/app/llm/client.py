@@ -17,7 +17,8 @@ from openai import OpenAI
 _backend_root = Path(__file__).resolve().parents[2]
 _repo_root = _backend_root.parent.parent
 load_dotenv(_repo_root / ".env", override=False)
-load_dotenv(_backend_root / ".env", override=False)
+# Backend-local env should win for backend processes (matches app.config behavior).
+load_dotenv(_backend_root / ".env", override=True)
 
 
 class LLMClientConfigError(Exception):

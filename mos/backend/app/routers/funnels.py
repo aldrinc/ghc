@@ -15,6 +15,7 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
 from app.db.enums import (
     ArtifactTypeEnum,
+    FunnelPageReviewStatusEnum,
     FunnelPageVersionSourceEnum,
     FunnelPageVersionStatusEnum,
     FunnelStatusEnum,
@@ -35,11 +36,16 @@ from app.schemas.funnels import (
     FunnelPageUpdateRequest,
     FunnelUpdateRequest,
 )
-from app.services.funnel_ai import AiAttachmentError, generate_funnel_page_draft, stream_funnel_page_draft
+from app.agent.funnel_objectives import (
+    run_generate_page_draft,
+    run_generate_page_draft_stream,
+    run_generate_page_testimonials,
+    run_publish_funnel,
+)
+from app.services.funnel_ai import AiAttachmentError
 from app.services.funnel_testimonials import (
     TestimonialGenerationError,
     TestimonialGenerationNotFoundError,
-    generate_funnel_page_testimonials,
 )
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_templates import apply_template_assets, get_funnel_template, list_funnel_templates
@@ -48,7 +54,6 @@ from app.services.funnels import (
     duplicate_funnel,
     create_funnel_upload_asset,
     generate_unique_slug,
-    publish_funnel,
 )
 
 router = APIRouter(prefix="/funnels", tags=["funnels"])
@@ -731,6 +736,7 @@ def approve_page(
         ai_metadata=draft.ai_metadata,
         created_at=datetime.now(timezone.utc),
     )
+    page.review_status = FunnelPageReviewStatusEnum.approved
     session.add(approved)
     session.commit()
     session.refresh(approved)
@@ -744,7 +750,7 @@ def publish_funnel_route(
     session: Session = Depends(get_session),
 ):
     try:
-        publication = publish_funnel(
+        result = run_publish_funnel(
             session=session,
             org_id=auth.org_id,
             user_id=auth.user_id,
@@ -754,7 +760,10 @@ def publish_funnel_route(
         message = str(exc)
         code = status.HTTP_404_NOT_FOUND if "not found" in message.lower() else status.HTTP_409_CONFLICT
         raise HTTPException(status_code=code, detail=message) from exc
-    return {"publicationId": str(publication.id)}
+    return {
+        "publicationId": result.get("publicationId") or "",
+        **({"runId": result.get("runId")} if result.get("runId") else {}),
+    }
 
 
 @router.post("/{funnel_id}/pages/{page_id}/ai/attachments", status_code=status.HTTP_201_CREATED)
@@ -851,7 +860,7 @@ def ai_generate_page_draft(
             detail=f"Too many attached images (max {_AI_ATTACHMENT_MAX_COUNT}).",
         )
     try:
-        assistant_message, version, puck_data, generated_images = generate_funnel_page_draft(
+        result = run_generate_page_draft(
             session=session,
             org_id=auth.org_id,
             user_id=auth.user_id,
@@ -868,6 +877,7 @@ def ai_generate_page_draft(
             max_tokens=payload.maxTokens,
             generate_images=payload.generateImages,
             max_images=payload.maxImages,
+            copy_pack=getattr(payload, "copyPack", None),
         )
     except AiAttachmentError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -877,11 +887,12 @@ def ai_generate_page_draft(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
     return {
-        "assistantMessage": assistant_message,
-        "puckData": puck_data,
-        "draftVersionId": str(version.id),
-        "generatedImages": generated_images,
-        "imagePlans": version.ai_metadata.get("imagePlans") if isinstance(version.ai_metadata, dict) else [],
+        "assistantMessage": result.get("assistantMessage") or "",
+        "puckData": result.get("puckData") or {},
+        "draftVersionId": result.get("draftVersionId") or "",
+        "generatedImages": result.get("generatedImages") or [],
+        "imagePlans": result.get("imagePlans") or [],
+        **({"runId": result.get("runId")} if result.get("runId") else {}),
     }
 
 
@@ -894,7 +905,7 @@ def ai_generate_page_testimonials(
     session: Session = Depends(get_session),
 ):
     try:
-        version, puck_data, generated = generate_funnel_page_testimonials(
+        result = run_generate_page_testimonials(
             session=session,
             org_id=auth.org_id,
             user_id=auth.user_id,
@@ -917,9 +928,10 @@ def ai_generate_page_testimonials(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
     return {
-        "draftVersionId": str(version.id),
-        "puckData": puck_data,
-        "generatedTestimonials": generated,
+        "draftVersionId": result.get("draftVersionId") or "",
+        "puckData": result.get("puckData") or {},
+        "generatedTestimonials": result.get("generatedTestimonials") or [],
+        **({"runId": result.get("runId")} if result.get("runId") else {}),
     }
 
 
@@ -940,7 +952,7 @@ def ai_generate_page_draft_stream(
         return f"data: {json.dumps(data, separators=(',', ':'))}\n\n".encode("utf-8")
 
     def event_stream():
-        for event in stream_funnel_page_draft(
+        for event in run_generate_page_draft_stream(
             session=session,
             org_id=auth.org_id,
             user_id=auth.user_id,
@@ -957,6 +969,7 @@ def ai_generate_page_draft_stream(
             max_tokens=payload.maxTokens,
             generate_images=payload.generateImages,
             max_images=payload.maxImages,
+            copy_pack=getattr(payload, "copyPack", None),
         ):
             yield _sse(event)
 

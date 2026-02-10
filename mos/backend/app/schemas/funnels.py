@@ -127,6 +127,7 @@ class FunnelPageAIGenerateRequest(BaseModel):
     prompt: str
     messages: list[FunnelAIChatMessage] = Field(default_factory=list)
     attachedAssets: list[FunnelAIAttachment] = Field(default_factory=list)
+    copyPack: Optional[str] = None
     currentPuckData: Optional[dict[str, Any]] = None
     templateId: Optional[str] = None
     ideaWorkspaceId: Optional[str] = None

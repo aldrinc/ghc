@@ -8,6 +8,7 @@ from app.config import settings
 from app.db.base import engine
 from app.services.media_storage import MediaStorageConfigurationError
 from app.routers import (
+    agent_runs,
     artifacts,
     assets,
     claude,
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(campaigns.router)
     app.include_router(artifacts.router)
     app.include_router(assets.router)
+    app.include_router(agent_runs.router)
     app.include_router(funnels.router)
     app.include_router(public_funnels.router)
     app.include_router(experiments.router)
