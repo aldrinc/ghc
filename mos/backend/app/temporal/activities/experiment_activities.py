@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 
@@ -25,10 +26,31 @@ from app.services.claude_files import (
 CLAUDE_EXPERIMENT_MODEL = os.getenv("CLAUDE_EXPERIMENT_MODEL", CLAUDE_DEFAULT_MODEL)
 CLAUDE_ASSET_BRIEF_MODEL = os.getenv("CLAUDE_ASSET_BRIEF_MODEL", CLAUDE_DEFAULT_MODEL)
 CLAUDE_STRUCTURED_MAX_TOKENS = int(os.getenv("CLAUDE_STRUCTURED_MAX_TOKENS", "4096"))
+CLAUDE_ASSET_BRIEF_EXPERIMENTS_PER_CALL = int(os.getenv("CLAUDE_ASSET_BRIEF_EXPERIMENTS_PER_CALL", "1"))
 
 
 def _normalize_token(value: str) -> str:
     return " ".join(value.strip().lower().split())
+
+_DIGIT_RE = re.compile(r"\\d")
+_UNVERIFIED_CLAIM_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(r"\bfda\b", flags=re.IGNORECASE),
+    re.compile(r"\bclinically\b", flags=re.IGNORECASE),
+    re.compile(r"\bclinical\s+proof\b", flags=re.IGNORECASE),
+    re.compile(r"\bclinical\s+trial\b", flags=re.IGNORECASE),
+    re.compile(r"\bclinical\s+study\b", flags=re.IGNORECASE),
+    re.compile(r"\bpatented\b", flags=re.IGNORECASE),
+]
+_NEGATING_CLAIM_HINTS = (
+    "do not",
+    "don't",
+    "avoid",
+    "without",
+    "no ",
+    "needs confirmation",
+    "if verified",
+    "unless verified",
+)
 
 EXPERIMENT_SCHEMA: Dict[str, Any] = {
     "type": "object",
@@ -113,6 +135,121 @@ ASSET_BRIEFS_SCHEMA: Dict[str, Any] = {
 }
 
 
+def _chunk_experiment_specs(experiments: list[dict[str, Any]], *, chunk_size: int) -> list[list[dict[str, Any]]]:
+    if chunk_size <= 0:
+        raise ValueError("chunk_size must be greater than zero for asset brief generation.")
+    if not experiments:
+        return []
+    return [experiments[idx : idx + chunk_size] for idx in range(0, len(experiments), chunk_size)]
+
+
+def _collect_expected_variant_pairs(experiments: list[dict[str, Any]]) -> set[tuple[str, str]]:
+    expected: set[tuple[str, str]] = set()
+    for experiment in experiments:
+        if not isinstance(experiment, dict):
+            raise RuntimeError("Experiment specs must be objects.")
+        experiment_id = experiment.get("id")
+        if not isinstance(experiment_id, str) or not experiment_id.strip():
+            raise RuntimeError("Experiment spec is missing id during asset brief generation.")
+        variants = experiment.get("variants")
+        if not isinstance(variants, list) or not variants:
+            raise RuntimeError(f"Experiment spec {experiment_id!r} is missing variants.")
+        for variant in variants:
+            if not isinstance(variant, dict):
+                raise RuntimeError(f"Experiment spec {experiment_id!r} contains a non-object variant.")
+            variant_id = variant.get("id")
+            if not isinstance(variant_id, str) or not variant_id.strip():
+                raise RuntimeError(f"Experiment spec {experiment_id!r} contains a variant missing id.")
+            expected.add((experiment_id, variant_id))
+    return expected
+
+
+def _build_asset_brief_prompt(
+    *,
+    experiments_json: str,
+    channel_hint: str,
+    format_hint: str,
+    tone_guidelines: list[str],
+    constraints: list[str],
+    chunk_index: int,
+    chunk_total: int,
+) -> str:
+    return f"""
+You are a creative strategist. Using the experiment specs below and the attached canon/strategy/research documents, create precise creative asset briefs.
+
+- Cover each experiment variant with at least one brief.
+- Include variantId (must match the experiment variant id) and variantName for each brief.
+- Include 1-3 requirements per brief with channel + format + angle/hook and optional funnelStage.
+- Respect tone guidelines and constraints if present; keep strings concise and production-ready.
+- Do NOT invent product facts or policy specifics (warranty length, return window, price, FDA status, clinical study outcomes, time-to-results, session length, brightness levels).
+- Do NOT include unverified regulatory/clinical claims. Avoid these terms unless they are explicitly verified in the attached product/offer facts: FDA, cleared, approved, clinically proven, clinical proof, patented.
+- Do NOT use the phrases "clinical proof" or "clinically proven". Use "proof points" or "evidence" instead.
+- If a brief needs that kind of proof, add a constraint like: \"Needs confirmation: regulatory or clinical claim support\" and rewrite the hook without the claim.
+- Do NOT include numbers anywhere in creativeConcept, requirements[].angle, requirements[].hook, constraints, toneGuidelines, or visualGuidelines.
+- If a brief depends on an unknown fact, add a constraint like: "Needs confirmation: <fact>" and keep the hook phrased without the fact.
+- This request is chunk {chunk_index} of {chunk_total}; include only briefs for experiment variants present in this chunk.
+{channel_hint}
+{format_hint}
+
+Experiment specs (inline):
+{experiments_json}
+
+Known tone guidelines: {tone_guidelines}
+Known constraints: {constraints}
+
+Return JSON that matches the asset_briefs schema.
+"""
+
+
+def _validate_asset_brief_variant_coverage(
+    *,
+    briefs_raw: list[dict[str, Any]],
+    expected_variant_pairs: set[tuple[str, str]],
+) -> None:
+    seen_variant_pairs: set[tuple[str, str]] = set()
+    unexpected_pairs: set[tuple[str, str]] = set()
+
+    for brief in briefs_raw:
+        experiment_id = brief.get("experimentId")
+        variant_id = brief.get("variantId") or brief.get("variant_id")
+        if not isinstance(experiment_id, str) or not experiment_id.strip():
+            raise RuntimeError("Asset brief generation missing experimentId.")
+        if not isinstance(variant_id, str) or not variant_id.strip():
+            raise RuntimeError("Asset brief generation missing variantId.")
+        key = (experiment_id, variant_id)
+        seen_variant_pairs.add(key)
+        if key not in expected_variant_pairs:
+            unexpected_pairs.add(key)
+
+    if unexpected_pairs:
+        rendered = ", ".join(sorted([f"{exp}:{var}" for exp, var in unexpected_pairs]))
+        raise RuntimeError(f"Asset brief generation returned unknown experiment/variant combinations: {rendered}.")
+
+    missing_pairs = expected_variant_pairs.difference(seen_variant_pairs)
+    if missing_pairs:
+        rendered = ", ".join(sorted([f"{exp}:{var}" for exp, var in missing_pairs]))
+        raise RuntimeError(
+            "Asset brief generation did not cover all approved experiment variants. "
+            f"Missing combinations: {rendered}."
+        )
+
+
+def _find_unverified_claim_pattern(value: str) -> re.Pattern[str] | None:
+    lowered = value.lower()
+    for pattern in _UNVERIFIED_CLAIM_PATTERNS:
+        match = pattern.search(value)
+        if not match:
+            continue
+        window_start = max(0, match.start() - 64)
+        guardrail_window = lowered[window_start : match.start()]
+        if any(hint in guardrail_window for hint in _NEGATING_CLAIM_HINTS):
+            continue
+        if any(hint in lowered for hint in ("needs confirmation", "if verified", "unless verified")):
+            continue
+        return pattern
+    return None
+
+
 def _load_metric(repo: ArtifactsRepository, org_id: str, client_id: str, product_id: str) -> Dict[str, Any]:
     artifact = repo.get_latest_by_type(
         org_id=org_id,
@@ -134,11 +271,19 @@ def _load_canon(repo: ArtifactsRepository, org_id: str, client_id: str, product_
 
 
 def _build_experiment_prompt(
-    metric: Dict[str, Any],
+    *,
+    available_metric_ids: list[str],
+    purple_ocean_angles: list[str],
     campaign_channels: Optional[list[str]] = None,
     asset_brief_types: Optional[list[str]] = None,
 ) -> str:
-    kpis = metric.get("kpis") or metric.get("metrics") or []
+    if not available_metric_ids:
+        raise RuntimeError("available_metric_ids cannot be empty when building experiment prompt.")
+    if not purple_ocean_angles:
+        raise RuntimeError(
+            "purple_ocean_angles is required to build experiments. "
+            "Precanon step 015 (Purple Ocean Angle Analysis) must be present in client canon."
+        )
     channel_hint = ""
     format_hint = ""
     if campaign_channels:
@@ -147,20 +292,149 @@ def _build_experiment_prompt(
         )
     if asset_brief_types:
         format_hint = f"\nCreative brief types for this campaign: {asset_brief_types}"
+    angles_hint = "\n".join([f"- {angle}" for angle in purple_ocean_angles])
     return f"""
-You are a media & experiment architect. Use the attached client canon and metric schema (including any precanon research in canon) to propose 2-3 high-leverage experiments.
+You are a media & experiment architect. Use the attached client canon, Purple Ocean Angle Analysis, and metric schema to propose ONE experiment per Purple Ocean angle below.
 
 Context hints:
-- KPIs: {kpis}
+- Available metricIds (use ONLY these exact ids in metricIds): {available_metric_ids}
 {channel_hint}{format_hint}
+
+Purple Ocean angle library (use these exact names as experiment.name):
+{angles_hint}
 
 Rules:
 - Keep strings concise and actionable; no markdown.
-- Include 2-3 variants per experiment with clear changes + channels.
+- Return {len(purple_ocean_angles)} experiments (one per angle above).
+- Each experiment.name must be exactly one of the angle names above (no prefixes/suffixes).
+- Include exactly 2 variants per experiment:
+  - var_control_generic: generic saturated control messaging (results-first). No regulatory claims.
+  - var_angle: the purple-ocean angle. Describe messaging focus + what proof is required (do NOT invent specifics).
 - Use only the campaign channels for each variant's channels list when provided.
-- Map to metricIds that exist in the attached metric schema.
+- Map metricIds to the available metricIds list above.
+- Do NOT invent product facts: warranty length, return period, price, FDA status, clinical study results, time-to-results, session length.
+- Avoid unverified regulatory/clinical claims (FDA, clinically proven, clinical proof, patented). If proof is needed, state it as \"Needs confirmation\" rather than asserting it.
+- Do NOT include any numbers in: experiment.name, experiment.hypothesis, variants[].description.
+
+Hard banned words/phrases (do not use in any hypothesis or variant description unless explicitly verified elsewhere):
+- FDA
+- clinically proven
+- clinical proof
+- clinical trial
+- clinical study
+- patented
+
 Return JSON only that conforms to the requested schema.
 """
+
+
+def _extract_purple_ocean_angles(canon: Dict[str, Any]) -> list[str]:
+    precanon = canon.get("precanon_research") if isinstance(canon, dict) else None
+    step_contents = (precanon or {}).get("step_contents") if isinstance(precanon, dict) else None
+    step_summaries = (precanon or {}).get("step_summaries") if isinstance(precanon, dict) else None
+
+    content_015 = (step_contents or {}).get("015") if isinstance(step_contents, dict) else None
+    summary_015 = (step_summaries or {}).get("015") if isinstance(step_summaries, dict) else None
+
+    def _clean_title(title: str) -> str:
+        cleaned = " ".join(title.replace("\u2011", "-").split()).strip()
+        # Strip any parenthetical/tagline suffixes: "Angle Name (tagline...)".
+        if " (" in cleaned:
+            cleaned = cleaned.split(" (", 1)[0].strip()
+        cleaned = cleaned.strip("*").strip()
+        cleaned = cleaned.strip(".").strip()
+        return cleaned
+
+    angles: list[str] = []
+
+    # Prefer parsing the detailed step content, but scope to the "Top 10" section to avoid
+    # accidentally capturing other numbered lists (e.g. saturated control angles).
+    if isinstance(content_015, str) and content_015.strip():
+        scoped = content_015
+        # Find the specific "Top 10 Purple Ocean angles" section header, not the executive summary title.
+        header_match = re.search(
+            r"^#{1,6}\s*Top\s*10.*purple\s*ocean.*angles",
+            content_015,
+            flags=re.IGNORECASE | re.MULTILINE,
+        )
+        if header_match:
+            scoped = content_015[header_match.start() :]
+        for match in re.finditer(r"^\s*\d+\)\s*\*\*(.+?)\*\*", scoped, flags=re.MULTILINE):
+            title = match.group(1)
+            if not isinstance(title, str):
+                continue
+            cleaned = _clean_title(title)
+            if cleaned:
+                angles.append(cleaned)
+            if len(angles) >= 10:
+                break
+
+    # Fallback: parse the summary format if step contents are missing.
+    if not angles and isinstance(summary_015, str) and summary_015.strip():
+        # Summary format: "... Top 10 ...: A; B; C; ... . This is marketing research ..."
+        lower = summary_015.lower()
+        idx = lower.find("top 10")
+        tail = summary_015[idx:] if idx != -1 else summary_015
+        if ":" in tail:
+            tail = tail.split(":", 1)[1]
+        if "This is marketing research" in tail:
+            tail = tail.split("This is marketing research", 1)[0]
+        parts = [p.strip() for p in tail.replace("\n", " ").split(";")]
+        for part in parts:
+            if not part:
+                continue
+            cleaned = _clean_title(part)
+            if cleaned:
+                angles.append(cleaned)
+
+    # Deduplicate while preserving order.
+    seen: set[str] = set()
+    out: list[str] = []
+    for angle in angles:
+        key = _normalize_token(angle)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(angle)
+    return out
+
+
+def _build_client_canon_compact(canon: Dict[str, Any]) -> Dict[str, Any]:
+    brand = canon.get("brand") if isinstance(canon, dict) else {}
+    voice = canon.get("voiceOfCustomer") if isinstance(canon, dict) else {}
+    constraints = canon.get("constraints") if isinstance(canon, dict) else {}
+    patterns = canon.get("contentPatterns") if isinstance(canon, dict) else {}
+    precanon = canon.get("precanon_research") if isinstance(canon, dict) else {}
+
+    step_summaries = (precanon or {}).get("step_summaries") if isinstance(precanon, dict) else None
+    step_summaries = step_summaries if isinstance(step_summaries, dict) else {}
+
+    angles = _extract_purple_ocean_angles(canon)
+
+    return {
+        "clientId": canon.get("clientId"),
+        "brand": {
+            "story": (brand or {}).get("story"),
+            "manifesto": (brand or {}).get("manifesto"),
+            "values": (brand or {}).get("values") or [],
+            "mission": (brand or {}).get("mission"),
+            "toneOfVoice": (brand or {}).get("toneOfVoice") or {},
+        },
+        "offers": canon.get("offers") if isinstance(canon, dict) else [],
+        "icps": canon.get("icps") if isinstance(canon, dict) else [],
+        "voiceOfCustomer": {
+            "quotes": (voice or {}).get("quotes") or [],
+            "objections": (voice or {}).get("objections") or [],
+            "triggers": (voice or {}).get("triggers") or [],
+            "languagePatterns": (voice or {}).get("languagePatterns") or [],
+        },
+        "constraints": constraints or {},
+        "contentPatterns": patterns or {},
+        "precanon_research": {
+            "step_summaries": step_summaries,
+        },
+        "purple_ocean_angles": angles,
+    }
 
 
 @activity.defn
@@ -218,9 +492,68 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     if not available_metrics:
         raise RuntimeError("Metric schema has no KPI definitions; update metric schema before generating experiments.")
 
+    available_metric_ids = [
+        str(metric_id).strip()
+        for metric_id in (available_metrics or [])
+        if isinstance(metric_id, str) and str(metric_id).strip()
+    ]
+    if not available_metric_ids:
+        raise RuntimeError(
+            "Metric schema KPI definitions are present but invalid (expected non-empty strings)."
+        )
+
+    purple_ocean_angles = _extract_purple_ocean_angles(canon)
+    if not purple_ocean_angles:
+        raise RuntimeError(
+            "Purple Ocean angles not found in client canon. "
+            "Expected precanon_research step 015 to be present before generating experiments."
+        )
+
+    # Keep the experiment generator focused: upload a compact canon that includes Purple Ocean
+    # angle names + step summaries, rather than passing the entire canon (which can be very large).
+    canon_compact = _build_client_canon_compact(canon)
+    canon_compact_bytes = json.dumps(canon_compact, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    ensure_uploaded_to_claude(
+        org_id=org_id,
+        idea_workspace_id=idea_workspace_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        doc_key="client_canon_compact",
+        doc_title="Client Canon (Compact)",
+        source_kind="client_canon_compact",
+        step_key=None,
+        filename="client_canon_compact.json",
+        mime_type="text/plain",
+        content_bytes=canon_compact_bytes,
+        drive_doc_id=None,
+        drive_url=None,
+        allow_stub=allow_claude_stub,
+    )
+
+    # Ensure metric schema is available in this idea workspace so downstream steps can reuse it.
+    metric_bytes = json.dumps(metric, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    ensure_uploaded_to_claude(
+        org_id=org_id,
+        idea_workspace_id=idea_workspace_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        doc_key="metric_schema",
+        doc_title="Metric Schema",
+        source_kind="metric_schema",
+        step_key=None,
+        filename="metric_schema.json",
+        mime_type="text/plain",
+        content_bytes=metric_bytes,
+        drive_doc_id=None,
+        drive_url=None,
+        allow_stub=allow_claude_stub,
+    )
+
     with session_scope() as session:
         ctx_repo = ClaudeContextFilesRepository(session)
-        context_files = ctx_repo.list_for_generation_context(
+        context_files = ctx_repo.list_for_workspace_or_client(
             org_id=org_id,
             idea_workspace_id=idea_workspace_id,
             client_id=client_id,
@@ -229,7 +562,9 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         )
 
     context_files = [
-        cf for cf in context_files if not (cf.doc_key or "").startswith("strategy_sheet")
+        cf
+        for cf in context_files
+        if not (cf.doc_key or "").startswith(("strategy_sheet", "experiment_specs"))
     ]
 
     if not context_files:
@@ -238,68 +573,47 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "client_canon and metric_schema are required."
         )
 
-    def _has_prefix(prefix: str) -> bool:
-        return any((cf.doc_key or "").startswith(prefix) for cf in context_files)
+    def _pick_latest(files: list, *, doc_key: str):
+        best = None
+        for cf in files:
+            if (cf.doc_key or "") != doc_key:
+                continue
+            if best is None:
+                best = cf
+                continue
+            created_at = getattr(cf, "created_at", None)
+            best_created_at = getattr(best, "created_at", None)
+            if best_created_at is None:
+                best = cf
+                continue
+            if created_at is not None and created_at > best_created_at:
+                best = cf
+        return best
 
-    missing_required = [p for p in ("metric_schema", "client_canon") if not _has_prefix(p)]
-    if missing_required:
-        uploads_made = False
-        if "metric_schema" in missing_required and metric:
-            metric_bytes = json.dumps(metric, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
-            ensure_uploaded_to_claude(
-                org_id=org_id,
-                idea_workspace_id=idea_workspace_id,
-                client_id=client_id,
-                product_id=product_id,
-                campaign_id=campaign_id,
-                doc_key="metric_schema",
-                doc_title="Metric Schema",
-                source_kind="metric_schema",
-                step_key=None,
-                filename="metric_schema.json",
-                mime_type="text/plain",
-                content_bytes=metric_bytes,
-                drive_doc_id=None,
-                drive_url=None,
-                allow_stub=allow_claude_stub,
-            )
-            uploads_made = True
-        if "client_canon" in missing_required and canon:
-            canon_bytes = json.dumps(canon, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
-            ensure_uploaded_to_claude(
-                org_id=org_id,
-                idea_workspace_id=idea_workspace_id,
-                client_id=client_id,
-                product_id=product_id,
-                campaign_id=campaign_id,
-                doc_key="client_canon",
-                doc_title="Client Canon",
-                source_kind="client_canon",
-                step_key=None,
-                filename="client_canon.json",
-                mime_type="text/plain",
-                content_bytes=canon_bytes,
-                drive_doc_id=None,
-                drive_url=None,
-                allow_stub=allow_claude_stub,
-            )
-            uploads_made = True
-        if uploads_made:
-            with session_scope() as session:
-                ctx_repo = ClaudeContextFilesRepository(session)
-                context_files = ctx_repo.list_for_generation_context(
-                    org_id=org_id,
-                    idea_workspace_id=idea_workspace_id,
-                    client_id=client_id,
-                    product_id=product_id,
-                    campaign_id=campaign_id,
-                )
-            missing_required = [p for p in ("metric_schema", "client_canon") if not _has_prefix(p)]
-        if missing_required:
-            raise RuntimeError(f"Missing required Claude context files: {missing_required}")
+    # Prefer a small, angle-focused context set.
+    selected: list = []
+    for key in ("client_canon_compact", "precanon:015", "precanon:07", "precanon:08", "precanon:09", "metric_schema"):
+        picked = _pick_latest(context_files, doc_key=key)
+        if picked is not None:
+            selected.append(picked)
 
-    documents = build_document_blocks(context_files)
-    prompt = _build_experiment_prompt(metric, campaign_channels, asset_brief_types)
+    if not any((cf.doc_key or "").startswith("client_canon") for cf in selected):
+        raise RuntimeError("Missing required Claude context file: client_canon (expected client_canon_compact).")
+    if not any((cf.doc_key or "").startswith("metric_schema") for cf in selected):
+        raise RuntimeError("Missing required Claude context file: metric_schema.")
+    if not any((cf.doc_key or "") == "precanon:015" for cf in selected):
+        raise RuntimeError(
+            "Missing required Claude context file: precanon:015 (Purple Ocean Angle Analysis). "
+            "This is required to generate Purple Ocean-aligned experiments."
+        )
+
+    documents = build_document_blocks(selected)
+    prompt = _build_experiment_prompt(
+        available_metric_ids=available_metric_ids,
+        purple_ocean_angles=purple_ocean_angles,
+        campaign_channels=campaign_channels,
+        asset_brief_types=asset_brief_types,
+    )
     user_content: List[Dict[str, Any]] = [{"type": "text", "text": prompt}, *documents]
     claude_response = call_claude_structured_message(
         model=model,
@@ -315,6 +629,18 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     if not experiments:
         raise RuntimeError("Claude did not return any experiments")
 
+    if not isinstance(experiments, list):
+        raise RuntimeError("Claude returned invalid experiments; expected a list.")
+    if len(experiments) != len(purple_ocean_angles):
+        raise RuntimeError(
+            "Experiment spec generation returned the wrong number of experiments "
+            f"(expected={len(purple_ocean_angles)}, got={len(experiments)})."
+        )
+
+    angle_set = {angle.strip() for angle in purple_ocean_angles if isinstance(angle, str) and angle.strip()}
+    angle_norm = {_normalize_token(angle): angle for angle in angle_set}
+    matched_angles: set[str] = set()
+
     missing_experiment_fields: list[str] = []
     invalid_channels: set[str] = set()
     allowed_channels = {_normalize_token(ch) for ch in campaign_channels or []}
@@ -324,10 +650,27 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             continue
         if not exp.get("id") or not exp.get("name"):
             missing_experiment_fields.append("experiment_id_or_name")
+        exp_name = exp.get("name")
+        if isinstance(exp_name, str):
+            exp_name_clean = exp_name.strip()
+            if _DIGIT_RE.search(exp_name_clean):
+                raise RuntimeError("Experiment names must not include numbers.")
+            norm = _normalize_token(exp_name_clean)
+            if norm not in angle_norm:
+                raise RuntimeError(
+                    "Experiment name must match a Purple Ocean angle exactly. "
+                    f"Got name={exp_name_clean!r}."
+                )
+            matched_angles.add(norm)
+        exp_hypothesis = exp.get("hypothesis")
+        if isinstance(exp_hypothesis, str) and _DIGIT_RE.search(exp_hypothesis):
+            raise RuntimeError("Experiment hypotheses must not include numbers.")
         variants = exp.get("variants") or []
         if not isinstance(variants, list) or not variants:
             missing_experiment_fields.append("variants")
             continue
+        if len(variants) != 2:
+            raise RuntimeError("Each experiment must include exactly 2 variants (control + angle).")
         for variant in variants:
             if not isinstance(variant, dict):
                 missing_experiment_fields.append("variant_object")
@@ -336,6 +679,9 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 missing_experiment_fields.append("variant_id_or_name")
             if not variant.get("description"):
                 missing_experiment_fields.append("variant_description")
+            desc = variant.get("description")
+            if isinstance(desc, str) and _DIGIT_RE.search(desc):
+                raise RuntimeError("Variant descriptions must not include numbers.")
             channels = variant.get("channels") or []
             if not isinstance(channels, list) or not channels:
                 missing_experiment_fields.append("variant_channels")
@@ -346,6 +692,18 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         metric_ids = exp.get("metricIds") or []
         if not isinstance(metric_ids, list) or not metric_ids:
             missing_experiment_fields.append("metricIds")
+        else:
+            # Enforce metricIds are from the allowed list we surfaced to the model.
+            allowed_metric_ids = set(available_metric_ids)
+            invalid_metric_ids = [m for m in metric_ids if not isinstance(m, str) or m not in allowed_metric_ids]
+            if invalid_metric_ids:
+                raise RuntimeError(
+                    f"Experiment metricIds include unsupported ids: {invalid_metric_ids}. "
+                    f"Allowed metricIds: {available_metric_ids}."
+                )
+    if matched_angles != set(angle_norm.keys()):
+        missing = sorted(set(angle_norm.keys()) - matched_angles)
+        raise RuntimeError(f"Experiment set did not cover all Purple Ocean angles. Missing: {missing}")
     if invalid_channels:
         invalid_list = ", ".join(sorted(invalid_channels))
         raise RuntimeError(
@@ -457,7 +815,10 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
     asset_brief_types: Optional[list[str]] = None
     with session_scope() as session:
         ctx_repo = ClaudeContextFilesRepository(session)
-        context_files = ctx_repo.list_for_generation_context(
+        # Funnel generation runs may use a fresh Temporal workflow id as idea_workspace_id.
+        # Use a broader context query (workspace OR client/campaign) so we can reuse the
+        # already-uploaded onboarding + campaign planning docs without forcing a re-upload.
+        context_files = ctx_repo.list_for_workspace_or_client(
             org_id=org_id,
             idea_workspace_id=idea_workspace_id,
             client_id=client_id,
@@ -516,6 +877,23 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
     if not context_files:
         raise RuntimeError(f"No Claude context files registered for workspace {idea_workspace_id}")
 
+    def _pick_latest(files: list, *, doc_key: str):
+        best = None
+        for cf in files:
+            if (cf.doc_key or "") != doc_key:
+                continue
+            if best is None:
+                best = cf
+                continue
+            created_at = getattr(cf, "created_at", None)
+            best_created_at = getattr(best, "created_at", None)
+            if best_created_at is None:
+                best = cf
+                continue
+            if created_at is not None and created_at > best_created_at:
+                best = cf
+        return best
+
     tone_guidelines = []
     constraints = []
     if canon and isinstance(canon.data, dict):
@@ -525,45 +903,135 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
         cons = canon.data.get("constraints") or {}
         constraints = cons.get("brand") or cons.get("legal") or []
 
-    documents = build_document_blocks(context_files)
-    experiments_json = json.dumps({"experiments": experiments}, ensure_ascii=True, indent=2)
+    # Keep the context set small so we stay within model token limits.
+    selected: list = []
+    strategy_doc_key = f"strategy_sheet:{campaign_id or 'none'}"
+    for key in (
+        "client_canon_compact",
+        "client_canon",
+        "precanon:07",
+        "precanon:08",
+        "precanon:09",
+        "metric_schema",
+        strategy_doc_key,
+    ):
+        picked = _pick_latest(context_files, doc_key=key)
+        if picked is not None:
+            selected.append(picked)
+
+    if not any((cf.doc_key or "").startswith("client_canon") for cf in selected):
+        raise RuntimeError("Missing required Claude context file: client_canon (expected client_canon_compact).")
+
+    if CLAUDE_ASSET_BRIEF_EXPERIMENTS_PER_CALL <= 0:
+        raise RuntimeError("CLAUDE_ASSET_BRIEF_EXPERIMENTS_PER_CALL must be greater than zero.")
+
+    documents = build_document_blocks(selected)
     channel_hint = ""
     format_hint = ""
     if campaign_channels:
         channel_hint = f"Allowed channels (use ONLY these identifiers): {campaign_channels}"
     if asset_brief_types:
         format_hint = f"Allowed formats (use ONLY these identifiers): {asset_brief_types}"
-    prompt = f"""
-You are a creative strategist. Using the experiment specs below and the attached canon/strategy/research documents, create precise creative asset briefs.
+    normalized_experiments: list[dict[str, Any]] = []
+    for experiment in experiments:
+        if not isinstance(experiment, dict):
+            raise RuntimeError("Experiment specs must be objects.")
+        normalized_experiments.append(experiment)
 
-- Cover each experiment variant with at least one brief.
-- Include variantId (must match the experiment variant id) and variantName for each brief.
-- Include 1-3 requirements per brief with channel + format + angle/hook and optional funnelStage.
-- Respect tone guidelines and constraints if present; keep strings concise and production-ready.
-{channel_hint}
-{format_hint}
-
-Experiment specs (inline):
-{experiments_json}
-
-Known tone guidelines: {tone_guidelines}
-Known constraints: {constraints}
-
-Return JSON that matches the asset_briefs schema.
-"""
-    user_content: List[Dict[str, Any]] = [{"type": "text", "text": prompt}, *documents]
-    claude_response = call_claude_structured_message(
-        model=model,
-        system="Generate actionable creative briefs that align with the attached context and experiment goals.",
-        user_content=user_content,
-        output_schema=ASSET_BRIEFS_SCHEMA,
-        max_tokens=CLAUDE_STRUCTURED_MAX_TOKENS,
-        temperature=0.4,
+    experiment_chunks = _chunk_experiment_specs(
+        normalized_experiments,
+        chunk_size=CLAUDE_ASSET_BRIEF_EXPERIMENTS_PER_CALL,
     )
-    parsed = claude_response.get("parsed") or {}
-    briefs_raw = parsed.get("asset_briefs") if isinstance(parsed, dict) else None
+    if not experiment_chunks:
+        raise RuntimeError("No valid experiment specs available for asset brief generation.")
+
+    chunk_prompts: list[str] = []
+    claude_raw_responses: list[Any] = []
+    briefs_raw: list[dict[str, Any]] = []
+    for chunk_idx, chunk in enumerate(experiment_chunks, start=1):
+        experiments_json = json.dumps({"experiments": chunk}, ensure_ascii=True, indent=2)
+        prompt = _build_asset_brief_prompt(
+            experiments_json=experiments_json,
+            channel_hint=channel_hint,
+            format_hint=format_hint,
+            tone_guidelines=tone_guidelines,
+            constraints=constraints,
+            chunk_index=chunk_idx,
+            chunk_total=len(experiment_chunks),
+        )
+        chunk_prompts.append(prompt)
+        user_content: List[Dict[str, Any]] = [{"type": "text", "text": prompt}, *documents]
+        claude_response = call_claude_structured_message(
+            model=model,
+            system="Generate actionable creative briefs that align with the attached context and experiment goals.",
+            user_content=user_content,
+            output_schema=ASSET_BRIEFS_SCHEMA,
+            max_tokens=CLAUDE_STRUCTURED_MAX_TOKENS,
+            temperature=0.4,
+        )
+        claude_raw_responses.append(claude_response.get("raw"))
+        parsed = claude_response.get("parsed") or {}
+        chunk_briefs = parsed.get("asset_briefs") if isinstance(parsed, dict) else None
+        if not chunk_briefs:
+            raise RuntimeError(
+                f"Claude did not return any asset_briefs for chunk {chunk_idx}/{len(experiment_chunks)}."
+            )
+        for brief in chunk_briefs:
+            if isinstance(brief, dict):
+                briefs_raw.append(brief)
+
     if not briefs_raw:
-        raise RuntimeError("Claude did not return any asset_briefs")
+        raise RuntimeError("Claude did not return any valid asset_briefs.")
+
+    expected_variant_pairs = _collect_expected_variant_pairs(normalized_experiments)
+    _validate_asset_brief_variant_coverage(
+        briefs_raw=briefs_raw,
+        expected_variant_pairs=expected_variant_pairs,
+    )
+
+    for brief in briefs_raw:
+        if not isinstance(brief, dict):
+            continue
+        creative_concept = brief.get("creativeConcept")
+        if isinstance(creative_concept, str) and _DIGIT_RE.search(creative_concept):
+            raise RuntimeError("Asset brief creativeConcept must not include numbers.")
+        if isinstance(creative_concept, str):
+            pattern = _find_unverified_claim_pattern(creative_concept)
+            if pattern:
+                raise RuntimeError(
+                    "Asset brief creativeConcept contains an unverified regulatory/clinical claim. "
+                    f"Matched={pattern.pattern!r} creativeConcept={creative_concept!r}"
+                )
+        for list_key in ("constraints", "toneGuidelines", "visualGuidelines"):
+            items = brief.get(list_key) or []
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, str) and _DIGIT_RE.search(item):
+                    raise RuntimeError(f"Asset brief {list_key} entries must not include numbers.")
+                if isinstance(item, str):
+                    pattern = _find_unverified_claim_pattern(item)
+                    if pattern:
+                        raise RuntimeError(
+                            f"Asset brief {list_key} contains an unverified regulatory/clinical claim. "
+                            f"Matched={pattern.pattern!r} value={item!r}"
+                        )
+        requirements = brief.get("requirements") or []
+        if isinstance(requirements, list):
+            for req in requirements:
+                if not isinstance(req, dict):
+                    continue
+                for text_key in ("angle", "hook", "funnelStage"):
+                    value = req.get(text_key)
+                    if isinstance(value, str) and _DIGIT_RE.search(value):
+                        raise RuntimeError(f"Asset brief requirements.{text_key} must not include numbers.")
+                    if isinstance(value, str):
+                        pattern = _find_unverified_claim_pattern(value)
+                        if pattern:
+                            raise RuntimeError(
+                                f"Asset brief requirements.{text_key} contains an unverified regulatory/clinical claim. "
+                                f"Matched={pattern.pattern!r} value={value!r}"
+                            )
 
     invalid_channels: set[str] = set()
     invalid_formats: set[str] = set()
@@ -599,8 +1067,12 @@ Return JSON that matches the asset_briefs schema.
 
     briefs: List[AssetBrief] = []
     brief_ids: List[str] = []
+    seen_brief_ids: set[str] = set()
     for brief in briefs_raw:
         brief_id = brief.get("id") or str(uuid4())
+        if brief_id in seen_brief_ids:
+            raise RuntimeError(f"Asset brief generation returned duplicate brief id: {brief_id}")
+        seen_brief_ids.add(brief_id)
         variant_id = brief.get("variantId") or brief.get("variant_id")
         if not variant_id:
             raise RuntimeError("Asset brief generation missing variantId.")
@@ -631,7 +1103,12 @@ Return JSON that matches the asset_briefs schema.
         brief_ids.append(brief_id)
 
     data_out = [b.model_dump() for b in briefs]
-    payload_to_store = {"asset_briefs": data_out, "rawPrompt": prompt, "claudeResponse": claude_response.get("raw")}
+    payload_to_store = {
+        "asset_briefs": data_out,
+        "rawPrompt": chunk_prompts[0] if len(chunk_prompts) == 1 else "\n\n--- chunk ---\n\n".join(chunk_prompts),
+        "claudeResponse": claude_raw_responses[0] if len(claude_raw_responses) == 1 else claude_raw_responses,
+        "chunk_count": len(experiment_chunks),
+    }
     with session_scope() as session:
         repo = ArtifactsRepository(session)
         repo.insert(

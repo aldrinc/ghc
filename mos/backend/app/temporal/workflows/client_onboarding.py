@@ -30,32 +30,6 @@ class ClientOnboardingWorkflow:
     def __init__(self) -> None:
         self.canon: Optional[Dict[str, Any]] = None
         self.metric_schema: Optional[Dict[str, Any]] = None
-        self._canon_approved = False
-        self._metric_approved = False
-
-    @workflow.signal
-    def approve_canon(self, payload: Any) -> None:
-        """
-        Accepts either a boolean (approved) or a dict with keys approved/updated_canon/updatedCanon.
-        Using a single payload keeps signal invocation simple from HTTP.
-        """
-        approved = payload if isinstance(payload, bool) else bool(payload.get("approved", False))
-        updated_canon = None
-        if isinstance(payload, dict):
-            updated_canon = payload.get("updated_canon") or payload.get("updatedCanon")
-        if approved and updated_canon:
-            self.canon = updated_canon
-        self._canon_approved = approved
-
-    @workflow.signal
-    def approve_metric_schema(self, payload: Any) -> None:
-        approved = payload if isinstance(payload, bool) else bool(payload.get("approved", False))
-        updated_schema = None
-        if isinstance(payload, dict):
-            updated_schema = payload.get("updated_schema") or payload.get("updatedSchema")
-        if approved and updated_schema:
-            self.metric_schema = updated_schema
-        self._metric_approved = approved
 
     @workflow.run
     async def run(self, input: ClientOnboardingInput) -> None:
@@ -84,8 +58,6 @@ class ClientOnboardingWorkflow:
             schedule_to_close_timeout=timedelta(minutes=5),
         )
 
-        await workflow.wait_condition(lambda: self._canon_approved)
-
         self.metric_schema = await workflow.execute_activity(
             build_metric_schema_activity,
             {
@@ -96,8 +68,6 @@ class ClientOnboardingWorkflow:
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
-
-        await workflow.wait_condition(lambda: self._metric_approved)
 
         await workflow.execute_activity(
             build_design_system_activity,

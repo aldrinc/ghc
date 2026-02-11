@@ -79,7 +79,7 @@ export function ExperimentsPage() {
         </div>
       ) : (
         <div className="ds-card ds-card--md ds-card--empty text-sm">
-          No angles generated yet. Approve strategy to trigger angle planning.
+          No angles generated yet. Start campaign planning to generate angle specs.
         </div>
       )}
 

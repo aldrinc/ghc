@@ -148,3 +148,36 @@ def upload_text_file(
         "webViewLink": file.get("webViewLink"),
         "webContentLink": file.get("webContentLink"),
     }
+
+
+def download_drive_text_file(*, file_id: str, encoding: str = "utf-8") -> str:
+    """
+    Download a Drive file as text.
+
+    Notes:
+    - For regular files, Drive "media" download is used.
+    - For Google-native files (Docs, Sheets, etc.), Drive export is used.
+    """
+    drive = get_drive_client()
+    try:
+        meta = (
+            drive.files()
+            .get(fileId=file_id, fields="mimeType", supportsAllDrives=True)
+            .execute()
+        )
+        mime_type = meta.get("mimeType") if isinstance(meta, dict) else None
+
+        if isinstance(mime_type, str) and mime_type.startswith("application/vnd.google-apps."):
+            data = drive.files().export_media(fileId=file_id, mimeType="text/plain").execute()
+        else:
+            data = drive.files().get_media(fileId=file_id, supportsAllDrives=True).execute()
+    except HttpError as exc:
+        raise RuntimeError(f"Failed to download file from Drive (file_id={file_id}): {exc}") from exc
+
+    if not isinstance(data, (bytes, bytearray)):
+        raise RuntimeError("Drive download did not return bytes.")
+
+    try:
+        return bytes(data).decode(encoding)
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"Failed to decode Drive file content as {encoding}: {exc}") from exc

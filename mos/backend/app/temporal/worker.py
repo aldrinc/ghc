@@ -66,7 +66,9 @@ from app.temporal.activities.signal_activities import (
 from app.temporal.activities.playbook_activities import update_playbook_from_reports_activity
 from app.temporal.activities.ads_ingestion_activities import (
     upsert_brands_and_identities_activity,
+    fetch_ad_library_page_totals_activity,
     ingest_ads_for_identities_activity,
+    select_ads_for_context_activity,
     build_ads_context_activity,
     list_ads_for_run_activity,
 )
@@ -134,7 +136,9 @@ async def main() -> None:
                 build_experiment_report_activity,
                 update_playbook_from_reports_activity,
                 upsert_brands_and_identities_activity,
+                fetch_ad_library_page_totals_activity,
                 ingest_ads_for_identities_activity,
+                select_ads_for_context_activity,
                 build_ads_context_activity,
                 list_ads_for_run_activity,
                 generate_ad_breakdown_activity,

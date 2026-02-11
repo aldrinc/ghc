@@ -7,17 +7,21 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 import { useArtifacts, useLatestArtifact } from "@/api/artifacts";
 import { useApiClient, type ApiError } from "@/api/client";
 import { useCampaign, useUpdateExperimentSpecs } from "@/api/campaigns";
 import { useFunnels } from "@/api/funnels";
+import { useProduct } from "@/api/products";
 import { useWorkflowLogs, useWorkflows, useWorkflowSignal } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 import type { Artifact, AssetBrief, ExperimentSpec, StrategySheet } from "@/types/artifacts";
+import type { ProductAsset } from "@/types/products";
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -30,12 +34,68 @@ function truncate(text?: string, max = 120) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+function formatBytes(value?: number | null): string | null {
+  if (value === null || value === undefined) return null;
+  if (value === 0) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  let size = value;
+  let idx = 0;
+  while (size >= 1024 && idx < units.length - 1) {
+    size /= 1024;
+    idx += 1;
+  }
+  return `${size.toFixed(size < 10 && idx > 0 ? 1 : 0)} ${units[idx]}`;
+}
+
+function assetLabel(asset: ProductAsset): string {
+  const filename = asset.ai_metadata?.filename;
+  if (typeof filename === "string" && filename.trim()) return filename;
+  if (asset.content_type) return asset.content_type;
+  return `Asset ${asset.id.slice(0, 8)}`;
+}
+
+function normalizeListText(value: string) {
+  const items = value
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  // Preserve order while removing duplicates.
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
+type ExperimentVariantEditDraft = {
+  id: string;
+  name: string;
+  description: string;
+  channelsText: string;
+  guardrailsText: string;
+};
+
+type ExperimentSpecEditDraft = {
+  id: string;
+  name: string;
+  hypothesis: string;
+  metricIdsText: string;
+  sampleSizeEstimateText: string;
+  durationDaysText: string;
+  budgetEstimateText: string;
+  variants: ExperimentVariantEditDraft[];
+};
+
 const funnelToneMap: Record<string, "neutral" | "accent" | "success" | "danger"> = {
   draft: "neutral",
   published: "success",
   disabled: "danger",
   archived: "neutral",
 };
+
+const READABILITY_MAX_WIDTH_CLASS = "w-full max-w-4xl";
 
 const EMPTY_ARTIFACTS: Artifact[] = [];
 
@@ -55,11 +115,14 @@ export function CampaignDetailPage() {
   const [selectedAssetBriefIds, setSelectedAssetBriefIds] = useState<string[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSpec, setEditingSpec] = useState<ExperimentSpec | null>(null);
-  const [editingJson, setEditingJson] = useState("");
+  const [editingDraft, setEditingDraft] = useState<ExperimentSpecEditDraft | null>(null);
   const [editingError, setEditingError] = useState<string | null>(null);
   const [funnelGenerationPending, setFunnelGenerationPending] = useState(false);
   const [funnelGenerationError, setFunnelGenerationError] = useState<string | null>(null);
   const [funnelCreationRequested, setFunnelCreationRequested] = useState(false);
+  const [creativeProductionPending, setCreativeProductionPending] = useState(false);
+  const [creativeProductionError, setCreativeProductionError] = useState<string | null>(null);
+  const [selectedPreviewAssetByBrief, setSelectedPreviewAssetByBrief] = useState<Record<string, string>>({});
 
   const strategyFilters = useMemo(() => (campaignId ? { campaignId, type: "strategy_sheet" } : {}), [campaignId]);
   const experimentFilters = useMemo(() => (campaignId ? { campaignId, type: "experiment_spec" } : {}), [campaignId]);
@@ -83,20 +146,13 @@ export function CampaignDetailPage() {
   const latestFunnelWorkflow = funnelWorkflows[0];
   const { data: funnelLogs = [] } = useWorkflowLogs(latestFunnelWorkflow?.id);
   const latestWorkflow = campaignWorkflows[0];
-  const strategyWorkflow =
-    campaignWorkflows.find((wf) => wf.kind === "campaign_planning" && wf.status === "running") ??
-    campaignWorkflows.find((wf) => wf.kind === "campaign_intent" && wf.status === "running");
-  const intentWorkflow = campaignWorkflows.find(
-    (wf) => wf.kind === "campaign_intent" && wf.status === "running"
-  );
+  const planningWorkflow = campaignWorkflows.find((wf) => wf.kind === "campaign_planning" && wf.status === "running");
   const funnelWorkflow = campaignWorkflows.find(
     (wf) => wf.kind === "campaign_funnel_generation" && wf.status === "running"
   );
 
-  const strategySignal = useWorkflowSignal(strategyWorkflow?.id);
-  const intentSignal = useWorkflowSignal(intentWorkflow?.id);
-  const canApproveStrategy = Boolean(strategyWorkflow?.id);
-  const canApproveAssetBriefs = Boolean(intentWorkflow?.id);
+  const planningSignal = useWorkflowSignal(planningWorkflow?.id);
+  const canApproveExperiments = Boolean(planningWorkflow?.id);
   const isFunnelGenerationActive =
     funnelGenerationPending ||
     funnelCreationRequested ||
@@ -123,6 +179,8 @@ export function CampaignDetailPage() {
     if (workspace?.id === campaign.client_id) return workspace.name;
     return clients.find((client) => client.id === campaign.client_id)?.name ?? null;
   }, [campaign?.client_id, workspace?.id, workspace?.name, clients]);
+  const campaignProductId = campaign?.product_id || product?.id;
+  const { data: campaignProductDetail, isLoading: campaignProductLoading } = useProduct(campaignProductId || undefined);
 
   const campaignProduct = useMemo(
     () => products.find((item) => item.id === campaign?.product_id),
@@ -136,21 +194,14 @@ export function CampaignDetailPage() {
   const mitigations = strategy.mitigations || [];
 
   const experimentSpecs = useMemo(() => {
-    const map = new Map<string, ExperimentSpec>();
-    experimentArtifacts.forEach((art) => {
-      const data = (art.data || {}) as {
-        experimentSpecs?: ExperimentSpec[];
-        experiment_specs?: ExperimentSpec[];
-      };
-      const specs = data.experimentSpecs || (data as any).experiment_specs || [];
-      specs.forEach((spec) => {
-        if (!spec || typeof spec !== "object") return;
-        const id = (spec as ExperimentSpec).id;
-        if (!id || map.has(id)) return;
-        map.set(id, spec as ExperimentSpec);
-      });
-    });
-    return Array.from(map.values());
+    const latest = experimentArtifacts?.[0];
+    const data = (latest?.data || {}) as {
+      experimentSpecs?: ExperimentSpec[];
+      experiment_specs?: ExperimentSpec[];
+    };
+    const specs = data.experimentSpecs || (data as any).experiment_specs || [];
+    if (!Array.isArray(specs)) return [];
+    return specs.filter((spec) => spec && typeof spec === "object" && Boolean((spec as ExperimentSpec).id));
   }, [experimentArtifacts]);
 
   const experimentNameById = useMemo(() => {
@@ -193,6 +244,28 @@ export function CampaignDetailPage() {
     });
     return Array.from(map.values());
   }, [assetBriefArtifacts]);
+  const generatedAssetsByBriefId = useMemo(() => {
+    const groups = campaignProductDetail?.creative_brief_assets || [];
+    const validBriefIds = new Set(assetBriefs.map((brief) => brief.id));
+    const mapped = new Map<string, ProductAsset[]>();
+    groups.forEach((group) => {
+      if (!group?.assetBriefId) return;
+      if (!validBriefIds.has(group.assetBriefId)) return;
+      mapped.set(group.assetBriefId, group.assets || []);
+    });
+    return mapped;
+  }, [campaignProductDetail?.creative_brief_assets, assetBriefs]);
+  const generatedAssetTotal = useMemo(
+    () =>
+      Array.from(generatedAssetsByBriefId.values()).reduce((sum, assets) => {
+        return sum + assets.length;
+      }, 0),
+    [generatedAssetsByBriefId]
+  );
+  const briefsWithGeneratedAssets = useMemo(
+    () => Array.from(generatedAssetsByBriefId.values()).filter((assets) => assets.length > 0).length,
+    [generatedAssetsByBriefId]
+  );
 
   useEffect(() => {
     setExperimentDrafts(experimentSpecs);
@@ -212,6 +285,22 @@ export function CampaignDetailPage() {
     }
   }, [funnels.length, funnelCreationRequested]);
 
+  useEffect(() => {
+    setSelectedPreviewAssetByBrief((prev) => {
+      const next: Record<string, string> = {};
+      generatedAssetsByBriefId.forEach((assets, briefId) => {
+        if (!assets.length) return;
+        const previousSelection = prev[briefId];
+        if (previousSelection && assets.some((asset) => asset.id === previousSelection)) {
+          next[briefId] = previousSelection;
+          return;
+        }
+        next[briefId] = assets[0].id;
+      });
+      return next;
+    });
+  }, [generatedAssetsByBriefId]);
+
   const allExperimentIds = useMemo(() => experimentDrafts.map((spec) => spec.id).filter(Boolean), [experimentDrafts]);
   const allExperimentsSelected =
     allExperimentIds.length > 0 && allExperimentIds.every((id) => selectedExperimentIds.includes(id));
@@ -221,6 +310,15 @@ export function CampaignDetailPage() {
   const toggleAllExperiments = () => {
     setSelectedExperimentIds(allExperimentsSelected ? [] : allExperimentIds);
   };
+
+  const selectedVariantCount = useMemo(() => {
+    if (!selectedExperimentIds.length) return 0;
+    const selected = new Set(selectedExperimentIds);
+    return experimentDrafts.reduce((sum, spec) => {
+      if (!selected.has(spec.id)) return sum;
+      return sum + (spec.variants?.length || 0);
+    }, 0);
+  }, [experimentDrafts, selectedExperimentIds]);
 
   const allAssetBriefIds = useMemo(() => assetBriefs.map((brief) => brief.id).filter(Boolean), [assetBriefs]);
   const allAssetBriefsSelected =
@@ -234,7 +332,22 @@ export function CampaignDetailPage() {
 
   const openEditSpec = (spec: ExperimentSpec) => {
     setEditingSpec(spec);
-    setEditingJson(JSON.stringify(spec, null, 2));
+    setEditingDraft({
+      id: spec.id,
+      name: spec.name || "",
+      hypothesis: spec.hypothesis || "",
+      metricIdsText: (spec.metricIds || []).join("\n"),
+      sampleSizeEstimateText: spec.sampleSizeEstimate ? String(spec.sampleSizeEstimate) : "",
+      durationDaysText: spec.durationDays ? String(spec.durationDays) : "",
+      budgetEstimateText: spec.budgetEstimate ? String(spec.budgetEstimate) : "",
+      variants: (spec.variants || []).map((variant) => ({
+        id: variant.id,
+        name: variant.name || "",
+        description: variant.description || "",
+        channelsText: (variant.channels || []).join("\n"),
+        guardrailsText: (variant.guardrails || []).join("\n"),
+      })),
+    });
     setEditingError(null);
     setEditDialogOpen(true);
   };
@@ -279,6 +392,7 @@ export function CampaignDetailPage() {
         `/campaigns/${campaign.id}/funnels/generate`,
         {
           experimentIds: selectedExperimentIds,
+          generateTestimonials: true,
         }
       );
       if (!response?.workflow_run_id) {
@@ -296,44 +410,135 @@ export function CampaignDetailPage() {
     }
   };
 
-  const handleSaveSpec = () => {
-    if (!editingSpec) return;
-    let parsed: ExperimentSpec;
-    try {
-      const raw = JSON.parse(editingJson);
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-        setEditingError("Angle spec must be a JSON object.");
-        return;
-      }
-      parsed = raw as ExperimentSpec;
-    } catch {
-      setEditingError("Invalid JSON. Check for missing commas or quotes.");
+  const handleApproveExperiments = () => {
+    if (!planningWorkflow?.id) return;
+    planningSignal.mutate({
+      signal: "approve-experiments",
+      body: { approved_ids: selectedExperimentIds, rejected_ids: [] },
+    });
+  };
+
+  const handleStartCreativeProduction = async () => {
+    setCreativeProductionError(null);
+    if (!campaign) {
+      setCreativeProductionError("Campaign is required to start creative production.");
+      return;
+    }
+    if (!campaign.id) {
+      setCreativeProductionError("Campaign id is missing.");
+      return;
+    }
+    if (!selectedAssetBriefIds.length) {
+      setCreativeProductionError("Select at least one creative brief to generate assets.");
       return;
     }
 
-    if (!parsed.id || parsed.id !== editingSpec.id) {
+    setCreativeProductionPending(true);
+    try {
+      const response = await post<{ workflow_run_id: string }>(`/campaigns/${campaign.id}/creative/produce`, {
+        assetBriefIds: selectedAssetBriefIds,
+      });
+      if (!response?.workflow_run_id) {
+        setCreativeProductionError("Creative production started but no workflow id was returned.");
+        return;
+      }
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      navigate(`/workflows/${response.workflow_run_id}`);
+    } catch (err) {
+      setCreativeProductionError(`Failed to start creative production: ${getErrorMessage(err)}`);
+    } finally {
+      setCreativeProductionPending(false);
+    }
+  };
+
+  const handleSaveSpec = () => {
+    if (!editingSpec || !editingDraft) {
+      setEditingError("Angle spec is required to save edits.");
+      return;
+    }
+
+    const parseOptionalPositiveInt = (raw: string, label: string) => {
+      const trimmed = raw.trim();
+      if (!trimmed) return { value: undefined as number | undefined };
+      const num = Number(trimmed);
+      if (!Number.isFinite(num) || !Number.isInteger(num)) {
+        return { error: `${label} must be a whole number.` };
+      }
+      if (num <= 0) {
+        return { error: `${label} must be greater than 0.` };
+      }
+      return { value: num };
+    };
+
+    if (!editingDraft.id || editingDraft.id !== editingSpec.id) {
       setEditingError("Angle spec id cannot be changed.");
       return;
     }
-    if (!parsed.name) {
-      setEditingError("Angle spec must include a name.");
+
+    const name = editingDraft.name.trim();
+    if (!name) {
+      setEditingError("Angle name is required.");
       return;
     }
-    if (!Array.isArray(parsed.metricIds) || parsed.metricIds.length === 0) {
-      setEditingError("Angle spec must include at least one metric id.");
+
+    const metricIds = normalizeListText(editingDraft.metricIdsText);
+    if (!metricIds.length) {
+      setEditingError("Angle must include at least one metric id.");
       return;
     }
-    if (!Array.isArray(parsed.variants) || parsed.variants.length === 0) {
-      setEditingError("Angle spec must include at least one variant.");
+
+    if (!editingDraft.variants.length) {
+      setEditingError("Angle must include at least one variant.");
       return;
     }
-    const invalidVariant = parsed.variants.find(
-      (variant) => !variant || typeof variant !== "object" || !variant.id || !variant.name
-    );
+
+    const nextVariants = editingDraft.variants.map((variant) => {
+      const variantName = variant.name.trim();
+      const description = variant.description.trim();
+      const channels = normalizeListText(variant.channelsText);
+      const guardrails = normalizeListText(variant.guardrailsText);
+      return {
+        id: variant.id,
+        name: variantName,
+        ...(description ? { description } : {}),
+        ...(channels.length ? { channels } : {}),
+        ...(guardrails.length ? { guardrails } : {}),
+      };
+    });
+
+    const invalidVariant = nextVariants.find((variant) => !variant.id || !variant.name);
     if (invalidVariant) {
-      setEditingError("Each variant must include id and name.");
+      setEditingError("Each variant must include an id and a name.");
       return;
     }
+
+    const sampleSizeResult = parseOptionalPositiveInt(editingDraft.sampleSizeEstimateText, "Sample size");
+    if (sampleSizeResult.error) {
+      setEditingError(sampleSizeResult.error);
+      return;
+    }
+    const durationResult = parseOptionalPositiveInt(editingDraft.durationDaysText, "Duration (days)");
+    if (durationResult.error) {
+      setEditingError(durationResult.error);
+      return;
+    }
+    const budgetResult = parseOptionalPositiveInt(editingDraft.budgetEstimateText, "Budget");
+    if (budgetResult.error) {
+      setEditingError(budgetResult.error);
+      return;
+    }
+
+    const parsed: ExperimentSpec = {
+      ...editingSpec,
+      id: editingSpec.id,
+      name,
+      hypothesis: editingDraft.hypothesis.trim() || undefined,
+      metricIds,
+      variants: nextVariants,
+      sampleSizeEstimate: sampleSizeResult.value,
+      durationDays: durationResult.value,
+      budgetEstimate: budgetResult.value,
+    };
 
     const nextSpecs = experimentDrafts.map((spec) => (spec.id === parsed.id ? parsed : spec));
     setExperimentDrafts(nextSpecs);
@@ -343,6 +548,7 @@ export function CampaignDetailPage() {
         onSuccess: () => {
           setEditDialogOpen(false);
           setEditingSpec(null);
+          setEditingDraft(null);
         },
       }
     );
@@ -599,376 +805,527 @@ export function CampaignDetailPage() {
         </TabsContent>
 
         <TabsContent value="strategy" flush>
-          {strategyLoading ? (
-            <div className="border border-border bg-transparent px-4 py-3 text-base text-content-muted">
-              Loading strategy sheet…
-            </div>
-          ) : !strategyArtifact ? (
-            <div className="border border-border bg-transparent px-4 py-3 text-base">
-              No strategy sheet generated yet.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="border border-border bg-transparent p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-base font-semibold text-content">Strategy sheet</div>
-                    <div className="text-sm text-content-muted">
-                      Updated {formatDate(strategyArtifact.created_at)}
+          <div className={READABILITY_MAX_WIDTH_CLASS}>
+            {strategyLoading ? (
+              <div className="border border-border bg-transparent px-4 py-3 text-base text-content-muted">
+                Loading strategy sheet…
+              </div>
+            ) : !strategyArtifact ? (
+              <div className="border border-border bg-transparent px-4 py-3 text-base">
+                No strategy sheet generated yet.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="border border-border bg-transparent p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-base font-semibold text-content">Strategy sheet</div>
+                      <div className="text-sm text-content-muted">
+                        Updated {formatDate(strategyArtifact.created_at)}
+                      </div>
                     </div>
                   </div>
-                  {canApproveStrategy ? (
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      onClick={() => strategySignal.mutate({ signal: "approve-strategy", body: { approved: true } })}
-                      disabled={!strategyArtifact || strategySignal.isPending}
-                    >
-                      {strategySignal.isPending ? "Sending…" : "Approve strategy"}
-                    </Button>
-                  ) : null}
-                </div>
-                <div className="mt-4 space-y-3 text-base text-content">
-                  <div>
-                    <div className="text-sm font-semibold text-content-muted uppercase">Goal</div>
-                    <div>{truncate(strategy.goal || "—", 240)}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-content-muted uppercase">Hypothesis</div>
-                    <div>{truncate(strategy.hypothesis || "—", 240)}</div>
+                  <div className="mt-2 text-sm text-content-muted">Strategy sheets are auto-approved.</div>
+                  <div className="mt-4 space-y-3 text-base text-content">
+                    <div>
+                      <div className="text-sm font-semibold text-content-muted uppercase">Goal</div>
+                      <div>{truncate(strategy.goal || "—", 240)}</div>
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-content-muted uppercase">Hypothesis</div>
+                      <div>{truncate(strategy.hypothesis || "—", 240)}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="border border-border bg-transparent">
-                <div className="border-b border-border px-4 py-3">
-                  <div className="text-base font-semibold text-content">Channel plan</div>
-                  <div className="text-sm text-content-muted">Budget split and objectives by channel.</div>
-                </div>
-                <div className="p-4">
-                  {channelPlan.length ? (
-                    <Table variant="ghost">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHeadCell>Channel</TableHeadCell>
-                          <TableHeadCell>Objective</TableHeadCell>
-                          <TableHeadCell>Budget %</TableHeadCell>
-                          <TableHeadCell>Notes</TableHeadCell>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {channelPlan.map((plan, idx) => (
-                          <TableRow key={`${plan.channel}-${idx}`}>
-                            <TableCell>{plan.channel}</TableCell>
-                            <TableCell className="text-sm text-content-muted">{truncate(plan.objective, 120)}</TableCell>
-                            <TableCell className="text-sm text-content-muted">{plan.budgetSplitPercent ?? "—"}</TableCell>
-                            <TableCell className="text-sm text-content-muted">{truncate(plan.notes, 120)}</TableCell>
+                <div className="border border-border bg-transparent">
+                  <div className="border-b border-border px-4 py-3">
+                    <div className="text-base font-semibold text-content">Channel plan</div>
+                    <div className="text-sm text-content-muted">Budget split and objectives by channel.</div>
+                  </div>
+                  <div className="p-4">
+                    {channelPlan.length ? (
+                      <Table variant="ghost">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHeadCell>Channel</TableHeadCell>
+                            <TableHeadCell>Objective</TableHeadCell>
+                            <TableHeadCell>Budget %</TableHeadCell>
+                            <TableHeadCell>Notes</TableHeadCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  ) : (
-                    <div className="text-sm text-content-muted">No channel plan generated yet.</div>
-                  )}
+                        </TableHeader>
+                        <TableBody>
+                          {channelPlan.map((plan, idx) => (
+                            <TableRow key={`${plan.channel}-${idx}`}>
+                              <TableCell>{plan.channel}</TableCell>
+                              <TableCell className="text-sm text-content-muted">
+                                {truncate(plan.objective, 120)}
+                              </TableCell>
+                              <TableCell className="text-sm text-content-muted">
+                                {plan.budgetSplitPercent ?? "—"}
+                              </TableCell>
+                              <TableCell className="text-sm text-content-muted">{truncate(plan.notes, 120)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    ) : (
+                      <div className="text-sm text-content-muted">No channel plan generated yet.</div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="border border-border bg-transparent">
-                <div className="border-b border-border px-4 py-3">
-                  <div className="text-base font-semibold text-content">Messaging</div>
-                  <div className="text-sm text-content-muted">Proof points and story arcs.</div>
-                </div>
-                <div className="p-4">
-                  {messaging.length ? (
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {messaging.map((msg, idx) => (
-                        <div key={`${msg.title}-${idx}`} className="border border-border bg-transparent p-3">
-                          <div className="text-base font-semibold text-content">{msg.title || "Messaging pillar"}</div>
-                          <div className="mt-1 text-sm text-content-muted">
-                            Proof points: {(msg.proofPoints || []).join("; ") || "—"}
+                <div className="border border-border bg-transparent">
+                  <div className="border-b border-border px-4 py-3">
+                    <div className="text-base font-semibold text-content">Messaging</div>
+                    <div className="text-sm text-content-muted">Proof points and story arcs.</div>
+                  </div>
+                  <div className="p-4">
+                    {messaging.length ? (
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {messaging.map((msg, idx) => (
+                          <div key={`${msg.title}-${idx}`} className="border border-border bg-transparent p-3">
+                            <div className="text-base font-semibold text-content">
+                              {msg.title || "Messaging pillar"}
+                            </div>
+                            <div className="mt-1 text-sm text-content-muted">
+                              Proof points: {(msg.proofPoints || []).join("; ") || "—"}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-content-muted">No messaging pillars generated yet.</div>
-                  )}
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-content-muted">No messaging pillars generated yet.</div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="border border-border bg-transparent p-4">
-                  <div className="text-base font-semibold text-content">Risks</div>
-                  <div className="mt-2 text-sm text-content-muted">
-                    {risks.length ? risks.map((risk, idx) => <div key={`risk-${idx}`}>• {risk}</div>) : "—"}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="border border-border bg-transparent p-4">
+                    <div className="text-base font-semibold text-content">Risks</div>
+                    <div className="mt-2 text-sm text-content-muted">
+                      {risks.length ? risks.map((risk, idx) => <div key={`risk-${idx}`}>• {risk}</div>) : "—"}
+                    </div>
                   </div>
-                </div>
-                <div className="border border-border bg-transparent p-4">
-                  <div className="text-base font-semibold text-content">Mitigations</div>
-                  <div className="mt-2 text-sm text-content-muted">
-                    {mitigations.length ? mitigations.map((risk, idx) => <div key={`mitigation-${idx}`}>• {risk}</div>) : "—"}
+                  <div className="border border-border bg-transparent p-4">
+                    <div className="text-base font-semibold text-content">Mitigations</div>
+                    <div className="mt-2 text-sm text-content-muted">
+                      {mitigations.length
+                        ? mitigations.map((risk, idx) => <div key={`mitigation-${idx}`}>• {risk}</div>)
+                        : "—"}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="experiments" flush>
-          {experimentsLoading ? (
-            <div className="border border-border bg-transparent px-4 py-3 text-base text-content-muted">
-              Loading angles…
-            </div>
-          ) : experimentDrafts.length ? (
-            <div className="border border-border bg-transparent">
-              <div className="border-b border-border px-4 py-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-base font-semibold text-content">Angle specs</div>
-                    <div className="text-sm text-content-muted">Generated from canon and metric schema.</div>
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleCreateFunnels}
-                    disabled={
-                      funnelGenerationPending || isFunnelGenerationActive || selectedExperimentIds.length === 0
-                    }
-                  >
-                    {funnelGenerationPending || isFunnelGenerationActive ? "Creating…" : "Create funnels"}
-                  </Button>
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-content-muted">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className={cn(
-                        "h-4 w-4 rounded border border-border bg-surface text-accent",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                      )}
-                      checked={allExperimentsSelected}
-                      onChange={toggleAllExperiments}
-                    />
-                    <span>Select all</span>
-                  </label>
-                  <span>{selectedExperimentIds.length} selected</span>
-                  {updateExperimentSpecs.isPending ? <span>Saving edits…</span> : null}
-                </div>
-                <div className="mt-2 space-y-2 text-sm text-content-muted">
-                  <div>
-                    Creating funnels uses the default pre-sales + sales templates and generates creative briefs for the
-                    selected angles.
-                  </div>
-                  {funnelGenerationError ? <div className="text-danger">{funnelGenerationError}</div> : null}
-                  {funnelFailureSummary ? (
-                    <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
-                      <div className="font-semibold">Funnel generation failed</div>
-                      <div>{funnelFailureSummary}</div>
-                      {latestFunnelWorkflow?.id ? (
+          <div className={READABILITY_MAX_WIDTH_CLASS}>
+            {experimentsLoading ? (
+              <div className="border border-border bg-transparent px-4 py-3 text-base text-content-muted">
+                Loading angles…
+              </div>
+            ) : experimentDrafts.length ? (
+              <div className="rounded-xl border border-border bg-transparent">
+                <div className="border-b border-border px-4 py-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-base font-semibold text-content">Angle specs</div>
+                      <div className="text-sm text-content-muted">Generated from canon and metric schema.</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {canApproveExperiments ? (
                         <Button
-                          variant="secondary"
-                          size="xs"
-                          className="mt-2"
-                          onClick={() => navigate(`/workflows/${latestFunnelWorkflow.id}`)}
+                          variant="primary"
+                          size="sm"
+                          onClick={handleApproveExperiments}
+                          disabled={planningSignal.isPending || selectedExperimentIds.length === 0}
                         >
-                          Open workflow
+                          {planningSignal.isPending ? "Sending…" : "Approve experiments"}
                         </Button>
                       ) : null}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleCreateFunnels}
+                        disabled={
+                          funnelGenerationPending || isFunnelGenerationActive || selectedExperimentIds.length === 0
+                        }
+                      >
+                        {funnelGenerationPending || isFunnelGenerationActive ? "Creating…" : "Create funnels"}
+                      </Button>
                     </div>
-                  ) : null}
-                </div>
-                {isFunnelGenerationActive ? (
-                  <div className="mt-2 text-sm text-content-muted">
-                    Creating funnels… They will appear in the Funnels tab once ready.
                   </div>
-                ) : null}
-              </div>
-              <div className="divide-y divide-border">
-                {experimentDrafts.map((exp) => {
-                  const isSelected = selectedExperimentIds.includes(exp.id);
-                  return (
-                    <div key={exp.id} className="px-4 py-3 text-base">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            className={cn(
-                              "mt-1 h-4 w-4 rounded border border-border bg-surface text-accent",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                            )}
-                            checked={isSelected}
-                            onChange={() => toggleExperimentSelection(exp.id)}
-                          />
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="font-semibold text-content">{exp.name || exp.id}</div>
-                              <div className="text-sm text-content-muted font-mono">{exp.id}</div>
-                            </div>
-                            <div className="mt-1 text-sm text-content-muted">
-                              {exp.hypothesis || "No hypothesis set."}
-                            </div>
-                            <div className="mt-2 text-sm text-content-muted">
-                              Metrics: {(exp.metricIds || []).join(", ") || "—"} · Variants:{" "}
-                              {(exp.variants || []).length}
-                            </div>
-                            <div className="mt-2 text-sm text-content-muted">
-                              Sample size: {exp.sampleSizeEstimate ?? "—"} · Duration: {exp.durationDays ?? "—"} days ·
-                              Budget: {exp.budgetEstimate ?? "—"}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-content-muted">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className={cn(
+                          "h-4 w-4 rounded border border-border bg-surface text-accent",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                        )}
+                        checked={allExperimentsSelected}
+                        onChange={toggleAllExperiments}
+                      />
+                      <span>Select all</span>
+                    </label>
+                    <span>
+                      {selectedExperimentIds.length} angles selected · {selectedVariantCount} variants included
+                    </span>
+                    {updateExperimentSpecs.isPending ? <span>Saving edits…</span> : null}
+                  </div>
+                  <div className="mt-2 space-y-2 text-sm text-content-muted">
+                    <div>Approving experiments unblocks campaign planning to generate creative briefs downstream.</div>
+                    <div>
+                      Creating funnels uses the default pre-sales + sales templates and generates creative briefs for
+                      the selected angles.
+                    </div>
+                    <div>Selection is per angle spec. Selecting an angle includes all of its variants below.</div>
+                    {funnelGenerationError ? <div className="text-danger">{funnelGenerationError}</div> : null}
+                    {funnelFailureSummary ? (
+                      <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+                        <div className="font-semibold">Funnel generation failed</div>
+                        <div>{funnelFailureSummary}</div>
+                        {latestFunnelWorkflow?.id ? (
                           <Button
                             variant="secondary"
                             size="xs"
-                            onClick={() => openEditSpec(exp)}
-                            disabled={updateExperimentSpecs.isPending}
+                            className="mt-2"
+                            onClick={() => navigate(`/workflows/${latestFunnelWorkflow.id}`)}
                           >
-                            Edit JSON
+                            Open workflow
                           </Button>
-                        </div>
+                        ) : null}
                       </div>
-                      {exp.variants?.length ? (
-                        <div className="mt-3 space-y-2">
-                          {exp.variants.map((variant) => (
-                            <div key={variant.id} className="border border-border bg-transparent px-3 py-2 text-sm">
-                              <div className="flex items-center justify-between">
-                                <div className="font-semibold text-content">{variant.name || variant.id}</div>
-                                <div className="font-mono text-sm text-content-muted">{variant.id}</div>
-                              </div>
-                              <div className="mt-1 text-content-muted">
-                                {variant.description || "No variant description."}
-                              </div>
-                              <div className="mt-1 text-content-muted">
-                                Channels: {(variant.channels || []).join(", ") || "—"}
-                              </div>
-                              {variant.guardrails?.length ? (
-                                <div className="mt-1 text-content-muted">
-                                  Guardrails: {variant.guardrails.join("; ")}
-                                </div>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                    ) : null}
+                  </div>
+                  {isFunnelGenerationActive ? (
+                    <div className="mt-2 text-sm text-content-muted">
+                      Creating funnels… They will appear in the Funnels tab once ready.
                     </div>
-                  );
-                })}
+                  ) : null}
+                </div>
+                <div className="space-y-4 p-4">
+                  {experimentDrafts.map((exp) => {
+                    const isSelected = selectedExperimentIds.includes(exp.id);
+                    return (
+                      <div
+                        key={exp.id}
+                        className={cn(
+                          "rounded-xl border border-border bg-surface p-4 shadow-sm",
+                          isSelected && "border-accent/30 ring-2 ring-accent/10"
+                        )}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="flex min-w-0 items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className={cn(
+                                "mt-1 h-4 w-4 rounded border border-border bg-surface text-accent",
+                                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                              )}
+                              checked={isSelected}
+                              onChange={() => toggleExperimentSelection(exp.id)}
+                            />
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="text-base font-semibold text-content">{exp.name || exp.id}</div>
+                                {isSelected ? <Badge tone="accent">Selected</Badge> : null}
+                                <Badge tone="neutral">{(exp.variants || []).length} variants</Badge>
+                              </div>
+                              <div className="mt-0.5 text-xs font-mono text-content-muted">{exp.id}</div>
+                              {exp.hypothesis ? (
+                                <div className="mt-2 text-sm text-content-muted">{exp.hypothesis}</div>
+                              ) : null}
+                              <div className="mt-3 flex flex-wrap gap-2 text-xs text-content-muted">
+                                <span className="rounded-full bg-muted px-2.5 py-1">
+                                  Metrics: {(exp.metricIds || []).join(", ") || "—"}
+                                </span>
+                                <span className="rounded-full bg-muted px-2.5 py-1">
+                                  Sample size: {exp.sampleSizeEstimate ?? "—"}
+                                </span>
+                                <span className="rounded-full bg-muted px-2.5 py-1">
+                                  Duration: {exp.durationDays ?? "—"} days
+                                </span>
+                                <span className="rounded-full bg-muted px-2.5 py-1">
+                                  Budget: {exp.budgetEstimate ?? "—"}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              onClick={() => openEditSpec(exp)}
+                              disabled={updateExperimentSpecs.isPending}
+                            >
+                              Edit angle
+                            </Button>
+                          </div>
+                        </div>
+
+                        {exp.variants?.length ? (
+                          <div className="mt-4 rounded-lg bg-muted p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
+                                Variants
+                              </div>
+                              <div className="text-xs text-content-muted">Included when angle is selected</div>
+                            </div>
+                            <div className="mt-2 space-y-2">
+                              {exp.variants.map((variant) => (
+                                <div key={variant.id} className="rounded-md bg-surface px-3 py-2">
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-semibold text-content">
+                                        {variant.name || variant.id}
+                                      </div>
+                                      {variant.description ? (
+                                        <div className="mt-1 text-sm text-content-muted">{variant.description}</div>
+                                      ) : null}
+                                    </div>
+                                    <div className="shrink-0 font-mono text-xs text-content-muted">{variant.id}</div>
+                                  </div>
+                                  <div className="mt-2 text-xs text-content-muted">
+                                    Channels: {(variant.channels || []).join(", ") || "—"}
+                                  </div>
+                                  {variant.guardrails?.length ? (
+                                    <div className="mt-1 text-xs text-content-muted">
+                                      Guardrails: {variant.guardrails.join("; ")}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="mt-4 text-sm text-content-muted">No variants.</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="border border-border bg-transparent px-4 py-3 text-base">
-              No angle specs generated yet. Approve the strategy step to trigger angles.
-            </div>
-          )}
+            ) : (
+              <div className="border border-border bg-transparent px-4 py-3 text-base">
+                No angle specs generated yet. Start campaign planning to generate angles.
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="assets" flush>
-          {briefsLoading ? (
-            <div className="border border-border bg-transparent px-4 py-3 text-base text-content-muted">
-              Loading creative briefs…
-            </div>
-          ) : assetBriefs.length ? (
-            <div className="border border-border bg-transparent">
-              <div className="border-b border-border px-4 py-3">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-base font-semibold text-content">Creative briefs</div>
-                    <div className="text-sm text-content-muted">Requirements derived from angle variants.</div>
-                  </div>
-                  {canApproveAssetBriefs ? (
+          <div className={READABILITY_MAX_WIDTH_CLASS}>
+            {briefsLoading ? (
+              <div className="border border-border bg-transparent px-4 py-3 text-base text-content-muted">
+                Loading creative briefs…
+              </div>
+            ) : assetBriefs.length ? (
+              <div className="border border-border bg-transparent">
+                <div className="border-b border-border px-4 py-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-base font-semibold text-content">Creative briefs</div>
+                      <div className="text-sm text-content-muted">Requirements derived from angle variants.</div>
+                    </div>
                     <Button
                       variant="primary"
                       size="sm"
-                      onClick={() =>
-                        intentSignal.mutate({
-                          signal: "approve-asset-briefs",
-                          body: { approved_ids: selectedAssetBriefIds },
-                        })
-                      }
-                      disabled={intentSignal.isPending || selectedAssetBriefIds.length === 0}
+                      onClick={handleStartCreativeProduction}
+                      disabled={creativeProductionPending || selectedAssetBriefIds.length === 0}
                     >
-                      {intentSignal.isPending ? "Sending…" : "Approve creative briefs"}
+                      {creativeProductionPending ? "Starting…" : "Generate assets"}
                     </Button>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-content-muted">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className={cn(
+                          "h-4 w-4 rounded border border-border bg-surface text-accent",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                        )}
+                        checked={allAssetBriefsSelected}
+                        onChange={toggleAllAssetBriefs}
+                      />
+                      <span>Select all</span>
+                    </label>
+                    <span>{selectedAssetBriefIds.length} selected</span>
+                    <span>
+                      Generated: {generatedAssetTotal} assets across {briefsWithGeneratedAssets}/{assetBriefs.length} briefs
+                    </span>
+                  </div>
+                  <div className="mt-2 text-sm text-content-muted">
+                    Generating assets triggers creative production for the selected briefs.
+                  </div>
+                  {campaignProductLoading ? (
+                    <div className="mt-1 text-sm text-content-muted">Loading generated assets…</div>
+                  ) : null}
+                  {creativeProductionError ? (
+                    <div className="mt-2 text-sm text-danger">{creativeProductionError}</div>
                   ) : null}
                 </div>
-                <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-content-muted">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className={cn(
-                        "h-4 w-4 rounded border border-border bg-surface text-accent",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                      )}
-                      checked={allAssetBriefsSelected}
-                      onChange={toggleAllAssetBriefs}
-                    />
-                    <span>Select all</span>
-                  </label>
-                  <span>{selectedAssetBriefIds.length} selected</span>
-                </div>
-                {canApproveAssetBriefs ? (
-                  <div className="mt-2 text-sm text-content-muted">
-                    Approving creative briefs marks them ready for creative production.
-                  </div>
-                ) : null}
-              </div>
-              <div className="divide-y divide-border">
-                {assetBriefs.map((brief) => {
-                  const isSelected = selectedAssetBriefIds.includes(brief.id);
-                  const experimentLabel = brief.experimentId
-                    ? experimentNameById[brief.experimentId] || brief.experimentId
-                    : "—";
-                  const variantLabel =
-                    brief.variantName ||
-                    (brief.variantId ? variantNameById[brief.variantId] || brief.variantId : "—");
-                  const funnelLabel = brief.funnelId ? funnelNameById[brief.funnelId] || brief.funnelId : "—";
-                  return (
-                    <div key={brief.id} className="px-4 py-3 text-base">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            className={cn(
-                              "mt-1 h-4 w-4 rounded border border-border bg-surface text-accent",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                <div className="divide-y divide-border">
+                  {assetBriefs.map((brief) => {
+                    const isSelected = selectedAssetBriefIds.includes(brief.id);
+                    const generatedAssets = generatedAssetsByBriefId.get(brief.id) || [];
+                    const experimentLabel = brief.experimentId
+                      ? experimentNameById[brief.experimentId] || brief.experimentId
+                      : "—";
+                    const variantLabel =
+                      brief.variantName ||
+                      (brief.variantId ? variantNameById[brief.variantId] || brief.variantId : "—");
+                    const funnelLabel = brief.funnelId ? funnelNameById[brief.funnelId] || brief.funnelId : "—";
+                    const selectedPreviewAssetId = selectedPreviewAssetByBrief[brief.id];
+                    const featuredAsset =
+                      generatedAssets.find((asset) => asset.id === selectedPreviewAssetId) || generatedAssets[0];
+                    const featuredAssetUrl = featuredAsset?.download_url || undefined;
+                    const featuredIsImage = featuredAsset?.asset_kind === "image";
+                    const featuredIsVideo = featuredAsset?.asset_kind === "video";
+                    const featuredSize = featuredAsset ? formatBytes(featuredAsset.size_bytes) : null;
+                    return (
+                      <div key={brief.id} className="px-4 py-3 text-base">
+                        <div className="grid gap-4 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+                          <div className="min-w-0">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                className={cn(
+                                  "mt-1 h-4 w-4 rounded border border-border bg-surface text-accent",
+                                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                                )}
+                                checked={isSelected}
+                                onChange={() => toggleAssetBriefSelection(brief.id)}
+                              />
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="font-semibold text-content">{brief.creativeConcept || brief.id}</div>
+                                  <div className="text-sm text-content-muted font-mono">{brief.id}</div>
+                                  {generatedAssets.length ? (
+                                    <Badge tone="success">{generatedAssets.length} generated</Badge>
+                                  ) : (
+                                    <Badge tone="neutral">No generated assets</Badge>
+                                  )}
+                                </div>
+                                <div className="mt-1 text-sm text-content-muted">
+                                  Angle: {experimentLabel} · Variant: {variantLabel} · Requirements:{" "}
+                                  {(brief.requirements || []).length}
+                                </div>
+                                <div className="mt-1 text-sm text-content-muted">Funnel: {funnelLabel}</div>
+                              </div>
+                            </div>
+
+                            {brief.requirements?.length ? (
+                              <div className="mt-3 grid gap-1 text-sm text-content-muted">
+                                {brief.requirements.map((req, idx) => (
+                                  <div key={`${brief.id}-req-${idx}`}>
+                                    • {req.channel} / {req.format} {req.angle ? `– ${req.angle}` : ""}{" "}
+                                    {req.hook ? `(${truncate(req.hook, 60)})` : ""}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="min-w-0 rounded-lg border border-border bg-surface p-3">
+                            {featuredAsset ? (
+                              <div className="space-y-3">
+                                <div className="overflow-hidden rounded-md border border-border bg-surface-2">
+                                  {featuredIsImage && featuredAssetUrl ? (
+                                    <img
+                                      src={featuredAssetUrl}
+                                      alt={featuredAsset.alt || assetLabel(featuredAsset)}
+                                      className="h-[420px] w-full object-contain"
+                                      loading="lazy"
+                                    />
+                                  ) : featuredIsVideo && featuredAssetUrl ? (
+                                    <video src={featuredAssetUrl} controls className="h-[420px] w-full bg-black" />
+                                  ) : (
+                                    <div className="flex h-[420px] items-center justify-center text-sm font-semibold uppercase text-content-muted">
+                                      No preview available
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold text-content">
+                                      {assetLabel(featuredAsset)}
+                                    </div>
+                                    <div className="text-xs text-content-muted">
+                                      {featuredAsset.content_type || featuredAsset.asset_kind}
+                                      {featuredSize ? ` · ${featuredSize}` : ""}
+                                      {` · Created ${formatDate(featuredAsset.created_at)}`}
+                                    </div>
+                                  </div>
+                                  {featuredAssetUrl ? (
+                                    <a
+                                      className="text-xs font-semibold text-primary hover:underline"
+                                      href={featuredAssetUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                    >
+                                      Open full size
+                                    </a>
+                                  ) : null}
+                                </div>
+                                <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                                  {generatedAssets.map((asset) => {
+                                    const thumbUrl = asset.download_url || undefined;
+                                    const thumbIsImage = asset.asset_kind === "image";
+                                    const thumbSelected = featuredAsset.id === asset.id;
+                                    return (
+                                      <button
+                                        key={asset.id}
+                                        type="button"
+                                        onClick={() =>
+                                          setSelectedPreviewAssetByBrief((prev) => ({ ...prev, [brief.id]: asset.id }))
+                                        }
+                                        className={cn(
+                                          "overflow-hidden rounded-md border bg-surface-2 text-left transition",
+                                          thumbSelected
+                                            ? "border-accent ring-2 ring-accent/20"
+                                            : "border-border hover:border-accent/50"
+                                        )}
+                                        title={assetLabel(asset)}
+                                      >
+                                        <div className="h-20 w-full">
+                                          {thumbIsImage && thumbUrl ? (
+                                            <img
+                                              src={thumbUrl}
+                                              alt={asset.alt || assetLabel(asset)}
+                                              className="h-full w-full object-cover"
+                                              loading="lazy"
+                                            />
+                                          ) : (
+                                            <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase text-content-muted">
+                                              {asset.asset_kind}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-content-muted">No generated assets for this brief yet.</div>
                             )}
-                            checked={isSelected}
-                            onChange={() => toggleAssetBriefSelection(brief.id)}
-                          />
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="font-semibold text-content">{brief.creativeConcept || brief.id}</div>
-                              <div className="text-sm text-content-muted font-mono">{brief.id}</div>
-                            </div>
-                            <div className="mt-1 text-sm text-content-muted">
-                              Angle: {experimentLabel} · Variant: {variantLabel} · Requirements:{" "}
-                              {(brief.requirements || []).length}
-                            </div>
-                            <div className="mt-1 text-sm text-content-muted">Funnel: {funnelLabel}</div>
                           </div>
                         </div>
                       </div>
-                      {brief.requirements?.length ? (
-                        <div className="mt-2 grid gap-1 text-sm text-content-muted">
-                          {brief.requirements.map((req, idx) => (
-                            <div key={`${brief.id}-req-${idx}`}>
-                              • {req.channel} / {req.format} {req.angle ? `– ${req.angle}` : ""}{" "}
-                              {req.hook ? `(${truncate(req.hook, 60)})` : ""}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="border border-border bg-transparent px-4 py-3 text-base">
-              Creative briefs will appear after angle specs are generated.
-            </div>
-          )}
+            ) : (
+              <div className="border border-border bg-transparent px-4 py-3 text-base">
+                Creative briefs will appear after angle specs are generated.
+              </div>
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="funnels" flush>
@@ -1049,15 +1406,16 @@ export function CampaignDetailPage() {
           setEditDialogOpen(open);
           if (!open) {
             setEditingSpec(null);
+            setEditingDraft(null);
             setEditingError(null);
           }
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <div className="space-y-2">
-            <DialogTitle>Edit angle spec</DialogTitle>
+            <DialogTitle>Edit angle</DialogTitle>
             <DialogDescription>
-              Update the angle JSON before approving. IDs must remain stable so downstream assets can link correctly.
+              Update angle and variant details. IDs are locked so downstream assets can link correctly.
             </DialogDescription>
             {editingSpec ? (
               <div className="text-sm text-content-muted">
@@ -1065,27 +1423,218 @@ export function CampaignDetailPage() {
               </div>
             ) : null}
           </div>
-          <div className="mt-4 space-y-2">
-            <label className="text-sm font-semibold text-content">Angle JSON</label>
-            <textarea
-              rows={16}
-              value={editingJson}
-              onChange={(e) => {
-                setEditingJson(e.target.value);
-                setEditingError(null);
-              }}
-              className={cn(
-                "w-full rounded-md border border-border bg-surface px-3 py-2 text-base text-content",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-              )}
-            />
-            {editingError ? <div className="text-sm text-danger">{editingError}</div> : null}
-          </div>
+
+          {editingError ? (
+            <div className="mt-4 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+              {editingError}
+            </div>
+          ) : null}
+
+          {editingDraft ? (
+            <div className="mt-4 max-h-[70vh] space-y-6 overflow-y-auto pr-1">
+              <div className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-content">Angle name</label>
+                    <Input
+                      value={editingDraft.name}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditingDraft((prev) => (prev ? { ...prev, name: value } : prev));
+                        setEditingError(null);
+                      }}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-content">Metrics (one per line)</label>
+                    <Textarea
+                      rows={4}
+                      value={editingDraft.metricIdsText}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditingDraft((prev) => (prev ? { ...prev, metricIdsText: value } : prev));
+                        setEditingError(null);
+                      }}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-content">Hypothesis</label>
+                  <Textarea
+                    rows={3}
+                    value={editingDraft.hypothesis}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setEditingDraft((prev) => (prev ? { ...prev, hypothesis: value } : prev));
+                      setEditingError(null);
+                    }}
+                  />
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-content">Sample size</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={editingDraft.sampleSizeEstimateText}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditingDraft((prev) => (prev ? { ...prev, sampleSizeEstimateText: value } : prev));
+                        setEditingError(null);
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-content">Duration (days)</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={editingDraft.durationDaysText}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditingDraft((prev) => (prev ? { ...prev, durationDaysText: value } : prev));
+                        setEditingError(null);
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-content">Budget</label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={editingDraft.budgetEstimateText}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setEditingDraft((prev) => (prev ? { ...prev, budgetEstimateText: value } : prev));
+                        setEditingError(null);
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="text-sm font-semibold text-content">Variants</div>
+                  <div className="text-xs text-content-muted">Variant IDs are locked.</div>
+                </div>
+                <div className="space-y-3">
+                  {editingDraft.variants.map((variant) => (
+                    <div key={variant.id} className="rounded-xl bg-muted p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="text-sm font-semibold text-content">
+                          Variant: {variant.name || variant.id}
+                        </div>
+                        <div className="text-xs font-mono text-content-muted">{variant.id}</div>
+                      </div>
+
+                      <div className="mt-3 grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-content">Name</label>
+                          <Input
+                            value={variant.name}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setEditingDraft((prev) => {
+                                if (!prev) return prev;
+                                return {
+                                  ...prev,
+                                  variants: prev.variants.map((item) =>
+                                    item.id === variant.id ? { ...item, name: value } : item
+                                  ),
+                                };
+                              });
+                              setEditingError(null);
+                            }}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-semibold text-content">Channels (one per line)</label>
+                          <Textarea
+                            rows={3}
+                            value={variant.channelsText}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setEditingDraft((prev) => {
+                                if (!prev) return prev;
+                                return {
+                                  ...prev,
+                                  variants: prev.variants.map((item) =>
+                                    item.id === variant.id ? { ...item, channelsText: value } : item
+                                  ),
+                                };
+                              });
+                              setEditingError(null);
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        <label className="text-sm font-semibold text-content">Description</label>
+                        <Textarea
+                          rows={3}
+                          value={variant.description}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setEditingDraft((prev) => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                variants: prev.variants.map((item) =>
+                                  item.id === variant.id ? { ...item, description: value } : item
+                                ),
+                              };
+                            });
+                            setEditingError(null);
+                          }}
+                        />
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        <label className="text-sm font-semibold text-content">Guardrails (one per line)</label>
+                        <Textarea
+                          rows={3}
+                          value={variant.guardrailsText}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            setEditingDraft((prev) => {
+                              if (!prev) return prev;
+                              return {
+                                ...prev,
+                                variants: prev.variants.map((item) =>
+                                  item.id === variant.id ? { ...item, guardrailsText: value } : item
+                                ),
+                              };
+                            });
+                            setEditingError(null);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+              No angle loaded for editing.
+            </div>
+          )}
+
           <div className="mt-4 flex items-center justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSaveSpec} disabled={updateExperimentSpecs.isPending}>
+            <Button size="sm" onClick={handleSaveSpec} disabled={updateExperimentSpecs.isPending || !editingDraft}>
               {updateExperimentSpecs.isPending ? "Saving…" : "Save"}
             </Button>
           </div>

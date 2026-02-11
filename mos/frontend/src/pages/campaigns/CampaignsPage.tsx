@@ -14,7 +14,10 @@ import { cn } from "@/lib/utils";
 import type { Campaign } from "@/types/common";
 
 const CHANNEL_OPTIONS = [{ value: "facebook", label: "Facebook Ads" }];
-const ASSET_BRIEF_OPTIONS = [{ value: "image", label: "Image" }];
+const ASSET_BRIEF_OPTIONS = [
+  { value: "image", label: "Image" },
+  { value: "video", label: "Video" },
+];
 const DEFAULT_CHANNELS = ["facebook"];
 const DEFAULT_ASSET_BRIEF_TYPES = ["image"];
 
@@ -197,7 +200,11 @@ export function CampaignsPage() {
         ) : (
           <ul className="divide-y divide-border">
             {campaigns.map((c) => (
-              <li key={c.id} className="px-4 py-3">
+              <li
+                key={c.id}
+                className="group cursor-pointer px-4 py-3 transition hover:bg-surface-hover"
+                onClick={() => navigate(`/campaigns/${c.id}`)}
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div className="space-y-1">
                     <div className="font-semibold text-content">{c.name}</div>
@@ -208,7 +215,14 @@ export function CampaignsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => navigate(`/campaigns/${c.id}`)}>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        navigate(`/campaigns/${c.id}`);
+                      }}
+                    >
                       Open
                     </Button>
                   </div>

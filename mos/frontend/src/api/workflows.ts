@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
-import type { ActivityLog, WorkflowDetail, WorkflowRun } from "@/types/common";
+import type { ActivityLog, ResearchArtifactRef, WorkflowDetail, WorkflowRun } from "@/types/common";
 import { toast } from "@/components/ui/toast";
 
 export function useWorkflows(filters?: { clientId?: string; productId?: string; campaignId?: string }) {
@@ -35,6 +35,22 @@ export function useWorkflowDetail(workflowId?: string) {
     queryKey: ["workflows", workflowId, "detail"],
     queryFn: () => get(`/workflows/${workflowId}`),
     enabled: Boolean(workflowId),
+  });
+}
+
+export type WorkflowResearchArtifact = ResearchArtifactRef & { content: string };
+
+export function useWorkflowResearchArtifact(
+  workflowId?: string,
+  stepKey?: string,
+  opts?: { enabled?: boolean },
+) {
+  const { get } = useApiClient();
+  const enabled = Boolean(workflowId && stepKey) && (opts?.enabled ?? true);
+  return useQuery<WorkflowResearchArtifact>({
+    queryKey: ["workflows", workflowId, "research", stepKey],
+    queryFn: () => get(`/workflows/${workflowId}/research/${stepKey}`),
+    enabled,
   });
 }
 

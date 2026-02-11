@@ -3,7 +3,7 @@ import { ArrowLeft, Copy, ExternalLink } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { useWorkflowDetail } from "@/api/workflows";
+import { useWorkflowDetail, useWorkflowResearchArtifact } from "@/api/workflows";
 import type { ResearchArtifactRef } from "@/types/common";
 import { MarkdownViewer } from "@/components/ui/MarkdownViewer";
 
@@ -39,20 +39,38 @@ export function ResearchDetailPage() {
     return isCanonArtifactRef(match) ? match : undefined;
   }, [data?.precanon_research, stepKey]);
 
-  const stepSummaries = (data?.precanon_research?.step_summaries as Record<string, string> | undefined) || {};
-  const stepContents = (data?.precanon_research?.step_contents as Record<string, string> | undefined) || {};
+  const precanonResearch = data?.precanon_research as Record<string, unknown> | null | undefined;
+  const stepSummaries =
+    ((precanonResearch?.step_summaries ||
+      (precanonResearch as { stepSummaries?: unknown } | null | undefined)?.stepSummaries) as
+      | Record<string, string>
+      | undefined) || {};
+  const stepContents =
+    ((precanonResearch?.step_contents ||
+      (precanonResearch as { stepContents?: unknown } | null | undefined)?.stepContents) as
+      | Record<string, string>
+      | undefined) || {};
 
   const resolvedStepKey = stepKey || "";
-  const resolvedTitle = (artifact?.title || canonArtifactRef?.title || "").trim();
-  const hasTitle = Boolean(resolvedTitle);
-  const summary = artifact?.summary || stepSummaries[resolvedStepKey] || "";
-  const content = artifact?.content || stepContents[resolvedStepKey] || "";
-  const docUrl = artifact?.doc_url || canonArtifactRef?.doc_url;
+  const inlineContent = artifact?.content || stepContents[resolvedStepKey] || "";
+  const hasInlineContent = Boolean(inlineContent.trim());
 
-  const hasContent = Boolean(content?.trim());
-  const displayContent = hasContent ? content : summary;
-  const hasDisplayContent = Boolean(displayContent?.trim());
-  const exists = Boolean(artifact || hasContent || summary?.trim() || docUrl);
+  const shouldFetchFullContent = Boolean(workflowId && resolvedStepKey && !hasInlineContent);
+  const {
+    data: fullArtifact,
+    isLoading: isFullLoading,
+    isError: isFullError,
+    error: fullError,
+  } = useWorkflowResearchArtifact(workflowId, resolvedStepKey, { enabled: shouldFetchFullContent });
+
+  const fullContent = hasInlineContent ? inlineContent : fullArtifact?.content || "";
+  const hasFullContent = Boolean(fullContent.trim());
+
+  const docUrl = artifact?.doc_url || canonArtifactRef?.doc_url || fullArtifact?.doc_url;
+  const resolvedTitle = (artifact?.title || canonArtifactRef?.title || fullArtifact?.title || "").trim();
+  const hasTitle = Boolean(resolvedTitle);
+  const summary = artifact?.summary || stepSummaries[resolvedStepKey] || fullArtifact?.summary || "";
+  const exists = Boolean(artifact || canonArtifactRef || hasFullContent || summary?.trim() || docUrl);
   const missingTitle = Boolean(!isLoading && exists && !hasTitle);
 
   useEffect(() => {
@@ -64,8 +82,8 @@ export function ResearchDetailPage() {
   }, []);
 
   const handleCopyContent = async () => {
-    if (!hasDisplayContent) return;
-    const text = displayContent?.trim();
+    if (!hasFullContent) return;
+    const text = fullContent?.trim();
     if (!text) return;
     try {
       await navigator?.clipboard?.writeText(text);
@@ -97,9 +115,9 @@ export function ResearchDetailPage() {
               : `Step ${resolvedStepKey || "—"} • Full research output captured during pre-canon.`
           }
           actions={
-            hasDisplayContent || docUrl ? (
+            hasFullContent || docUrl ? (
               <div className="flex items-center gap-2">
-                {hasDisplayContent ? (
+                {hasFullContent ? (
                   <Button
                     type="button"
                     variant="ghost"
@@ -148,14 +166,22 @@ export function ResearchDetailPage() {
           <div className="ds-card ds-card--md text-sm text-danger">
             Missing research document title for step {resolvedStepKey || "—"}.
           </div>
+        ) : shouldFetchFullContent && isFullLoading ? (
+          <div className="ds-card ds-card--md text-sm text-content-muted">Loading full document…</div>
+        ) : shouldFetchFullContent && isFullError ? (
+          <div className="ds-card ds-card--md text-sm text-danger">
+            {typeof (fullError as { message?: unknown } | undefined)?.message === "string"
+              ? (fullError as { message: string }).message
+              : "Failed to load the full document content."}
+          </div>
         ) : (
           <div className="space-y-4">
-            {hasDisplayContent ? (
-              <MarkdownViewer content={displayContent} />
+            {hasFullContent ? (
+              <MarkdownViewer content={fullContent} />
             ) : (
               <div className="mx-auto w-full max-w-[75ch] ds-card ds-card--md ds-card--empty text-sm">
                 {docUrl
-                  ? "No inline content available. Open the linked doc to view the full file."
+                  ? "Full document content is not available inline. Open the linked doc to view the full file."
                   : "No content captured for this step."}
               </div>
             )}

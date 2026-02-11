@@ -22,6 +22,7 @@ from app.db.repositories.design_systems import DesignSystemsRepository
 from app.services.design_systems import resolve_design_system_tokens
 
 
+
 @activity.defn
 def create_campaign_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     org_id = params["org_id"]
@@ -87,6 +88,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     idea_workspace_id = params.get("idea_workspace_id")
     actor_user_id = params.get("actor_user_id") or "workflow"
     generate_ai_drafts = bool(params.get("generate_ai_drafts", False))
+    generate_testimonials = bool(params.get("generate_testimonials", False))
     workflow_run_id = params.get("workflow_run_id")
 
     def log_activity(step: str, status: str, *, payload_in=None, payload_out=None, error: str | None = None) -> None:
@@ -255,8 +257,6 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         current_puck_data=puck_data,
                         template_id=template_id,
                         idea_workspace_id=idea_workspace_id,
-                        generate_images=True,
-                        max_images=0,
                     )
                     draft_version_id = result.get("draftVersionId") or ""
                     generated_images = result.get("generatedImages") or []
@@ -293,36 +293,47 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         },
                     )
 
-                log_activity(
-                    "funnel_page_testimonials",
-                    "started",
-                    payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
-                )
-                try:
-                    generate_funnel_page_testimonials(
-                        session=session,
-                        org_id=org_id,
-                        user_id=str(actor_user_id),
-                        funnel_id=str(funnel.id),
-                        page_id=str(page.id),
-                        draft_version_id=draft_version_id,
-                        template_id=template_id,
-                        idea_workspace_id=idea_workspace_id,
-                        synthetic=True,
-                    )
-                except Exception as exc:  # noqa: BLE001
+                if generate_testimonials:
                     log_activity(
                         "funnel_page_testimonials",
-                        "failed",
-                        error=str(exc),
+                        "started",
                         payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
                     )
-                    raise
+                    try:
+                        generate_funnel_page_testimonials(
+                            session=session,
+                            org_id=org_id,
+                            user_id=str(actor_user_id),
+                            funnel_id=str(funnel.id),
+                            page_id=str(page.id),
+                            draft_version_id=draft_version_id,
+                            template_id=template_id,
+                            idea_workspace_id=idea_workspace_id,
+                            synthetic=True,
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        log_activity(
+                            "funnel_page_testimonials",
+                            "failed",
+                            error=str(exc),
+                            payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
+                        )
+                        raise
+                    else:
+                        log_activity(
+                            "funnel_page_testimonials",
+                            "completed",
+                            payload_out={"page_id": str(page.id), "funnel_id": str(funnel.id)},
+                        )
                 else:
                     log_activity(
                         "funnel_page_testimonials",
-                        "completed",
-                        payload_out={"page_id": str(page.id), "funnel_id": str(funnel.id)},
+                        "skipped",
+                        payload_in={
+                            "page_id": str(page.id),
+                            "funnel_id": str(funnel.id),
+                            "reason": "Synthetic testimonials require explicit authorization; generation disabled by default.",
+                        },
                     )
 
         if created_pages:
@@ -392,6 +403,9 @@ Instructions:
 - Align copy and structure to the experiment variant angle.
 - Use brand voice, constraints, and claims from the attached context documents.
 - Keep claims compliant and avoid medical promises.
+- Do NOT invent product facts or policy specifics (warranty length, return window, price, FDA status, clinical study outcomes, time-to-results, session length, brightness levels).
+- Do NOT include any numbers anywhere unless the number is explicitly present in the attached product/offer context (if absent, rewrite without numbers).
+- If the base template contains numeric placeholders (review counts, star ratings, trial durations, discounts), remove or replace them with non-numeric phrasing.
 - Provide concrete, conversion-focused copy for the template sections.
 """
 
@@ -408,6 +422,7 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
     idea_workspace_id = params.get("idea_workspace_id")
     actor_user_id = params.get("actor_user_id") or "workflow"
     generate_ai_drafts = bool(params.get("generate_ai_drafts", False))
+    generate_testimonials = bool(params.get("generate_testimonials", False))
     temporal_workflow_id = params.get("temporal_workflow_id")
     temporal_run_id = params.get("temporal_run_id")
 
@@ -451,11 +466,19 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
         strategy = artifacts_repo.get_latest_by_type_for_campaign(
             org_id=org_id, campaign_id=campaign_id, artifact_type=ArtifactTypeEnum.strategy_sheet
         )
+        briefs_artifact = artifacts_repo.get_latest_by_type_for_campaign(
+            org_id=org_id, campaign_id=campaign_id, artifact_type=ArtifactTypeEnum.asset_brief
+        )
 
     if not strategy:
         raise ValueError("Strategy sheet not found for funnel generation")
 
     strategy_sheet = strategy.data if isinstance(strategy.data, dict) else {}
+    asset_briefs_all: list[dict[str, Any]] = []
+    if briefs_artifact and isinstance(briefs_artifact.data, dict):
+        raw_briefs = briefs_artifact.data.get("asset_briefs") or []
+        if isinstance(raw_briefs, list):
+            asset_briefs_all = [b for b in raw_briefs if isinstance(b, dict)]
 
     results = []
     for experiment in experiment_specs:
@@ -491,6 +514,11 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
                 },
             )
             try:
+                matching_briefs = [
+                    b
+                    for b in asset_briefs_all
+                    if b.get("experimentId") == experiment_id and b.get("variantId") == variant_id
+                ]
                 funnel_result = create_funnel_drafts_activity(
                     {
                         "org_id": org_id,
@@ -503,10 +531,11 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
                         "experiment": experiment,
                         "variant": variant,
                         "strategy_sheet": strategy_sheet,
-                        "asset_briefs": [],
+                        "asset_briefs": matching_briefs,
                         "idea_workspace_id": idea_workspace_id,
                         "actor_user_id": actor_user_id,
                         "generate_ai_drafts": generate_ai_drafts,
+                        "generate_testimonials": generate_testimonials,
                         "workflow_run_id": workflow_run_id,
                     }
                 )

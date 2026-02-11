@@ -82,22 +82,44 @@ class TestCampaignWorkflow:
             },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
-        brief_id = briefs.get("asset_brief_ids", [None])[0]
+        brief_ids = briefs.get("asset_brief_ids") if isinstance(briefs, dict) else None
+        if not isinstance(brief_ids, list) or not brief_ids:
+            raise RuntimeError("Asset brief generation returned no asset_brief_ids.")
+        brief_id = brief_ids[0]
 
         assets = await workflow.execute_activity(
             generate_assets_for_brief_activity,
-            {"org_id": input.org_id, "client_id": input.client_id, "campaign_id": None, "asset_brief_id": brief_id},
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "product_id": input.product_id,
+                "asset_brief_id": brief_id,
+            },
             schedule_to_close_timeout=timedelta(minutes=5),
         )
+        asset_ids = assets.get("asset_ids") if isinstance(assets, dict) else []
 
         brand_qa = await workflow.execute_activity(
             run_brand_qa_activity,
-            {"org_id": input.org_id, "client_id": input.client_id, "campaign_id": None, "asset_brief_id": brief_id, "assets": assets},
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "asset_brief_id": brief_id,
+                "assets": [{"asset_id": asset_id} for asset_id in asset_ids],
+            },
             schedule_to_close_timeout=timedelta(minutes=2),
         )
         compliance_qa = await workflow.execute_activity(
             run_compliance_qa_activity,
-            {"org_id": input.org_id, "client_id": input.client_id, "campaign_id": None, "asset_brief_id": brief_id, "assets": assets},
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "campaign_id": None,
+                "asset_brief_id": brief_id,
+                "assets": [{"asset_id": asset_id} for asset_id in asset_ids],
+            },
             schedule_to_close_timeout=timedelta(minutes=2),
         )
 
@@ -107,7 +129,7 @@ class TestCampaignWorkflow:
             "strategy_sheet": strategy,
             "experiment_specs": experiments.get("experiment_specs", []),
             "asset_brief_id": brief_id,
-            "assets": assets,
+            "asset_ids": asset_ids,
             "brand_qa": brand_qa,
             "compliance_qa": compliance_qa,
         }

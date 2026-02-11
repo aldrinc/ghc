@@ -10,10 +10,12 @@ from app.db.deps import get_session
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum
+from app.db.models import WorkflowRun
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.products import ProductsRepository
 from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
+from app.schemas.creative_production import CreativeProductionRequest
 from app.schemas.experiment_spec import ExperimentSpecSet, ExperimentSpecsUpdateRequest
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.campaign_planning import CampaignPlanningInput, CampaignPlanningWorkflow
@@ -21,6 +23,7 @@ from app.temporal.workflows.campaign_funnel_generation import (
     CampaignFunnelGenerationInput,
     CampaignFunnelGenerationWorkflow,
 )
+from app.temporal.workflows.creative_production import CreativeProductionInput, CreativeProductionWorkflow
 
 
 def _validate_planning_prereqs(
@@ -43,13 +46,7 @@ def _validate_planning_prereqs(
         product_id=product_id,
         artifact_type=ArtifactTypeEnum.metric_schema,
     )
-    wf_repo = WorkflowsRepository(session)
-    approvals_ok = wf_repo.has_onboarding_approvals(
-        org_id=org_id,
-        client_id=client_id,
-        product_id=product_id,
-    )
-    if (not canon or not metric) and not approvals_ok:
+    if not canon or not metric:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Complete client onboarding (canon + metric schema) before starting campaign planning.",
@@ -282,6 +279,7 @@ async def generate_campaign_funnels(
             campaign_id=str(campaign.id),
             experiment_ids=payload.experimentIds,
             funnel_name_prefix=f"{campaign.name} Funnel",
+            generate_testimonials=bool(payload.generateTestimonials),
         ),
         id=f"campaign-funnels-{auth.org_id}-{campaign_id}-{uuid4()}",
         task_queue=settings.TEMPORAL_TASK_QUEUE,
@@ -306,6 +304,105 @@ async def generate_campaign_funnels(
             "product_id": str(campaign.product_id),
             "experiment_ids": payload.experimentIds,
         },
+    )
+
+    return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}
+
+
+@router.post("/{campaign_id}/creative/produce")
+async def start_creative_production(
+    campaign_id: str,
+    payload: CreativeProductionRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = CampaignsRepository(session)
+    campaign = repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    if not campaign.product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign is missing a product_id. Attach a product before starting creative production.",
+        )
+
+    asset_brief_ids = payload.asset_brief_ids
+    artifacts_repo = ArtifactsRepository(session)
+    brief_artifacts = artifacts_repo.list(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        campaign_id=str(campaign.id),
+        artifact_type=ArtifactTypeEnum.asset_brief,
+        limit=200,
+    )
+    brief_map: dict[str, dict] = {}
+    for art in brief_artifacts:
+        data = art.data if isinstance(art.data, dict) else {}
+        briefs = data.get("asset_briefs") or data.get("assetBriefs") or []
+        if not isinstance(briefs, list):
+            continue
+        for brief in briefs:
+            if not isinstance(brief, dict):
+                continue
+            brief_id = brief.get("id")
+            if isinstance(brief_id, str) and brief_id.strip():
+                # Keep the first-seen (latest artifact list is already newest-first).
+                brief_map.setdefault(brief_id.strip(), brief)
+
+    missing = [brief_id for brief_id in asset_brief_ids if brief_id not in brief_map]
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"message": "Some asset briefs were not found.", "missingAssetBriefIds": missing},
+        )
+
+    temporal = await get_temporal_client()
+    temporal_workflow_id = f"creative-production-{auth.org_id}-{campaign_id}-{uuid4()}"
+
+    wf_repo = WorkflowsRepository(session)
+    run = WorkflowRun(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        product_id=str(campaign.product_id),
+        campaign_id=str(campaign.id),
+        temporal_workflow_id=temporal_workflow_id,
+        temporal_run_id="pending",
+        kind="creative_production",
+    )
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+
+    try:
+        handle = await temporal.start_workflow(
+            CreativeProductionWorkflow.run,
+            CreativeProductionInput(
+                org_id=auth.org_id,
+                client_id=str(campaign.client_id),
+                product_id=str(campaign.product_id),
+                campaign_id=str(campaign.id),
+                asset_brief_ids=asset_brief_ids,
+                workflow_run_id=str(run.id),
+            ),
+            id=temporal_workflow_id,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+        )
+    except Exception as exc:  # noqa: BLE001
+        session.delete(run)
+        session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to start creative production workflow.",
+        ) from exc
+
+    run.temporal_run_id = handle.first_execution_run_id
+    session.commit()
+
+    wf_repo.log_activity(
+        workflow_run_id=str(run.id),
+        step="creative_production",
+        status="started",
+        payload_in={"campaign_id": str(campaign.id), "asset_brief_ids": asset_brief_ids},
     )
 
     return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}
