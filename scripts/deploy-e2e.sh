@@ -56,7 +56,7 @@ cat >"${PLAN_FILE}" <<'JSON'
             },
             "service_config": {
               "command": "npm run start",
-              "environment": {},
+              "environment": {"PORT":"3000"},
               "ports": [
                 3000
               ]
@@ -80,7 +80,7 @@ request_post() {
   local data="$2"
   curl --fail-with-body --silent --show-error \
     --request POST "${url}" \
-    --header "Authorization: Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18zNmlRenNVb25UN2VXS3RSNXZJNkthelkxU0EiLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL21vc2hxLmFwcCIsImV4cCI6MTc3MDg0MTU1NSwiaWF0IjoxNzcwODQxNDk1LCJpc3MiOiJodHRwczovL2ltbXVuZS10dXJ0bGUtNzkuY2xlcmsuYWNjb3VudHMuZGV2IiwianRpIjoiMmZiOThlMTIxNThjY2IwYjhmYmEiLCJuYmYiOjE3NzA4NDE0OTAsIm9yZ19pZCI6Im9yZ18zNmliN1JxNU5pc2JHR1FDcDU0cmJRQTRCaEsiLCJzdWIiOiJ1c2VyXzM2aVRNdENsbmtTZGNSQkRGdXF2Y0Q3MkR3dCJ9.GotAv9T5L2igjRO0EjS6y7_HXF30a2-U-ILJJc1-vBnvcC4AGSW2dvk88mYC13b8p18v59rPp1zoxkT_8dr-1zMIF54t6GLFusjvYpNf-w7hs9DH_mRYQ3D3aSEjoMLQw2twY7zsFHegz8Ii9o0Vl9RzHy1fPk7_a4MXsbs_yaA_PsE0l3KN9s-b8-jz98E-_pqY1H_vocGYLdzsLbBVVcQgQ2BwTW9XkpWuORYA20qlivw90hOqTnvgciJB0NBw8dgd9oy6NM1gCkVGmYqqCOPOB4SDiXm_KfHvu60zN_fesZ6XzEiK6CFqvwOt_Gki9_rh-QGMniw2sQA7GFw5Ew" \
+    --header "Authorization: Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18zNmlRenNVb25UN2VXS3RSNXZJNkthelkxU0EiLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL21vc2hxLmFwcCIsImV4cCI6MTc3MDg0MjA0MiwiaWF0IjoxNzcwODQxOTgyLCJpc3MiOiJodHRwczovL2ltbXVuZS10dXJ0bGUtNzkuY2xlcmsuYWNjb3VudHMuZGV2IiwianRpIjoiZDJiZWRmMmIxMWQwMjVmNThiYzYiLCJuYmYiOjE3NzA4NDE5NzcsIm9yZ19pZCI6Im9yZ18zNmliN1JxNU5pc2JHR1FDcDU0cmJRQTRCaEsiLCJzdWIiOiJ1c2VyXzM2aVRNdENsbmtTZGNSQkRGdXF2Y0Q3MkR3dCJ9.spFHDb9bZOrG5vnhz0d7Djw19ufrH746-T4j0yI8kxTm-moxctPMz1Q_FCzbwjjpo9S2yhQ7R1-of9yd6dSNaNly0gnfBkJ_uw1QQf2d5zFXxXu1GndP5soaDk7xWxyLOSPA6HzbP1ZYRRFdUgslm4QOiZj8BB6XXnFZfiMsQEGm1GNc0-GdQaaZvFs97gZfXf9WMxMLrNN1XEuLSkB9iwLntUANwYCQ4bY378NBsPEEmcCCVQZmOMcyrapf3k-Od04MCHyE3UxWYMy9HG41enfyBvqyEzBE2oTayoTMKbTrYa9jc5S8yZvZGj8I-3e9zoW6kk1oRoNLs14aGldyhg" \
     --header "Content-Type: application/json" \
     --data "${data}"
 }
