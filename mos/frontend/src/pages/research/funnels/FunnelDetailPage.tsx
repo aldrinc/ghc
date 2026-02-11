@@ -37,6 +37,8 @@ export function FunnelDetailPage() {
   const [isPageModalOpen, setIsPageModalOpen] = useState(false);
   const [pageName, setPageName] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [publishServerNamesInput, setPublishServerNamesInput] = useState(deployServerNames.join(", "));
 
   const pageOptions = useMemo(() => {
     return funnel?.pages?.map((p) => ({ label: `${p.name} (${p.slug})`, value: p.id })) || [];
@@ -80,7 +82,7 @@ export function FunnelDetailPage() {
 
   const publicBase = funnel?.public_id ? `/f/${funnel.public_id}` : null;
 
-  const handlePublish = () => {
+  const handlePublish = async (serverNames: string[]) => {
     if (!funnelId || !funnel) return;
     const payload: {
       deploy: {
@@ -103,11 +105,34 @@ export function FunnelDetailPage() {
 
     if (deployPlanPath) payload.deploy.planPath = deployPlanPath;
     if (deployInstanceName) payload.deploy.instanceName = deployInstanceName;
-    if (deployServerNames.length > 0) payload.deploy.serverNames = deployServerNames;
+    if (serverNames.length > 0) payload.deploy.serverNames = serverNames;
     if (deployUpstreamBaseUrl) payload.deploy.upstreamBaseUrl = deployUpstreamBaseUrl;
     if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
 
-    publish.mutate({ funnelId, payload });
+    await publish.mutateAsync({ funnelId, payload });
+  };
+
+  const openPublishModal = () => {
+    setPublishServerNamesInput(deployServerNames.join(", "));
+    setIsPublishModalOpen(true);
+  };
+
+  const handlePublishSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const serverNames = Array.from(
+      new Set(
+        publishServerNamesInput
+          .split(",")
+          .map((value: string) => value.trim())
+          .filter((value: string) => value.length > 0)
+      )
+    );
+    try {
+      await handlePublish(serverNames);
+      setIsPublishModalOpen(false);
+    } catch {
+      // toast is handled by the mutation hook
+    }
   };
 
   return (
@@ -122,7 +147,7 @@ export function FunnelDetailPage() {
             </Button>
             <Button
               size="sm"
-              onClick={handlePublish}
+              onClick={openPublishModal}
               disabled={!funnel?.canPublish || publish.isPending}
             >
               {publish.isPending ? "Publishing…" : "Publish + Deploy"}
@@ -329,6 +354,38 @@ export function FunnelDetailPage() {
               </DialogClose>
               <Button type="submit" disabled={!pageName.trim() || createPage.isPending}>
                 {createPage.isPending ? "Creating…" : "Create page"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogRoot>
+
+      <DialogRoot open={isPublishModalOpen} onOpenChange={setIsPublishModalOpen}>
+        <DialogContent>
+          <DialogTitle>Publish + Deploy</DialogTitle>
+          <DialogDescription>
+            Enter one or more domains to bind this deploy (comma separated). Leave blank for catch-all HTTP.
+          </DialogDescription>
+          <form className="space-y-3" onSubmit={handlePublishSubmit}>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Deploy domains</label>
+              <Input
+                placeholder="landing.example.com, www.landing.example.com"
+                value={publishServerNamesInput}
+                onChange={(e) => setPublishServerNamesInput(e.target.value)}
+              />
+              <div className="text-xs text-content-muted">
+                Empty input deploys without host-specific TLS (HTTP catch-all).
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <DialogClose asChild>
+                <Button type="button" variant="secondary" disabled={publish.isPending}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={publish.isPending}>
+                {publish.isPending ? "Publishing…" : "Publish"}
               </Button>
             </div>
           </form>
