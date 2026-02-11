@@ -253,10 +253,6 @@ WantedBy=multi-user.target
             raise ValueError("source_ref is required when source_type='funnel_publication'.")
 
         server_names = self._normalize_server_names(app.service_config.server_names)
-        if not server_names:
-            raise ValueError(
-                f"Workload '{app.name}' with source_type='funnel_publication' requires service_config.server_names."
-            )
         server_name_line = self._server_name_directive(server_names)
 
         public_id = source.public_id

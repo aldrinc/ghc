@@ -160,12 +160,12 @@ def build_funnel_publication_workload_patch(
             continue
         seen_server_names.add(hostname)
         normalized_server_names.append(hostname)
-    if not normalized_server_names:
-        raise DeployError("Deploy serverNames must include at least one hostname.")
 
     destination = destination_path.strip()
     if not destination:
         raise DeployError("Deploy destinationPath must be non-empty.")
+
+    https_enabled = https and bool(normalized_server_names)
 
     return {
         "name": name,
@@ -187,7 +187,7 @@ def build_funnel_publication_workload_patch(
             "environment": {},
             "ports": [],
             "server_names": normalized_server_names,
-            "https": https,
+            "https": https_enabled,
         },
         "destination_path": destination,
     }

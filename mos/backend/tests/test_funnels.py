@@ -345,8 +345,29 @@ def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitte
     assert workload_patch["service_config"]["server_names"] == ["offers.example.com"]
 
 
-def test_publish_with_deploy_errors_when_server_names_unavailable(api_client: TestClient):
+def test_publish_with_deploy_allows_no_server_names(api_client: TestClient, monkeypatch):
     funnel_id, _ = _create_publish_ready_funnel(api_client, funnel_name="Missing Domain Deploy Funnel")
+
+    captured: dict[str, object] = {}
+
+    def fake_patch_workload_in_plan(
+        *,
+        workload_patch,
+        plan_path=None,
+        instance_name=None,
+        create_if_missing=False,
+        in_place=False,
+    ):
+        captured["workload_patch"] = workload_patch
+        return {
+            "status": "ok",
+            "base_plan_path": "/tmp/plan-base.json",
+            "updated_plan_path": "/tmp/plan-updated.json",
+            "workload_name": workload_patch["name"],
+            "updated_count": 1,
+        }
+
+    monkeypatch.setattr(deploy_service, "patch_workload_in_plan", fake_patch_workload_in_plan)
 
     resp = api_client.post(
         f"/funnels/{funnel_id}/publish",
@@ -359,5 +380,8 @@ def test_publish_with_deploy_errors_when_server_names_unavailable(api_client: Te
             }
         },
     )
-    assert resp.status_code == 400
-    assert "Deploy server names are required" in resp.json()["detail"]
+    assert resp.status_code == 201
+
+    workload_patch = captured["workload_patch"]
+    assert workload_patch["service_config"]["server_names"] == []
+    assert workload_patch["service_config"]["https"] is False
