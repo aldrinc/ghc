@@ -5,19 +5,19 @@ import { cn } from "@/lib/utils";
 export const FormRoot = Form;
 
 export const FieldRoot = ({ className, ...props }: Field.Root.Props) => (
-  <Field.Root {...props} className={cn("flex flex-col gap-1 text-sm text-content", className)} />
+  <Field.Root {...props} className={cn("flex flex-col gap-2 text-sm text-content", className)} />
 );
 
 export const FieldLabel = ({ className, ...props }: Field.Label.Props) => (
-  <Field.Label {...props} className={cn("text-content font-medium", className)} />
+  <Field.Label {...props} className={cn("text-content font-medium leading-tight", className)} />
 );
 
 export const FieldDescription = ({ className, ...props }: Field.Description.Props) => (
-  <Field.Description {...props} className={cn("text-xs text-content-muted", className)} />
+  <Field.Description {...props} className={cn("-mt-1 text-xs text-content-muted leading-tight", className)} />
 );
 
 export const FieldError = ({ className, ...props }: Field.Error.Props) => (
-  <Field.Error {...props} className={cn("text-xs text-danger", className)} />
+  <Field.Error {...props} className={cn("-mt-1 text-xs text-danger leading-tight", className)} />
 );
 
 export const FieldControl = Field.Control;

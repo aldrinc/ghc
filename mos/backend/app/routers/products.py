@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
 from fastapi.encoders import jsonable_encoder
@@ -8,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
+from app.config import settings
 from app.db.deps import get_session
 from app.db.repositories.assets import AssetsRepository
 from app.db.models import Asset
@@ -84,6 +86,15 @@ def _serialize_product_asset(asset, primary_asset_id: str | None, storage: Media
         data["download_url"] = None
     data["is_primary"] = bool(primary_asset_id and str(asset.id) == primary_asset_id)
     return data
+
+
+def _is_asset_active(asset: Asset, *, now: datetime) -> bool:
+    expires_at = getattr(asset, "expires_at", None)
+    if expires_at is None:
+        return True
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at > now
 
 
 @router.get("")
@@ -188,9 +199,41 @@ def get_product(
             storage = MediaStorage()
             primary_asset_url = storage.presign_get(bucket=storage.bucket, key=asset.storage_key)
 
+    assets_repo = AssetsRepository(session)
+    now = datetime.now(timezone.utc)
+    product_assets = [
+        asset
+        for asset in assets_repo.list(org_id=auth.org_id, product_id=str(product.id))
+        if _is_asset_active(asset, now=now)
+    ]
+    primary_asset_id = str(product.primary_asset_id) if product.primary_asset_id else None
+    storage = MediaStorage() if product_assets else None
+    serialized_assets = (
+        [_serialize_product_asset(asset, primary_asset_id, storage) for asset in product_assets]
+        if storage is not None
+        else []
+    )
+
+    max_assets_per_brief = int(settings.CREATIVE_SERVICE_ASSETS_PER_BRIEF or 6)
+    grouped_by_brief: dict[str, list[dict]] = {}
+    for idx, asset in enumerate(product_assets):
+        metadata = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
+        brief_id = metadata.get("assetBriefId")
+        if not isinstance(brief_id, str) or not brief_id.strip():
+            continue
+        group = grouped_by_brief.setdefault(brief_id, [])
+        if len(group) >= max_assets_per_brief:
+            continue
+        group.append(serialized_assets[idx])
+
     return {
         **jsonable_encoder(product),
         "primary_asset_url": primary_asset_url,
+        "assets": serialized_assets,
+        "creative_brief_assets": [
+            {"assetBriefId": brief_id, "assets": assets}
+            for brief_id, assets in grouped_by_brief.items()
+        ],
         "offers": [
             {
                 **jsonable_encoder(offer),
@@ -213,7 +256,8 @@ def list_product_assets(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     assets_repo = AssetsRepository(session)
-    assets = assets_repo.list(org_id=auth.org_id, product_id=product_id)
+    now = datetime.now(timezone.utc)
+    assets = [asset for asset in assets_repo.list(org_id=auth.org_id, product_id=product_id) if _is_asset_active(asset, now=now)]
     primary_asset_id = str(product.primary_asset_id) if product.primary_asset_id else None
     if not assets:
         return []

@@ -40,10 +40,6 @@ export interface ProductOfferPricePoint {
   option_values?: Record<string, unknown> | null;
 }
 
-export interface ProductDetail extends Product {
-  offers: ProductOffer[];
-}
-
 export interface ProductAsset {
   id: string;
   org_id: string;
@@ -65,6 +61,18 @@ export interface ProductAsset {
   ai_metadata?: Record<string, unknown> | null;
   tags: string[];
   created_at: string;
+  expires_at?: string | null;
   download_url?: string | null;
   is_primary: boolean;
+}
+
+export interface CreativeBriefAssetGroup {
+  assetBriefId: string;
+  assets: ProductAsset[];
+}
+
+export interface ProductDetail extends Product {
+  offers: ProductOffer[];
+  assets: ProductAsset[];
+  creative_brief_assets: CreativeBriefAssetGroup[];
 }
