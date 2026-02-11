@@ -9,6 +9,7 @@ from app.routers import (
     experiments,
     workflows,
     brands,
+    deploy,
 )
 from app.routers import (
     claude,
@@ -36,6 +37,7 @@ __all__ = [
     "swipes",
     "experiments",
     "workflows",
+    "deploy",
     "claude",
     "deep_research",
     "explore",

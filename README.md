@@ -51,3 +51,44 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
 - Auth/org: backend now requires a real Clerk JWT (no dev fallbacks) and expects an organization claim. Create a Clerk JWT template (e.g., `backend`) that includes `org_id: {{organization.id}}` (and optionally slug/role), then set `VITE_CLERK_JWT_TEMPLATE=backend` in `frontend/.env.local`. The frontend forces a fresh token (`skipCache`) so org selection updates immediately. Select an active organization in Clerk so the token contains org context. The backend will auto-create an org row when a new external org_id is seen.
 - CORS: configure `BACKEND_CORS_ORIGINS` (JSON array) in `mos/backend/.env` to match the allowed frontend origins (defaults to localhost/127.0.0.1 on port 5275).
 - Smoke tests: `mos/backend/SMOKE_TESTS.md` lists curl commands with Clerk dev JWTs. Automated API coverage lives in `mos/backend/tests` and runs via `.venv/bin/pytest`.
+
+## MOS deploy integration (Hetzner landing pages)
+
+### What was added
+
+- Cloudhand deploy engine is embedded in the MOS backend under `mos/backend/cloudhand/` and packaged with the backend app.
+- Deploy API routes are mounted under `mos/backend/app/routers/deploy.py`:
+  - `GET /deploy/plans/latest`
+  - `POST /deploy/plans`
+  - `POST /deploy/plans/workloads`
+  - `POST /deploy/plans/apply`
+  - `POST /deploy/apply` (alias)
+- Workload modify/append support is implemented in `patch_workload_in_plan` (`mos/backend/app/services/deploy.py`):
+  - deep-merge by workload `name`
+  - append when `create_if_missing=true`
+- Terraform apply is triggered from MOS API (`mos/backend/app/services/deploy.py`) via:
+  - `python -m cloudhand.cli ... apply ...`
+  - configurable binary via `DEPLOY_TERRAFORM_BIN` (default: `terraform`)
+- Deploy endpoint exposure is constrained to MOS-proxied traffic:
+  - Bearer auth (Clerk token) is required
+  - direct backend-port calls are blocked by loopback proxy check
+- Nginx workload routing modes are supported:
+  - `CLOUDHAND_NGINX_MODE=per-app` (default, one site config per workload)
+  - `CLOUDHAND_NGINX_MODE=combined|single|shared` (one shared config with path-based routing)
+
+### Required runtime configuration
+
+- `HCLOUD_TOKEN` (or `TF_VAR_hcloud_token`) for Hetzner provider auth
+- `DEPLOY_ROOT_DIR` (default `cloudhand`)
+- `DEPLOY_PROJECT_ID` (default `mos`)
+- `DEPLOY_TERRAFORM_BIN` (default `terraform`)
+
+### Known gaps
+
+- RBAC for deploy is not yet scoped to admin/operator roles; any authenticated org member can call deploy routes.
+- Proxy-only restriction is transport-level, not a full policy-level "UI-only" restriction.
+- Terraform generation is partial: `firewalls`, `load_balancers`, `dns_records`, and `containers` are modeled but not currently emitted by `terraform_gen.py`.
+- Network behavior currently expects existing Hetzner networks (`data "hcloud_network"`); plan `cidr` values are not creating new networks.
+- No deploy queue/lock exists yet; concurrent applies can race against shared plan/state artifacts.
+- Plan files can contain sensitive environment values and are stored under `DEPLOY_ROOT_DIR`; treat that directory as sensitive deployment state.
+- Incorrect `CLOUDHAND_NGINX_MODE` can produce routing behavior that does not match the intended MOS host/path layout.
