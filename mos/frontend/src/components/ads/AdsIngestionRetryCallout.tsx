@@ -67,7 +67,11 @@ export function AdsIngestionRetryCallout({
 
   if (!showRetry) return null;
 
-  const subtitle = !canRetry ? "Missing ads research run id; cannot retry from UI." : ingestionError || ingestionReason;
+  const subtitle = !canRetry
+    ? [ "Missing ads research run id; cannot retry from UI.", ingestionError || ingestionReason ]
+        .filter(Boolean)
+        .join(" ")
+    : ingestionError || ingestionReason;
 
   return (
     <Callout

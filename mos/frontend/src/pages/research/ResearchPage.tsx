@@ -34,6 +34,12 @@ const statusOptions = [
   { value: "unknown", label: "Unknown" },
 ];
 
+const mediaTypeOptions = [
+  { value: "", label: "All ad types" },
+  { value: "IMAGE", label: "Image" },
+  { value: "VIDEO", label: "Video" },
+];
+
 const sortOptions = [
   { value: "last_seen", label: "Last seen" },
   { value: "ad_count", label: "Ad count" },
@@ -66,15 +72,13 @@ function LoadingGrid() {
         >
           <div className="relative">
             <div className="aspect-[4/5] w-full bg-muted" />
-            <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="h-5 w-20 rounded-full bg-black/20" />
-                <div className="h-5 w-12 rounded-full bg-black/20" />
-              </div>
-              <div className="h-4 w-24 rounded-full bg-black/20" />
-            </div>
           </div>
           <div className="space-y-2 px-3 pb-3 pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="h-4 w-24 rounded-full bg-muted" />
+              <div className="h-4 w-12 rounded-full bg-muted" />
+              <div className="h-4 w-16 rounded-full bg-muted" />
+            </div>
             <div className="h-3 w-3/4 rounded bg-muted" />
             <div className="h-3 w-5/6 rounded bg-muted" />
             <div className="h-3 w-1/2 rounded bg-muted" />
@@ -93,6 +97,7 @@ function ResearchAdsTab() {
 
   const [query, setQuery] = useState("");
   const [channel, setChannel] = useState("");
+  const [mediaType, setMediaType] = useState("");
   const [status, setStatus] = useState("");
   const [brandId, setBrandId] = useState("");
   const [brandOptions, setBrandOptions] = useState<{ value: string; label: string }[]>([]);
@@ -164,6 +169,7 @@ function ResearchAdsTab() {
     () => ({
       q: query || undefined,
       channels: channel ? [channel] : undefined,
+      mediaTypes: mediaType ? [mediaType] : undefined,
       status: status ? [status] : undefined,
       brandIds: brandId ? [brandId] : undefined,
       clientId: workspace?.id,
@@ -171,7 +177,7 @@ function ResearchAdsTab() {
       limitPerBrand: limitPerBrand || undefined,
       sort: "last_seen",
     }),
-    [brandId, channel, limitPerBrand, product?.id, query, status, workspace?.id],
+    [brandId, channel, limitPerBrand, mediaType, product?.id, query, status, workspace?.id],
   );
 
   const filtersKey = useMemo(() => JSON.stringify(baseParams), [baseParams]);
@@ -306,6 +312,17 @@ function ResearchAdsTab() {
           className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           {statusOptions.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={mediaType}
+          onChange={(e) => setMediaType(e.target.value)}
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
+        >
+          {mediaTypeOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
             </option>

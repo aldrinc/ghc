@@ -1,5 +1,8 @@
-import { useMemo, useState } from "react";
+import { Play } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import type { MediaAsset } from "@/types/library";
+
+const VIDEO_HOVER_PREVIEW_DELAY_MS = 1000;
 
 function aspectToClass(aspect: "1/1" | "4/5" | "9/16" | "16/9") {
   switch (aspect) {
@@ -15,7 +18,23 @@ function aspectToClass(aspect: "1/1" | "4/5" | "9/16" | "16/9") {
   }
 }
 
+function mediaThumb(asset?: MediaAsset) {
+  if (!asset) return "";
+  if (asset.type === "video") {
+    return asset.posterUrl || asset.thumbUrl || asset.url;
+  }
+  return asset.thumbUrl || asset.url;
+}
+
 function MediaContent({ asset }: { asset?: MediaAsset }) {
+  const [errored, setErrored] = useState(false);
+
+  const thumb = mediaThumb(asset);
+
+  useEffect(() => {
+    setErrored(false);
+  }, [thumb]);
+
   if (!asset) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-content-muted">
@@ -40,15 +59,18 @@ function MediaContent({ asset }: { asset?: MediaAsset }) {
     );
   }
 
-  const thumb =
-    asset.type === "video"
-      ? asset.posterUrl || asset.thumbUrl || asset.url
-      : asset.thumbUrl || asset.url;
-
   if (!thumb) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-content-muted">
         No media
+      </div>
+    );
+  }
+
+  if (errored) {
+    return (
+      <div className="flex h-full items-center justify-center text-sm text-content-muted">
+        Media unavailable
       </div>
     );
   }
@@ -61,15 +83,133 @@ function MediaContent({ asset }: { asset?: MediaAsset }) {
         className="h-full w-full object-cover"
         loading="lazy"
         draggable={false}
+        onError={() => setErrored(true)}
       />
-      {asset.type === "video" && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/10">
-          <div className="rounded-full bg-black/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
-            Play
+    </>
+  );
+}
+
+function VideoHoverPreview({
+  asset,
+  aspectClass,
+  onClick,
+}: {
+  asset: Extract<MediaAsset, { type: "video" }>;
+  aspectClass: string;
+  onClick?: () => void;
+}) {
+  const [errored, setErrored] = useState(false);
+  const [previewActive, setPreviewActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const hoverDelayTimerRef = useRef<number | null>(null);
+
+  const sourceUrl = asset.fullUrl || asset.url;
+  const posterUrl = asset.posterUrl || asset.thumbUrl;
+
+  const clearHoverDelay = useCallback(() => {
+    if (hoverDelayTimerRef.current !== null) {
+      window.clearTimeout(hoverDelayTimerRef.current);
+      hoverDelayTimerRef.current = null;
+    }
+  }, []);
+
+  const stopPreview = useCallback(() => {
+    clearHoverDelay();
+    setPreviewActive(false);
+  }, [clearHoverDelay]);
+
+  useEffect(() => {
+    setErrored(false);
+    stopPreview();
+  }, [asset.fullUrl, asset.posterUrl, asset.status, asset.thumbUrl, asset.url, stopPreview]);
+
+  useEffect(() => {
+    return () => {
+      clearHoverDelay();
+    };
+  }, [clearHoverDelay]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    if (!previewActive) {
+      video.pause();
+      video.currentTime = 0;
+      return;
+    }
+
+    video.currentTime = 0;
+    const playPromise = video.play();
+    if (playPromise && typeof playPromise.catch === "function") {
+      playPromise.catch(() => {
+        setPreviewActive(false);
+      });
+    }
+  }, [previewActive]);
+
+  const handlePointerEnter = (event: PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse") return;
+    if (asset.status === "pending" || asset.status === "failed" || errored || !sourceUrl) return;
+    clearHoverDelay();
+    hoverDelayTimerRef.current = window.setTimeout(() => {
+      setPreviewActive(true);
+      hoverDelayTimerRef.current = null;
+    }, VIDEO_HOVER_PREVIEW_DELAY_MS);
+  };
+
+  return (
+    <div
+      className={`group relative overflow-hidden rounded-xl border border-border bg-surface-2 ${aspectClass}`}
+      onClick={onClick}
+      onPointerEnter={handlePointerEnter}
+      onPointerLeave={stopPreview}
+      role="presentation"
+    >
+      {asset.status === "pending" ? (
+        <div className="flex h-full animate-pulse items-center justify-center text-sm text-content-muted">
+          Processing media…
+        </div>
+      ) : asset.status === "failed" || errored ? (
+        <div className="flex h-full items-center justify-center text-sm text-content-muted">
+          Media unavailable
+        </div>
+      ) : previewActive && sourceUrl ? (
+        <video
+          ref={videoRef}
+          src={sourceUrl}
+          poster={posterUrl}
+          className="h-full w-full object-cover"
+          muted
+          playsInline
+          loop
+          preload="metadata"
+          onError={() => {
+            setErrored(true);
+            setPreviewActive(false);
+          }}
+        />
+      ) : posterUrl ? (
+        <img
+          src={posterUrl}
+          alt="Video preview"
+          className="h-full w-full object-cover"
+          loading="lazy"
+          draggable={false}
+          onError={() => setErrored(true)}
+        />
+      ) : (
+        <div className="flex h-full items-center justify-center text-sm text-content-muted">Video</div>
+      )}
+
+      {!previewActive && asset.status !== "pending" && asset.status !== "failed" && !errored ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black/55 text-white shadow-md backdrop-blur-sm">
+            <Play className="h-5 w-5 fill-white" />
           </div>
         </div>
-      )}
-    </>
+      ) : null}
+    </div>
   );
 }
 
@@ -127,24 +267,6 @@ export function SwipeCarousel({
       >
         {">"}
       </button>
-
-      <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1">
-        {media.map((_, idx) => (
-          <button
-            key={idx}
-            type="button"
-            aria-label={`Go to media ${idx + 1}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              setIndex(idx);
-            }}
-            className={[
-              "h-2 w-2 rounded-full transition",
-              idx === index ? "bg-foreground" : "bg-foreground/60",
-            ].join(" ")}
-          />
-        ))}
-      </div>
     </div>
   );
 }
@@ -160,6 +282,7 @@ export function SwipeMedia({
 }) {
   const aspectClass = aspectToClass(aspect);
   const assets = media || [];
+  const primaryVideoAsset = assets.find((asset) => asset.type === "video");
 
   if (assets.length === 0) {
     return (
@@ -167,6 +290,10 @@ export function SwipeMedia({
         No media
       </div>
     );
+  }
+
+  if (primaryVideoAsset) {
+    return <VideoHoverPreview asset={primaryVideoAsset} aspectClass={aspectClass} onClick={onOpen} />;
   }
 
   if (assets.length === 1) {

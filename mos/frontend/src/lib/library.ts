@@ -47,28 +47,78 @@ function guessAssetType(input: any): MediaAsset["type"] {
 
 export function mapMediaAssets(rawAssets: any[] | undefined | null): MediaAsset[] {
   if (!rawAssets || !Array.isArray(rawAssets)) return [];
-  return rawAssets
+  const normalizeRole = (value: any): string => (value ?? "").toString().trim().toLowerCase();
+  const isThumbnailRole = (asset: any): boolean => normalizeRole(asset?.role) === "thumbnail";
+
+  const thumbnailAssets = rawAssets.filter(isThumbnailRole);
+  const nonThumbnailAssets = rawAssets.filter((asset) => !isThumbnailRole(asset));
+
+  // If we only have thumbnails, surface them rather than showing an empty media state.
+  const assetsToRender = nonThumbnailAssets.length ? nonThumbnailAssets : thumbnailAssets;
+
+  const toCandidateUrl = (asset: any): string | undefined =>
+    toAbsoluteUrl(
+      asset?.preview_url ||
+        asset?.thumbnail_url ||
+        asset?.stored_url ||
+        asset?.source_url ||
+        asset?.url,
+    );
+
+  const thumbnailUrlCandidates = Array.from(
+    new Set(thumbnailAssets.map(toCandidateUrl).filter(Boolean) as string[]),
+  );
+
+  const videoCount = assetsToRender.reduce(
+    (acc, asset) => acc + (guessAssetType(asset) === "video" ? 1 : 0),
+    0,
+  );
+  const videoPosterFallback = videoCount === 1 ? thumbnailUrlCandidates[0] : undefined;
+
+  const isProbablyRenderableImage = (url: string | undefined): url is string => {
+    if (!url) return false;
+    if (url.startsWith("data:image/")) return true;
+    // Best-effort: avoid using video URLs as <img> src (can render as blank tiles).
+    return guessAssetType({ url }) === "image";
+  };
+
+  return assetsToRender
     .map((asset) => {
-      const previewUrl = toAbsoluteUrl(
-        asset?.preview_url ||
-          asset?.thumbnail_url ||
-          asset?.stored_url ||
-          asset?.source_url ||
-          asset?.url,
-      );
-      const fullUrl = toAbsoluteUrl(asset?.media_url || asset?.stored_url || asset?.source_url || asset?.url);
       const status = (asset?.mirror_status || asset?.status || "").toString().toLowerCase();
-      const normalizedStatus = ["pending", "succeeded", "failed", "partial"].includes(status) ? (status as MediaAsset["status"]) : undefined;
+      const normalizedStatus = ["pending", "succeeded", "failed", "partial"].includes(status)
+        ? (status as MediaAsset["status"])
+        : undefined;
+
+      const type = guessAssetType(asset);
+      const fullUrl = toAbsoluteUrl(asset?.media_url || asset?.stored_url || asset?.source_url || asset?.url);
+      const previewUrl = toCandidateUrl(asset);
 
       if (!previewUrl && !fullUrl && normalizedStatus !== "pending") return null;
-      const type = guessAssetType(asset);
-      const thumb = previewUrl || fullUrl || "";
+
+      if (type === "video") {
+        const posterCandidate = [
+          toAbsoluteUrl(asset?.thumbnail_url),
+          toAbsoluteUrl(asset?.preview_image_url),
+          toAbsoluteUrl(asset?.poster_url),
+          toAbsoluteUrl(asset?.preview_url),
+        ].find(isProbablyRenderableImage);
+        const posterUrl = posterCandidate || (isProbablyRenderableImage(videoPosterFallback) ? videoPosterFallback : undefined);
+        return {
+          type,
+          url: fullUrl || previewUrl || "",
+          fullUrl: fullUrl || undefined,
+          thumbUrl: posterUrl,
+          posterUrl,
+          status: normalizedStatus,
+        } satisfies MediaAsset;
+      }
+
+      const url = previewUrl || fullUrl || "";
       return {
         type,
-        url: previewUrl || fullUrl || "",
-        thumbUrl: thumb,
+        url,
+        thumbUrl: url,
         fullUrl: fullUrl || undefined,
-        posterUrl: type === "video" ? thumb : undefined,
         status: normalizedStatus,
       } satisfies MediaAsset;
     })
@@ -161,6 +211,7 @@ export function normalizeFacebookAdToLibraryItem(raw: any): LibraryItem {
     ctaText: snapshot.cta_text,
     destinationUrl: snapshot.link_url,
     media,
+    raw,
   };
 }
 
@@ -180,7 +231,7 @@ export function normalizeBreakdownAdToLibraryItem(ad: any): LibraryItem {
   const rawJson = parseMaybeJson(ad?.raw_json);
   // If raw_json carries the full snapshot, reuse the Facebook normalizer.
   if (rawJson?.snapshot) {
-    return normalizeFacebookAdToLibraryItem(rawJson);
+    return { ...normalizeFacebookAdToLibraryItem(rawJson), raw: ad };
   }
 
   const thesis = ad?.breakdown?.algorithmic_thesis;
@@ -190,6 +241,8 @@ export function normalizeBreakdownAdToLibraryItem(ad: any): LibraryItem {
     brandName: ad?.brand_name || "Unknown brand",
     platform: ad?.channel ? [ad.channel] : [],
     status: mapStatus(ad?.ad_status),
+    startAt: ad?.start_date,
+    endAt: ad?.end_date,
     destinationUrl: ad?.landing_url || ad?.destination_domain,
     headline: ad?.headline,
     body: ad?.primary_text || thesis,
@@ -197,6 +250,7 @@ export function normalizeBreakdownAdToLibraryItem(ad: any): LibraryItem {
     hookScore: ad?.breakdown?.hook_score,
     funnelStage: undefined,
     media: mapMediaAssets(ad?.media_assets),
+    raw: ad,
   };
 }
 
@@ -320,6 +374,7 @@ export function normalizeSwipeToLibraryItem(swipe: CompanySwipeAsset): LibraryIt
     destinationUrl,
     media,
     status: swipe.active === true ? "active" : swipe.active === false ? "inactive" : undefined,
+    raw: swipe,
   };
 }
 
@@ -340,6 +395,7 @@ export function normalizeExploreAdToLibraryItem(ad: any): LibraryItem {
     ctaText: ad?.cta_text,
     destinationUrl: ad?.landing_url || ad?.destination_domain,
     media,
+    raw: ad,
     scores: {
       performanceScore: scoresRaw.performance_score ?? scoresRaw.performanceScore,
       performanceStars: scoresRaw.performance_stars ?? scoresRaw.performanceStars,

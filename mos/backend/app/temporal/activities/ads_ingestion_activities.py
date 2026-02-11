@@ -12,10 +12,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.ads.ingestors.registry import IngestorRegistry
-from app.ads.normalization import derive_primary_domain, normalize_url
+from app.ads.normalization import derive_primary_domain, normalize_facebook_page_url, normalize_url
 from app.ads.types import NormalizeContext
 from app.db.enums import (
     AdChannelEnum,
+    AdStatusEnum,
     ProductBrandRelationshipSourceEnum,
     ProductBrandRelationshipTypeEnum,
 )
@@ -24,7 +25,7 @@ from app.db.repositories.jobs import JOB_STATUS_FAILED, JOB_STATUS_RUNNING, JOB_
 from app.schemas.ads_ingestion import BrandDiscovery
 from app.db.base import SessionLocal
 from app.ads.apify_client import ApifyClient
-from app.db.models import Ad, Brand, Job, ResearchRun, ResearchRunBrand
+from app.db.models import Ad, AdFacts, AdScore, Brand, Job, ResearchRun, ResearchRunBrand
 from app.services.ad_breakdown import extract_teardown_header_fields
 from app.services.media_mirror import MediaMirrorService
 
@@ -337,6 +338,452 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
 
 
 @activity.defn
+def fetch_ad_library_page_totals_activity(params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Fetch total ads counts per Facebook Page using Apify's maintained actor.
+
+    This is intended for competitor "strength" ranking (active volume) without having
+    to scrape full creative payloads.
+    """
+    research_run_id = params["research_run_id"]
+    query_key = str(params.get("query_key") or os.getenv("ADS_META_TOTALS_QUERY_KEY", "meta_active_total"))
+    active_status = str(params.get("active_status") or os.getenv("ADS_META_TOTALS_ACTIVE_STATUS", "active"))
+
+    results_limit_raw = params.get("results_limit") or os.getenv("ADS_META_TOTALS_RESULTS_LIMIT", "1")
+    try:
+        results_limit = int(results_limit_raw)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"results_limit must be an int, got {results_limit_raw!r}") from exc
+
+    include_about_page_raw = params.get("include_about_page")
+    if include_about_page_raw is None:
+        include_about_page_raw = os.getenv("ADS_META_TOTALS_INCLUDE_ABOUT_PAGE", "true")
+    include_about_page = str(include_about_page_raw).strip().lower() in {"1", "true", "yes", "y"}
+
+    actor_id = os.getenv("APIFY_META_TOTALS_ACTOR_ID", "apify~facebook-ads-scraper")
+    max_wait_raw = os.getenv("ADS_META_TOTALS_MAX_WAIT_SECONDS", "900")
+    try:
+        max_wait_seconds = int(max_wait_raw)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"ADS_META_TOTALS_MAX_WAIT_SECONDS must be an int, got {max_wait_raw!r}") from exc
+
+    identity_ids = params.get("brand_channel_identity_ids")
+
+    apify = ApifyClient()
+    with _repo() as repo:
+        run = repo.session.get(ResearchRun, research_run_id)
+        if not run:
+            raise RuntimeError(f"Research run {research_run_id} not found.")
+
+        identities = repo.identities_for_run(research_run_id)
+        if identity_ids:
+            identity_strs = {str(i) for i in identity_ids}
+            identities = [i for i in identities if str(i.id) in identity_strs]
+            if not identities:
+                raise RuntimeError(
+                    f"No brand channel identities matched for research run {research_run_id}; "
+                    f"identity_ids={sorted(identity_strs)}"
+                )
+
+        url_to_identities: dict[str, list[Any]] = {}
+        for identity in identities:
+            candidate_urls: list[str] = []
+            if identity.external_url:
+                candidate_urls.append(identity.external_url)
+            metadata = getattr(identity, "metadata_json", None) or {}
+            if isinstance(metadata, dict):
+                for u in metadata.get("facebook_page_urls") or []:
+                    if isinstance(u, str) and u.strip():
+                        candidate_urls.append(u)
+            canonical = None
+            for u in candidate_urls:
+                canonical = normalize_facebook_page_url(u)
+                if canonical:
+                    break
+            if not canonical:
+                raise RuntimeError(
+                    "Cannot fetch totals: identity is missing a valid Facebook Page URL "
+                    f"(brand_channel_identity_id={identity.id})"
+                )
+            url_to_identities.setdefault(canonical, []).append(identity)
+
+        start_urls = [{"url": u, "method": "GET"} for u in sorted(url_to_identities.keys())]
+        if not start_urls:
+            raise RuntimeError(f"No Facebook Page URLs found for research run {research_run_id}.")
+
+        actor_input: Dict[str, Any] = {
+            "startUrls": start_urls,
+            "onlyTotal": True,
+            "includeAboutPage": include_about_page,
+            "isDetailsPerAd": True,
+            "resultsLimit": results_limit,
+            "activeStatus": active_status,
+        }
+
+        activity.logger.info(
+            "ads_ingestion.totals.start",
+            extra={
+                "research_run_id": research_run_id,
+                "query_key": query_key,
+                "active_status": active_status,
+                "page_count": len(start_urls),
+                "actor_id": actor_id,
+            },
+        )
+
+        run_data = apify.start_actor_run(actor_id, input_payload=actor_input)
+        provider_run_id = run_data.get("id") or run_data.get("runId")
+        if not provider_run_id:
+            raise RuntimeError(f"Apify actor run did not return an id (actor_id={actor_id}).")
+
+        final = apify.poll_run_until_terminal(provider_run_id, max_wait_seconds=max_wait_seconds)
+        dataset_id = final.get("defaultDatasetId")
+        if not dataset_id:
+            raise RuntimeError(
+                f"Apify actor run missing defaultDatasetId (actor_id={actor_id}, run_id={provider_run_id})."
+            )
+
+        items = apify.fetch_dataset_items(dataset_id, limit=len(start_urls))
+        if not items:
+            raise RuntimeError(
+                f"Apify dataset returned no items (actor_id={actor_id}, run_id={provider_run_id}, dataset_id={dataset_id})."
+            )
+
+        totals_by_url: dict[str, dict[str, Any]] = {}
+        for item in items:
+            raw_url = item.get("inputUrl") or item.get("facebookUrl") or item.get("url")
+            canonical_url = normalize_facebook_page_url(raw_url) if isinstance(raw_url, str) else None
+            if not canonical_url:
+                raise RuntimeError(
+                    "Apify totals item missing inputUrl/facebookUrl; cannot map totals to identities. "
+                    f"keys={sorted(list(item.keys()))}"
+                )
+
+            results = item.get("results")
+            if not isinstance(results, list) or not results:
+                raise RuntimeError(
+                    f"Apify totals item missing results[] for url={canonical_url}. "
+                    f"keys={sorted(list(item.keys()))}"
+                )
+            first = results[0] if isinstance(results[0], dict) else None
+            if not isinstance(first, dict) or "totalCount" not in first:
+                raise RuntimeError(
+                    f"Apify totals item missing results[0].totalCount for url={canonical_url}. "
+                    f"first_keys={sorted(list(first.keys())) if isinstance(first, dict) else None}"
+                )
+            total_raw = first.get("totalCount")
+            try:
+                total_count = int(total_raw)
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(
+                    f"Apify totals item has non-int totalCount for url={canonical_url}: {total_raw!r}"
+                ) from exc
+
+            page_id = first.get("pageID")
+            page_id_str = str(page_id) if page_id is not None else None
+
+            page_name = None
+            page_info = item.get("pageInfo")
+            if isinstance(page_info, dict):
+                adlib = page_info.get("adLibraryPageInfo")
+                if isinstance(adlib, dict):
+                    pinfo = adlib.get("pageInfo")
+                    if isinstance(pinfo, dict):
+                        name = pinfo.get("name")
+                        if isinstance(name, str) and name.strip():
+                            page_name = name.strip()
+
+            totals_by_url[canonical_url] = {
+                "input_url": canonical_url,
+                "total_count": total_count,
+                "page_id": page_id_str,
+                "page_name": page_name,
+                "raw_result": item,
+            }
+
+        missing_urls = [u for u in url_to_identities.keys() if u not in totals_by_url]
+        if missing_urls:
+            raise RuntimeError(
+                "Apify totals did not return results for all requested pages. "
+                f"missing={missing_urls}"
+            )
+
+        stored: list[dict[str, Any]] = []
+        for url, identities_for_url in url_to_identities.items():
+            result = totals_by_url[url]
+            for identity in identities_for_url:
+                row = repo.upsert_ad_library_page_total(
+                    org_id=str(run.org_id),
+                    research_run_id=research_run_id,
+                    brand_id=str(identity.brand_id),
+                    brand_channel_identity_id=str(identity.id),
+                    channel=identity.channel,
+                    query_key=query_key,
+                    active_status=active_status,
+                    input_url=result["input_url"],
+                    total_count=result["total_count"],
+                    page_id=result["page_id"],
+                    page_name=result["page_name"],
+                    provider="APIFY",
+                    provider_actor_id=actor_id,
+                    provider_run_id=provider_run_id,
+                    provider_dataset_id=dataset_id,
+                    actor_input=actor_input,
+                    raw_result=result.get("raw_result"),
+                )
+                stored.append(
+                    {
+                        "ad_library_page_total_id": str(row.id),
+                        "brand_channel_identity_id": str(identity.id),
+                        "brand_id": str(identity.brand_id),
+                        "input_url": result["input_url"],
+                        "total_count": result["total_count"],
+                        "page_id": result["page_id"],
+                        "page_name": result["page_name"],
+                    }
+                )
+
+        activity.logger.info(
+            "ads_ingestion.totals.done",
+            extra={
+                "research_run_id": research_run_id,
+                "query_key": query_key,
+                "active_status": active_status,
+                "stored_count": len(stored),
+                "actor_id": actor_id,
+                "provider_run_id": provider_run_id,
+                "provider_dataset_id": dataset_id,
+            },
+        )
+        return {
+            "research_run_id": research_run_id,
+            "query_key": query_key,
+            "active_status": active_status,
+            "provider_run_id": provider_run_id,
+            "provider_dataset_id": dataset_id,
+            "stored": stored,
+        }
+
+
+@activity.defn
+def select_ads_for_context_activity(params: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Select a small, high-signal subset of ads for downstream ads_context and creative breakdowns.
+
+    The intent is to bias toward "winning" ads:
+    - active
+    - running >= N days
+    - image/video formats
+    - (optionally) preferred language codes
+    """
+
+    def _parse_bool(value: Any, *, name: str) -> bool:
+        if isinstance(value, bool):
+            return value
+        text = str(value or "").strip().lower()
+        if text in {"1", "true", "yes", "y"}:
+            return True
+        if text in {"0", "false", "no", "n", ""}:
+            return False
+        raise ValueError(f"{name} must be a bool-like value, got {value!r}")
+
+    def _parse_int(value: Any, *, name: str) -> int:
+        try:
+            return int(value)
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError(f"{name} must be an int, got {value!r}") from exc
+
+    def _parse_csv(value: Any) -> list[str]:
+        if value is None:
+            return []
+        if isinstance(value, (list, tuple, set)):
+            return [str(v).strip() for v in value if str(v).strip()]
+        text = str(value or "").strip()
+        if not text:
+            return []
+        return [part.strip() for part in text.split(",") if part.strip()]
+
+    research_run_id = params["research_run_id"]
+    totals_query_key = str(
+        params.get("totals_query_key") or os.getenv("ADS_META_TOTALS_QUERY_KEY", "meta_active_total")
+    )
+
+    max_total_ads = _parse_int(
+        params.get("max_total_ads") or os.getenv("ADS_CONTEXT_SELECT_MAX_TOTAL_ADS", "40"),
+        name="max_total_ads",
+    )
+    if max_total_ads <= 0:
+        raise ValueError(f"max_total_ads must be > 0, got {max_total_ads}")
+
+    max_ads_per_brand = _parse_int(
+        params.get("max_ads_per_brand")
+        or os.getenv("ADS_CONTEXT_SELECT_MAX_ADS_PER_BRAND")
+        or os.getenv("ADS_CONTEXT_MAX_ADS_PER_BRAND", "3"),
+        name="max_ads_per_brand",
+    )
+    if max_ads_per_brand <= 0:
+        raise ValueError(f"max_ads_per_brand must be > 0, got {max_ads_per_brand}")
+
+    max_brands = _parse_int(
+        params.get("max_brands") or os.getenv("ADS_CONTEXT_SELECT_MAX_BRANDS", "25"),
+        name="max_brands",
+    )
+    if max_brands <= 0:
+        raise ValueError(f"max_brands must be > 0, got {max_brands}")
+
+    active_only = _parse_bool(
+        params.get("active_only") or os.getenv("ADS_CONTEXT_SELECT_ACTIVE_ONLY", "true"),
+        name="active_only",
+    )
+    min_days_active = _parse_int(
+        params.get("min_days_active") or os.getenv("ADS_CONTEXT_SELECT_MIN_DAYS_ACTIVE", "7"),
+        name="min_days_active",
+    )
+    if min_days_active < 0:
+        raise ValueError(f"min_days_active must be >= 0, got {min_days_active}")
+
+    allowed_formats = [f.lower() for f in _parse_csv(os.getenv("ADS_CONTEXT_SELECT_DISPLAY_FORMATS", "image,video"))]
+    allowed_formats = [f for f in allowed_formats if f]
+    if not allowed_formats:
+        raise ValueError("ADS_CONTEXT_SELECT_DISPLAY_FORMATS must include at least one format")
+
+    preferred_language_codes = [c.upper() for c in _parse_csv(os.getenv("ADS_CONTEXT_SELECT_LANGUAGE_CODES", "EN"))]
+    language_strict = _parse_bool(
+        os.getenv("ADS_CONTEXT_SELECT_LANGUAGE_STRICT", "false"),
+        name="ADS_CONTEXT_SELECT_LANGUAGE_STRICT",
+    )
+
+    with _repo() as repo:
+        totals_rows = repo.ad_library_page_totals_for_run(
+            research_run_id=research_run_id,
+            query_key=totals_query_key,
+        )
+        if not totals_rows:
+            raise RuntimeError(
+                "No ad library totals found for research run; cannot rank competitors. "
+                f"research_run_id={research_run_id} totals_query_key={totals_query_key}"
+            )
+
+        totals_by_brand = Counter()
+        for row in totals_rows:
+            totals_by_brand[row.brand_id] += int(getattr(row, "total_count", 0) or 0)
+
+        brand_order = [brand_id for brand_id, _ in totals_by_brand.most_common()]
+        if not brand_order:
+            raise RuntimeError(
+                "Ad library totals returned no brands; cannot select ads. "
+                f"research_run_id={research_run_id} totals_query_key={totals_query_key}"
+            )
+        brand_order = brand_order[:max_brands]
+
+        stmt = (
+            select(
+                Ad.id,
+                Ad.brand_id,
+                Ad.last_seen_at,
+                AdFacts.days_active,
+                AdFacts.display_format,
+                AdFacts.language_codes,
+                AdScore.performance_score,
+            )
+            .join(ResearchRunBrand, ResearchRunBrand.brand_id == Ad.brand_id)
+            .join(AdFacts, AdFacts.ad_id == Ad.id)
+            .outerjoin(AdScore, AdScore.ad_id == Ad.id)
+            .where(ResearchRunBrand.research_run_id == research_run_id)
+            .where(Ad.brand_id.in_(brand_order))
+        )
+        if active_only:
+            stmt = stmt.where(AdFacts.status == AdStatusEnum.active)
+        if min_days_active:
+            stmt = stmt.where(AdFacts.days_active.isnot(None), AdFacts.days_active >= min_days_active)
+        if allowed_formats:
+            stmt = stmt.where(AdFacts.display_format.isnot(None), AdFacts.display_format.in_(allowed_formats))
+        if language_strict and preferred_language_codes:
+            stmt = stmt.where(AdFacts.language_codes.overlap(preferred_language_codes))
+
+        rows = list(repo.session.execute(stmt).all())
+        if not rows:
+            raise RuntimeError(
+                "No ads matched selection filters for research run. "
+                f"research_run_id={research_run_id} active_only={active_only} "
+                f"min_days_active={min_days_active} allowed_formats={allowed_formats} "
+                f"language_strict={language_strict} preferred_language_codes={preferred_language_codes}"
+            )
+
+        candidates_by_brand: dict[Any, list[dict[str, Any]]] = {}
+        for ad_id, brand_id, last_seen_at, days_active, display_format, language_codes, performance_score in rows:
+            languages = language_codes or []
+            language_match = (
+                bool(preferred_language_codes)
+                and any(code in languages for code in preferred_language_codes)
+            )
+            candidates_by_brand.setdefault(brand_id, []).append(
+                {
+                    "ad_id": str(ad_id),
+                    "brand_id": str(brand_id),
+                    "language_match": language_match,
+                    "days_active": int(days_active or 0),
+                    "performance_score": int(performance_score or 0),
+                    "last_seen_at": last_seen_at,
+                    "display_format": display_format,
+                }
+            )
+
+        def _sort_key(c: dict[str, Any]) -> tuple:
+            # Prefer language match first, then longer-running, then generic performance score.
+            # last_seen_at acts as a stable tie-breaker for similarly "good" ads.
+            last_seen = c.get("last_seen_at")
+            last_seen_ord = last_seen.timestamp() if last_seen else 0
+            return (
+                1 if c.get("language_match") else 0,
+                int(c.get("days_active") or 0),
+                int(c.get("performance_score") or 0),
+                last_seen_ord,
+            )
+
+        selected_ad_ids: list[str] = []
+        selected_by_brand: dict[str, int] = {}
+        for brand_id in brand_order:
+            candidates = candidates_by_brand.get(brand_id) or []
+            if not candidates:
+                continue
+            candidates = sorted(candidates, key=_sort_key, reverse=True)
+            remaining = max_total_ads - len(selected_ad_ids)
+            if remaining <= 0:
+                break
+            take = min(max_ads_per_brand, remaining)
+            chosen = candidates[:take]
+            if not chosen:
+                continue
+            selected_ad_ids.extend([c["ad_id"] for c in chosen])
+            selected_by_brand[str(brand_id)] = len(chosen)
+
+        if not selected_ad_ids:
+            raise RuntimeError(
+                "Selection produced zero ads after ranking. "
+                f"research_run_id={research_run_id} brand_count={len(brand_order)}"
+            )
+
+        return {
+            "research_run_id": research_run_id,
+            "ad_ids": selected_ad_ids,
+            "selection": {
+                "active_only": active_only,
+                "min_days_active": min_days_active,
+                "allowed_formats": allowed_formats,
+                "preferred_language_codes": preferred_language_codes,
+                "language_strict": language_strict,
+                "max_total_ads": max_total_ads,
+                "max_ads_per_brand": max_ads_per_brand,
+                "max_brands": max_brands,
+                "totals_query_key": totals_query_key,
+                "selected_count": len(selected_ad_ids),
+                "selected_by_brand": selected_by_brand,
+            },
+        }
+
+
+@activity.defn
 def build_ads_context_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     research_run_id = params["research_run_id"]
     max_media_assets = int(os.getenv("ADS_CONTEXT_MAX_MEDIA_ASSETS", "2"))
@@ -387,18 +834,26 @@ def build_ads_context_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             ad_ids = params.get("ad_ids")
             if ad_ids:
                 ad_ids_set: set[UUID] = set()
+                ad_id_order: list[str] = []
+                invalid_ids: list[Any] = []
                 for aid in ad_ids:
                     try:
-                        ad_ids_set.add(UUID(str(aid)))
+                        parsed = UUID(str(aid))
+                        ad_ids_set.add(parsed)
+                        ad_id_order.append(str(parsed))
                     except Exception:  # noqa: BLE001
-                        continue
+                        invalid_ids.append(aid)
+                if invalid_ids:
+                    raise ValueError(f"Invalid ad_ids passed to build_ads_context_activity: {invalid_ids}")
                 ads = list(
                     session.scalars(
                         select(Ad)
                         .where(Ad.id.in_(ad_ids_set))
-                        .order_by(Ad.last_seen_at.desc().nullslast(), Ad.created_at.desc())
                     ).all()
                 )
+                if ad_id_order:
+                    order_map = {ad_id: idx for idx, ad_id in enumerate(ad_id_order)}
+                    ads.sort(key=lambda ad: order_map.get(str(ad.id), len(order_map)))
             else:
                 ads = repo.ads_for_run(research_run_id)
 
@@ -422,6 +877,16 @@ def build_ads_context_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             brand_lookup: Dict[str, Brand] = {}
             if brand_ids:
                 brand_lookup = {brand.id: brand for brand in session.query(Brand).filter(Brand.id.in_(brand_ids)).all()}
+
+            totals_query_key = os.getenv("ADS_META_TOTALS_QUERY_KEY", "meta_active_total")
+            totals_rows = repo.ad_library_page_totals_for_run(
+                research_run_id=research_run_id,
+                query_key=totals_query_key,
+            )
+            totals_by_brand = Counter()
+            if totals_rows:
+                for row in totals_rows:
+                    totals_by_brand[str(row.brand_id)] += int(getattr(row, "total_count", 0) or 0)
 
             per_brand: Dict[str, Dict[str, Any]] = {}
             cross_domains = Counter()
@@ -474,6 +939,15 @@ def build_ads_context_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     "cta_distribution": cross_cta.most_common(5),
                 },
             }
+            selection_meta = params.get("selection")
+            if ad_ids:
+                # Document the intent behind passing explicit ad_ids; selection is performed upstream.
+                context["selection"] = {
+                    "ad_ids_provided": True,
+                    "selected_ads": len(ads),
+                }
+                if isinstance(selection_meta, dict):
+                    context["selection"].update(selection_meta)
             for stats in per_brand.values():
                 brand_entry: Dict[str, Any] = {
                     "brand_id": stats["brand_id"],
@@ -483,6 +957,8 @@ def build_ads_context_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     "top_destination_domains": stats["destination_domains"].most_common(5),
                     "top_cta_types": stats["cta_types"].most_common(5),
                 }
+                if totals_rows:
+                    brand_entry["ad_library_active_ads_total"] = totals_by_brand.get(stats["brand_id"], 0)
                 ad_briefs = stats.get("ad_briefs") or []
                 if ad_briefs:
                     brand_entry["top_ads"] = ad_briefs[:max_ads_per_brand]
@@ -507,6 +983,20 @@ def build_ads_context_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                             "representative_ad_ids": [],
                         }
                     )
+            if totals_rows:
+                for brand_entry in context["brands"]:
+                    if "ad_library_active_ads_total" not in brand_entry:
+                        brand_entry["ad_library_active_ads_total"] = totals_by_brand.get(
+                            str(brand_entry.get("brand_id") or ""), 0
+                        )
+                context["brands"] = sorted(
+                    context["brands"],
+                    key=lambda b: (
+                        int(b.get("ad_library_active_ads_total") or 0),
+                        int(b.get("ad_count") or 0),
+                    ),
+                    reverse=True,
+                )
 
             def _section_by_prefix(sections: Dict[str, str], prefix: str) -> Optional[str]:
                 for key, value in sections.items():
