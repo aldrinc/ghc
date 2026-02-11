@@ -12,41 +12,52 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
+from app.config import settings
 from app.db.deps import get_session
 from app.db.enums import (
     ArtifactTypeEnum,
+    FunnelDomainStatusEnum,
     FunnelPageVersionSourceEnum,
     FunnelPageVersionStatusEnum,
     FunnelStatusEnum,
 )
-from app.db.models import Campaign, FunnelPageSlugRedirect, FunnelPageVersion, Product, ProductOffer
+from app.db.models import (
+    Campaign,
+    FunnelDomain,
+    FunnelPageSlugRedirect,
+    FunnelPageVersion,
+    Product,
+    ProductOffer,
+)
 from app.db.repositories.artifacts import ArtifactsRepository
-from app.db.repositories.funnels import FunnelPageVersionsRepository, FunnelPagesRepository, FunnelsRepository
 from app.db.repositories.design_systems import DesignSystemsRepository
+from app.db.repositories.funnels import FunnelPageVersionsRepository, FunnelPagesRepository, FunnelsRepository
 from app.schemas.funnels import (
     FunnelCreateRequest,
     FunnelDuplicateRequest,
-    FunnelPageCreateRequest,
     FunnelPageAIGenerateRequest,
-    FunnelPageTestimonialGenerateRequest,
+    FunnelPageCreateRequest,
     FunnelPageSaveDraftRequest,
+    FunnelPageTestimonialGenerateRequest,
+    FunnelPageUpdateRequest,
+    FunnelPublishRequest,
     FunnelTemplateDetail,
     FunnelTemplateSummary,
-    FunnelPageUpdateRequest,
     FunnelUpdateRequest,
 )
+from app.services import deploy as deploy_service
+from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_ai import AiAttachmentError, generate_funnel_page_draft, stream_funnel_page_draft
+from app.services.funnel_templates import apply_template_assets, get_funnel_template, list_funnel_templates
 from app.services.funnel_testimonials import (
     TestimonialGenerationError,
     TestimonialGenerationNotFoundError,
     generate_funnel_page_testimonials,
 )
-from app.services.design_systems import resolve_design_system_tokens
-from app.services.funnel_templates import apply_template_assets, get_funnel_template, list_funnel_templates
 from app.services.funnels import (
+    create_funnel_upload_asset,
     default_puck_data,
     duplicate_funnel,
-    create_funnel_upload_asset,
     generate_unique_slug,
     publish_funnel,
 )
@@ -63,6 +74,55 @@ _AI_ATTACHMENT_ALLOWED_MIME_TYPES = {
     "image/webp",
     "image/gif",
 }
+
+
+def _normalize_server_names(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for raw in values:
+        host = raw.strip().lower()
+        if not host or host in seen:
+            continue
+        seen.add(host)
+        normalized.append(host)
+    return normalized
+
+
+def _resolve_deploy_server_names(
+    *,
+    session: Session,
+    org_id: str,
+    funnel_id: str,
+    requested_server_names: list[str],
+) -> list[str]:
+    requested = _normalize_server_names(requested_server_names)
+    if requested:
+        return requested
+
+    rows = session.scalars(
+        select(FunnelDomain.hostname).where(
+            FunnelDomain.org_id == org_id,
+            FunnelDomain.funnel_id == funnel_id,
+            FunnelDomain.status.in_(
+                [
+                    FunnelDomainStatusEnum.active,
+                    FunnelDomainStatusEnum.verified,
+                ]
+            ),
+        )
+    ).all()
+
+    from_db = _normalize_server_names([str(hostname) for hostname in rows if hostname])
+    if from_db:
+        return from_db
+
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=(
+            "Deploy server names are required. "
+            "Provide deploy.serverNames or configure an active/verified funnel domain."
+        ),
+    )
 
 
 def _validate_design_system(
@@ -738,8 +798,9 @@ def approve_page(
 
 
 @router.post("/{funnel_id}/publish", status_code=status.HTTP_201_CREATED)
-def publish_funnel_route(
+async def publish_funnel_route(
     funnel_id: str,
+    payload: FunnelPublishRequest | None = None,
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -754,7 +815,87 @@ def publish_funnel_route(
         message = str(exc)
         code = status.HTTP_404_NOT_FOUND if "not found" in message.lower() else status.HTTP_409_CONFLICT
         raise HTTPException(status_code=code, detail=message) from exc
-    return {"publicationId": str(publication.id)}
+
+    if not payload or not payload.deploy:
+        return {"publicationId": str(publication.id)}
+
+    deploy = payload.deploy
+    funnels_repo = FunnelsRepository(session)
+    funnel = funnels_repo.get(org_id=auth.org_id, funnel_id=funnel_id)
+    if not funnel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+
+    server_names = _resolve_deploy_server_names(
+        session=session,
+        org_id=auth.org_id,
+        funnel_id=funnel_id,
+        requested_server_names=deploy.serverNames,
+    )
+
+    upstream_base_url = (deploy.upstreamBaseUrl or settings.DEPLOY_PUBLIC_BASE_URL or "").strip()
+    if not upstream_base_url:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Deploy upstream base URL is required. "
+                "Set deploy.upstreamBaseUrl or DEPLOY_PUBLIC_BASE_URL."
+            ),
+        )
+
+    upstream_api_base_root = (deploy.upstreamApiBaseUrl or settings.DEPLOY_PUBLIC_API_BASE_URL or "").strip()
+    if not upstream_api_base_root:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Deploy upstream API base URL is required. "
+                "Set deploy.upstreamApiBaseUrl or DEPLOY_PUBLIC_API_BASE_URL."
+            ),
+        )
+
+    upstream_api_base_url = f"{upstream_api_base_root.rstrip('/')}/public/funnels/{funnel.public_id}"
+
+    try:
+        workload_patch = deploy_service.build_funnel_publication_workload_patch(
+            workload_name=deploy.workloadName,
+            funnel_public_id=str(funnel.public_id),
+            upstream_base_url=upstream_base_url,
+            upstream_api_base_url=upstream_api_base_url,
+            server_names=server_names,
+            https=deploy.https,
+            destination_path=deploy.destinationPath,
+        )
+        patch_result = deploy_service.patch_workload_in_plan(
+            workload_patch=workload_patch,
+            plan_path=deploy.planPath,
+            instance_name=deploy.instanceName,
+            create_if_missing=deploy.createIfMissing,
+            in_place=deploy.inPlace,
+        )
+    except deploy_service.DeployError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Funnel published but deploy patch failed: {exc}",
+        ) from exc
+
+    deploy_response: dict[str, object] = {"patch": patch_result}
+    if deploy.applyPlan:
+        try:
+            apply_result = await deploy_service.apply_plan(plan_path=patch_result["updated_plan_path"])
+        except deploy_service.DeployError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Funnel published but deploy apply failed: {exc}",
+            ) from exc
+
+        return_code = int(apply_result.get("returncode", 1))
+        if return_code != 0:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Funnel published but deploy apply failed with return code {return_code}.",
+            )
+        deploy_response["apply"] = apply_result
+
+    return {"publicationId": str(publication.id), "deploy": deploy_response}
 
 
 @router.post("/{funnel_id}/pages/{page_id}/ai/attachments", status_code=status.HTTP_201_CREATED)

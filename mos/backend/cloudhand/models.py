@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class NodeType(str, Enum):
@@ -59,10 +59,21 @@ class RuntimeType(str, Enum):
     GO = "go"
 
 
+class ApplicationSourceType(str, Enum):
+    GIT = "git"
+    FUNNEL_PUBLICATION = "funnel_publication"
+
+
+class FunnelPublicationSourceSpec(BaseModel):
+    public_id: str
+    upstream_base_url: str
+    upstream_api_base_url: str
+
+
 class ServiceSpec(BaseModel):
     """How to run the app in the background."""
 
-    command: str
+    command: Optional[str] = None
     environment: Dict[str, str] = Field(default_factory=dict)
     environment_file: Optional[str] = None
     environment_file_upload: Optional[str] = None
@@ -81,12 +92,47 @@ class BuildSpec(BaseModel):
 
 class ApplicationSpec(BaseModel):
     name: str
-    repo_url: str
+    source_type: ApplicationSourceType = ApplicationSourceType.GIT
+    source_ref: Optional[FunnelPublicationSourceSpec] = None
+    repo_url: Optional[str] = None
     branch: str = "main"
     runtime: RuntimeType
     build_config: BuildSpec
     service_config: ServiceSpec
     destination_path: str = "/opt/apps"
+
+    @model_validator(mode="after")
+    def validate_source(self) -> "ApplicationSpec":
+        if self.source_type == ApplicationSourceType.GIT:
+            repo_url = (self.repo_url or "").strip()
+            if not repo_url:
+                raise ValueError("repo_url is required when source_type='git'.")
+            command = (self.service_config.command or "").strip()
+            if not command:
+                raise ValueError("service_config.command is required when source_type='git'.")
+            if self.source_ref is not None:
+                raise ValueError("source_ref is not allowed when source_type='git'.")
+            self.repo_url = repo_url
+            self.service_config.command = command
+            return self
+
+        if self.source_type == ApplicationSourceType.FUNNEL_PUBLICATION:
+            if self.repo_url is not None:
+                raise ValueError("repo_url is not allowed when source_type='funnel_publication'.")
+            if self.source_ref is None:
+                raise ValueError("source_ref is required when source_type='funnel_publication'.")
+            self.source_ref.public_id = self.source_ref.public_id.strip()
+            self.source_ref.upstream_base_url = self.source_ref.upstream_base_url.strip().rstrip("/")
+            self.source_ref.upstream_api_base_url = self.source_ref.upstream_api_base_url.strip().rstrip("/")
+            if not self.source_ref.public_id:
+                raise ValueError("source_ref.public_id must be non-empty for source_type='funnel_publication'.")
+            if not self.source_ref.upstream_base_url.startswith(("http://", "https://")):
+                raise ValueError("source_ref.upstream_base_url must start with http:// or https://.")
+            if not self.source_ref.upstream_api_base_url.startswith(("http://", "https://")):
+                raise ValueError("source_ref.upstream_api_base_url must start with http:// or https://.")
+            return self
+
+        raise ValueError(f"Unsupported source_type: {self.source_type}")
 
 
 class NetworkSpec(BaseModel):

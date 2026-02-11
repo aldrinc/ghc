@@ -34,6 +34,24 @@ class FunnelDuplicateRequest(BaseModel):
     autoPublish: bool = False
 
 
+class FunnelPublishDeployRequest(BaseModel):
+    workloadName: str
+    planPath: Optional[str] = None
+    instanceName: Optional[str] = None
+    createIfMissing: bool = True
+    inPlace: bool = False
+    applyPlan: bool = True
+    serverNames: list[str] = Field(default_factory=list)
+    https: bool = True
+    destinationPath: str = "/opt/apps"
+    upstreamBaseUrl: Optional[str] = None
+    upstreamApiBaseUrl: Optional[str] = None
+
+
+class FunnelPublishRequest(BaseModel):
+    deploy: Optional[FunnelPublishDeployRequest] = None
+
+
 class FunnelPageCreateRequest(BaseModel):
     name: str
     slug: Optional[str] = None

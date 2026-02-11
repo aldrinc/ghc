@@ -5,7 +5,7 @@ from pathlib import Path
 import paramiko
 from typing import Dict, List, Optional  # noqa: F401
 
-from ..models import ApplicationSpec, RuntimeType
+from ..models import ApplicationSourceType, ApplicationSpec, RuntimeType
 
 
 class ServerDeployer:
@@ -185,6 +185,26 @@ WantedBy=multi-user.target
         self.run(f"systemctl enable {app.name}")
         self.run(f"systemctl restart {app.name}")
 
+    def _service_unit_exists(self, service_name: str) -> bool:
+        safe_name = service_name.replace("'", "'\"'\"'")
+        out = self.run(f"bash -lc \"systemctl cat '{safe_name}.service' >/dev/null 2>&1 && echo yes || true\"")
+        return out.strip() == "yes"
+
+    def _port_is_listening(self, port: int) -> bool:
+        out = self.run(f"bash -lc \"ss -ltnH '( sport = :{port} )' | head -n 1 || true\"")
+        return bool(out.strip())
+
+    def _assert_ports_available(self, app: ApplicationSpec):
+        for port in sorted(set(app.service_config.ports)):
+            if not self._port_is_listening(port):
+                continue
+            if self._service_unit_exists(app.name):
+                # Allow rolling restarts for an existing managed workload on the same port.
+                continue
+            raise ValueError(
+                f"Port {port} is already in use on server {self.ip}; cannot deploy workload '{app.name}'."
+            )
+
     def _enable_https(self, server_names: List[str]):
         names = self._normalize_server_names(server_names)
         if not names:
@@ -214,10 +234,7 @@ WantedBy=multi-user.target
                 "--register-unsafely-without-email"
             )
 
-    def _configure_nginx(self, app: ApplicationSpec):
-        if not app.service_config.ports:
-            return
-
+    def _ensure_nginx(self):
         # Ensure nginx exists (Hetzner cloud-init installs it in our Terraform, but be defensive)
         nginx_bin = self.run("command -v nginx || true").strip()
         if not nginx_bin:
@@ -229,6 +246,98 @@ WantedBy=multi-user.target
         self.run("mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled")
         self.run("systemctl enable nginx || true")
         self.run("systemctl start nginx || true")
+
+    def _configure_funnel_publication_proxy(self, app: ApplicationSpec):
+        source = app.source_ref
+        if source is None:
+            raise ValueError("source_ref is required when source_type='funnel_publication'.")
+
+        server_names = self._normalize_server_names(app.service_config.server_names)
+        if not server_names:
+            raise ValueError(
+                f"Workload '{app.name}' with source_type='funnel_publication' requires service_config.server_names."
+            )
+        server_name_line = self._server_name_directive(server_names)
+
+        public_id = source.public_id
+        upstream_base_url = source.upstream_base_url.rstrip("/")
+        upstream_api_base_url = source.upstream_api_base_url.rstrip("/")
+
+        conf = f"""server {{
+    listen 80;
+    server_name {server_name_line};
+    client_max_body_size 25m;
+
+    location = / {{
+        proxy_pass {upstream_base_url}/f/{public_id};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
+    location ^~ /api/ {{
+        proxy_pass {upstream_api_base_url}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
+    location ^~ /assets/ {{
+        proxy_pass {upstream_base_url}/assets/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Accept-Encoding "";
+        sub_filter_once off;
+        sub_filter_types text/css application/javascript text/javascript application/json;
+        sub_filter '{upstream_api_base_url}' '/api';
+    }}
+
+    location = /favicon.ico {{
+        proxy_pass {upstream_base_url}/favicon.ico;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
+    location / {{
+        proxy_pass {upstream_base_url}/f/{public_id}$request_uri;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Accept-Encoding "";
+        sub_filter_once off;
+        sub_filter_types text/html text/css application/javascript text/javascript application/json;
+        sub_filter '{upstream_api_base_url}' '/api';
+    }}
+}}"""
+        self.upload_file(conf, f"/etc/nginx/sites-available/{app.name}")
+        self.run(f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}")
+        self.run("rm -f /etc/nginx/sites-enabled/default")
+        self.run("systemctl reload nginx")
+        if app.service_config.https:
+            self._enable_https(server_names)
+
+    def _configure_nginx(self, app: ApplicationSpec):
+        if app.source_type == ApplicationSourceType.FUNNEL_PUBLICATION:
+            self._ensure_nginx()
+            self._configure_funnel_publication_proxy(app)
+            return
+
+        if not app.service_config.ports:
+            return
+
+        self._ensure_nginx()
 
         port = app.service_config.ports[0]
         server_names = self._normalize_server_names(app.service_config.server_names)
@@ -325,6 +434,11 @@ WantedBy=multi-user.target
                 f"DEBIAN_FRONTEND=noninteractive apt-get update && "
                 f"DEBIAN_FRONTEND=noninteractive apt-get install -y {' '.join(app.build_config.system_packages)}"
             )
+        if app.source_type == ApplicationSourceType.FUNNEL_PUBLICATION:
+            if configure_nginx:
+                self._configure_nginx(app)
+            return
+
         if app.runtime == RuntimeType.NODEJS:
             # Ensure a modern Node runtime regardless of base image defaults.
             self.run(
@@ -334,7 +448,13 @@ WantedBy=multi-user.target
             self.run('bash -lc "curl -fsSL https://deb.nodesource.com/setup_20.x | bash -"')
             self.run("DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs")
 
+        self._assert_ports_available(app)
+
         # 2. Git Sync
+        repo_url = (app.repo_url or "").strip()
+        if not repo_url:
+            raise ValueError(f"Workload '{app.name}' requires repo_url for source_type='git'.")
+
         gh_token = (
             os.getenv("GITHUB_TOKEN")
             or os.getenv("GH_TOKEN")
@@ -355,9 +475,9 @@ WantedBy=multi-user.target
             # Clean any partial checkout and reclone.
             self.run(f"rm -rf {app_dir}")
             self.run(f"mkdir -p {app.destination_path}")
-            clone_url = app.repo_url
+            clone_url = repo_url
             if gh_token:
-                clone_url = app.repo_url.replace("https://", f"https://{gh_token}@")
+                clone_url = repo_url.replace("https://", f"https://{gh_token}@")
             self.run(
                 f"git clone --branch {app.branch} {clone_url} {app_dir}",
                 mask=[gh_token] if gh_token else None,

@@ -10,6 +10,15 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { FormEvent, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
+const deployPlanPath = (import.meta.env.VITE_DEPLOY_PLAN_PATH || "").trim();
+const deployInstanceName = (import.meta.env.VITE_DEPLOY_INSTANCE_NAME || "").trim();
+const deployUpstreamBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_BASE_URL || "").trim();
+const deployUpstreamApiBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_API_BASE_URL || "").trim();
+const deployServerNames = (import.meta.env.VITE_DEPLOY_SERVER_NAMES || "")
+  .split(",")
+  .map((value: string) => value.trim())
+  .filter((value: string) => value.length > 0);
+
 export function FunnelDetailPage() {
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
@@ -71,6 +80,36 @@ export function FunnelDetailPage() {
 
   const publicBase = funnel?.public_id ? `/f/${funnel.public_id}` : null;
 
+  const handlePublish = () => {
+    if (!funnelId || !funnel) return;
+    const payload: {
+      deploy: {
+        workloadName: string;
+        createIfMissing: boolean;
+        applyPlan: boolean;
+        planPath?: string;
+        instanceName?: string;
+        serverNames?: string[];
+        upstreamBaseUrl?: string;
+        upstreamApiBaseUrl?: string;
+      };
+    } = {
+      deploy: {
+        workloadName: `funnel-${funnel.public_id}`,
+        createIfMissing: true,
+        applyPlan: true,
+      },
+    };
+
+    if (deployPlanPath) payload.deploy.planPath = deployPlanPath;
+    if (deployInstanceName) payload.deploy.instanceName = deployInstanceName;
+    if (deployServerNames.length > 0) payload.deploy.serverNames = deployServerNames;
+    if (deployUpstreamBaseUrl) payload.deploy.upstreamBaseUrl = deployUpstreamBaseUrl;
+    if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
+
+    publish.mutate({ funnelId, payload });
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader
@@ -83,10 +122,10 @@ export function FunnelDetailPage() {
             </Button>
             <Button
               size="sm"
-              onClick={() => funnelId && publish.mutate(funnelId)}
+              onClick={handlePublish}
               disabled={!funnel?.canPublish || publish.isPending}
             >
-              {publish.isPending ? "Publishing…" : "Publish"}
+              {publish.isPending ? "Publishing…" : "Publish + Deploy"}
             </Button>
           </div>
         }

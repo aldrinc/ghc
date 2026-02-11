@@ -41,9 +41,10 @@ class Settings(BaseSettings):
     # Deploy control plane (Terraform apply + SSH deploy) embedded in the MOS backend.
     # Root folder where plan files and Terraform state will be written.
     DEPLOY_ROOT_DIR: str = "cloudhand"
-    DEPLOY_TERRAFORM_BIN: str = "terraform"
     DEPLOY_PROJECT_ID: str = "mos"
     DEPLOY_WORKSPACE_ID: str = "default"
+    DEPLOY_PUBLIC_BASE_URL: str | None = None
+    DEPLOY_PUBLIC_API_BASE_URL: str | None = None
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None

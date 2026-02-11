@@ -35,7 +35,8 @@ Hard constraints for deployment requests:
 DesiredStateSpec schema for provider "{provider}":
 - networks[]: {{"name": str, "cidr": str}}
 - instances[]: {{"name": str, "size": str, "network": str, "region"?: str, "labels"?: {{}},"workloads"?: [ApplicationSpec]}}
-- ApplicationSpec: {{"name": str, "repo_url": str, "branch"?: str, "runtime": str, "build_config": {{"install_command"?: str, "build_command"?: str, "system_packages"?: [str]}}, "service_config": {{"command": str, "environment"?: {{}}, "environment_file"?: str, "environment_file_upload"?: str, "ports"?: [int], "server_names"?: [str], "https"?: bool}}, "destination_path"?: str}}
+- ApplicationSpec (git source): {{"name": str, "source_type": "git", "repo_url": str, "branch"?: str, "runtime": str, "build_config": {{"install_command"?: str, "build_command"?: str, "system_packages"?: [str]}}, "service_config": {{"command": str, "environment"?: {{}}, "environment_file"?: str, "environment_file_upload"?: str, "ports"?: [int], "server_names"?: [str], "https"?: bool}}, "destination_path"?: str}}
+- ApplicationSpec (DB-backed funnel source): {{"name": str, "source_type": "funnel_publication", "source_ref": {{"public_id": str, "upstream_base_url": str, "upstream_api_base_url": str}}, "runtime": "static", "build_config": {{"install_command"?: str, "build_command"?: str, "system_packages"?: [str]}}, "service_config": {{"command"?: str, "environment"?: {{}}, "environment_file"?: str, "environment_file_upload"?: str, "ports"?: [int], "server_names"?: [str], "https"?: bool}}, "destination_path"?: str}}
 - firewalls[]: {{"name": str, "rules": [{{"direction": str, "protocol": str, "port"?: str, "cidr"?: str}}], "targets": [{{"type": str, "selector": str}}]}}
 - containers[]: legacy container specs (prefer workloads on instances).
 

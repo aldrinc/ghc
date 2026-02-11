@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -46,6 +47,13 @@ def _cloudhand_dir() -> Path:
 
 def _terraform_dir() -> Path:
     return _cloudhand_dir() / "terraform"
+
+
+def _resolve_terraform_bin() -> str:
+    tf_bin = shutil.which("terraform")
+    if not tf_bin:
+        raise DeployError("Terraform binary 'terraform' not found in PATH. Install Terraform on the MOS API host.")
+    return tf_bin
 
 
 def _find_latest_plan() -> Optional[Path]:
@@ -112,6 +120,77 @@ def _deep_merge(dst: Any, patch: Any) -> Any:
             out[k] = _deep_merge(out.get(k), v)
         return out
     return patch
+
+
+def build_funnel_publication_workload_patch(
+    *,
+    workload_name: str,
+    funnel_public_id: str,
+    upstream_base_url: str,
+    upstream_api_base_url: str,
+    server_names: list[str],
+    https: bool,
+    destination_path: str,
+) -> dict[str, Any]:
+    name = workload_name.strip()
+    if not name:
+        raise DeployError("Deploy workloadName must be non-empty.")
+
+    public_id = funnel_public_id.strip()
+    if not public_id:
+        raise DeployError("Funnel public_id must be non-empty.")
+
+    base_url = upstream_base_url.strip().rstrip("/")
+    if not base_url.startswith(("http://", "https://")):
+        raise DeployError("Deploy upstreamBaseUrl must start with http:// or https://.")
+
+    api_base_url = upstream_api_base_url.strip().rstrip("/")
+    if not api_base_url.startswith(("http://", "https://")):
+        raise DeployError("Deploy upstreamApiBaseUrl must start with http:// or https://.")
+
+    seen_server_names: set[str] = set()
+    normalized_server_names: list[str] = []
+    for raw in server_names:
+        hostname = raw.strip().lower()
+        if not hostname:
+            continue
+        if " " in hostname:
+            raise DeployError(f"Invalid hostname in deploy serverNames: '{raw}'.")
+        if hostname in seen_server_names:
+            continue
+        seen_server_names.add(hostname)
+        normalized_server_names.append(hostname)
+    if not normalized_server_names:
+        raise DeployError("Deploy serverNames must include at least one hostname.")
+
+    destination = destination_path.strip()
+    if not destination:
+        raise DeployError("Deploy destinationPath must be non-empty.")
+
+    return {
+        "name": name,
+        "source_type": "funnel_publication",
+        "source_ref": {
+            "public_id": public_id,
+            "upstream_base_url": base_url,
+            "upstream_api_base_url": api_base_url,
+        },
+        "repo_url": None,
+        "runtime": "static",
+        "build_config": {
+            "install_command": None,
+            "build_command": None,
+            "system_packages": [],
+        },
+        "service_config": {
+            "command": None,
+            "environment": {},
+            "ports": [],
+            "server_names": normalized_server_names,
+            "https": https,
+        },
+        "destination_path": destination,
+    }
 
 
 def patch_workload_in_plan(
@@ -235,7 +314,7 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
     # Run Cloudhand apply in a subprocess so we can stream/capture Terraform output.
     env = os.environ.copy()
     project_id = settings.DEPLOY_PROJECT_ID
-    terraform_bin = settings.DEPLOY_TERRAFORM_BIN
+    terraform_bin = _resolve_terraform_bin()
 
     cmd = [
         sys.executable,

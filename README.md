@@ -68,20 +68,37 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
   - append when `create_if_missing=true`
 - Terraform apply is triggered from MOS API (`mos/backend/app/services/deploy.py`) via:
   - `python -m cloudhand.cli ... apply ...`
-  - configurable binary via `DEPLOY_TERRAFORM_BIN` (default: `terraform`)
+  - `terraform` resolved from host `PATH` (hard error if missing)
 - Deploy endpoint exposure is constrained to MOS-proxied traffic:
   - Bearer auth (Clerk token) is required
   - direct backend-port calls are blocked by loopback proxy check
 - Nginx workload routing modes are supported:
   - `CLOUDHAND_NGINX_MODE=per-app` (default, one site config per workload)
   - `CLOUDHAND_NGINX_MODE=combined|single|shared` (one shared config with path-based routing)
+- Workload port safety is enforced during apply:
+  - if a non-`funnel_publication` workload omits `service_config.ports`, MOS assigns a deterministic high port per instance/workload
+  - per-instance port conflicts fail fast before deploy
+  - reserved system ports (`22`, `80`, `443`) are blocked for workload ports
+  - deploy preflight checks each target server and errors if a required port is already listening and not managed by that workload service
+- Workload source types are supported:
+  - `source_type: "git"`: deploy from `repo_url` + `branch` (existing behavior)
+  - `source_type: "funnel_publication"`: deploy a DB-backed funnel publication proxy with:
+    - `source_ref.public_id`
+    - `source_ref.upstream_base_url`
+    - `source_ref.upstream_api_base_url`
+  - In `funnel_publication` mode, `repo_url` is forbidden and per-app nginx mode is required.
+- Funnel publish can now patch/apply deploy plans from inside MOS in a single call:
+  - `POST /funnels/{funnel_id}/publish` accepts optional `deploy` payload
+  - workload `source_ref.public_id` is taken from MOS DB (`funnels.public_id`) at publish time
+  - if `deploy.serverNames` is omitted, active/verified `funnel_domains.hostname` values are used from DB
 
 ### Required runtime configuration
 
 - `HCLOUD_TOKEN` (or `TF_VAR_hcloud_token`) for Hetzner provider auth
 - `DEPLOY_ROOT_DIR` (default `cloudhand`)
 - `DEPLOY_PROJECT_ID` (default `mos`)
-- `DEPLOY_TERRAFORM_BIN` (default `terraform`)
+- `DEPLOY_PUBLIC_BASE_URL` (for example `https://moshq.app`)
+- `DEPLOY_PUBLIC_API_BASE_URL` (for example `https://moshq.app/api`)
 
 ### Known gaps
 
