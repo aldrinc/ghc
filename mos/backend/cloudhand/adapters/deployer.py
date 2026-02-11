@@ -8,6 +8,11 @@ from typing import Dict, List, Optional  # noqa: F401
 from ..models import ApplicationSourceType, ApplicationSpec, RuntimeType
 
 
+_NGINX_PROXY_CONNECT_TIMEOUT = "60s"
+_NGINX_PROXY_SEND_TIMEOUT = "3600s"
+_NGINX_PROXY_READ_TIMEOUT = "3600s"
+
+
 class ServerDeployer:
     """SSH-based deployer that configures apps without replacing servers."""
 
@@ -263,6 +268,9 @@ WantedBy=multi-user.target
     listen 80;
     server_name {server_name_line};
     client_max_body_size 25m;
+    proxy_connect_timeout {_NGINX_PROXY_CONNECT_TIMEOUT};
+    proxy_send_timeout {_NGINX_PROXY_SEND_TIMEOUT};
+    proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};
 
     location = / {{
         proxy_pass {upstream_base_url}/f/{public_id};
@@ -341,6 +349,9 @@ WantedBy=multi-user.target
         conf = f"""server {{
     listen 80;
     server_name {server_name_line};
+    proxy_connect_timeout {_NGINX_PROXY_CONNECT_TIMEOUT};
+    proxy_send_timeout {_NGINX_PROXY_SEND_TIMEOUT};
+    proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};
     location / {{
         proxy_pass http://127.0.0.1:{port};
         proxy_http_version 1.1;
@@ -402,6 +413,9 @@ WantedBy=multi-user.target
             "    listen 80;",
             f"    server_name {server_name_line};",
             "    client_max_body_size 25m;",
+            f"    proxy_connect_timeout {_NGINX_PROXY_CONNECT_TIMEOUT};",
+            f"    proxy_send_timeout {_NGINX_PROXY_SEND_TIMEOUT};",
+            f"    proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};",
             "    location / {",
             f"        proxy_pass http://127.0.0.1:{root_port}/;",
             "        proxy_http_version 1.1;",

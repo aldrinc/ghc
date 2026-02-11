@@ -75,6 +75,7 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
 - Nginx workload routing modes are supported:
   - `CLOUDHAND_NGINX_MODE=per-app` (default, one site config per workload)
   - `CLOUDHAND_NGINX_MODE=combined|single|shared` (one shared config with path-based routing)
+  - generated nginx configs set long upstream timeouts (`proxy_read_timeout/proxy_send_timeout=3600s`) for long-running API calls
 - Workload port safety is enforced during apply:
   - if a non-`funnel_publication` workload omits `service_config.ports`, MOS assigns a deterministic high port per instance/workload
   - per-instance port conflicts fail fast before deploy
