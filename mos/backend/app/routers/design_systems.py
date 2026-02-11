@@ -9,6 +9,10 @@ from app.db.deps import get_session
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.design_systems import DesignSystemsRepository
 from app.schemas.design_systems import DesignSystemCreateRequest, DesignSystemUpdateRequest
+from app.services.design_system_generation import (
+    DesignSystemGenerationError,
+    validate_design_system_tokens,
+)
 
 router = APIRouter(prefix="/design-systems", tags=["design-systems"])
 
@@ -19,6 +23,13 @@ def _ensure_client_belongs(session: Session, *, org_id: str, client_id: str):
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     return client
+
+
+def _validated_tokens_or_422(tokens: dict[str, object]) -> dict[str, object]:
+    try:
+        return validate_design_system_tokens(tokens)
+    except DesignSystemGenerationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
 
 
 @router.get("")
@@ -49,10 +60,11 @@ def create_design_system(
     repo = DesignSystemsRepository(session)
     if client_id:
         has_existing = repo.has_client_design_systems(org_id=auth.org_id, client_id=client_id)
+    validated_tokens = _validated_tokens_or_422(payload.tokens)
     design_system = repo.create(
         org_id=auth.org_id,
         name=payload.name,
-        tokens=payload.tokens,
+        tokens=validated_tokens,
         client_id=client_id,
     )
     if client_id and client and client.design_system_id is None and not has_existing:
@@ -91,7 +103,7 @@ def update_design_system(
     if payload.name is not None:
         fields["name"] = payload.name
     if payload.tokens is not None:
-        fields["tokens"] = payload.tokens
+        fields["tokens"] = _validated_tokens_or_422(payload.tokens)
     if "clientId" in payload.model_fields_set:
         client_id = payload.clientId or None
         if client_id:

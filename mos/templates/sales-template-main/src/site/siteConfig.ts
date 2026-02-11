@@ -25,7 +25,7 @@ export const siteConfig: SiteConfig = {
 
   copy: {
     common: {
-      starsAriaLabelTemplate: '{rating} out of 5 stars',
+      starsAriaLabelTemplate: '{rating} out of five stars',
     },
     modal: {
       closeAriaLabel: 'Close dialog',
@@ -247,7 +247,7 @@ export const siteConfig: SiteConfig = {
     },
 
     videos: {
-      badge: '37,000+ DOG PARENTS LOVE US!',
+      badge: 'CUSTOMERS LOVE THIS',
       title: "See Why We're The Most Shared Pee Pad On Facebook",
       videos: [
         { id: 'v1', thumbnail: { src: '/assets/ph-3x4.svg', alt: 'Video testimonial 1' } },
@@ -448,7 +448,7 @@ export const siteConfig: SiteConfig = {
       id: 'reviews',
       badge: 'VET RECOMMENDED',
       title: 'What Our Customers Are Saying',
-      ratingLabel: '37,893 - 5 STAR REVIEWS',
+      ratingLabel: 'Verified customer reviews',
       showMoreLabel: 'Show more reviews',
       tiles: Array.from({ length: 14 }).map((_, i) => ({
         id: `tile-${i + 1}`,
@@ -460,8 +460,8 @@ export const siteConfig: SiteConfig = {
     },
 
     footer: {
-      logo: { src: '/assets/puppypad-logo.svg', alt: 'PuppyPad' },
-      copyright: '© 2026 PuppyPad',
+      logo: { src: '/assets/puppypad-logo.svg', alt: 'Brand logo' },
+      copyright: '© All rights reserved.',
     },
 
     modals: {
