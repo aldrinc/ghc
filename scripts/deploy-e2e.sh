@@ -80,7 +80,7 @@ request_post() {
   local data="$2"
   curl --fail-with-body --silent --show-error \
     --request POST "${url}" \
-    --header "Authorization: Bearer ${MOS_TOKEN}" \
+    --header "Authorization: Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18zNmlRenNVb25UN2VXS3RSNXZJNkthelkxU0EiLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL21vc2hxLmFwcCIsImV4cCI6MTc3MDg0MDg3MywiaWF0IjoxNzcwODQwODEzLCJpc3MiOiJodHRwczovL2ltbXVuZS10dXJ0bGUtNzkuY2xlcmsuYWNjb3VudHMuZGV2IiwianRpIjoiMWUwYzM0N2NhYjE1OTc1NWJhNGEiLCJuYmYiOjE3NzA4NDA4MDgsIm9yZ19pZCI6Im9yZ18zNmliN1JxNU5pc2JHR1FDcDU0cmJRQTRCaEsiLCJzdWIiOiJ1c2VyXzM2aVRNdENsbmtTZGNSQkRGdXF2Y0Q3MkR3dCJ9.ikRuBe0zbMwuys0KlvS3ff1mC9A2Tj3SKqeTE3457BwOvAeJ5P8ZaDcqGXOuK_UemPIHEXkO5rhnntT0xZPgrAgzJO0dJ-NlXWvBNujLu1MRWLoRZGl5unUeAGw2s8L-YUmHsAPM8VBn72XJmkje5oR3O7a-pkAfjhUk75tYqbCRs2FunM-f2ZtmcpIU0W_-e5weNiJn6G0fte0G10jcRQiyvKhBPKXHp9gppIBCv79sg8TKpNu7J9udf2uZvPTsPw1AYktAhm8nZHh75uvKC8PJnreQfjG8rGDBUTbnVMN_A31XTlvZrHK0R0_0sblbpx002Xn8TIlWqbuQ2GUGOA" \
     --header "Content-Type: application/json" \
     --data "${data}"
 }
