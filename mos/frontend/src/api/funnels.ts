@@ -245,24 +245,6 @@ export function useSaveFunnelDraft() {
   });
 }
 
-export function useApproveFunnelPage() {
-  const { post } = useApiClient();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ funnelId, pageId }: { funnelId: string; pageId: string }) =>
-      post<FunnelPageVersion>(`/funnels/${funnelId}/pages/${pageId}/approve`),
-    onSuccess: (_data, vars) => {
-      toast.success("Page approved");
-      queryClient.invalidateQueries({ queryKey: ["funnels", "page", vars.funnelId, vars.pageId] });
-      queryClient.invalidateQueries({ queryKey: ["funnels", "detail", vars.funnelId] });
-    },
-    onError: (err: ApiError | Error) => {
-      const message = "message" in err ? err.message : err?.message || "Failed to approve page";
-      toast.error(message);
-    },
-  });
-}
-
 export function useUpdateFunnelPage() {
   const { request } = useApiClient();
   const queryClient = useQueryClient();

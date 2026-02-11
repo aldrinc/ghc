@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Instagram-Style Comment Card</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-[#eef6ff] antialiased">
+    <div id="card" class="mx-auto w-full max-w-[430px] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+      <div id="post-header" class="border-b border-neutral-100 px-4 pb-2 pt-4"></div>
+      <div class="px-4 pb-3 pt-2">
+        <div id="comments" class="space-y-4"></div>
+        <div id="post-actions" class="mt-4"></div>
+      </div>
+      <div class="flex items-center gap-3 border-t border-neutral-200 px-4 py-3">
+        <button type="button" class="h-7 w-7 rounded-full text-neutral-500 hover:bg-neutral-100" aria-label="Add emoji">
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M8.5 10.5h.01" />
+            <path d="M15.5 10.5h.01" />
+            <path d="M8 15c1.2 1.6 2.7 2.4 4 2.4S14.8 16.6 16 15" />
+          </svg>
+        </button>
+        <div class="flex-1 text-sm text-neutral-400">Add a comment...</div>
+        <button type="button" class="text-sm font-semibold text-sky-400" disabled>Post</button>
+      </div>
+    </div>
+
+    <script>
+      const waitForImage = (img) =>
+        new Promise((resolve, reject) => {
+          if (!img) {
+            reject(new Error('Image element not found.'));
+            return;
+          }
+          if (img.complete && img.naturalWidth > 0) {
+            resolve();
+            return;
+          }
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => reject(new Error('Failed to load image.')), { once: true });
+        });
+
+      const initials = (value) => {
+        const text = (value || '?').trim();
+        return text ? text.slice(0, 1).toUpperCase() : '?';
+      };
+
+      const createAvatar = ({ username, src, size, ring, imageList }) => {
+        const wrapper = document.createElement('div');
+        const ringClass = ring ? ' ring-2 ring-offset-2 ring-rose-500/70 ring-offset-white' : '';
+        wrapper.className = `flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-200 font-semibold text-neutral-700${ringClass}`;
+        wrapper.style.width = `${size}px`;
+        wrapper.style.height = `${size}px`;
+        if (src) {
+          const img = document.createElement('img');
+          img.className = 'h-full w-full object-cover';
+          img.alt = username;
+          img.src = src;
+          wrapper.appendChild(img);
+          imageList.push(img);
+        } else {
+          const label = document.createElement('span');
+          label.textContent = initials(username);
+          label.style.fontSize = `${Math.max(10, Math.floor(size * 0.42))}px`;
+          wrapper.appendChild(label);
+        }
+        return wrapper;
+      };
+
+      const icon = {
+        heart: (filled = false, size = 'h-5 w-5') =>
+          filled
+            ? `<svg viewBox="0 0 24 24" class="${size}"><path d="M12 21s-7-4.35-9.33-8.36C1.1 9.8 2.1 6.9 4.6 5.4 7 4 9.3 5.1 10.6 6.7L12 8.4l1.4-1.7c1.3-1.6 3.6-2.7 6-1.3 2.5 1.5 3.5 4.4 1.93 7.24C19 16.65 12 21 12 21z" fill="currentColor"/></svg>`
+            : `<svg viewBox="0 0 24 24" class="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 7.5c0 5.1-8.8 11.3-8.8 11.3S3.2 12.6 3.2 7.5c0-2.5 2-4.5 4.5-4.5 1.7 0 3.3.9 4.3 2.3 1-1.4 2.6-2.3 4.3-2.3 2.5 0 4.5 2 4.5 4.5z"/></svg>`,
+        comment: (size = 'h-5 w-5') =>
+          `<svg viewBox="0 0 24 24" class="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"/></svg>`,
+        send: (size = 'h-5 w-5') =>
+          `<svg viewBox="0 0 24 24" class="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/></svg>`,
+        bookmark: (size = 'h-5 w-5') =>
+          `<svg viewBox="0 0 24 24" class="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12a1 1 0 0 1 1 1v18l-7-4-7 4V4a1 1 0 0 1 1-1z"/></svg>`,
+      };
+
+      const buildPostHeader = ({ post, imageList }) => {
+        const root = document.createElement('div');
+        root.className = 'flex items-start justify-between gap-3';
+
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-3';
+        left.appendChild(createAvatar({ username: post.username, src: post.avatarUrl, size: 32, ring: true, imageList }));
+
+        const textWrap = document.createElement('div');
+        textWrap.className = 'leading-tight';
+
+        const topRow = document.createElement('div');
+        topRow.className = 'flex items-center gap-2';
+        const username = document.createElement('span');
+        username.className = 'text-sm font-semibold text-neutral-900';
+        username.textContent = post.username;
+        const dot = document.createElement('span');
+        dot.className = 'text-sm text-neutral-400';
+        dot.innerHTML = '&bull;';
+        const follow = document.createElement('button');
+        follow.type = 'button';
+        follow.className = 'text-sm font-semibold text-sky-600';
+        follow.textContent = 'Follow';
+        topRow.appendChild(username);
+        topRow.appendChild(dot);
+        topRow.appendChild(follow);
+
+        const location = document.createElement('div');
+        location.className = 'text-xs text-neutral-600';
+        location.textContent = post.location || '';
+
+        textWrap.appendChild(topRow);
+        textWrap.appendChild(location);
+        left.appendChild(textWrap);
+
+        const more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'h-8 w-8 rounded-full text-neutral-500 hover:bg-neutral-100';
+        more.setAttribute('aria-label', 'More');
+        more.innerHTML =
+          '<svg viewBox="0 0 24 24" class="h-5 w-5" fill="currentColor"><circle cx="6" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18" cy="12" r="1.2"/></svg>';
+
+        root.appendChild(left);
+        root.appendChild(more);
+        return root;
+      };
+
+      const buildCommentRow = ({ comment, depth, imageList }) => {
+        const row = document.createElement('div');
+        row.className = `space-y-1 ${depth === 0 ? '' : 'pl-11'}`;
+
+        const top = document.createElement('div');
+        top.className = 'flex items-start gap-3';
+
+        top.appendChild(createAvatar({ username: comment.name, src: comment.avatarUrl, size: depth === 0 ? 28 : 26, ring: true, imageList }));
+
+        const body = document.createElement('div');
+        body.className = 'min-w-0 flex-1';
+        const text = document.createElement('div');
+        text.className = 'text-sm leading-snug text-neutral-900';
+        const author = document.createElement('span');
+        author.className = 'mr-2 font-semibold';
+        author.textContent = comment.name;
+        const commentText = document.createElement('span');
+        commentText.textContent = comment.text;
+        text.appendChild(author);
+        text.appendChild(commentText);
+        body.appendChild(text);
+
+        if (comment.attachmentUrl) {
+          const media = document.createElement('div');
+          media.className = 'mt-2 max-w-[250px] overflow-hidden rounded-xl border border-neutral-200';
+          const img = document.createElement('img');
+          img.className = 'h-auto w-full object-cover';
+          img.alt = 'Attachment';
+          img.src = comment.attachmentUrl;
+          media.appendChild(img);
+          body.appendChild(media);
+          imageList.push(img);
+        }
+
+        const likeBtn = document.createElement('button');
+        likeBtn.type = 'button';
+        likeBtn.className = '-mr-1 h-8 w-8 rounded-full text-neutral-500 hover:bg-neutral-100';
+        likeBtn.setAttribute('aria-label', 'Like comment');
+        likeBtn.innerHTML = icon.heart(false, 'h-4 w-4');
+
+        top.appendChild(body);
+        top.appendChild(likeBtn);
+
+        const meta = document.createElement('div');
+        meta.className = `flex items-center gap-3 text-xs text-neutral-500 ${depth === 0 ? 'pl-11' : 'pl-[84px]'}`;
+        const time = document.createElement('span');
+        time.textContent = comment.meta.time;
+        meta.appendChild(time);
+        if (typeof comment.reactionCount === 'number' && comment.reactionCount > 0) {
+          const likes = document.createElement('span');
+          likes.textContent = `${comment.reactionCount} like${comment.reactionCount === 1 ? '' : 's'}`;
+          meta.appendChild(likes);
+        }
+        const reply = document.createElement('button');
+        reply.type = 'button';
+        reply.className = 'font-semibold hover:text-neutral-700';
+        reply.textContent = 'Reply';
+        meta.appendChild(reply);
+
+        row.appendChild(top);
+        row.appendChild(meta);
+
+        if (comment.viewRepliesText) {
+          const view = document.createElement('div');
+          view.className = 'pl-11 text-xs font-semibold text-neutral-500';
+          view.textContent = comment.viewRepliesText;
+          row.appendChild(view);
+        }
+
+        if (Array.isArray(comment.replies) && comment.replies.length > 0) {
+          const repliesWrap = document.createElement('div');
+          repliesWrap.className = 'space-y-2';
+          comment.replies.forEach((replyComment) => {
+            repliesWrap.appendChild(buildCommentRow({ comment: replyComment, depth: 1, imageList }));
+          });
+          row.appendChild(repliesWrap);
+        }
+
+        return row;
+      };
+
+      const buildPostActions = ({ likeCount, dateLabel }) => {
+        const root = document.createElement('div');
+
+        const top = document.createElement('div');
+        top.className = 'flex items-center justify-between';
+
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-2';
+        ['heart', 'comment', 'send'].forEach((name) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = '-ml-2 h-10 w-10 rounded-full text-neutral-900 hover:bg-neutral-100';
+          btn.innerHTML = icon[name]('h-6 w-6');
+          left.appendChild(btn);
+        });
+
+        const save = document.createElement('button');
+        save.type = 'button';
+        save.className = 'h-10 w-10 rounded-full text-neutral-900 hover:bg-neutral-100';
+        save.innerHTML = icon.bookmark('h-6 w-6');
+
+        top.appendChild(left);
+        top.appendChild(save);
+
+        const likes = document.createElement('div');
+        likes.className = 'mt-2 text-sm font-semibold text-neutral-900';
+        likes.textContent = `${likeCount} likes`;
+
+        const date = document.createElement('div');
+        date.className = 'mt-0.5 text-xs text-neutral-500';
+        date.textContent = dateLabel;
+
+        root.appendChild(top);
+        root.appendChild(likes);
+        root.appendChild(date);
+        return root;
+      };
+
+      window.setCardData = async (data) => {
+        if (!data || typeof data !== 'object') {
+          throw new Error('Payload must be an object.');
+        }
+        if (!data.post || typeof data.post !== 'object') {
+          throw new Error('post is required.');
+        }
+        if (!Array.isArray(data.comments) || data.comments.length === 0) {
+          throw new Error('comments must be a non-empty array.');
+        }
+
+        const imageList = [];
+
+        const postHeader = document.getElementById('post-header');
+        postHeader.innerHTML = '';
+        postHeader.appendChild(buildPostHeader({ post: data.post, imageList }));
+
+        const comments = document.getElementById('comments');
+        comments.innerHTML = '';
+        data.comments.forEach((comment) => {
+          comments.appendChild(buildCommentRow({ comment, depth: 0, imageList }));
+        });
+
+        const postActions = document.getElementById('post-actions');
+        postActions.innerHTML = '';
+        postActions.appendChild(buildPostActions({ likeCount: data.post.likeCount, dateLabel: data.post.dateLabel }));
+
+        await Promise.all(imageList.map(waitForImage));
+      };
+    </script>
+  </body>
+</html>

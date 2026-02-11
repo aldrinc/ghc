@@ -20,6 +20,8 @@ def _template_paths() -> dict[str, Path]:
     return {
         "review_card": base / "review_card.html",
         "social_comment": base / "social_comment.html",
+        "social_comment_no_header": base / "social_comment_no_header.html",
+        "social_comment_instagram": base / "social_comment_instagram.html",
         "testimonial_media": base / "testimonial_media.html",
     }
 

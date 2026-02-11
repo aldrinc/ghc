@@ -7,3 +7,4 @@ from pydantic import BaseModel
 
 class CampaignFunnelGenerationRequest(BaseModel):
     experimentIds: List[str]
+    generateTestimonials: bool = False

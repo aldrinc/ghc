@@ -149,9 +149,17 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
     if str(funnel.entry_page_id) not in page_id_set:
         raise ValueError("Entry page does not belong to funnel")
 
-    approved_by_page: dict[str, FunnelPageVersion] = {}
+    version_by_page: dict[str, FunnelPageVersion] = {}
     for page in pages:
-        version = session.scalars(
+        draft = session.scalars(
+            select(FunnelPageVersion)
+            .where(
+                FunnelPageVersion.page_id == page.id,
+                FunnelPageVersion.status == FunnelPageVersionStatusEnum.draft,
+            )
+            .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
+        ).first()
+        approved = session.scalars(
             select(FunnelPageVersion)
             .where(
                 FunnelPageVersion.page_id == page.id,
@@ -159,8 +167,9 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
             )
             .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
         ).first()
+        version = draft or approved
         if not version:
-            raise ValueError(f"Page '{page.name}' is not approved")
+            raise ValueError(f"Page '{page.name}' has no saved version to publish")
         # Compliance gate: prevent publishing synthetic testimonials in production.
         if settings.ENVIRONMENT.lower() in {"prod", "production"} and not settings.ALLOW_SYNTHETIC_TESTIMONIALS_IN_PRODUCTION:
             md = version.ai_metadata if isinstance(version.ai_metadata, dict) else {}
@@ -175,7 +184,7 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
                     f"Page '{page.name}' contains synthetic testimonials and cannot be published in production. "
                     "Replace with production testimonials or remove testimonials before publishing."
                 )
-        approved_by_page[str(page.id)] = version
+        version_by_page[str(page.id)] = version
 
     publication = FunnelPublication(
         funnel_id=funnel.id,
@@ -187,7 +196,7 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
 
     extracted_links: list[tuple[str, InternalLink]] = []
     for page in pages:
-        version = approved_by_page[str(page.id)]
+        version = version_by_page[str(page.id)]
         for link in extract_internal_links(version.puck_data):
             if link.to_page_id not in page_id_set:
                 raise ValueError(f"Invalid internal link target: {link.to_page_id}")
@@ -213,7 +222,7 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
             FunnelPublicationPage(
                 publication_id=publication.id,
                 page_id=page.id,
-                page_version_id=approved_by_page[str(page.id)].id,
+                page_version_id=version_by_page[str(page.id)].id,
                 slug_at_publish=page.slug,
             )
         )

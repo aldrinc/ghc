@@ -444,7 +444,7 @@ function Gallery({
       <div className={styles.thumbRow} role="tablist" aria-label="Image thumbnails">
         {slides.map((s, i) => (
           <button
-            key={s.src + i}
+            key={`${s.assetPublicId ?? s.src ?? 'slide'}-${i}`}
             type="button"
             className={`${styles.thumb} ${i === index ? styles.thumbSelected : ''}`}
             onClick={() => setIndex(i)}
@@ -847,9 +847,17 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       setCheckoutError("Commerce data is not available.");
       return;
     }
+    if (!runtime.commerce.offers.length) {
+      setCheckoutError("Checkout is not configured for this funnel product. No product offers were found.");
+      return;
+    }
+    if (!runtime.commerce.offers.some((item) => Array.isArray(item.pricePoints) && item.pricePoints.length > 0)) {
+      setCheckoutError("Checkout is not configured for this funnel product. No offer price points were found.");
+      return;
+    }
     const productOfferId = selectedOfferObj?.productOfferId;
     if (!productOfferId) {
-      setCheckoutError("Selected offer is missing productOfferId.");
+      setCheckoutError("Selected offer is missing productOfferId in SalesPdpHero.purchase.offer.options.");
       return;
     }
     const offer = runtime.commerce.offers.find((item) => item.id === productOfferId);

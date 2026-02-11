@@ -17,6 +17,7 @@ from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.funnels import create_funnel_image_asset, create_funnel_upload_asset
 from app.services.funnel_ai import _load_product_context
 from app.services.funnels import _walk_json as walk_json
+from app.services.media_storage import MediaStorage
 from app.testimonial_renderer.renderer import TestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 
@@ -55,6 +56,445 @@ class _TestimonialGroup:
 
 _DATE_FORMAT = "%Y-%m-%d"
 _TESTIMONIAL_TEMPLATES = {"review_card", "social_comment", "testimonial_media"}
+_REVIEW_WALL_SOCIAL_RATIO = 0.60
+_REVIEW_WALL_REVIEW_RATIO = 0.40
+_SOCIAL_CARD_VARIANTS = ("social_comment", "social_comment_instagram", "social_comment_no_header")
+_POV_OPTIONS = ("front-camera selfie", "rear-camera observer")
+_SCENE_MODE_WITH_PEOPLE = "with_people"
+_SCENE_MODE_NO_PEOPLE = "no_people"
+_MEDIA_SCENE_MODE_CYCLE = (
+    _SCENE_MODE_WITH_PEOPLE,
+    _SCENE_MODE_NO_PEOPLE,
+    _SCENE_MODE_NO_PEOPLE,
+)
+_SINGLE_SCENE_MODE_CYCLE = (_SCENE_MODE_WITH_PEOPLE, _SCENE_MODE_NO_PEOPLE)
+
+
+def _clean_single_line(text: str) -> str:
+    return " ".join(text.strip().split())
+
+
+def _truncate(text: str, *, limit: int) -> str:
+    compact = _clean_single_line(text)
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[: limit - 3].rstrip()}..."
+
+
+def _seed_value(*parts: str) -> int:
+    value = 0
+    for part in parts:
+        for ch in part:
+            value += ord(ch)
+    return value
+
+
+def _normalize_identity_key(value: str) -> str:
+    return " ".join(value.strip().lower().split())
+
+
+def _append_identity_suffix(*, base: str, suffix: str, limit: int) -> str:
+    if len(suffix) >= limit:
+        raise TestimonialGenerationError(
+            f"Unable to disambiguate testimonial identity because suffix exceeds max length ({limit})."
+        )
+    truncated_base = base[: limit - len(suffix)].rstrip()
+    if not truncated_base:
+        raise TestimonialGenerationError(
+            "Unable to disambiguate testimonial identity because the base value is empty after truncation."
+        )
+    return f"{truncated_base}{suffix}"
+
+
+def _make_identity_unique(
+    *,
+    label: str,
+    raw_value: str,
+    idx: int,
+    seen: dict[str, int],
+    max_length: int,
+) -> tuple[str, bool]:
+    value = _clean_single_line(raw_value)
+    key = _normalize_identity_key(value)
+    if key not in seen:
+        seen[key] = idx
+        return value, False
+
+    attempt = 2
+    while attempt <= 200:
+        suffix = f" ({attempt})"
+        candidate = _append_identity_suffix(base=value, suffix=suffix, limit=max_length)
+        candidate_key = _normalize_identity_key(candidate)
+        if candidate_key not in seen:
+            seen[candidate_key] = idx
+            return candidate, True
+        attempt += 1
+
+    previous_position = seen[key] + 1
+    raise TestimonialGenerationError(
+        f"Unable to disambiguate duplicate testimonial {label} at position {idx + 1} "
+        f"(first seen at position {previous_position}): {value!r}."
+    )
+
+
+def _repair_distinct_testimonial_identities(
+    validated_testimonials: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    seen_names: dict[str, int] = {}
+    seen_personas: dict[str, int] = {}
+    repairs: list[dict[str, Any]] = []
+
+    def repair_field(
+        *,
+        testimonial: dict[str, Any],
+        field_path: tuple[str, ...],
+        label: str,
+        max_length: int,
+        idx: int,
+        seen: dict[str, int],
+    ) -> None:
+        node: Any = testimonial
+        for key in field_path[:-1]:
+            node = node[key]
+        leaf = field_path[-1]
+        original = node[leaf]
+        repaired, changed = _make_identity_unique(
+            label=label,
+            raw_value=original,
+            idx=idx,
+            seen=seen,
+            max_length=max_length,
+        )
+        if changed:
+            node[leaf] = repaired
+            repairs.append(
+                {
+                    "position": idx + 1,
+                    "field": ".".join(field_path),
+                    "from": original,
+                    "to": repaired,
+                }
+            )
+
+    for idx, testimonial in enumerate(validated_testimonials):
+        repair_field(
+            testimonial=testimonial,
+            field_path=("name",),
+            label="name",
+            max_length=80,
+            idx=idx,
+            seen=seen_names,
+        )
+        repair_field(
+            testimonial=testimonial,
+            field_path=("persona",),
+            label="persona",
+            max_length=240,
+            idx=idx,
+            seen=seen_personas,
+        )
+        repair_field(
+            testimonial=testimonial,
+            field_path=("reply", "name"),
+            label="name",
+            max_length=80,
+            idx=idx,
+            seen=seen_names,
+        )
+        repair_field(
+            testimonial=testimonial,
+            field_path=("reply", "persona"),
+            label="persona",
+            max_length=240,
+            idx=idx,
+            seen=seen_personas,
+        )
+
+    return repairs
+
+
+def _assert_distinct_testimonial_identities(validated_testimonials: list[dict[str, Any]]) -> None:
+    seen_names: dict[str, int] = {}
+    seen_personas: dict[str, int] = {}
+
+    def register_identity(*, label: str, raw_value: str, idx: int, seen: dict[str, int]) -> None:
+        key = _normalize_identity_key(raw_value)
+        if key in seen:
+            prev = seen[key] + 1
+            current = idx + 1
+            raise TestimonialGenerationError(
+                f"Duplicate testimonial {label} detected at positions {prev} and {current}: {raw_value!r}. "
+                f"All testimonial {label}s must be distinct."
+            )
+        seen[key] = idx
+
+    for idx, testimonial in enumerate(validated_testimonials):
+        name = testimonial["name"]
+        persona = testimonial["persona"]
+        reply = testimonial["reply"]
+        reply_name = reply["name"]
+        reply_persona = reply["persona"]
+
+        register_identity(label="name", raw_value=name, idx=idx, seen=seen_names)
+        register_identity(label="persona", raw_value=persona, idx=idx, seen=seen_personas)
+        register_identity(label="name", raw_value=reply_name, idx=idx, seen=seen_names)
+        register_identity(label="persona", raw_value=reply_persona, idx=idx, seen=seen_personas)
+
+
+def _select_pov(*parts: str) -> str:
+    seed = _seed_value(*parts)
+    return _POV_OPTIONS[seed % len(_POV_OPTIONS)]
+
+
+def _derive_setting(*, validated: dict[str, Any], fallback_text: str) -> str:
+    meta = validated.get("meta")
+    if isinstance(meta, dict):
+        location = meta.get("location")
+        if isinstance(location, str) and location.strip():
+            return _truncate(
+                f"{location.strip()} with natural clutter, imperfect background details, and lived-in realism.",
+                limit=220,
+            )
+    return _truncate(fallback_text, limit=220)
+
+
+def _derive_action(*, primary_direction: str, review: str) -> str:
+    combined = f"{primary_direction}. {review}"
+    return _truncate(combined, limit=220)
+
+
+def _select_media_scene_mode(index: int) -> str:
+    if index < 0:
+        raise TestimonialGenerationError("Media scene mode index cannot be negative.")
+    return _MEDIA_SCENE_MODE_CYCLE[index % len(_MEDIA_SCENE_MODE_CYCLE)]
+
+
+def _select_single_scene_mode(index: int) -> str:
+    if index < 0:
+        raise TestimonialGenerationError("Single scene mode index cannot be negative.")
+    return _SINGLE_SCENE_MODE_CYCLE[index % len(_SINGLE_SCENE_MODE_CYCLE)]
+
+
+def _build_product_image_prompt(
+    *,
+    render_label: str,
+    persona: str,
+    setting: str,
+    action: str,
+    direction: str,
+    identity_name: str | None = None,
+    identity_anchor: str | None = None,
+    require_subject_match: bool = False,
+    prohibit_visible_text: bool = True,
+) -> str:
+    pov = _select_pov(render_label, persona, setting, action, direction)
+    identity_lines = ""
+    if identity_name or identity_anchor:
+        details = []
+        if identity_name:
+            details.append(f'name "{identity_name}"')
+        if identity_anchor:
+            details.append(f"identity cues: {identity_anchor}")
+        identity_lines = (
+            "IDENTITY ANCHOR: "
+            + "; ".join(details)
+            + ". "
+            + (
+                "If a human subject appears, it must be this same person and must not drift to a different ethnicity, age impression, facial structure, hair pattern, or body type.\n\n"
+                if require_subject_match
+                else "Maintain identity consistency if a human subject appears.\n\n"
+            )
+        )
+    text_policy = (
+        "TEXT POLICY: absolutely no visible text in the image. "
+        "No captions, subtitles, labels, logos, UI overlays, timestamps, watermark text, or packaging text.\n\n"
+        if prohibit_visible_text
+        else ""
+    )
+    return (
+        "VERTICAL 9:16 hyper-real smartphone photo, looks like an unplanned UGC shot (NOT cinematic).\n"
+        f"POV: {pov}. Device: iPhone-style smartphone capture, slight shadow noise, realistic exposure behavior, natural color, no LUT.\n\n"
+        f"SUBJECT/PERSONA: fictional person, {persona}. Natural skin texture, subtle under-eye detail, believable hair flyaways. "
+        "Expression: candid, mid-thought, slightly imperfect (no \"model pose\").\n\n"
+        f"{identity_lines}"
+        f"SETTING: {setting}.\n\n"
+        "COMPOSITION: slightly crooked framing, off-center crop, mild headroom error, shoulder/arm partly clipped if selfie. "
+        "Distance feels like a real phone: ~30-60cm for selfie / ~1-2m for rear-cam. One minor autofocus pulse or slight motion blur is okay.\n\n"
+        f"ACTION: {action}. Minimal gestures, no hands near lens.\n\n"
+        f"{text_policy}"
+        "REALISM LOCKS: realistic pores and fabric texture, natural room reflections, believable phone HDR (not extreme), no plastic skin, "
+        "no perfect studio lighting, no hyper-sharp edges, no AI gloss.\n\n"
+        "AVOID: extra fingers, warped hands, melted jewelry, duplicated facial features, over-smoothing, beauty filter, cinematic depth-of-field, "
+        "heavy grain, over-saturated colors, perfect symmetry, influencer staging, fake lens flares, watermark, text artifacts, captions, subtitles, logos, UI text.\n\n"
+        f"Direction: {direction}\n"
+        "Output testimonial photo of the product attached following the prompt."
+    )
+
+
+def _build_non_user_ugc_prompt(
+    *,
+    render_label: str,
+    persona: str,
+    setting: str,
+    action: str,
+    direction: str,
+    include_text_screen_line: bool,
+    prohibit_visible_text: bool,
+) -> str:
+    pov = _select_pov(render_label, persona, setting, action, direction, "non_user")
+    text_screen_line = (
+        "IF TEXT/SCREEN IS VISIBLE (optional): show ONLY 1-2 lines of BIG high-contrast text, held steady, readable, "
+        "no dense UI, no tiny legal text, no sensitive personal numbers. Keep prop 1.5-2 feet from camera.\n\n"
+        if include_text_screen_line
+        else ""
+    )
+    text_policy = (
+        "TEXT POLICY: absolutely no visible text in the image. "
+        "No captions, subtitles, labels, logos, UI overlays, timestamps, watermark text, or packaging text.\n\n"
+        if prohibit_visible_text
+        else ""
+    )
+    return (
+        "VERTICAL 9:16 hyper-real smartphone photo, looks like an unplanned UGC shot (NOT cinematic).\n"
+        f"POV: {pov}. Device: iPhone-style smartphone capture, slight shadow noise, realistic exposure behavior, natural color, no LUT.\n\n"
+        f"STYLE CONTEXT: persona cues are allowed only for atmosphere ({persona}); do not depict any person.\n\n"
+        "SUBJECT: the product and surrounding environment only.\n"
+        "NO PEOPLE POLICY: absolutely no humans, faces, skin, hands, silhouettes, or reflected bodies in mirrors/glass.\n\n"
+        f"SETTING: {setting}.\n\n"
+        "COMPOSITION: candid handheld framing with mild imperfection, off-center crop, and realistic phone focus behavior. "
+        "Keep the product clearly visible with supporting props only.\n\n"
+        f"ACTION: {action}. Communicate use via product placement, environmental clues, or in-progress setup without showing any person.\n\n"
+        f"{text_screen_line}"
+        f"{text_policy}"
+        "REALISM LOCKS: realistic material textures, natural room reflections, believable phone HDR (not extreme), "
+        "no perfect studio lighting, no hyper-sharp edges, no AI gloss.\n\n"
+        "AVOID: any human presence, hands, face reflections, beauty-filter look, cinematic depth-of-field, heavy grain, "
+        "over-saturated colors, perfect symmetry, influencer staging, fake lens flares, watermark, text artifacts.\n\n"
+        f"Direction: {direction}\n"
+        "Output testimonial photo of the product attached following the prompt."
+    )
+
+
+def _build_testimonial_scene_prompt(
+    *,
+    scene_mode: str,
+    render_label: str,
+    persona: str,
+    setting: str,
+    action: str,
+    direction: str,
+    identity_name: str | None = None,
+    identity_anchor: str | None = None,
+    require_subject_match: bool = False,
+    include_text_screen_line: bool = False,
+    prohibit_visible_text: bool = True,
+) -> str:
+    if scene_mode == _SCENE_MODE_WITH_PEOPLE:
+        return _build_product_image_prompt(
+            render_label=render_label,
+            persona=persona,
+            setting=setting,
+            action=action,
+            direction=direction,
+            identity_name=identity_name,
+            identity_anchor=identity_anchor,
+            require_subject_match=require_subject_match,
+            prohibit_visible_text=prohibit_visible_text,
+        )
+    if scene_mode == _SCENE_MODE_NO_PEOPLE:
+        return _build_non_user_ugc_prompt(
+            render_label=render_label,
+            persona=persona,
+            setting=setting,
+            action=action,
+            direction=direction,
+            include_text_screen_line=include_text_screen_line,
+            prohibit_visible_text=prohibit_visible_text,
+        )
+    raise TestimonialGenerationError(f"Unsupported testimonial scene mode: {scene_mode}")
+
+
+def _build_distinct_avatar_prompt(
+    *,
+    render_label: str,
+    display_name: str,
+    persona: str,
+    direction: str,
+    variant_label: str,
+) -> str:
+    pov = _select_pov(render_label, display_name, persona, direction, variant_label, "avatar")
+    return (
+        "SQUARE 1:1 hyper-real smartphone portrait photo, looks like an unplanned UGC profile shot (NOT cinematic).\n"
+        f"POV: {pov}. Device: iPhone-style smartphone capture, realistic exposure behavior, natural color, no LUT.\n\n"
+        f"SUBJECT/PERSONA: fictional person named {display_name}. {persona}\n"
+        "Natural skin texture, subtle under-eye detail, believable hair flyaways, candid expression.\n\n"
+        "COMPOSITION: tight head-and-shoulders framing, slight framing imperfection, casual real-world posture, not studio-lit.\n"
+        "BACKGROUND: normal lived-in environment with mild blur from phone optics; no staged set dressing.\n\n"
+        "TEXT POLICY: no visible text, logos, labels, or watermark overlays.\n\n"
+        "REALISM LOCKS: believable pores, realistic skin tone, natural fabric detail, no beauty filter, no AI gloss.\n\n"
+        "IDENTITY LOCKS: avatar must stay consistent with the provided name/persona cues and must not conflict with the described identity.\n"
+        "Identity constraint: this must be a distinct person from any other avatar in this render set.\n\n"
+        "AVOID: extra fingers, warped facial features, duplicated features, plastic skin, influencer glam styling, fake lens flares, watermark, text artifacts.\n\n"
+        f"Direction: {direction}"
+    )
+
+
+def _load_reference_asset_bytes(asset: Asset) -> tuple[bytes, str]:
+    if not asset.storage_key:
+        raise TestimonialGenerationError("Product primary image asset is missing storage_key.")
+    try:
+        storage = MediaStorage()
+        image_bytes, mime_type = storage.download_bytes(key=asset.storage_key)
+    except Exception as exc:  # noqa: BLE001
+        raise TestimonialGenerationError("Unable to load product primary image bytes.") from exc
+    if not image_bytes:
+        raise TestimonialGenerationError("Product primary image bytes are empty.")
+    resolved_mime = mime_type or asset.content_type
+    if not isinstance(resolved_mime, str) or not resolved_mime.strip():
+        raise TestimonialGenerationError("Product primary image MIME type is required.")
+    return image_bytes, resolved_mime.split(";")[0].strip()
+
+
+def _wall_template_sequence(total: int) -> list[str]:
+    if total < 0:
+        raise TestimonialGenerationError("Review wall image count cannot be negative.")
+    if total == 0:
+        return []
+    ratio_sum = _REVIEW_WALL_SOCIAL_RATIO + _REVIEW_WALL_REVIEW_RATIO
+    if abs(ratio_sum - 1.0) > 1e-9:
+        raise TestimonialGenerationError(
+            "Review wall testimonial ratios must sum to 1.0."
+        )
+    social_target = int((total * _REVIEW_WALL_SOCIAL_RATIO) + 0.5)
+    if social_target > total:
+        raise TestimonialGenerationError("Computed social review wall target exceeds total slots.")
+    review_target = total - social_target
+    templates: list[str] = []
+    social_assigned = 0
+    review_assigned = 0
+    for _ in range(total):
+        social_progress = (
+            social_assigned / social_target if social_target > 0 else float("inf")
+        )
+        review_progress = (
+            review_assigned / review_target if review_target > 0 else float("inf")
+        )
+        if social_assigned < social_target and social_progress <= review_progress:
+            templates.append("social_comment")
+            social_assigned += 1
+            continue
+        if review_assigned < review_target:
+            templates.append("review_card")
+            review_assigned += 1
+            continue
+        raise TestimonialGenerationError("Unable to allocate testimonial template mix for review wall.")
+    return templates
+
+
+def _next_social_card_variant(index: int) -> str:
+    if index < 0:
+        raise TestimonialGenerationError("Social card variant index cannot be negative.")
+    return _SOCIAL_CARD_VARIANTS[index % len(_SOCIAL_CARD_VARIANTS)]
 
 def _require_public_asset_base_url() -> str:
     base_url = settings.PUBLIC_ASSET_BASE_URL
@@ -390,8 +830,8 @@ def _force_pre_sales_review_media_templates(puck_data: dict[str, Any]) -> None:
 
 def _apply_review_wall_template_mix(puck_data: dict[str, Any], template_kind: str) -> None:
     def assign_templates(images: list[dict[str, Any]]) -> None:
-        for idx, image in enumerate(images):
-            template = "social_comment" if idx % 3 == 1 else "review_card"
+        templates = _wall_template_sequence(len(images))
+        for image, template in zip(images, templates):
             image["testimonialTemplate"] = template
 
     def update_pre_sales_wall(config: dict[str, Any]) -> None:
@@ -625,6 +1065,26 @@ def _testimonial_output_schema(count: int) -> dict[str, Any]:
                             "maxItems": 3,
                             "items": {"type": "string"},
                         },
+                        "reply": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "name": {"type": "string"},
+                                "persona": {"type": "string"},
+                                "text": {"type": "string"},
+                                "avatarPrompt": {"type": "string"},
+                                "time": {"type": "string"},
+                                "reactionCount": {"type": "integer", "minimum": 0},
+                            },
+                            "required": [
+                                "name",
+                                "persona",
+                                "text",
+                                "avatarPrompt",
+                                "time",
+                                "reactionCount",
+                            ],
+                        },
                         "meta": {
                             "type": "object",
                             "additionalProperties": False,
@@ -643,6 +1103,7 @@ def _testimonial_output_schema(count: int) -> dict[str, Any]:
                         "avatarPrompt",
                         "heroImagePrompt",
                         "mediaPrompts",
+                        "reply",
                     ],
                 },
             }
@@ -691,6 +1152,53 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
                 f"Testimonial mediaPrompts[{idx}] must be 300 characters or fewer."
             )
         cleaned_media_prompts.append(prompt.strip())
+    reply = payload.get("reply")
+    if not isinstance(reply, dict):
+        raise TestimonialGenerationError("Testimonial reply must be an object.")
+    reply_name = reply.get("name")
+    if not isinstance(reply_name, str) or not reply_name.strip():
+        raise TestimonialGenerationError("Testimonial reply.name must be a non-empty string.")
+    if len(reply_name.strip()) > 80:
+        raise TestimonialGenerationError("Testimonial reply.name must be 80 characters or fewer.")
+    reply_persona = reply.get("persona")
+    if not isinstance(reply_persona, str) or not reply_persona.strip():
+        raise TestimonialGenerationError("Testimonial reply.persona must be a non-empty string.")
+    if len(reply_persona.strip()) > 240:
+        raise TestimonialGenerationError("Testimonial reply.persona must be 240 characters or fewer.")
+    reply_text = reply.get("text")
+    if not isinstance(reply_text, str) or not reply_text.strip():
+        raise TestimonialGenerationError("Testimonial reply.text must be a non-empty string.")
+    if len(reply_text.strip()) > 600:
+        raise TestimonialGenerationError("Testimonial reply.text must be 600 characters or fewer.")
+    reply_avatar_prompt = reply.get("avatarPrompt")
+    if not isinstance(reply_avatar_prompt, str) or not reply_avatar_prompt.strip():
+        raise TestimonialGenerationError("Testimonial reply.avatarPrompt must be a non-empty string.")
+    if len(reply_avatar_prompt.strip()) > 500:
+        raise TestimonialGenerationError(
+            "Testimonial reply.avatarPrompt must be 500 characters or fewer."
+        )
+    reply_time = reply.get("time")
+    if not isinstance(reply_time, str) or not reply_time.strip():
+        raise TestimonialGenerationError("Testimonial reply.time must be a non-empty string.")
+    if len(reply_time.strip()) > 24:
+        raise TestimonialGenerationError("Testimonial reply.time must be 24 characters or fewer.")
+    reply_reaction_count = reply.get("reactionCount")
+    if (
+        not isinstance(reply_reaction_count, int)
+        or isinstance(reply_reaction_count, bool)
+        or reply_reaction_count < 0
+    ):
+        raise TestimonialGenerationError(
+            "Testimonial reply.reactionCount must be a non-negative integer."
+        )
+    if _normalize_identity_key(reply_name) == _normalize_identity_key(name):
+        raise TestimonialGenerationError(
+            "Testimonial reply.name must be different from the primary testimonial name."
+        )
+    if _normalize_identity_key(reply_persona) == _normalize_identity_key(persona):
+        raise TestimonialGenerationError(
+            "Testimonial reply.persona must be different from the primary testimonial persona."
+        )
     verified = payload.get("verified")
     if not isinstance(verified, bool):
         raise TestimonialGenerationError("Testimonial verified must be a boolean.")
@@ -724,6 +1232,14 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "avatarPrompt": avatar_prompt.strip(),
         "heroImagePrompt": hero_prompt.strip(),
         "mediaPrompts": cleaned_media_prompts,
+        "reply": {
+            "name": reply_name.strip(),
+            "persona": reply_persona.strip(),
+            "text": reply_text.strip(),
+            "avatarPrompt": reply_avatar_prompt.strip(),
+            "time": reply_time.strip(),
+            "reactionCount": reply_reaction_count,
+        },
         "meta": meta,
     }
 
@@ -743,9 +1259,13 @@ def _build_testimonial_prompt(*, count: int, copy: str, product_context: str, to
         "- persona should be a 1-2 sentence description of the reviewer (age range, context, motivation).\n"
         "- avatarPrompt should describe a realistic, candid portrait of that persona (no brand logos).\n"
         "- heroImagePrompt should describe a realistic lifestyle/product scene relevant to the review.\n"
+        "- reply must describe a SECOND commenter identity with fields: name, persona, text, avatarPrompt, time, reactionCount.\n"
+        "- reply.name and reply.persona must be different from the primary name/persona.\n"
+        "- reply.avatarPrompt must describe the reply person's portrait and must stay consistent with reply name/persona.\n"
         "- mediaPrompts must include 3 short image prompts tied to the review; keep them general and product-agnostic (refer to 'the product' instead of specific brand names).\n"
         "- If the review references the product, include the product in at least one mediaPrompt using generic wording.\n"
         "- avatarPrompt and heroImagePrompt must be unique per testimonial.\n"
+        "- Do not reuse names or personas across testimonials.\n"
         "- meta.location (optional) should be <= 120 characters.\n"
         f"- meta.date (optional) must be YYYY-MM-DD; today is {today}.\n"
         "- Keep claims compliant; avoid medical promises or unrealistic outcomes.\n"
@@ -755,7 +1275,7 @@ def _build_testimonial_prompt(*, count: int, copy: str, product_context: str, to
         "Page copy:\n"
         f"{copy}\n\n"
         "Return JSON with this exact shape:\n"
-        '{ "testimonials": [ { "name": "...", "verified": true, "rating": 5, "review": "...", "persona": "...", "avatarPrompt": "...", "heroImagePrompt": "...", "mediaPrompts": ["...", "...", "..."], "meta": { "location": "...", "date": "YYYY-MM-DD" } } ] }\n'
+        '{ "testimonials": [ { "name": "...", "verified": true, "rating": 5, "review": "...", "persona": "...", "avatarPrompt": "...", "heroImagePrompt": "...", "mediaPrompts": ["...", "...", "..."], "reply": { "name": "...", "persona": "...", "text": "...", "avatarPrompt": "...", "time": "2d", "reactionCount": 2 }, "meta": { "location": "...", "date": "YYYY-MM-DD" } } ] }\n'
     )
 
 
@@ -886,12 +1406,13 @@ def generate_funnel_page_testimonials(
         raise TestimonialGenerationError("Product context is required to generate testimonials.")
 
     # Validate that the product has a primary image configured (required by business rules).
-    _resolve_product_primary_image(
+    product_primary_asset = _resolve_product_primary_image(
         session=session,
         org_id=org_id,
         client_id=str(funnel.client_id),
         product=product,
     )
+    product_reference_bytes, product_reference_mime = _load_reference_asset_bytes(product_primary_asset)
 
     copy_text = _extract_copy_lines(base_puck)
     if not copy_text.strip():
@@ -903,6 +1424,9 @@ def generate_funnel_page_testimonials(
     testimonials: list[dict[str, Any]] = []
     batch_size = 6
     sales_review_wall_social_index = 0
+    social_card_variant_index = 0
+    review_card_scene_index = 0
+    social_attachment_scene_index = 0
 
     for start in range(0, len(groups), batch_size):
         batch = groups[start : start + batch_size]
@@ -939,11 +1463,22 @@ def generate_funnel_page_testimonials(
             )
         testimonials.extend(batch_items)
 
+    validated_testimonials: list[dict[str, Any]] = []
+    for idx, raw in enumerate(testimonials):
+        try:
+            validated_testimonials.append(_validate_testimonial_payload(raw or {}))
+        except TestimonialGenerationError as exc:
+            raise TestimonialGenerationError(
+                f"Invalid testimonial payload at position {idx + 1}: {exc}"
+            ) from exc
+    identity_repairs = _repair_distinct_testimonial_identities(validated_testimonials)
+    _assert_distinct_testimonial_identities(validated_testimonials)
+
     generated: list[dict[str, Any]] = []
     try:
         with TestimonialRenderer() as renderer:
             for idx, group in enumerate(groups):
-                validated = _validate_testimonial_payload(testimonials[idx] or {})
+                validated = validated_testimonials[idx]
 
                 if group.slide is not None:
                     group.slide["text"] = validated["review"]
@@ -956,7 +1491,7 @@ def generate_funnel_page_testimonials(
                 media_targets = [
                     render for render in group.renders if render.template == "testimonial_media"
                 ]
-                media_prompt_iter: Optional[Iterator[str]] = None
+                media_prompt_iter: Optional[Iterator[tuple[int, str]]] = None
                 if media_targets:
                     if len(media_targets) != 3:
                         raise TestimonialGenerationError(
@@ -967,33 +1502,61 @@ def generate_funnel_page_testimonials(
                         raise TestimonialGenerationError(
                             "mediaPrompts must include exactly 3 prompts for testimonial media images."
                         )
-                    media_prompt_iter = iter(media_prompts)
+                    media_prompt_iter = iter(enumerate(media_prompts))
 
                 for render in group.renders:
+                    setting_value = _derive_setting(
+                        validated=validated,
+                        fallback_text=validated["heroImagePrompt"],
+                    )
+                    action_value = _derive_action(
+                        primary_direction=validated["heroImagePrompt"],
+                        review=validated["review"],
+                    )
+                    direction_value = _truncate(validated["heroImagePrompt"], limit=260)
+
                     if render.template == "testimonial_media":
                         if media_prompt_iter is None:
                             raise TestimonialGenerationError(
                                 "mediaPrompts are required for testimonial_media renders."
                             )
                         try:
-                            prompt = next(media_prompt_iter)
+                            media_index, prompt = next(media_prompt_iter)
                         except StopIteration as exc:
                             raise TestimonialGenerationError(
                                 "Insufficient mediaPrompts provided for testimonial_media renders."
                             ) from exc
 
+                        media_scene_mode = _select_media_scene_mode(media_index)
+                        media_prompt = _build_testimonial_scene_prompt(
+                            scene_mode=media_scene_mode,
+                            render_label=render.label,
+                            persona=validated["persona"],
+                            setting=setting_value,
+                            action=action_value,
+                            direction=_truncate(prompt, limit=260),
+                            identity_name=validated["name"],
+                            identity_anchor=validated["avatarPrompt"],
+                            require_subject_match=True,
+                            include_text_screen_line=False,
+                            prohibit_visible_text=True,
+                        )
                         media_asset = create_funnel_image_asset(
                             session=session,
                             org_id=org_id,
                             client_id=str(funnel.client_id),
-                            prompt=prompt,
-                            aspect_ratio="3:4",
+                            prompt=media_prompt,
+                            aspect_ratio="9:16",
                             usage_context={
                                 "kind": "testimonial_media_image",
                                 "funnelId": funnel_id,
                                 "pageId": page_id,
                                 "target": render.label,
                             },
+                            reference_image_bytes=product_reference_bytes,
+                            reference_image_mime_type=product_reference_mime,
+                            reference_asset_public_id=str(product_primary_asset.public_id),
+                            reference_asset_id=str(product_primary_asset.id),
                             funnel_id=funnel_id,
                             product_id=str(funnel.product_id) if funnel.product_id else None,
                             tags=["funnel", "testimonial", "testimonial_media", "source"],
@@ -1035,6 +1598,8 @@ def generate_funnel_page_testimonials(
                                 "publicId": str(asset.public_id),
                                 "assetId": str(asset.id),
                                 "mediaSourcePublicId": str(media_asset.public_id),
+                                "mediaPrompt": media_prompt,
+                                "sceneMode": media_scene_mode,
                             }
                         )
                         continue
@@ -1045,25 +1610,82 @@ def generate_funnel_page_testimonials(
                         )
 
                     if render.template == "review_card":
+                        review_scene_mode = _select_single_scene_mode(review_card_scene_index)
+                        review_card_scene_index += 1
+                        review_hero_prompt = _build_testimonial_scene_prompt(
+                            scene_mode=review_scene_mode,
+                            render_label=render.label,
+                            persona=validated["persona"],
+                            setting=setting_value,
+                            action=action_value,
+                            direction=direction_value,
+                            identity_name=validated["name"],
+                            identity_anchor=validated["avatarPrompt"],
+                            require_subject_match=True,
+                            include_text_screen_line=False,
+                            prohibit_visible_text=True,
+                        )
+                        review_avatar_prompt = _build_distinct_avatar_prompt(
+                            render_label=render.label,
+                            display_name=validated["name"],
+                            persona=validated["persona"],
+                            direction=validated["avatarPrompt"],
+                            variant_label="review-card-avatar",
+                        )
+                        hero_asset = create_funnel_image_asset(
+                            session=session,
+                            org_id=org_id,
+                            client_id=str(funnel.client_id),
+                            prompt=review_hero_prompt,
+                            aspect_ratio="9:16",
+                            usage_context={
+                                "kind": "testimonial_review_hero",
+                                "funnelId": funnel_id,
+                                "pageId": page_id,
+                                "target": render.label,
+                            },
+                            reference_image_bytes=product_reference_bytes,
+                            reference_image_mime_type=product_reference_mime,
+                            reference_asset_public_id=str(product_primary_asset.public_id),
+                            reference_asset_id=str(product_primary_asset.id),
+                            funnel_id=funnel_id,
+                            product_id=str(funnel.product_id) if funnel.product_id else None,
+                            tags=["funnel", "testimonial", "review_card", "hero"],
+                        )
+                        review_avatar_asset = create_funnel_image_asset(
+                            session=session,
+                            org_id=org_id,
+                            client_id=str(funnel.client_id),
+                            prompt=review_avatar_prompt,
+                            aspect_ratio="1:1",
+                            usage_context={
+                                "kind": "testimonial_review_avatar",
+                                "funnelId": funnel_id,
+                                "pageId": page_id,
+                                "target": render.label,
+                            },
+                            funnel_id=funnel_id,
+                            product_id=str(funnel.product_id) if funnel.product_id else None,
+                            tags=["funnel", "testimonial", "review_card", "avatar"],
+                        )
                         payload: dict[str, Any] = {
                             "template": "review_card",
                             "name": validated["name"],
                             "verified": validated["verified"],
                             "rating": validated["rating"],
                             "review": validated["review"],
+                            "heroImageUrl": _public_asset_url(str(hero_asset.public_id)),
+                            "avatarUrl": _public_asset_url(str(review_avatar_asset.public_id)),
                         }
                         if validated.get("meta") is not None:
                             payload["meta"] = validated["meta"]
-                        payload["avatarPrompt"] = validated["avatarPrompt"]
-                        payload["heroImagePrompt"] = validated["heroImagePrompt"]
+                        payload["avatarPrompt"] = review_avatar_prompt
+                        payload["heroImagePrompt"] = review_hero_prompt
                         payload["renderContext"] = {
                             "userContext": validated["persona"],
                             "pageCopy": copy_text,
                             "productContext": product_context,
                         }
-                        image_model = os.getenv("TESTIMONIAL_RENDERER_IMAGE_MODEL")
-                        if image_model:
-                            payload["imageModel"] = image_model
 
                         image_bytes = renderer.render_png(payload)
                         asset = create_funnel_upload_asset(
@@ -1095,15 +1717,42 @@ def generate_funnel_page_testimonials(
                                 "payload": payload,
                                 "publicId": str(asset.public_id),
                                 "assetId": str(asset.id),
+                                "heroSourcePublicId": str(hero_asset.public_id),
+                                "avatarSourcePublicId": str(review_avatar_asset.public_id),
+                                "heroPrompt": review_hero_prompt,
+                                "avatarPrompt": review_avatar_prompt,
+                                "heroSceneMode": review_scene_mode,
                             }
                         )
                         continue
 
+                    social_avatar_prompt = _build_distinct_avatar_prompt(
+                        render_label=render.label,
+                        display_name=validated["name"],
+                        persona=validated["persona"],
+                        direction=validated["avatarPrompt"],
+                        variant_label="social-main-avatar",
+                    )
+                    social_scene_mode = _select_single_scene_mode(social_attachment_scene_index)
+                    social_attachment_scene_index += 1
+                    social_attachment_prompt = _build_testimonial_scene_prompt(
+                        scene_mode=social_scene_mode,
+                        render_label=render.label,
+                        persona=validated["persona"],
+                        setting=setting_value,
+                        action=action_value,
+                        direction=direction_value,
+                        identity_name=validated["name"],
+                        identity_anchor=validated["avatarPrompt"],
+                        require_subject_match=True,
+                        include_text_screen_line=False,
+                        prohibit_visible_text=True,
+                    )
                     avatar_asset = create_funnel_image_asset(
                         session=session,
                         org_id=org_id,
                         client_id=str(funnel.client_id),
-                        prompt=validated["avatarPrompt"],
+                        prompt=social_avatar_prompt,
                         aspect_ratio="1:1",
                         usage_context={
                             "kind": "testimonial_social_avatar",
@@ -1119,14 +1768,18 @@ def generate_funnel_page_testimonials(
                         session=session,
                         org_id=org_id,
                         client_id=str(funnel.client_id),
-                        prompt=validated["heroImagePrompt"],
-                        aspect_ratio="4:3",
+                        prompt=social_attachment_prompt,
+                        aspect_ratio="9:16",
                         usage_context={
                             "kind": "testimonial_social_attachment",
                             "funnelId": funnel_id,
                             "pageId": page_id,
                             "target": render.label,
                         },
+                        reference_image_bytes=product_reference_bytes,
+                        reference_image_mime_type=product_reference_mime,
+                        reference_asset_public_id=str(product_primary_asset.public_id),
+                        reference_asset_id=str(product_primary_asset.id),
                         funnel_id=funnel_id,
                         product_id=str(funnel.product_id) if funnel.product_id else None,
                         tags=["funnel", "testimonial", "social_comment", "attachment"],
@@ -1143,6 +1796,37 @@ def generate_funnel_page_testimonials(
                     view_replies_text = None
                     reaction_count = 3 + (seed % 17)
                     follow_label = "Follow" if variant == 1 else None
+                    reply_payload = validated["reply"]
+                    reply_avatar_asset: Optional[Asset] = None
+
+                    def ensure_reply_avatar_asset() -> Asset:
+                        nonlocal reply_avatar_asset
+                        if reply_avatar_asset is not None:
+                            return reply_avatar_asset
+                        reply_avatar_prompt = _build_distinct_avatar_prompt(
+                            render_label=render.label,
+                            display_name=reply_payload["name"],
+                            persona=reply_payload["persona"],
+                            direction=reply_payload["avatarPrompt"],
+                            variant_label="social-reply-avatar",
+                        )
+                        reply_avatar_asset = create_funnel_image_asset(
+                            session=session,
+                            org_id=org_id,
+                            client_id=str(funnel.client_id),
+                            prompt=reply_avatar_prompt,
+                            aspect_ratio="1:1",
+                            usage_context={
+                                "kind": "testimonial_social_reply_avatar",
+                                "funnelId": funnel_id,
+                                "pageId": page_id,
+                                "target": render.label,
+                            },
+                            funnel_id=funnel_id,
+                            product_id=str(funnel.product_id) if funnel.product_id else None,
+                            tags=["funnel", "testimonial", "social_comment", "reply_avatar"],
+                        )
+                        return reply_avatar_asset
 
                     is_sales_review_wall = (
                         template_kind == "sales-pdp"
@@ -1152,59 +1836,83 @@ def generate_funnel_page_testimonials(
                         force_reply = sales_review_wall_social_index % 2 == 0
                         sales_review_wall_social_index += 1
                         if force_reply:
+                            reply_avatar = ensure_reply_avatar_asset()
                             replies = [
                                 {
-                                    "name": "Avery P.",
-                                    "text": "Same here—this guide made everything feel manageable.",
-                                    "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
-                                    "meta": {"time": "2d"},
-                                    "reactionCount": 2,
+                                    "name": reply_payload["name"],
+                                    "text": reply_payload["text"],
+                                    "avatarUrl": _public_asset_url(str(reply_avatar.public_id)),
+                                    "meta": {"time": reply_payload["time"]},
+                                    "reactionCount": reply_payload["reactionCount"],
                                 }
                             ]
                             view_replies_text = "View 1 reply"
 
                     if variant == 0:
-                        reply_templates = [
-                            "Same here—this guide made everything feel manageable.",
-                            "Agreed. The steps were easy to follow.",
-                            "We had a similar experience and it helped a lot.",
-                        ]
-                        reply_text = reply_templates[seed % len(reply_templates)]
+                        reply_avatar = ensure_reply_avatar_asset()
                         replies = [
                             {
-                                "name": "Avery P.",
-                                "text": reply_text,
-                                "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
-                                "meta": {"time": "2d"},
-                                "reactionCount": 2,
+                                "name": reply_payload["name"],
+                                "text": reply_payload["text"],
+                                "avatarUrl": _public_asset_url(str(reply_avatar.public_id)),
+                                "meta": {"time": reply_payload["time"]},
+                                "reactionCount": reply_payload["reactionCount"],
                             }
                         ]
                         view_replies_text = "View 1 reply"
 
-                    payload = {
-                        "template": "social_comment",
-                        "header": {"title": "All comments", "showSortIcon": variant != 2},
-                        "comments": [
-                            {
-                                "name": validated["name"],
-                                "text": validated["review"],
-                                "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
-                                "attachmentUrl": _public_asset_url(
-                                    str(attachment_asset.public_id)
-                                ),
-                                "meta": {
-                                    "time": time_value,
-                                    **({"followLabel": follow_label} if follow_label else {}),
-                                },
-                                "reactionCount": reaction_count,
-                                **(
-                                    {"replies": replies, "viewRepliesText": view_replies_text}
-                                    if replies
-                                    else {}
-                                ),
-                            }
-                        ],
+                    primary_comment = {
+                        "name": validated["name"],
+                        "text": validated["review"],
+                        "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
+                        "attachmentUrl": _public_asset_url(str(attachment_asset.public_id)),
+                        "meta": {
+                            "time": time_value,
+                            **({"followLabel": follow_label} if follow_label else {}),
+                        },
+                        "reactionCount": reaction_count,
+                        **(
+                            {"replies": replies, "viewRepliesText": view_replies_text}
+                            if replies
+                            else {}
+                        ),
                     }
+
+                    social_template = _next_social_card_variant(social_card_variant_index)
+                    social_card_variant_index += 1
+                    if social_template == "social_comment_instagram":
+                        username = _clean_single_line(validated["name"]).lower().replace(" ", ".")
+                        if not username:
+                            raise TestimonialGenerationError("Instagram social template requires a non-empty username.")
+                        location_value = ""
+                        if isinstance(validated.get("meta"), dict):
+                            location_raw = validated["meta"].get("location")
+                            if isinstance(location_raw, str) and location_raw.strip():
+                                location_value = location_raw.strip()
+                        post_payload: dict[str, Any] = {
+                            "username": username,
+                            "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
+                            "likeCount": max(1, reaction_count * 3),
+                            "dateLabel": time_value,
+                        }
+                        if location_value:
+                            post_payload["location"] = location_value
+                        payload = {
+                            "template": "social_comment_instagram",
+                            "post": post_payload,
+                            "comments": [primary_comment],
+                        }
+                    elif social_template == "social_comment_no_header":
+                        payload = {
+                            "template": "social_comment_no_header",
+                            "comments": [primary_comment],
+                        }
+                    else:
+                        payload = {
+                            "template": "social_comment",
+                            "header": {"title": "All comments", "showSortIcon": variant != 2},
+                            "comments": [primary_comment],
+                        }
                     image_bytes = renderer.render_png(payload)
                     asset = create_funnel_upload_asset(
                         session=session,
@@ -1222,7 +1930,7 @@ def generate_funnel_page_testimonials(
                         },
                         funnel_id=funnel_id,
                         product_id=str(funnel.product_id) if funnel.product_id else None,
-                        tags=["funnel", "testimonial", "social_comment"],
+                        tags=["funnel", "testimonial", "social_comment", social_template],
                     )
                     render.image["assetPublicId"] = str(asset.public_id)
                     if "alt" not in render.image or not render.image.get("alt"):
@@ -1237,6 +1945,18 @@ def generate_funnel_page_testimonials(
                             "assetId": str(asset.id),
                             "avatarPublicId": str(avatar_asset.public_id),
                             "attachmentPublicId": str(attachment_asset.public_id),
+                            "replyAvatarPublicId": (
+                                str(reply_avatar_asset.public_id) if reply_avatar_asset else None
+                            ),
+                            "replyName": (
+                                reply_payload["name"] if reply_avatar_asset is not None else None
+                            ),
+                            "replyPersona": (
+                                reply_payload["persona"] if reply_avatar_asset is not None else None
+                            ),
+                            "socialTemplate": social_template,
+                            "attachmentPrompt": social_attachment_prompt,
+                            "attachmentSceneMode": social_scene_mode,
                         }
                     )
     except TestimonialRenderError as exc:
@@ -1274,6 +1994,7 @@ def generate_funnel_page_testimonials(
         "synthetic": synthetic,
         "testimonialsProvenance": {"source": "synthetic" if synthetic else "production"},
         "generatedTestimonials": generated,
+        "identityRepairs": identity_repairs,
         "actorUserId": user_id,
         "ideaWorkspaceId": idea_workspace_id,
         "templateId": resolved_template_id,

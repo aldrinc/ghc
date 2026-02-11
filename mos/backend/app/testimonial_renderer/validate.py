@@ -9,13 +9,20 @@ class TestimonialRenderError(RuntimeError):
     pass
 
 
-_TEMPLATE_TYPES = {"review_card", "social_comment", "testimonial_media"}
+_TEMPLATE_TYPES = {
+    "review_card",
+    "social_comment",
+    "social_comment_no_header",
+    "social_comment_instagram",
+    "testimonial_media",
+}
 _MAX_NAME_LENGTH = 80
 _MAX_REVIEW_LENGTH = 800
 _MAX_COMMENT_LENGTH = 600
 _MAX_HEADER_TITLE = 40
 _MAX_META_LABEL = 24
 _MAX_VIEW_REPLIES = 40
+_MAX_INSTAGRAM_USERNAME = 40
 _DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
@@ -201,6 +208,29 @@ def _validate_thread_comment(comment: Any, *, base_dir: Optional[Path], prefix: 
     }
 
 
+def _validate_instagram_post(post: Any, *, base_dir: Optional[Path]) -> dict[str, Any]:
+    if not _is_plain_object(post):
+        raise TestimonialRenderError("post must be an object.")
+    allowed_keys = {"username", "avatarUrl", "location", "likeCount", "dateLabel"}
+    for key in post.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"post contains unsupported key: {key}")
+    username = _assert_string(post.get("username"), "post.username", _MAX_INSTAGRAM_USERNAME)
+    avatar_url = _resolve_image_url(post.get("avatarUrl"), base_dir, "post.avatarUrl")
+    location = ""
+    if post.get("location") is not None:
+        location = _assert_string(post.get("location"), "post.location", 120)
+    like_count = _validate_reaction_count(post.get("likeCount"), "post.likeCount")
+    date_label = _assert_string(post.get("dateLabel"), "post.dateLabel", 40)
+    return {
+        "username": username,
+        "avatarUrl": avatar_url,
+        "location": location,
+        "likeCount": like_count,
+        "dateLabel": date_label,
+    }
+
+
 def validate_payload(payload: Any, *, base_dir: Optional[Path] = None) -> dict[str, Any]:
     if not _is_plain_object(payload):
         raise TestimonialRenderError("Payload must be an object.")
@@ -250,6 +280,34 @@ def validate_payload(payload: Any, *, base_dir: Optional[Path] = None) -> dict[s
         output["comments"] = comments
         return output
 
+    if template == "social_comment_no_header":
+        raw_comments = payload.get("comments")
+        if not isinstance(raw_comments, list) or len(raw_comments) == 0:
+            raise TestimonialRenderError("comments must be a non-empty array.")
+        comments = [
+            _validate_thread_comment(comment, base_dir=base_dir, prefix=f"comments[{idx}]")
+            for idx, comment in enumerate(raw_comments)
+        ]
+        output = dict(payload)
+        output["template"] = template
+        output["comments"] = comments
+        return output
+
+    if template == "social_comment_instagram":
+        post = _validate_instagram_post(payload.get("post"), base_dir=base_dir)
+        raw_comments = payload.get("comments")
+        if not isinstance(raw_comments, list) or len(raw_comments) == 0:
+            raise TestimonialRenderError("comments must be a non-empty array.")
+        comments = [
+            _validate_thread_comment(comment, base_dir=base_dir, prefix=f"comments[{idx}]")
+            for idx, comment in enumerate(raw_comments)
+        ]
+        output = dict(payload)
+        output["template"] = template
+        output["post"] = post
+        output["comments"] = comments
+        return output
+
     if template == "testimonial_media":
         image_url = _resolve_image_url(payload.get("imageUrl"), base_dir, "imageUrl")
         alt: str | None = None
@@ -262,4 +320,3 @@ def validate_payload(payload: Any, *, base_dir: Optional[Path] = None) -> dict[s
         return output
 
     raise TestimonialRenderError("Unsupported template.")
-

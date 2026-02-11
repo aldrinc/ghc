@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from urllib.parse import urlparse
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.encoders import jsonable_encoder
@@ -106,24 +107,27 @@ def _metadata_value(value: object, key: str) -> str:
 
 def _preview_page_map(*, session: Session, funnel_id: str) -> dict[str, str]:
     """
-    For unpublished funnels, we treat "preview" pages as those with an approved version.
+    For unpublished funnels, we treat "preview" pages as those with at least one saved version
+    (draft or approved).
     """
 
-    approved_page_ids = set(
+    preview_page_ids = set(
         str(page_id)
         for page_id in session.scalars(
             select(FunnelPageVersion.page_id)
             .join(FunnelPage, FunnelPage.id == FunnelPageVersion.page_id)
             .where(
                 FunnelPage.funnel_id == funnel_id,
-                FunnelPageVersion.status == FunnelPageVersionStatusEnum.approved,
+                FunnelPageVersion.status.in_(
+                    [FunnelPageVersionStatusEnum.draft, FunnelPageVersionStatusEnum.approved]
+                ),
             )
             .distinct()
         ).all()
     )
     pages_repo = FunnelPagesRepository(session)
     pages = pages_repo.list(funnel_id=funnel_id)
-    return {str(page.id): page.slug for page in pages if str(page.id) in approved_page_ids}
+    return {str(page.id): page.slug for page in pages if str(page.id) in preview_page_ids}
 
 
 @router.get("/funnels/{public_id}/meta")
@@ -166,7 +170,7 @@ def public_funnel_meta(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
     entry_slug = page_map.get(str(funnel.entry_page_id))
     if not entry_slug:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not approved")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page has no saved version")
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
@@ -226,7 +230,7 @@ def public_funnel_page(
             "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
         }
 
-    # Preview mode: allow viewing approved pages even if the funnel hasn't been published yet.
+    # Preview mode: allow viewing pages with draft or approved versions even if the funnel hasn't been published yet.
     page = session.scalars(
         select(FunnelPage).where(FunnelPage.funnel_id == funnel.id, FunnelPage.slug == slug)
     ).first()
@@ -238,9 +242,11 @@ def public_funnel_page(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
 
     versions_repo = FunnelPageVersionsRepository(session)
+    draft = versions_repo.latest_for_page(page_id=str(page.id), status=FunnelPageVersionStatusEnum.draft)
     approved = versions_repo.latest_for_page(page_id=str(page.id), status=FunnelPageVersionStatusEnum.approved)
-    if not approved:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not approved")
+    version = draft or approved
+    if not version:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page has no saved version")
 
     page_map = _preview_page_map(session=session, funnel_id=str(funnel.id))
     design_system_tokens = resolve_design_system_tokens(
@@ -256,7 +262,7 @@ def public_funnel_page(
         "publicationId": publication_id,
         "pageId": str(page.id),
         "slug": page.slug,
-        "puckData": approved.puck_data,
+        "puckData": version.puck_data,
         "pageMap": page_map,
         "designSystemTokens": design_system_tokens,
         "nextPageId": str(page.next_page_id) if page.next_page_id else None,
@@ -290,12 +296,12 @@ def public_funnel_graph(
             "links": [jsonable_encoder(link) for link in links],
         }
 
-    # Preview mode: only return approved pages for the graph.
+    # Preview mode: only return pages that have at least one saved version (draft or approved) for the graph.
     page_map = _preview_page_map(session=session, funnel_id=str(funnel.id))
     if not funnel.entry_page_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
     if str(funnel.entry_page_id) not in page_map:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not approved")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page has no saved version")
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
@@ -330,6 +336,11 @@ def public_funnel_commerce(
     offers = session.scalars(
         select(ProductOffer).where(ProductOffer.product_id == product.id)
     ).all()
+    if not offers:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product offers are not configured for this funnel product.",
+        )
     offer_ids = [str(offer.id) for offer in offers]
     price_points = (
         session.scalars(
@@ -338,6 +349,11 @@ def public_funnel_commerce(
         if offer_ids
         else []
     )
+    if not price_points:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product offer price points are not configured for this funnel product.",
+        )
     price_points_by_offer: dict[str, list[dict]] = {}
     for pp in price_points:
         data = jsonable_encoder(pp)
@@ -497,8 +513,28 @@ def ingest_public_events(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Batch must share publicationId")
     publication_id = next(iter(publication_ids))
 
-    funnel = session.scalars(select(Funnel).where(Funnel.active_publication_id == publication_id)).first()
+    try:
+        publication_uuid = UUID(str(publication_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="publicationId must be a valid UUID.",
+        ) from exc
+
+    funnel = session.scalars(
+        select(Funnel).where(Funnel.active_publication_id == publication_uuid)
+    ).first()
     if not funnel:
+        # Preview mode: publicationId is the funnel id (see _publication_id_for_public_response()).
+        # Unpublished funnels cannot persist events because funnel_events.publication_id is a FK.
+        preview_funnel = session.scalars(
+            select(Funnel).where(
+                Funnel.id == publication_uuid,
+                Funnel.active_publication_id.is_(None),
+            )
+        ).first()
+        if preview_funnel:
+            return {"ingested": 0}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found")
 
     host = request.headers.get("host")
@@ -517,7 +553,7 @@ def ingest_public_events(
                 client_id=funnel.client_id,
                 campaign_id=funnel.campaign_id,
                 funnel_id=funnel.id,
-                publication_id=publication_id,
+                publication_id=publication_uuid,
                 page_id=ev.pageId,
                 event_type=event_type,
                 visitor_id=ev.visitorId,

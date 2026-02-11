@@ -3,7 +3,7 @@
   "name": "Sales PDP (PuppyPad)",
   "description": "Exact visual clone of the PuppyPad PDP sales page.",
   "previewImage": null,
-  "assetBasePath": "templates/sales-template-main/public",
+  "assetBasePath": "templates/sales-template-main/public/assets",
   "assetPrefix": "/assets/",
   "puckData": {
     "root": {
@@ -361,7 +361,7 @@
                 },
                 "copy": {
                   "common": {
-                    "starsAriaLabelTemplate": "{rating} out of 5 stars"
+                    "starsAriaLabelTemplate": "{rating} out of five stars"
                   },
                   "modal": {
                     "closeAriaLabel": "Close dialog",
@@ -382,15 +382,15 @@
               }
             },
             {
-              "type": "SalesPdpVideos",
-              "props": {
-                "config": {
-                  "badge": "37,000+ DOG PARENTS LOVE US!",
-                  "title": "See Why We're The Most Shared Pee Pad On Facebook",
-                  "videos": [
-                    {
-                      "id": "v1",
-                      "thumbnail": {
+                  "type": "SalesPdpVideos",
+                  "props": {
+                    "config": {
+                      "badge": "CUSTOMERS LOVE THIS",
+                      "title": "See It In Action",
+                      "videos": [
+                        {
+                          "id": "v1",
+                          "thumbnail": {
                         "src": "/assets/ph-3x4.svg",
                         "alt": "Video testimonial 1"
                       }
@@ -719,7 +719,7 @@
                   "id": "reviews",
                   "badge": "VET RECOMMENDED",
                   "title": "What Our Customers Are Saying",
-                  "ratingLabel": "37,893 - 5 STAR REVIEWS",
+                  "ratingLabel": "Verified customer reviews",
                   "showMoreLabel": "Show more reviews",
                   "tiles": [
                     {
@@ -845,9 +845,9 @@
                 "config": {
                   "logo": {
                     "src": "/assets/puppypad-logo.svg",
-                    "alt": "PuppyPad"
+                    "alt": "Brand logo"
                   },
-                  "copyright": "© 2026 PuppyPad"
+                  "copyright": "© All rights reserved."
                 },
                 "id": "sales-pdp-footer"
               }

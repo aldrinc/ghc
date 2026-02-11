@@ -180,11 +180,11 @@ export function FunnelDetailPage() {
                 <div className="text-sm font-semibold text-content">Pages</div>
                 <div className="text-xs text-content-muted">{funnel.pages.length} pages</div>
               </div>
-              <div className="text-xs text-content-muted">Set next page wiring, approve each page, then publish</div>
+              <div className="text-xs text-content-muted">Set next page wiring, then publish</div>
             </div>
             <ul className="divide-y divide-border">
               {funnel.pages.map((page) => {
-                const isApproved = Boolean(page.latestApprovedVersionId);
+                const hasDraft = Boolean(page.latestDraftVersionId);
                 const nextPageOptions = [
                   { label: "No next page", value: "" },
                   ...funnel.pages
@@ -205,7 +205,7 @@ export function FunnelDetailPage() {
                           >
                             {page.name}
                           </Link>
-                          <Badge tone={isApproved ? "success" : "warning"}>{isApproved ? "approved" : "needs approval"}</Badge>
+                          <Badge tone={hasDraft ? "neutral" : "warning"}>{hasDraft ? "draft" : "no saved version"}</Badge>
                         </div>
                         <div className="text-xs text-content-muted">
                           Slug: <span className="font-mono">{page.slug}</span>

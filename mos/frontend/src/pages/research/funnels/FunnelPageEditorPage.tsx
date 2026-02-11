@@ -1,6 +1,6 @@
 import { Puck } from "@measured/puck";
 import type { Data } from "@measured/puck";
-import { useApproveFunnelPage, useFunnel, useFunnelPage, useSaveFunnelDraft, useUpdateFunnelPage } from "@/api/funnels";
+import { useFunnel, useFunnelPage, useSaveFunnelDraft, useUpdateFunnelPage } from "@/api/funnels";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -24,7 +24,6 @@ export function FunnelPageEditorPage() {
   const { data: funnel } = useFunnel(funnelId);
   const { data: pageDetail, isLoading } = useFunnelPage(funnelId, pageId);
   const saveDraft = useSaveFunnelDraft();
-  const approvePage = useApproveFunnelPage();
   const updatePage = useUpdateFunnelPage();
 
   const [data, setData] = useState<Data>(() => defaultFunnelPuckData() as unknown as Data);
@@ -55,7 +54,7 @@ export function FunnelPageEditorPage() {
       (pageDetail.latestDraft?.puck_data as Data | undefined) ||
       (pageDetail.latestApproved?.puck_data as Data | undefined) ||
       (defaultFunnelPuckData() as unknown as Data);
-    setData(normalizePuckData(initial));
+    setData(normalizePuckData(initial, { designSystemTokens: pageDetail.designSystemTokens ?? null }));
     setPuckKey(`${pageId}:${pageDetail.latestDraft?.id || pageDetail.latestApproved?.id || "initial"}`);
     setMetaName(pageDetail.page.name);
     setMetaSlug(pageDetail.page.slug);
@@ -82,7 +81,6 @@ export function FunnelPageEditorPage() {
     return page ? `${page.name} (${page.slug})` : "Page";
   }, [funnel?.pages, pageId]);
 
-  const isApproved = Boolean(pageDetail?.latestApproved?.id);
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
   const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
   const designSystemTokens = pageDetail?.designSystemTokens ?? null;
@@ -145,7 +143,6 @@ export function FunnelPageEditorPage() {
         title={
           <span className="flex flex-wrap items-center gap-2">
             <span>{currentPageLabel}</span>
-            <Badge tone={isApproved ? "success" : "warning"}>{isApproved ? "Approved" : "Needs approval"}</Badge>
             {pageDetail?.latestDraft ? <Badge tone="neutral">Draft saved</Badge> : null}
           </span>
         }
@@ -184,15 +181,6 @@ export function FunnelPageEditorPage() {
                 className={saveDraft.isPending ? "pointer-events-none opacity-60" : undefined}
               >
                 {saveDraft.isPending ? "Saving draft..." : "Save draft"}
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  if (!funnelId || !pageId || approvePage.isPending) return;
-                  approvePage.mutate({ funnelId, pageId });
-                }}
-                className={approvePage.isPending ? "pointer-events-none opacity-60" : undefined}
-              >
-                {approvePage.isPending ? "Approving..." : "Approve"}
               </MenuItem>
             </MenuContent>
           </Menu>

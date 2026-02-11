@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import base64
 import json
+import re
 import time
 import uuid
 from collections.abc import Iterator
@@ -40,6 +41,7 @@ _ASSISTANT_MESSAGE_MAX_CHARS = 600
 _REPAIR_PREVIOUS_RESPONSE_MAX_CHARS = 4000
 _CLAUDE_MAX_OUTPUT_TOKENS = 64000
 _MAX_AI_ATTACHMENTS = 8
+_MAX_PAGE_IMAGE_GENERATIONS = 50
 _VISION_ALLOWED_MIME_TYPES = {
     "image/png",
     "image/jpeg",
@@ -115,6 +117,622 @@ def _required_template_component_types(
     base_counts = _count_component_types(base_puck_data)
     return {comp_type for comp_type in candidates if base_counts.get(comp_type, 0) > 0}
 
+
+def _infer_template_component_kind(template_kind: str | None, base_puck_data: dict[str, Any]) -> str | None:
+    """
+    Some template ids have multiple underlying implementations (e.g. older templates built from
+    SalesPdp*/PreSales* blocks vs newer templates built purely from primitive blocks).
+
+    We only enable the specialized "template component" guidance when the base page actually
+    contains those template-specific blocks.
+    """
+
+    if not template_kind:
+        return None
+    base_counts = _count_component_types(base_puck_data)
+    if template_kind == "sales-pdp":
+        if base_counts.get("SalesPdpPage", 0) > 0 or base_counts.get("SalesPdpTemplate", 0) > 0:
+            return "sales-pdp"
+        return None
+    if template_kind == "pre-sales-listicle":
+        if base_counts.get("PreSalesPage", 0) > 0 or base_counts.get("PreSalesTemplate", 0) > 0:
+            return "pre-sales-listicle"
+        return None
+    return None
+
+
+def _describe_value(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return f"bool({value})"
+    if isinstance(value, (int, float)):
+        return f"number({value})"
+    if isinstance(value, str):
+        return f"string({value[:120]!r})"
+    if isinstance(value, list):
+        return f"list(len={len(value)})"
+    if isinstance(value, dict):
+        keys = list(value.keys())[:12]
+        return f"object(keys={keys})"
+    return f"{type(value).__name__}({str(value)[:120]!r})"
+
+
+def _validate_pre_sales_listicle_component_configs(puck_data: dict[str, Any]) -> None:
+    """
+    Ensure PreSales* blocks won't crash the editor/runtime due to basic shape issues.
+
+    This is intentionally minimal: validate container types + a few required keys that are
+    directly accessed by the frontend components.
+    """
+
+    supported_types = {
+        "PreSalesTemplate",
+        "PreSalesPage",
+        "PreSalesHero",
+        "PreSalesReasons",
+        "PreSalesReviews",
+        "PreSalesMarquee",
+        "PreSalesPitch",
+        "PreSalesReviewWall",
+        "PreSalesFooter",
+        "PreSalesFloatingCta",
+    }
+
+    def load_config(props: dict[str, Any]) -> tuple[Any, str] | None:
+        raw_json = props.get("configJson")
+        if isinstance(raw_json, str) and raw_json.strip():
+            try:
+                return json.loads(raw_json), "configJson"
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"configJson must be valid JSON: {exc}") from exc
+        if "config" in props and props.get("config") is not None:
+            return props.get("config"), "config"
+        return None
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        if comp_type not in supported_types:
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        loaded = load_config(props)
+        if not loaded:
+            continue
+        config, source = loaded
+        block_id = props.get("id")
+        id_suffix = f" (id={block_id})" if isinstance(block_id, str) and block_id else ""
+
+        if comp_type == "PreSalesHero":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesHero.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            hero = config.get("hero")
+            badges = config.get("badges")
+            if not isinstance(hero, dict) or not isinstance(hero.get("title"), str) or not isinstance(hero.get("subtitle"), str):
+                raise ValueError(
+                    f"PreSalesHero.{source}.hero must be an object with string title/subtitle{id_suffix}. Received {_describe_value(hero)}."
+                )
+            if not isinstance(badges, list):
+                raise ValueError(
+                    f"PreSalesHero.{source}.badges must be a list{id_suffix}. Received {_describe_value(badges)}."
+                )
+        elif comp_type == "PreSalesReasons":
+            if not isinstance(config, list):
+                raise ValueError(
+                    f"PreSalesReasons.{source} must be a JSON array{id_suffix}. Received {_describe_value(config)}."
+                )
+        elif comp_type == "PreSalesMarquee":
+            if not isinstance(config, list):
+                raise ValueError(
+                    f"PreSalesMarquee.{source} must be a JSON array{id_suffix}. Received {_describe_value(config)}."
+                )
+        elif comp_type == "PreSalesPitch":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesPitch.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            bullets = config.get("bullets")
+            image = config.get("image")
+            if not isinstance(bullets, list):
+                raise ValueError(
+                    f"PreSalesPitch.{source}.bullets must be a list{id_suffix}. Received {_describe_value(bullets)}."
+                )
+            if not isinstance(image, dict) or not isinstance(image.get("alt"), str):
+                raise ValueError(
+                    f"PreSalesPitch.{source}.image must be an object with string alt{id_suffix}. Received {_describe_value(image)}."
+                )
+        elif comp_type == "PreSalesReviews":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesReviews.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            slides = config.get("slides")
+            if not isinstance(slides, list):
+                raise ValueError(
+                    f"PreSalesReviews.{source}.slides must be a list{id_suffix}. Received {_describe_value(slides)}."
+                )
+            for idx, slide in enumerate(slides):
+                if not isinstance(slide, dict):
+                    raise ValueError(
+                        f"PreSalesReviews.{source}.slides[{idx}] must be an object{id_suffix}. Received {_describe_value(slide)}."
+                    )
+                images = slide.get("images")
+                if not isinstance(images, list) or not images:
+                    raise ValueError(
+                        f"PreSalesReviews.{source}.slides[{idx}].images must be a non-empty list{id_suffix}. "
+                        f"Received {_describe_value(images)}."
+                    )
+                for jdx, img in enumerate(images):
+                    if not isinstance(img, dict) or not isinstance(img.get("alt"), str) or not img.get("alt"):
+                        raise ValueError(
+                            f"PreSalesReviews.{source}.slides[{idx}].images[{jdx}] must be an object with string alt{id_suffix}. "
+                            f"Received {_describe_value(img)}."
+                        )
+        elif comp_type == "PreSalesReviewWall":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesReviewWall.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            columns = config.get("columns")
+            if not isinstance(columns, list):
+                raise ValueError(
+                    f"PreSalesReviewWall.{source}.columns must be a list{id_suffix}. Received {_describe_value(columns)}."
+                )
+        elif comp_type == "PreSalesFooter":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesFooter.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            logo = config.get("logo")
+            if not isinstance(logo, dict) or not isinstance(logo.get("alt"), str):
+                raise ValueError(
+                    f"PreSalesFooter.{source}.logo must be an object with string alt{id_suffix}. Received {_describe_value(logo)}."
+                )
+        elif comp_type == "PreSalesFloatingCta":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesFloatingCta.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            if not isinstance(config.get("label"), str):
+                raise ValueError(
+                    f"PreSalesFloatingCta.{source}.label must be a string{id_suffix}. Received {_describe_value(config.get('label'))}."
+                )
+        elif comp_type == "PreSalesTemplate":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesTemplate.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            # Minimal keys that are directly dereferenced by the frontend template.
+            required_keys = ("hero", "badges", "reasons", "marquee", "pitch", "reviews", "reviewsWall", "footer", "floatingCta")
+            missing = [k for k in required_keys if k not in config]
+            if missing:
+                missing_str = ", ".join(missing)
+                raise ValueError(f"PreSalesTemplate.{source} missing required keys: {missing_str}{id_suffix}.")
+
+
+def _extract_pre_sales_hero_badges(tree: Any) -> list[dict[str, Any]] | None:
+    for obj in walk_json(tree):
+        if not isinstance(obj, dict) or obj.get("type") != "PreSalesHero":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        config = props.get("config")
+        if isinstance(config, dict):
+            badges = config.get("badges")
+            if isinstance(badges, list):
+                return badges
+        raw_config_json = props.get("configJson")
+        if isinstance(raw_config_json, str) and raw_config_json.strip():
+            try:
+                parsed = json.loads(raw_config_json)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                badges = parsed.get("badges")
+                if isinstance(badges, list):
+                    return badges
+    return None
+
+
+def _repair_pre_sales_badge_icons(
+    *,
+    badges: list[Any],
+    fallback_badges: list[dict[str, Any]],
+) -> bool:
+    changed = False
+    for idx, badge in enumerate(badges):
+        if not isinstance(badge, dict):
+            continue
+        if idx >= len(fallback_badges):
+            continue
+        fallback = fallback_badges[idx]
+        if not isinstance(fallback, dict):
+            continue
+        has_icon_src = isinstance(badge.get("iconSrc"), str) and bool(badge.get("iconSrc").strip())
+        has_icon_asset = isinstance(badge.get("iconAssetPublicId"), str) and bool(
+            badge.get("iconAssetPublicId").strip()
+        )
+        if not has_icon_src and not has_icon_asset:
+            fallback_icon_asset = fallback.get("iconAssetPublicId")
+            if isinstance(fallback_icon_asset, str) and fallback_icon_asset.strip():
+                badge["iconAssetPublicId"] = fallback_icon_asset.strip()
+                changed = True
+            fallback_icon_src = fallback.get("iconSrc")
+            if isinstance(fallback_icon_src, str) and fallback_icon_src.strip():
+                badge["iconSrc"] = fallback_icon_src.strip()
+                changed = True
+        icon_alt = badge.get("iconAlt")
+        if not isinstance(icon_alt, str) or not icon_alt.strip():
+            fallback_icon_alt = fallback.get("iconAlt")
+            if isinstance(fallback_icon_alt, str) and fallback_icon_alt.strip():
+                badge["iconAlt"] = fallback_icon_alt.strip()
+                changed = True
+    return changed
+
+
+def _ensure_pre_sales_badge_icons(
+    *,
+    puck_data: dict[str, Any],
+    config_contexts: list[_ConfigJsonContext],
+    fallback_puck_data: dict[str, Any] | None,
+) -> None:
+    if not fallback_puck_data:
+        return
+    fallback_badges = _extract_pre_sales_hero_badges(fallback_puck_data)
+    if not fallback_badges:
+        return
+    current_badges = _extract_pre_sales_hero_badges(puck_data)
+    if current_badges:
+        _repair_pre_sales_badge_icons(badges=current_badges, fallback_badges=fallback_badges)
+    for ctx in config_contexts:
+        if ctx.component_type != "PreSalesHero":
+            continue
+        if not isinstance(ctx.parsed, dict):
+            continue
+        badges = ctx.parsed.get("badges")
+        if not isinstance(badges, list):
+            continue
+        if _repair_pre_sales_badge_icons(badges=badges, fallback_badges=fallback_badges):
+            ctx.dirty = True
+
+
+def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
+    """
+    Ensure SalesPdp* blocks won't crash the editor/runtime due to basic shape issues.
+
+    This is intentionally minimal: validate container types + a few required keys that are
+    directly accessed by the frontend components.
+    """
+
+    supported_types = {
+        "SalesPdpTemplate",
+        "SalesPdpPage",
+        "SalesPdpHeader",
+        "SalesPdpHero",
+        "SalesPdpVideos",
+        "SalesPdpMarquee",
+        "SalesPdpStoryProblem",
+        "SalesPdpStorySolution",
+        "SalesPdpComparison",
+        "SalesPdpGuarantee",
+        "SalesPdpFaq",
+        "SalesPdpReviewWall",
+        "SalesPdpFooter",
+        "SalesPdpReviewSlider",
+    }
+
+    def load_config(props: dict[str, Any]) -> tuple[Any, str] | None:
+        raw_json = props.get("configJson")
+        if isinstance(raw_json, str) and raw_json.strip():
+            try:
+                return json.loads(raw_json), "configJson"
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"configJson must be valid JSON: {exc}") from exc
+        if "config" in props and props.get("config") is not None:
+            return props.get("config"), "config"
+        return None
+
+    def load_optional_object_prop(
+        *,
+        props: dict[str, Any],
+        object_key: str,
+        json_key: str,
+        component_type: str,
+        id_suffix: str,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        raw_json = props.get(json_key)
+        if isinstance(raw_json, str) and raw_json.strip():
+            try:
+                parsed = json.loads(raw_json)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{component_type}.{json_key} must be valid JSON{id_suffix}: {exc}") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError(
+                    f"{component_type}.{json_key} must decode to a JSON object{id_suffix}. "
+                    f"Received {_describe_value(parsed)}."
+                )
+            return parsed, json_key
+
+        value = props.get(object_key)
+        if value is None:
+            return None, None
+        if not isinstance(value, dict):
+            raise ValueError(
+                f"{component_type}.{object_key} must be a JSON object{id_suffix}. "
+                f"Received {_describe_value(value)}."
+            )
+        return value, object_key
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        if comp_type not in supported_types:
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        loaded = load_config(props)
+        if not loaded:
+            continue
+        config, source = loaded
+        block_id = props.get("id")
+        id_suffix = f" (id={block_id})" if isinstance(block_id, str) and block_id else ""
+
+        if comp_type == "SalesPdpHeader":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpHeader.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            logo = config.get("logo")
+            nav = config.get("nav")
+            cta = config.get("cta")
+            if not isinstance(logo, dict) or not isinstance(logo.get("alt"), str) or not logo.get("alt"):
+                raise ValueError(
+                    f"SalesPdpHeader.{source}.logo must be an object with string alt{id_suffix}. Received {_describe_value(logo)}."
+                )
+            if not isinstance(nav, list):
+                raise ValueError(
+                    f"SalesPdpHeader.{source}.nav must be a list{id_suffix}. Received {_describe_value(nav)}."
+                )
+            if not isinstance(cta, dict) or not isinstance(cta.get("label"), str) or not isinstance(cta.get("href"), str):
+                raise ValueError(
+                    f"SalesPdpHeader.{source}.cta must be an object with string label/href{id_suffix}. Received {_describe_value(cta)}."
+                )
+
+        elif comp_type == "SalesPdpMarquee":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpMarquee.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            items = config.get("items")
+            if not isinstance(items, list):
+                raise ValueError(
+                    f"SalesPdpMarquee.{source}.items must be a list{id_suffix}. Received {_describe_value(items)}."
+                )
+
+        elif comp_type == "SalesPdpFaq":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpFaq.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            title = config.get("title")
+            items = config.get("items")
+            if not isinstance(title, str):
+                raise ValueError(
+                    f"SalesPdpFaq.{source}.title must be a string{id_suffix}. Received {_describe_value(title)}."
+                )
+            if not isinstance(items, list):
+                raise ValueError(
+                    f"SalesPdpFaq.{source}.items must be a list{id_suffix}. Received {_describe_value(items)}."
+                )
+
+        elif comp_type == "SalesPdpFooter":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpFooter.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            logo = config.get("logo")
+            if not isinstance(logo, dict) or not isinstance(logo.get("alt"), str) or not logo.get("alt"):
+                raise ValueError(
+                    f"SalesPdpFooter.{source}.logo must be an object with string alt{id_suffix}. Received {_describe_value(logo)}."
+                )
+            copyright_text = config.get("copyright")
+            if not isinstance(copyright_text, str):
+                raise ValueError(
+                    f"SalesPdpFooter.{source}.copyright must be a string{id_suffix}. Received {_describe_value(copyright_text)}."
+                )
+
+        elif comp_type == "SalesPdpReviewSlider":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpReviewSlider.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            toggle = config.get("toggle")
+            slides = config.get("slides")
+            if not isinstance(config.get("title"), str) or not isinstance(config.get("body"), str) or not isinstance(config.get("hint"), str):
+                raise ValueError(
+                    f"SalesPdpReviewSlider.{source} must include string title/body/hint{id_suffix}. Received {_describe_value(config)}."
+                )
+            if not isinstance(toggle, dict) or not isinstance(toggle.get("auto"), str) or not isinstance(toggle.get("manual"), str):
+                raise ValueError(
+                    f"SalesPdpReviewSlider.{source}.toggle must be an object with string auto/manual{id_suffix}. Received {_describe_value(toggle)}."
+                )
+            if not isinstance(slides, list) or not slides:
+                raise ValueError(
+                    f"SalesPdpReviewSlider.{source}.slides must be a non-empty list{id_suffix}. Received {_describe_value(slides)}."
+                )
+            for idx, slide in enumerate(slides):
+                if not isinstance(slide, dict) or not isinstance(slide.get("alt"), str) or not slide.get("alt"):
+                    raise ValueError(
+                        f"SalesPdpReviewSlider.{source}.slides[{idx}] must be an image object with string alt{id_suffix}. "
+                        f"Received {_describe_value(slide)}."
+                    )
+
+        elif comp_type == "SalesPdpHero":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            header = config.get("header")
+            gallery = config.get("gallery")
+            purchase = config.get("purchase")
+            if not isinstance(header, dict) or not isinstance(header.get("logo"), dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.header must be an object{id_suffix}. Received {_describe_value(header)}."
+                )
+            if not isinstance(gallery, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.gallery must be an object{id_suffix}. Received {_describe_value(gallery)}."
+                )
+            slides = gallery.get("slides") if isinstance(gallery, dict) else None
+            if not isinstance(slides, list) or not slides:
+                raise ValueError(
+                    f"SalesPdpHero.{source}.gallery.slides must be a non-empty list{id_suffix}. Received {_describe_value(slides)}."
+                )
+            for idx, slide in enumerate(slides):
+                if not isinstance(slide, dict) or not isinstance(slide.get("alt"), str) or not slide.get("alt"):
+                    raise ValueError(
+                        f"SalesPdpHero.{source}.gallery.slides[{idx}] must be an image object with string alt{id_suffix}. "
+                        f"Received {_describe_value(slide)}."
+                    )
+            if not isinstance(purchase, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase must be an object{id_suffix}. Received {_describe_value(purchase)}."
+                )
+            if not isinstance(purchase.get("title"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.title must be a string{id_suffix}. Received {_describe_value(purchase.get('title'))}."
+                )
+            for key in ("faqPills", "benefits"):
+                value = purchase.get(key)
+                if not isinstance(value, list):
+                    raise ValueError(
+                        f"SalesPdpHero.{source}.purchase.{key} must be a list{id_suffix}. Received {_describe_value(value)}."
+                    )
+            size = purchase.get("size")
+            color = purchase.get("color")
+            offer = purchase.get("offer")
+            cta = purchase.get("cta")
+            if not isinstance(size, dict) or not isinstance(size.get("options"), list) or not size.get("options"):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.size.options must be a non-empty list{id_suffix}. Received {_describe_value(size)}."
+                )
+            if not isinstance(color, dict) or not isinstance(color.get("options"), list) or not color.get("options"):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.color.options must be a non-empty list{id_suffix}. Received {_describe_value(color)}."
+                )
+            if not isinstance(offer, dict) or not isinstance(offer.get("options"), list) or not offer.get("options"):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.offer.options must be a non-empty list{id_suffix}. Received {_describe_value(offer)}."
+                )
+            if not isinstance(cta, dict) or not isinstance(cta.get("labelTemplate"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.cta.labelTemplate must be a string{id_suffix}. Received {_describe_value(cta)}."
+                )
+
+            size_options = size.get("options") if isinstance(size, dict) else None
+            if isinstance(size_options, list):
+                for idx, opt in enumerate(size_options):
+                    if not isinstance(opt, dict) or not isinstance(opt.get("id"), str) or not isinstance(opt.get("label"), str):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.size.options[{idx}] must be an object with string id/label{id_suffix}. "
+                            f"Received {_describe_value(opt)}."
+                        )
+
+            color_options = color.get("options") if isinstance(color, dict) else None
+            if isinstance(color_options, list):
+                for idx, opt in enumerate(color_options):
+                    if not isinstance(opt, dict) or not isinstance(opt.get("id"), str) or not isinstance(opt.get("label"), str):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.color.options[{idx}] must be an object with string id/label{id_suffix}. "
+                            f"Received {_describe_value(opt)}."
+                        )
+
+            offer_options = offer.get("options") if isinstance(offer, dict) else None
+            if isinstance(offer_options, list):
+                for idx, opt in enumerate(offer_options):
+                    if not isinstance(opt, dict):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.offer.options[{idx}] must be an object{id_suffix}. Received {_describe_value(opt)}."
+                        )
+                    if not isinstance(opt.get("id"), str) or not isinstance(opt.get("title"), str):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.offer.options[{idx}] must include string id/title{id_suffix}. "
+                            f"Received {_describe_value(opt)}."
+                        )
+                    image = opt.get("image")
+                    if not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt"):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.offer.options[{idx}].image must be an object with string alt{id_suffix}. "
+                            f"Received {_describe_value(image)}."
+                        )
+                    price = opt.get("price")
+                    if not isinstance(price, (int, float)):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.offer.options[{idx}].price must be a number{id_suffix}. "
+                            f"Received {_describe_value(price)}."
+                        )
+
+            modals, modals_source = load_optional_object_prop(
+                props=props,
+                object_key="modals",
+                json_key="modalsJson",
+                component_type=comp_type,
+                id_suffix=id_suffix,
+            )
+            if modals is not None:
+                size_chart = modals.get("sizeChart")
+                why_bundle = modals.get("whyBundle")
+                free_gifts = modals.get("freeGifts")
+                if not isinstance(size_chart, dict):
+                    raise ValueError(
+                        f"SalesPdpHero.{modals_source}.sizeChart must be an object{id_suffix}. "
+                        f"Received {_describe_value(size_chart)}."
+                    )
+                if not isinstance(why_bundle, dict):
+                    raise ValueError(
+                        f"SalesPdpHero.{modals_source}.whyBundle must be an object{id_suffix}. "
+                        f"Received {_describe_value(why_bundle)}."
+                    )
+                if not isinstance(free_gifts, dict):
+                    raise ValueError(
+                        f"SalesPdpHero.{modals_source}.freeGifts must be an object{id_suffix}. "
+                        f"Received {_describe_value(free_gifts)}."
+                    )
+                if not isinstance(size_chart.get("title"), str) or not isinstance(size_chart.get("note"), str):
+                    raise ValueError(
+                        f"SalesPdpHero.{modals_source}.sizeChart must include string title/note{id_suffix}. "
+                        f"Received {_describe_value(size_chart)}."
+                    )
+                sizes = size_chart.get("sizes")
+                if not isinstance(sizes, list) or not sizes:
+                    raise ValueError(
+                        f"SalesPdpHero.{modals_source}.sizeChart.sizes must be a non-empty list{id_suffix}. "
+                        f"Received {_describe_value(sizes)}."
+                    )
+                if not isinstance(why_bundle.get("title"), str) or not isinstance(why_bundle.get("body"), str):
+                    raise ValueError(
+                        f"SalesPdpHero.{modals_source}.whyBundle must include string title/body{id_suffix}. "
+                        f"Received {_describe_value(why_bundle)}."
+                    )
+                quotes = why_bundle.get("quotes")
+                if not isinstance(quotes, list):
+                    raise ValueError(
+                        f"SalesPdpHero.{modals_source}.whyBundle.quotes must be a list{id_suffix}. "
+                        f"Received {_describe_value(quotes)}."
+                    )
+                if not isinstance(free_gifts.get("title"), str) or not isinstance(free_gifts.get("body"), str):
+                    raise ValueError(
+                        f"SalesPdpHero.{modals_source}.freeGifts must include string title/body{id_suffix}. "
+                        f"Received {_describe_value(free_gifts)}."
+                    )
 
 def _collect_config_json_contexts_all(puck_data: dict[str, Any]) -> list[_ConfigJsonContext]:
     contexts: list[_ConfigJsonContext] = []
@@ -228,6 +846,72 @@ _BOOK_DEVICE_KEYWORDS = (
     "kindle",
 )
 
+_STOCK_SCENE_KEYWORDS = (
+    "lifestyle",
+    "at home",
+    "home setting",
+    "kitchen",
+    "living room",
+    "office",
+    "workspace",
+    "outdoor",
+    "street",
+    "city",
+    "natural light",
+    "candid",
+    "authentic",
+    "realistic",
+    "wellness",
+    "portrait",
+    "person",
+    "woman",
+    "man",
+    "family",
+    "group",
+    "background",
+    "environment",
+)
+
+_AI_GRAPHIC_STYLE_KEYWORDS = (
+    "vector",
+    "icon",
+    "illustration",
+    "infographic",
+    "diagram",
+    "transparent background",
+    "flat design",
+    "line art",
+    "logo",
+)
+
+_PRODUCT_EXACTNESS_KEYWORDS = (
+    "include the product prominently",
+    "product photo",
+    "product shot",
+    "close-up",
+    "close up",
+    "studio shot",
+    "packaging",
+    "hero product",
+    "on white background",
+    "technical detail",
+    "e-commerce",
+)
+
+_STOCK_SCENE_COMPLEXITY_KEYWORDS = (
+    "concept",
+    "tracking",
+    "progress",
+    "before and after",
+    "split screen",
+    "collage",
+    "mockup",
+    "visible in corner",
+)
+
+_STOCK_PROMPT_MAX_WORDS = 16
+_STOCK_PROMPT_MAX_COMMAS = 2
+
 
 def _text_mentions_product(text: str | None) -> bool:
     if not isinstance(text, str) or not text.strip():
@@ -248,6 +932,57 @@ def _product_prompt_mentions_devices(prompt: str | None) -> bool:
         return False
     lowered = prompt.lower()
     return any(keyword in lowered for keyword in _BOOK_DEVICE_KEYWORDS)
+
+
+def _has_explicit_image_source(obj: dict[str, Any]) -> bool:
+    if "imageSource" in obj and obj.get("imageSource") is not None:
+        return True
+    if "image_source" in obj and obj.get("image_source") is not None:
+        return True
+    return False
+
+
+def _prompt_mentions_product_terms(prompt: str) -> bool:
+    lowered = prompt.lower()
+    for keyword in _PRODUCT_KEYWORDS:
+        if re.search(rf"\b{re.escape(keyword)}s?\b", lowered):
+            return True
+    return False
+
+
+def _is_stock_scene_prompt_too_specific(prompt: str) -> bool:
+    lowered = prompt.lower()
+    words = re.findall(r"[a-z0-9']+", lowered)
+    if len(words) > _STOCK_PROMPT_MAX_WORDS:
+        return True
+    if lowered.count(",") > _STOCK_PROMPT_MAX_COMMAS:
+        return True
+    if any(keyword in lowered for keyword in _STOCK_SCENE_COMPLEXITY_KEYWORDS):
+        return True
+    return False
+
+
+def _recommend_image_source(
+    *,
+    prompt: str,
+    asset_key: str,
+    reference_public_id: str | None,
+) -> tuple[str, str]:
+    if asset_key == "iconAssetPublicId":
+        return "ai", "Icon prompts are generated by AI."
+    if reference_public_id:
+        return "ai", "referenceAssetPublicId requires AI generation."
+
+    lowered = prompt.lower()
+    if any(keyword in lowered for keyword in _AI_GRAPHIC_STYLE_KEYWORDS):
+        return "ai", "Graphic/icon/diagram prompts are generated by AI."
+    if _prompt_mentions_product_terms(prompt) or any(keyword in lowered for keyword in _PRODUCT_EXACTNESS_KEYWORDS):
+        return "ai", "Prompt references product-specific visuals."
+    if any(keyword in lowered for keyword in _STOCK_SCENE_KEYWORDS):
+        if _is_stock_scene_prompt_too_specific(prompt):
+            return "ai", "Prompt is too specific for reliable stock search; use AI."
+        return "unsplash", "Prompt is a generic stock-suitable scene."
+    return "ai", "Default to AI when stock suitability is unclear."
 
 
 def _book_prompt_suffix() -> str:
@@ -500,8 +1235,6 @@ def _apply_product_image_overrides_for_ai(
                         if ctx:
                             ctx.dirty = True
 
-        return
-
     if template_kind == "pre-sales-listicle":
         for comp_type, config, ctx in iter_component_configs({"PreSalesHero", "PreSalesReasons", "PreSalesPitch"}):
             if comp_type == "PreSalesHero":
@@ -559,6 +1292,32 @@ def _apply_product_image_overrides_for_ai(
                         )
                         if ctx:
                             ctx.dirty = True
+
+    # Generic support for templates that use primitive Image components (not SalesPdp*/PreSales*).
+    #
+    # We only fill obvious "product image" slots so we do not accidentally overwrite icons or other
+    # decorative imagery. These slots are expected to have no src/assetPublicId and an alt/id that
+    # clearly indicates a product image placeholder.
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict) or obj.get("type") != "Image":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        if props.get("assetPublicId") or props.get("src") or props.get("referenceAssetPublicId"):
+            continue
+        alt = props.get("alt")
+        cid = props.get("id")
+        alt_str = str(alt or "")
+        cid_str = str(cid or "")
+        looks_like_product_slot = "product" in alt_str.lower() or "hero_image" in cid_str.lower()
+        if not looks_like_product_slot:
+            continue
+        if not product_public_ids:
+            raise ValueError("No product image assets available for funnel generation.")
+        props["assetPublicId"] = product_public_ids[0]
+        if not alt_str.strip():
+            props["alt"] = "Product image"
 def _get_image_src_for_asset_key(obj: dict[str, Any], asset_key: str) -> Any:
     if asset_key == "iconAssetPublicId":
         return obj.get("iconSrc")
@@ -656,6 +1415,12 @@ def _collect_image_plans(
                     target = _extract_image_prompt_target(props, "assetPublicId")
                     if target:
                         prompt, reference_public_id, image_source, aspect_ratio = target
+                        explicit_source = _has_explicit_image_source(props)
+                        suggested_source, suggested_reason = _recommend_image_source(
+                            prompt=prompt,
+                            asset_key="assetPublicId",
+                            reference_public_id=reference_public_id,
+                        )
                         plans.append(
                             {
                                 "path": f"{path}.props",
@@ -664,6 +1429,13 @@ def _collect_image_plans(
                                 "imageSource": image_source,
                                 "referenceAssetPublicId": reference_public_id,
                                 "aspectRatio": aspect_ratio,
+                                "routingExplicit": explicit_source,
+                                "routingSuggestedImageSource": suggested_source,
+                                "routingReason": (
+                                    f"Explicit imageSource='{image_source}' was provided."
+                                    if explicit_source
+                                    else suggested_reason
+                                ),
                             }
                         )
                 continue
@@ -679,6 +1451,12 @@ def _collect_image_plans(
             target = _extract_image_prompt_target(obj, asset_key)
             if target:
                 prompt, reference_public_id, image_source, aspect_ratio = target
+                explicit_source = _has_explicit_image_source(obj)
+                suggested_source, suggested_reason = _recommend_image_source(
+                    prompt=prompt,
+                    asset_key=asset_key,
+                    reference_public_id=reference_public_id,
+                )
                 plans.append(
                     {
                         "path": path,
@@ -687,6 +1465,13 @@ def _collect_image_plans(
                         "imageSource": image_source,
                         "referenceAssetPublicId": reference_public_id,
                         "aspectRatio": aspect_ratio,
+                        "routingExplicit": explicit_source,
+                        "routingSuggestedImageSource": suggested_source,
+                        "routingReason": (
+                            f"Explicit imageSource='{image_source}' was provided."
+                            if explicit_source
+                            else suggested_reason
+                        ),
                     }
                 )
 
@@ -696,38 +1481,28 @@ def _collect_image_plans(
     return plans
 
 
-def _seed_unsplash_usage(
+def _auto_route_image_sources(
     *,
     puck_data: dict[str, Any],
     config_contexts: list[_ConfigJsonContext],
-    max_items: int = 2,
 ) -> int:
-    seeded = 0
-
-    def try_seed(*, allow_product_prompts: bool) -> None:
-        nonlocal seeded
-        for obj, asset_key, prompt, reference_public_id, image_source, _, ctx in _iter_ai_image_prompt_targets(
-            puck_data
-        ):
-            if seeded >= max_items:
-                return
-            if image_source != "ai":
-                continue
-            if reference_public_id:
-                continue
-            if asset_key == "iconAssetPublicId":
-                continue
-            if not allow_product_prompts and _text_mentions_product(prompt):
-                continue
-            obj["imageSource"] = "unsplash"
-            if ctx:
-                ctx.dirty = True
-            seeded += 1
-
-    try_seed(allow_product_prompts=False)
-    if seeded == 0:
-        try_seed(allow_product_prompts=True)
-    return seeded
+    _ = config_contexts
+    routed = 0
+    for obj, asset_key, prompt, reference_public_id, image_source, _, ctx in _iter_ai_image_prompt_targets(puck_data):
+        if _has_explicit_image_source(obj):
+            continue
+        recommended_source, _ = _recommend_image_source(
+            prompt=prompt,
+            asset_key=asset_key,
+            reference_public_id=reference_public_id,
+        )
+        if recommended_source == image_source:
+            continue
+        obj["imageSource"] = recommended_source
+        if ctx:
+            ctx.dirty = True
+        routed += 1
+    return routed
 
 
 def _ensure_unsplash_usage(
@@ -738,23 +1513,9 @@ def _ensure_unsplash_usage(
 ) -> list[dict[str, Any]]:
     if not plans:
         return plans
-    eligible = [
-        plan
-        for plan in plans
-        if plan.get("imageSource") == "ai"
-        and not plan.get("referenceAssetPublicId")
-        and plan.get("assetKey") != "iconAssetPublicId"
-    ]
-    if not eligible:
+    routed = _auto_route_image_sources(puck_data=puck_data, config_contexts=config_contexts)
+    if routed == 0:
         return plans
-    unsplash_count = sum(1 for plan in plans if plan.get("imageSource") == "unsplash")
-    if unsplash_count > 0:
-        return plans
-    seeded = _seed_unsplash_usage(puck_data=puck_data, config_contexts=config_contexts)
-    if seeded == 0:
-        raise ValueError(
-            "Unsplash usage is required. Mark stock-appropriate images with imageSource='unsplash' and a prompt."
-        )
     return _collect_image_plans(puck_data=puck_data, config_contexts=config_contexts)
 
 
@@ -1747,6 +2508,39 @@ def _count_ai_image_targets(puck_data: dict[str, Any]) -> int:
     return sum(1 for _ in _iter_ai_image_prompt_targets(puck_data))
 
 
+def _resolve_image_generation_count(
+    *,
+    puck_data: dict[str, Any],
+    image_plans: list[dict[str, Any]] | None = None,
+    cap: int = _MAX_PAGE_IMAGE_GENERATIONS,
+) -> int:
+    total_images_needed = _count_ai_image_targets(puck_data)
+    if total_images_needed <= cap:
+        return total_images_needed
+
+    if image_plans is None:
+        config_contexts = _collect_config_json_contexts_all(puck_data)
+        image_plans = _collect_image_plans(puck_data=puck_data, config_contexts=config_contexts)
+
+    sample_paths: list[str] = []
+    for plan in image_plans:
+        path = plan.get("path")
+        if not isinstance(path, str) or not path.strip() or path in sample_paths:
+            continue
+        sample_paths.append(path)
+        if len(sample_paths) >= 12:
+            break
+
+    sample = ""
+    if sample_paths:
+        sample = "\nExample image paths:\n" + "\n".join(f"- {path}" for path in sample_paths)
+
+    raise ValueError(
+        f"Refusing to generate {total_images_needed} images for a single page. "
+        f"Cap is {cap}. Reduce image prompts before retrying.{sample}"
+    )
+
+
 def _fill_ai_images(
     *,
     session: Session,
@@ -1967,22 +2761,31 @@ def generate_funnel_page_draft(
     if template_mode and base_puck is None:
         base_puck = template.puck_data
 
+    template_component_kind: str | None = None
+    if template_mode and isinstance(base_puck, dict):
+        template_component_kind = _infer_template_component_kind(template_kind, base_puck)
+
     if not template_mode:
         structure_guidance = (
             "- Use Section as the top-level blocks in puckData.content (do not place bare Heading/Text directly at the root)\n"
             "- Use Columns inside Sections for two-column layouts (image + copy)\n\n"
         )
-    elif template_kind == "sales-pdp":
+    elif template_component_kind == "sales-pdp":
         structure_guidance = (
             "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
             "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
             "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
         )
-    else:
+    elif template_component_kind == "pre-sales-listicle":
         structure_guidance = (
             "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
             "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
             "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+        )
+    else:
+        structure_guidance = (
+            "- Preserve the template's existing top-level structure in puckData.content.\n"
+            "- Do not introduce new component types; only edit props fields.\n\n"
         )
     header_footer_guidance = (
         "Header/Footer guidance:\n"
@@ -2060,9 +2863,20 @@ def generate_funnel_page_draft(
             "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
             "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
         )
+    elif template_mode and template_component_kind == "pre-sales-listicle":
+        template_config_guidance = (
+            "Pre-sales listicle config requirements:\n"
+            "- PreSalesHero.config MUST be: { hero: { title: string, subtitle: string, media?: { type:'image', alt:string, src?:string, assetPublicId?:string } | { type:'video', srcMp4:string, poster?:string, alt?:string, assetPublicId?:string } }, badges: [] }\n"
+            "- PreSalesReasons.config MUST be an array of reasons: [{ number: number, title: string, body: string, image?: { alt:string, src?:string, assetPublicId?:string } }]\n"
+            "- PreSalesMarquee.config MUST be an array of strings.\n"
+            "- PreSalesPitch.config MUST be: { title: string, bullets: string[], image: { alt:string, src?:string, assetPublicId?:string }, cta?: { label: string, linkType?: 'external'|'funnelPage'|'nextPage', href?:string, targetPageId?:string } }\n"
+            "- PreSalesReviews.config MUST be: { slides: [{ text: string, author: string, images: [{ alt:string, src?:string, assetPublicId?:string }] }], autoAdvanceMs?: number }\n"
+            "- PreSalesFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string } }\n"
+            "- Do NOT use keys like headline/subheadline/ctaLabel/ctaLinkType/items/reasons/reviews/links/copyrightText inside PreSales* configs.\n\n"
+        )
     if not template_mode:
         template_component = ""
-    elif template_kind == "sales-pdp":
+    elif template_component_kind == "sales-pdp":
         template_component = (
             "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
             "12) SalesPdpHeader: props { id, config, configJson? }\n"
@@ -2078,7 +2892,7 @@ def generate_funnel_page_draft(
             "22) SalesPdpFooter: props { id, config, configJson? }\n"
             "23) SalesPdpReviewSlider: props { id, config, configJson? }\n"
         )
-    else:
+    elif template_component_kind == "pre-sales-listicle":
         template_component = (
             "11) PreSalesPage: props { id, anchorId?, theme, themeJson?, content? }\n"
             "12) PreSalesHero: props { id, config, configJson? }\n"
@@ -2090,6 +2904,8 @@ def generate_funnel_page_draft(
             "18) PreSalesFooter: props { id, config, configJson? }\n"
             "19) PreSalesFloatingCta: props { id, config, configJson? }\n"
         )
+    else:
+        template_component = ""
 
     page_label = "sales page"
     if template_kind == "pre-sales-listicle":
@@ -2133,6 +2949,7 @@ def generate_funnel_page_draft(
             "ComponentData shape:\n"
             "- Every component must be an object with keys: type, props\n"
             "- props should include a string id (unique per component)\n\n"
+            "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
             "Available primitives (component types) and their props:\n"
             "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
             "   - purpose: 'header' | 'section' | 'footer'\n"
@@ -2205,7 +3022,7 @@ def generate_funnel_page_draft(
         "Testimonials",
         "FAQ",
     }
-    if template_kind == "sales-pdp":
+    if template_component_kind == "sales-pdp":
         allowed_types.update(
             {
                 "SalesPdpPage",
@@ -2224,7 +3041,7 @@ def generate_funnel_page_draft(
                 "SalesPdpTemplate",
             }
         )
-    elif template_kind == "pre-sales-listicle":
+    elif template_component_kind == "pre-sales-listicle":
         allowed_types.update(
             {
                 "PreSalesPage",
@@ -2340,7 +3157,7 @@ def generate_funnel_page_draft(
         _ensure_block_ids(puck_data)
 
     if template_mode and isinstance(base_puck, dict):
-        required_types = _required_template_component_types(base_puck, template_kind=template_kind)
+        required_types = _required_template_component_types(base_puck, template_kind=template_component_kind)
         if required_types:
             generated_counts = _count_component_types(puck_data)
             missing_types = sorted(
@@ -2418,6 +3235,11 @@ def generate_funnel_page_draft(
         if not isinstance(desc, str):
             root_props["description"] = ""
 
+    if template_component_kind == "pre-sales-listicle":
+        _validate_pre_sales_listicle_component_configs(puck_data)
+    elif template_component_kind == "sales-pdp":
+        _validate_sales_pdp_component_configs(puck_data)
+
     design_system_tokens = resolve_design_system_tokens(
         session=session,
         org_id=org_id,
@@ -2449,11 +3271,17 @@ def generate_funnel_page_draft(
         client_id=str(funnel.client_id),
         puck_data=puck_data,
         config_contexts=config_contexts,
-        template_kind=template_kind,
+        template_kind=template_component_kind,
         product=product,
         brand_logo_public_id=brand_logo_public_id,
     )
     _ensure_flat_vector_icon_prompts(puck_data=puck_data, config_contexts=config_contexts)
+    if template_component_kind == "pre-sales-listicle":
+        _ensure_pre_sales_badge_icons(
+            puck_data=puck_data,
+            config_contexts=config_contexts,
+            fallback_puck_data=current_puck_data,
+        )
     if template_mode and generate_images:
         _validate_required_template_images(puck_data=puck_data, config_contexts=config_contexts)
     image_plans: list[dict[str, Any]] = []
@@ -2468,16 +3296,19 @@ def generate_funnel_page_draft(
     _sync_config_json_contexts(config_contexts)
 
     generated_images: list[dict[str, Any]] = []
+    requested_image_count = 0
     if generate_images:
-        total_images_needed = _count_ai_image_targets(puck_data)
-        max_images = total_images_needed
+        requested_image_count = _resolve_image_generation_count(
+            puck_data=puck_data,
+            image_plans=image_plans,
+        )
         try:
             _, generated_images = _fill_ai_images(
                 session=session,
                 org_id=org_id,
                 client_id=str(funnel.client_id),
                 puck_data=puck_data,
-                max_images=max_images,
+                max_images=requested_image_count,
                 funnel_id=funnel_id,
                 product_id=str(funnel.product_id) if funnel.product_id else None,
             )
@@ -2492,7 +3323,8 @@ def generate_funnel_page_draft(
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "generatedImages": generated_images,
         "imagePlans": image_plans,
-        "requestedImageCount": max_images,
+        "requestedImageCount": requested_image_count,
+        "appliedImageGenerationCap": _MAX_PAGE_IMAGE_GENERATIONS,
         "actorUserId": user_id,
         "ideaWorkspaceId": resolved_workspace_id,
         "templateId": resolved_template_id,
@@ -2647,22 +3479,31 @@ def stream_funnel_page_draft(
         if template_mode and base_puck is None:
             base_puck = template.puck_data
 
+        template_component_kind: str | None = None
+        if template_mode and isinstance(base_puck, dict):
+            template_component_kind = _infer_template_component_kind(template_kind, base_puck)
+
         if not template_mode:
             structure_guidance = (
                 "- Use Section as the top-level blocks in puckData.content (do not place bare Heading/Text directly at the root)\n"
                 "- Use Columns inside Sections for two-column layouts (image + copy)\n\n"
             )
-        elif template_kind == "sales-pdp":
+        elif template_component_kind == "sales-pdp":
             structure_guidance = (
                 "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
                 "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
                 "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
             )
-        else:
+        elif template_component_kind == "pre-sales-listicle":
             structure_guidance = (
                 "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
                 "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
                 "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+            )
+        else:
+            structure_guidance = (
+                "- Preserve the template's existing top-level structure in puckData.content.\n"
+                "- Do not introduce new component types; only edit props fields.\n\n"
             )
         header_footer_guidance = (
             "Header/Footer guidance:\n"
@@ -2715,9 +3556,20 @@ def stream_funnel_page_draft(
                 "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
                 "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
             )
+        elif template_mode and template_component_kind == "pre-sales-listicle":
+            template_config_guidance = (
+                "Pre-sales listicle config requirements:\n"
+                "- PreSalesHero.config MUST be: { hero: { title: string, subtitle: string, media?: { type:'image', alt:string, src?:string, assetPublicId?:string } | { type:'video', srcMp4:string, poster?:string, alt?:string, assetPublicId?:string } }, badges: [] }\n"
+                "- PreSalesReasons.config MUST be an array of reasons: [{ number: number, title: string, body: string, image?: { alt:string, src?:string, assetPublicId?:string } }]\n"
+                "- PreSalesMarquee.config MUST be an array of strings.\n"
+                "- PreSalesPitch.config MUST be: { title: string, bullets: string[], image: { alt:string, src?:string, assetPublicId?:string }, cta?: { label: string, linkType?: 'external'|'funnelPage'|'nextPage', href?:string, targetPageId?:string } }\n"
+                "- PreSalesReviews.config MUST be: { slides: [{ text: string, author: string, images: [{ alt:string, src?:string, assetPublicId?:string }] }], autoAdvanceMs?: number }\n"
+                "- PreSalesFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string } }\n"
+                "- Do NOT use keys like headline/subheadline/ctaLabel/ctaLinkType/items/reasons/reviews/links/copyrightText inside PreSales* configs.\n\n"
+            )
         if not template_mode:
             template_component = ""
-        elif template_kind == "sales-pdp":
+        elif template_component_kind == "sales-pdp":
             template_component = (
                 "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
                 "12) SalesPdpHeader: props { id, config, configJson? }\n"
@@ -2733,7 +3585,7 @@ def stream_funnel_page_draft(
                 "22) SalesPdpFooter: props { id, config, configJson? }\n"
                 "23) SalesPdpReviewSlider: props { id, config, configJson? }\n"
             )
-        else:
+        elif template_component_kind == "pre-sales-listicle":
             template_component = (
                 "11) PreSalesPage: props { id, anchorId?, theme, themeJson?, content? }\n"
                 "12) PreSalesHero: props { id, config, configJson? }\n"
@@ -2745,6 +3597,8 @@ def stream_funnel_page_draft(
                 "18) PreSalesFooter: props { id, config, configJson? }\n"
                 "19) PreSalesFloatingCta: props { id, config, configJson? }\n"
             )
+        else:
+            template_component = ""
 
         page_label = "sales page"
         if template_kind == "pre-sales-listicle":
@@ -2785,16 +3639,17 @@ def stream_funnel_page_draft(
                 "Structure guidance:\n"
                 f"{structure_guidance}"
                 f"{header_footer_guidance}"
-                "ComponentData shape:\n"
-                "- Every component must be an object with keys: type, props\n"
-                "- props should include a string id (unique per component)\n\n"
-                "Available primitives (component types) and their props:\n"
-                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
-                "   - purpose: 'header' | 'section' | 'footer'\n"
-                "   - layout: 'full' | 'contained' | 'card'\n"
-                "     - full = full-width background, content constrained to containerWidth\n"
-                "     - contained = background constrained to containerWidth (no card styling)\n"
-                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
+	                "ComponentData shape:\n"
+	                "- Every component must be an object with keys: type, props\n"
+	                "- props should include a string id (unique per component)\n\n"
+	                "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
+	                "Available primitives (component types) and their props:\n"
+	                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+	                "   - purpose: 'header' | 'section' | 'footer'\n"
+	                "   - layout: 'full' | 'contained' | 'card'\n"
+	                "     - full = full-width background, content constrained to containerWidth\n"
+	                "     - contained = background constrained to containerWidth (no card styling)\n"
+	                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
                 "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
                 "   - content is a slot: ComponentData[]\n"
                 "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
@@ -2862,7 +3717,7 @@ def stream_funnel_page_draft(
             "Testimonials",
             "FAQ",
         }
-        if template_kind == "sales-pdp":
+        if template_component_kind == "sales-pdp":
             allowed_types.update(
                 {
                     "SalesPdpPage",
@@ -2881,7 +3736,7 @@ def stream_funnel_page_draft(
                     "SalesPdpTemplate",
                 }
             )
-        elif template_kind == "pre-sales-listicle":
+        elif template_component_kind == "pre-sales-listicle":
             allowed_types.update(
                 {
                     "PreSalesPage",
@@ -2972,7 +3827,7 @@ def stream_funnel_page_draft(
             _ensure_block_ids(puck_data)
 
         if template_mode and isinstance(base_puck, dict):
-            required_types = _required_template_component_types(base_puck, template_kind=template_kind)
+            required_types = _required_template_component_types(base_puck, template_kind=template_component_kind)
             if required_types:
                 generated_counts = _count_component_types(puck_data)
                 missing_types = sorted(
@@ -3054,6 +3909,11 @@ def stream_funnel_page_draft(
             if not isinstance(desc, str):
                 root_props["description"] = ""
 
+        if template_component_kind == "pre-sales-listicle":
+            _validate_pre_sales_listicle_component_configs(puck_data)
+        elif template_component_kind == "sales-pdp":
+            _validate_sales_pdp_component_configs(puck_data)
+
         design_system_tokens = resolve_design_system_tokens(
             session=session,
             org_id=org_id,
@@ -3085,11 +3945,17 @@ def stream_funnel_page_draft(
             client_id=str(funnel.client_id),
             puck_data=puck_data,
             config_contexts=config_contexts,
-            template_kind=template_kind,
+            template_kind=template_component_kind,
             product=product,
             brand_logo_public_id=brand_logo_public_id,
         )
         _ensure_flat_vector_icon_prompts(puck_data=puck_data, config_contexts=config_contexts)
+        if template_component_kind == "pre-sales-listicle":
+            _ensure_pre_sales_badge_icons(
+                puck_data=puck_data,
+                config_contexts=config_contexts,
+                fallback_puck_data=current_puck_data,
+            )
         if template_mode and generate_images:
             _validate_required_template_images(puck_data=puck_data, config_contexts=config_contexts)
         image_plans: list[dict[str, Any]] = []
@@ -3104,17 +3970,20 @@ def stream_funnel_page_draft(
         _sync_config_json_contexts(config_contexts)
 
         generated_images: list[dict[str, Any]] = []
+        requested_image_count = 0
         if generate_images:
             yield {"type": "status", "status": "generating_images"}
-            total_images_needed = _count_ai_image_targets(puck_data)
-            max_images = total_images_needed
+            requested_image_count = _resolve_image_generation_count(
+                puck_data=puck_data,
+                image_plans=image_plans,
+            )
             try:
                 _, generated_images = _fill_ai_images(
                     session=session,
                     org_id=org_id,
                     client_id=str(funnel.client_id),
                     puck_data=puck_data,
-                    max_images=max_images,
+                    max_images=requested_image_count,
                     funnel_id=funnel_id,
                     product_id=str(funnel.product_id) if funnel.product_id else None,
                 )
@@ -3131,13 +4000,15 @@ def stream_funnel_page_draft(
                 "prompt": prompt,
                 "messages": conversation,
                 "model": model_id,
-                "temperature": temperature,
-                "generatedAt": datetime.now(timezone.utc).isoformat(),
-                "generatedImages": generated_images,
-                "imagePlans": image_plans,
-                "actorUserId": user_id,
-            },
-        )
+                    "temperature": temperature,
+                    "generatedAt": datetime.now(timezone.utc).isoformat(),
+                    "generatedImages": generated_images,
+                    "imagePlans": image_plans,
+                    "requestedImageCount": requested_image_count,
+                    "appliedImageGenerationCap": _MAX_PAGE_IMAGE_GENERATIONS,
+                    "actorUserId": user_id,
+                },
+            )
         session.add(version)
         session.commit()
         session.refresh(version)
