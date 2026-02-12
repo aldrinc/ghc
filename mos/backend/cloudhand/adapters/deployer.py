@@ -5,6 +5,7 @@ import subprocess
 import tarfile
 import time
 import shlex
+import hashlib
 from pathlib import Path
 import paramiko
 from typing import Dict, List, Optional  # noqa: F401
@@ -21,6 +22,7 @@ from ..models import (
 _NGINX_PROXY_CONNECT_TIMEOUT = "60s"
 _NGINX_PROXY_SEND_TIMEOUT = "3600s"
 _NGINX_PROXY_READ_TIMEOUT = "3600s"
+_RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
 
 
 class ServerDeployer:
@@ -86,8 +88,14 @@ class ServerDeployer:
 
         archive_stream = io.BytesIO()
         with tarfile.open(fileobj=archive_stream, mode="w:gz") as tar:
-            for child in local_dir.iterdir():
-                tar.add(str(child), arcname=child.name)
+            for child in sorted(local_dir.rglob("*")):
+                if child.is_dir():
+                    continue
+                if child.name.startswith("."):
+                    continue
+                if child.suffix == ".map":
+                    continue
+                tar.add(str(child), arcname=child.relative_to(local_dir).as_posix())
         archive_stream.seek(0)
 
         remote_archive = f"/tmp/cloudhand-runtime-{int(time.time() * 1000)}.tar.gz"
@@ -267,6 +275,25 @@ WantedBy=multi-user.target
             raise ValueError(
                 f"Local command failed: {' '.join(args)} (cwd={cwd})\n{detail}"
             )
+
+    def _hash_local_directory(self, local_dir: Path) -> str:
+        hasher = hashlib.sha256()
+        for path in sorted(local_dir.rglob("*")):
+            if path.is_dir():
+                continue
+            if path.name.startswith("."):
+                continue
+            if path.suffix == ".map":
+                continue
+            rel = path.relative_to(local_dir).as_posix()
+            hasher.update(rel.encode("utf-8"))
+            with path.open("rb") as file:
+                while True:
+                    chunk = file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    hasher.update(chunk)
+        return hasher.hexdigest()[:16]
 
     def _find_local_repo_root(self) -> Optional[Path]:
         candidates: List[Path] = []
@@ -531,6 +558,36 @@ WantedBy=multi-user.target
         )
         self.run(f"python3 -c {shlex.quote(script)}")
 
+    def _inject_funnel_runtime_config(self, *, site_dir: str, public_id: str) -> None:
+        if not public_id:
+            raise ValueError("public_id is required for runtime config injection.")
+        config_json = json.dumps({"publicId": public_id, "rootDomainMode": True}, separators=(",", ":"))
+        block = (
+            "<!-- MOS_DEPLOY_RUNTIME_START -->"
+            f"<script>window.__MOS_DEPLOY_RUNTIME__={config_json};</script>"
+            "<!-- MOS_DEPLOY_RUNTIME_END -->"
+        )
+        script = (
+            "import pathlib\n"
+            f"index_path = pathlib.Path({(site_dir + '/index.html')!r})\n"
+            "if not index_path.exists():\n"
+            "    raise SystemExit(0)\n"
+            f"block = {block!r}\n"
+            "start_marker = '<!-- MOS_DEPLOY_RUNTIME_START -->'\n"
+            "end_marker = '<!-- MOS_DEPLOY_RUNTIME_END -->'\n"
+            "raw = index_path.read_text(encoding='utf-8')\n"
+            "if start_marker in raw and end_marker in raw:\n"
+            "    start_idx = raw.index(start_marker)\n"
+            "    end_idx = raw.index(end_marker) + len(end_marker)\n"
+            "    raw = raw[:start_idx] + block + raw[end_idx:]\n"
+            "elif '</head>' in raw:\n"
+            "    raw = raw.replace('</head>', block + '</head>', 1)\n"
+            "else:\n"
+            "    raw = block + raw\n"
+            "index_path.write_text(raw, encoding='utf-8')\n"
+        )
+        self.run(f"python3 -c {shlex.quote(script)}")
+
     def _write_funnel_artifact_payload(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
         artifact = source.artifact or {}
         meta = artifact.get("meta")
@@ -596,7 +653,15 @@ WantedBy=multi-user.target
                     f"{runtime_dist_path}. Build/copy the runtime bundle there or set "
                     "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH to a valid path."
                 )
-            self._upload_local_directory(local_dir=local_dist, remote_dir=site_dir)
+            runtime_hash = self._hash_local_directory(local_dist)
+            cached_runtime_dir = f"{_RUNTIME_CACHE_DIR}/{runtime_hash}"
+            if not self._path_exists(cached_runtime_dir):
+                self.run(f"mkdir -p {shlex.quote(_RUNTIME_CACHE_DIR)}")
+                self.run(f"mkdir -p {shlex.quote(cached_runtime_dir)}")
+                self._upload_local_directory(local_dir=local_dist, remote_dir=cached_runtime_dir)
+            cached_runtime_q = shlex.quote(cached_runtime_dir)
+            self.run(f"cp -R {cached_runtime_q}/. {site_dir_q}/")
+        self._inject_funnel_runtime_config(site_dir=site_dir, public_id=source.public_id)
         self._replace_api_base_tokens(site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root)
         self._write_funnel_artifact_payload(site_dir=site_dir, source=source)
 
@@ -623,10 +688,6 @@ WantedBy=multi-user.target
     proxy_connect_timeout {_NGINX_PROXY_CONNECT_TIMEOUT};
     proxy_send_timeout {_NGINX_PROXY_SEND_TIMEOUT};
     proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};
-
-    location = / {{
-        return 302 /f/{public_id}$is_args$args;
-    }}
 
     location = /api/public/checkout {{
         default_type application/json;

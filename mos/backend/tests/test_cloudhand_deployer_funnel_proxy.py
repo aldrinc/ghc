@@ -218,6 +218,7 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
     conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
     assert "listen 24123;" in conf
     assert "server_name _;" in conf
+    assert "return 302 /f/" not in conf
     assert "location = /api/public/checkout" in conf
     assert "location ^~ /api/public/events" in conf
     assert "location ^~ /api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95/" in conf
@@ -251,7 +252,7 @@ def test_funnel_artifact_site_uploads_local_runtime_when_remote_missing(tmp_path
     local_dist.mkdir(parents=True, exist_ok=True)
     (local_dist / "index.html").write_text("<html></html>", encoding="utf-8")
 
-    deployer, uploaded, commands = _stub_deployer()
+    deployer, _uploaded, commands = _stub_deployer()
     deployer.local_root = tmp_path
     deployer._path_exists = lambda path: False
     deployed: dict[str, str] = {}
@@ -266,6 +267,33 @@ def test_funnel_artifact_site_uploads_local_runtime_when_remote_missing(tmp_path
     deployer._configure_funnel_artifact_site(app)
 
     assert deployed["local_dir"] == str(local_dist)
-    assert deployed["remote_dir"] == "/opt/apps/landing-artifact/site"
+    assert deployed["remote_dir"].startswith("/opt/apps/.cloudhand-runtime-cache/")
+    assert any(
+        cmd.startswith("cp -R /opt/apps/.cloudhand-runtime-cache/") and cmd.endswith("/. /opt/apps/landing-artifact/site/")
+        for cmd in commands
+    )
     assert "nginx -t" in commands
     assert "systemctl reload nginx" in commands
+
+
+def test_funnel_artifact_site_reuses_cached_runtime_without_upload(tmp_path):
+    app = _artifact_app()
+    deployer, _uploaded, commands = _stub_deployer()
+    deployer._path_exists = lambda path: path == "/opt/apps/.cloudhand-runtime-cache/runtimehash123"
+    deployer._ensure_local_runtime_dist = lambda runtime_dist_path: tmp_path
+    deployer._hash_local_directory = lambda local_dir: "runtimehash123"
+    upload_calls: list[tuple[str, str]] = []
+
+    def fake_upload_local_directory(*, local_dir: Path, remote_dir: str):
+        upload_calls.append((str(local_dir), remote_dir))
+
+    deployer._upload_local_directory = fake_upload_local_directory
+    deployer._replace_api_base_tokens = lambda **_: None
+
+    deployer._configure_funnel_artifact_site(app)
+
+    assert upload_calls == []
+    assert any(
+        cmd.startswith("cp -R /opt/apps/.cloudhand-runtime-cache/runtimehash123/. /opt/apps/landing-artifact/site/")
+        for cmd in commands
+    )
