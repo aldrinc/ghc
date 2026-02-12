@@ -31,7 +31,7 @@ from app.schemas.products import (
 
 router = APIRouter(prefix="/products", tags=["products"])
 
-_SUPPORTED_PRICE_PROVIDERS = {"stripe"}
+_SUPPORTED_PRICE_PROVIDERS = {"stripe", "shopify"}
 _PRODUCT_ASSET_KIND_BY_MIME: dict[str, str] = {
     "image/png": "image",
     "image/jpeg": "image",

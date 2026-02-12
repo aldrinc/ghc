@@ -35,6 +35,7 @@ from app.schemas.commerce import PublicCheckoutRequest
 from app.schemas.funnels import PublicEventsIngestRequest
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.media_storage import MediaStorage
+from app.services.shopify_checkout import create_shopify_checkout
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -449,32 +450,6 @@ def public_checkout(
             status_code=status.HTTP_409_CONFLICT,
             detail="Price point provider is required for checkout.",
         )
-    if price_point.provider != "stripe":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Unsupported checkout provider.",
-        )
-    if not price_point.external_price_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Stripe price ID is missing for this price point.",
-        )
-    if not settings.STRIPE_SECRET_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Stripe is not configured.",
-        )
-
-    allowed_hosts = _allowed_hosts(request)
-    if not allowed_hosts:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Host header is required for checkout.",
-        )
-    _validate_return_url(str(payload.successUrl), allowed_hosts, "successUrl")
-    _validate_return_url(str(payload.cancelUrl), allowed_hosts, "cancelUrl")
-
-    stripe.api_key = settings.STRIPE_SECRET_KEY
     metadata = {
         "public_id": _metadata_value(payload.publicId, "publicId"),
         "funnel_id": _metadata_value(str(funnel.id), "funnelId"),
@@ -488,15 +463,55 @@ def public_checkout(
         "quantity": _metadata_value(str(payload.quantity), "quantity"),
     }
     metadata = {key: value for key, value in metadata.items() if value}
+    if price_point.provider == "stripe":
+        if not price_point.external_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Stripe price ID is missing for this price point.",
+            )
+        if not settings.STRIPE_SECRET_KEY:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Stripe is not configured.",
+            )
+        stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    checkout_session = stripe.checkout.Session.create(
-        mode="payment",
-        success_url=str(payload.successUrl),
-        cancel_url=str(payload.cancelUrl),
-        line_items=[{"price": price_point.external_price_id, "quantity": payload.quantity}],
-        metadata=metadata,
+        allowed_hosts = _allowed_hosts(request)
+        if not allowed_hosts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Host header is required for checkout.",
+            )
+        _validate_return_url(str(payload.successUrl), allowed_hosts, "successUrl")
+        _validate_return_url(str(payload.cancelUrl), allowed_hosts, "cancelUrl")
+
+        checkout_session = stripe.checkout.Session.create(
+            mode="payment",
+            success_url=str(payload.successUrl),
+            cancel_url=str(payload.cancelUrl),
+            line_items=[{"price": price_point.external_price_id, "quantity": payload.quantity}],
+            metadata=metadata,
+        )
+        return {"checkoutUrl": checkout_session.url, "sessionId": checkout_session.id}
+
+    if price_point.provider == "shopify":
+        if not price_point.external_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopify variant GID is missing for this price point.",
+            )
+        checkout = create_shopify_checkout(
+            client_id=str(funnel.client_id),
+            variant_gid=price_point.external_price_id,
+            quantity=payload.quantity,
+            metadata=metadata,
+        )
+        return {"checkoutUrl": checkout["checkoutUrl"], "sessionId": checkout["cartId"]}
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Unsupported checkout provider.",
     )
-    return {"checkoutUrl": checkout_session.url, "sessionId": checkout_session.id}
 
 
 @router.post("/events")

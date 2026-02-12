@@ -45,7 +45,7 @@ class VideoAdsOrchestrator:
     def __init__(self, *, client: CreativeServiceClient) -> None:
         self.client = client
         self.poll_interval_seconds = float(settings.CREATIVE_SERVICE_POLL_INTERVAL_SECONDS or 2.0)
-        self.poll_timeout_seconds = float(settings.CREATIVE_SERVICE_POLL_TIMEOUT_SECONDS or 300.0)
+        self.poll_timeout_seconds = float(settings.CREATIVE_SERVICE_VIDEO_POLL_TIMEOUT_SECONDS)
         self.max_turns = int(settings.CREATIVE_SERVICE_MAX_VIDEO_TURNS or 3)
 
     def run_variant(

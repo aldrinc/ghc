@@ -70,7 +70,122 @@ def _required_css_var_keys() -> list[str]:
     return sorted(str(k) for k in css_vars.keys())
 
 
-def _build_prompt(*, ctx: DesignSystemGenerationContext, required_css_vars: list[str]) -> str:
+# Layout tokens are static across generated design systems to preserve template geometry.
+_LOCKED_LAYOUT_CSS_VAR_KEYS: frozenset[str] = frozenset(
+    {
+        "--badge-icon-size",
+        "--badge-strip-gap",
+        "--badge-strip-pad-y",
+        "--container-max",
+        "--cta-circle-size-lg",
+        "--cta-circle-size-md",
+        "--cta-circle-size-sm",
+        "--cta-font-size-lg",
+        "--cta-font-size-md",
+        "--cta-font-size-sm",
+        "--cta-font-weight",
+        "--cta-height-lg",
+        "--cta-height-md",
+        "--cta-height-sm",
+        "--cta-icon-size",
+        "--cta-icon-size-lg",
+        "--cta-icon-size-md",
+        "--cta-icon-size-sm",
+        "--cta-letter-spacing",
+        "--cta-min-width-lg",
+        "--cta-min-width-md",
+        "--cta-min-width-sm",
+        "--cta-pad-x-lg",
+        "--cta-pad-x-md",
+        "--cta-pad-x-sm",
+        "--cta-shell-pad",
+        "--footer-logo-height",
+        "--h1",
+        "--h2",
+        "--h3",
+        "--heading-line",
+        "--heading-size",
+        "--heading-size-mobile",
+        "--heading-weight",
+        "--hero-min-height",
+        "--hero-pad-x",
+        "--hero-pad-y",
+        "--hero-subtitle-gap",
+        "--hero-subtitle-line",
+        "--hero-subtitle-max",
+        "--hero-subtitle-size",
+        "--hero-subtitle-weight",
+        "--hero-title-letter-spacing",
+        "--hero-title-line",
+        "--hero-title-max",
+        "--hero-title-size",
+        "--hero-title-weight",
+        "--line",
+        "--listicle-body-gap",
+        "--listicle-body-line",
+        "--listicle-body-size",
+        "--listicle-card-border",
+        "--listicle-card-radius",
+        "--listicle-content-pad-x",
+        "--listicle-content-pad-x-mobile",
+        "--listicle-content-pad-y",
+        "--listicle-content-pad-y-mobile",
+        "--listicle-media-min-height",
+        "--listicle-media-min-height-mobile",
+        "--listicle-media-width",
+        "--listicle-title-line",
+        "--listicle-title-margin-bottom",
+        "--listicle-title-size",
+        "--listicle-title-size-mobile",
+        "--radius-lg",
+        "--radius-md",
+        "--radius-sm",
+        "--reviews-card-pad",
+        "--reviews-card-radius",
+        "--reviews-card-width",
+        "--reviews-height",
+        "--reviews-media-gap",
+        "--reviews-media-main-width",
+        "--reviews-media-radius",
+        "--reviews-media-slim-width",
+        "--section-pad-y",
+        "--wall-card-pad",
+        "--wall-card-radius",
+        "--wall-fade-height",
+        "--wall-gap",
+        "--wall-height",
+        "--wall-pad-x",
+        "--wall-title-letter-spacing",
+        "--wall-title-line",
+        "--wall-title-size",
+        "--wall-title-weight",
+    }
+)
+
+
+@lru_cache(maxsize=1)
+def _locked_layout_css_var_values() -> dict[str, Any]:
+    template = load_base_tokens_template()
+    css_vars = template.get("cssVars")
+    if not isinstance(css_vars, dict):
+        raise DesignSystemGenerationError("Design system base template cssVars must be a JSON object.")
+    missing = sorted(key for key in _LOCKED_LAYOUT_CSS_VAR_KEYS if key not in css_vars)
+    if missing:
+        preview = ", ".join(missing[:25])
+        suffix = "" if len(missing) <= 25 else f" (+{len(missing) - 25} more)"
+        raise DesignSystemGenerationError(
+            "Locked layout token configuration references missing base template keys: "
+            f"{preview}{suffix}."
+        )
+    return {key: css_vars[key] for key in sorted(_LOCKED_LAYOUT_CSS_VAR_KEYS)}
+
+
+def _build_prompt(
+    *,
+    ctx: DesignSystemGenerationContext,
+    required_css_vars: list[str],
+    locked_layout_css_vars: dict[str, Any],
+) -> str:
     # Keep the prompt explicit: we want a full theme, not a small delta.
     # We provide key list and context; the model must output the full JSON.
     context_obj: dict[str, Any] = {
@@ -103,6 +218,7 @@ def _build_prompt(*, ctx: DesignSystemGenerationContext, required_css_vars: list
     # This nudges the model to create a cohesive theme from scratch.
     required_css_vars_json = json.dumps(required_css_vars, ensure_ascii=True)
     context_json = json.dumps(context_obj, ensure_ascii=True)
+    locked_layout_css_vars_json = json.dumps(locked_layout_css_vars, ensure_ascii=True)
     return "\n".join(
         [
             "Generate a full custom design system tokens JSON for a brand. Output ONLY valid JSON.",
@@ -123,10 +239,13 @@ def _build_prompt(*, ctx: DesignSystemGenerationContext, required_css_vars: list
             "--color-page-bg, --color-bg, --hero-bg, --badge-strip-bg, --pitch-bg, "
             "--reviews-card-bg, --wall-card-bg, --pdp-surface-soft, --pdp-surface-muted, --pdp-swatch-bg.",
             "- Dark accent bars/sections are allowed only when their paired text tokens stay accessible.",
+            "- Keep template layout geometry static: each cssVars key listed in lockedLayoutCssVars MUST keep the exact same value.",
             "",
             f"Brand/product context JSON:\n{context_json}",
             "",
             f"requiredCssVars (must include all):\n{required_css_vars_json}",
+            "",
+            f"lockedLayoutCssVars (must match exactly):\n{locked_layout_css_vars_json}",
         ]
     )
 
@@ -272,6 +391,7 @@ def _validate_tokens(tokens: Any, *, required_css_vars: list[str]) -> dict[str, 
         if isinstance(value, str) and not value.strip():
             raise DesignSystemGenerationError(f"Design system cssVars[{key}] must not be an empty string.")
 
+    _validate_locked_layout_css_vars(css_vars)
     _validate_light_background_tokens(css_vars)
     _validate_text_tokens(css_vars)
     _validate_required_contrast_pairs(css_vars)
@@ -328,6 +448,26 @@ _REQUIRED_CONTRAST_PAIRS = (
     ("--marquee-text", "--marquee-bg", 4.5),
     ("--color-cta-text", "--color-cta", 3.0),
 )
+
+
+def _validate_locked_layout_css_vars(css_vars: dict[str, Any]) -> None:
+    locked = _locked_layout_css_var_values()
+    mismatches: list[tuple[str, Any, Any]] = []
+    for key, expected in locked.items():
+        actual = css_vars.get(key)
+        if actual != expected:
+            mismatches.append((key, expected, actual))
+
+    if mismatches:
+        preview = "; ".join(
+            f"{key}: expected {expected!r}, received {actual!r}" for key, expected, actual in mismatches[:10]
+        )
+        suffix = "" if len(mismatches) <= 10 else f" (+{len(mismatches) - 10} more)"
+        raise DesignSystemGenerationError(
+            "Design system cssVars changed template-locked layout tokens. "
+            "These tokens are static to preserve template geometry: "
+            f"{preview}{suffix}."
+        )
 
 
 def _resolve_css_var_value(*, css_vars: dict[str, Any], value: str, stack: list[str]) -> str:
@@ -644,7 +784,12 @@ def generate_design_system_tokens(
     max_output_tokens: int = 9000,
 ) -> dict[str, Any]:
     required_css_vars = _required_css_var_keys()
-    prompt = _build_prompt(ctx=ctx, required_css_vars=required_css_vars)
+    locked_layout_css_vars = _locked_layout_css_var_values()
+    prompt = _build_prompt(
+        ctx=ctx,
+        required_css_vars=required_css_vars,
+        locked_layout_css_vars=locked_layout_css_vars,
+    )
 
     llm = LLMClient()
     model_id = model or llm.default_model

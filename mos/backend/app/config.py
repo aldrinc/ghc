@@ -43,6 +43,9 @@ class Settings(BaseSettings):
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
+    SHOPIFY_CHECKOUT_APP_BASE_URL: str | None = None
+    SHOPIFY_CHECKOUT_APP_API_TOKEN: str | None = None
+    SHOPIFY_ORDER_WEBHOOK_SECRET: str | None = None
 
     META_GRAPH_API_VERSION: str | None = None
     META_GRAPH_API_BASE_URL: str = "https://graph.facebook.com"
@@ -56,6 +59,7 @@ class Settings(BaseSettings):
     CREATIVE_SERVICE_TIMEOUT_SECONDS: float = 30.0
     CREATIVE_SERVICE_POLL_INTERVAL_SECONDS: float = 2.0
     CREATIVE_SERVICE_POLL_TIMEOUT_SECONDS: float = 300.0
+    CREATIVE_SERVICE_VIDEO_POLL_TIMEOUT_SECONDS: float = 1200.0
     CREATIVE_SERVICE_MAX_VIDEO_TURNS: int = 3
     CREATIVE_SERVICE_ASSETS_PER_BRIEF: int = 6
     CREATIVE_SERVICE_RETENTION_DAYS: int = 60

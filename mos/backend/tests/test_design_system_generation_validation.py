@@ -76,3 +76,23 @@ def test_validate_tokens_rejects_muted_text_coupled_to_brand():
         match=r"cssVars\[--color-muted\] must not resolve to the same rendered color as --color-brand",
     ):
         _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+
+
+def test_validate_tokens_rejects_locked_layout_token_change():
+    tokens = deepcopy(load_base_tokens_template())
+    tokens["cssVars"]["--hero-min-height"] = "600px"
+    with pytest.raises(DesignSystemGenerationError, match=r"template-locked layout tokens.*--hero-min-height"):
+        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+
+
+def test_validate_tokens_rejects_unclear_layout_token_change():
+    tokens = deepcopy(load_base_tokens_template())
+    tokens["cssVars"]["--radius-md"] = "28px"
+    with pytest.raises(DesignSystemGenerationError, match=r"template-locked layout tokens.*--radius-md"):
+        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+
+
+def test_validate_tokens_allows_brand_color_change():
+    tokens = deepcopy(load_base_tokens_template())
+    tokens["cssVars"]["--color-brand"] = "#123456"
+    _validate_tokens(tokens, required_css_vars=_required_css_var_keys())

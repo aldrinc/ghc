@@ -29,6 +29,7 @@ from app.routers import (
     ads,
     workflows,
     meta_ads,
+    shopify_webhooks,
 )
 
 
@@ -86,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(teardowns.router)
     app.include_router(ads.router)
     app.include_router(meta_ads.router)
+    app.include_router(shopify_webhooks.router)
     app.include_router(workflows.router)
     app.include_router(deep_research.router)
     app.include_router(openai_webhooks.router)
