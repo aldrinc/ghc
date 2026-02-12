@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { PublicFunnelMeta } from "@/types/funnels";
+import { buildPublicFunnelPath, isStandaloneRootModeForPublicId } from "@/funnels/runtimeRouting";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
 
@@ -39,7 +40,15 @@ export function PublicFunnelEntryRedirectPage() {
         return (await resp.json()) as PublicFunnelMeta;
       })
       .then((meta) => {
-        navigate(`/f/${publicId}/${meta.entrySlug}`, { replace: true });
+        navigate(
+          buildPublicFunnelPath({
+            publicId,
+            slug: meta.entrySlug,
+            entrySlug: meta.entrySlug,
+            rootMode: isStandaloneRootModeForPublicId(publicId),
+          }),
+          { replace: true },
+        );
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Unable to load funnel");

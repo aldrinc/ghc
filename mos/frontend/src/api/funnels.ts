@@ -21,6 +21,41 @@ type FunnelFilters = {
   experimentId?: string;
 };
 
+type PublishFunnelDeployPayload = {
+  workloadName: string;
+  planPath?: string;
+  instanceName?: string;
+  createIfMissing?: boolean;
+  inPlace?: boolean;
+  applyPlan?: boolean;
+  serverNames?: string[];
+  https?: boolean;
+  destinationPath?: string;
+  upstreamBaseUrl?: string;
+  upstreamApiBaseUrl?: string;
+};
+
+type PublishFunnelPayload = {
+  deploy?: PublishFunnelDeployPayload;
+};
+
+type PublishFunnelApplyResponse = {
+  mode?: string;
+  jobId?: string;
+  status?: string;
+  statusPath?: string;
+  accessUrls?: string[];
+  [key: string]: unknown;
+};
+
+type PublishFunnelResponse = {
+  publicationId?: string | null;
+  deploy?: {
+    patch?: Record<string, unknown>;
+    apply?: PublishFunnelApplyResponse;
+  };
+};
+
 const buildFunnelsPath = (filters: FunnelFilters) => {
   const params = new URLSearchParams();
   if (filters.clientId) params.set("clientId", filters.clientId);
@@ -148,10 +183,15 @@ export function usePublishFunnel() {
   const { post } = useApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (funnelId: string) => post<{ publicationId: string }>(`/funnels/${funnelId}/publish`),
-    onSuccess: (_data, funnelId) => {
-      toast.success("Funnel published");
-      queryClient.invalidateQueries({ queryKey: ["funnels", "detail", funnelId] });
+    mutationFn: ({ funnelId, payload }: { funnelId: string; payload?: PublishFunnelPayload }) =>
+      post<PublishFunnelResponse>(`/funnels/${funnelId}/publish`, payload),
+    onSuccess: (data, vars) => {
+      if (data.deploy?.apply?.mode === "async") {
+        toast.success("Funnel published and deploy started");
+      } else {
+        toast.success("Funnel published");
+      }
+      queryClient.invalidateQueries({ queryKey: ["funnels", "detail", vars.funnelId] });
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to publish funnel";

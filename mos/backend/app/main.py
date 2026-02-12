@@ -29,6 +29,7 @@ from app.routers import (
     ads,
     workflows,
     meta_ads,
+    deploy,
 )
 
 
@@ -91,6 +92,7 @@ def create_app() -> FastAPI:
     app.include_router(openai_webhooks.router)
     app.include_router(stripe_webhooks.router)
     app.include_router(claude.router)
+    app.include_router(deploy.router)
 
     return app
 

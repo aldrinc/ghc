@@ -60,3 +60,78 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
 - Auth/org: backend now requires a real Clerk JWT (no dev fallbacks) and expects an organization claim. Create a Clerk JWT template (e.g., `backend`) that includes `org_id: {{organization.id}}` (and optionally slug/role), then set `VITE_CLERK_JWT_TEMPLATE=backend` in `frontend/.env.local`. The frontend forces a fresh token (`skipCache`) so org selection updates immediately. Select an active organization in Clerk so the token contains org context. The backend will auto-create an org row when a new external org_id is seen.
 - CORS: configure `BACKEND_CORS_ORIGINS` (JSON array) in `mos/backend/.env` to match the allowed frontend origins (defaults to localhost/127.0.0.1 on port 5275).
 - Smoke tests: `mos/backend/SMOKE_TESTS.md` lists curl commands with Clerk dev JWTs. Automated API coverage lives in `mos/backend/tests` and runs via `.venv/bin/pytest`.
+
+## MOS deploy integration (Hetzner landing pages)
+
+### What was added
+
+- Cloudhand deploy engine is embedded in the MOS backend under `mos/backend/cloudhand/` and packaged with the backend app.
+- Deploy API routes are mounted under `mos/backend/app/routers/deploy.py`:
+  - `GET /deploy/plans/latest`
+  - `POST /deploy/plans`
+  - `POST /deploy/plans/workloads`
+  - `POST /deploy/plans/apply`
+  - `POST /deploy/apply` (alias)
+- Workload modify/append support is implemented in `patch_workload_in_plan` (`mos/backend/app/services/deploy.py`):
+  - deep-merge by workload `name`
+  - append when `create_if_missing=true`
+- Terraform apply is triggered from MOS API (`mos/backend/app/services/deploy.py`) via:
+  - `python -m cloudhand.cli ... apply ...`
+  - `terraform` resolved from host `PATH` (hard error if missing)
+- Deploy endpoint exposure is constrained to MOS-proxied traffic:
+  - Bearer auth (Clerk token) is required
+  - direct backend-port calls are blocked by loopback proxy check
+- Nginx workload routing modes are supported:
+  - `CLOUDHAND_NGINX_MODE=per-app` (default, one site config per workload)
+  - `CLOUDHAND_NGINX_MODE=combined|single|shared` (one shared config with path-based routing)
+  - generated nginx configs set long upstream timeouts (`proxy_read_timeout/proxy_send_timeout=3600s`) for long-running API calls
+- Workload port safety is enforced during apply:
+  - if a non-`funnel_publication` workload omits `service_config.ports`, MOS assigns a deterministic high port per instance/workload
+  - per-instance port conflicts fail fast before deploy
+  - reserved system ports (`22`, `80`, `443`) are blocked for workload ports
+  - deploy preflight checks each target server and errors if a required port is already listening and not managed by that workload service
+- Workload source types are supported:
+  - `source_type: "git"`: deploy from `repo_url` + `branch` (existing behavior)
+  - `source_type: "funnel_publication"`: deploy a DB-backed funnel publication proxy with:
+    - `source_ref.public_id`
+    - `source_ref.upstream_base_url`
+    - `source_ref.upstream_api_base_url`
+  - In `funnel_publication` mode, `repo_url` is forbidden and per-app nginx mode is required.
+  - `service_config.server_names` can be empty; deploy then uses HTTP only (no certificate provisioning) and binds nginx on that workload's deterministic `service_config.ports[0]`.
+  - In no-domain HTTP mode, requests on `http://<server-ip>:<port>/<slug>` are redirected to same-host funnel routes (`/f/{public_id}/<slug>`) rather than MOS app paths.
+  - Publish job status includes both MOS-internal rendering and external access URL(s); when server names are omitted, external URLs are derived from Terraform server IP outputs plus the assigned workload port.
+- Funnel publish can now patch/apply deploy plans from inside MOS in a single call:
+  - `POST /funnels/{funnel_id}/publish` accepts optional `deploy` payload
+  - workload `source_ref.public_id` is taken from MOS DB (`funnels.public_id`) at publish time
+  - if `deploy.serverNames` is omitted, active/verified `funnel_domains.hostname` values are used from DB when present; otherwise the deploy proceeds with no host binding/certs (`server_name _`, HTTP only)
+  - publish+deploy runs asynchronously and returns a publish job (`jobId`, `statusPath`)
+  - publish job status is available at `GET /funnels/{funnel_id}/publish-jobs/{job_id}`
+
+### Required runtime configuration
+
+- `HCLOUD_TOKEN` (or `TF_VAR_hcloud_token`) for Hetzner provider auth
+- `DEPLOY_ROOT_DIR` (default `cloudhand`)
+- `DEPLOY_PROJECT_ID` (default `mos`)
+- `DEPLOY_PUBLIC_BASE_URL` (for example `https://moshq.app`)
+- `DEPLOY_PUBLIC_API_BASE_URL` (for example `https://moshq.app/api`)
+
+### First-Run Plan Bootstrap (No Existing Plan)
+
+When funnel publish is requested with deploy settings and no plan file exists, MOS auto-creates a base plan using this template:
+
+- `provider: "hetzner"`
+- `region: "fsn1"`
+- `networks: [{ "name": "default", "cidr": "10.0.0.0/16" }]`
+- `instance: { "name": "ubuntu-4gb-nbg1-2", "size": "cx23", "network": "default", "region": "nbg1", "labels": {} }`
+
+If `deploy.instanceName` is provided in the publish payload, it overrides only the instance name in that template.
+
+### Known gaps
+
+- RBAC for deploy is not yet scoped to admin/operator roles; any authenticated org member can call deploy routes.
+- Proxy-only restriction is transport-level, not a full policy-level "UI-only" restriction.
+- Terraform generation is partial: `firewalls`, `load_balancers`, `dns_records`, and `containers` are modeled but not currently emitted by `terraform_gen.py`.
+- Network behavior currently expects existing Hetzner networks (`data "hcloud_network"`); plan `cidr` values are not creating new networks.
+- No deploy queue/lock exists yet; concurrent applies can race against shared plan/state artifacts.
+- Plan files can contain sensitive environment values and are stored under `DEPLOY_ROOT_DIR`; treat that directory as sensitive deployment state.
+- Incorrect `CLOUDHAND_NGINX_MODE` can produce routing behavior that does not match the intended MOS host/path layout.

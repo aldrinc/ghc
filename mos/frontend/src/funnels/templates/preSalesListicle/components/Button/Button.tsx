@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { useFunnelRuntime } from '@/funnels/puckConfig'
+import { resolveRuntimePagePath, useFunnelRuntime } from '@/funnels/puckConfig'
 import { ArrowRightIcon } from '../Icons/ArrowRightIcon'
 import styles from './Button.module.css'
 
@@ -57,7 +57,7 @@ function resolveButtonHref({
     throw new Error('Target page is not available in this funnel.')
   }
 
-  return { href: `/f/${runtime.publicId}/${slug}`, isInternal: true }
+  return { href: resolveRuntimePagePath(runtime, slug), isInternal: true }
 }
 
 export function Button({ linkType, href, targetPageId, children, size = 'lg', className }: Props) {

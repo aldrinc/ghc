@@ -24,6 +24,7 @@ import { ProductProvider } from "@/contexts/ProductContext";
 import { ClaudeChatPage } from "@/pages/claude/ClaudeChatPage";
 import { PublicFunnelEntryRedirectPage } from "@/pages/public/PublicFunnelEntryRedirectPage";
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
+import { getStandalonePublicId } from "@/funnels/runtimeRouting";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   return (
@@ -41,59 +42,69 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function App() {
+  const standalonePublicId = getStandalonePublicId();
+
   return (
     <BrowserRouter>
       <Routes>
+        {standalonePublicId ? <Route path="/" element={<PublicFunnelPage />} /> : null}
+        {standalonePublicId ? <Route path="/:slug" element={<PublicFunnelPage />} /> : null}
         <Route path="/f/:publicId" element={<PublicFunnelEntryRedirectPage />} />
         <Route path="/f/:publicId/:slug" element={<PublicFunnelPage />} />
-        <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />
-        <Route
-          path="/workspaces"
-          element={
-            <RequireAuth>
-              <WorkspacesPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/workspaces/new"
-          element={
-            <RequireAuth>
-              <WorkspaceOnboardingPage />
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/"
-          element={
-            <RequireAuth>
-              <AppShell />
-            </RequireAuth>
-          }
-        >
-          <Route index element={<Navigate to="/workspaces/overview" replace />} />
-          <Route path="workspaces/overview" element={<WorkspaceOverviewPage />} />
-          <Route path="workspaces/brand" element={<BrandDesignSystemPage />} />
-          <Route path="workspaces/products" element={<ProductsPage />} />
-          <Route path="workspaces/products/:productId" element={<ProductDetailPage />} />
-          <Route path="research/documents" element={<DocumentsPage />} />
-          <Route path="research" element={<ResearchPage />} />
-          <Route path="research/competitors" element={<Navigate to="/research?tab=brands" replace />} />
-          <Route path="research/ad-library" element={<Navigate to="/research?tab=ads" replace />} />
-          <Route path="research/funnels" element={<FunnelsPage />} />
-          <Route path="research/funnels/:funnelId" element={<FunnelDetailPage />} />
-          <Route path="research/funnels/:funnelId/pages/:pageId" element={<FunnelPageEditorPage />} />
-          <Route path="explore/ads" element={<Navigate to="/research?tab=ads" replace />} />
-          <Route path="explore/brands" element={<Navigate to="/research?tab=brands" replace />} />
-          <Route path="creative-library" element={<CreativeLibraryPage />} />
-          <Route path="claude-chat" element={<ClaudeChatPage />} />
-          <Route path="workflows" element={<WorkflowsPage />} />
-          <Route path="workflows/:workflowId" element={<WorkflowDetailPage />} />
-          <Route path="workflows/:workflowId/research/:stepKey" element={<ResearchDetailPage />} />
-          <Route path="campaigns" element={<CampaignsPage />} />
-          <Route path="campaigns/:campaignId" element={<CampaignDetailPage />} />
-        </Route>
-        <Route path="*" element={<Navigate to="/workspaces" replace />} />
+        {standalonePublicId ? null : <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />}
+        {standalonePublicId ? null : (
+          <Route
+            path="/workspaces"
+            element={
+              <RequireAuth>
+                <WorkspacesPage />
+              </RequireAuth>
+            }
+          />
+        )}
+        {standalonePublicId ? null : (
+          <Route
+            path="/workspaces/new"
+            element={
+              <RequireAuth>
+                <WorkspaceOnboardingPage />
+              </RequireAuth>
+            }
+          />
+        )}
+        {standalonePublicId ? null : (
+          <Route
+            path="/"
+            element={
+              <RequireAuth>
+                <AppShell />
+              </RequireAuth>
+            }
+          >
+            <Route index element={<Navigate to="/workspaces/overview" replace />} />
+            <Route path="workspaces/overview" element={<WorkspaceOverviewPage />} />
+            <Route path="workspaces/brand" element={<BrandDesignSystemPage />} />
+            <Route path="workspaces/products" element={<ProductsPage />} />
+            <Route path="workspaces/products/:productId" element={<ProductDetailPage />} />
+            <Route path="research/documents" element={<DocumentsPage />} />
+            <Route path="research" element={<ResearchPage />} />
+            <Route path="research/competitors" element={<Navigate to="/research?tab=brands" replace />} />
+            <Route path="research/ad-library" element={<Navigate to="/research?tab=ads" replace />} />
+            <Route path="research/funnels" element={<FunnelsPage />} />
+            <Route path="research/funnels/:funnelId" element={<FunnelDetailPage />} />
+            <Route path="research/funnels/:funnelId/pages/:pageId" element={<FunnelPageEditorPage />} />
+            <Route path="explore/ads" element={<Navigate to="/research?tab=ads" replace />} />
+            <Route path="explore/brands" element={<Navigate to="/research?tab=brands" replace />} />
+            <Route path="creative-library" element={<CreativeLibraryPage />} />
+            <Route path="claude-chat" element={<ClaudeChatPage />} />
+            <Route path="workflows" element={<WorkflowsPage />} />
+            <Route path="workflows/:workflowId" element={<WorkflowDetailPage />} />
+            <Route path="workflows/:workflowId/research/:stepKey" element={<ResearchDetailPage />} />
+            <Route path="campaigns" element={<CampaignsPage />} />
+            <Route path="campaigns/:campaignId" element={<CampaignDetailPage />} />
+          </Route>
+        )}
+        <Route path="*" element={<Navigate to={standalonePublicId ? "/" : "/workspaces"} replace />} />
       </Routes>
     </BrowserRouter>
   );

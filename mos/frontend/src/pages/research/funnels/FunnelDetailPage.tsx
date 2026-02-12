@@ -1,4 +1,5 @@
 import { useFunnel, useUpdateFunnel, useCreateFunnelPage, usePublishFunnel, useDisableFunnel, useEnableFunnel, useDuplicateFunnel, useFunnelTemplates, useUpdateFunnelPage } from "@/api/funnels";
+import { useApiClient } from "@/api/client";
 import { useDesignSystems } from "@/api/designSystems";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
@@ -7,8 +8,36 @@ import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+
+const deployPlanPath = (import.meta.env.VITE_DEPLOY_PLAN_PATH || "").trim();
+const deployInstanceName = (import.meta.env.VITE_DEPLOY_INSTANCE_NAME || "").trim();
+const deployUpstreamBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_BASE_URL || "").trim();
+const deployUpstreamApiBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_API_BASE_URL || "").trim();
+const deployServerNames = (import.meta.env.VITE_DEPLOY_SERVER_NAMES || "")
+  .split(",")
+  .map((value: string) => value.trim())
+  .filter((value: string) => value.length > 0);
+
+type DeployJobState = {
+  jobId: string;
+  statusPath: string;
+  status: string;
+  accessUrl: string | null;
+  publicationId: string | null;
+  error: string | null;
+};
+
+type DeployJobStatusResponse = {
+  id: string;
+  status: string;
+  access_urls?: string[];
+  result?: {
+    publicationId?: string | null;
+  } | null;
+  error?: string | null;
+};
 
 export function FunnelDetailPage() {
   const navigate = useNavigate();
@@ -24,10 +53,14 @@ export function FunnelDetailPage() {
   const disable = useDisableFunnel();
   const enable = useEnableFunnel();
   const duplicate = useDuplicateFunnel();
+  const { get } = useApiClient();
 
   const [isPageModalOpen, setIsPageModalOpen] = useState(false);
   const [pageName, setPageName] = useState("");
   const [templateId, setTemplateId] = useState("");
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [publishServerNamesInput, setPublishServerNamesInput] = useState(deployServerNames.join(", "));
+  const [deployJob, setDeployJob] = useState<DeployJobState | null>(null);
 
   const pageOptions = useMemo(() => {
     return funnel?.pages?.map((p) => ({ label: `${p.name} (${p.slug})`, value: p.id })) || [];
@@ -70,6 +103,109 @@ export function FunnelDetailPage() {
   };
 
   const publicBase = funnel?.public_id ? `/f/${funnel.public_id}` : null;
+  const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
+
+  const handlePublish = async (serverNames: string[]) => {
+    if (!funnelId || !funnel) return;
+    const payload: {
+      deploy: {
+        workloadName: string;
+        createIfMissing: boolean;
+        applyPlan: boolean;
+        planPath?: string;
+        instanceName?: string;
+        serverNames?: string[];
+        upstreamBaseUrl?: string;
+        upstreamApiBaseUrl?: string;
+      };
+    } = {
+      deploy: {
+        workloadName: `funnel-${funnel.public_id}`,
+        createIfMissing: true,
+        applyPlan: true,
+      },
+    };
+
+    if (deployPlanPath) payload.deploy.planPath = deployPlanPath;
+    if (deployInstanceName) payload.deploy.instanceName = deployInstanceName;
+    if (serverNames.length > 0) payload.deploy.serverNames = serverNames;
+    if (deployUpstreamBaseUrl) payload.deploy.upstreamBaseUrl = deployUpstreamBaseUrl;
+    if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
+
+    const response = await publish.mutateAsync({ funnelId, payload });
+    const apply = response.deploy?.apply;
+    const jobId = typeof apply?.jobId === "string" ? apply.jobId : "";
+    const statusPath = typeof apply?.statusPath === "string" ? apply.statusPath : "";
+    if (jobId && statusPath) {
+      const initialAccess = Array.isArray(apply?.accessUrls) ? apply.accessUrls[0] || null : null;
+      const initialStatus = typeof apply.status === "string" ? apply.status : "queued";
+      setDeployJob({
+        jobId,
+        statusPath,
+        status: initialStatus,
+        accessUrl: initialAccess,
+        publicationId: typeof response.publicationId === "string" ? response.publicationId : null,
+        error: null,
+      });
+    }
+  };
+
+  const openPublishModal = () => {
+    setPublishServerNamesInput(deployServerNames.join(", "));
+    setIsPublishModalOpen(true);
+  };
+
+  const handlePublishSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const serverNames = Array.from(
+      new Set(
+        publishServerNamesInput
+          .split(",")
+          .map((value: string) => value.trim())
+          .filter((value: string) => value.length > 0)
+      )
+    );
+    try {
+      await handlePublish(serverNames);
+      setIsPublishModalOpen(false);
+    } catch {
+      // toast is handled by the mutation hook
+    }
+  };
+
+  useEffect(() => {
+    if (!deployJob?.statusPath) return;
+    if (deployJob.status === "succeeded" || deployJob.status === "failed") return;
+
+    let stopped = false;
+    const poll = async () => {
+      try {
+        const job = await get<DeployJobStatusResponse>(deployJob.statusPath);
+        if (stopped) return;
+        const accessUrl = Array.isArray(job.access_urls) ? job.access_urls[0] || null : null;
+        const publicationId = typeof job.result?.publicationId === "string" ? job.result.publicationId : null;
+        setDeployJob((current) => {
+          if (!current || current.jobId !== job.id) return current;
+          return {
+            ...current,
+            status: job.status,
+            accessUrl: accessUrl || current.accessUrl,
+            publicationId: publicationId || current.publicationId,
+            error: job.error || null,
+          };
+        });
+      } catch {
+        // Keep polling; publish mutation already surfaces initial errors.
+      }
+    };
+
+    poll();
+    const timer = window.setInterval(poll, 5000);
+    return () => {
+      stopped = true;
+      window.clearInterval(timer);
+    };
+  }, [deployJob?.jobId, deployJob?.status, deployJob?.statusPath, get]);
 
   return (
     <div className="space-y-4">
@@ -81,12 +217,26 @@ export function FunnelDetailPage() {
             <Button variant="secondary" size="sm" onClick={() => setIsPageModalOpen(true)} disabled={!funnelId || !funnel}>
               New page
             </Button>
+            {deployJob?.status === "succeeded" && deployJob.accessUrl ? (
+              <Button variant="secondary" size="sm" asChild>
+                <a href={deployJob.accessUrl} target="_blank" rel="noreferrer">
+                  Open Deployed Page
+                </a>
+              </Button>
+            ) : null}
+            {deployJob?.publicationId && mosPreviewUrl ? (
+              <Button variant="secondary" size="sm" asChild>
+                <a href={mosPreviewUrl} target="_blank" rel="noreferrer">
+                  Open In MOS
+                </a>
+              </Button>
+            ) : null}
             <Button
               size="sm"
-              onClick={() => funnelId && publish.mutate(funnelId)}
+              onClick={openPublishModal}
               disabled={!funnel?.canPublish || publish.isPending}
             >
-              {publish.isPending ? "Publishing…" : "Publish"}
+              {publish.isPending ? "Publishing…" : "Publish + Deploy"}
             </Button>
           </div>
         }
@@ -98,6 +248,13 @@ export function FunnelDetailPage() {
         <div className="ds-card ds-card--md text-sm text-content-muted">Funnel not found.</div>
       ) : (
         <>
+          {deployJob ? (
+            <div className="ds-card ds-card--md text-xs text-content-muted">
+              Deploy job <span className="font-mono">{deployJob.jobId}</span>:{" "}
+              <span className="font-semibold text-content">{deployJob.status}</span>
+              {deployJob.error ? <span className="ml-2 text-danger">{deployJob.error}</span> : null}
+            </div>
+          ) : null}
           <div className="ds-card ds-card--md space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -290,6 +447,38 @@ export function FunnelDetailPage() {
               </DialogClose>
               <Button type="submit" disabled={!pageName.trim() || createPage.isPending}>
                 {createPage.isPending ? "Creating…" : "Create page"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogRoot>
+
+      <DialogRoot open={isPublishModalOpen} onOpenChange={setIsPublishModalOpen}>
+        <DialogContent>
+          <DialogTitle>Publish + Deploy</DialogTitle>
+          <DialogDescription>
+            Enter one or more domains to bind this deploy (comma separated). Leave blank for catch-all HTTP.
+          </DialogDescription>
+          <form className="space-y-3" onSubmit={handlePublishSubmit}>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Deploy domains</label>
+              <Input
+                placeholder="landing.example.com, www.landing.example.com"
+                value={publishServerNamesInput}
+                onChange={(e) => setPublishServerNamesInput(e.target.value)}
+              />
+              <div className="text-xs text-content-muted">
+                Empty input deploys without host-specific TLS (HTTP catch-all).
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <DialogClose asChild>
+                <Button type="button" variant="secondary" disabled={publish.isPending}>
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={publish.isPending}>
+                {publish.isPending ? "Publishing…" : "Publish"}
               </Button>
             </div>
           </form>
