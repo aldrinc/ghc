@@ -459,7 +459,12 @@ WantedBy=multi-user.target
         app_dir_q = shlex.quote(app_dir)
         site_dir_q = shlex.quote(site_dir)
 
-        self.run(f"test -d {dist_q}")
+        if not self._path_exists(runtime_dist_path):
+            raise ValueError(
+                "source_ref.runtime_dist_path does not exist on target server: "
+                f"{runtime_dist_path}. Build/copy the runtime bundle there or set "
+                "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH to the correct directory."
+            )
         self.run(f"mkdir -p {app_dir_q}")
         self.run(f"rm -rf {site_dir_q}")
         self.run(f"mkdir -p {site_dir_q}")

@@ -228,3 +228,13 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
 
     assert "nginx -t" in commands
     assert "systemctl reload nginx" in commands
+
+
+def test_funnel_artifact_site_errors_with_clear_message_when_runtime_dist_missing():
+    app = _artifact_app()
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    deployer._path_exists = lambda path: False
+
+    with pytest.raises(ValueError, match="runtime_dist_path does not exist on target server"):
+        deployer._configure_funnel_artifact_site(app)

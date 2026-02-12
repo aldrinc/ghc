@@ -25,6 +25,7 @@ type DeployJobState = {
   statusPath: string;
   status: string;
   accessUrl: string | null;
+  publicationId: string | null;
   error: string | null;
 };
 
@@ -32,6 +33,9 @@ type DeployJobStatusResponse = {
   id: string;
   status: string;
   access_urls?: string[];
+  result?: {
+    publicationId?: string | null;
+  } | null;
   error?: string | null;
 };
 
@@ -140,6 +144,7 @@ export function FunnelDetailPage() {
         statusPath,
         status: initialStatus,
         accessUrl: initialAccess,
+        publicationId: typeof response.publicationId === "string" ? response.publicationId : null,
         error: null,
       });
     }
@@ -178,12 +183,14 @@ export function FunnelDetailPage() {
         const job = await get<DeployJobStatusResponse>(deployJob.statusPath);
         if (stopped) return;
         const accessUrl = Array.isArray(job.access_urls) ? job.access_urls[0] || null : null;
+        const publicationId = typeof job.result?.publicationId === "string" ? job.result.publicationId : null;
         setDeployJob((current) => {
           if (!current || current.jobId !== job.id) return current;
           return {
             ...current,
             status: job.status,
             accessUrl: accessUrl || current.accessUrl,
+            publicationId: publicationId || current.publicationId,
             error: job.error || null,
           };
         });
@@ -217,7 +224,7 @@ export function FunnelDetailPage() {
                 </a>
               </Button>
             ) : null}
-            {deployJob?.status === "succeeded" && mosPreviewUrl ? (
+            {deployJob?.publicationId && mosPreviewUrl ? (
               <Button variant="secondary" size="sm" asChild>
                 <a href={mosPreviewUrl} target="_blank" rel="noreferrer">
                   Open In MOS
