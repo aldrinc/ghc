@@ -41,6 +41,15 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str | None = None
     OPENAI_WEBHOOK_SECRET: str | None = None
 
+    # Deploy control plane (Terraform apply + SSH deploy) embedded in the MOS backend.
+    # Root folder where plan files and Terraform state will be written.
+    DEPLOY_ROOT_DIR: str = "cloudhand"
+    DEPLOY_PROJECT_ID: str = "mos"
+    DEPLOY_WORKSPACE_ID: str = "default"
+    DEPLOY_PUBLIC_BASE_URL: str | None = None
+    DEPLOY_PUBLIC_API_BASE_URL: str | None = None
+    DEPLOY_ARTIFACT_RUNTIME_DIST_PATH: str = "mos/frontend/dist"
+
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
     SHOPIFY_CHECKOUT_APP_BASE_URL: str | None = None

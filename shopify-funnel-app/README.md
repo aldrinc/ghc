@@ -110,6 +110,8 @@ set `SHOPIFY_ENABLE_ORDER_FORWARDING=false` while testing checkout creation. In 
 
 Dev stores often have storefront password protection enabled. In that case, checkout URLs can redirect to `/password` for logged-out visitors. Disable the storefront password in the dev store or test while authenticated in the storefront session.
 
+If checkout shows `Out of stock` after redirect, verify storefront lock state first. When the Storefront API returns `Online Store channel is locked`, disable storefront password protection in the dev store and retry with a fresh checkout URL.
+
 ## Tests
 
 ```bash

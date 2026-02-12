@@ -40,6 +40,8 @@ const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile)
 type FunnelRuntimeContextValue = {
   publicId: string;
   pageMap: Record<string, string>;
+  rootMode?: boolean;
+  entrySlug?: string | null;
   trackEvent?: (event: { eventType: string; props?: Record<string, unknown> }) => void;
   commerce?: PublicFunnelCommerce | null;
   commerceError?: string | null;
@@ -63,6 +65,21 @@ export function FunnelRuntimeProvider({
 
 export function useFunnelRuntime() {
   return useContext(FunnelRuntimeContext);
+}
+
+export function resolveRuntimePagePath(runtime: FunnelRuntimeContextValue, slug: string): string {
+  const normalizedSlug = (slug || "").trim();
+  if (!normalizedSlug) {
+    return "#";
+  }
+  if (runtime.rootMode) {
+    const entrySlug = (runtime.entrySlug || "").trim();
+    if (entrySlug && normalizedSlug === entrySlug) {
+      return "/";
+    }
+    return `/${encodeURIComponent(normalizedSlug)}`;
+  }
+  return `/f/${runtime.publicId}/${encodeURIComponent(normalizedSlug)}`;
 }
 
 type PageOption = { label: string; value: string };
@@ -147,7 +164,7 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
 
   if (linkType === "funnelPage" && runtime && targetPageId) {
     const targetSlug = runtime.pageMap[targetPageId];
-    const to = targetSlug ? `/f/${runtime.publicId}/${targetSlug}` : "#";
+    const to = targetSlug ? resolveRuntimePagePath(runtime, targetSlug) : "#";
     return (
       <div className={wrapperClass}>
         <Link
@@ -175,7 +192,7 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
     if (!targetSlug) {
       throw new Error("Next page is not available in this funnel.");
     }
-    const to = `/f/${runtime.publicId}/${targetSlug}`;
+    const to = resolveRuntimePagePath(runtime, targetSlug);
     return (
       <div className={wrapperClass}>
         <Link

@@ -101,3 +101,4 @@ This is read by `POST /public/checkout` and converted into a Storefront `cartCre
 - Checkout page customization remains limited on non-Plus plans.
 - If multiple Shopify stores are linked to one Marketi client, checkout creation by `clientId` will fail with a clear conflict. In that case use explicit shop targeting in bridge requests.
 - Dev stores may redirect checkout URLs to `/password` if storefront password protection is enabled.
+- If checkout removes items as out of stock in a dev store, confirm storefront lock isn’t enabled (`Online Store channel is locked`) and disable storefront password protection before retesting.

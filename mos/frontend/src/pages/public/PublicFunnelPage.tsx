@@ -6,6 +6,7 @@ import type { PublicFunnelMeta, PublicFunnelPage as PublicFunnelPageType } from 
 import type { PublicFunnelCommerce } from "@/types/commerce";
 import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
+import { buildPublicFunnelPath, getStandalonePublicId, isStandaloneRootModeForPublicId } from "@/funnels/runtimeRouting";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
@@ -76,7 +77,10 @@ async function parsePublicError(resp: Response): Promise<string> {
 }
 
 export function PublicFunnelPage() {
-  const { publicId, slug } = useParams();
+  const { publicId: routePublicId, slug: routeSlug } = useParams();
+  const standalonePublicId = getStandalonePublicId();
+  const publicId = routePublicId || standalonePublicId || undefined;
+  const rootMode = isStandaloneRootModeForPublicId(publicId);
   const navigate = useNavigate();
   const [meta, setMeta] = useState<PublicFunnelMeta | null>(null);
   const [page, setPage] = useState<PublicFunnelPageType | null>(null);
@@ -84,6 +88,7 @@ export function PublicFunnelPage() {
   const [commerce, setCommerce] = useState<PublicFunnelCommerce | null>(null);
   const [commerceError, setCommerceError] = useState<string | null>(null);
   const sentPageViewRef = useRef<string | null>(null);
+  const effectiveSlug = routeSlug || (rootMode ? meta?.entrySlug : undefined);
 
   const visitorId = useMemo(() => getOrCreateId(localStorage, "funnel_visitor_id"), []);
   const sessionId = useMemo(
@@ -128,10 +133,10 @@ export function PublicFunnelPage() {
   }, [publicId]);
 
   useEffect(() => {
-    if (!publicId || !slug) return;
+    if (!publicId || !effectiveSlug) return;
     setError(null);
     setPage(null);
-    fetch(`${apiBaseUrl}/public/funnels/${publicId}/pages/${encodeURIComponent(slug)}`)
+    fetch(`${apiBaseUrl}/public/funnels/${publicId}/pages/${encodeURIComponent(effectiveSlug)}`)
       .then(async (resp) => {
         if (!resp.ok) {
           throw new Error(await parsePublicError(resp));
@@ -140,7 +145,15 @@ export function PublicFunnelPage() {
       })
       .then((data) => {
         if (data.redirectToSlug) {
-          navigate(`/f/${publicId}/${data.redirectToSlug}`, { replace: true });
+          navigate(
+            buildPublicFunnelPath({
+              publicId,
+              slug: data.redirectToSlug,
+              entrySlug: meta?.entrySlug,
+              rootMode,
+            }),
+            { replace: true },
+          );
           return;
         }
         setPage(data);
@@ -148,7 +161,7 @@ export function PublicFunnelPage() {
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Unable to load funnel page");
       });
-  }, [navigate, publicId, slug]);
+  }, [effectiveSlug, meta?.entrySlug, navigate, publicId, rootMode]);
 
   const trackEvent = async (event: { eventType: string; props?: Record<string, unknown> }) => {
     if (!page) return;
@@ -230,6 +243,8 @@ export function PublicFunnelPage() {
         value={{
           publicId,
           pageMap: page.pageMap,
+          rootMode,
+          entrySlug: meta?.entrySlug ?? null,
           trackEvent,
           commerce,
           commerceError,
