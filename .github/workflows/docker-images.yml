@@ -36,8 +36,8 @@ jobs:
       DATABASE_URL: postgresql+psycopg://app:app@localhost:5432/app
       CLERK_JWT_ISSUER: https://example.com/issuer
       CLERK_JWKS_URL: https://example.com/.well-known/jwks.json
-      CLERK_AUDIENCE: mos
-      BACKEND_CORS_ORIGINS: http://localhost:5173
+      CLERK_AUDIENCE: '["mos"]'
+      BACKEND_CORS_ORIGINS: '["http://localhost:5173"]'
       TEMPORAL_ADDRESS: localhost:7234
     steps:
       - name: Checkout
