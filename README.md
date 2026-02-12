@@ -107,18 +107,14 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
 
 ### First-Run Plan Bootstrap (No Existing Plan)
 
-When funnel publish is requested with deploy settings and no plan file exists, MOS can auto-create a minimal plan containing the funnel publication workload.
+When funnel publish is requested with deploy settings and no plan file exists, MOS auto-creates a base plan using this template:
 
-- Required:
-  - `DEPLOY_BOOTSTRAP_PROVIDER`
-  - `DEPLOY_BOOTSTRAP_REGION`
-  - `DEPLOY_BOOTSTRAP_NETWORK_NAME`
-  - `DEPLOY_BOOTSTRAP_NETWORK_CIDR`
-  - `DEPLOY_BOOTSTRAP_INSTANCE_SIZE`
-  - `deploy.instanceName` in the publish payload, or `DEPLOY_BOOTSTRAP_INSTANCE_NAME`
-- Optional:
-  - `DEPLOY_BOOTSTRAP_INSTANCE_REGION` (defaults to `DEPLOY_BOOTSTRAP_REGION`)
-  - `DEPLOY_BOOTSTRAP_INSTANCE_LABELS` (JSON object)
+- `provider: "hetzner"`
+- `region: "fsn1"`
+- `networks: [{ "name": "default", "cidr": "10.0.0.0/16" }]`
+- `instance: { "name": "ubuntu-4gb-nbg1-2", "size": "cx23", "network": "default", "region": "nbg1", "labels": {} }`
+
+If `deploy.instanceName` is provided in the publish payload, it overrides only the instance name in that template.
 
 ### Known gaps
 

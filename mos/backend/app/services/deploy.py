@@ -355,39 +355,7 @@ def patch_workload_in_plan(
 def _bootstrap_deploy_plan_payload(*, workload_patch: dict[str, Any], instance_name: str | None) -> dict[str, Any]:
     from cloudhand.models import ApplicationSpec
 
-    requested_instance_name = (instance_name or "").strip()
-    default_instance_name = (settings.DEPLOY_BOOTSTRAP_INSTANCE_NAME or "").strip()
-    resolved_instance_name = requested_instance_name or default_instance_name
-
-    provider = (settings.DEPLOY_BOOTSTRAP_PROVIDER or "").strip()
-    region = (settings.DEPLOY_BOOTSTRAP_REGION or "").strip()
-    network_name = (settings.DEPLOY_BOOTSTRAP_NETWORK_NAME or "").strip()
-    network_cidr = (settings.DEPLOY_BOOTSTRAP_NETWORK_CIDR or "").strip()
-    instance_size = (settings.DEPLOY_BOOTSTRAP_INSTANCE_SIZE or "").strip()
-    instance_region = (settings.DEPLOY_BOOTSTRAP_INSTANCE_REGION or "").strip() or region
-
-    missing: list[str] = []
-    if not resolved_instance_name:
-        missing.append("deploy.instanceName (or DEPLOY_BOOTSTRAP_INSTANCE_NAME)")
-    if not provider:
-        missing.append("DEPLOY_BOOTSTRAP_PROVIDER")
-    if not region:
-        missing.append("DEPLOY_BOOTSTRAP_REGION")
-    if not network_name:
-        missing.append("DEPLOY_BOOTSTRAP_NETWORK_NAME")
-    if not network_cidr:
-        missing.append("DEPLOY_BOOTSTRAP_NETWORK_CIDR")
-    if not instance_size:
-        missing.append("DEPLOY_BOOTSTRAP_INSTANCE_SIZE")
-    if missing:
-        raise DeployError(
-            "No plan found. Auto-bootstrap requires: " + ", ".join(missing) + "."
-        )
-
-    labels_raw = settings.DEPLOY_BOOTSTRAP_INSTANCE_LABELS or {}
-    if not isinstance(labels_raw, dict):
-        raise DeployError("DEPLOY_BOOTSTRAP_INSTANCE_LABELS must be a JSON object when set.")
-    labels = {str(k).strip(): str(v).strip() for k, v in labels_raw.items() if str(k).strip()}
+    resolved_instance_name = (instance_name or "").strip() or "ubuntu-4gb-nbg1-2"
 
     try:
         validated_workload = ApplicationSpec.model_validate(workload_patch)
@@ -398,21 +366,21 @@ def _bootstrap_deploy_plan_payload(*, workload_patch: dict[str, Any], instance_n
     return {
         "operations": [],
         "new_spec": {
-            "provider": provider,
-            "region": region,
+            "provider": "hetzner",
+            "region": "fsn1",
             "networks": [
                 {
-                    "name": network_name,
-                    "cidr": network_cidr,
+                    "name": "default",
+                    "cidr": "10.0.0.0/16",
                 }
             ],
             "instances": [
                 {
                     "name": resolved_instance_name,
-                    "size": instance_size,
-                    "network": network_name,
-                    "region": instance_region,
-                    "labels": labels,
+                    "size": "cx23",
+                    "network": "default",
+                    "region": "nbg1",
+                    "labels": {},
                     "workloads": [workload_payload],
                     "maintenance": None,
                 }
