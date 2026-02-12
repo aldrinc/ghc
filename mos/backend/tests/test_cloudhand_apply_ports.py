@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from cloudhand.core.apply import _assign_and_validate_instance_ports
-from cloudhand.models import ApplicationSpec
+from cloudhand.core.apply import _assign_and_validate_instance_ports, _compute_stale_workloads
+from cloudhand.models import ApplicationSpec, DesiredStateSpec
 
 
 def _git_app(*, name: str, ports: list[int] | None = None, env: dict[str, str] | None = None) -> ApplicationSpec:
@@ -60,6 +60,69 @@ def _funnel_app(
         "destination_path": "/opt/apps",
     }
     return ApplicationSpec.model_validate(payload)
+
+
+def _artifact_app(
+    *,
+    name: str,
+    ports: list[int] | None = None,
+    env: dict[str, str] | None = None,
+) -> ApplicationSpec:
+    payload = {
+        "name": name,
+        "source_type": "funnel_artifact",
+        "source_ref": {
+            "public_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+            "upstream_api_base_root": "https://moshq.app/api",
+            "runtime_dist_path": "/opt/apps/mos-ui/mos/frontend/dist",
+            "artifact": {
+                "meta": {"publicId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95", "entrySlug": "landing", "pages": []},
+                "pages": {"landing": {"slug": "landing", "puckData": {"root": {"props": {}}, "content": [], "zones": {}}}},
+            },
+        },
+        "runtime": "static",
+        "build_config": {
+            "install_command": None,
+            "build_command": None,
+            "system_packages": [],
+        },
+        "service_config": {
+            "command": None,
+            "environment": env or {},
+            "ports": ports or [],
+            "server_names": [],
+            "https": False,
+        },
+        "destination_path": "/opt/apps",
+    }
+    return ApplicationSpec.model_validate(payload)
+
+
+def _instance_payload(name: str, app_payloads: list[dict]) -> dict:
+    return {
+        "name": name,
+        "size": "cx23",
+        "network": "default",
+        "region": "nbg1",
+        "labels": {},
+        "workloads": app_payloads,
+        "maintenance": None,
+    }
+
+
+def _desired_spec(instances: list[dict]) -> DesiredStateSpec:
+    return DesiredStateSpec.model_validate(
+        {
+            "provider": "hetzner",
+            "region": "fsn1",
+            "networks": [{"name": "default", "cidr": "10.0.0.0/16"}],
+            "instances": instances,
+            "load_balancers": [],
+            "firewalls": [],
+            "dns_records": [],
+            "containers": [],
+        }
+    )
 
 
 def test_assign_ports_deterministic_and_unique():
@@ -120,3 +183,53 @@ def test_assign_ports_for_funnel_publication_is_deterministic_and_no_port_env():
     _assign_and_validate_instance_ports(instance_name="mos-ghc-1", app_models=[app_a_2, app_b_2])
     assert app_a_2.service_config.ports[0] == a_port
     assert app_b_2.service_config.ports[0] == b_port
+
+
+def test_assign_ports_for_funnel_artifact_is_deterministic_and_no_port_env():
+    app_a = _artifact_app(name="landing-artifact-a")
+    app_b = _artifact_app(name="landing-artifact-b")
+    _assign_and_validate_instance_ports(instance_name="mos-ghc-1", app_models=[app_a, app_b])
+
+    a_port = app_a.service_config.ports[0]
+    b_port = app_b.service_config.ports[0]
+    assert a_port != b_port
+    assert 20000 <= a_port <= 29999
+    assert 20000 <= b_port <= 29999
+    assert "PORT" not in app_a.service_config.environment
+    assert "PORT" not in app_b.service_config.environment
+
+
+def test_compute_stale_workloads_identifies_removed_workloads_and_instances():
+    previous = _desired_spec(
+        [
+            _instance_payload(
+                "mos-ghc-1",
+                [
+                    _git_app(name="honest-herbalist").model_dump(),
+                    _funnel_app(name="funnel-old").model_dump(),
+                ],
+            ),
+            _instance_payload(
+                "mos-ghc-2",
+                [
+                    _git_app(name="legacy-site").model_dump(),
+                ],
+            ),
+        ]
+    )
+
+    desired = _desired_spec(
+        [
+            _instance_payload(
+                "mos-ghc-1",
+                [
+                    _funnel_app(name="funnel-new").model_dump(),
+                ],
+            ),
+        ]
+    )
+
+    stale = _compute_stale_workloads(previous_spec=previous, desired_spec=desired)
+    assert set(stale.keys()) == {"mos-ghc-1", "mos-ghc-2"}
+    assert {app.name for app in stale["mos-ghc-1"]} == {"honest-herbalist", "funnel-old"}
+    assert {app.name for app in stale["mos-ghc-2"]} == {"legacy-site"}

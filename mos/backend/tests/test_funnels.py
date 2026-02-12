@@ -217,7 +217,7 @@ def test_funnel_public_preview_allows_approved_pages_before_publish(api_client: 
     assert unapproved.status_code == 404
 
 
-def test_publish_with_deploy_builds_funnel_publication_workload_from_db(api_client: TestClient, monkeypatch):
+def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client: TestClient, monkeypatch):
     funnel_id, public_id = _create_publish_ready_funnel(api_client, funnel_name="Deploy Funnel")
 
     captured: dict[str, object] = {}
@@ -271,10 +271,12 @@ def test_publish_with_deploy_builds_funnel_publication_workload_from_db(api_clie
 
     deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
-    assert workload_patch["source_type"] == "funnel_publication"
+    assert workload_patch["source_type"] == "funnel_artifact"
     assert workload_patch["source_ref"]["public_id"] == public_id
-    assert workload_patch["source_ref"]["upstream_base_url"] == "https://moshq.app"
-    assert workload_patch["source_ref"]["upstream_api_base_url"] == f"https://moshq.app/api/public/funnels/{public_id}"
+    assert workload_patch["source_ref"]["upstream_api_base_root"] == "https://moshq.app/api"
+    assert workload_patch["source_ref"]["runtime_dist_path"] == "/opt/apps/mos-ui/mos/frontend/dist"
+    assert workload_patch["source_ref"]["artifact"]["meta"]["publicId"] == public_id
+    assert workload_patch["source_ref"]["artifact"]["pages"] == {}
     assert workload_patch["service_config"]["server_names"] == ["landing.example.com"]
     assert deploy_request["plan_path"] is None
     assert deploy_request["instance_name"] == "mos-ghc-1"

@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     DEPLOY_WORKSPACE_ID: str = "default"
     DEPLOY_PUBLIC_BASE_URL: str | None = None
     DEPLOY_PUBLIC_API_BASE_URL: str | None = None
+    DEPLOY_ARTIFACT_RUNTIME_DIST_PATH: str = "/opt/apps/mos-ui/mos/frontend/dist"
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None

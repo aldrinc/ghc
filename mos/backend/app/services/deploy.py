@@ -202,17 +202,19 @@ def build_funnel_publication_workload_patch(
     name = workload_name.strip()
     if not name:
         raise DeployError("Deploy workloadName must be non-empty.")
+    _ = upstream_base_url
 
     public_id = funnel_public_id.strip()
     if not public_id:
         raise DeployError("Funnel public_id must be non-empty.")
 
-    base_url = upstream_base_url.strip().rstrip("/")
-    if not base_url.startswith(("http://", "https://")):
-        raise DeployError("Deploy upstreamBaseUrl must start with http:// or https://.")
-
     api_base_url = upstream_api_base_url.strip().rstrip("/")
     if not api_base_url.startswith(("http://", "https://")):
+        raise DeployError("Deploy upstreamApiBaseUrl must start with http:// or https://.")
+    suffix = f"/public/funnels/{public_id}"
+    api_base_root = api_base_url[:-len(suffix)] if api_base_url.endswith(suffix) else api_base_url
+    api_base_root = api_base_root.rstrip("/")
+    if not api_base_root.startswith(("http://", "https://")):
         raise DeployError("Deploy upstreamApiBaseUrl must start with http:// or https://.")
 
     seen_server_names: set[str] = set()
@@ -236,11 +238,19 @@ def build_funnel_publication_workload_patch(
 
     return {
         "name": name,
-        "source_type": "funnel_publication",
+        "source_type": "funnel_artifact",
         "source_ref": {
             "public_id": public_id,
-            "upstream_base_url": base_url,
-            "upstream_api_base_url": api_base_url,
+            "upstream_api_base_root": api_base_root,
+            "runtime_dist_path": settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH,
+            "artifact": {
+                "meta": {
+                    "publicId": public_id,
+                    "entrySlug": "",
+                    "pages": [],
+                },
+                "pages": {},
+            },
         },
         "repo_url": None,
         "runtime": "static",
@@ -258,6 +268,183 @@ def build_funnel_publication_workload_patch(
         },
         "destination_path": destination,
     }
+
+
+def build_funnel_artifact_workload_patch(
+    *,
+    workload_name: str,
+    funnel_public_id: str,
+    upstream_base_url: str,
+    upstream_api_base_url: str,
+    server_names: list[str],
+    https: bool,
+    destination_path: str,
+) -> dict[str, Any]:
+    return build_funnel_publication_workload_patch(
+        workload_name=workload_name,
+        funnel_public_id=funnel_public_id,
+        upstream_base_url=upstream_base_url,
+        upstream_api_base_url=upstream_api_base_url,
+        server_names=server_names,
+        https=https,
+        destination_path=destination_path,
+    )
+
+
+def build_funnel_artifact_payload(
+    *,
+    session: Any,
+    org_id: str,
+    funnel_id: str,
+    publication_id: str,
+) -> dict[str, Any]:
+    from fastapi.encoders import jsonable_encoder
+    from sqlalchemy import select
+
+    from app.db.models import (
+        Funnel,
+        FunnelPage,
+        FunnelPageSlugRedirect,
+        Product,
+        ProductOffer,
+        ProductOfferPricePoint,
+    )
+    from app.db.repositories.funnels import FunnelPublicRepository
+    from app.services.design_systems import resolve_design_system_tokens
+
+    funnel = session.scalars(select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)).first()
+    if not funnel:
+        raise DeployError("Funnel not found while creating deploy artifact.")
+
+    public_repo = FunnelPublicRepository(session)
+    publication = public_repo.get_active_publication(funnel_id=str(funnel.id), publication_id=publication_id)
+    if not publication:
+        raise DeployError("Publication not found while creating deploy artifact.")
+
+    publication_pages = public_repo.list_publication_pages(publication_id=publication_id)
+    if not publication_pages:
+        raise DeployError("Publication contains no pages.")
+
+    entry_slug = None
+    page_map = {str(item.page_id): item.slug_at_publish for item in publication_pages}
+    pages_payload: dict[str, dict[str, Any]] = {}
+
+    for item in publication_pages:
+        if str(item.page_id) == str(publication.entry_page_id):
+            entry_slug = item.slug_at_publish
+
+        version = public_repo.get_page_version(version_id=str(item.page_version_id))
+        if not version:
+            raise DeployError(f"Publication page '{item.page_id}' has no version.")
+
+        page = session.scalars(select(FunnelPage).where(FunnelPage.id == item.page_id)).first()
+        tokens = resolve_design_system_tokens(
+            session=session,
+            org_id=str(funnel.org_id),
+            client_id=str(funnel.client_id),
+            funnel=funnel,
+            page=page,
+        )
+        pages_payload[item.slug_at_publish] = {
+            "funnelId": str(funnel.id),
+            "publicationId": publication_id,
+            "pageId": str(item.page_id),
+            "slug": item.slug_at_publish,
+            "puckData": version.puck_data,
+            "pageMap": page_map,
+            "designSystemTokens": tokens,
+            "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
+        }
+
+    if not entry_slug:
+        raise DeployError("Entry page slug not found in publication.")
+
+    redirects = session.scalars(
+        select(FunnelPageSlugRedirect).where(FunnelPageSlugRedirect.funnel_id == funnel.id)
+    ).all()
+    for redirect in redirects:
+        from_slug = (redirect.from_slug or "").strip()
+        if not from_slug:
+            continue
+        if "/" in from_slug or "\\" in from_slug:
+            continue
+        pages_payload[from_slug] = {"redirectToSlug": redirect.to_slug}
+
+    commerce_payload: dict[str, Any] | None = None
+    if funnel.product_id:
+        product = session.scalars(
+            select(Product).where(Product.id == funnel.product_id, Product.org_id == funnel.org_id)
+        ).first()
+        if product:
+            offers = session.scalars(select(ProductOffer).where(ProductOffer.product_id == product.id)).all()
+            offer_ids = [str(offer.id) for offer in offers]
+            price_points = (
+                session.scalars(
+                    select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id.in_(offer_ids))
+                ).all()
+                if offer_ids
+                else []
+            )
+            price_points_by_offer: dict[str, list[dict[str, Any]]] = {}
+            for price_point in price_points:
+                data = jsonable_encoder(price_point)
+                data.pop("external_price_id", None)
+                price_points_by_offer.setdefault(str(price_point.offer_id), []).append(data)
+            commerce_payload = {
+                "publicId": str(funnel.public_id),
+                "funnelId": str(funnel.id),
+                "product": jsonable_encoder(product),
+                "selectedOfferId": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
+                "offers": [
+                    {
+                        **jsonable_encoder(offer),
+                        "pricePoints": price_points_by_offer.get(str(offer.id), []),
+                    }
+                    for offer in offers
+                ],
+            }
+
+    return {
+        "meta": {
+            "publicId": str(funnel.public_id),
+            "funnelId": str(funnel.id),
+            "publicationId": publication_id,
+            "entrySlug": entry_slug,
+            "pages": [{"pageId": str(item.page_id), "slug": item.slug_at_publish} for item in publication_pages],
+        },
+        "pages": pages_payload,
+        "commerce": commerce_payload,
+    }
+
+
+def hydrate_funnel_artifact_workload_patch(
+    *,
+    session: Any,
+    org_id: str,
+    funnel_id: str,
+    publication_id: str,
+    workload_patch: dict[str, Any],
+) -> dict[str, Any]:
+    source_type = str(workload_patch.get("source_type") or "").strip().lower()
+    if source_type != "funnel_artifact":
+        return workload_patch
+
+    source_ref = workload_patch.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError("funnel_artifact workload patch is missing source_ref.")
+
+    artifact = source_ref.get("artifact")
+    if isinstance(artifact, dict) and artifact.get("pages"):
+        return workload_patch
+
+    source_ref["artifact"] = build_funnel_artifact_payload(
+        session=session,
+        org_id=org_id,
+        funnel_id=funnel_id,
+        publication_id=publication_id,
+    )
+    workload_patch["source_ref"] = source_ref
+    return workload_patch
 
 
 def patch_workload_in_plan(
@@ -557,9 +744,12 @@ def _workload_port_from_latest_spec(*, workload_name: str, instance_name: str | 
     except Exception as exc:
         raise DeployError(f"Failed to read Cloudhand spec.json: {exc}") from exc
 
-    new_spec = payload.get("new_spec")
-    if not isinstance(new_spec, dict):
-        raise DeployError("Cloudhand spec.json is invalid (missing new_spec object).")
+    if isinstance(payload.get("new_spec"), dict):
+        new_spec = payload["new_spec"]
+    elif isinstance(payload, dict):
+        new_spec = payload
+    else:
+        raise DeployError("Cloudhand spec.json is invalid (expected JSON object).")
 
     instances = new_spec.get("instances")
     if not isinstance(instances, list):
@@ -724,67 +914,74 @@ async def _run_funnel_publish_job(job_id: str) -> None:
         session = SessionLocal()
         try:
             publication = publish_funnel(session=session, org_id=org_id, user_id=user_id, funnel_id=funnel_id)
+            result_payload["publicationId"] = str(publication.id)
+
+            if deploy_request is not None:
+                if not isinstance(deploy_request, dict):
+                    raise DeployError("Invalid publish deploy request payload.")
+
+                workload_patch = deploy_request.get("workload_patch")
+                if not isinstance(workload_patch, dict):
+                    raise DeployError("Publish deploy request is missing workload_patch.")
+
+                workload_patch = hydrate_funnel_artifact_workload_patch(
+                    session=session,
+                    org_id=org_id,
+                    funnel_id=funnel_id,
+                    publication_id=str(publication.id),
+                    workload_patch=workload_patch,
+                )
+
+                plan_resolution = ensure_plan_for_funnel_publish_workload(
+                    workload_patch=workload_patch,
+                    plan_path=deploy_request.get("plan_path"),
+                    instance_name=deploy_request.get("instance_name"),
+                )
+
+                patch_result = patch_workload_in_plan(
+                    workload_patch=workload_patch,
+                    plan_path=plan_resolution["plan_path"],
+                    instance_name=deploy_request.get("instance_name"),
+                    create_if_missing=bool(deploy_request.get("create_if_missing", True)),
+                    in_place=bool(deploy_request.get("in_place", False)),
+                )
+                deploy_response: dict[str, Any] = {"patch": patch_result}
+                if plan_resolution.get("bootstrapped"):
+                    deploy_response["bootstrap"] = {
+                        "created": True,
+                        "plan_path": plan_resolution["plan_path"],
+                    }
+                access_urls = _normalize_access_urls(deploy_request.get("access_urls"))
+
+                apply_plan_enabled = bool(deploy_request.get("apply_plan", True))
+                if apply_plan_enabled:
+                    apply_result = await apply_plan(plan_path=patch_result["updated_plan_path"])
+                    return_code, summary = _summarize_apply_result(apply_result)
+                    deploy_response["apply"] = summary
+                    if return_code != 0:
+                        result_payload["deploy"] = deploy_response
+                        job["result"] = result_payload
+                        job["access_urls"] = access_urls
+                        job["status"] = "failed"
+                        job["error"] = f"Funnel published but deploy apply failed with return code {return_code}."
+                        job["finished_at"] = _utc_now_iso()
+                        _write_json_atomic(path, job)
+                        return
+                    if not access_urls:
+                        workload_name = str(workload_patch.get("name") or "").strip()
+                        if not workload_name:
+                            raise DeployError("Publish deploy workload patch is missing workload name.")
+                        access_urls = _infer_external_access_urls(
+                            server_ips=summary.get("server_ips") or {},
+                            workload_name=workload_name,
+                            instance_name=deploy_request.get("instance_name"),
+                        )
+                    summary["access_urls"] = access_urls
+                    deploy_response["apply"] = summary
+
+                result_payload["deploy"] = deploy_response
         finally:
             session.close()
-
-        result_payload["publicationId"] = str(publication.id)
-
-        if deploy_request is not None:
-            if not isinstance(deploy_request, dict):
-                raise DeployError("Invalid publish deploy request payload.")
-
-            workload_patch = deploy_request.get("workload_patch")
-            if not isinstance(workload_patch, dict):
-                raise DeployError("Publish deploy request is missing workload_patch.")
-
-            plan_resolution = ensure_plan_for_funnel_publish_workload(
-                workload_patch=workload_patch,
-                plan_path=deploy_request.get("plan_path"),
-                instance_name=deploy_request.get("instance_name"),
-            )
-
-            patch_result = patch_workload_in_plan(
-                workload_patch=workload_patch,
-                plan_path=plan_resolution["plan_path"],
-                instance_name=deploy_request.get("instance_name"),
-                create_if_missing=bool(deploy_request.get("create_if_missing", True)),
-                in_place=bool(deploy_request.get("in_place", False)),
-            )
-            deploy_response: dict[str, Any] = {"patch": patch_result}
-            if plan_resolution.get("bootstrapped"):
-                deploy_response["bootstrap"] = {
-                    "created": True,
-                    "plan_path": plan_resolution["plan_path"],
-                }
-            access_urls = _normalize_access_urls(deploy_request.get("access_urls"))
-
-            apply_plan_enabled = bool(deploy_request.get("apply_plan", True))
-            if apply_plan_enabled:
-                apply_result = await apply_plan(plan_path=patch_result["updated_plan_path"])
-                return_code, summary = _summarize_apply_result(apply_result)
-                deploy_response["apply"] = summary
-                if return_code != 0:
-                    result_payload["deploy"] = deploy_response
-                    job["result"] = result_payload
-                    job["access_urls"] = access_urls
-                    job["status"] = "failed"
-                    job["error"] = f"Funnel published but deploy apply failed with return code {return_code}."
-                    job["finished_at"] = _utc_now_iso()
-                    _write_json_atomic(path, job)
-                    return
-                if not access_urls:
-                    workload_name = str(workload_patch.get("name") or "").strip()
-                    if not workload_name:
-                        raise DeployError("Publish deploy workload patch is missing workload name.")
-                    access_urls = _infer_external_access_urls(
-                        server_ips=summary.get("server_ips") or {},
-                        workload_name=workload_name,
-                        instance_name=deploy_request.get("instance_name"),
-                    )
-                summary["access_urls"] = access_urls
-                deploy_response["apply"] = summary
-
-            result_payload["deploy"] = deploy_response
 
         job["result"] = result_payload
         job["access_urls"] = access_urls

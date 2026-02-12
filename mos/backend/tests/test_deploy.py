@@ -118,6 +118,32 @@ def test_infer_external_access_urls_uses_assigned_workload_port(tmp_path, monkey
     assert urls == ["http://198.51.100.10:24123/"]
 
 
+def test_infer_external_access_urls_uses_plain_spec_shape(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    spec_payload = {
+        "provider": "hetzner",
+        "instances": [
+            {
+                "name": "ubuntu-4gb-nbg1-2",
+                "workloads": [
+                    {
+                        "name": "landing-page",
+                        "service_config": {"ports": [24123]},
+                    }
+                ],
+            }
+        ],
+    }
+    (tmp_path / "spec.json").write_text(json.dumps(spec_payload), encoding="utf-8")
+
+    urls = deploy_service._infer_external_access_urls(
+        server_ips={"ubuntu-4gb-nbg1-2": "198.51.100.10"},
+        workload_name="landing-page",
+        instance_name="ubuntu-4gb-nbg1-2",
+    )
+    assert urls == ["http://198.51.100.10:24123/"]
+
+
 def test_infer_external_access_urls_errors_when_server_ips_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     with pytest.raises(deploy_service.DeployError, match="did not include server IPs"):

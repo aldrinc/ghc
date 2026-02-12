@@ -139,9 +139,49 @@ def _assign_and_validate_instance_ports(*, instance_name: str, app_models: list[
         )
         app.service_config.ports = [assigned_port]
         used_ports[assigned_port] = app.name
-        if app.source_type != ApplicationSourceType.FUNNEL_PUBLICATION:
+        if app.source_type == ApplicationSourceType.GIT:
             _set_or_validate_port_env(app=app, instance_name=instance_name, assigned_port=assigned_port)
         print(f"  -> Assigned port {assigned_port} to {app.name} on {instance_name}.")
+
+
+def _load_existing_spec(spec_path: Path) -> DesiredStateSpec | None:
+    if not spec_path.exists():
+        return None
+
+    try:
+        payload = json.loads(spec_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise ValueError(f"Existing spec at {spec_path} is not valid JSON: {exc}") from exc
+
+    if isinstance(payload, dict) and isinstance(payload.get("new_spec"), dict):
+        payload = payload["new_spec"]
+
+    try:
+        return DesiredStateSpec.model_validate(payload)
+    except Exception as exc:
+        raise ValueError(f"Existing spec at {spec_path} is invalid: {exc}") from exc
+
+
+def _compute_stale_workloads(
+    *,
+    previous_spec: DesiredStateSpec | None,
+    desired_spec: DesiredStateSpec,
+) -> dict[str, list[ApplicationSpec]]:
+    if previous_spec is None:
+        return {}
+
+    desired_by_instance: dict[str, set[str]] = {}
+    for inst in desired_spec.instances:
+        desired_by_instance[inst.name] = {app.name for app in inst.workloads}
+
+    stale: dict[str, list[ApplicationSpec]] = {}
+    for prev_inst in previous_spec.instances:
+        desired_names = desired_by_instance.get(prev_inst.name, set())
+        removed = [app for app in prev_inst.workloads if app.name not in desired_names]
+        if removed:
+            stale[prev_inst.name] = removed
+
+    return stale
 
 
 def apply_plan(
@@ -173,6 +213,8 @@ def apply_plan(
     ch_dir = cloudhand_dir(root)
     ch_dir.mkdir(parents=True, exist_ok=True)
     spec_path = ch_dir / "spec.json"
+    previous_spec = _load_existing_spec(spec_path)
+    stale_workloads_by_instance = _compute_stale_workloads(previous_spec=previous_spec, desired_spec=new_spec)
     spec_path.write_text(new_spec.model_dump_json(indent=2), encoding="utf-8")
 
     # Regenerate Terraform to reflect the new spec
@@ -212,12 +254,25 @@ def apply_plan(
     # Deploy workloads over SSH
     print("Deploying Applications...")
     nginx_mode = os.getenv("CLOUDHAND_NGINX_MODE", "per-app").strip().lower()
+    desired_instance_names = {inst.name for inst in new_spec.instances}
+
     for inst in new_spec.instances:
         ip = server_ips.get(inst.name)
-        if not ip or not inst.workloads:
+        stale_apps = stale_workloads_by_instance.get(inst.name, [])
+        if not ip:
+            continue
+        if not inst.workloads and not stale_apps:
             continue
         print(f" Configuring {inst.name} ({ip})...")
         deployer = ServerDeployer(ip, priv_key, local_root=root)
+
+        if stale_apps:
+            print(f"  -> Removing stale workloads on {inst.name}: {', '.join(app.name for app in stale_apps)}")
+            for stale_app in stale_apps:
+                deployer.remove_workload(stale_app)
+
+        if not inst.workloads:
+            continue
 
         app_models = [
             app if isinstance(app, ApplicationSpec) else ApplicationSpec.model_validate(app)
@@ -228,10 +283,13 @@ def apply_plan(
         # - per-app (default): each workload gets its own nginx site (domain -> workload)
         # - combined: one nginx site proxies multiple workloads on a single host (path-based routing)
         if nginx_mode in {"combined", "single", "shared"}:
-            if any(app.source_type == ApplicationSourceType.FUNNEL_PUBLICATION for app in app_models):
+            if any(
+                app.source_type in {ApplicationSourceType.FUNNEL_PUBLICATION, ApplicationSourceType.FUNNEL_ARTIFACT}
+                for app in app_models
+            ):
                 raise ValueError(
                     "CLOUDHAND_NGINX_MODE=combined is not supported for workloads "
-                    "with source_type='funnel_publication'. Use per-app mode."
+                    "with source_type='funnel_publication' or 'funnel_artifact'. Use per-app mode."
                 )
             deployed_apps = []
             for app_model in app_models:
@@ -244,5 +302,17 @@ def apply_plan(
             for app_model in app_models:
                 print(f"  -> Deploying {app_model.name} ({app_model.runtime})...")
                 deployer.deploy(app_model, configure_nginx=True)
+
+    # Handle stale workloads for instances removed from the desired spec but still present in outputs.
+    for instance_name, stale_apps in stale_workloads_by_instance.items():
+        if instance_name in desired_instance_names:
+            continue
+        ip = server_ips.get(instance_name)
+        if not ip:
+            continue
+        print(f" Cleaning removed instance {instance_name} ({ip}) stale workloads: {', '.join(app.name for app in stale_apps)}")
+        deployer = ServerDeployer(ip, priv_key, local_root=root)
+        for stale_app in stale_apps:
+            deployer.remove_workload(stale_app)
 
     return 0

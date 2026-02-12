@@ -39,6 +39,81 @@ def _funnel_app(
     return ApplicationSpec.model_validate(payload)
 
 
+def _git_app(name: str = "legacy-app") -> ApplicationSpec:
+    payload = {
+        "name": name,
+        "source_type": "git",
+        "repo_url": "https://github.com/example/repo",
+        "branch": "main",
+        "runtime": "nodejs",
+        "build_config": {
+            "install_command": "npm ci",
+            "build_command": "npm run build",
+            "system_packages": [],
+        },
+        "service_config": {
+            "command": "npm run start",
+            "environment": {},
+            "ports": [3000],
+            "server_names": ["example.com"],
+            "https": False,
+        },
+        "destination_path": "/opt/apps",
+    }
+    return ApplicationSpec.model_validate(payload)
+
+
+def _artifact_app(
+    *,
+    name: str = "landing-artifact",
+    ports: list[int] | None = None,
+    server_names: list[str] | None = None,
+) -> ApplicationSpec:
+    payload = {
+        "name": name,
+        "source_type": "funnel_artifact",
+        "source_ref": {
+            "public_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+            "upstream_api_base_root": "https://moshq.app/api",
+            "runtime_dist_path": "/opt/apps/mos-ui/mos/frontend/dist",
+            "artifact": {
+                "meta": {
+                    "publicId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+                    "funnelId": "funnel-1",
+                    "publicationId": "pub-1",
+                    "entrySlug": "landing",
+                    "pages": [{"pageId": "page-1", "slug": "landing"}],
+                },
+                "pages": {
+                    "landing": {
+                        "funnelId": "funnel-1",
+                        "publicationId": "pub-1",
+                        "pageId": "page-1",
+                        "slug": "landing",
+                        "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+                        "pageMap": {"page-1": "landing"},
+                    }
+                },
+            },
+        },
+        "runtime": "static",
+        "build_config": {
+            "install_command": None,
+            "build_command": None,
+            "system_packages": [],
+        },
+        "service_config": {
+            "command": None,
+            "environment": {},
+            "ports": ports or [24123],
+            "server_names": server_names or [],
+            "https": False,
+        },
+        "destination_path": "/opt/apps",
+    }
+    return ApplicationSpec.model_validate(payload)
+
+
 def _stub_deployer():
     deployer = object.__new__(ServerDeployer)
     deployer.ip = "127.0.0.1"
@@ -96,3 +171,60 @@ def test_funnel_proxy_requires_port_when_server_names_are_empty():
 
     with pytest.raises(ValueError, match="service_config.ports must include one port"):
         deployer._configure_funnel_publication_proxy(app)
+
+
+def test_remove_workload_cleans_service_nginx_and_app_dir():
+    app = _git_app(name="honest-herbalist")
+    deployer, _uploaded, commands = _stub_deployer()
+
+    removed: list[tuple[str, bool]] = []
+    existing_paths = {
+        "/etc/systemd/system/honest-herbalist.service": True,
+        "/etc/nginx/sites-enabled/honest-herbalist": True,
+        "/etc/nginx/sites-available/honest-herbalist": True,
+        "/opt/apps/honest-herbalist": True,
+    }
+
+    deployer._service_unit_exists = lambda service_name: service_name == "honest-herbalist"
+
+    def fake_remove(path: str, recursive: bool = False) -> bool:
+        removed.append((path, recursive))
+        return existing_paths.get(path, False)
+
+    deployer._remove_path_if_exists = fake_remove
+
+    deployer.remove_workload(app)
+
+    assert any(cmd.startswith("systemctl stop") and "honest-herbalist.service" in cmd for cmd in commands)
+    assert any(cmd.startswith("systemctl disable") and "honest-herbalist.service" in cmd for cmd in commands)
+    assert "systemctl daemon-reload" in commands
+    assert "nginx -t" in commands
+    assert "systemctl reload nginx" in commands
+    assert ("/etc/systemd/system/honest-herbalist.service", False) in removed
+    assert ("/etc/nginx/sites-enabled/honest-herbalist", False) in removed
+    assert ("/etc/nginx/sites-available/honest-herbalist", False) in removed
+    assert ("/opt/apps/honest-herbalist", True) in removed
+
+
+def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
+    app = _artifact_app()
+    deployer, uploaded, commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    conf = uploaded["/etc/nginx/sites-available/landing-artifact"]
+    assert "listen 24123;" in conf
+    assert "server_name _;" in conf
+    assert "location = /api/public/checkout" in conf
+    assert "location ^~ /api/public/events" in conf
+    assert "location ^~ /api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95/" in conf
+    assert "try_files $uri.json =404;" in conf
+    assert "try_files $uri /index.html;" in conf
+
+    meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95/meta.json"
+    page_path = "/opt/apps/landing-artifact/site/api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95/pages/landing.json"
+    assert meta_path in uploaded
+    assert page_path in uploaded
+
+    assert "nginx -t" in commands
+    assert "systemctl reload nginx" in commands

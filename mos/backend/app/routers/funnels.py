@@ -833,14 +833,6 @@ async def publish_funnel_route(
     )
 
     upstream_base_url = (deploy.upstreamBaseUrl or settings.DEPLOY_PUBLIC_BASE_URL or "").strip()
-    if not upstream_base_url:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=(
-                "Deploy upstream base URL is required. "
-                "Set deploy.upstreamBaseUrl or DEPLOY_PUBLIC_BASE_URL."
-            ),
-        )
 
     upstream_api_base_root = (deploy.upstreamApiBaseUrl or settings.DEPLOY_PUBLIC_API_BASE_URL or "").strip()
     if not upstream_api_base_root:
@@ -855,7 +847,7 @@ async def publish_funnel_route(
     upstream_api_base_url = f"{upstream_api_base_root.rstrip('/')}/public/funnels/{funnel.public_id}"
 
     try:
-        workload_patch = deploy_service.build_funnel_publication_workload_patch(
+        workload_patch = deploy_service.build_funnel_artifact_workload_patch(
             workload_name=deploy.workloadName,
             funnel_public_id=str(funnel.public_id),
             upstream_base_url=upstream_base_url,

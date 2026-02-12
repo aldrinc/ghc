@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -62,12 +62,20 @@ class RuntimeType(str, Enum):
 class ApplicationSourceType(str, Enum):
     GIT = "git"
     FUNNEL_PUBLICATION = "funnel_publication"
+    FUNNEL_ARTIFACT = "funnel_artifact"
 
 
 class FunnelPublicationSourceSpec(BaseModel):
     public_id: str
     upstream_base_url: str
     upstream_api_base_url: str
+
+
+class FunnelArtifactSourceSpec(BaseModel):
+    public_id: str
+    upstream_api_base_root: str
+    runtime_dist_path: str = "/opt/apps/mos-ui/mos/frontend/dist"
+    artifact: Dict[str, Any]
 
 
 class ServiceSpec(BaseModel):
@@ -93,7 +101,7 @@ class BuildSpec(BaseModel):
 class ApplicationSpec(BaseModel):
     name: str
     source_type: ApplicationSourceType = ApplicationSourceType.GIT
-    source_ref: Optional[FunnelPublicationSourceSpec] = None
+    source_ref: Optional[FunnelPublicationSourceSpec | FunnelArtifactSourceSpec] = None
     repo_url: Optional[str] = None
     branch: str = "main"
     runtime: RuntimeType
@@ -121,6 +129,8 @@ class ApplicationSpec(BaseModel):
                 raise ValueError("repo_url is not allowed when source_type='funnel_publication'.")
             if self.source_ref is None:
                 raise ValueError("source_ref is required when source_type='funnel_publication'.")
+            if not isinstance(self.source_ref, FunnelPublicationSourceSpec):
+                raise ValueError("source_ref must be FunnelPublicationSourceSpec when source_type='funnel_publication'.")
             self.source_ref.public_id = self.source_ref.public_id.strip()
             self.source_ref.upstream_base_url = self.source_ref.upstream_base_url.strip().rstrip("/")
             self.source_ref.upstream_api_base_url = self.source_ref.upstream_api_base_url.strip().rstrip("/")
@@ -130,6 +140,30 @@ class ApplicationSpec(BaseModel):
                 raise ValueError("source_ref.upstream_base_url must start with http:// or https://.")
             if not self.source_ref.upstream_api_base_url.startswith(("http://", "https://")):
                 raise ValueError("source_ref.upstream_api_base_url must start with http:// or https://.")
+            return self
+
+        if self.source_type == ApplicationSourceType.FUNNEL_ARTIFACT:
+            if self.repo_url is not None:
+                raise ValueError("repo_url is not allowed when source_type='funnel_artifact'.")
+            if self.source_ref is None:
+                raise ValueError("source_ref is required when source_type='funnel_artifact'.")
+            if not isinstance(self.source_ref, FunnelArtifactSourceSpec):
+                raise ValueError("source_ref must be FunnelArtifactSourceSpec when source_type='funnel_artifact'.")
+            self.source_ref.public_id = self.source_ref.public_id.strip()
+            self.source_ref.upstream_api_base_root = self.source_ref.upstream_api_base_root.strip().rstrip("/")
+            self.source_ref.runtime_dist_path = self.source_ref.runtime_dist_path.strip()
+            if not self.source_ref.public_id:
+                raise ValueError("source_ref.public_id must be non-empty for source_type='funnel_artifact'.")
+            if not self.source_ref.upstream_api_base_root.startswith(("http://", "https://")):
+                raise ValueError("source_ref.upstream_api_base_root must start with http:// or https://.")
+            if not self.source_ref.runtime_dist_path:
+                raise ValueError("source_ref.runtime_dist_path must be non-empty for source_type='funnel_artifact'.")
+            if not isinstance(self.source_ref.artifact, dict):
+                raise ValueError("source_ref.artifact must be an object for source_type='funnel_artifact'.")
+            if not isinstance(self.source_ref.artifact.get("meta"), dict):
+                raise ValueError("source_ref.artifact.meta must be an object for source_type='funnel_artifact'.")
+            if not isinstance(self.source_ref.artifact.get("pages"), dict):
+                raise ValueError("source_ref.artifact.pages must be an object for source_type='funnel_artifact'.")
             return self
 
         raise ValueError(f"Unsupported source_type: {self.source_type}")

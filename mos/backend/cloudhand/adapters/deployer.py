@@ -1,11 +1,19 @@
 import io
+import json
 import os
 import time
+import shlex
 from pathlib import Path
 import paramiko
 from typing import Dict, List, Optional  # noqa: F401
 
-from ..models import ApplicationSourceType, ApplicationSpec, RuntimeType
+from ..models import (
+    ApplicationSourceType,
+    ApplicationSpec,
+    FunnelArtifactSourceSpec,
+    FunnelPublicationSourceSpec,
+    RuntimeType,
+)
 
 
 _NGINX_PROXY_CONNECT_TIMEOUT = "60s"
@@ -195,6 +203,21 @@ WantedBy=multi-user.target
         out = self.run(f"bash -lc \"systemctl cat '{safe_name}.service' >/dev/null 2>&1 && echo yes || true\"")
         return out.strip() == "yes"
 
+    def _path_exists(self, path: str) -> bool:
+        safe_path = shlex.quote(path)
+        out = self.run(f"bash -lc \"test -e {safe_path} && echo yes || true\"")
+        return out.strip() == "yes"
+
+    def _remove_path_if_exists(self, path: str, *, recursive: bool = False) -> bool:
+        if not self._path_exists(path):
+            return False
+        safe_path = shlex.quote(path)
+        if recursive:
+            self.run(f"rm -rf {safe_path}")
+        else:
+            self.run(f"rm -f {safe_path}")
+        return True
+
     def _port_is_listening(self, port: int) -> bool:
         out = self.run(f"bash -lc \"ss -ltnH '( sport = :{port} )' | head -n 1 || true\"")
         return bool(out.strip())
@@ -256,6 +279,8 @@ WantedBy=multi-user.target
         source = app.source_ref
         if source is None:
             raise ValueError("source_ref is required when source_type='funnel_publication'.")
+        if not isinstance(source, FunnelPublicationSourceSpec):
+            raise ValueError("source_ref must be FunnelPublicationSourceSpec when source_type='funnel_publication'.")
 
         server_names = self._normalize_server_names(app.service_config.server_names)
         server_name_line = self._server_name_directive(server_names)
@@ -354,10 +379,156 @@ WantedBy=multi-user.target
         if app.service_config.https:
             self._enable_https(server_names)
 
+    def _replace_api_base_tokens(self, *, site_dir: str, upstream_api_base_root: str) -> None:
+        if not upstream_api_base_root:
+            return
+        if not upstream_api_base_root.startswith(("http://", "https://")):
+            raise ValueError("upstream_api_base_root must start with http:// or https://.")
+
+        script = (
+            "import pathlib\n"
+            f"SITE = pathlib.Path({site_dir!r})\n"
+            f"FROM = {upstream_api_base_root!r}\n"
+            "TO = '/api'\n"
+            "if not SITE.exists():\n"
+            "    raise SystemExit(0)\n"
+            "for path in SITE.rglob('*'):\n"
+            "    if not path.is_file():\n"
+            "        continue\n"
+            "    if path.suffix.lower() not in {'.js', '.css', '.html', '.json'}:\n"
+            "        continue\n"
+            "    try:\n"
+            "        raw = path.read_text(encoding='utf-8')\n"
+            "    except Exception:\n"
+            "        continue\n"
+            "    replaced = raw.replace(FROM, TO)\n"
+            "    if replaced != raw:\n"
+            "        path.write_text(replaced, encoding='utf-8')\n"
+        )
+        self.run(f"python3 -c {shlex.quote(script)}")
+
+    def _write_funnel_artifact_payload(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
+        artifact = source.artifact or {}
+        meta = artifact.get("meta")
+        pages = artifact.get("pages")
+        commerce = artifact.get("commerce")
+        if not isinstance(meta, dict):
+            raise ValueError("source_ref.artifact.meta must be an object.")
+        if not isinstance(pages, dict):
+            raise ValueError("source_ref.artifact.pages must be an object.")
+
+        public_id = source.public_id.strip()
+        if not public_id:
+            raise ValueError("source_ref.public_id must be non-empty.")
+
+        base_dir = f"{site_dir}/api/public/funnels/{public_id}"
+        pages_dir = f"{base_dir}/pages"
+        self.run(f"mkdir -p {shlex.quote(pages_dir)}")
+        self.upload_file(json.dumps(meta, ensure_ascii=False), f"{base_dir}/meta.json")
+
+        if isinstance(commerce, dict):
+            self.upload_file(json.dumps(commerce, ensure_ascii=False), f"{base_dir}/commerce.json")
+
+        for raw_slug, page_payload in pages.items():
+            slug = str(raw_slug or "").strip()
+            if not slug:
+                continue
+            if "/" in slug or "\\" in slug:
+                raise ValueError(f"Invalid artifact page slug '{slug}'.")
+            if not isinstance(page_payload, dict):
+                raise ValueError(f"Artifact page payload for slug '{slug}' must be an object.")
+            self.upload_file(
+                json.dumps(page_payload, ensure_ascii=False),
+                f"{pages_dir}/{slug}.json",
+            )
+
+    def _configure_funnel_artifact_site(self, app: ApplicationSpec):
+        source = app.source_ref
+        if source is None:
+            raise ValueError("source_ref is required when source_type='funnel_artifact'.")
+        if not isinstance(source, FunnelArtifactSourceSpec):
+            raise ValueError("source_ref must be FunnelArtifactSourceSpec when source_type='funnel_artifact'.")
+
+        runtime_dist_path = (source.runtime_dist_path or "").strip()
+        if not runtime_dist_path:
+            raise ValueError("source_ref.runtime_dist_path must be non-empty for source_type='funnel_artifact'.")
+
+        app_dir = f"{app.destination_path}/{app.name}"
+        site_dir = f"{app_dir}/site"
+        dist_q = shlex.quote(runtime_dist_path)
+        app_dir_q = shlex.quote(app_dir)
+        site_dir_q = shlex.quote(site_dir)
+
+        self.run(f"test -d {dist_q}")
+        self.run(f"mkdir -p {app_dir_q}")
+        self.run(f"rm -rf {site_dir_q}")
+        self.run(f"mkdir -p {site_dir_q}")
+        self.run(f"cp -R {dist_q}/. {site_dir_q}/")
+        self._replace_api_base_tokens(site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root)
+        self._write_funnel_artifact_payload(site_dir=site_dir, source=source)
+
+        server_names = self._normalize_server_names(app.service_config.server_names)
+        server_name_line = self._server_name_directive(server_names)
+        if server_names:
+            listen_port = 80
+        else:
+            ports = list(app.service_config.ports or [])
+            if not ports:
+                raise ValueError(
+                    "service_config.ports must include one port for source_type='funnel_artifact' "
+                    "when server_names is empty."
+                )
+            listen_port = int(ports[0])
+
+        public_id = source.public_id
+        conf = f"""server {{
+    listen {listen_port};
+    server_name {server_name_line};
+    root {site_dir};
+    index index.html;
+    client_max_body_size 25m;
+    proxy_connect_timeout {_NGINX_PROXY_CONNECT_TIMEOUT};
+    proxy_send_timeout {_NGINX_PROXY_SEND_TIMEOUT};
+    proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};
+
+    location = / {{
+        return 302 /f/{public_id}$is_args$args;
+    }}
+
+    location = /api/public/checkout {{
+        default_type application/json;
+        return 501 '{{"detail":"Checkout is unavailable in standalone artifact mode."}}';
+    }}
+
+    location ^~ /api/public/events {{
+        return 204;
+    }}
+
+    location ^~ /api/public/funnels/{public_id}/ {{
+        default_type application/json;
+        try_files $uri.json =404;
+    }}
+
+    location / {{
+        try_files $uri /index.html;
+    }}
+}}"""
+        self.upload_file(conf, f"/etc/nginx/sites-available/{app.name}")
+        self.run(f"ln -sf /etc/nginx/sites-available/{app.name} /etc/nginx/sites-enabled/{app.name}")
+        self.run("rm -f /etc/nginx/sites-enabled/default")
+        self.run("nginx -t")
+        self.run("systemctl reload nginx")
+        if app.service_config.https:
+            self._enable_https(server_names)
+
     def _configure_nginx(self, app: ApplicationSpec):
         if app.source_type == ApplicationSourceType.FUNNEL_PUBLICATION:
             self._ensure_nginx()
             self._configure_funnel_publication_proxy(app)
+            return
+        if app.source_type == ApplicationSourceType.FUNNEL_ARTIFACT:
+            self._ensure_nginx()
+            self._configure_funnel_artifact_site(app)
             return
 
         if not app.service_config.ports:
@@ -457,6 +628,36 @@ WantedBy=multi-user.target
         if https_enabled:
             self._enable_https(server_names)
 
+    def remove_workload(self, app: ApplicationSpec):
+        app_name = (app.name or "").strip()
+        if not app_name:
+            raise ValueError("Workload name is required for removal.")
+
+        service_unit = f"{app_name}.service"
+        safe_service_unit = shlex.quote(service_unit)
+        service_exists = self._service_unit_exists(app_name)
+        if service_exists:
+            self.run(f"systemctl stop {safe_service_unit}")
+            self.run(f"systemctl disable {safe_service_unit}")
+
+        unit_removed = self._remove_path_if_exists(f"/etc/systemd/system/{service_unit}")
+        if service_exists or unit_removed:
+            self.run("systemctl daemon-reload")
+
+        nginx_removed = False
+        if self._remove_path_if_exists(f"/etc/nginx/sites-enabled/{app_name}"):
+            nginx_removed = True
+        if self._remove_path_if_exists(f"/etc/nginx/sites-available/{app_name}"):
+            nginx_removed = True
+        if nginx_removed:
+            self.run("nginx -t")
+            self.run("systemctl reload nginx")
+
+        destination = (app.destination_path or "").rstrip("/")
+        if destination:
+            app_dir = f"{destination}/{app_name}"
+            self._remove_path_if_exists(app_dir, recursive=True)
+
     def deploy(self, app: ApplicationSpec, configure_nginx: bool = True):
         app_dir = f"{app.destination_path}/{app.name}"
 
@@ -466,7 +667,10 @@ WantedBy=multi-user.target
                 f"DEBIAN_FRONTEND=noninteractive apt-get update && "
                 f"DEBIAN_FRONTEND=noninteractive apt-get install -y {' '.join(app.build_config.system_packages)}"
             )
-        if app.source_type == ApplicationSourceType.FUNNEL_PUBLICATION:
+        if app.source_type in {ApplicationSourceType.FUNNEL_PUBLICATION, ApplicationSourceType.FUNNEL_ARTIFACT}:
+            # Funnel publication workloads are nginx proxies only. Remove same-name
+            # legacy service/site artifacts before configuring the proxy.
+            self.remove_workload(app)
             if configure_nginx:
                 self._configure_nginx(app)
             return
