@@ -51,6 +51,7 @@ from app.agent.funnel_objectives import (
     run_generate_page_draft,
     run_generate_page_draft_stream,
     run_generate_page_testimonials,
+    run_publish_funnel,
 )
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_ai import AiAttachmentError
@@ -64,7 +65,6 @@ from app.services.funnels import (
     default_puck_data,
     duplicate_funnel,
     generate_unique_slug,
-    publish_funnel,
 )
 
 router = APIRouter(prefix="/funnels", tags=["funnels"])
@@ -813,7 +813,7 @@ async def publish_funnel_route(
 ):
     if not payload or not payload.deploy:
         try:
-            publication = publish_funnel(
+            result = run_publish_funnel(
                 session=session,
                 org_id=auth.org_id,
                 user_id=auth.user_id,
@@ -823,7 +823,10 @@ async def publish_funnel_route(
             message = str(exc)
             code = status.HTTP_404_NOT_FOUND if "not found" in message.lower() else status.HTTP_409_CONFLICT
             raise HTTPException(status_code=code, detail=message) from exc
-        return {"publicationId": str(publication.id)}
+        return {
+            "publicationId": result.get("publicationId") or "",
+            **({"runId": result.get("runId")} if result.get("runId") else {}),
+        }
 
     deploy = payload.deploy
     funnels_repo = FunnelsRepository(session)
