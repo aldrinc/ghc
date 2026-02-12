@@ -79,6 +79,23 @@ def _set_or_validate_port_env(
         )
 
 
+def _validate_instance_server_name_conflicts(*, instance_name: str, app_models: list[ApplicationSpec]) -> None:
+    seen_hostnames: dict[str, str] = {}
+    for app in app_models:
+        for raw_hostname in app.service_config.server_names:
+            hostname = (raw_hostname or "").strip().lower()
+            if not hostname:
+                continue
+
+            owner = seen_hostnames.get(hostname)
+            if owner and owner != app.name:
+                raise ValueError(
+                    f"Server name conflict on instance '{instance_name}': hostname '{hostname}' is configured for "
+                    f"both '{owner}' and '{app.name}'. Use unique domains per workload."
+                )
+            seen_hostnames[hostname] = app.name
+
+
 def _assign_and_validate_instance_ports(*, instance_name: str, app_models: list[ApplicationSpec]) -> None:
     used_ports: dict[int, str] = dict(_RESERVED_PORT_OWNERS)
 
@@ -207,6 +224,7 @@ def apply_plan(
             app if isinstance(app, ApplicationSpec) else ApplicationSpec.model_validate(app)
             for app in inst.workloads
         ]
+        _validate_instance_server_name_conflicts(instance_name=inst.name, app_models=app_models)
         _assign_and_validate_instance_ports(instance_name=inst.name, app_models=app_models)
         inst.workloads = app_models
 

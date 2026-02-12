@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from cloudhand.core.apply import _assign_and_validate_instance_ports, _compute_stale_workloads
+from cloudhand.core.apply import (
+    _assign_and_validate_instance_ports,
+    _compute_stale_workloads,
+    _validate_instance_server_name_conflicts,
+)
 from cloudhand.models import ApplicationSpec, DesiredStateSpec
 
 
@@ -197,6 +201,36 @@ def test_assign_ports_for_funnel_artifact_is_deterministic_and_no_port_env():
     assert 20000 <= b_port <= 29999
     assert "PORT" not in app_a.service_config.environment
     assert "PORT" not in app_b.service_config.environment
+
+
+def test_validate_instance_server_name_conflicts_allows_unique_domains_and_domainless():
+    app_domain_a = _artifact_app(name="artifact-a")
+    app_domain_a.service_config.server_names = ["funnel-a.example.com"]
+
+    app_domain_b = _artifact_app(name="artifact-b")
+    app_domain_b.service_config.server_names = ["funnel-b.example.com"]
+
+    app_domainless = _artifact_app(name="artifact-c")
+    app_domainless.service_config.server_names = []
+
+    _validate_instance_server_name_conflicts(
+        instance_name="mos-ghc-1",
+        app_models=[app_domain_a, app_domain_b, app_domainless],
+    )
+
+
+def test_validate_instance_server_name_conflicts_rejects_duplicate_domain():
+    app_a = _artifact_app(name="artifact-a")
+    app_a.service_config.server_names = ["landing.example.com"]
+
+    app_b = _artifact_app(name="artifact-b")
+    app_b.service_config.server_names = ["landing.example.com"]
+
+    with pytest.raises(ValueError, match="Server name conflict"):
+        _validate_instance_server_name_conflicts(
+            instance_name="mos-ghc-1",
+            app_models=[app_a, app_b],
+        )
 
 
 def test_compute_stale_workloads_identifies_removed_workloads_and_instances():
