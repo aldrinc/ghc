@@ -41,11 +41,17 @@ export function isStandaloneRootModeForPublicId(publicId: string | null | undefi
 }
 
 export function buildPublicFunnelPath(
-  *,
-  publicId: string,
-  slug: string | null | undefined,
-  entrySlug: string | null | undefined,
-  rootMode: boolean,
+  {
+    publicId,
+    slug,
+    entrySlug,
+    rootMode,
+  }: {
+    publicId: string;
+    slug?: string | null;
+    entrySlug?: string | null;
+    rootMode: boolean;
+  },
 ): string {
   const normalizedPublicId = (publicId || "").trim();
   if (!normalizedPublicId) {
@@ -66,4 +72,3 @@ export function buildPublicFunnelPath(
   }
   return `/f/${encodeURIComponent(normalizedPublicId)}/${encodeURIComponent(normalizedSlug)}`;
 }
-
