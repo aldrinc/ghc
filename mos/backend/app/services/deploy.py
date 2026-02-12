@@ -541,6 +541,108 @@ def _normalize_access_urls(urls: list[str] | None) -> list[str]:
     return out
 
 
+def _latest_spec_path() -> Path:
+    return _cloudhand_dir() / "spec.json"
+
+
+def _workload_port_from_latest_spec(*, workload_name: str, instance_name: str | None) -> int:
+    spec_path = _latest_spec_path()
+    if not spec_path.exists():
+        raise DeployError(
+            "Cloudhand spec.json was not found after apply; cannot determine deployed workload port."
+        )
+
+    try:
+        payload = json.loads(spec_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise DeployError(f"Failed to read Cloudhand spec.json: {exc}") from exc
+
+    new_spec = payload.get("new_spec")
+    if not isinstance(new_spec, dict):
+        raise DeployError("Cloudhand spec.json is invalid (missing new_spec object).")
+
+    instances = new_spec.get("instances")
+    if not isinstance(instances, list):
+        raise DeployError("Cloudhand spec.json is invalid (instances must be a list).")
+
+    target_instance_name = (instance_name or "").strip()
+    candidate_instances: list[dict[str, Any]] = []
+    if target_instance_name:
+        for inst in instances:
+            if isinstance(inst, dict) and str(inst.get("name") or "").strip() == target_instance_name:
+                candidate_instances.append(inst)
+        if not candidate_instances:
+            raise DeployError(
+                f"Instance '{target_instance_name}' was not found in Cloudhand spec.json."
+            )
+    else:
+        candidate_instances = [inst for inst in instances if isinstance(inst, dict)]
+
+    matches: list[int] = []
+    for inst in candidate_instances:
+        workloads = inst.get("workloads")
+        if not isinstance(workloads, list):
+            continue
+        for workload in workloads:
+            if not isinstance(workload, dict):
+                continue
+            if str(workload.get("name") or "").strip() != workload_name:
+                continue
+            service_cfg = workload.get("service_config")
+            if not isinstance(service_cfg, dict):
+                raise DeployError(
+                    f"Workload '{workload_name}' has no valid service_config in Cloudhand spec.json."
+                )
+            ports = service_cfg.get("ports")
+            if not isinstance(ports, list) or not ports:
+                raise DeployError(
+                    f"Workload '{workload_name}' has no assigned ports in Cloudhand spec.json."
+                )
+            try:
+                first_port = int(ports[0])
+            except Exception as exc:
+                raise DeployError(
+                    f"Workload '{workload_name}' has an invalid port in Cloudhand spec.json."
+                ) from exc
+            matches.append(first_port)
+
+    if not matches:
+        raise DeployError(
+            f"Workload '{workload_name}' was not found in Cloudhand spec.json."
+        )
+    if len(matches) > 1 and not target_instance_name:
+        raise DeployError(
+            f"Workload '{workload_name}' appears in multiple instances; provide instance_name."
+        )
+    return matches[0]
+
+
+def _infer_external_access_urls(
+    *,
+    server_ips: dict[str, Any],
+    workload_name: str,
+    instance_name: str | None,
+) -> list[str]:
+    if not isinstance(server_ips, dict) or not server_ips:
+        raise DeployError("Terraform outputs did not include server IPs for external access URL generation.")
+
+    port = _workload_port_from_latest_spec(workload_name=workload_name, instance_name=instance_name)
+    urls: list[str] = []
+    for value in server_ips.values():
+        ip = str(value or "").strip()
+        if not ip:
+            continue
+        if port == 80:
+            urls.append(f"http://{ip}/")
+        else:
+            urls.append(f"http://{ip}:{port}/")
+
+    resolved = _normalize_access_urls(urls)
+    if not resolved:
+        raise DeployError("External access URL generation failed because no valid server IPs were available.")
+    return resolved
+
+
 def _summarize_apply_result(result: dict[str, Any]) -> tuple[int, dict[str, Any]]:
     rc = int(result.get("returncode", 1))
     summary: dict[str, Any] = {
@@ -670,6 +772,17 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     job["finished_at"] = _utc_now_iso()
                     _write_json_atomic(path, job)
                     return
+                if not access_urls:
+                    workload_name = str(workload_patch.get("name") or "").strip()
+                    if not workload_name:
+                        raise DeployError("Publish deploy workload patch is missing workload name.")
+                    access_urls = _infer_external_access_urls(
+                        server_ips=summary.get("server_ips") or {},
+                        workload_name=workload_name,
+                        instance_name=deploy_request.get("instance_name"),
+                    )
+                summary["access_urls"] = access_urls
+                deploy_response["apply"] = summary
 
             result_payload["deploy"] = deploy_response
 

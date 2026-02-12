@@ -99,6 +99,7 @@ export function FunnelDetailPage() {
   };
 
   const publicBase = funnel?.public_id ? `/f/${funnel.public_id}` : null;
+  const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
 
   const handlePublish = async (serverNames: string[]) => {
     if (!funnelId || !funnel) return;
@@ -213,6 +214,13 @@ export function FunnelDetailPage() {
               <Button variant="secondary" size="sm" asChild>
                 <a href={deployJob.accessUrl} target="_blank" rel="noreferrer">
                   Open Deployed Page
+                </a>
+              </Button>
+            ) : null}
+            {deployJob?.status === "succeeded" && mosPreviewUrl ? (
+              <Button variant="secondary" size="sm" asChild>
+                <a href={mosPreviewUrl} target="_blank" rel="noreferrer">
+                  Open In MOS
                 </a>
               </Button>
             ) : null}

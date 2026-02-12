@@ -90,6 +90,7 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
   - In `funnel_publication` mode, `repo_url` is forbidden and per-app nginx mode is required.
   - `service_config.server_names` can be empty; deploy then uses HTTP only (no certificate provisioning) and binds nginx on that workload's deterministic `service_config.ports[0]`.
   - In no-domain HTTP mode, requests on `http://<server-ip>:<port>/<slug>` are redirected to same-host funnel routes (`/f/{public_id}/<slug>`) rather than MOS app paths.
+  - Publish job status includes both MOS-internal rendering and external access URL(s); when server names are omitted, external URLs are derived from Terraform server IP outputs plus the assigned workload port.
 - Funnel publish can now patch/apply deploy plans from inside MOS in a single call:
   - `POST /funnels/{funnel_id}/publish` accepts optional `deploy` payload
   - workload `source_ref.public_id` is taken from MOS DB (`funnels.public_id`) at publish time
