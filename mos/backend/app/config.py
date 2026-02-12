@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     DEPLOY_WORKSPACE_ID: str = "default"
     DEPLOY_PUBLIC_BASE_URL: str | None = None
     DEPLOY_PUBLIC_API_BASE_URL: str | None = None
+    DEPLOY_BOOTSTRAP_PROVIDER: str | None = None
+    DEPLOY_BOOTSTRAP_REGION: str | None = None
+    DEPLOY_BOOTSTRAP_NETWORK_NAME: str | None = None
+    DEPLOY_BOOTSTRAP_NETWORK_CIDR: str | None = None
+    DEPLOY_BOOTSTRAP_INSTANCE_NAME: str | None = None
+    DEPLOY_BOOTSTRAP_INSTANCE_SIZE: str | None = None
+    DEPLOY_BOOTSTRAP_INSTANCE_REGION: str | None = None
+    DEPLOY_BOOTSTRAP_INSTANCE_LABELS: dict[str, str] | None = None
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None

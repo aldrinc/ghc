@@ -352,6 +352,109 @@ def patch_workload_in_plan(
     }
 
 
+def _bootstrap_deploy_plan_payload(*, workload_patch: dict[str, Any], instance_name: str | None) -> dict[str, Any]:
+    from cloudhand.models import ApplicationSpec
+
+    requested_instance_name = (instance_name or "").strip()
+    default_instance_name = (settings.DEPLOY_BOOTSTRAP_INSTANCE_NAME or "").strip()
+    resolved_instance_name = requested_instance_name or default_instance_name
+
+    provider = (settings.DEPLOY_BOOTSTRAP_PROVIDER or "").strip()
+    region = (settings.DEPLOY_BOOTSTRAP_REGION or "").strip()
+    network_name = (settings.DEPLOY_BOOTSTRAP_NETWORK_NAME or "").strip()
+    network_cidr = (settings.DEPLOY_BOOTSTRAP_NETWORK_CIDR or "").strip()
+    instance_size = (settings.DEPLOY_BOOTSTRAP_INSTANCE_SIZE or "").strip()
+    instance_region = (settings.DEPLOY_BOOTSTRAP_INSTANCE_REGION or "").strip() or region
+
+    missing: list[str] = []
+    if not resolved_instance_name:
+        missing.append("deploy.instanceName (or DEPLOY_BOOTSTRAP_INSTANCE_NAME)")
+    if not provider:
+        missing.append("DEPLOY_BOOTSTRAP_PROVIDER")
+    if not region:
+        missing.append("DEPLOY_BOOTSTRAP_REGION")
+    if not network_name:
+        missing.append("DEPLOY_BOOTSTRAP_NETWORK_NAME")
+    if not network_cidr:
+        missing.append("DEPLOY_BOOTSTRAP_NETWORK_CIDR")
+    if not instance_size:
+        missing.append("DEPLOY_BOOTSTRAP_INSTANCE_SIZE")
+    if missing:
+        raise DeployError(
+            "No plan found. Auto-bootstrap requires: " + ", ".join(missing) + "."
+        )
+
+    labels_raw = settings.DEPLOY_BOOTSTRAP_INSTANCE_LABELS or {}
+    if not isinstance(labels_raw, dict):
+        raise DeployError("DEPLOY_BOOTSTRAP_INSTANCE_LABELS must be a JSON object when set.")
+    labels = {str(k).strip(): str(v).strip() for k, v in labels_raw.items() if str(k).strip()}
+
+    try:
+        validated_workload = ApplicationSpec.model_validate(workload_patch)
+    except Exception as exc:
+        raise DeployError(f"Workload is invalid for bootstrap plan: {exc}") from exc
+
+    workload_payload = json.loads(validated_workload.model_dump_json())
+    return {
+        "operations": [],
+        "new_spec": {
+            "provider": provider,
+            "region": region,
+            "networks": [
+                {
+                    "name": network_name,
+                    "cidr": network_cidr,
+                }
+            ],
+            "instances": [
+                {
+                    "name": resolved_instance_name,
+                    "size": instance_size,
+                    "network": network_name,
+                    "region": instance_region,
+                    "labels": labels,
+                    "workloads": [workload_payload],
+                    "maintenance": None,
+                }
+            ],
+            "load_balancers": [],
+            "firewalls": [],
+            "dns_records": [],
+            "containers": [],
+        },
+    }
+
+
+def ensure_plan_for_funnel_publish_workload(
+    *,
+    workload_patch: dict[str, Any],
+    plan_path: str | None,
+    instance_name: str | None,
+) -> dict[str, Any]:
+    requested_plan_path = (plan_path or "").strip()
+    if requested_plan_path:
+        candidate = _assert_under_cloudhand(Path(requested_plan_path))
+        if candidate.exists():
+            return {"plan_path": str(candidate), "bootstrapped": False}
+        bootstrap_payload = _bootstrap_deploy_plan_payload(
+            workload_patch=workload_patch,
+            instance_name=instance_name,
+        )
+        saved = save_plan(content=json.dumps(bootstrap_payload, indent=2), path=str(candidate))
+        return {"plan_path": saved["path"], "bootstrapped": True}
+
+    latest = _find_latest_plan()
+    if latest and latest.exists():
+        return {"plan_path": str(latest), "bootstrapped": False}
+
+    bootstrap_payload = _bootstrap_deploy_plan_payload(
+        workload_patch=workload_patch,
+        instance_name=instance_name,
+    )
+    saved = save_plan(content=json.dumps(bootstrap_payload, indent=2))
+    return {"plan_path": saved["path"], "bootstrapped": True}
+
+
 async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
     """
     Apply a plan using the embedded Cloudhand engine (Terraform + SSH deploy).
@@ -564,14 +667,25 @@ async def _run_funnel_publish_job(job_id: str) -> None:
             if not isinstance(workload_patch, dict):
                 raise DeployError("Publish deploy request is missing workload_patch.")
 
-            patch_result = patch_workload_in_plan(
+            plan_resolution = ensure_plan_for_funnel_publish_workload(
                 workload_patch=workload_patch,
                 plan_path=deploy_request.get("plan_path"),
+                instance_name=deploy_request.get("instance_name"),
+            )
+
+            patch_result = patch_workload_in_plan(
+                workload_patch=workload_patch,
+                plan_path=plan_resolution["plan_path"],
                 instance_name=deploy_request.get("instance_name"),
                 create_if_missing=bool(deploy_request.get("create_if_missing", True)),
                 in_place=bool(deploy_request.get("in_place", False)),
             )
             deploy_response: dict[str, Any] = {"patch": patch_result}
+            if plan_resolution.get("bootstrapped"):
+                deploy_response["bootstrap"] = {
+                    "created": True,
+                    "plan_path": plan_resolution["plan_path"],
+                }
             access_urls = _normalize_access_urls(deploy_request.get("access_urls"))
 
             apply_plan_enabled = bool(deploy_request.get("apply_plan", True))

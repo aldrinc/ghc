@@ -105,6 +105,21 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
 - `DEPLOY_PUBLIC_BASE_URL` (for example `https://moshq.app`)
 - `DEPLOY_PUBLIC_API_BASE_URL` (for example `https://moshq.app/api`)
 
+### First-Run Plan Bootstrap (No Existing Plan)
+
+When funnel publish is requested with deploy settings and no plan file exists, MOS can auto-create a minimal plan containing the funnel publication workload.
+
+- Required:
+  - `DEPLOY_BOOTSTRAP_PROVIDER`
+  - `DEPLOY_BOOTSTRAP_REGION`
+  - `DEPLOY_BOOTSTRAP_NETWORK_NAME`
+  - `DEPLOY_BOOTSTRAP_NETWORK_CIDR`
+  - `DEPLOY_BOOTSTRAP_INSTANCE_SIZE`
+  - `deploy.instanceName` in the publish payload, or `DEPLOY_BOOTSTRAP_INSTANCE_NAME`
+- Optional:
+  - `DEPLOY_BOOTSTRAP_INSTANCE_REGION` (defaults to `DEPLOY_BOOTSTRAP_REGION`)
+  - `DEPLOY_BOOTSTRAP_INSTANCE_LABELS` (JSON object)
+
 ### Known gaps
 
 - RBAC for deploy is not yet scoped to admin/operator roles; any authenticated org member can call deploy routes.
