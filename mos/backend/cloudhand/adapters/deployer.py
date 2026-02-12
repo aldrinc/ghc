@@ -259,13 +259,23 @@ WantedBy=multi-user.target
 
         server_names = self._normalize_server_names(app.service_config.server_names)
         server_name_line = self._server_name_directive(server_names)
+        if server_names:
+            listen_port = 80
+        else:
+            ports = list(app.service_config.ports or [])
+            if not ports:
+                raise ValueError(
+                    "service_config.ports must include one port for source_type='funnel_publication' "
+                    "when server_names is empty."
+                )
+            listen_port = int(ports[0])
 
         public_id = source.public_id
         upstream_base_url = source.upstream_base_url.rstrip("/")
         upstream_api_base_url = source.upstream_api_base_url.rstrip("/")
 
         conf = f"""server {{
-    listen 80;
+    listen {listen_port};
     server_name {server_name_line};
     client_max_body_size 25m;
     proxy_connect_timeout {_NGINX_PROXY_CONNECT_TIMEOUT};
@@ -273,12 +283,33 @@ WantedBy=multi-user.target
     proxy_read_timeout {_NGINX_PROXY_READ_TIMEOUT};
 
     location = / {{
+        return 302 /f/{public_id}$is_args$args;
+    }}
+
+    location = /f/{public_id} {{
         proxy_pass {upstream_base_url}/f/{public_id};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Accept-Encoding "";
+        sub_filter_once off;
+        sub_filter_types text/html text/css application/javascript text/javascript application/json;
+        sub_filter '{upstream_api_base_url}' '/api';
+    }}
+
+    location ^~ /f/{public_id}/ {{
+        proxy_pass {upstream_base_url};
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Accept-Encoding "";
+        sub_filter_once off;
+        sub_filter_types text/html text/css application/javascript text/javascript application/json;
+        sub_filter '{upstream_api_base_url}' '/api';
     }}
 
     location ^~ /api/ {{
@@ -313,16 +344,7 @@ WantedBy=multi-user.target
     }}
 
     location / {{
-        proxy_pass {upstream_base_url}/f/{public_id}$request_uri;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_set_header Accept-Encoding "";
-        sub_filter_once off;
-        sub_filter_types text/html text/css application/javascript text/javascript application/json;
-        sub_filter '{upstream_api_base_url}' '/api';
+        return 302 /f/{public_id}$request_uri;
     }}
 }}"""
         self.upload_file(conf, f"/etc/nginx/sites-available/{app.name}")

@@ -119,6 +119,13 @@ def _resolve_deploy_server_names(
     return []
 
 
+def _deploy_access_urls(*, server_names: list[str], https_enabled: bool) -> list[str]:
+    if not server_names:
+        return []
+    scheme = "https" if https_enabled else "http"
+    return [f"{scheme}://{hostname}/" for hostname in server_names]
+
+
 def _validate_design_system(
     *,
     session: Session,
@@ -798,19 +805,18 @@ async def publish_funnel_route(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    try:
-        publication = publish_funnel(
-            session=session,
-            org_id=auth.org_id,
-            user_id=auth.user_id,
-            funnel_id=funnel_id,
-        )
-    except ValueError as exc:
-        message = str(exc)
-        code = status.HTTP_404_NOT_FOUND if "not found" in message.lower() else status.HTTP_409_CONFLICT
-        raise HTTPException(status_code=code, detail=message) from exc
-
     if not payload or not payload.deploy:
+        try:
+            publication = publish_funnel(
+                session=session,
+                org_id=auth.org_id,
+                user_id=auth.user_id,
+                funnel_id=funnel_id,
+            )
+        except ValueError as exc:
+            message = str(exc)
+            code = status.HTTP_404_NOT_FOUND if "not found" in message.lower() else status.HTTP_409_CONFLICT
+            raise HTTPException(status_code=code, detail=message) from exc
         return {"publicationId": str(publication.id)}
 
     deploy = payload.deploy
@@ -858,38 +864,83 @@ async def publish_funnel_route(
             https=deploy.https,
             destination_path=deploy.destinationPath,
         )
-        patch_result = deploy_service.patch_workload_in_plan(
-            workload_patch=workload_patch,
-            plan_path=deploy.planPath,
-            instance_name=deploy.instanceName,
-            create_if_missing=deploy.createIfMissing,
-            in_place=deploy.inPlace,
+        https_enabled = bool(deploy.https and server_names)
+        access_urls = _deploy_access_urls(server_names=server_names, https_enabled=https_enabled)
+        job = deploy_service.start_funnel_publish_job(
+            org_id=auth.org_id,
+            user_id=auth.user_id,
+            funnel_id=funnel_id,
+            deploy_request={
+                "workload_patch": workload_patch,
+                "plan_path": deploy.planPath,
+                "instance_name": deploy.instanceName,
+                "create_if_missing": deploy.createIfMissing,
+                "in_place": deploy.inPlace,
+                "apply_plan": deploy.applyPlan,
+                "access_urls": access_urls,
+            },
+            access_urls=access_urls,
         )
     except deploy_service.DeployError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Funnel published but deploy patch failed: {exc}",
+            detail=f"Publish job start failed: {exc}",
         ) from exc
 
-    deploy_response: dict[str, object] = {"patch": patch_result}
-    if deploy.applyPlan:
-        try:
-            apply_result = await deploy_service.apply_plan(plan_path=patch_result["updated_plan_path"])
-        except deploy_service.DeployError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Funnel published but deploy apply failed: {exc}",
-            ) from exc
+    return {
+        "publicationId": None,
+        "deploy": {
+            "apply": {
+                "mode": "async",
+                "jobId": job["id"],
+                "status": job["status"],
+                "statusPath": f"/funnels/{funnel_id}/publish-jobs/{job['id']}",
+                "accessUrls": job.get("access_urls", []),
+            }
+        },
+    }
 
-        return_code = int(apply_result.get("returncode", 1))
-        if return_code != 0:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Funnel published but deploy apply failed with return code {return_code}.",
-            )
-        deploy_response["apply"] = apply_result
 
-    return {"publicationId": str(publication.id), "deploy": deploy_response}
+@router.get("/{funnel_id}/publish-jobs/{job_id}")
+def get_publish_job_status(
+    funnel_id: str,
+    job_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    funnels_repo = FunnelsRepository(session)
+    funnel = funnels_repo.get(org_id=auth.org_id, funnel_id=funnel_id)
+    if not funnel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+
+    try:
+        job = deploy_service.get_funnel_publish_job(
+            job_id=job_id,
+            org_id=auth.org_id,
+            funnel_id=funnel_id,
+        )
+    except deploy_service.DeployError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return job
+
+
+@router.get("/{funnel_id}/deploy-jobs/{job_id}")
+def get_deploy_job_status(
+    funnel_id: str,
+    job_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    funnels_repo = FunnelsRepository(session)
+    funnel = funnels_repo.get(org_id=auth.org_id, funnel_id=funnel_id)
+    if not funnel:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+
+    try:
+        job = deploy_service.get_apply_plan_job(job_id=job_id)
+    except deploy_service.DeployError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    return job
 
 
 @router.post("/{funnel_id}/pages/{page_id}/ai/attachments", status_code=status.HTTP_201_CREATED)

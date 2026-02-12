@@ -5,15 +5,19 @@ import json
 import os
 import shutil
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+from uuid import uuid4
 
 from app.config import settings
 
 
 class DeployError(RuntimeError):
     pass
+
+
+_DEPLOY_JOB_LOG_TAIL_CHARS = 12000
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -70,6 +74,69 @@ def _assert_under_cloudhand(path: Path) -> Path:
     if not resolved.is_relative_to(ch_dir):
         raise DeployError("plan_path must be inside the deploy plan directory (DEPLOY_ROOT_DIR).")
     return resolved
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _jobs_dir() -> Path:
+    return _cloudhand_dir() / "jobs"
+
+
+def _job_path(job_id: str) -> Path:
+    safe = (job_id or "").strip()
+    if not safe:
+        raise DeployError("job_id is required.")
+    if "/" in safe or "\\" in safe:
+        raise DeployError("job_id is invalid.")
+    return _jobs_dir() / f"{safe}.json"
+
+
+def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def _read_job(job_id: str) -> dict[str, Any]:
+    path = _job_path(job_id)
+    if not path.exists():
+        raise DeployError(f"Deploy job '{job_id}' not found.")
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise DeployError(f"Failed to read deploy job '{job_id}': {exc}") from exc
+    if not isinstance(raw, dict):
+        raise DeployError(f"Deploy job '{job_id}' is invalid.")
+    return raw
+
+
+def _publish_jobs_dir() -> Path:
+    return _cloudhand_dir() / "publish-jobs"
+
+
+def _publish_job_path(job_id: str) -> Path:
+    safe = (job_id or "").strip()
+    if not safe:
+        raise DeployError("job_id is required.")
+    if "/" in safe or "\\" in safe:
+        raise DeployError("job_id is invalid.")
+    return _publish_jobs_dir() / f"{safe}.json"
+
+
+def _read_publish_job(job_id: str) -> dict[str, Any]:
+    path = _publish_job_path(job_id)
+    if not path.exists():
+        raise DeployError(f"Publish job '{job_id}' not found.")
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise DeployError(f"Failed to read publish job '{job_id}': {exc}") from exc
+    if not isinstance(raw, dict):
+        raise DeployError(f"Publish job '{job_id}' is invalid.")
+    return raw
 
 
 def get_latest_plan() -> dict[str, str]:
@@ -385,3 +452,262 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
         "live_url": live_url,
         "logs": "".join(logs),
     }
+
+
+def _normalize_access_urls(urls: list[str] | None) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in urls or []:
+        if not isinstance(raw, str):
+            continue
+        url = raw.strip()
+        if not url:
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        out.append(url)
+    return out
+
+
+def _summarize_apply_result(result: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    rc = int(result.get("returncode", 1))
+    summary: dict[str, Any] = {
+        "returncode": rc,
+        "plan_path": result.get("plan_path"),
+        "server_ips": result.get("server_ips"),
+        "live_url": result.get("live_url"),
+    }
+    logs = result.get("logs")
+    if isinstance(logs, str) and logs:
+        summary["logs_tail"] = logs[-_DEPLOY_JOB_LOG_TAIL_CHARS:]
+    return rc, summary
+
+
+async def _run_apply_plan_job(job_id: str) -> None:
+    job = _read_job(job_id)
+    path = _job_path(job_id)
+    plan_path = str(job.get("plan_path") or "").strip()
+    if not plan_path:
+        job["status"] = "failed"
+        job["error"] = "Job is missing plan_path."
+        job["finished_at"] = _utc_now_iso()
+        _write_json_atomic(path, job)
+        return
+
+    job["status"] = "running"
+    job["started_at"] = _utc_now_iso()
+    _write_json_atomic(path, job)
+
+    try:
+        result = await apply_plan(plan_path=plan_path)
+        rc, summary = _summarize_apply_result(result)
+
+        access_urls = _normalize_access_urls(job.get("access_urls"))
+        job["result"] = summary
+        job["access_urls"] = access_urls
+        if rc == 0:
+            job["status"] = "succeeded"
+            job["error"] = None
+        else:
+            job["status"] = "failed"
+            job["error"] = f"Apply failed with return code {rc}."
+    except DeployError as exc:
+        job["status"] = "failed"
+        job["error"] = str(exc)
+    except Exception as exc:  # pragma: no cover - defensive
+        job["status"] = "failed"
+        job["error"] = f"Unexpected deploy failure: {exc}"
+
+    job["finished_at"] = _utc_now_iso()
+    _write_json_atomic(path, job)
+
+
+async def _run_funnel_publish_job(job_id: str) -> None:
+    from app.db.base import SessionLocal
+    from app.services.funnels import publish_funnel
+
+    job = _read_publish_job(job_id)
+    path = _publish_job_path(job_id)
+    job["status"] = "running"
+    job["started_at"] = _utc_now_iso()
+    _write_json_atomic(path, job)
+
+    org_id = str(job.get("org_id") or "").strip()
+    user_id = str(job.get("user_id") or "").strip()
+    funnel_id = str(job.get("funnel_id") or "").strip()
+    deploy_request = job.get("deploy_request")
+    result_payload: dict[str, Any] = {}
+    access_urls = _normalize_access_urls(job.get("access_urls"))
+
+    if not org_id or not user_id or not funnel_id:
+        job["status"] = "failed"
+        job["error"] = "Publish job is missing org_id, user_id, or funnel_id."
+        job["finished_at"] = _utc_now_iso()
+        _write_json_atomic(path, job)
+        return
+
+    try:
+        session = SessionLocal()
+        try:
+            publication = publish_funnel(session=session, org_id=org_id, user_id=user_id, funnel_id=funnel_id)
+        finally:
+            session.close()
+
+        result_payload["publicationId"] = str(publication.id)
+
+        if deploy_request is not None:
+            if not isinstance(deploy_request, dict):
+                raise DeployError("Invalid publish deploy request payload.")
+
+            workload_patch = deploy_request.get("workload_patch")
+            if not isinstance(workload_patch, dict):
+                raise DeployError("Publish deploy request is missing workload_patch.")
+
+            patch_result = patch_workload_in_plan(
+                workload_patch=workload_patch,
+                plan_path=deploy_request.get("plan_path"),
+                instance_name=deploy_request.get("instance_name"),
+                create_if_missing=bool(deploy_request.get("create_if_missing", True)),
+                in_place=bool(deploy_request.get("in_place", False)),
+            )
+            deploy_response: dict[str, Any] = {"patch": patch_result}
+            access_urls = _normalize_access_urls(deploy_request.get("access_urls"))
+
+            apply_plan_enabled = bool(deploy_request.get("apply_plan", True))
+            if apply_plan_enabled:
+                apply_result = await apply_plan(plan_path=patch_result["updated_plan_path"])
+                return_code, summary = _summarize_apply_result(apply_result)
+                deploy_response["apply"] = summary
+                if return_code != 0:
+                    result_payload["deploy"] = deploy_response
+                    job["result"] = result_payload
+                    job["access_urls"] = access_urls
+                    job["status"] = "failed"
+                    job["error"] = f"Funnel published but deploy apply failed with return code {return_code}."
+                    job["finished_at"] = _utc_now_iso()
+                    _write_json_atomic(path, job)
+                    return
+
+            result_payload["deploy"] = deploy_response
+
+        job["result"] = result_payload
+        job["access_urls"] = access_urls
+        job["status"] = "succeeded"
+        job["error"] = None
+    except ValueError as exc:
+        job["status"] = "failed"
+        job["error"] = str(exc)
+        if result_payload:
+            job["result"] = result_payload
+        job["access_urls"] = access_urls
+    except DeployError as exc:
+        job["status"] = "failed"
+        job["error"] = str(exc)
+        if result_payload:
+            job["result"] = result_payload
+        job["access_urls"] = access_urls
+    except Exception as exc:  # pragma: no cover - defensive
+        job["status"] = "failed"
+        job["error"] = f"Unexpected publish/deploy failure: {exc}"
+        if result_payload:
+            job["result"] = result_payload
+        job["access_urls"] = access_urls
+
+    job["finished_at"] = _utc_now_iso()
+    _write_json_atomic(path, job)
+
+
+def start_apply_plan_job(
+    *,
+    plan_path: str | None = None,
+    access_urls: list[str] | None = None,
+) -> dict[str, Any]:
+    if plan_path:
+        plan_file = _assert_under_cloudhand(Path(plan_path))
+    else:
+        plan_file = _find_latest_plan()
+    if not plan_file or not plan_file.exists():
+        raise DeployError("No plan found.")
+
+    job_id = str(uuid4())
+    job = {
+        "id": job_id,
+        "status": "queued",
+        "created_at": _utc_now_iso(),
+        "started_at": None,
+        "finished_at": None,
+        "plan_path": str(plan_file),
+        "access_urls": _normalize_access_urls(access_urls),
+        "result": None,
+        "error": None,
+    }
+    _write_json_atomic(_job_path(job_id), job)
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError as exc:
+        raise DeployError("No running event loop available to start async deploy job.") from exc
+
+    loop.create_task(_run_apply_plan_job(job_id))
+    return job
+
+
+def get_apply_plan_job(*, job_id: str) -> dict[str, Any]:
+    return _read_job(job_id)
+
+
+def start_funnel_publish_job(
+    *,
+    org_id: str,
+    user_id: str,
+    funnel_id: str,
+    deploy_request: dict[str, Any] | None,
+    access_urls: list[str] | None = None,
+) -> dict[str, Any]:
+    safe_org_id = (org_id or "").strip()
+    safe_user_id = (user_id or "").strip()
+    safe_funnel_id = (funnel_id or "").strip()
+    if not safe_org_id:
+        raise DeployError("org_id is required.")
+    if not safe_user_id:
+        raise DeployError("user_id is required.")
+    if not safe_funnel_id:
+        raise DeployError("funnel_id is required.")
+
+    if deploy_request is not None and not isinstance(deploy_request, dict):
+        raise DeployError("deploy_request must be an object when provided.")
+
+    job_id = str(uuid4())
+    job = {
+        "id": job_id,
+        "status": "queued",
+        "created_at": _utc_now_iso(),
+        "started_at": None,
+        "finished_at": None,
+        "org_id": safe_org_id,
+        "user_id": safe_user_id,
+        "funnel_id": safe_funnel_id,
+        "deploy_request": deploy_request,
+        "access_urls": _normalize_access_urls(access_urls),
+        "result": None,
+        "error": None,
+    }
+    _write_json_atomic(_publish_job_path(job_id), job)
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError as exc:
+        raise DeployError("No running event loop available to start async publish job.") from exc
+
+    loop.create_task(_run_funnel_publish_job(job_id))
+    return job
+
+
+def get_funnel_publish_job(*, job_id: str, org_id: str, funnel_id: str) -> dict[str, Any]:
+    job = _read_publish_job(job_id)
+    if str(job.get("org_id") or "") != (org_id or "").strip():
+        raise DeployError(f"Publish job '{job_id}' not found.")
+    if str(job.get("funnel_id") or "") != (funnel_id or "").strip():
+        raise DeployError(f"Publish job '{job_id}' not found.")
+    return job

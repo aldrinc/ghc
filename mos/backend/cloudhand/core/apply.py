@@ -84,8 +84,6 @@ def _assign_and_validate_instance_ports(*, instance_name: str, app_models: list[
 
     # First pass: validate explicit ports and reserve them.
     for app in app_models:
-        if app.source_type == ApplicationSourceType.FUNNEL_PUBLICATION:
-            continue
         ports = list(app.service_config.ports)
         if not ports:
             continue
@@ -110,8 +108,6 @@ def _assign_and_validate_instance_ports(*, instance_name: str, app_models: list[
 
     # Second pass: assign deterministic ports for workloads that omitted ports.
     for app in app_models:
-        if app.source_type == ApplicationSourceType.FUNNEL_PUBLICATION:
-            continue
         if app.service_config.ports:
             continue
 
@@ -143,7 +139,8 @@ def _assign_and_validate_instance_ports(*, instance_name: str, app_models: list[
         )
         app.service_config.ports = [assigned_port]
         used_ports[assigned_port] = app.name
-        _set_or_validate_port_env(app=app, instance_name=instance_name, assigned_port=assigned_port)
+        if app.source_type != ApplicationSourceType.FUNNEL_PUBLICATION:
+            _set_or_validate_port_env(app=app, instance_name=instance_name, assigned_port=assigned_port)
         print(f"  -> Assigned port {assigned_port} to {app.name} on {instance_name}.")
 
 

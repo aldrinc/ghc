@@ -39,11 +39,20 @@ type PublishFunnelPayload = {
   deploy?: PublishFunnelDeployPayload;
 };
 
+type PublishFunnelApplyResponse = {
+  mode?: string;
+  jobId?: string;
+  status?: string;
+  statusPath?: string;
+  accessUrls?: string[];
+  [key: string]: unknown;
+};
+
 type PublishFunnelResponse = {
-  publicationId: string;
+  publicationId?: string | null;
   deploy?: {
-    patch: Record<string, unknown>;
-    apply?: Record<string, unknown>;
+    patch?: Record<string, unknown>;
+    apply?: PublishFunnelApplyResponse;
   };
 };
 
@@ -177,7 +186,7 @@ export function usePublishFunnel() {
     mutationFn: ({ funnelId, payload }: { funnelId: string; payload?: PublishFunnelPayload }) =>
       post<PublishFunnelResponse>(`/funnels/${funnelId}/publish`, payload),
     onSuccess: (data, vars) => {
-      if (data.deploy) {
+      if (data.deploy?.apply?.mode === "async") {
         toast.success("Funnel published and deploy started");
       } else {
         toast.success("Funnel published");

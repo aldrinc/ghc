@@ -222,39 +222,29 @@ def test_publish_with_deploy_builds_funnel_publication_workload_from_db(api_clie
 
     captured: dict[str, object] = {}
 
-    def fake_patch_workload_in_plan(
+    def fake_start_funnel_publish_job(
         *,
-        workload_patch,
-        plan_path=None,
-        instance_name=None,
-        create_if_missing=False,
-        in_place=False,
+        org_id=None,
+        user_id=None,
+        funnel_id=None,
+        deploy_request=None,
+        access_urls=None,
     ):
-        captured["workload_patch"] = workload_patch
-        captured["plan_path"] = plan_path
-        captured["instance_name"] = instance_name
-        captured["create_if_missing"] = create_if_missing
-        captured["in_place"] = in_place
+        captured["org_id"] = org_id
+        captured["user_id"] = user_id
+        captured["funnel_id"] = funnel_id
+        captured["deploy_request"] = deploy_request
+        captured["access_urls"] = access_urls
         return {
-            "status": "ok",
-            "base_plan_path": "/tmp/plan-base.json",
-            "updated_plan_path": "/tmp/plan-updated.json",
-            "workload_name": workload_patch["name"],
-            "updated_count": 1,
+            "id": "publish-job-123",
+            "status": "queued",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "access_urls": access_urls or [],
+            "result": None,
+            "error": None,
         }
 
-    async def fake_apply_plan(*, plan_path=None):
-        captured["apply_plan_path"] = plan_path
-        return {
-            "returncode": 0,
-            "plan_path": plan_path,
-            "server_ips": {},
-            "live_url": None,
-            "logs": "",
-        }
-
-    monkeypatch.setattr(deploy_service, "patch_workload_in_plan", fake_patch_workload_in_plan)
-    monkeypatch.setattr(deploy_service, "apply_plan", fake_apply_plan)
+    monkeypatch.setattr(deploy_service, "start_funnel_publish_job", fake_start_funnel_publish_job)
 
     resp = api_client.post(
         f"/funnels/{funnel_id}/publish",
@@ -273,17 +263,25 @@ def test_publish_with_deploy_builds_funnel_publication_workload_from_db(api_clie
     assert resp.status_code == 201
 
     body = resp.json()
-    assert body["publicationId"]
-    assert body["deploy"]["patch"]["updated_plan_path"] == "/tmp/plan-updated.json"
-    assert body["deploy"]["apply"]["returncode"] == 0
+    assert body["publicationId"] is None
+    assert body["deploy"]["apply"]["mode"] == "async"
+    assert body["deploy"]["apply"]["jobId"] == "publish-job-123"
+    assert body["deploy"]["apply"]["statusPath"] == f"/funnels/{funnel_id}/publish-jobs/publish-job-123"
+    assert body["deploy"]["apply"]["accessUrls"] == ["https://landing.example.com/"]
 
-    workload_patch = captured["workload_patch"]
+    deploy_request = captured["deploy_request"]
+    workload_patch = deploy_request["workload_patch"]
     assert workload_patch["source_type"] == "funnel_publication"
     assert workload_patch["source_ref"]["public_id"] == public_id
     assert workload_patch["source_ref"]["upstream_base_url"] == "https://moshq.app"
     assert workload_patch["source_ref"]["upstream_api_base_url"] == f"https://moshq.app/api/public/funnels/{public_id}"
     assert workload_patch["service_config"]["server_names"] == ["landing.example.com"]
-    assert captured["apply_plan_path"] == "/tmp/plan-updated.json"
+    assert deploy_request["plan_path"] is None
+    assert deploy_request["instance_name"] == "mos-ghc-1"
+    assert deploy_request["create_if_missing"] is True
+    assert deploy_request["in_place"] is False
+    assert deploy_request["apply_plan"] is True
+    assert captured["access_urls"] == ["https://landing.example.com/"]
 
 
 def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitted(
@@ -308,24 +306,26 @@ def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitte
 
     captured: dict[str, object] = {}
 
-    def fake_patch_workload_in_plan(
+    def fake_start_funnel_publish_job(
         *,
-        workload_patch,
-        plan_path=None,
-        instance_name=None,
-        create_if_missing=False,
-        in_place=False,
+        org_id=None,
+        user_id=None,
+        funnel_id=None,
+        deploy_request=None,
+        access_urls=None,
     ):
-        captured["workload_patch"] = workload_patch
+        captured["deploy_request"] = deploy_request
+        captured["access_urls"] = access_urls
         return {
-            "status": "ok",
-            "base_plan_path": "/tmp/plan-base.json",
-            "updated_plan_path": "/tmp/plan-updated.json",
-            "workload_name": workload_patch["name"],
-            "updated_count": 1,
+            "id": "publish-job-234",
+            "status": "queued",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "access_urls": access_urls or [],
+            "result": None,
+            "error": None,
         }
 
-    monkeypatch.setattr(deploy_service, "patch_workload_in_plan", fake_patch_workload_in_plan)
+    monkeypatch.setattr(deploy_service, "start_funnel_publish_job", fake_start_funnel_publish_job)
 
     resp = api_client.post(
         f"/funnels/{funnel_id}/publish",
@@ -340,9 +340,12 @@ def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitte
     )
     assert resp.status_code == 201
 
-    workload_patch = captured["workload_patch"]
+    deploy_request = captured["deploy_request"]
+    workload_patch = deploy_request["workload_patch"]
     assert workload_patch["source_ref"]["public_id"] == public_id
     assert workload_patch["service_config"]["server_names"] == ["offers.example.com"]
+    assert deploy_request["apply_plan"] is False
+    assert captured["access_urls"] == ["https://offers.example.com/"]
 
 
 def test_publish_with_deploy_allows_no_server_names(api_client: TestClient, monkeypatch):
@@ -350,24 +353,26 @@ def test_publish_with_deploy_allows_no_server_names(api_client: TestClient, monk
 
     captured: dict[str, object] = {}
 
-    def fake_patch_workload_in_plan(
+    def fake_start_funnel_publish_job(
         *,
-        workload_patch,
-        plan_path=None,
-        instance_name=None,
-        create_if_missing=False,
-        in_place=False,
+        org_id=None,
+        user_id=None,
+        funnel_id=None,
+        deploy_request=None,
+        access_urls=None,
     ):
-        captured["workload_patch"] = workload_patch
+        captured["deploy_request"] = deploy_request
+        captured["access_urls"] = access_urls
         return {
-            "status": "ok",
-            "base_plan_path": "/tmp/plan-base.json",
-            "updated_plan_path": "/tmp/plan-updated.json",
-            "workload_name": workload_patch["name"],
-            "updated_count": 1,
+            "id": "publish-job-456",
+            "status": "queued",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "access_urls": access_urls or [],
+            "result": None,
+            "error": None,
         }
 
-    monkeypatch.setattr(deploy_service, "patch_workload_in_plan", fake_patch_workload_in_plan)
+    monkeypatch.setattr(deploy_service, "start_funnel_publish_job", fake_start_funnel_publish_job)
 
     resp = api_client.post(
         f"/funnels/{funnel_id}/publish",
@@ -376,12 +381,69 @@ def test_publish_with_deploy_allows_no_server_names(api_client: TestClient, monk
                 "workloadName": "landing-page",
                 "upstreamBaseUrl": "https://moshq.app",
                 "upstreamApiBaseUrl": "https://moshq.app/api",
-                "applyPlan": False,
+                "applyPlan": True,
             }
         },
     )
     assert resp.status_code == 201
 
-    workload_patch = captured["workload_patch"]
+    deploy_request = captured["deploy_request"]
+    workload_patch = deploy_request["workload_patch"]
     assert workload_patch["service_config"]["server_names"] == []
     assert workload_patch["service_config"]["https"] is False
+    body = resp.json()
+    assert body["deploy"]["apply"]["jobId"] == "publish-job-456"
+    assert captured["access_urls"] == []
+
+
+def test_get_funnel_publish_job_status(api_client: TestClient, monkeypatch):
+    funnel_id, _ = _create_publish_ready_funnel(api_client, funnel_name="Publish Job Status Funnel")
+
+    def fake_get_funnel_publish_job(*, job_id=None, org_id=None, funnel_id=None):
+        assert job_id == "publish-job-789"
+        return {
+            "id": "publish-job-789",
+            "status": "succeeded",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "started_at": "2026-01-01T00:00:01+00:00",
+            "finished_at": "2026-01-01T00:01:00+00:00",
+            "access_urls": ["https://landing.example.com/"],
+            "result": {"publicationId": "pub-1"},
+            "error": None,
+        }
+
+    monkeypatch.setattr(deploy_service, "get_funnel_publish_job", fake_get_funnel_publish_job)
+
+    resp = api_client.get(f"/funnels/{funnel_id}/publish-jobs/publish-job-789")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == "publish-job-789"
+    assert body["status"] == "succeeded"
+    assert body["access_urls"] == ["https://landing.example.com/"]
+
+
+def test_get_funnel_deploy_job_status(api_client: TestClient, monkeypatch):
+    funnel_id, _ = _create_publish_ready_funnel(api_client, funnel_name="Deploy Job Status Funnel")
+
+    def fake_get_apply_plan_job(*, job_id=None):
+        assert job_id == "job-789"
+        return {
+            "id": "job-789",
+            "status": "succeeded",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "started_at": "2026-01-01T00:00:01+00:00",
+            "finished_at": "2026-01-01T00:01:00+00:00",
+            "plan_path": "/tmp/plan-updated.json",
+            "access_urls": ["https://landing.example.com/"],
+            "result": {"returncode": 0},
+            "error": None,
+        }
+
+    monkeypatch.setattr(deploy_service, "get_apply_plan_job", fake_get_apply_plan_job)
+
+    resp = api_client.get(f"/funnels/{funnel_id}/deploy-jobs/job-789")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == "job-789"
+    assert body["status"] == "succeeded"
+    assert body["access_urls"] == ["https://landing.example.com/"]

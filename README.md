@@ -88,11 +88,14 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
     - `source_ref.upstream_base_url`
     - `source_ref.upstream_api_base_url`
   - In `funnel_publication` mode, `repo_url` is forbidden and per-app nginx mode is required.
-  - `service_config.server_names` can be empty; deploy then uses `server_name _` with HTTP only (no certificate provisioning).
+  - `service_config.server_names` can be empty; deploy then uses HTTP only (no certificate provisioning) and binds nginx on that workload's deterministic `service_config.ports[0]`.
+  - In no-domain HTTP mode, requests on `http://<server-ip>:<port>/<slug>` are redirected to same-host funnel routes (`/f/{public_id}/<slug>`) rather than MOS app paths.
 - Funnel publish can now patch/apply deploy plans from inside MOS in a single call:
   - `POST /funnels/{funnel_id}/publish` accepts optional `deploy` payload
   - workload `source_ref.public_id` is taken from MOS DB (`funnels.public_id`) at publish time
   - if `deploy.serverNames` is omitted, active/verified `funnel_domains.hostname` values are used from DB when present; otherwise the deploy proceeds with no host binding/certs (`server_name _`, HTTP only)
+  - publish+deploy runs asynchronously and returns a publish job (`jobId`, `statusPath`)
+  - publish job status is available at `GET /funnels/{funnel_id}/publish-jobs/{job_id}`
 
 ### Required runtime configuration
 
