@@ -274,7 +274,7 @@ def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client:
     assert workload_patch["source_type"] == "funnel_artifact"
     assert workload_patch["source_ref"]["public_id"] == public_id
     assert workload_patch["source_ref"]["upstream_api_base_root"] == "https://moshq.app/api"
-    assert workload_patch["source_ref"]["runtime_dist_path"] == "/opt/apps/mos-ui/mos/frontend/dist"
+    assert workload_patch["source_ref"]["runtime_dist_path"] == "mos/frontend/dist"
     assert workload_patch["source_ref"]["artifact"]["meta"]["publicId"] == public_id
     assert workload_patch["source_ref"]["artifact"]["pages"] == {}
     assert workload_patch["service_config"]["server_names"] == ["landing.example.com"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import pytest
 
 from cloudhand.adapters.deployer import ServerDeployer
@@ -75,7 +76,7 @@ def _artifact_app(
         "source_ref": {
             "public_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
             "upstream_api_base_root": "https://moshq.app/api",
-            "runtime_dist_path": "/opt/apps/mos-ui/mos/frontend/dist",
+            "runtime_dist_path": "mos/frontend/dist",
             "artifact": {
                 "meta": {
                     "publicId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
@@ -117,6 +118,7 @@ def _artifact_app(
 def _stub_deployer():
     deployer = object.__new__(ServerDeployer)
     deployer.ip = "127.0.0.1"
+    deployer.local_root = Path.cwd()
     uploaded: dict[str, str] = {}
     commands: list[str] = []
 
@@ -129,6 +131,7 @@ def _stub_deployer():
 
     deployer.upload_file = fake_upload
     deployer.run = fake_run
+    deployer._path_exists = lambda path: True
     deployer._enable_https = lambda server_names: None
     return deployer, uploaded, commands
 
@@ -235,6 +238,34 @@ def test_funnel_artifact_site_errors_with_clear_message_when_runtime_dist_missin
     deployer, _uploaded, _commands = _stub_deployer()
 
     deployer._path_exists = lambda path: False
+    deployer._ensure_local_runtime_dist = lambda runtime_dist_path: None
 
-    with pytest.raises(ValueError, match="runtime_dist_path does not exist on target server"):
+    with pytest.raises(ValueError, match="runtime_dist_path was not found on target server or local control-plane host"):
         deployer._configure_funnel_artifact_site(app)
+
+
+def test_funnel_artifact_site_uploads_local_runtime_when_remote_missing(tmp_path):
+    app = _artifact_app()
+    app.source_ref.runtime_dist_path = "mos/frontend/dist"
+    local_dist = tmp_path / "mos" / "frontend" / "dist"
+    local_dist.mkdir(parents=True, exist_ok=True)
+    (local_dist / "index.html").write_text("<html></html>", encoding="utf-8")
+
+    deployer, uploaded, commands = _stub_deployer()
+    deployer.local_root = tmp_path
+    deployer._path_exists = lambda path: False
+    deployed: dict[str, str] = {}
+
+    def fake_upload_local_directory(*, local_dir: Path, remote_dir: str):
+        deployed["local_dir"] = str(local_dir)
+        deployed["remote_dir"] = remote_dir
+
+    deployer._upload_local_directory = fake_upload_local_directory
+    deployer._replace_api_base_tokens = lambda **_: None
+
+    deployer._configure_funnel_artifact_site(app)
+
+    assert deployed["local_dir"] == str(local_dist)
+    assert deployed["remote_dir"] == "/opt/apps/landing-artifact/site"
+    assert "nginx -t" in commands
+    assert "systemctl reload nginx" in commands

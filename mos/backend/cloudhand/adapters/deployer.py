@@ -1,6 +1,8 @@
 import io
 import json
 import os
+import subprocess
+import tarfile
 import time
 import shlex
 from pathlib import Path
@@ -74,6 +76,32 @@ class ServerDeployer:
         with sftp.file(remote_path, "w") as f:
             f.write(content)
         sftp.close()
+
+    def _upload_local_directory(self, *, local_dir: Path, remote_dir: str) -> None:
+        if not local_dir.is_dir():
+            raise ValueError(f"Local runtime directory does not exist: {local_dir}")
+
+        if self.client.get_transport() is None or not self.client.get_transport().is_active():
+            self.connect()
+
+        archive_stream = io.BytesIO()
+        with tarfile.open(fileobj=archive_stream, mode="w:gz") as tar:
+            for child in local_dir.iterdir():
+                tar.add(str(child), arcname=child.name)
+        archive_stream.seek(0)
+
+        remote_archive = f"/tmp/cloudhand-runtime-{int(time.time() * 1000)}.tar.gz"
+        sftp = self.client.open_sftp()
+        try:
+            with sftp.file(remote_archive, "wb") as remote_file:
+                remote_file.write(archive_stream.read())
+        finally:
+            sftp.close()
+
+        remote_dir_q = shlex.quote(remote_dir)
+        remote_archive_q = shlex.quote(remote_archive)
+        self.run(f"tar -xzf {remote_archive_q} -C {remote_dir_q}")
+        self.run(f"rm -f {remote_archive_q}")
 
     def _normalize_server_names(self, server_names: Optional[List[str]]) -> List[str]:
         names: List[str] = []
@@ -217,6 +245,102 @@ WantedBy=multi-user.target
         else:
             self.run(f"rm -f {safe_path}")
         return True
+
+    def _run_local_command(self, args: List[str], *, cwd: Path) -> None:
+        try:
+            proc = subprocess.run(
+                args,
+                cwd=str(cwd),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError as exc:
+            raise ValueError(
+                f"Required local command is unavailable: '{args[0]}'. Install it on the MOS API host."
+            ) from exc
+
+        if proc.returncode != 0:
+            stderr = (proc.stderr or "").strip()
+            stdout = (proc.stdout or "").strip()
+            detail = stderr or stdout or "no output"
+            raise ValueError(
+                f"Local command failed: {' '.join(args)} (cwd={cwd})\n{detail}"
+            )
+
+    def _find_local_repo_root(self) -> Optional[Path]:
+        candidates: List[Path] = []
+        if self.local_root:
+            candidates.append(self.local_root.resolve())
+        candidates.append(Path.cwd().resolve())
+        candidates.append(Path(__file__).resolve())
+
+        seen: set[Path] = set()
+        for start in candidates:
+            for candidate in [start, *start.parents]:
+                if candidate in seen:
+                    continue
+                seen.add(candidate)
+                if (candidate / "mos" / "frontend" / "package.json").is_file():
+                    return candidate
+        return None
+
+    def _ensure_local_runtime_dist(self, runtime_dist_path: str) -> Path | None:
+        raw_path = Path(runtime_dist_path)
+        dist_candidates: List[Path] = []
+        if raw_path.is_absolute():
+            dist_candidates.append(raw_path)
+        else:
+            dist_candidates.append(self._resolve_local_path(runtime_dist_path))
+            repo_root = self._find_local_repo_root()
+            if repo_root is not None:
+                dist_candidates.append((repo_root / runtime_dist_path).resolve())
+
+        unique_dist_candidates: List[Path] = []
+        seen: set[Path] = set()
+        for candidate in dist_candidates:
+            resolved = candidate.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            unique_dist_candidates.append(resolved)
+
+        for candidate in unique_dist_candidates:
+            if candidate.is_dir():
+                return candidate
+
+        frontend_candidates: List[Path] = []
+        for candidate in unique_dist_candidates:
+            if candidate.name == "dist" and (candidate.parent / "package.json").is_file():
+                if candidate.parent not in frontend_candidates:
+                    frontend_candidates.append(candidate.parent)
+
+        repo_root = self._find_local_repo_root()
+        if repo_root:
+            repo_frontend = (repo_root / "mos" / "frontend").resolve()
+            if (repo_frontend / "package.json").is_file() and repo_frontend not in frontend_candidates:
+                frontend_candidates.append(repo_frontend)
+
+        if not frontend_candidates:
+            return None
+
+        frontend_dir = frontend_candidates[0]
+        print(f"[{self.ip}] Local runtime dist missing; building frontend in {frontend_dir}")
+        self._run_local_command(["npm", "ci"], cwd=frontend_dir)
+        self._run_local_command(["npm", "run", "build"], cwd=frontend_dir)
+
+        for candidate in unique_dist_candidates:
+            if candidate.is_dir():
+                return candidate
+
+        fallback_dist = frontend_dir / "dist"
+        if fallback_dist.is_dir():
+            return fallback_dist
+
+        raise ValueError(
+            "Frontend build completed but no dist directory was produced for "
+            f"runtime_dist_path={runtime_dist_path!r}."
+        )
 
     def _port_is_listening(self, port: int) -> bool:
         out = self.run(f"bash -lc \"ss -ltnH '( sport = :{port} )' | head -n 1 || true\"")
@@ -455,20 +579,24 @@ WantedBy=multi-user.target
 
         app_dir = f"{app.destination_path}/{app.name}"
         site_dir = f"{app_dir}/site"
-        dist_q = shlex.quote(runtime_dist_path)
         app_dir_q = shlex.quote(app_dir)
         site_dir_q = shlex.quote(site_dir)
 
-        if not self._path_exists(runtime_dist_path):
-            raise ValueError(
-                "source_ref.runtime_dist_path does not exist on target server: "
-                f"{runtime_dist_path}. Build/copy the runtime bundle there or set "
-                "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH to the correct directory."
-            )
         self.run(f"mkdir -p {app_dir_q}")
         self.run(f"rm -rf {site_dir_q}")
         self.run(f"mkdir -p {site_dir_q}")
-        self.run(f"cp -R {dist_q}/. {site_dir_q}/")
+        if self._path_exists(runtime_dist_path):
+            dist_q = shlex.quote(runtime_dist_path)
+            self.run(f"cp -R {dist_q}/. {site_dir_q}/")
+        else:
+            local_dist = self._ensure_local_runtime_dist(runtime_dist_path)
+            if local_dist is None:
+                raise ValueError(
+                    "source_ref.runtime_dist_path was not found on target server or local control-plane host: "
+                    f"{runtime_dist_path}. Build/copy the runtime bundle there or set "
+                    "DEPLOY_ARTIFACT_RUNTIME_DIST_PATH to a valid path."
+                )
+            self._upload_local_directory(local_dir=local_dist, remote_dir=site_dir)
         self._replace_api_base_tokens(site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root)
         self._write_funnel_artifact_payload(site_dir=site_dir, source=source)
 

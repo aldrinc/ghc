@@ -74,7 +74,7 @@ class FunnelPublicationSourceSpec(BaseModel):
 class FunnelArtifactSourceSpec(BaseModel):
     public_id: str
     upstream_api_base_root: str
-    runtime_dist_path: str = "/opt/apps/mos-ui/mos/frontend/dist"
+    runtime_dist_path: str = "mos/frontend/dist"
     artifact: Dict[str, Any]
 
 

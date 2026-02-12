@@ -74,7 +74,7 @@ def _artifact_app(
         "source_ref": {
             "public_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
             "upstream_api_base_root": "https://moshq.app/api",
-            "runtime_dist_path": "/opt/apps/mos-ui/mos/frontend/dist",
+            "runtime_dist_path": "mos/frontend/dist",
             "artifact": {
                 "meta": {"publicId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95", "entrySlug": "landing", "pages": []},
                 "pages": {"landing": {"slug": "landing", "puckData": {"root": {"props": {}}, "content": [], "zones": {}}}},
