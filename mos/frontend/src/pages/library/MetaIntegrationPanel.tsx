@@ -55,12 +55,10 @@ function shortId(value?: string | null, size = 6) {
 }
 
 function stepClass(status?: string | null) {
-  if (!status || status === "missing") return "border-slate-200 bg-slate-50 text-slate-500";
-  if (["draft", "pending"].includes(status)) return "border-amber-200 bg-amber-50 text-amber-700";
-  if (["ready", "uploaded", "approved", "active"].includes(status)) {
-    return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  }
-  return "border-slate-200 bg-slate-100 text-slate-700";
+  if (!status || status === "missing") return "border-border bg-muted text-content-muted";
+  if (["draft", "pending"].includes(status)) return "border-warning/30 bg-warning/10 text-warning";
+  if (["ready", "uploaded", "approved", "active"].includes(status)) return "border-success/30 bg-success/10 text-success";
+  return "border-border bg-surface-2 text-content";
 }
 
 function PipelineStep({ label, status, count }: { label: string; status?: string | null; count?: number }) {
@@ -461,15 +459,15 @@ export function MetaIntegrationPanel() {
               key={tab.key}
               type="button"
               onClick={() => setInventoryTab(tab.key)}
-              className={[
-                "rounded-full px-3 py-1.5 text-xs font-semibold transition",
-                inventoryTab === tab.key
-                  ? "bg-slate-900 text-white"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200",
-              ].join(" ")}
-            >
-              {tab.label}
-            </button>
+                className={[
+                  "rounded-full px-3 py-1.5 text-xs font-semibold transition",
+                  inventoryTab === tab.key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-surface-2 text-content-muted hover:bg-hover",
+                ].join(" ")}
+              >
+                {tab.label}
+              </button>
           ))}
         </div>
 

@@ -311,6 +311,7 @@ class PreCanonMarketResearchWorkflow:
             persist_request = PersistArtifactRequest(
                 step_key=step_key,
                 title=definition.title,
+                summary=parsed.summary,
                 content=parsed.content,
                 prompt_sha256=prompt_result.prompt_sha256,
                 org_id=input.org_id,
@@ -320,6 +321,8 @@ class PreCanonMarketResearchWorkflow:
                 idea_workspace_id=base_context.idea_workspace_id,
                 workflow_id=base_context.workflow_id,
                 workflow_run_id=base_context.workflow_run_id,
+                parent_workflow_id=base_context.parent_workflow_id,
+                parent_run_id=base_context.parent_run_id,
                 parent_folder_id=base_context.parent_folder_id,
                 idea_folder_id=base_context.idea_folder_id,
                 idea_folder_url=base_context.idea_folder_url,
@@ -346,6 +349,7 @@ class PreCanonMarketResearchWorkflow:
 
             ref = {
                 "step_key": step_key,
+                "title": definition.title,
                 "doc_url": persist_result.doc_url,
                 "doc_id": persist_result.doc_id,
                 "summary": parsed.summary,
@@ -424,6 +428,7 @@ class PreCanonMarketResearchWorkflow:
             PersistArtifactRequest(
                 step_key="02",
                 title="Competitor Facebook Page Resolution",
+                summary=f"Resolved Facebook pages for {len(resolve_result.competitors)} competitors.",
                 content=resolution_content,
                 prompt_sha256="",
                 org_id=input.org_id,
@@ -433,6 +438,8 @@ class PreCanonMarketResearchWorkflow:
                 idea_workspace_id=base_context.idea_workspace_id,
                 workflow_id=base_context.workflow_id,
                 workflow_run_id=base_context.workflow_run_id,
+                parent_workflow_id=base_context.parent_workflow_id,
+                parent_run_id=base_context.parent_run_id,
                 parent_folder_id=base_context.parent_folder_id,
                 idea_folder_id=base_context.idea_folder_id,
                 idea_folder_url=base_context.idea_folder_url,
@@ -447,6 +454,7 @@ class PreCanonMarketResearchWorkflow:
         artifacts.append(
             {
                 "step_key": "02",
+                "title": "Competitor Facebook Page Resolution",
                 "doc_url": resolution_persist_result.doc_url,
                 "doc_id": resolution_persist_result.doc_id,
                 "summary": f"Resolved Facebook pages for {len(resolve_result.competitors)} competitors.",
@@ -607,7 +615,13 @@ class PreCanonMarketResearchWorkflow:
             "step_summaries": step_summaries,
             "step_contents": step_contents,
             "artifact_refs": [
-                {"step_key": a["step_key"], "doc_url": a["doc_url"], "doc_id": a["doc_id"]} for a in artifacts
+                {
+                    "step_key": a["step_key"],
+                    "title": a["title"],
+                    "doc_url": a["doc_url"],
+                    "doc_id": a["doc_id"],
+                }
+                for a in artifacts
             ],
             "prompt_shas": prompt_shas,
             "ads_context": base_vars.get("ADS_CONTEXT", ""),

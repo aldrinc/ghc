@@ -72,6 +72,7 @@ class LlmGenerationResult:
 class PersistArtifactRequest:
     step_key: str
     title: str
+    summary: Optional[str]
     content: str
     prompt_sha256: str
     org_id: str
@@ -81,6 +82,8 @@ class PersistArtifactRequest:
     idea_workspace_id: Optional[str]
     workflow_id: Optional[str]
     workflow_run_id: Optional[str]
+    parent_workflow_id: Optional[str]
+    parent_run_id: Optional[str]
     parent_folder_id: Optional[str]
     idea_folder_id: Optional[str]
     idea_folder_url: Optional[str]

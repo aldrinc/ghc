@@ -347,7 +347,7 @@ function SidebarInset({ className, ...props }: SidebarInsetProps) {
     <main
       data-slot="sidebar-inset"
       className={cn(
-        'bg-background relative flex w-full flex-1 flex-col dark:bg-slate-950',
+        'bg-background relative flex w-full flex-1 flex-col',
         'md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2',
         className,
       )}
@@ -363,7 +363,7 @@ function SidebarInput({ className, ...props }: SidebarInputProps) {
     <Input
       data-slot="sidebar-input"
       data-sidebar="input"
-      className={cn('bg-white h-8 w-full shadow-none dark:bg-slate-950', className)}
+      className={cn('h-8 w-full shadow-none', className)}
       {...props}
     />
   );
@@ -555,7 +555,7 @@ const sidebarMenuButtonVariants = cva(
         default:
           '[&:not([data-highlight])]:hover:bg-sidebar-accent [&:not([data-highlight])]:hover:text-sidebar-foreground',
         outline:
-          'bg-white shadow-[0_0_0_1px_var(--sidebar-border)] [&:not([data-highlight])]:hover:bg-sidebar-accent [&:not([data-highlight])]:hover:text-sidebar-foreground [&:not([data-highlight])]:hover:shadow-[0_0_0_1px_var(--sidebar-accent)] dark:bg-slate-950',
+          'bg-sidebar shadow-[0_0_0_1px_var(--sidebar-border)] [&:not([data-highlight])]:hover:bg-sidebar-accent [&:not([data-highlight])]:hover:text-sidebar-foreground [&:not([data-highlight])]:hover:shadow-[0_0_0_1px_var(--sidebar-accent)]',
       },
       size: {
         default: 'h-8 text-sm',

@@ -69,6 +69,17 @@ class WorkflowsRepository:
         )
         return self.session.scalars(stmt).first()
 
+    def get_by_temporal_workflow_id(self, org_id: str, temporal_workflow_id: str) -> Optional[WorkflowRun]:
+        stmt = (
+            select(WorkflowRun)
+            .where(
+                WorkflowRun.org_id == org_id,
+                WorkflowRun.temporal_workflow_id == temporal_workflow_id,
+            )
+            .order_by(WorkflowRun.started_at.desc())
+        )
+        return self.session.scalars(stmt).first()
+
     def set_status(
         self,
         org_id: str,

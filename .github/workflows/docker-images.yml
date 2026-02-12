@@ -82,6 +82,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Check semantic UI tokens
+        run: node scripts/check-semantic-ui.mjs
+
       - name: Build frontend
         env:
           VITE_API_BASE_URL: http://localhost:8000

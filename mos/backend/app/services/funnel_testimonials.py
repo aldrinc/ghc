@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Iterator, Optional
 
-import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -18,6 +17,8 @@ from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.funnels import create_funnel_image_asset, create_funnel_upload_asset
 from app.services.funnel_ai import _load_product_context
 from app.services.funnels import _walk_json as walk_json
+from app.testimonial_renderer.renderer import TestimonialRenderer
+from app.testimonial_renderer.validate import TestimonialRenderError
 
 
 class TestimonialGenerationError(RuntimeError):
@@ -54,16 +55,6 @@ class _TestimonialGroup:
 
 _DATE_FORMAT = "%Y-%m-%d"
 _TESTIMONIAL_TEMPLATES = {"review_card", "social_comment", "testimonial_media"}
-
-
-def _require_renderer_url() -> str:
-    base_url = settings.TESTIMONIAL_RENDERER_URL
-    if not isinstance(base_url, str) or not base_url.strip():
-        raise TestimonialGenerationError(
-            "TESTIMONIAL_RENDERER_URL is required to render testimonials."
-        )
-    return base_url.rstrip("/")
-
 
 def _require_public_asset_base_url() -> str:
     base_url = settings.PUBLIC_ASSET_BASE_URL
@@ -310,7 +301,30 @@ def _collect_testimonial_targets(
                 groups.extend(_collect_pre_sales_targets({"reviewsWall": config}, context=ctx))
 
     if not groups:
-        raise TestimonialGenerationError("No testimonial image slots found for this template.")
+        expected: set[str] = set()
+        if template_kind == "sales-pdp":
+            expected = {"SalesPdpReviewWall", "SalesPdpReviewSlider", "SalesPdpTemplate"}
+        elif template_kind == "pre-sales-listicle":
+            expected = {"PreSalesReviews", "PreSalesReviewWall", "PreSalesTemplate"}
+        counts = {key: 0 for key in expected}
+        for obj in walk_json(puck_data):
+            if not isinstance(obj, dict):
+                continue
+            comp_type = obj.get("type")
+            if comp_type in counts:
+                counts[comp_type] += 1
+        found_summary = ", ".join(
+            f"{comp_type}={count}" for comp_type, count in sorted(counts.items()) if count
+        )
+        if not found_summary:
+            found_summary = "none"
+        expected_summary = ", ".join(sorted(expected)) if expected else "unknown"
+        raise TestimonialGenerationError(
+            "No testimonial image slots found for this template. "
+            f"templateKind={template_kind}. "
+            f"Expected at least one of: {expected_summary}. "
+            f"Found: {found_summary}."
+        )
     for group in groups:
         for render in group.renders:
             image_id = id(render.image)
@@ -714,57 +728,6 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _render_review_card(payload: dict[str, Any]) -> bytes:
-    renderer_url = _require_renderer_url()
-    url = f"{renderer_url}/render"
-    try:
-        resp = httpx.post(url, params={"format": "png"}, json=payload, timeout=30.0)
-    except httpx.RequestError as exc:
-        raise TestimonialGenerationError(f"Failed to reach testimonial renderer: {exc}") from exc
-    if resp.status_code != 200:
-        detail = resp.text.strip()
-        raise TestimonialGenerationError(
-            f"Testimonial renderer error ({resp.status_code}): {detail or 'unknown'}"
-        )
-    if not resp.content:
-        raise TestimonialGenerationError("Testimonial renderer returned empty image data.")
-    return resp.content
-
-
-def _render_social_comment(payload: dict[str, Any]) -> bytes:
-    renderer_url = _require_renderer_url()
-    url = f"{renderer_url}/render"
-    try:
-        resp = httpx.post(url, params={"format": "png"}, json=payload, timeout=30.0)
-    except httpx.RequestError as exc:
-        raise TestimonialGenerationError(f"Failed to reach testimonial renderer: {exc}") from exc
-    if resp.status_code != 200:
-        detail = resp.text.strip()
-        raise TestimonialGenerationError(
-            f"Testimonial renderer error ({resp.status_code}): {detail or 'unknown'}"
-        )
-    if not resp.content:
-        raise TestimonialGenerationError("Testimonial renderer returned empty image data.")
-    return resp.content
-
-
-def _render_testimonial_media(payload: dict[str, Any]) -> bytes:
-    renderer_url = _require_renderer_url()
-    url = f"{renderer_url}/render"
-    try:
-        resp = httpx.post(url, params={"format": "png"}, json=payload, timeout=30.0)
-    except httpx.RequestError as exc:
-        raise TestimonialGenerationError(f"Failed to reach testimonial renderer: {exc}") from exc
-    if resp.status_code != 200:
-        detail = resp.text.strip()
-        raise TestimonialGenerationError(
-            f"Testimonial renderer error ({resp.status_code}): {detail or 'unknown'}"
-        )
-    if not resp.content:
-        raise TestimonialGenerationError("Testimonial renderer returned empty image data.")
-    return resp.content
-
-
 def _build_testimonial_prompt(*, count: int, copy: str, product_context: str, today: str) -> str:
     return (
         "You are generating synthetic customer testimonials for a landing page.\n"
@@ -922,13 +885,13 @@ def generate_funnel_page_testimonials(
     if not product:
         raise TestimonialGenerationError("Product context is required to generate testimonials.")
 
-    primary_asset = _resolve_product_primary_image(
+    # Validate that the product has a primary image configured (required by business rules).
+    _resolve_product_primary_image(
         session=session,
         org_id=org_id,
         client_id=str(funnel.client_id),
         product=product,
     )
-    hero_image_url = _public_asset_url(str(primary_asset.public_id))
 
     copy_text = _extract_copy_lines(base_puck)
     if not copy_text.strip():
@@ -977,291 +940,307 @@ def generate_funnel_page_testimonials(
         testimonials.extend(batch_items)
 
     generated: list[dict[str, Any]] = []
-    for idx, group in enumerate(groups):
-        validated = _validate_testimonial_payload(testimonials[idx] or {})
+    try:
+        with TestimonialRenderer() as renderer:
+            for idx, group in enumerate(groups):
+                validated = _validate_testimonial_payload(testimonials[idx] or {})
 
-        if group.slide is not None:
-            group.slide["text"] = validated["review"]
-            group.slide["author"] = validated["name"]
-            group.slide["rating"] = validated["rating"]
-            group.slide["verified"] = validated["verified"]
-            if group.context:
-                group.context.dirty = True
+                if group.slide is not None:
+                    group.slide["text"] = validated["review"]
+                    group.slide["author"] = validated["name"]
+                    group.slide["rating"] = validated["rating"]
+                    group.slide["verified"] = validated["verified"]
+                    if group.context:
+                        group.context.dirty = True
 
-        media_targets = [render for render in group.renders if render.template == "testimonial_media"]
-        media_prompt_iter: Optional[Iterator[str]] = None
-        if media_targets:
-            if len(media_targets) != 3:
-                raise TestimonialGenerationError(
-                    "testimonial_media requires exactly 3 image slots for each review slide."
-                )
-            media_prompts = validated["mediaPrompts"]
-            if len(media_prompts) != len(media_targets):
-                raise TestimonialGenerationError(
-                    "mediaPrompts must include exactly 3 prompts for testimonial media images."
-                )
-            media_prompt_iter = iter(media_prompts)
+                media_targets = [
+                    render for render in group.renders if render.template == "testimonial_media"
+                ]
+                media_prompt_iter: Optional[Iterator[str]] = None
+                if media_targets:
+                    if len(media_targets) != 3:
+                        raise TestimonialGenerationError(
+                            "testimonial_media requires exactly 3 image slots for each review slide."
+                        )
+                    media_prompts = validated["mediaPrompts"]
+                    if len(media_prompts) != len(media_targets):
+                        raise TestimonialGenerationError(
+                            "mediaPrompts must include exactly 3 prompts for testimonial media images."
+                        )
+                    media_prompt_iter = iter(media_prompts)
 
-        for render in group.renders:
-            if render.template == "testimonial_media":
-                if media_prompt_iter is None:
-                    raise TestimonialGenerationError(
-                        "mediaPrompts are required for testimonial_media renders."
-                    )
-                try:
-                    prompt = next(media_prompt_iter)
-                except StopIteration as exc:
-                    raise TestimonialGenerationError(
-                        "Insufficient mediaPrompts provided for testimonial_media renders."
-                    ) from exc
+                for render in group.renders:
+                    if render.template == "testimonial_media":
+                        if media_prompt_iter is None:
+                            raise TestimonialGenerationError(
+                                "mediaPrompts are required for testimonial_media renders."
+                            )
+                        try:
+                            prompt = next(media_prompt_iter)
+                        except StopIteration as exc:
+                            raise TestimonialGenerationError(
+                                "Insufficient mediaPrompts provided for testimonial_media renders."
+                            ) from exc
 
-                media_asset = create_funnel_image_asset(
-                    session=session,
-                    org_id=org_id,
-                    client_id=str(funnel.client_id),
-                    prompt=prompt,
-                    aspect_ratio="3:4",
-                    usage_context={
-                        "kind": "testimonial_media_image",
-                        "funnelId": funnel_id,
-                        "pageId": page_id,
-                        "target": render.label,
-                    },
-                    funnel_id=funnel_id,
-                    product_id=str(funnel.product_id) if funnel.product_id else None,
-                    tags=["funnel", "testimonial", "testimonial_media", "source"],
-                )
+                        media_asset = create_funnel_image_asset(
+                            session=session,
+                            org_id=org_id,
+                            client_id=str(funnel.client_id),
+                            prompt=prompt,
+                            aspect_ratio="3:4",
+                            usage_context={
+                                "kind": "testimonial_media_image",
+                                "funnelId": funnel_id,
+                                "pageId": page_id,
+                                "target": render.label,
+                            },
+                            funnel_id=funnel_id,
+                            product_id=str(funnel.product_id) if funnel.product_id else None,
+                            tags=["funnel", "testimonial", "testimonial_media", "source"],
+                        )
 
-                payload = {
-                    "template": "testimonial_media",
-                    "imageUrl": _public_asset_url(str(media_asset.public_id)),
-                    "alt": f"Customer scene for {validated['name']}",
-                }
-                image_bytes = _render_testimonial_media(payload)
-                asset = create_funnel_upload_asset(
-                    session=session,
-                    org_id=org_id,
-                    client_id=str(funnel.client_id),
-                    content_bytes=image_bytes,
-                    filename=f"testimonial-media-{page_id}-{idx + 1}.png",
-                    content_type="image/png",
-                    alt=f"Customer scene for {validated['name']}",
-                    usage_context={
-                        "kind": "testimonial_media_render",
-                        "funnelId": funnel_id,
-                        "pageId": page_id,
-                        "target": render.label,
-                    },
-                    funnel_id=funnel_id,
-                    product_id=str(funnel.product_id) if funnel.product_id else None,
-                    tags=["funnel", "testimonial", "testimonial_media"],
-                )
-                render.image["assetPublicId"] = str(asset.public_id)
-                if "alt" not in render.image or not render.image.get("alt"):
-                    render.image["alt"] = f"Customer scene for {validated['name']}"
-                if render.context:
-                    render.context.dirty = True
-                generated.append(
-                    {
-                        "target": render.label,
-                        "payload": payload,
-                        "publicId": str(asset.public_id),
-                        "assetId": str(asset.id),
-                        "mediaSourcePublicId": str(media_asset.public_id),
-                    }
-                )
-                continue
-
-            if render.template == "social_comment" and len(validated["review"]) > 600:
-                raise TestimonialGenerationError(
-                    "Testimonial review must be 600 characters or fewer for social_comment renders."
-                )
-
-            if render.template == "review_card":
-                payload: dict[str, Any] = {
-                    "template": "review_card",
-                    "name": validated["name"],
-                    "verified": validated["verified"],
-                    "rating": validated["rating"],
-                    "review": validated["review"],
-                }
-                if validated.get("meta") is not None:
-                    payload["meta"] = validated["meta"]
-                payload["avatarPrompt"] = validated["avatarPrompt"]
-                payload["heroImagePrompt"] = validated["heroImagePrompt"]
-                payload["renderContext"] = {
-                    "userContext": validated["persona"],
-                    "pageCopy": copy_text,
-                    "productContext": product_context,
-                }
-                image_model = os.getenv("TESTIMONIAL_RENDERER_IMAGE_MODEL")
-                if image_model:
-                    payload["imageModel"] = image_model
-                if not validated.get("heroImagePrompt"):
-                    payload["heroImageUrl"] = hero_image_url
-
-                image_bytes = _render_review_card(payload)
-                asset = create_funnel_upload_asset(
-                    session=session,
-                    org_id=org_id,
-                    client_id=str(funnel.client_id),
-                    content_bytes=image_bytes,
-                    filename=f"testimonial-{page_id}-{idx + 1}.png",
-                    content_type="image/png",
-                    alt=f"Testimonial from {validated['name']}",
-                    usage_context={
-                        "kind": "testimonial_render",
-                        "funnelId": funnel_id,
-                        "pageId": page_id,
-                        "target": render.label,
-                    },
-                    funnel_id=funnel_id,
-                    product_id=str(funnel.product_id) if funnel.product_id else None,
-                    tags=["funnel", "testimonial", "review_card"],
-                )
-                render.image["assetPublicId"] = str(asset.public_id)
-                if "alt" not in render.image or not render.image.get("alt"):
-                    render.image["alt"] = f"Review from {validated['name']}"
-                if render.context:
-                    render.context.dirty = True
-                generated.append(
-                    {
-                        "target": render.label,
-                        "payload": payload,
-                        "publicId": str(asset.public_id),
-                        "assetId": str(asset.id),
-                    }
-                )
-                continue
-
-            avatar_asset = create_funnel_image_asset(
-                session=session,
-                org_id=org_id,
-                client_id=str(funnel.client_id),
-                prompt=validated["avatarPrompt"],
-                aspect_ratio="1:1",
-                usage_context={
-                    "kind": "testimonial_social_avatar",
-                    "funnelId": funnel_id,
-                    "pageId": page_id,
-                    "target": render.label,
-                },
-                funnel_id=funnel_id,
-                product_id=str(funnel.product_id) if funnel.product_id else None,
-                tags=["funnel", "testimonial", "social_comment", "avatar"],
-            )
-            attachment_asset = create_funnel_image_asset(
-                session=session,
-                org_id=org_id,
-                client_id=str(funnel.client_id),
-                prompt=validated["heroImagePrompt"],
-                aspect_ratio="4:3",
-                usage_context={
-                    "kind": "testimonial_social_attachment",
-                    "funnelId": funnel_id,
-                    "pageId": page_id,
-                    "target": render.label,
-                },
-                funnel_id=funnel_id,
-                product_id=str(funnel.product_id) if funnel.product_id else None,
-                tags=["funnel", "testimonial", "social_comment", "attachment"],
-            )
-            time_value = today
-            if isinstance(validated.get("meta"), dict):
-                meta_date = validated["meta"].get("date")
-                if isinstance(meta_date, str) and meta_date.strip():
-                    time_value = meta_date.strip()
-
-            seed = sum(ord(ch) for ch in render.label) + idx
-            variant = seed % 3
-            replies = None
-            view_replies_text = None
-            reaction_count = 3 + (seed % 17)
-            follow_label = "Follow" if variant == 1 else None
-
-            is_sales_review_wall = template_kind == "sales-pdp" and "sales_pdp.reviewWall.tiles" in render.label
-            if is_sales_review_wall:
-                force_reply = sales_review_wall_social_index % 2 == 0
-                sales_review_wall_social_index += 1
-                if force_reply:
-                    replies = [
-                        {
-                            "name": "Avery P.",
-                            "text": "Same here—this guide made everything feel manageable.",
-                            "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
-                            "meta": {"time": "2d"},
-                            "reactionCount": 2,
+                        payload = {
+                            "template": "testimonial_media",
+                            "imageUrl": _public_asset_url(str(media_asset.public_id)),
+                            "alt": f"Customer scene for {validated['name']}",
                         }
-                    ]
-                    view_replies_text = "View 1 reply"
+                        image_bytes = renderer.render_png(payload)
+                        asset = create_funnel_upload_asset(
+                            session=session,
+                            org_id=org_id,
+                            client_id=str(funnel.client_id),
+                            content_bytes=image_bytes,
+                            filename=f"testimonial-media-{page_id}-{idx + 1}.png",
+                            content_type="image/png",
+                            alt=f"Customer scene for {validated['name']}",
+                            usage_context={
+                                "kind": "testimonial_media_render",
+                                "funnelId": funnel_id,
+                                "pageId": page_id,
+                                "target": render.label,
+                            },
+                            funnel_id=funnel_id,
+                            product_id=str(funnel.product_id) if funnel.product_id else None,
+                            tags=["funnel", "testimonial", "testimonial_media"],
+                        )
+                        render.image["assetPublicId"] = str(asset.public_id)
+                        if "alt" not in render.image or not render.image.get("alt"):
+                            render.image["alt"] = f"Customer scene for {validated['name']}"
+                        if render.context:
+                            render.context.dirty = True
+                        generated.append(
+                            {
+                                "target": render.label,
+                                "payload": payload,
+                                "publicId": str(asset.public_id),
+                                "assetId": str(asset.id),
+                                "mediaSourcePublicId": str(media_asset.public_id),
+                            }
+                        )
+                        continue
 
-            if variant == 0:
-                reply_templates = [
-                    "Same here—this guide made everything feel manageable.",
-                    "Agreed. The steps were easy to follow.",
-                    "We had a similar experience and it helped a lot.",
-                ]
-                reply_text = reply_templates[seed % len(reply_templates)]
-                replies = [
-                    {
-                        "name": "Avery P.",
-                        "text": reply_text,
-                        "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
-                        "meta": {"time": "2d"},
-                        "reactionCount": 2,
-                    }
-                ]
-                view_replies_text = "View 1 reply"
+                    if render.template == "social_comment" and len(validated["review"]) > 600:
+                        raise TestimonialGenerationError(
+                            "Testimonial review must be 600 characters or fewer for social_comment renders."
+                        )
 
-            payload = {
-                "template": "social_comment",
-                "header": {"title": "All comments", "showSortIcon": variant != 2},
-                "comments": [
-                    {
-                        "name": validated["name"],
-                        "text": validated["review"],
-                        "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
-                        "attachmentUrl": _public_asset_url(str(attachment_asset.public_id)),
-                        "meta": {"time": time_value, **({"followLabel": follow_label} if follow_label else {})},
-                        "reactionCount": reaction_count,
-                        **({"replies": replies, "viewRepliesText": view_replies_text} if replies else {}),
+                    if render.template == "review_card":
+                        payload: dict[str, Any] = {
+                            "template": "review_card",
+                            "name": validated["name"],
+                            "verified": validated["verified"],
+                            "rating": validated["rating"],
+                            "review": validated["review"],
+                        }
+                        if validated.get("meta") is not None:
+                            payload["meta"] = validated["meta"]
+                        payload["avatarPrompt"] = validated["avatarPrompt"]
+                        payload["heroImagePrompt"] = validated["heroImagePrompt"]
+                        payload["renderContext"] = {
+                            "userContext": validated["persona"],
+                            "pageCopy": copy_text,
+                            "productContext": product_context,
+                        }
+                        image_model = os.getenv("TESTIMONIAL_RENDERER_IMAGE_MODEL")
+                        if image_model:
+                            payload["imageModel"] = image_model
+
+                        image_bytes = renderer.render_png(payload)
+                        asset = create_funnel_upload_asset(
+                            session=session,
+                            org_id=org_id,
+                            client_id=str(funnel.client_id),
+                            content_bytes=image_bytes,
+                            filename=f"testimonial-{page_id}-{idx + 1}.png",
+                            content_type="image/png",
+                            alt=f"Testimonial from {validated['name']}",
+                            usage_context={
+                                "kind": "testimonial_render",
+                                "funnelId": funnel_id,
+                                "pageId": page_id,
+                                "target": render.label,
+                            },
+                            funnel_id=funnel_id,
+                            product_id=str(funnel.product_id) if funnel.product_id else None,
+                            tags=["funnel", "testimonial", "review_card"],
+                        )
+                        render.image["assetPublicId"] = str(asset.public_id)
+                        if "alt" not in render.image or not render.image.get("alt"):
+                            render.image["alt"] = f"Review from {validated['name']}"
+                        if render.context:
+                            render.context.dirty = True
+                        generated.append(
+                            {
+                                "target": render.label,
+                                "payload": payload,
+                                "publicId": str(asset.public_id),
+                                "assetId": str(asset.id),
+                            }
+                        )
+                        continue
+
+                    avatar_asset = create_funnel_image_asset(
+                        session=session,
+                        org_id=org_id,
+                        client_id=str(funnel.client_id),
+                        prompt=validated["avatarPrompt"],
+                        aspect_ratio="1:1",
+                        usage_context={
+                            "kind": "testimonial_social_avatar",
+                            "funnelId": funnel_id,
+                            "pageId": page_id,
+                            "target": render.label,
+                        },
+                        funnel_id=funnel_id,
+                        product_id=str(funnel.product_id) if funnel.product_id else None,
+                        tags=["funnel", "testimonial", "social_comment", "avatar"],
+                    )
+                    attachment_asset = create_funnel_image_asset(
+                        session=session,
+                        org_id=org_id,
+                        client_id=str(funnel.client_id),
+                        prompt=validated["heroImagePrompt"],
+                        aspect_ratio="4:3",
+                        usage_context={
+                            "kind": "testimonial_social_attachment",
+                            "funnelId": funnel_id,
+                            "pageId": page_id,
+                            "target": render.label,
+                        },
+                        funnel_id=funnel_id,
+                        product_id=str(funnel.product_id) if funnel.product_id else None,
+                        tags=["funnel", "testimonial", "social_comment", "attachment"],
+                    )
+                    time_value = today
+                    if isinstance(validated.get("meta"), dict):
+                        meta_date = validated["meta"].get("date")
+                        if isinstance(meta_date, str) and meta_date.strip():
+                            time_value = meta_date.strip()
+
+                    seed = sum(ord(ch) for ch in render.label) + idx
+                    variant = seed % 3
+                    replies = None
+                    view_replies_text = None
+                    reaction_count = 3 + (seed % 17)
+                    follow_label = "Follow" if variant == 1 else None
+
+                    is_sales_review_wall = (
+                        template_kind == "sales-pdp"
+                        and "sales_pdp.reviewWall.tiles" in render.label
+                    )
+                    if is_sales_review_wall:
+                        force_reply = sales_review_wall_social_index % 2 == 0
+                        sales_review_wall_social_index += 1
+                        if force_reply:
+                            replies = [
+                                {
+                                    "name": "Avery P.",
+                                    "text": "Same here—this guide made everything feel manageable.",
+                                    "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
+                                    "meta": {"time": "2d"},
+                                    "reactionCount": 2,
+                                }
+                            ]
+                            view_replies_text = "View 1 reply"
+
+                    if variant == 0:
+                        reply_templates = [
+                            "Same here—this guide made everything feel manageable.",
+                            "Agreed. The steps were easy to follow.",
+                            "We had a similar experience and it helped a lot.",
+                        ]
+                        reply_text = reply_templates[seed % len(reply_templates)]
+                        replies = [
+                            {
+                                "name": "Avery P.",
+                                "text": reply_text,
+                                "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
+                                "meta": {"time": "2d"},
+                                "reactionCount": 2,
+                            }
+                        ]
+                        view_replies_text = "View 1 reply"
+
+                    payload = {
+                        "template": "social_comment",
+                        "header": {"title": "All comments", "showSortIcon": variant != 2},
+                        "comments": [
+                            {
+                                "name": validated["name"],
+                                "text": validated["review"],
+                                "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
+                                "attachmentUrl": _public_asset_url(
+                                    str(attachment_asset.public_id)
+                                ),
+                                "meta": {
+                                    "time": time_value,
+                                    **({"followLabel": follow_label} if follow_label else {}),
+                                },
+                                "reactionCount": reaction_count,
+                                **(
+                                    {"replies": replies, "viewRepliesText": view_replies_text}
+                                    if replies
+                                    else {}
+                                ),
+                            }
+                        ],
                     }
-                ],
-            }
-            image_bytes = _render_social_comment(payload)
-            asset = create_funnel_upload_asset(
-                session=session,
-                org_id=org_id,
-                client_id=str(funnel.client_id),
-                content_bytes=image_bytes,
-                filename=f"testimonial-{page_id}-{idx + 1}.png",
-                content_type="image/png",
-                alt=f"Social comment from {validated['name']}",
-                usage_context={
-                    "kind": "testimonial_render",
-                    "funnelId": funnel_id,
-                    "pageId": page_id,
-                    "target": render.label,
-                },
-                funnel_id=funnel_id,
-                product_id=str(funnel.product_id) if funnel.product_id else None,
-                tags=["funnel", "testimonial", "social_comment"],
-            )
-            render.image["assetPublicId"] = str(asset.public_id)
-            if "alt" not in render.image or not render.image.get("alt"):
-                render.image["alt"] = f"Social comment from {validated['name']}"
-            if render.context:
-                render.context.dirty = True
-            generated.append(
-                {
-                    "target": render.label,
-                    "payload": payload,
-                    "publicId": str(asset.public_id),
-                    "assetId": str(asset.id),
-                    "avatarPublicId": str(avatar_asset.public_id),
-                    "attachmentPublicId": str(attachment_asset.public_id),
-                }
-            )
+                    image_bytes = renderer.render_png(payload)
+                    asset = create_funnel_upload_asset(
+                        session=session,
+                        org_id=org_id,
+                        client_id=str(funnel.client_id),
+                        content_bytes=image_bytes,
+                        filename=f"testimonial-{page_id}-{idx + 1}.png",
+                        content_type="image/png",
+                        alt=f"Social comment from {validated['name']}",
+                        usage_context={
+                            "kind": "testimonial_render",
+                            "funnelId": funnel_id,
+                            "pageId": page_id,
+                            "target": render.label,
+                        },
+                        funnel_id=funnel_id,
+                        product_id=str(funnel.product_id) if funnel.product_id else None,
+                        tags=["funnel", "testimonial", "social_comment"],
+                    )
+                    render.image["assetPublicId"] = str(asset.public_id)
+                    if "alt" not in render.image or not render.image.get("alt"):
+                        render.image["alt"] = f"Social comment from {validated['name']}"
+                    if render.context:
+                        render.context.dirty = True
+                    generated.append(
+                        {
+                            "target": render.label,
+                            "payload": payload,
+                            "publicId": str(asset.public_id),
+                            "assetId": str(asset.id),
+                            "avatarPublicId": str(avatar_asset.public_id),
+                            "attachmentPublicId": str(attachment_asset.public_id),
+                        }
+                    )
+    except TestimonialRenderError as exc:
+        raise TestimonialGenerationError(str(exc)) from exc
 
     missing_assets: list[str] = []
     for group in groups:
@@ -1293,6 +1272,7 @@ def generate_funnel_page_testimonials(
         "temperature": temperature,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "synthetic": synthetic,
+        "testimonialsProvenance": {"source": "synthetic" if synthetic else "production"},
         "generatedTestimonials": generated,
         "actorUserId": user_id,
         "ideaWorkspaceId": idea_workspace_id,

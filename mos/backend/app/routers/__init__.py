@@ -10,6 +10,7 @@ from app.routers import (
     workflows,
     brands,
     deploy,
+    agent_runs,
 )
 from app.routers import (
     claude,
@@ -25,6 +26,7 @@ from app.routers import (
 )
 
 __all__ = [
+    "agent_runs",
     "clients",
     "campaigns",
     "artifacts",

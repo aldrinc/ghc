@@ -17,6 +17,10 @@ export interface PrecanonResearch {
   prompt_shas?: Record<string, string>;
   ads_context?: unknown;
   ads_research_run_id?: string;
+  ads_ingestion_status?: string;
+  ads_ingestion_reason?: string;
+  ads_ingestion_error?: string;
+  ads_creative_analysis?: unknown;
   research_highlights?: Record<string, unknown>;
 }
 

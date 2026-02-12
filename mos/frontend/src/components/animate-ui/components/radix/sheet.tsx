@@ -69,11 +69,11 @@ function SheetContent({
       <SheetOverlay />
       <SheetContentPrimitive
         className={cn(
-          'bg-white fixed z-50 flex flex-col gap-4 shadow-lg dark:bg-slate-950',
+          'fixed z-50 flex flex-col gap-4 border-border bg-surface text-content shadow-lg',
           side === 'right' && 'h-full w-[350px] border-l',
           side === 'left' && 'h-full w-[350px] border-r',
-          side === 'top' && 'w-full h-[350px] border-b',
-          side === 'bottom' && 'w-full h-[350px] border-t',
+          side === 'top' && 'h-[350px] w-full border-b',
+          side === 'bottom' && 'h-[350px] w-full border-t',
           className,
         )}
         side={side}
@@ -81,7 +81,7 @@ function SheetContent({
       >
         {children}
         {showCloseButton && (
-          <SheetClose className="ring-offset-white focus:ring-slate-950 data-[state=open]:bg-slate-100 absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none dark:ring-offset-slate-950 dark:focus:ring-slate-300 dark:data-[state=open]:bg-slate-800">
+          <SheetClose className="absolute right-4 top-4 rounded-xs text-content-muted opacity-70 transition-opacity hover:text-content hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:pointer-events-none data-[state=open]:bg-hover">
             <XIcon className="size-4" />
             <span className="sr-only">Close</span>
           </SheetClose>
@@ -118,7 +118,7 @@ type SheetTitleProps = SheetTitlePrimitiveProps;
 function SheetTitle({ className, ...props }: SheetTitleProps) {
   return (
     <SheetTitlePrimitive
-      className={cn('text-slate-950 font-semibold dark:text-slate-50', className)}
+      className={cn('text-content font-semibold', className)}
       {...props}
     />
   );
@@ -129,7 +129,7 @@ type SheetDescriptionProps = SheetDescriptionPrimitiveProps;
 function SheetDescription({ className, ...props }: SheetDescriptionProps) {
   return (
     <SheetDescriptionPrimitive
-      className={cn('text-slate-500 text-sm dark:text-slate-400', className)}
+      className={cn('text-sm text-content-muted', className)}
       {...props}
     />
   );

@@ -100,6 +100,8 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal):
     plan_resp = api_client.post(f"/campaigns/{campaign_id}/plan", json={"goal": "grow"})
     assert plan_resp.status_code == 200
     planning_run = plan_resp.json()["workflow_run_id"]
+    planning_temporal_id = plan_resp.json()["temporal_workflow_id"]
+    assert planning_temporal_id
 
     workflows = api_client.get("/workflows").json()
     workflow_ids = {wf["id"] for wf in workflows}
@@ -111,10 +113,15 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal):
         json={"approved": True},
     )
     assert approve_resp.status_code == 200
-    assert (
-        "approve_strategy_sheet",
-        ({"approved": True, "updated_strategy_sheet": None},),
-    ) in fake_temporal.signals
+    assert ("approve_strategy_sheet", ({"approved": True, "updated_strategy_sheet": None},)) in fake_temporal.signals
+
+    # The API should also accept Temporal workflow IDs so operators can unblock runs from the Temporal UI.
+    approve_by_temporal_id = api_client.post(
+        f"/workflows/{planning_temporal_id}/signals/approve-strategy",
+        json={"approved": True},
+    )
+    assert approve_by_temporal_id.status_code == 200
+    assert ("approve_strategy_sheet", ({"approved": True, "updated_strategy_sheet": None},)) in fake_temporal.signals
 
     logs_resp = api_client.get(f"/workflows/{onboarding_run}/logs")
     assert logs_resp.status_code == 200

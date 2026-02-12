@@ -17,7 +17,8 @@ from openai import OpenAI
 _backend_root = Path(__file__).resolve().parents[2]
 _repo_root = _backend_root.parent.parent
 load_dotenv(_repo_root / ".env", override=False)
-load_dotenv(_backend_root / ".env", override=False)
+# Backend-local env should win for backend processes (matches app.config behavior).
+load_dotenv(_backend_root / ".env", override=True)
 
 
 class LLMClientConfigError(Exception):
@@ -114,6 +115,57 @@ class LLMClient:
             return "".join(parts) if parts else None
         except Exception:
             return None
+
+    @staticmethod
+    def _openai_text_format_from_response_format(response_format: dict[str, Any]) -> dict[str, Any]:
+        """Normalize Chat Completions `response_format` into Responses API `text.format`.
+
+        OpenAI uses different shapes:
+        - Chat Completions: {"type": "json_schema", "json_schema": {"name": ..., "schema": ..., "strict": ...}}
+        - Responses API:    {"type": "json_schema", "name": ..., "schema": ..., "strict": ...}
+
+        We accept either and validate required fields so we fail fast with a clear error.
+        """
+
+        if not isinstance(response_format, dict):
+            raise TypeError(
+                "response_format must be a dict compatible with OpenAI response formatting. "
+                f"Received {type(response_format).__name__}."
+            )
+
+        fmt_type = response_format.get("type")
+        if fmt_type != "json_schema":
+            # For non-json_schema formats we pass through unchanged.
+            return dict(response_format)
+
+        # Chat Completions shape: {"type": "json_schema", "json_schema": {...}}
+        json_schema = response_format.get("json_schema")
+        if isinstance(json_schema, dict):
+            name = json_schema.get("name")
+            if not isinstance(name, str) or not name.strip():
+                raise ValueError(
+                    "OpenAI Responses API requires structured outputs to include `text.format.name`. "
+                    "Expected response_format like {type: 'json_schema', json_schema: {name: <string>, schema: <object>}}."
+                )
+            schema = json_schema.get("schema")
+            if not isinstance(schema, dict):
+                raise ValueError(
+                    "OpenAI Responses API requires structured outputs to include `text.format.schema` as a JSON schema object."
+                )
+            # Lift json_schema fields to the top-level for the Responses API.
+            return {"type": "json_schema", **json_schema}
+
+        # Responses API shape (already lifted): {"type": "json_schema", "name": ..., "schema": ...}
+        name = response_format.get("name")
+        schema = response_format.get("schema")
+        if isinstance(name, str) and name.strip() and isinstance(schema, dict):
+            return dict(response_format)
+
+        raise ValueError(
+            "Invalid json_schema response_format. Provide either Chat Completions shape "
+            "{type: 'json_schema', json_schema: {name, schema, ...}} or Responses API shape "
+            "{type: 'json_schema', name, schema, ...}."
+        )
 
     def _normalize_openai_status(self, status: Any) -> Optional[str]:
         if status is None:
@@ -255,7 +307,9 @@ class LLMClient:
             if use_reasoning:
                 request_kwargs["reasoning"] = {"effort": "medium"}
             if response_format:
-                request_kwargs["text"] = {"format": response_format}
+                request_kwargs["text"] = {
+                    "format": self._openai_text_format_from_response_format(response_format)
+                }
 
             response = self._openai_client.responses.create(**request_kwargs)
             response_id = getattr(response, "id", None)
@@ -357,7 +411,9 @@ class LLMClient:
             if use_reasoning:
                 request_kwargs["reasoning"] = {"effort": "medium"}
             if response_format:
-                request_kwargs["text"] = {"format": response_format}
+                request_kwargs["text"] = {
+                    "format": self._openai_text_format_from_response_format(response_format)
+                }
 
             saw_delta = False
             with self._openai_client.responses.stream(**request_kwargs) as stream:

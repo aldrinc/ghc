@@ -1,0 +1,1525 @@
+from __future__ import annotations
+
+import json
+import time
+from collections.abc import Generator
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Literal, Optional, cast
+
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import select
+
+from app.agent.runtime import BaseTool
+from app.agent.types import ToolContext, ToolResult
+from app.config import settings
+from app.db.enums import FunnelPageReviewStatusEnum, FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
+from app.db.models import Funnel, FunnelPage, FunnelPageVersion, Product
+from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
+from app.llm.client import LLMClient, LLMGenerationParams
+from app.services.claude_files import build_document_blocks, call_claude_structured_message
+from app.services.design_systems import resolve_design_system_tokens
+from app.services.funnel_templates import get_funnel_template
+from app.services.funnels import extract_internal_links, publish_funnel
+from app.services.funnel_testimonials import generate_funnel_page_testimonials
+
+# Reuse funnel_ai internals to keep behavior consistent while we split orchestration.
+from app.services import funnel_ai as funnel_ai
+
+
+_ObjectiveTemplateKind = Literal["sales-pdp", "pre-sales-listicle"]
+
+
+def _resolve_template_kind(template_id: str) -> _ObjectiveTemplateKind | None:
+    if template_id == "sales-pdp":
+        return "sales-pdp"
+    if template_id == "pre-sales-listicle":
+        return "pre-sales-listicle"
+    return None
+
+
+def _allowed_component_types(template_kind: str | None) -> set[str]:
+    allowed = {
+        "Section",
+        "Columns",
+        "Heading",
+        "Text",
+        "Button",
+        "Image",
+        "Spacer",
+        "FeatureGrid",
+        "Testimonials",
+        "FAQ",
+    }
+    if template_kind == "sales-pdp":
+        allowed.update(
+            {
+                "SalesPdpPage",
+                "SalesPdpHeader",
+                "SalesPdpHero",
+                "SalesPdpVideos",
+                "SalesPdpMarquee",
+                "SalesPdpStoryProblem",
+                "SalesPdpStorySolution",
+                "SalesPdpComparison",
+                "SalesPdpGuarantee",
+                "SalesPdpFaq",
+                "SalesPdpReviewWall",
+                "SalesPdpFooter",
+                "SalesPdpReviewSlider",
+                "SalesPdpTemplate",
+            }
+        )
+    elif template_kind == "pre-sales-listicle":
+        allowed.update(
+            {
+                "PreSalesPage",
+                "PreSalesHero",
+                "PreSalesReasons",
+                "PreSalesReviews",
+                "PreSalesMarquee",
+                "PreSalesPitch",
+                "PreSalesReviewWall",
+                "PreSalesFooter",
+                "PreSalesFloatingCta",
+                "PreSalesTemplate",
+            }
+        )
+    return allowed
+
+
+@dataclass(frozen=True)
+class _TemplateContext:
+    template_id: str | None
+    template_mode: bool
+    template_kind: str | None
+
+
+def _build_attachment_guidance(attachment_summaries: list[dict[str, Any]]) -> str:
+    if not attachment_summaries:
+        return ""
+    lines = [
+        "Attached images guidance:",
+        "- Use Image.props.assetPublicId to place an attached image as-is.",
+        "- Use Image.props.referenceAssetPublicId with a prompt to generate a new image based on an attachment.",
+        "- Do not invent assetPublicId/referenceAssetPublicId values.",
+        "Attached images:",
+    ]
+    for item in attachment_summaries:
+        line = f"- {item.get('publicId')}"
+        filename = item.get("filename") or ""
+        if filename:
+            line += f" (filename: {filename})"
+        if item.get("width") and item.get("height"):
+            line += f" [{item.get('width')}x{item.get('height')}]"
+        lines.append(line)
+    return "\n".join(lines) + "\n\n"
+
+
+class ContextLoadFunnelArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    funnelId: str
+    pageId: str
+    currentPuckData: Optional[dict[str, Any]] = None
+    templateId: Optional[str] = None
+
+
+class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
+    name = "context.load_funnel"
+    ArgsModel = ContextLoadFunnelArgs
+
+    def run(self, *, ctx: ToolContext, args: ContextLoadFunnelArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        funnel = ctx.session.scalars(
+            select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+        ).first()
+        if not funnel:
+            raise ValueError("Funnel not found")
+
+        page = ctx.session.scalars(
+            select(FunnelPage).where(FunnelPage.funnel_id == args.funnelId, FunnelPage.id == args.pageId)
+        ).first()
+        if not page:
+            raise ValueError("Page not found")
+
+        resolved_template_id = funnel_ai._resolve_template_id(args.templateId, page)
+        template = get_funnel_template(resolved_template_id) if resolved_template_id else None
+        if resolved_template_id and not template:
+            raise ValueError("Template not found")
+
+        template_kind = None
+        if template is not None:
+            template_kind = _resolve_template_kind(template.template_id)
+            if template_kind is None:
+                raise ValueError(f"Template {template.template_id} is not supported for AI generation")
+
+        pages = list(
+            ctx.session.scalars(
+                select(FunnelPage)
+                .where(FunnelPage.funnel_id == args.funnelId)
+                .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
+            ).all()
+        )
+        page_context = [{"id": str(p.id), "name": p.name, "slug": p.slug} for p in pages]
+        page_id_set = {str(p.id) for p in pages}
+
+        latest_draft = ctx.session.scalars(
+            select(FunnelPageVersion)
+            .where(
+                FunnelPageVersion.page_id == args.pageId,
+                FunnelPageVersion.status == FunnelPageVersionStatusEnum.draft,
+            )
+            .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
+        ).first()
+
+        base_puck = args.currentPuckData or (latest_draft.puck_data if latest_draft else None)
+        if not isinstance(base_puck, dict):
+            base_puck = None
+        if template is not None and base_puck is None:
+            base_puck = template.puck_data
+
+        required_types: list[str] = []
+        if template is not None and isinstance(base_puck, dict):
+            required_types = sorted(
+                funnel_ai._required_template_component_types(base_puck, template_kind=template_kind)
+            )
+
+        allowed_types = sorted(_allowed_component_types(template_kind))
+
+        template_ctx = _TemplateContext(
+            template_id=resolved_template_id,
+            template_mode=template is not None,
+            template_kind=template_kind,
+        )
+
+        ui_details = {
+            "funnelId": str(funnel.id),
+            "clientId": str(funnel.client_id),
+            "productId": str(funnel.product_id) if funnel.product_id else None,
+            "campaignId": str(funnel.campaign_id) if funnel.campaign_id else None,
+            "pageId": str(page.id),
+            "pageName": page.name,
+            "pageSlug": page.slug,
+            "pageContext": page_context,
+            "pageIdSet": sorted(page_id_set),
+            "basePuckData": base_puck,
+            "templateId": template_ctx.template_id,
+            "templateMode": template_ctx.template_mode,
+            "templateKind": template_ctx.template_kind,
+            "allowedTypes": allowed_types,
+            "requiredTypes": required_types,
+        }
+
+        llm_output = json.dumps(
+            {
+                "templateId": template_ctx.template_id,
+                "templateKind": template_ctx.template_kind,
+                "allowedTypes": allowed_types,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class ContextLoadProductOfferArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    funnelId: str
+    clientId: str
+
+
+class ContextLoadProductOfferTool(BaseTool[ContextLoadProductOfferArgs]):
+    name = "context.load_product_offer"
+    ArgsModel = ContextLoadProductOfferArgs
+
+    def run(self, *, ctx: ToolContext, args: ContextLoadProductOfferArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+        funnel = ctx.session.scalars(
+            select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+        ).first()
+        if not funnel:
+            raise ValueError("Funnel not found")
+
+        product, offer, product_context = funnel_ai._load_product_context(
+            session=ctx.session,
+            org_id=ctx.org_id,
+            client_id=args.clientId,
+            funnel=funnel,
+        )
+
+        ui_details = {
+            "productId": str(product.id) if product else None,
+            "selectedOfferId": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
+            "productContext": product_context,
+        }
+        if offer:
+            ui_details["offerId"] = str(offer.id)
+
+        llm_output = product_context
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class ContextLoadDesignTokensArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    clientId: str
+    funnelId: str
+    pageId: str
+
+
+class ContextLoadDesignTokensTool(BaseTool[ContextLoadDesignTokensArgs]):
+    name = "context.load_design_tokens"
+    ArgsModel = ContextLoadDesignTokensArgs
+
+    def run(self, *, ctx: ToolContext, args: ContextLoadDesignTokensArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        funnel = ctx.session.scalars(
+            select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+        ).first()
+        if not funnel:
+            raise ValueError("Funnel not found")
+        page = ctx.session.scalars(
+            select(FunnelPage).where(FunnelPage.funnel_id == args.funnelId, FunnelPage.id == args.pageId)
+        ).first()
+        if not page:
+            raise ValueError("Page not found")
+
+        tokens = resolve_design_system_tokens(
+            session=ctx.session,
+            org_id=ctx.org_id,
+            client_id=args.clientId,
+            funnel=funnel,
+            page=page,
+        )
+
+        brand_logo_public_id: str | None = None
+        logo_alt: str | None = None
+        if isinstance(tokens, dict):
+            brand = tokens.get("brand")
+            if isinstance(brand, dict):
+                logo_value = brand.get("logoAssetPublicId")
+                if isinstance(logo_value, str) and logo_value.strip():
+                    brand_logo_public_id = logo_value.strip()
+                alt_value = brand.get("logoAlt")
+                if isinstance(alt_value, str) and alt_value.strip():
+                    logo_alt = alt_value.strip()
+
+        ui_details = {
+            "designSystemTokens": tokens,
+            "brandLogoAssetPublicId": brand_logo_public_id,
+            "brandLogoAlt": logo_alt,
+        }
+        llm_output = json.dumps({"brandLogoAssetPublicId": brand_logo_public_id}, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class ContextLoadBrandDocsArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    funnelId: str
+    ideaWorkspaceId: Optional[str] = None
+
+
+class ContextLoadBrandDocsTool(BaseTool[ContextLoadBrandDocsArgs]):
+    name = "context.load_brand_docs"
+    ArgsModel = ContextLoadBrandDocsArgs
+
+    def run(self, *, ctx: ToolContext, args: ContextLoadBrandDocsArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        funnel = ctx.session.scalars(
+            select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+        ).first()
+        if not funnel:
+            raise ValueError("Funnel not found")
+        if not funnel.product_id:
+            raise ValueError("product_id is required to generate AI funnel drafts.")
+
+        resolved_workspace_id = args.ideaWorkspaceId or f"client-{funnel.client_id}"
+        ctx_repo = ClaudeContextFilesRepository(ctx.session)
+        context_files = ctx_repo.list_for_generation_context(
+            org_id=ctx.org_id,
+            idea_workspace_id=resolved_workspace_id,
+            client_id=str(funnel.client_id),
+            product_id=str(funnel.product_id),
+            campaign_id=str(funnel.campaign_id) if funnel.campaign_id else None,
+        )
+
+        documents = build_document_blocks(context_files)
+        ui_details = {
+            "ideaWorkspaceId": resolved_workspace_id,
+            "contextFiles": [
+                {
+                    "id": str(getattr(rec, "id", "")),
+                    "docKey": getattr(rec, "doc_key", None),
+                    "docTitle": getattr(rec, "doc_title", None),
+                    "claudeFileId": getattr(rec, "claude_file_id", None),
+                    "status": getattr(rec, "status", None),
+                }
+                for rec in context_files
+            ],
+            "documentBlocks": documents,
+        }
+        llm_output = json.dumps(
+            {"documents": [{"title": d.get("title"), "file_id": d.get("source", {}).get("file_id")} for d in documents]},
+            separators=(",", ":"),
+        )
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class DraftGeneratePageArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    funnelId: str
+    pageId: str
+    pageName: str = ""
+    prompt: str
+    messages: list[dict[str, str]] = Field(default_factory=list)
+    model: Optional[str] = None
+    temperature: float = 0.2
+    maxTokens: Optional[int] = Field(default=None, gt=0)
+    templateId: Optional[str] = None
+    templateKind: Optional[str] = None
+    templateMode: bool = False
+    pageContext: list[dict[str, Any]] = Field(default_factory=list)
+    basePuckData: Optional[dict[str, Any]] = None
+    productContext: str
+    attachmentSummaries: list[dict[str, Any]] = Field(default_factory=list)
+    attachmentBlocks: list[dict[str, Any]] = Field(default_factory=list)
+    brandDocuments: list[dict[str, Any]] = Field(default_factory=list)
+    copyPack: Optional[str] = None
+
+
+class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
+    name = "draft.generate_page"
+    ArgsModel = DraftGeneratePageArgs
+
+    def run_stream(self, *, ctx: ToolContext, args: DraftGeneratePageArgs) -> Generator[dict[str, Any], None, ToolResult]:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        llm = LLMClient()
+        model_id = args.model or llm.default_model
+        max_tokens = funnel_ai._coerce_max_tokens(model_id, args.maxTokens)
+
+        template_kind = args.templateKind
+        template_mode = bool(args.templateMode)
+
+        # Layout guidance varies based on template mode.
+        if not template_mode:
+            structure_guidance = (
+                "- Use Section as the top-level blocks in puckData.content (do not place bare Heading/Text directly at the root)\n"
+                "- Use Columns inside Sections for two-column layouts (image + copy)\n\n"
+            )
+        elif template_kind == "sales-pdp":
+            structure_guidance = (
+                "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
+                "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
+                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
+            )
+        else:
+            structure_guidance = (
+                "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
+                "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
+                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+            )
+
+        header_footer_guidance = (
+            "Header/Footer guidance:\n"
+            "- If the user requests a header: add a Section with props.purpose='header' as the FIRST item in puckData.content\n"
+            "- If the user requests a footer: add a Section with props.purpose='footer' as the LAST item in puckData.content\n"
+            "- Header should include brand + simple navigation (Buttons linking to internal pages when available)\n"
+            "- Footer should include a brief disclaimer + secondary links (Buttons)\n\n"
+            if not template_mode
+            else ""
+        )
+
+        copy_pack_guidance = ""
+        if isinstance(args.copyPack, str) and args.copyPack.strip():
+            copy_pack_guidance = (
+                "Copy pack (source of truth):\n"
+                "- Use this copy as the default wording for headlines, claims, and offers.\n"
+                "- Do not invent missing facts; keep health/medical claims conservative.\n"
+                f"{args.copyPack.strip()}\n\n"
+            )
+
+        context_guidance = (
+            "Context guidance:\n"
+            "- Use the attached brand documents as the source of truth for brand voice, offer, and constraints.\n\n"
+            if args.brandDocuments
+            else ""
+        )
+
+        attachment_guidance = _build_attachment_guidance(args.attachmentSummaries)
+
+        template_guidance = (
+            f"Template guidance:\n- Template id: {args.templateId}\n"
+            "- Do not introduce new component types not listed below.\n"
+            "- Do not remove or rename existing template components in the current page puckData; only edit their props/config/copy fields.\n"
+            if template_mode and args.templateId
+            else ""
+        )
+
+        template_image_guidance = ""
+        if template_mode:
+            template_image_guidance = (
+                "Template image prompts:\n"
+                "- Add a `prompt` on every image object inside props.config/props.modals/props.copy that should be generated.\n"
+                "- Do NOT add prompts to brand logos (logo objects). Keep logo assetPublicId intact.\n"
+                "- Do NOT add prompts to testimonial images (objects with testimonialTemplate); those are rendered separately.\n"
+                "- Leave the corresponding *AssetPublicId field empty so the backend can generate and fill it.\n"
+                "- Placeholder /assets/ph-* images must be replaced with prompts or assetPublicId.\n"
+                "- Prefer Unsplash for stock-appropriate imagery (lifestyle, generic product-in-use, backgrounds).\n"
+                "- To use Unsplash, set imageSource='unsplash' on the image object and include a prompt.\n"
+                "- Use AI generation only when stock imagery does not fit the need.\n"
+                "- Icon prompts (iconAssetPublicId) must be flat vector icons on transparent backgrounds.\n"
+                "- Do not set referenceAssetPublicId unless you are using one of the attached images listed above.\n"
+                "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n\n"
+            )
+            if template_kind == "sales-pdp":
+                template_image_guidance += (
+                    "Sales PDP product imagery:\n"
+                    "- Hero/gallery imagery must show the product clearly.\n"
+                    "- Any section that calls out the product should include the product in the image.\n\n"
+                )
+            if template_kind == "pre-sales-listicle":
+                template_image_guidance += (
+                    "Pre-sales listicle imagery:\n"
+                    "- Reason images should use a square (1:1) aspect ratio.\n"
+                    "- If copy references the product, include the product in the image.\n\n"
+                )
+
+        template_config_guidance = ""
+        if template_mode and template_kind == "sales-pdp":
+            template_config_guidance = (
+                "Sales PDP config requirements:\n"
+                "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
+                "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
+            )
+
+        if not template_mode:
+            template_component = ""
+        elif template_kind == "sales-pdp":
+            template_component = (
+                "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
+                "12) SalesPdpHeader: props { id, config, configJson? }\n"
+                "13) SalesPdpHero: props { id, config, configJson?, modals?, modalsJson?, copy?, copyJson? }\n"
+                "14) SalesPdpVideos: props { id, config, configJson? }\n"
+                "15) SalesPdpMarquee: props { id, config, configJson? }\n"
+                "16) SalesPdpStoryProblem: props { id, config, configJson? }\n"
+                "17) SalesPdpStorySolution: props { id, config, configJson? }\n"
+                "18) SalesPdpComparison: props { id, config, configJson? }\n"
+                "19) SalesPdpGuarantee: props { id, config, configJson?, feedImages?, feedImagesJson? }\n"
+                "20) SalesPdpFaq: props { id, config, configJson? }\n"
+                "21) SalesPdpReviewWall: props { id, config, configJson? }\n"
+                "22) SalesPdpFooter: props { id, config, configJson? }\n"
+                "23) SalesPdpReviewSlider: props { id, config, configJson? }\n"
+            )
+        else:
+            template_component = (
+                "11) PreSalesPage: props { id, anchorId?, theme, themeJson?, content? }\n"
+                "12) PreSalesHero: props { id, config, configJson? }\n"
+                "13) PreSalesReasons: props { id, config, configJson? }\n"
+                "14) PreSalesReviews: props { id, config, configJson?, copy?, copyJson? }\n"
+                "15) PreSalesMarquee: props { id, config, configJson? }\n"
+                "16) PreSalesPitch: props { id, config, configJson? }\n"
+                "17) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
+                "18) PreSalesFooter: props { id, config, configJson? }\n"
+                "19) PreSalesFloatingCta: props { id, config, configJson? }\n"
+            )
+
+        page_label = "sales page" if template_kind != "pre-sales-listicle" else "pre-sales listicle page"
+
+        system_content = (
+            f"You are generating content for a Puck editor {page_label}.\n\n"
+            "You MUST output valid JSON only (no markdown, no code fences, no commentary).\n"
+            "Do not wrap the output in ``` or any code fences.\n"
+            "The response must start with '{' and end with '}' (no leading or trailing text).\n"
+            "Use \\n for line breaks inside JSON string values (no raw newlines).\n"
+            "Return exactly ONE JSON object with this shape:\n"
+            '{ \"assistantMessage\": string, \"puckData\": string }\n'
+            "puckData must be a JSON-encoded string for this object shape:\n"
+            '{ \"root\": { \"props\": object }, \"content\": ComponentData[], \"zones\": object }\n\n'
+            "Output the top-level keys in this exact order: assistantMessage, puckData.\n\n"
+            "assistantMessage requirements:\n"
+            "- Plain text (no markdown)\n"
+            f"- Keep it under {funnel_ai._ASSISTANT_MESSAGE_MAX_CHARS} characters (short summary only; do not include full page copy)\n"
+            "- Provide a short preview of the page (headings + main CTA only) so it looks good in a chat bubble\n"
+            "- Include a medical safety disclaimer and avoid making medical claims\n\n"
+            "Copy goals:\n"
+            "- High-converting direct-response structure (clear promise, benefits, proof, objections/FAQ, repeated CTA)\n"
+            "- Be specific and scannable (short paragraphs, bullets)\n"
+            "- Use ethical persuasion; avoid fear-mongering\n\n"
+            "Layout guidance:\n"
+            "- Default to Section.layout='full' for most sections (do not place bare Heading/Text directly at the root)\n"
+            "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
+            "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
+            f"{context_guidance}"
+            f"{copy_pack_guidance}"
+            f"{args.productContext}"
+            f"{attachment_guidance}"
+            f"{template_guidance}"
+            f"{template_image_guidance}"
+            f"{template_config_guidance}"
+            "Structure guidance:\n"
+            f"{structure_guidance}"
+            f"{header_footer_guidance}"
+            "ComponentData shape:\n"
+            "- Every component must be an object with keys: type, props\n"
+            "- props should include a string id (unique per component)\n\n"
+            "Available primitives (component types) and their props:\n"
+            "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+            "   - purpose: 'header' | 'section' | 'footer'\n"
+            "   - layout: 'full' | 'contained' | 'card'\n"
+            "     - full = full-width background, content constrained to containerWidth\n"
+            "     - contained = background constrained to containerWidth (no card styling)\n"
+            "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
+            "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
+            "   - content is a slot: ComponentData[]\n"
+            "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
+            "   - left/right are slots: ComponentData[]\n"
+            "3) Heading: props { id, text, level?, align? }\n"
+            "   - level: 1|2|3|4 (H1-H4)\n"
+            "   - align: 'left' | 'center'\n"
+            "4) Text: props { id, text, size?, tone?, align? }\n"
+            "   - size: 'sm' | 'md' | 'lg'\n"
+            "   - tone: 'default' | 'muted'\n"
+            "   - align: 'left' | 'center'\n"
+            "5) Spacer: props { id, height }\n"
+            "6) Image: props { id, prompt, alt, imageSource?, assetPublicId?, referenceAssetPublicId?, src?, radius? }\n"
+            "   - imageSource: 'ai' (default) | 'unsplash'\n"
+            "   - radius: 'none' | 'md' | 'lg'\n"
+            "   - If imageSource='unsplash': include prompt and leave assetPublicId empty (no referenceAssetPublicId)\n"
+            "   - If referenceAssetPublicId is set: include prompt and leave assetPublicId empty\n"
+            "7) Button: props { id, label, variant?, size?, width?, align?, linkType?, targetPageId?, href? }\n"
+            "   - variant: 'primary' | 'secondary'\n"
+            "   - size: 'sm' | 'md' | 'lg'\n"
+            "   - width: 'auto' | 'full'\n"
+            "   - align: 'left' | 'center' | 'right'\n"
+            "   - If linkType='funnelPage': include targetPageId\n"
+            "   - If linkType='external': include href\n"
+            "8) FeatureGrid: props { id, title?, columns?, features? }\n"
+            "9) Testimonials: props { id, title?, testimonials? }\n"
+            "10) FAQ: props { id, title?, items? }\n"
+            f"{template_component}\n"
+            "Root props (optional):\n"
+            "- root.props.title\n"
+            "- root.props.description\n\n"
+            "Internal funnel pages you can link to (targetPageId should be one of these ids):\n"
+            f"{json.dumps(args.pageContext, ensure_ascii=False)}\n\n"
+            "Current page puckData (may be null):\n"
+            f"{json.dumps(args.basePuckData, ensure_ascii=False)}"
+        )
+
+        conversation: list[dict[str, str]] = []
+        for msg in args.messages or []:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role in ("user", "assistant") and isinstance(content, str) and content.strip():
+                conversation.append({"role": cast(Literal["user", "assistant"], role), "content": content.strip()})
+        if args.prompt and args.prompt.strip():
+            conversation.append({"role": "user", "content": args.prompt.strip()})
+        if not conversation:
+            conversation.append({"role": "user", "content": "Generate a simple funnel landing page."})
+
+        base_prompt_parts = [system_content] + [f"{m['role'].upper()}: {m['content']}" for m in conversation]
+        compiled_prompt = "\n\n".join(base_prompt_parts + ["Return JSON now."])
+
+        allowed_types = _allowed_component_types(template_kind)
+
+        params = LLMGenerationParams(
+            model=model_id,
+            max_tokens=max_tokens,
+            temperature=args.temperature,
+            use_reasoning=True,
+            use_web_search=False,
+            response_format=funnel_ai._puck_response_format(),
+        )
+
+        # Claude structured outputs: support brand docs and vision attachments (non-stream).
+        #
+        # We intentionally do NOT switch models: if brand docs/vision blocks are present, the caller
+        # must already be using a Claude model. This keeps model selection explicit and avoids hidden
+        # "fallback" behavior.
+        is_claude_model = model_id.lower().startswith("claude")
+        if args.brandDocuments and not is_claude_model:
+            raise ValueError("brandDocuments require a Claude model (model must start with 'claude').")
+        if args.attachmentBlocks and not is_claude_model:
+            raise ValueError("attachmentBlocks require a Claude vision-capable model (model must start with 'claude').")
+
+        out = ""
+        obj: dict[str, Any] | None = None
+        final_model = model_id
+
+        def _claude_structured(prompt_text: str) -> tuple[dict[str, Any], str]:
+            # Claude's global default max token budget in funnel_ai is intentionally huge (64k), but
+            # page draft generations should not need that much. Large max_tokens budgets can cause
+            # very long-running requests. Cap by default unless the caller explicitly overrides.
+            default_claude_max = 20_000
+            claude_max = args.maxTokens if args.maxTokens is not None else default_claude_max
+            claude_max = min(claude_max, funnel_ai._CLAUDE_MAX_OUTPUT_TOKENS)
+            user_content = [{"type": "text", "text": prompt_text}, *args.attachmentBlocks, *args.brandDocuments]
+            response = call_claude_structured_message(
+                model=model_id,
+                system=None,
+                user_content=user_content,
+                output_schema=funnel_ai._puck_output_schema(),
+                max_tokens=claude_max,
+                temperature=args.temperature,
+            )
+            parsed = response.get("parsed") if isinstance(response, dict) else None
+            if not isinstance(parsed, dict):
+                raise RuntimeError("Claude structured response returned no parsed JSON.")
+            return parsed, json.dumps(parsed, ensure_ascii=False)
+
+        if is_claude_model:
+            obj, out = _claude_structured(compiled_prompt)
+        else:
+            extractor = funnel_ai._AssistantMessageJsonExtractor()
+            raw_parts: list[str] = []
+            for delta in llm.stream_text(compiled_prompt, params=params):
+                raw_parts.append(delta)
+                if delta:
+                    yield {"type": "raw", "text": delta}
+                assistant_delta = extractor.feed(delta)
+                if assistant_delta:
+                    yield {"type": "text", "text": assistant_delta}
+            out = "".join(raw_parts)
+
+            try:
+                obj = funnel_ai._extract_json_object(out)
+            except Exception as exc:  # noqa: BLE001
+                yield {"type": "status", "status": "repairing"}
+                repair_lines = [
+                    "The previous response was invalid JSON. Regenerate from scratch.",
+                    f"Error: {exc}",
+                    f"assistantMessage must be under {funnel_ai._ASSISTANT_MESSAGE_MAX_CHARS} characters.",
+                    "The response must start with '{' and end with '}' (no code fences).",
+                ]
+                if len(out) <= funnel_ai._REPAIR_PREVIOUS_RESPONSE_MAX_CHARS:
+                    repair_lines.append(f"Previous response:\n{out}")
+                repair_lines.append("Return corrected JSON only.")
+                repair_prompt = "\n\n".join(base_prompt_parts + repair_lines)
+                out = llm.generate_text(repair_prompt, params=params)
+                obj = funnel_ai._extract_json_object(out)
+
+        if obj is None:
+            raise RuntimeError("Model returned no parsable JSON response")
+
+        assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage") if isinstance(obj, dict) else None)
+
+        puck_data_raw = funnel_ai._coerce_puck_data(obj.get("puckData") if isinstance(obj, dict) else None)
+        puck_data = funnel_ai._sanitize_puck_data(puck_data_raw)
+        puck_data["content"] = funnel_ai._sanitize_component_tree(puck_data.get("content"), allowed_types)
+        zones = puck_data.get("zones")
+        if isinstance(zones, dict):
+            for key, value in list(zones.items()):
+                zones[key] = funnel_ai._sanitize_component_tree(value, allowed_types)
+        funnel_ai._ensure_block_ids(puck_data)
+
+        if not puck_data.get("content"):
+            yield {"type": "status", "status": "repairing_empty"}
+            repair_prompt = "\n\n".join(
+                base_prompt_parts
+                + [
+                    "Your previous response resulted in an empty page.",
+                    "Return a complete page using the available component types listed above.",
+                    f"assistantMessage must be under {funnel_ai._ASSISTANT_MESSAGE_MAX_CHARS} characters.",
+                    "The response must start with '{' and end with '}' (no code fences).",
+                    f"Previous response:\n{out}" if len(out) <= funnel_ai._REPAIR_PREVIOUS_RESPONSE_MAX_CHARS else "",
+                    "Return corrected JSON only.",
+                ]
+            )
+            if is_claude_model:
+                obj, out = _claude_structured(repair_prompt)
+            else:
+                out = llm.generate_text(repair_prompt, params=params)
+                obj = funnel_ai._extract_json_object(out)
+            assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage") if isinstance(obj, dict) else None)
+            puck_data_raw = funnel_ai._coerce_puck_data(obj.get("puckData") if isinstance(obj, dict) else None)
+            puck_data = funnel_ai._sanitize_puck_data(puck_data_raw)
+            puck_data["content"] = funnel_ai._sanitize_component_tree(puck_data.get("content"), allowed_types)
+            zones = puck_data.get("zones")
+            if isinstance(zones, dict):
+                for key, value in list(zones.items()):
+                    zones[key] = funnel_ai._sanitize_component_tree(value, allowed_types)
+            funnel_ai._ensure_block_ids(puck_data)
+
+        # Header/footer request repair + deterministic injection (non-template only).
+        wants_header, wants_footer = funnel_ai._prompt_wants_header_footer(args.prompt)
+        if template_mode:
+            wants_header = False
+            wants_footer = False
+        missing_header = wants_header and not funnel_ai._puck_has_section_purpose(puck_data, "header")
+        missing_footer = wants_footer and not funnel_ai._puck_has_section_purpose(puck_data, "footer")
+        if missing_header or missing_footer:
+            yield {"type": "status", "status": "repairing_header_footer"}
+            requirements: list[str] = []
+            if missing_header:
+                requirements.append(
+                    "- Add a header Section as the FIRST item with props.purpose='header', layout='full', containerWidth='lg', padding='sm'."
+                )
+                requirements.append("- Header content should include brand + navigation Buttons (link to internal pages when available).")
+            if missing_footer:
+                requirements.append(
+                    "- Add a footer Section as the LAST item with props.purpose='footer', layout='full', containerWidth='lg', variant='muted', padding='md'."
+                )
+                requirements.append("- Footer content should include a brief disclaimer + secondary navigation Buttons.")
+
+            repair_prompt = "\n\n".join(
+                base_prompt_parts
+                + [
+                    "Your previous response did not include the requested header/footer sections in puckData.content.",
+                    *requirements,
+                    "Keep the rest of the page content unchanged.",
+                    f"Previous response:\n{out}",
+                    "Return corrected JSON only.",
+                ]
+            )
+            if is_claude_model:
+                obj, out = _claude_structured(repair_prompt)
+            else:
+                out = llm.generate_text(repair_prompt, params=params)
+                obj = funnel_ai._extract_json_object(out)
+            assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage") if isinstance(obj, dict) else None)
+            puck_data_raw = funnel_ai._coerce_puck_data(obj.get("puckData") if isinstance(obj, dict) else None)
+            puck_data = funnel_ai._sanitize_puck_data(puck_data_raw)
+            puck_data["content"] = funnel_ai._sanitize_component_tree(puck_data.get("content"), allowed_types)
+            zones = puck_data.get("zones")
+            if isinstance(zones, dict):
+                for key, value in list(zones.items()):
+                    zones[key] = funnel_ai._sanitize_component_tree(value, allowed_types)
+            funnel_ai._ensure_block_ids(puck_data)
+
+        funnel_ai._inject_header_footer_if_missing(
+            puck_data=puck_data,
+            page_name=args.pageName,
+            current_page_id=args.pageId,
+            page_context=args.pageContext,
+            wants_header=wants_header,
+            wants_footer=wants_footer,
+        )
+
+        if not puck_data.get("content"):
+            raise RuntimeError("AI generation produced an empty page (no content).")
+
+        ui_details = {
+            "assistantMessage": assistant_message,
+            "puckData": puck_data,
+            "model": final_model,
+        }
+        llm_output = json.dumps({"assistantMessage": assistant_message, "model": final_model}, ensure_ascii=False)
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class DraftApplyOverridesArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    clientId: str
+    funnelId: str
+    pageId: str
+    puckData: dict[str, Any]
+    basePuckData: Optional[dict[str, Any]] = None
+    templateKind: Optional[str] = None
+    designSystemTokens: Optional[dict[str, Any]] = None
+    brandLogoAssetPublicId: Optional[str] = None
+    productId: str
+
+
+class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
+    name = "draft.apply_overrides"
+    ArgsModel = DraftApplyOverridesArgs
+
+    def run(self, *, ctx: ToolContext, args: DraftApplyOverridesArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        page = ctx.session.scalars(
+            select(FunnelPage).where(FunnelPage.funnel_id == args.funnelId, FunnelPage.id == args.pageId)
+        ).first()
+        if not page:
+            raise ValueError("Page not found")
+
+        product = ctx.session.scalars(
+            select(Product).where(Product.org_id == ctx.org_id, Product.client_id == args.clientId, Product.id == args.productId)
+        ).first()
+        if not product:
+            raise ValueError("Product not found")
+
+        restored_sections = 0
+        if args.templateKind and args.basePuckData and isinstance(args.basePuckData, dict):
+            page_type: str | None = None
+            if args.templateKind == "sales-pdp":
+                page_type = "SalesPdpPage"
+            elif args.templateKind == "pre-sales-listicle":
+                page_type = "PreSalesPage"
+
+            def find_page(puck: dict[str, Any], type_name: str) -> Optional[dict[str, Any]]:
+                content = puck.get("content")
+                if not isinstance(content, list):
+                    return None
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == type_name:
+                        return item
+                return None
+
+            if page_type:
+                cur_page = find_page(args.puckData, page_type)
+                base_page = find_page(args.basePuckData, page_type)
+                if base_page is not None and cur_page is None:
+                    raise ValueError(f"Template page component {page_type} missing from generated puckData.")
+
+                cur_props = cur_page.get("props") if isinstance(cur_page, dict) else None
+                base_props = base_page.get("props") if isinstance(base_page, dict) else None
+                if isinstance(cur_props, dict) and isinstance(base_props, dict):
+                    base_page_id = base_props.get("id")
+                    if isinstance(base_page_id, str) and base_page_id.strip():
+                        cur_props["id"] = base_page_id
+
+                    # Restore any missing page-level props (excluding the section slot).
+                    for key, value in base_props.items():
+                        if key == "content":
+                            continue
+                        if key not in cur_props:
+                            cur_props[key] = deepcopy(value)
+
+                    cur_children = cur_props.get("content")
+                    base_children = base_props.get("content")
+                    if isinstance(cur_children, list) and isinstance(base_children, list):
+                        current_by_id: dict[str, dict[str, Any]] = {}
+                        current_by_type: dict[str, list[dict[str, Any]]] = {}
+                        for child in cur_children:
+                            if not isinstance(child, dict):
+                                continue
+                            ctype = child.get("type")
+                            cprops = child.get("props")
+                            cid = cprops.get("id") if isinstance(cprops, dict) else None
+                            if isinstance(cid, str) and cid.strip() and cid not in current_by_id:
+                                current_by_id[cid] = child
+                            if isinstance(ctype, str) and ctype:
+                                current_by_type.setdefault(ctype, []).append(child)
+
+                        used_ids: set[str] = set()
+                        merged: list[Any] = []
+                        for base_child in base_children:
+                            if not isinstance(base_child, dict):
+                                merged.append(deepcopy(base_child))
+                                continue
+                            btype = base_child.get("type")
+                            bprops = base_child.get("props")
+                            bid = bprops.get("id") if isinstance(bprops, dict) else None
+
+                            candidate: dict[str, Any] | None = None
+                            if isinstance(bid, str) and bid.strip() and bid in current_by_id:
+                                candidate = current_by_id[bid]
+                            elif isinstance(btype, str) and btype and current_by_type.get(btype):
+                                candidate = current_by_type[btype].pop(0)
+
+                            if candidate is None:
+                                merged.append(deepcopy(base_child))
+                                restored_sections += 1
+                                continue
+
+                            # Preserve template ids when we can match a base section.
+                            cprops = candidate.get("props")
+                            if isinstance(bid, str) and bid.strip() and isinstance(cprops, dict):
+                                cprops["id"] = bid
+                            cid = cprops.get("id") if isinstance(cprops, dict) else None
+                            if isinstance(cid, str) and cid.strip():
+                                used_ids.add(cid)
+                            merged.append(candidate)
+
+                        # Append any extra generated sections not present in the base template.
+                        for child in cur_children:
+                            if not isinstance(child, dict):
+                                continue
+                            cprops = child.get("props")
+                            cid = cprops.get("id") if isinstance(cprops, dict) else None
+                            if isinstance(cid, str) and cid.strip() and cid in used_ids:
+                                continue
+                            merged.append(child)
+
+                        cur_props["content"] = merged
+
+        config_contexts: list[funnel_ai._ConfigJsonContext] = []
+        if args.templateKind:
+            config_contexts = funnel_ai._collect_config_json_contexts_all(args.puckData)
+
+        funnel_ai._apply_brand_logo_overrides_for_ai(
+            session=ctx.session,
+            org_id=ctx.org_id,
+            client_id=args.clientId,
+            puck_data=args.puckData,
+            config_contexts=config_contexts,
+            design_system_tokens=args.designSystemTokens,
+        )
+
+        funnel_ai._apply_product_image_overrides_for_ai(
+            session=ctx.session,
+            org_id=ctx.org_id,
+            client_id=args.clientId,
+            puck_data=args.puckData,
+            config_contexts=config_contexts,
+            template_kind=args.templateKind,
+            product=product,
+            brand_logo_public_id=args.brandLogoAssetPublicId,
+        )
+        funnel_ai._ensure_flat_vector_icon_prompts(puck_data=args.puckData, config_contexts=config_contexts)
+
+        # Template pages often include image nodes inside config structures. The LLM occasionally deletes
+        # src/iconSrc fields while leaving prompts empty, which makes image validation fail. Restore missing
+        # non-placeholder src values from the base template puckData deterministically.
+        restored = 0
+        if args.basePuckData and isinstance(args.basePuckData, dict):
+            def set_src(target: dict[str, Any], *, asset_key: str, value: str) -> None:
+                if asset_key == "iconAssetPublicId":
+                    target["iconSrc"] = value
+                elif asset_key == "posterAssetPublicId":
+                    target["poster"] = value
+                elif asset_key == "thumbAssetPublicId":
+                    target["thumbSrc"] = value
+                elif asset_key == "swatchAssetPublicId":
+                    target["swatchImageSrc"] = value
+                else:
+                    target["src"] = value
+
+            def restore_missing_src(current: Any, base: Any) -> int:
+                # Restore src values only when the current node is missing src/prompt/assetPublicId and
+                # the base node has a non-placeholder src. Use structural matching rather than absolute
+                # JSON paths (LLM edits can reorder arrays, making path matching brittle).
+                if isinstance(current, dict) and isinstance(base, dict):
+                    if current.get("type") == "video" or funnel_ai._is_testimonial_image(current):
+                        return 0
+
+                    asset_key = funnel_ai._resolve_image_asset_key(current)
+                    if asset_key:
+                        if not current.get(asset_key):
+                            prompt = current.get("prompt")
+                            current_src = funnel_ai._get_image_src_for_asset_key(current, asset_key)
+                            if not (isinstance(prompt, str) and prompt.strip()) and not (
+                                isinstance(current_src, str) and current_src.strip()
+                            ):
+                                base_src = funnel_ai._get_image_src_for_asset_key(base, asset_key)
+                                if isinstance(base_src, str) and base_src.strip() and not funnel_ai._is_placeholder_src(
+                                    base_src
+                                ):
+                                    set_src(current, asset_key=asset_key, value=base_src)
+                                    return 1 + sum(
+                                        restore_missing_src(v, base.get(k)) for k, v in current.items() if k in base
+                                    )
+
+                    return sum(restore_missing_src(v, base.get(k)) for k, v in current.items() if k in base)
+
+                if isinstance(current, list) and isinstance(base, list):
+                    if not current or not base:
+                        return 0
+
+                    # Try to match objects by a stable key when possible (id/label/name/key),
+                    # otherwise fall back to index-wise pairing.
+                    match_field: str | None = None
+                    for candidate in ("id", "label", "name", "key"):
+                        if any(
+                            isinstance(item, dict) and isinstance(item.get(candidate), str) and item.get(candidate).strip()
+                            for item in current
+                        ) and any(
+                            isinstance(item, dict) and isinstance(item.get(candidate), str) and item.get(candidate).strip()
+                            for item in base
+                        ):
+                            match_field = candidate
+                            break
+
+                    if match_field:
+                        base_by: dict[str, Any] = {}
+                        for item in base:
+                            if not isinstance(item, dict):
+                                continue
+                            raw = item.get(match_field)
+                            if isinstance(raw, str) and raw.strip() and raw.strip() not in base_by:
+                                base_by[raw.strip()] = item
+
+                        restored_local = 0
+                        for item in current:
+                            if not isinstance(item, dict):
+                                continue
+                            raw = item.get(match_field)
+                            key = raw.strip() if isinstance(raw, str) else ""
+                            if key and key in base_by:
+                                restored_local += restore_missing_src(item, base_by[key])
+                        if restored_local:
+                            return restored_local
+
+                    return sum(restore_missing_src(cur, base[idx]) for idx, cur in enumerate(current[: len(base)]))
+
+                return 0
+
+            restored = restore_missing_src(args.puckData, args.basePuckData)
+
+        root_props = args.puckData.get("root", {}).get("props") if isinstance(args.puckData.get("root"), dict) else None
+        if isinstance(root_props, dict):
+            title = root_props.get("title")
+            if not isinstance(title, str) or not title.strip():
+                root_props["title"] = page.name
+            desc = root_props.get("description")
+            if not isinstance(desc, str):
+                root_props["description"] = ""
+
+        funnel_ai._sync_config_json_contexts(config_contexts)
+
+        applied = ["brand_logo", "product_images", "icon_prompts"]
+        if restored_sections:
+            applied.append("restore_base_sections")
+        if restored:
+            applied.append("restore_base_images")
+        ui_details = {
+            "puckData": args.puckData,
+            "applied": applied,
+            "restoredSectionCount": restored_sections,
+            "restoredImageCount": restored,
+        }
+        llm_output = json.dumps({"applied": ui_details["applied"]}, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class DraftValidateArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    puckData: dict[str, Any]
+    allowedTypes: list[str] = Field(default_factory=list)
+    requiredTypes: list[str] = Field(default_factory=list)
+    templateKind: Optional[str] = None
+    pageIdSet: list[str] = Field(default_factory=list)
+    validateTemplateImages: bool = False
+
+
+class DraftValidateTool(BaseTool[DraftValidateArgs]):
+    name = "draft.validate"
+    ArgsModel = DraftValidateArgs
+
+    def run(self, *, ctx: ToolContext, args: DraftValidateArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        errors: list[str] = []
+        warnings: list[str] = []
+
+        allowed_set = set(args.allowedTypes or [])
+        if allowed_set:
+            unknown: set[str] = set()
+            for obj in funnel_ai.walk_json(args.puckData):
+                if not isinstance(obj, dict):
+                    continue
+                t = obj.get("type")
+                # Only treat nodes that look like Puck components (type + props dict) as component types.
+                props = obj.get("props")
+                if isinstance(t, str) and t and isinstance(props, dict) and t not in allowed_set:
+                    unknown.add(t)
+            if unknown:
+                errors.append(f"Unknown component types present: {', '.join(sorted(unknown))}")
+
+        if args.requiredTypes:
+            counts = funnel_ai._count_component_types(args.puckData)
+            missing = [t for t in args.requiredTypes if counts.get(t, 0) == 0]
+            if missing:
+                errors.append(
+                    "Required template components missing from puckData: " + ", ".join(sorted(missing))
+                )
+
+        # Internal links must resolve to valid page ids.
+        if args.pageIdSet:
+            page_ids = set(args.pageIdSet)
+            for link in extract_internal_links(args.puckData):
+                if link.to_page_id not in page_ids:
+                    errors.append(f"Invalid internal link targetPageId: {link.to_page_id}")
+
+        # Template image slots must have prompts/assets before image generation.
+        if args.validateTemplateImages and args.templateKind:
+            config_contexts = funnel_ai._collect_config_json_contexts_all(args.puckData)
+            try:
+                funnel_ai._validate_required_template_images(
+                    puck_data=args.puckData,
+                    config_contexts=config_contexts,
+                )
+            except Exception as exc:  # noqa: BLE001
+                errors.append(str(exc))
+
+        ok = not errors
+        ui_details = {"ok": ok, "errors": errors, "warnings": warnings}
+        llm_output = json.dumps(ui_details, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class ImagesPlanArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    puckData: dict[str, Any]
+    templateMode: bool = False
+    templateKind: Optional[str] = None
+
+
+class ImagesPlanTool(BaseTool[ImagesPlanArgs]):
+    name = "images.plan"
+    ArgsModel = ImagesPlanArgs
+
+    def run(self, *, ctx: ToolContext, args: ImagesPlanArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+        config_contexts = funnel_ai._collect_config_json_contexts_all(args.puckData) if args.templateMode else []
+        plans = funnel_ai._collect_image_plans(puck_data=args.puckData, config_contexts=config_contexts)
+        if args.templateMode:
+            plans = funnel_ai._ensure_unsplash_usage(
+                plans,
+                puck_data=args.puckData,
+                config_contexts=config_contexts,
+            )
+        funnel_ai._sync_config_json_contexts(config_contexts)
+        ui_details = {"imagePlans": plans, "puckData": args.puckData}
+        llm_output = json.dumps({"imagePlanCount": len(plans)}, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class ImagesGenerateArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    clientId: str
+    funnelId: str
+    productId: Optional[str] = None
+    puckData: dict[str, Any]
+    maxImages: int = 3
+
+
+class ImagesGenerateTool(BaseTool[ImagesGenerateArgs]):
+    name = "images.generate"
+    ArgsModel = ImagesGenerateArgs
+
+    def run(self, *, ctx: ToolContext, args: ImagesGenerateArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        generated_images: list[dict[str, Any]] = []
+        if args.maxImages <= 0:
+            ui_details = {"generatedImages": [], "puckData": args.puckData}
+            return ToolResult(llm_output=json.dumps({"generated": 0}), ui_details=ui_details, attachments=[])
+
+        # Cap generation by requested maxImages.
+        total_needed = funnel_ai._count_ai_image_targets(args.puckData)
+        max_images = min(args.maxImages, total_needed) if total_needed > 0 else 0
+
+        try:
+            _, generated_images = funnel_ai._fill_ai_images(
+                session=ctx.session,
+                org_id=ctx.org_id,
+                client_id=args.clientId,
+                puck_data=args.puckData,
+                max_images=max_images,
+                funnel_id=args.funnelId,
+                product_id=args.productId,
+            )
+        except Exception as exc:  # noqa: BLE001
+            generated_images = [{"error": str(exc)}]
+
+        ui_details = {"generatedImages": generated_images, "puckData": args.puckData, "maxImages": max_images}
+        llm_output = json.dumps({"generated": len(generated_images), "maxImages": max_images}, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class DraftPersistVersionArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    userId: str
+    funnelId: str
+    pageId: str
+    prompt: str
+    messages: list[dict[str, str]] = Field(default_factory=list)
+    puckData: dict[str, Any]
+    assistantMessage: str
+    model: str
+    temperature: float
+    ideaWorkspaceId: Optional[str] = None
+    templateId: Optional[str] = None
+    attachmentSummaries: list[dict[str, Any]] = Field(default_factory=list)
+    imagePlans: list[dict[str, Any]] = Field(default_factory=list)
+    generatedImages: list[dict[str, Any]] = Field(default_factory=list)
+    agentRunId: Optional[str] = None
+
+
+class DraftPersistVersionTool(BaseTool[DraftPersistVersionArgs]):
+    name = "draft.persist_version"
+    ArgsModel = DraftPersistVersionArgs
+
+    def run(self, *, ctx: ToolContext, args: DraftPersistVersionArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+        if args.userId != ctx.user_id:
+            raise ValueError("userId mismatch")
+
+        # Ensure page exists and belongs to funnel.
+        page = ctx.session.scalars(
+            select(FunnelPage).where(FunnelPage.funnel_id == args.funnelId, FunnelPage.id == args.pageId)
+        ).first()
+        if not page:
+            raise ValueError("Page not found")
+
+        page.review_status = FunnelPageReviewStatusEnum.review
+
+        ai_metadata: dict[str, Any] = {
+            "prompt": args.prompt,
+            "messages": args.messages,
+            "model": args.model,
+            "temperature": args.temperature,
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "generatedImages": args.generatedImages,
+            "imagePlans": args.imagePlans,
+            "requestedImageCount": len(args.imagePlans),
+            "actorUserId": args.userId,
+            "ideaWorkspaceId": args.ideaWorkspaceId,
+            "templateId": args.templateId,
+        }
+        if args.agentRunId:
+            ai_metadata["agentRunId"] = args.agentRunId
+        if args.attachmentSummaries:
+            ai_metadata["attachedAssets"] = args.attachmentSummaries
+
+        version = FunnelPageVersion(
+            page_id=page.id,
+            status=FunnelPageVersionStatusEnum.draft,
+            puck_data=args.puckData,
+            source=FunnelPageVersionSourceEnum.ai,
+            created_at=datetime.now(timezone.utc),
+            ai_metadata=ai_metadata,
+        )
+        ctx.session.add(version)
+        ctx.session.commit()
+        ctx.session.refresh(version)
+
+        ui_details = {"draftVersionId": str(version.id)}
+        llm_output = json.dumps(ui_details, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class TestimonialsGenerateAndApplyArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    userId: str
+    funnelId: str
+    pageId: str
+    draftVersionId: Optional[str] = None
+    currentPuckData: Optional[dict[str, Any]] = None
+    templateId: Optional[str] = None
+    ideaWorkspaceId: Optional[str] = None
+    model: Optional[str] = None
+    temperature: float = 0.3
+    maxTokens: Optional[int] = None
+    synthetic: bool = True
+    agentRunId: Optional[str] = None
+
+
+class TestimonialsGenerateAndApplyTool(BaseTool[TestimonialsGenerateAndApplyArgs]):
+    name = "testimonials.generate_and_apply"
+    ArgsModel = TestimonialsGenerateAndApplyArgs
+
+    def run(self, *, ctx: ToolContext, args: TestimonialsGenerateAndApplyArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+        if args.userId != ctx.user_id:
+            raise ValueError("userId mismatch")
+
+        version, puck_data, generated = generate_funnel_page_testimonials(
+            session=ctx.session,
+            org_id=ctx.org_id,
+            user_id=args.userId,
+            funnel_id=args.funnelId,
+            page_id=args.pageId,
+            draft_version_id=args.draftVersionId,
+            current_puck_data=args.currentPuckData,
+            template_id=args.templateId,
+            idea_workspace_id=args.ideaWorkspaceId,
+            model=args.model,
+            temperature=args.temperature,
+            max_tokens=args.maxTokens,
+            synthetic=args.synthetic,
+        )
+
+        # Attach agentRunId for traceability if requested.
+        if args.agentRunId:
+            if not isinstance(version.ai_metadata, dict):
+                version.ai_metadata = {}
+            version.ai_metadata["agentRunId"] = args.agentRunId
+            ctx.session.add(version)
+            ctx.session.commit()
+            ctx.session.refresh(version)
+
+        ui_details = {
+            "draftVersionId": str(version.id),
+            "puckData": puck_data,
+            "generatedTestimonials": generated,
+        }
+        llm_output = json.dumps({"draftVersionId": str(version.id)}, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class PublishValidateReadyArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    funnelId: str
+
+
+class PublishValidateReadyTool(BaseTool[PublishValidateReadyArgs]):
+    name = "publish.validate_ready"
+    ArgsModel = PublishValidateReadyArgs
+
+    def run(self, *, ctx: ToolContext, args: PublishValidateReadyArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+
+        funnel = ctx.session.scalars(
+            select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+        ).first()
+        if not funnel:
+            raise ValueError("Funnel not found")
+
+        pages = list(
+            ctx.session.scalars(
+                select(FunnelPage)
+                .where(FunnelPage.funnel_id == args.funnelId)
+                .order_by(FunnelPage.ordering.asc(), FunnelPage.created_at.asc())
+            ).all()
+        )
+        page_id_set = {str(p.id) for p in pages}
+
+        errors: list[str] = []
+        warnings: list[str] = []
+        pages_missing_approval: list[dict[str, Any]] = []
+        synthetic_pages: list[dict[str, Any]] = []
+        broken_links: list[dict[str, Any]] = []
+
+        if not pages:
+            errors.append("Funnel has no pages.")
+
+        if funnel.entry_page_id and str(funnel.entry_page_id) not in page_id_set:
+            errors.append("Entry page does not belong to funnel.")
+        if not funnel.entry_page_id:
+            errors.append("Entry page not set.")
+
+        for page in pages:
+            approved = ctx.session.scalars(
+                select(FunnelPageVersion)
+                .where(
+                    FunnelPageVersion.page_id == page.id,
+                    FunnelPageVersion.status == FunnelPageVersionStatusEnum.approved,
+                )
+                .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
+            ).first()
+            if not approved:
+                pages_missing_approval.append({"pageId": str(page.id), "pageName": page.name})
+                continue
+
+            md = approved.ai_metadata if isinstance(approved.ai_metadata, dict) else {}
+            is_synth = bool(md.get("kind") == "testimonial_generation" and md.get("synthetic") is True)
+            prov = md.get("testimonialsProvenance")
+            if isinstance(prov, dict) and prov.get("source") == "synthetic":
+                is_synth = True
+            if is_synth:
+                synthetic_pages.append({"pageId": str(page.id), "pageName": page.name, "versionId": str(approved.id)})
+
+            for link in extract_internal_links(approved.puck_data):
+                if link.to_page_id not in page_id_set:
+                    broken_links.append(
+                        {
+                            "fromPageId": str(page.id),
+                            "fromPageName": page.name,
+                            "toPageId": link.to_page_id,
+                            "label": link.label,
+                            "kind": link.kind,
+                        }
+                    )
+
+            if page.next_page_id:
+                next_id = str(page.next_page_id)
+                if next_id == str(page.id):
+                    broken_links.append(
+                        {
+                            "fromPageId": str(page.id),
+                            "fromPageName": page.name,
+                            "toPageId": next_id,
+                            "kind": "auto",
+                            "label": "Next page cannot reference itself",
+                        }
+                    )
+                elif next_id not in page_id_set:
+                    broken_links.append(
+                        {
+                            "fromPageId": str(page.id),
+                            "fromPageName": page.name,
+                            "toPageId": next_id,
+                            "kind": "auto",
+                            "label": "Next page does not belong to funnel",
+                        }
+                    )
+
+        if pages_missing_approval:
+            errors.append(f"{len(pages_missing_approval)} page(s) are not approved.")
+        if broken_links:
+            errors.append(f"{len(broken_links)} broken internal link(s) detected.")
+        if (
+            settings.ENVIRONMENT.lower() in {"prod", "production"}
+            and not settings.ALLOW_SYNTHETIC_TESTIMONIALS_IN_PRODUCTION
+            and synthetic_pages
+        ):
+            errors.append(f"{len(synthetic_pages)} page(s) contain synthetic testimonials (blocked in production).")
+
+        ok = not errors
+        ui_details = {
+            "ok": ok,
+            "errors": errors,
+            "warnings": warnings,
+            "pagesMissingApproval": pages_missing_approval,
+            "pagesWithSyntheticTestimonials": synthetic_pages,
+            "brokenInternalLinks": broken_links,
+        }
+        llm_output = json.dumps({"ok": ok}, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class PublishExecuteArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    userId: str
+    funnelId: str
+
+
+class PublishExecuteTool(BaseTool[PublishExecuteArgs]):
+    name = "publish.execute"
+    ArgsModel = PublishExecuteArgs
+
+    def run(self, *, ctx: ToolContext, args: PublishExecuteArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+        if args.userId != ctx.user_id:
+            raise ValueError("userId mismatch")
+
+        publication = publish_funnel(session=ctx.session, org_id=ctx.org_id, user_id=args.userId, funnel_id=args.funnelId)
+        ui_details = {"publicationId": str(publication.id)}
+        llm_output = json.dumps(ui_details, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])

@@ -94,10 +94,10 @@ def build_competitor_brand_discovery_activity(params: Dict[str, Any]) -> Dict[st
         return {"brand_discovery": None, "facebook_urls": []}
 
     if len(brands_missing_facebook) == len(brands):
-        missing = ", ".join(brands_missing_facebook)
-        raise RuntimeError(
-            f"No Facebook page URLs found for any competitors: {missing}. "
-            "Facebook resolution must return at least one valid page so ads ingestion can run."
+        # Do not fail the broader research workflow; ads ingestion can be skipped and retried later.
+        activity.logger.warning(
+            "competitor_brand_discovery.no_facebook_pages",
+            extra={"missing_count": len(brands_missing_facebook), "missing_names": brands_missing_facebook[:25]},
         )
 
     discovery = BrandDiscovery(brands=brands)

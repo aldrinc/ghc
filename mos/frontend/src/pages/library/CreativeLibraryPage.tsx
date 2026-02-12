@@ -29,8 +29,8 @@ export function CreativeLibraryPage() {
           className={[
             "rounded-full px-3 py-1.5 text-sm font-medium transition",
             tab === "library"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+              ? "bg-primary text-primary-foreground"
+              : "bg-surface-2 text-content-muted hover:bg-hover",
           ].join(" ")}
         >
           Library
@@ -45,8 +45,8 @@ export function CreativeLibraryPage() {
           className={[
             "rounded-full px-3 py-1.5 text-sm font-medium transition",
             tab === "meta"
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+              ? "bg-primary text-primary-foreground"
+              : "bg-surface-2 text-content-muted hover:bg-hover",
           ].join(" ")}
         >
           Meta

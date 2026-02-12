@@ -48,8 +48,12 @@ def _create_publish_ready_funnel(api_client: TestClient, *, funnel_name: str) ->
 
     return funnel_id, public_id
 
+from sqlalchemy import select
 
-def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient):
+from app.db.models import AgentRun, AgentToolCall
+
+
+def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_session):
     client_resp = api_client.post("/clients", json={"name": "Funnels Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
@@ -100,6 +104,17 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient):
     publish = api_client.post(f"/funnels/{funnel_id}/publish")
     assert publish.status_code == 201
     publication_id = publish.json()["publicationId"]
+    run_id = publish.json().get("runId")
+    assert isinstance(run_id, str) and run_id
+
+    agent_run = db_session.scalars(select(AgentRun).where(AgentRun.id == run_id)).first()
+    assert agent_run is not None
+    assert agent_run.objective_type == "objective.publish_funnel"
+    assert agent_run.status.value == "completed"
+
+    tool_calls = list(db_session.scalars(select(AgentToolCall).where(AgentToolCall.run_id == run_id)).all())
+    tool_names = sorted({c.tool_name for c in tool_calls})
+    assert tool_names == ["publish.execute", "publish.validate_ready"]
 
     meta = api_client.get(f"/public/funnels/{public_id}/meta")
     assert meta.status_code == 200

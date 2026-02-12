@@ -60,12 +60,12 @@ function DropdownMenuContent({
     <DropdownMenuContentPrimitive
       sideOffset={sideOffset}
       className={cn(
-        'bg-white text-slate-950 z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-x-hidden overflow-y-auto rounded-md border border-slate-200 p-1 shadow-md outline-none dark:bg-slate-950 dark:text-slate-50 dark:border-slate-800',
+        'bg-popover text-popover-foreground z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] min-w-[8rem] origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-x-hidden overflow-y-auto rounded-md border border-border p-1 shadow-md outline-none',
         className,
       )}
       {...props}
     >
-      <DropdownMenuHighlightPrimitive className="absolute inset-0 bg-slate-100 z-0 rounded-sm dark:bg-slate-800">
+      <DropdownMenuHighlightPrimitive className="absolute inset-0 z-0 rounded-sm bg-hover">
         {children}
       </DropdownMenuHighlightPrimitive>
     </DropdownMenuContentPrimitive>
@@ -93,9 +93,7 @@ function DropdownMenuItem({
   return (
     <DropdownMenuHighlightItemPrimitive
       activeClassName={
-        variant === 'destructive'
-          ? 'bg-red-500/10 dark:bg-red-500/20 dark:bg-red-900/10 dark:dark:bg-red-900/20'
-          : ''
+        variant === 'destructive' ? 'bg-danger/10' : ''
       }
       disabled={disabled}
     >
@@ -104,7 +102,7 @@ function DropdownMenuItem({
         data-inset={inset}
         data-variant={variant}
         className={cn(
-          "focus:text-slate-900 data-[variant=destructive]:text-red-500 data-[variant=destructive]:focus:text-red-500 data-[variant=destructive]:*:[svg]:!text-destructive [&_svg:not([class*='text-'])]:text-slate-500 relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 dark:focus:text-slate-50 dark:data-[variant=destructive]:text-red-900 dark:data-[variant=destructive]:focus:text-red-900 dark:[&_svg:not([class*='text-'])]:text-slate-400",
+          "focus:text-content data-[variant=destructive]:text-danger data-[variant=destructive]:focus:text-danger [&_svg:not([class*='text-'])]:text-content-muted relative flex cursor-default items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-[inset]:pl-8 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
           className,
         )}
         {...props}
@@ -127,7 +125,7 @@ function DropdownMenuCheckboxItem({
       <DropdownMenuCheckboxItemPrimitive
         disabled={disabled}
         className={cn(
-          "focus:text-slate-900 relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 dark:focus:text-slate-50",
+          "focus:text-content relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
           className,
         )}
         checked={checked}
@@ -166,7 +164,7 @@ function DropdownMenuRadioItem({
       <DropdownMenuRadioItemPrimitive
         disabled={disabled}
         className={cn(
-          "focus:text-slate-900 relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 dark:focus:text-slate-50",
+          "focus:text-content relative flex cursor-default items-center gap-2 rounded-sm py-1.5 pr-2 pl-8 text-sm outline-hidden select-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
           className,
         )}
         {...props}
@@ -211,7 +209,7 @@ function DropdownMenuSeparator({
 }: DropdownMenuSeparatorProps) {
   return (
     <DropdownMenuSeparatorPrimitive
-      className={cn('bg-slate-200 -mx-1 my-1 h-px dark:bg-slate-800', className)}
+      className={cn('bg-divider -mx-1 my-1 h-px', className)}
       {...props}
     />
   );
@@ -226,7 +224,7 @@ function DropdownMenuShortcut({
   return (
     <DropdownMenuShortcutPrimitive
       className={cn(
-        'text-slate-500 ml-auto text-xs tracking-widest dark:text-slate-400',
+        'text-content-muted ml-auto text-xs tracking-widest',
         className,
       )}
       {...props}
@@ -257,7 +255,7 @@ function DropdownMenuSubTrigger({
         disabled={disabled}
         data-inset={inset}
         className={cn(
-          'focus:text-slate-900 data-[state=open]:text-slate-900 flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[inset]:pl-8 dark:focus:text-slate-50 dark:data-[state=open]:text-slate-50',
+          'focus:text-content data-[state=open]:text-content flex cursor-default items-center rounded-sm px-2 py-1.5 text-sm outline-hidden select-none data-[inset]:pl-8',
           'data-[state=open]:[&_[data-slot=chevron]]:rotate-90 [&_[data-slot=chevron]]:transition-transform [&_[data-slot=chevron]]:duration-300 [&_[data-slot=chevron]]:ease-in-out',
           className,
         )}
@@ -279,7 +277,7 @@ function DropdownMenuSubContent({
   return (
     <DropdownMenuSubContentPrimitive
       className={cn(
-        'bg-white text-slate-950 z-50 min-w-[8rem] origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-hidden rounded-md border border-slate-200 p-1 shadow-lg outline-none dark:bg-slate-950 dark:text-slate-50 dark:border-slate-800',
+        'bg-popover text-popover-foreground z-50 min-w-[8rem] origin-[var(--radix-dropdown-menu-content-transform-origin)] overflow-hidden rounded-md border border-border p-1 shadow-lg outline-none',
         className,
       )}
       {...props}

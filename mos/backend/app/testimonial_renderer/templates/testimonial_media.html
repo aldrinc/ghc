@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Testimonial Media</title>
+    <link rel="stylesheet" href="./shared.css" />
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        background: transparent;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+
+      #card {
+        width: 900px;
+        height: 1200px;
+        border-radius: 26px;
+        overflow: hidden;
+        background: #ffffff;
+      }
+
+      #media {
+        width: 100%;
+        height: 100%;
+        display: block;
+        object-fit: cover;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card">
+      <img id="media" alt="" />
+    </div>
+
+    <script>
+      window.setCardData = (data) => {
+        const img = document.getElementById('media');
+        if (!data || !data.imageUrl) return;
+        img.src = data.imageUrl;
+        if (data.alt) {
+          img.alt = data.alt;
+        }
+      };
+    </script>
+  </body>
+</html>

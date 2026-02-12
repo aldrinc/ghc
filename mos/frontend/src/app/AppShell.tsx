@@ -31,6 +31,7 @@ import {
 } from "@/components/animate-ui/components/radix/sidebar";
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
@@ -62,6 +63,7 @@ import { appRoutes } from "./routes";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type NavItem = {
   title: string;
@@ -172,6 +174,7 @@ export function AppShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { theme, setTheme } = useTheme();
   const { user } = useUser();
   const { signOut, openUserProfile, openUserSettings } = useClerk();
   const {
@@ -294,7 +297,7 @@ export function AppShell() {
                           className="gap-3"
                           onClick={() => handleSelectWorkspace(client.id)}
                         >
-                          <div className="flex h-9 w-9 items-center justify-center rounded-md border border-sidebar-border bg-white text-sidebar-foreground text-sm font-semibold uppercase">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-md border border-sidebar-border bg-surface-2 text-sidebar-foreground text-sm font-semibold uppercase">
                             {getWorkspaceInitial(client.name)}
                           </div>
                           <div className="flex flex-col">
@@ -384,17 +387,11 @@ export function AppShell() {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuGroup>
-                    <DropdownMenuItem
-                      className="gap-3"
-                      onClick={() => openUserProfile?.()}
-                    >
+                    <DropdownMenuItem className="gap-3" onClick={() => openUserProfile?.()}>
                       <BadgeCheck className="size-4" />
                       <span>Profile</span>
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="gap-3"
-                      onClick={() => openUserSettings?.()}
-                    >
+                    <DropdownMenuItem className="gap-3" onClick={() => openUserSettings?.()}>
                       <Settings2 className="size-4" />
                       <span>Account settings</span>
                     </DropdownMenuItem>
@@ -410,6 +407,13 @@ export function AppShell() {
                     </DropdownMenuItem>
                   </DropdownMenuGroup>
                   <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={theme === "dark"}
+                    onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                  >
+                    Dark mode
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => signOut({ redirectUrl: "/sign-in" })}>
                     <LogOut />
                     Sign out
@@ -422,8 +426,8 @@ export function AppShell() {
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="bg-white dark:bg-slate-950">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-white px-4 pr-4 text-sm md:px-6 dark:bg-slate-950">
+      <SidebarInset className="bg-background text-foreground">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-4 pr-4 text-sm md:px-6">
           <div className="flex items-center gap-3">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="h-5" />
@@ -455,7 +459,7 @@ export function AppShell() {
             />
           </div>
         </header>
-        <div className="flex flex-1 flex-col overflow-y-auto bg-white px-4 py-4 md:px-6 md:py-6 dark:bg-slate-950">
+        <div className="flex flex-1 flex-col overflow-y-auto bg-background px-4 py-4 md:px-6 md:py-6">
           <Outlet />
         </div>
       </SidebarInset>

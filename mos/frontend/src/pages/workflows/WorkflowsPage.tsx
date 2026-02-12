@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button, buttonClasses } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Select } from "@/components/ui/select";
@@ -240,8 +241,10 @@ export function WorkflowsPage() {
           <DialogTitle>Stop workflow?</DialogTitle>
           <DialogDescription>Send a stop signal to halt the workflow run.</DialogDescription>
           {stopId ? (
-            <div className="mt-3 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              ID: <code className="font-mono">{stopId}</code>
+            <div className="mt-3">
+              <Callout variant="neutral" size="sm" title="Workflow ID">
+                <code className="font-mono">{stopId}</code>
+              </Callout>
             </div>
           ) : null}
           <div className="flex justify-end gap-2 pt-4">

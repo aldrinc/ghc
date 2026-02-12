@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTeardownApi } from "@/api/teardowns";
 import { MediaTile, MediaViewer } from "@/components/library/MediaViewer";
+import { Callout } from "@/components/ui/callout";
 import type { MediaAsset } from "@/types/library";
 import type { Teardown } from "@/types/teardowns";
 
 function ChannelBadge({ channel }: { channel?: string }) {
   if (!channel) return null;
   return (
-    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-700">
+    <span className="rounded-full border border-border bg-surface-2 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-content-muted">
       {channel.replace(/_/g, " ")}
     </span>
   );
@@ -170,7 +171,11 @@ export function CreativeTeardownsPanel() {
           </p>
         </div>
       </div>
-      {error && <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
+      {error ? (
+        <Callout variant="danger" size="sm" title="Failed to load teardowns">
+          {error}
+        </Callout>
+      ) : null}
       {loading && <LoadingGrid />}
       {!loading && teardowns.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

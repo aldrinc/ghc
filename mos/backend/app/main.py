@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
@@ -6,7 +6,9 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.db.base import engine
+from app.services.media_storage import MediaStorageConfigurationError
 from app.routers import (
+    agent_runs,
     artifacts,
     assets,
     claude,
@@ -50,6 +52,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.exception_handler(MediaStorageConfigurationError)
+    async def media_storage_configuration_error_handler(
+        _request: Request, exc: MediaStorageConfigurationError
+    ) -> ORJSONResponse:
+        return ORJSONResponse(status_code=500, content={"detail": str(exc)})
+
     @app.get("/health")
     async def health() -> dict[str, bool]:
         return {"ok": True}
@@ -70,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(campaigns.router)
     app.include_router(artifacts.router)
     app.include_router(assets.router)
+    app.include_router(agent_runs.router)
     app.include_router(funnels.router)
     app.include_router(public_funnels.router)
     app.include_router(experiments.router)

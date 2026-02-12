@@ -7,7 +7,11 @@ from typing import Any, Dict
 
 from temporalio import activity
 
+from sqlalchemy import select
+
 from app.db.base import session_scope
+from app.db.models import WorkflowRun
+from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
 from app.google_clients import upload_text_file, create_folder
 from app.services.claude_files import ensure_uploaded_to_claude
@@ -28,6 +32,63 @@ from app.temporal.precanon.research import (
 
 def _now_iso() -> str:
     return datetime.utcnow().replace(tzinfo=None).isoformat() + "Z"
+
+
+def _resolve_root_workflow_run_id(
+    *,
+    session,
+    org_id: str,
+    workflow_id: str | None,
+    workflow_run_id: str | None,
+    parent_workflow_id: str | None,
+    parent_run_id: str | None,
+) -> str:
+    """
+    Research artifacts should be attached to the *root* workflow run (the one the UI loads).
+    In onboarding, precanon runs as a child workflow, so we must use parent temporal ids.
+    """
+    if parent_workflow_id or parent_run_id:
+        if not parent_workflow_id or not parent_run_id:
+            raise RuntimeError(
+                "parent_workflow_id and parent_run_id are required together to persist research artifacts."
+            )
+        stmt = (
+            select(WorkflowRun)
+            .where(
+                WorkflowRun.org_id == org_id,
+                WorkflowRun.temporal_workflow_id == parent_workflow_id,
+                WorkflowRun.temporal_run_id == parent_run_id,
+            )
+            .order_by(WorkflowRun.started_at.desc())
+        )
+        run = session.scalars(stmt).first()
+        if not run:
+            raise RuntimeError(
+                "Workflow run not found for parent temporal ids while persisting research artifact "
+                f"(org_id={org_id}, parent_workflow_id={parent_workflow_id}, parent_run_id={parent_run_id})."
+            )
+        return str(run.id)
+
+    if not workflow_id or not workflow_run_id:
+        raise RuntimeError(
+            "workflow_id and workflow_run_id are required to persist research artifacts when parent ids are absent."
+        )
+    stmt = (
+        select(WorkflowRun)
+        .where(
+            WorkflowRun.org_id == org_id,
+            WorkflowRun.temporal_workflow_id == workflow_id,
+            WorkflowRun.temporal_run_id == workflow_run_id,
+        )
+        .order_by(WorkflowRun.started_at.desc())
+    )
+    run = session.scalars(stmt).first()
+    if not run:
+        raise RuntimeError(
+            "Workflow run not found for temporal ids while persisting research artifact "
+            f"(org_id={org_id}, workflow_id={workflow_id}, run_id={workflow_run_id})."
+        )
+    return str(run.id)
 
 
 @activity.defn
@@ -156,6 +217,27 @@ def persist_artifact_activity(request: PersistArtifactRequest) -> PersistArtifac
     except Exception:
         if not request.allow_claude_stub:
             raise
+
+    with session_scope() as session:
+        root_workflow_run_id = _resolve_root_workflow_run_id(
+            session=session,
+            org_id=request.org_id,
+            workflow_id=request.workflow_id,
+            workflow_run_id=request.workflow_run_id,
+            parent_workflow_id=request.parent_workflow_id,
+            parent_run_id=request.parent_run_id,
+        )
+        repo = ResearchArtifactsRepository(session)
+        repo.upsert(
+            org_id=request.org_id,
+            workflow_run_id=root_workflow_run_id,
+            step_key=request.step_key,
+            title=request.title,
+            doc_id=doc_id,
+            doc_url=doc_url,
+            prompt_sha256=request.prompt_sha256 or None,
+            summary=(request.summary or "").strip() or None,
+        )
 
     return PersistArtifactResult(
         doc_id=doc_id,

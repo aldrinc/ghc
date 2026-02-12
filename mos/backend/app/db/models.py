@@ -26,6 +26,8 @@ from app.db.enums import (
     AdChannelEnum,
     AdIngestStatusEnum,
     AdStatusEnum,
+    AgentRunStatusEnum,
+    AgentToolCallStatusEnum,
     ArtifactTypeEnum,
     AssetSourceEnum,
     AssetStatusEnum,
@@ -41,6 +43,7 @@ from app.db.enums import (
     FunnelAssetStatusEnum,
     FunnelDomainStatusEnum,
     FunnelEventTypeEnum,
+    FunnelPageReviewStatusEnum,
     FunnelPageVersionSourceEnum,
     FunnelPageVersionStatusEnum,
     FunnelPublicationLinkKindEnum,
@@ -286,6 +289,11 @@ class FunnelPage(Base):
         ForeignKey("funnel_pages.id", ondelete="SET NULL"), nullable=True
     )
     template_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    review_status: Mapped[FunnelPageReviewStatusEnum] = mapped_column(
+        Enum(FunnelPageReviewStatusEnum, name="funnel_page_review_status"),
+        nullable=False,
+        server_default=FunnelPageReviewStatusEnum.draft.value,
+    )
     ordering: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -581,6 +589,33 @@ class Artifact(Base):
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
     created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class ResearchArtifact(Base):
+    __tablename__ = "research_artifacts"
+    __table_args__ = (
+        UniqueConstraint("org_id", "workflow_run_id", "step_key", name="uq_research_artifacts_run_step"),
+        sa.Index("idx_research_artifacts_run", "org_id", "workflow_run_id"),
+        sa.Index("idx_research_artifacts_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    workflow_run_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    step_key: Mapped[str] = mapped_column(Text, nullable=False)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    doc_id: Mapped[str] = mapped_column(Text, nullable=False)
+    doc_url: Mapped[str] = mapped_column(Text, nullable=False)
+    prompt_sha256: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
@@ -1111,6 +1146,95 @@ class ActivityLog(Base):
     payload_in: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     payload_out: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AgentRun(Base):
+    __tablename__ = "agent_runs"
+    __table_args__ = (
+        sa.Index("idx_agent_runs_org_created_at", "org_id", "started_at"),
+        sa.Index("idx_agent_runs_org_funnel", "org_id", "funnel_id"),
+        sa.Index("idx_agent_runs_org_page", "org_id", "page_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[str] = mapped_column(Text, nullable=False)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"), nullable=True
+    )
+    funnel_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnels.id", ondelete="SET NULL"), nullable=True
+    )
+    page_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnel_pages.id", ondelete="SET NULL"), nullable=True
+    )
+
+    objective_type: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[AgentRunStatusEnum] = mapped_column(
+        Enum(AgentRunStatusEnum, name="agent_run_status"),
+        nullable=False,
+        server_default=AgentRunStatusEnum.running.value,
+    )
+
+    model: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    temperature: Mapped[Optional[float]] = mapped_column(sa.Float(), nullable=True)
+    max_tokens: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    ruleset_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    inputs_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    outputs_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class AgentToolCall(Base):
+    __tablename__ = "agent_tool_calls"
+    __table_args__ = (
+        sa.Index("idx_agent_tool_calls_run_seq", "run_id", "seq"),
+        sa.Index("idx_agent_tool_calls_run_tool", "run_id", "tool_name"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    tool_name: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[AgentToolCallStatusEnum] = mapped_column(
+        Enum(AgentToolCallStatusEnum, name="agent_tool_call_status"),
+        nullable=False,
+        server_default=AgentToolCallStatusEnum.running.value,
+    )
+    args_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    result_json: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+
+class AgentArtifact(Base):
+    __tablename__ = "agent_artifacts"
+    __table_args__ = (
+        sa.Index("idx_agent_artifacts_run_kind", "run_id", "kind"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("agent_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    data_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

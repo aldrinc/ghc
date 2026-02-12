@@ -6,6 +6,12 @@ import { normalizeExploreAdToLibraryItem } from "@/lib/library";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import type { LibraryItem } from "@/types/library";
+import { AdsIngestionRetryCallout } from "@/components/ads/AdsIngestionRetryCallout";
+import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
+import { Input } from "@/components/ui/input";
+import { FilterBar } from "@/components/layout/FilterBar";
+import { EmptyState } from "@/components/layout/EmptyState";
 
 const PAGE_SIZE = 60;
 
@@ -29,7 +35,7 @@ function LoadingGrid() {
       {Array.from({ length: 6 }).map((_, idx) => (
         <div
           key={idx}
-          className="ds-card ds-card--md flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-none animate-pulse"
+          className="ds-card ds-card--md flex h-full flex-col overflow-hidden rounded-2xl shadow-none animate-pulse"
         >
           <div className="relative">
             <div className="aspect-[4/5] w-full bg-muted" />
@@ -260,36 +266,39 @@ export function ExploreAdsPage() {
         title="Explore Ads"
         description="Browse ingested ads with basic filters and per-brand capping."
       />
+      {scope === "workspace" ? (
+        <AdsIngestionRetryCallout clientId={workspace?.id} productId={product?.id} />
+      ) : null}
       {workspace && !product ? (
         <div className="ds-card ds-card--md ds-card--empty text-sm">
           Select a product to scope explore results to your workspace.
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <FilterBar>
         <select
           value={scope}
           onChange={(e) => setScope(e.target.value as "workspace" | "global")}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           <option value="workspace" disabled={!workspace || !product}>
             Workspace only{workspace?.name ? ` (${workspace.name})` : ""}
           </option>
           <option value="global">All org ads (global)</option>
         </select>
-        <input
+        <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search copy, domains, brands"
-          className="min-w-[200px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="min-w-[200px] flex-1 shadow-none"
         />
         <select
           value={brandId}
           onChange={(e) => setBrandId(e.target.value)}
           disabled={brandsLoading && !brandOptions.length}
           aria-label="Filter by competitor"
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           <option value="">{brandsLoading ? "Loading competitors..." : "All competitors"}</option>
           {brandOptions.map((opt) => (
@@ -301,7 +310,7 @@ export function ExploreAdsPage() {
         <select
           value={channel}
           onChange={(e) => setChannel(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           {channelOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -312,7 +321,7 @@ export function ExploreAdsPage() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           {statusOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -321,8 +330,8 @@ export function ExploreAdsPage() {
           ))}
         </select>
         <div className="flex items-center gap-2">
-          <label className="text-xs font-semibold text-slate-600">Limit per brand</label>
-          <input
+          <label className="text-xs font-semibold text-content-muted">Limit per brand</label>
+          <Input
             type="number"
             min={1}
             value={limitPerBrand ?? ""}
@@ -330,11 +339,11 @@ export function ExploreAdsPage() {
               const value = e.target.value;
               setLimitPerBrand(value ? Math.max(1, Number(value)) : undefined);
             }}
-            className="w-20 rounded-lg border border-slate-200 px-2 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+            className="w-20 shadow-none"
           />
         </div>
         {filtersActive ? (
-          <button
+          <Button
             type="button"
             onClick={() => {
               setQuery("");
@@ -343,29 +352,35 @@ export function ExploreAdsPage() {
               setBrandId("");
               setLimitPerBrand(undefined);
             }}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            variant="secondary"
           >
             Reset
-          </button>
+          </Button>
         ) : null}
-      </div>
-      {brandError && (
-        <div className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">{brandError}</div>
-      )}
+      </FilterBar>
+      {brandError ? (
+        <Callout variant="danger" size="sm" title="Failed to load competitors">
+          {brandError}
+        </Callout>
+      ) : null}
 
-      <div className="flex flex-col gap-1 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-1 text-xs text-content-muted sm:flex-row sm:items-center sm:justify-between">
         <span>
           Showing {items.length} of {count || items.length} ads
         </span>
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
-          <span className="text-slate-500">
+          <span className="text-content-muted">
             Scope: {scope === "workspace" ? workspace?.name || "Workspace" : "Global"}
           </span>
-          <span className="text-slate-500">Phase 1 filters: competitor, channel, status, per-brand cap, search</span>
+          <span className="text-content-muted">Phase 1 filters: competitor, channel, status, per-brand cap, search</span>
         </div>
       </div>
 
-      {error && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</div>}
+      {error ? (
+        <Callout variant="danger" size="sm" title="Failed to load ads">
+          {error}
+        </Callout>
+      ) : null}
       {loading && <LoadingGrid />}
       {!loading && items.length > 0 && (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3 sm:gap-4">
@@ -375,18 +390,16 @@ export function ExploreAdsPage() {
           {(hasMore || loadingMore) && (
             <div ref={loadMoreRef} className="col-span-full flex items-center justify-center py-4">
               {loadingMore ? (
-                <span className="text-sm text-slate-500">Loading more ads…</span>
+                <span className="text-sm text-content-muted">Loading more ads…</span>
               ) : (
-                <span className="text-sm text-slate-400">Keep scrolling to load more</span>
+                <span className="text-sm text-content-muted/80">Keep scrolling to load more</span>
               )}
             </div>
           )}
         </div>
       )}
       {!loading && items.length === 0 && !error && (
-        <div className="ds-card ds-card--md ds-card--empty text-sm">
-          No ads match these filters yet.
-        </div>
+        <EmptyState description="No ads match these filters yet." />
       )}
     </div>
   );

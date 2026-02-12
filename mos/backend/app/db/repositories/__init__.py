@@ -11,6 +11,7 @@ from app.db.repositories.jobs import JobsRepository
 from app.db.repositories.teardowns import TeardownsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
+from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 
 __all__ = [
     "ClientsRepository",
@@ -26,4 +27,5 @@ __all__ = [
     "TeardownsRepository",
     "ClaudeContextFilesRepository",
     "MetaAdsRepository",
+    "ResearchArtifactsRepository",
 ]

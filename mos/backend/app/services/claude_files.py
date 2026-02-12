@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 CLAUDE_API_BASE_URL = os.getenv("ANTHROPIC_API_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
 CLAUDE_HTTP_TIMEOUT = int(os.getenv("ANTHROPIC_HTTP_TIMEOUT", "300"))
 CLAUDE_DEFAULT_MODEL = os.getenv("CLAUDE_DEFAULT_MODEL", "claude-3-5-sonnet-20241022")
-CLAUDE_FALLBACK_MODEL = os.getenv("CLAUDE_FALLBACK_MODEL", "claude-3-haiku-20240307")
 
 
 @dataclass
@@ -271,37 +270,6 @@ def _is_output_format_unsupported(exc: httpx.HTTPStatusError) -> bool:
         return False
 
 
-def _call_json_text_fallback(
-    *,
-    client: httpx.Client,
-    model: str,
-    user_content: List[Dict[str, Any]],
-    safe_schema: Dict[str, Any],
-    system: Optional[str],
-    max_tokens: int,
-    temperature: float,
-    headers: Dict[str, str],
-) -> Dict[str, Any]:
-    """
-    Fallback for models that don't support output_format: ask for JSON via text and parse it downstream.
-    """
-    schema_str = json.dumps(safe_schema, separators=(",", ":"))
-    content = list(user_content) + [
-        {"type": "text", "text": f"Return ONLY valid JSON matching this schema: {schema_str}"}
-    ]
-    body = {
-        "model": model,
-        "max_tokens": max_tokens,
-        "temperature": temperature,
-        "messages": [{"role": "user", "content": content}],
-    }
-    if system:
-        body["system"] = system
-    response = client.post(f"{CLAUDE_API_BASE_URL.rstrip('/')}/v1/messages", headers=headers, json=body)
-    response.raise_for_status()
-    return response.json()
-
-
 def call_claude_structured_message(
     *,
     model: str,
@@ -324,77 +292,38 @@ def call_claude_structured_message(
         "anthropic-beta": "structured-outputs-2025-11-13,files-api-2025-04-14",
     }
     safe_schema = _enforce_no_additional_properties(output_schema)
-    models_to_try = []
-    preferred_model = model or CLAUDE_DEFAULT_MODEL
-    if preferred_model:
-        models_to_try.append(preferred_model)
-    fallback_model = CLAUDE_FALLBACK_MODEL
-    if fallback_model and fallback_model not in models_to_try:
-        models_to_try.append(fallback_model)
+    candidate_model = model or CLAUDE_DEFAULT_MODEL
+    if not candidate_model:
+        raise RuntimeError("Claude model is required for structured message call")
 
-    last_exc: Exception | None = None
-    payload = None
-    for idx, candidate_model in enumerate(models_to_try):
-        body = {
-            "model": candidate_model,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "messages": [{"role": "user", "content": user_content}],
-            "output_format": {"type": "json_schema", "schema": safe_schema},
-        }
-        if system:
-            body["system"] = system
+    body = {
+        "model": candidate_model,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        "messages": [{"role": "user", "content": user_content}],
+        "output_format": {"type": "json_schema", "schema": safe_schema},
+    }
+    if system:
+        body["system"] = system
 
-        url = f"{CLAUDE_API_BASE_URL.rstrip('/')}/v1/messages"
-        try:
-            with httpx.Client(timeout=CLAUDE_HTTP_TIMEOUT) as client:
-                try:
-                    response = client.post(url, headers=headers, json=body)
-                    response.raise_for_status()
-                    payload = response.json()
-                except httpx.HTTPStatusError as exc:
-                    # Retry with next model if this one is missing.
-                    if _is_model_not_found(exc) and idx < len(models_to_try) - 1:
-                        logger.warning(
-                            "claude_model_not_found_retry",
-                            extra={"missing_model": candidate_model, "next_model": models_to_try[idx + 1]},
-                        )
-                        last_exc = exc
-                        continue
-                    # If output_format unsupported, fall back to text JSON on the same model.
-                    if _is_output_format_unsupported(exc):
-                        logger.warning(
-                            "claude_output_format_fallback",
-                            extra={"model": candidate_model},
-                        )
-                        payload = _call_json_text_fallback(
-                            client=client,
-                            model=candidate_model,
-                            user_content=user_content,
-                            safe_schema=safe_schema,
-                            system=system,
-                            max_tokens=max_tokens,
-                            temperature=temperature,
-                            headers=headers,
-                        )
-                    else:
-                        body_text = exc.response.text if exc.response else ""
-                        status = exc.response.status_code if exc.response else "unknown"
-                        raise RuntimeError(f"Claude structured message failed (status={status}): {body_text}") from exc
-        except Exception as exc:  # noqa: BLE001
-            last_exc = exc
-            raise RuntimeError(f"Claude structured message failed: {exc}") from exc
-
-        if payload is not None:
-            if idx > 0:
-                logger.warning(
-                    "claude_model_fallback_used",
-                    extra={"preferred_model": preferred_model, "fallback_model": candidate_model},
-                )
-            break
-
-    if payload is None and last_exc:
-        raise RuntimeError(f"Claude structured message failed: {last_exc}") from last_exc
+    url = f"{CLAUDE_API_BASE_URL.rstrip('/')}/v1/messages"
+    try:
+        with httpx.Client(timeout=CLAUDE_HTTP_TIMEOUT) as client:
+            response = client.post(url, headers=headers, json=body)
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as exc:
+        if _is_model_not_found(exc):
+            raise RuntimeError(f"Claude model not found: {candidate_model}") from exc
+        if _is_output_format_unsupported(exc):
+            raise RuntimeError(
+                f"Claude model does not support structured outputs (output_format=json_schema): {candidate_model}"
+            ) from exc
+        body_text = exc.response.text if exc.response else ""
+        status = exc.response.status_code if exc.response else "unknown"
+        raise RuntimeError(f"Claude structured message failed (status={status}): {body_text}") from exc
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"Claude structured message failed: {exc}") from exc
 
     parsed = None
     output_block = payload.get("output")

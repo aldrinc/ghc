@@ -11,8 +11,23 @@ export type AdsListParams = {
   status?: string;
 };
 
+export type AdsIngestionRetryRequest = {
+  researchRunId: string;
+  resultsLimit?: number;
+  brandChannelIdentityIds?: string[];
+  runCreativeAnalysis?: boolean;
+  creativeAnalysisMaxAds?: number;
+  creativeAnalysisConcurrency?: number;
+};
+
+export type AdsIngestionRetryResponse = {
+  research_run_id: string;
+  temporal_workflow_id: string;
+  temporal_run_id: string;
+};
+
 export function useAdsApi() {
-  const { get } = useApiClient();
+  const { get, post } = useApiClient();
 
   const listAds = useCallback(
     (params?: AdsListParams): Promise<any[]> => {
@@ -31,5 +46,11 @@ export function useAdsApi() {
     [get],
   );
 
-  return { listAds };
+  const retryIngestion = useCallback(
+    (body: AdsIngestionRetryRequest): Promise<AdsIngestionRetryResponse> =>
+      post<AdsIngestionRetryResponse>("/ads/ingestion/retry", body),
+    [post],
+  );
+
+  return { listAds, retryIngestion };
 }

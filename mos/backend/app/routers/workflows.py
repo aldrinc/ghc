@@ -2,17 +2,25 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+from uuid import UUID
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
 from app.db.enums import ArtifactTypeEnum, AssetStatusEnum, WorkflowStatusEnum
 from app.db.models import Asset
 from app.db.repositories.artifacts import ArtifactsRepository
+from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.temporal.client import get_temporal_client
 from temporalio.api.enums.v1 import WorkflowExecutionStatus
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
+
+def _maybe_uuid(value: str) -> UUID | None:
+    try:
+        return UUID(value)
+    except ValueError:
+        return None
 
 
 @router.get("")
@@ -46,14 +54,23 @@ async def get_workflow_run(
     session: Session = Depends(get_session),
 ):
     repo = WorkflowsRepository(session)
-    run = repo.get(org_id=auth.org_id, workflow_run_id=workflow_run_id)
+    run = None
+    parsed_run_id = _maybe_uuid(workflow_run_id)
+    if parsed_run_id:
+        run = repo.get(org_id=auth.org_id, workflow_run_id=str(parsed_run_id))
+    if not run:
+        # Allow using Temporal workflow IDs (e.g. campaign-planning-...) to fetch runs.
+        run = repo.get_by_temporal_workflow_id(org_id=auth.org_id, temporal_workflow_id=workflow_run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Workflow run not found")
 
     temporal_status = None
     try:
         client = await get_temporal_client()
-        handle = client.get_workflow_handle(run.temporal_workflow_id)
+        handle = client.get_workflow_handle(
+            run.temporal_workflow_id,
+            first_execution_run_id=run.temporal_run_id,
+        )
         desc = await handle.describe()
         temporal_status = desc.status.name if desc and getattr(desc, "status", None) else None
         status_map = {
@@ -118,14 +135,27 @@ async def get_workflow_run(
         experiment_specs = []
         asset_briefs = []
 
+    research_artifacts_repo = ResearchArtifactsRepository(session)
+    research_artifacts_rows = research_artifacts_repo.list_for_workflow_run(
+        org_id=auth.org_id,
+        workflow_run_id=str(run.id),
+    )
+    research_artifacts = [
+        {
+            "step_key": row.step_key,
+            "title": row.title,
+            "doc_url": row.doc_url,
+            "doc_id": row.doc_id,
+            "summary": row.summary,
+        }
+        for row in research_artifacts_rows
+    ]
+
     precanon_research = None
-    research_artifacts = None
     research_highlights = None
     if client_canon and isinstance(client_canon.data, dict):
         precanon_research = client_canon.data.get("precanon_research")
         research_highlights = client_canon.data.get("research_highlights")
-        if isinstance(precanon_research, dict):
-            research_artifacts = precanon_research.get("artifact_refs")
 
     return jsonable_encoder(
         {
@@ -146,11 +176,20 @@ async def get_workflow_run(
 
 async def _get_handle(session: Session, auth: AuthContext, workflow_run_id: str):
     repo = WorkflowsRepository(session)
-    run = repo.get(org_id=auth.org_id, workflow_run_id=workflow_run_id)
+    run = None
+    parsed_run_id = _maybe_uuid(workflow_run_id)
+    if parsed_run_id:
+        run = repo.get(org_id=auth.org_id, workflow_run_id=str(parsed_run_id))
+    if not run:
+        # Allow using Temporal workflow IDs (e.g. campaign-planning-...) for signals.
+        run = repo.get_by_temporal_workflow_id(org_id=auth.org_id, temporal_workflow_id=workflow_run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Workflow run not found")
     client = await get_temporal_client()
-    return repo, client.get_workflow_handle(run.temporal_workflow_id)
+    return repo, run, client.get_workflow_handle(
+        run.temporal_workflow_id,
+        first_execution_run_id=run.temporal_run_id,
+    )
 
 
 @router.post("/{workflow_run_id}/signals/approve-canon")
@@ -160,13 +199,13 @@ async def approve_canon(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo, handle = await _get_handle(session, auth, workflow_run_id)
+    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
     await handle.signal(
         "approve_canon",
         {"approved": body.get("approved", False), "updated_canon": body.get("updatedCanon")},
     )
     repo.log_activity(
-        workflow_run_id=workflow_run_id,
+        workflow_run_id=str(run.id),
         step="approve_canon",
         status="sent",
         payload_in={"approved": body.get("approved", False)},
@@ -181,13 +220,13 @@ async def approve_metric_schema(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo, handle = await _get_handle(session, auth, workflow_run_id)
+    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
     await handle.signal(
         "approve_metric_schema",
         {"approved": body.get("approved", False), "updated_schema": body.get("updatedSchema")},
     )
     repo.log_activity(
-        workflow_run_id=workflow_run_id,
+        workflow_run_id=str(run.id),
         step="approve_metric_schema",
         status="sent",
         payload_in={"approved": body.get("approved", False)},
@@ -202,13 +241,13 @@ async def approve_strategy(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo, handle = await _get_handle(session, auth, workflow_run_id)
+    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
     await handle.signal(
         "approve_strategy_sheet",
         {"approved": body.get("approved", False), "updated_strategy_sheet": body.get("updatedStrategy")},
     )
     repo.log_activity(
-        workflow_run_id=workflow_run_id,
+        workflow_run_id=str(run.id),
         step="approve_strategy_sheet",
         status="sent",
         payload_in={"approved": body.get("approved", False)},
@@ -223,7 +262,7 @@ async def approve_experiments(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo, handle = await _get_handle(session, auth, workflow_run_id)
+    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
     await handle.signal(
         "approve_experiments",
         {
@@ -233,7 +272,7 @@ async def approve_experiments(
         },
     )
     repo.log_activity(
-        workflow_run_id=workflow_run_id,
+        workflow_run_id=str(run.id),
         step="approve_experiments",
         status="sent",
         payload_in={
@@ -255,10 +294,10 @@ async def approve_asset_briefs(
     if not isinstance(approved_ids, list):
         raise HTTPException(status_code=400, detail="approved_ids must be a list.")
 
-    repo, handle = await _get_handle(session, auth, workflow_run_id)
+    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
     await handle.signal("approve_asset_briefs", {"approved_ids": approved_ids})
     repo.log_activity(
-        workflow_run_id=workflow_run_id,
+        workflow_run_id=str(run.id),
         step="approve_asset_briefs",
         status="sent",
         payload_in={"approved_ids": approved_ids},
@@ -309,13 +348,13 @@ async def approve_assets(
             )
         session.commit()
 
-    repo, handle = await _get_handle(session, auth, workflow_run_id)
+    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
     await handle.signal(
         "approve_assets",
         {"approved_ids": approved_ids, "rejected_ids": rejected_ids},
     )
     repo.log_activity(
-        workflow_run_id=workflow_run_id,
+        workflow_run_id=str(run.id),
         step="approve_assets",
         status="sent",
         payload_in={
@@ -332,10 +371,10 @@ async def stop_workflow(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo, handle = await _get_handle(session, auth, workflow_run_id)
+    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
     await handle.signal("stop")
     repo.log_activity(
-        workflow_run_id=workflow_run_id,
+        workflow_run_id=str(run.id),
         step="stop",
         status="sent",
         payload_in={},
@@ -350,5 +389,13 @@ def get_workflow_logs(
     session: Session = Depends(get_session),
 ):
     repo = WorkflowsRepository(session)
-    logs = repo.list_logs(org_id=auth.org_id, workflow_run_id=workflow_run_id)
+    run = None
+    parsed_run_id = _maybe_uuid(workflow_run_id)
+    if parsed_run_id:
+        run = repo.get(org_id=auth.org_id, workflow_run_id=str(parsed_run_id))
+    if not run:
+        run = repo.get_by_temporal_workflow_id(org_id=auth.org_id, temporal_workflow_id=workflow_run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    logs = repo.list_logs(org_id=auth.org_id, workflow_run_id=str(run.id))
     return jsonable_encoder(logs)

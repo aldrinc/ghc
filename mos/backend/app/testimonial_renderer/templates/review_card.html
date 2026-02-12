@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Review Card</title>
+    <link rel="stylesheet" href="./shared.css" />
+    <style>
+      .review-card {
+        width: 860px;
+        background: var(--card-bg);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+
+      .review-hero {
+        width: 100%;
+        height: 360px;
+        object-fit: cover;
+        background: #f3f4f6;
+      }
+
+      .review-body {
+        padding: 20px 24px 26px;
+      }
+
+      .review-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .review-header-left {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .review-avatar {
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        object-fit: cover;
+        background: #eef1f4;
+        flex-shrink: 0;
+      }
+
+      .review-name {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+
+      .review-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        color: var(--text-muted);
+        white-space: nowrap;
+      }
+
+      .review-badge svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .review-stars {
+        display: flex;
+        gap: 4px;
+        margin-top: 8px;
+      }
+
+      .review-star {
+        width: 20px;
+        height: 20px;
+        fill: #e5e7eb;
+      }
+
+      .review-star.filled {
+        fill: var(--star);
+      }
+
+      .review-text {
+        margin-top: 12px;
+        font-size: 18px;
+        line-height: 1.5;
+        color: #2f2f2f;
+      }
+
+      .review-meta {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #8a8f98;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card" class="review-card">
+      <img id="hero" class="review-hero" alt="Review hero" />
+      <div class="review-body">
+        <div class="review-header">
+          <div class="review-header-left">
+            <img id="avatar" class="review-avatar" alt="Reviewer avatar" />
+            <div id="name" class="review-name"></div>
+          </div>
+          <div id="badge" class="review-badge">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="#9CA3AF" stroke-width="1.5" />
+              <path d="M7.8 12.5l2.6 2.6 5.8-6" stroke="#6B7280" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span>Verified Customer</span>
+          </div>
+        </div>
+        <div id="stars" class="review-stars" aria-hidden="true">
+          <svg class="review-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+          <svg class="review-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+          <svg class="review-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+          <svg class="review-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+          <svg class="review-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+        </div>
+        <div id="review" class="review-text"></div>
+        <div id="meta" class="review-meta"></div>
+      </div>
+    </div>
+
+    <script>
+      const waitForImage = (img) =>
+        new Promise((resolve, reject) => {
+          if (!img) {
+            reject(new Error('Image element not found.'));
+            return;
+          }
+          if (img.complete && img.naturalWidth > 0) {
+            resolve();
+            return;
+          }
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => reject(new Error('Failed to load image.')), { once: true });
+        });
+
+      window.setCardData = async (data) => {
+        const name = document.getElementById('name');
+        const badge = document.getElementById('badge');
+        const review = document.getElementById('review');
+        const meta = document.getElementById('meta');
+        const hero = document.getElementById('hero');
+        const avatar = document.getElementById('avatar');
+        const stars = Array.from(document.querySelectorAll('.review-star'));
+
+        name.textContent = data.name;
+        review.textContent = data.review;
+        if (data.heroImageUrl) {
+          hero.src = data.heroImageUrl;
+        } else {
+          hero.style.display = 'none';
+        }
+
+        if (data.avatarUrl) {
+          avatar.src = data.avatarUrl;
+        } else {
+          avatar.style.display = 'none';
+        }
+
+        if (!data.verified) {
+          badge.style.display = 'none';
+        }
+
+        stars.forEach((star, index) => {
+          if (index < data.rating) {
+            star.classList.add('filled');
+          } else {
+            star.classList.remove('filled');
+          }
+        });
+
+        const metaParts = [];
+        if (data.meta && data.meta.location) {
+          metaParts.push(data.meta.location);
+        }
+        if (data.meta && data.meta.date) {
+          metaParts.push(data.meta.date);
+        }
+
+        if (metaParts.length > 0) {
+          meta.textContent = metaParts.join(' • ');
+        } else {
+          meta.style.display = 'none';
+        }
+
+        const waits = [];
+        if (data.heroImageUrl) {
+          waits.push(waitForImage(hero));
+        }
+        if (data.avatarUrl) {
+          waits.push(waitForImage(avatar));
+        }
+        await Promise.all(waits);
+      };
+    </script>
+  </body>
+</html>

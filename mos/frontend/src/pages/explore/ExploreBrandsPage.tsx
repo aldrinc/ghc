@@ -4,8 +4,14 @@ import { useExploreApi, type ExploreBrand } from "@/api/explore";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Callout } from "@/components/ui/callout";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { channelDisplayName } from "@/lib/channels";
+import { AdsIngestionRetryCallout } from "@/components/ads/AdsIngestionRetryCallout";
+import { FilterBar } from "@/components/layout/FilterBar";
+import { EmptyState } from "@/components/layout/EmptyState";
 
 const sortOptions = [
   { value: "last_seen", label: "Last seen" },
@@ -131,34 +137,37 @@ export function ExploreBrandsPage() {
         title="Explore Brands"
         description="Org-wide brand inventory with ad counts, channels, and visibility controls."
       />
+      {scope === "workspace" ? (
+        <AdsIngestionRetryCallout clientId={workspace?.id} productId={product?.id} />
+      ) : null}
       {workspace && !product ? (
         <div className="ds-card ds-card--md ds-card--empty text-sm">
           Select a product to scope explore results to your workspace.
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <FilterBar>
         <select
           value={scope}
           onChange={(e) => setScope(e.target.value as "workspace" | "global")}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           <option value="workspace" disabled={!workspace || !product}>
             Workspace only{workspace?.name ? ` (${workspace.name})` : ""}
           </option>
           <option value="global">All org brands (global)</option>
         </select>
-        <input
+        <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search brands or domains"
-          className="min-w-[200px] flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="min-w-[200px] flex-1 shadow-none"
         />
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-inner focus:border-slate-400 focus:outline-none"
+          className="h-10 rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:border-input-border-focus"
         >
           {sortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -166,45 +175,49 @@ export function ExploreBrandsPage() {
             </option>
           ))}
         </select>
-        <button
+        <Button
           type="button"
           onClick={() => setDirection((d) => (d === "asc" ? "desc" : "asc"))}
-          className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+          variant="secondary"
         >
           {direction === "asc" ? "Ascending" : "Descending"}
-        </button>
-        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+        </Button>
+        <label className="flex items-center gap-2 text-xs font-semibold text-content-muted">
           <input
             type="checkbox"
-            className="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-400"
+            className="h-4 w-4 rounded border-input-border bg-input accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             checked={includeHidden}
             onChange={(e) => setIncludeHidden(e.target.checked)}
           />
           Show hidden
         </label>
         {filtersActive ? (
-          <button
+          <Button
             type="button"
             onClick={resetFilters}
-            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+            variant="secondary"
           >
             Reset
-          </button>
+          </Button>
         ) : null}
-      </div>
+      </FilterBar>
 
-      <div className="flex flex-col gap-1 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-1 text-xs text-content-muted sm:flex-row sm:items-center sm:justify-between">
         <span>
           Showing {brands.length} of {count || brands.length} brands
         </span>
-        <div className="flex flex-wrap items-center gap-3 text-slate-500">
+        <div className="flex flex-wrap items-center gap-3 text-content-muted">
           <span>Scope: {scope === "workspace" ? workspace?.name || "Workspace" : "Global"}</span>
           <span>Sorting: {sortLabel} ({direction})</span>
           <span>Hidden brands: {includeHidden ? "included" : "filtered out"}</span>
         </div>
       </div>
 
-      {error && <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">{error}</div>}
+      {error ? (
+        <Callout variant="danger" size="sm" title="Failed to load brands">
+          {error}
+        </Callout>
+      ) : null}
 
       {loading ? (
         <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading brands…</div>
@@ -271,14 +284,15 @@ export function ExploreBrandsPage() {
                     <TableCell className="text-sm text-content">{formatDate(brand.first_seen_at)}</TableCell>
                     <TableCell className="text-sm text-content">{formatDate(brand.last_seen_at)}</TableCell>
                     <TableCell className="text-right">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => toggleVisibility(brand)}
                         disabled={updatingBrandId === brand.brand_id}
-                        className="inline-flex items-center justify-end rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                        variant="secondary"
+                        size="xs"
                       >
                         {brand.hidden ? "Unhide" : "Hide"}
-                      </button>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 );
@@ -287,7 +301,7 @@ export function ExploreBrandsPage() {
           </Table>
         </div>
       ) : (
-        <div className="ds-card ds-card--md ds-card--empty text-sm">No brands match these filters yet.</div>
+        <EmptyState description="No brands match these filters yet." />
       )}
     </div>
   );

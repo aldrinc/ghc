@@ -22,6 +22,7 @@ dependencies = [
   "python-jose[cryptography]",
   "httpx",
   "requests",
+  "playwright",
   "temporalio",
   "tenacity",
   "structlog",

@@ -6,6 +6,8 @@ import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import type { LibraryItem } from "@/types/library";
 import { useAdsApi } from "@/api/ads";
+import { AdsIngestionRetryCallout } from "@/components/ads/AdsIngestionRetryCallout";
+import { Callout } from "@/components/ui/callout";
 
 function LoadingGrid() {
   return (
@@ -173,6 +175,7 @@ export function AdsPanel() {
           <p className="text-sm text-content-muted">Raw ads you’ve ingested (with full media + metadata).</p>
         </div>
       </div>
+      <AdsIngestionRetryCallout clientId={workspace?.id} productId={product?.id} />
       {!workspace && (
         <div className="ds-card ds-card--md ds-card--empty text-sm">
           Select a workspace to view ingested ads.
@@ -184,9 +187,9 @@ export function AdsPanel() {
         </div>
       )}
       {(apiError || error) && (
-        <div className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <Callout variant="danger" size="sm" title="Failed to load ads">
           {apiError || (error as any)?.message || "Failed to load ads"}
-        </div>
+        </Callout>
       )}
       {(apiLoading || isLoading) && <LoadingGrid />}
       {!apiLoading && !isLoading && workspace && product && items.length > 0 && (
