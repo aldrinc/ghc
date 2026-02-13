@@ -3,8 +3,11 @@ from __future__ import annotations
 import copy
 import json
 import os
+import random
+import re
+from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Iterator, Optional
 
 from sqlalchemy import select
@@ -79,6 +82,281 @@ def _truncate(text: str, *, limit: int) -> str:
     if len(compact) <= limit:
         return compact
     return f"{compact[: limit - 3].rstrip()}..."
+
+
+_WORD_RE = re.compile(r"[A-Za-z]{3,}")
+_TOPIC_STOPWORDS = {
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "was",
+    "were",
+    "are",
+    "have",
+    "has",
+    "had",
+    "but",
+    "not",
+    "you",
+    "your",
+    "i",
+    "im",
+    "ive",
+    "its",
+    "it's",
+    "they",
+    "them",
+    "their",
+    "our",
+    "we",
+    "me",
+    "my",
+    "so",
+    "just",
+    "very",
+    "really",
+    "also",
+    "from",
+    "than",
+    "then",
+    "into",
+    "over",
+    "after",
+    "before",
+    "when",
+    "while",
+    "because",
+    "been",
+    "will",
+    "would",
+    "could",
+    "should",
+    "can",
+    "cant",
+    "can't",
+    "did",
+    "does",
+    "doing",
+    "use",
+    "using",
+    "used",
+    "make",
+    "made",
+    "get",
+    "got",
+    "one",
+    "two",
+    "three",
+    "product",
+}
+
+
+def _derive_review_title(review: str) -> str:
+    compact = _clean_single_line(review)
+    if not compact:
+        return "Review"
+
+    cutoff = None
+    for sep in (".", "!", "?"):
+        idx = compact.find(sep)
+        if idx != -1 and idx >= 18:
+            cutoff = idx
+            break
+    if cutoff is not None:
+        compact = compact[:cutoff].strip()
+
+    words = compact.split()
+    title = " ".join(words[:8]).strip()
+    if not title:
+        return "Review"
+    if len(title) > 80:
+        title = title[:80].rstrip()
+    return title
+
+
+def _extract_topics(reviews: list[str], *, limit: int = 12) -> tuple[list[dict[str, Any]], list[list[str]]]:
+    """
+    Deterministic topic extraction for synthetic reviews.
+
+    Returns:
+    - topics: list of {id,label,count}
+    - per-review topicIds (subset of topic ids)
+    """
+
+    counts: Counter[str] = Counter()
+    token_sets: list[set[str]] = []
+    for review in reviews:
+        tokens = [t.lower() for t in _WORD_RE.findall(review or "")]
+        filtered = [t for t in tokens if t not in _TOPIC_STOPWORDS]
+        token_set = set(filtered)
+        token_sets.append(token_set)
+        counts.update(filtered)
+
+    top = [word for word, _ in counts.most_common(limit)]
+    topics = [{"id": word, "label": word, "count": int(counts[word])} for word in top]
+
+    per_review: list[list[str]] = []
+    for token_set in token_sets:
+        selected = [word for word in top if word in token_set][:4]
+        per_review.append(selected)
+    return topics, per_review
+
+
+def _sync_sales_pdp_reviews_from_testimonials(
+    puck_data: dict[str, Any],
+    *,
+    product: Product,
+    validated_testimonials: list[dict[str, Any]],
+    today: str,
+    review_wall_images: Optional[list[dict[str, Any]]] = None,
+) -> None:
+    if not validated_testimonials:
+        return
+
+    # Build a ReviewsResponse-compatible payload.
+    review_texts = [t.get("review") or "" for t in validated_testimonials]
+    topics, per_review_topic_ids = _extract_topics(review_texts, limit=12)
+
+    reviews: list[dict[str, Any]] = []
+    media_gallery: list[dict[str, Any]] = []
+    rating_counts = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+    total_rating = 0.0
+
+    base_date = datetime.strptime(today, _DATE_FORMAT).date()
+    for idx, t in enumerate(validated_testimonials):
+        rating = int(t["rating"])
+        rating_counts[rating] = rating_counts.get(rating, 0) + 1
+        total_rating += float(rating)
+
+        meta_date = None
+        meta = t.get("meta")
+        if isinstance(meta, dict):
+            candidate = meta.get("date")
+            if isinstance(candidate, str) and candidate.strip():
+                meta_date = candidate.strip()
+        if meta_date:
+            created_at = f"{meta_date}T00:00:00.000Z"
+        else:
+            created_at = f"{(base_date - timedelta(days=idx)).isoformat()}T00:00:00.000Z"
+
+        media: list[dict[str, Any]] = []
+        if review_wall_images and idx < len(review_wall_images):
+            image = review_wall_images[idx]
+            asset_public_id = image.get("assetPublicId")
+            if isinstance(asset_public_id, str) and asset_public_id.strip():
+                url = _public_asset_url(asset_public_id.strip())
+                alt = image.get("alt") if isinstance(image.get("alt"), str) else None
+                media_item = {
+                    "id": f"review_media_{idx + 1}",
+                    "type": "image",
+                    "url": url,
+                    **({"alt": alt} if alt else {}),
+                }
+                media.append(media_item)
+                if len(media_gallery) < 8:
+                    media_gallery.append({**media_item, "id": f"gallery_{idx + 1}"})
+
+        reviews.append(
+            {
+                "id": f"synthetic_review_{idx + 1}",
+                "rating": rating,
+                "title": _derive_review_title(t["review"]),
+                "body": t["review"],
+                "createdAt": created_at,
+                "author": {
+                    "name": t["name"],
+                    "verifiedBuyer": bool(t["verified"]),
+                },
+                **({"topicIds": per_review_topic_ids[idx]} if per_review_topic_ids[idx] else {}),
+                **({"media": media} if media else {}),
+                "helpfulCount": int(t["reply"]["reactionCount"]),
+            }
+        )
+
+    total_reviews = len(reviews)
+    avg = (total_rating / total_reviews) if total_reviews else 0.0
+    breakdown = [{"rating": r, "count": int(rating_counts[r])} for r in (5, 4, 3, 2, 1)]
+    customers_say = ""
+    if topics:
+        labels = [t["label"] for t in topics[:3]]
+        if len(labels) >= 3:
+            customers_say = f"Customers often mention {labels[0]}, {labels[1]}, and {labels[2]}."
+        elif len(labels) == 2:
+            customers_say = f"Customers often mention {labels[0]} and {labels[1]}."
+        else:
+            customers_say = f"Customers often mention {labels[0]}."
+    else:
+        customers_say = "Customers share positive experiences with the product."
+
+    product_id = product.handle.strip() if isinstance(product.handle, str) and product.handle.strip() else str(product.id)
+
+    page_size = 10
+    total_pages = max(1, (total_reviews + page_size - 1) // page_size)
+
+    response: dict[str, Any] = {
+        "productId": product_id,
+        "summary": {
+            "averageRating": round(avg, 1),
+            "totalReviews": total_reviews,
+            "breakdown": breakdown,
+            "customersSay": customers_say,
+            "topics": topics,
+            "mediaGallery": media_gallery,
+        },
+        "filters": {
+            "ratings": [{"value": r, "label": str(r), "count": int(rating_counts[r])} for r in (5, 4, 3, 2, 1)],
+            "countries": [],
+            "sorts": [
+                {"value": "most_recent", "label": "Most recent"},
+                {"value": "highest_rating", "label": "Highest rating"},
+                {"value": "lowest_rating", "label": "Lowest rating"},
+                {"value": "most_helpful", "label": "Most helpful"},
+            ],
+        },
+        "pagination": {
+            "page": 1,
+            "pageSize": page_size,
+            "totalReviews": total_reviews,
+            "totalPages": total_pages,
+        },
+        "reviews": reviews,
+    }
+
+    # Apply to any SalesPdpReviews blocks in the page puck data.
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        if obj.get("type") != "SalesPdpReviews":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+
+        raw = props.get("configJson")
+        if isinstance(raw, str) and raw.strip():
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise TestimonialGenerationError(
+                    f"SalesPdpReviews.configJson must be valid JSON: {exc}"
+                ) from exc
+            if not isinstance(parsed, dict):
+                raise TestimonialGenerationError("SalesPdpReviews.configJson must decode to a JSON object.")
+            if not isinstance(parsed.get("id"), str) or not parsed["id"].strip():
+                raise TestimonialGenerationError("SalesPdpReviews.config.id must be a non-empty string.")
+            parsed["data"] = response
+            props["configJson"] = json.dumps(parsed, ensure_ascii=False)
+            continue
+
+        config = props.get("config")
+        if not isinstance(config, dict):
+            raise TestimonialGenerationError("SalesPdpReviews is missing config/configJson.")
+        if not isinstance(config.get("id"), str) or not config["id"].strip():
+            raise TestimonialGenerationError("SalesPdpReviews.config.id must be a non-empty string.")
+        config["data"] = response
 
 
 def _seed_value(*parts: str) -> int:
@@ -273,6 +551,28 @@ def _select_single_scene_mode(index: int) -> str:
     if index < 0:
         raise TestimonialGenerationError("Single scene mode index cannot be negative.")
     return _SINGLE_SCENE_MODE_CYCLE[index % len(_SINGLE_SCENE_MODE_CYCLE)]
+
+
+def _select_social_comment_without_attachment_indices(total: int, *, seed: int) -> set[int]:
+    if total < 0:
+        raise TestimonialGenerationError("Social comment total cannot be negative.")
+    if total <= 1:
+        return set()
+    desired = max(1, int(total * 0.25))
+    desired = min(desired, total - 1)  # Ensure at least one comment keeps an attachment.
+    rng = random.Random(seed)
+    return set(rng.sample(range(total), desired))
+
+
+def _select_review_card_without_hero_indices(total: int, *, seed: int) -> set[int]:
+    if total < 0:
+        raise TestimonialGenerationError("Review card total cannot be negative.")
+    if total <= 1:
+        return set()
+    desired = max(1, int(total * 0.15))
+    desired = min(desired, total - 1)  # Ensure at least one review keeps a hero image.
+    rng = random.Random(seed)
+    return set(rng.sample(range(total), desired))
 
 
 def _build_product_image_prompt(
@@ -1264,6 +1564,7 @@ def _build_testimonial_prompt(*, count: int, copy: str, product_context: str, to
         "- reply.avatarPrompt must describe the reply person's portrait and must stay consistent with reply name/persona.\n"
         "- mediaPrompts must include 3 short image prompts tied to the review; keep them general and product-agnostic (refer to 'the product' instead of specific brand names).\n"
         "- If the review references the product, include the product in at least one mediaPrompt using generic wording.\n"
+        "- Do not reference photos/pictures/screenshots/attachments in the review or reply text (the testimonial may render with or without media).\n"
         "- avatarPrompt and heroImagePrompt must be unique per testimonial.\n"
         "- Do not reuse names or personas across testimonials.\n"
         "- meta.location (optional) should be <= 120 characters.\n"
@@ -1427,6 +1728,21 @@ def generate_funnel_page_testimonials(
     social_card_variant_index = 0
     review_card_scene_index = 0
     social_attachment_scene_index = 0
+    total_social_comment_renders = sum(
+        1 for group in groups for render in group.renders if render.template == "social_comment"
+    )
+    total_review_card_renders = sum(
+        1 for group in groups for render in group.renders if render.template == "review_card"
+    )
+    selection_seed = _seed_value(funnel_id, page_id, resolved_template_id)
+    social_without_attachment = _select_social_comment_without_attachment_indices(
+        total_social_comment_renders, seed=_seed_value(str(selection_seed), "social_without_attachment")
+    )
+    review_without_hero = _select_review_card_without_hero_indices(
+        total_review_card_renders, seed=_seed_value(str(selection_seed), "review_without_hero")
+    )
+    social_comment_index = 0
+    review_card_index = 0
 
     for start in range(0, len(groups), batch_size):
         batch = groups[start : start + batch_size]
@@ -1610,21 +1926,26 @@ def generate_funnel_page_testimonials(
                         )
 
                     if render.template == "review_card":
+                        omit_hero = review_card_index in review_without_hero
+                        review_card_index += 1
                         review_scene_mode = _select_single_scene_mode(review_card_scene_index)
                         review_card_scene_index += 1
-                        review_hero_prompt = _build_testimonial_scene_prompt(
-                            scene_mode=review_scene_mode,
-                            render_label=render.label,
-                            persona=validated["persona"],
-                            setting=setting_value,
-                            action=action_value,
-                            direction=direction_value,
-                            identity_name=validated["name"],
-                            identity_anchor=validated["avatarPrompt"],
-                            require_subject_match=True,
-                            include_text_screen_line=False,
-                            prohibit_visible_text=True,
-                        )
+                        review_hero_prompt = None
+                        hero_asset: Optional[Asset] = None
+                        if not omit_hero:
+                            review_hero_prompt = _build_testimonial_scene_prompt(
+                                scene_mode=review_scene_mode,
+                                render_label=render.label,
+                                persona=validated["persona"],
+                                setting=setting_value,
+                                action=action_value,
+                                direction=direction_value,
+                                identity_name=validated["name"],
+                                identity_anchor=validated["avatarPrompt"],
+                                require_subject_match=True,
+                                include_text_screen_line=False,
+                                prohibit_visible_text=True,
+                            )
                         review_avatar_prompt = _build_distinct_avatar_prompt(
                             render_label=render.label,
                             display_name=validated["name"],
@@ -1632,26 +1953,31 @@ def generate_funnel_page_testimonials(
                             direction=validated["avatarPrompt"],
                             variant_label="review-card-avatar",
                         )
-                        hero_asset = create_funnel_image_asset(
-                            session=session,
-                            org_id=org_id,
-                            client_id=str(funnel.client_id),
-                            prompt=review_hero_prompt,
-                            aspect_ratio="9:16",
-                            usage_context={
-                                "kind": "testimonial_review_hero",
-                                "funnelId": funnel_id,
-                                "pageId": page_id,
-                                "target": render.label,
-                            },
-                            reference_image_bytes=product_reference_bytes,
-                            reference_image_mime_type=product_reference_mime,
-                            reference_asset_public_id=str(product_primary_asset.public_id),
-                            reference_asset_id=str(product_primary_asset.id),
-                            funnel_id=funnel_id,
-                            product_id=str(funnel.product_id) if funnel.product_id else None,
-                            tags=["funnel", "testimonial", "review_card", "hero"],
-                        )
+                        if not omit_hero:
+                            if review_hero_prompt is None:
+                                raise TestimonialGenerationError(
+                                    "Review card hero prompt was not generated even though hero rendering is enabled."
+                                )
+                            hero_asset = create_funnel_image_asset(
+                                session=session,
+                                org_id=org_id,
+                                client_id=str(funnel.client_id),
+                                prompt=review_hero_prompt,
+                                aspect_ratio="9:16",
+                                usage_context={
+                                    "kind": "testimonial_review_hero",
+                                    "funnelId": funnel_id,
+                                    "pageId": page_id,
+                                    "target": render.label,
+                                },
+                                reference_image_bytes=product_reference_bytes,
+                                reference_image_mime_type=product_reference_mime,
+                                reference_asset_public_id=str(product_primary_asset.public_id),
+                                reference_asset_id=str(product_primary_asset.id),
+                                funnel_id=funnel_id,
+                                product_id=str(funnel.product_id) if funnel.product_id else None,
+                                tags=["funnel", "testimonial", "review_card", "hero"],
+                            )
                         review_avatar_asset = create_funnel_image_asset(
                             session=session,
                             org_id=org_id,
@@ -1674,13 +2000,12 @@ def generate_funnel_page_testimonials(
                             "verified": validated["verified"],
                             "rating": validated["rating"],
                             "review": validated["review"],
-                            "heroImageUrl": _public_asset_url(str(hero_asset.public_id)),
                             "avatarUrl": _public_asset_url(str(review_avatar_asset.public_id)),
                         }
+                        if hero_asset is not None:
+                            payload["heroImageUrl"] = _public_asset_url(str(hero_asset.public_id))
                         if validated.get("meta") is not None:
                             payload["meta"] = validated["meta"]
-                        payload["avatarPrompt"] = review_avatar_prompt
-                        payload["heroImagePrompt"] = review_hero_prompt
                         payload["renderContext"] = {
                             "userContext": validated["persona"],
                             "pageCopy": copy_text,
@@ -1717,15 +2042,20 @@ def generate_funnel_page_testimonials(
                                 "payload": payload,
                                 "publicId": str(asset.public_id),
                                 "assetId": str(asset.id),
-                                "heroSourcePublicId": str(hero_asset.public_id),
+                                "heroSourcePublicId": (
+                                    str(hero_asset.public_id) if hero_asset is not None else None
+                                ),
                                 "avatarSourcePublicId": str(review_avatar_asset.public_id),
                                 "heroPrompt": review_hero_prompt,
                                 "avatarPrompt": review_avatar_prompt,
-                                "heroSceneMode": review_scene_mode,
+                                "heroSceneMode": (review_scene_mode if hero_asset is not None else None),
+                                "reviewHeroOmitted": bool(omit_hero),
                             }
                         )
                         continue
 
+                    omit_attachment = social_comment_index in social_without_attachment
+                    social_comment_index += 1
                     social_avatar_prompt = _build_distinct_avatar_prompt(
                         render_label=render.label,
                         display_name=validated["name"],
@@ -1764,26 +2094,28 @@ def generate_funnel_page_testimonials(
                         product_id=str(funnel.product_id) if funnel.product_id else None,
                         tags=["funnel", "testimonial", "social_comment", "avatar"],
                     )
-                    attachment_asset = create_funnel_image_asset(
-                        session=session,
-                        org_id=org_id,
-                        client_id=str(funnel.client_id),
-                        prompt=social_attachment_prompt,
-                        aspect_ratio="9:16",
-                        usage_context={
-                            "kind": "testimonial_social_attachment",
-                            "funnelId": funnel_id,
-                            "pageId": page_id,
-                            "target": render.label,
-                        },
-                        reference_image_bytes=product_reference_bytes,
-                        reference_image_mime_type=product_reference_mime,
-                        reference_asset_public_id=str(product_primary_asset.public_id),
-                        reference_asset_id=str(product_primary_asset.id),
-                        funnel_id=funnel_id,
-                        product_id=str(funnel.product_id) if funnel.product_id else None,
-                        tags=["funnel", "testimonial", "social_comment", "attachment"],
-                    )
+                    attachment_asset: Optional[Asset] = None
+                    if not omit_attachment:
+                        attachment_asset = create_funnel_image_asset(
+                            session=session,
+                            org_id=org_id,
+                            client_id=str(funnel.client_id),
+                            prompt=social_attachment_prompt,
+                            aspect_ratio="9:16",
+                            usage_context={
+                                "kind": "testimonial_social_attachment",
+                                "funnelId": funnel_id,
+                                "pageId": page_id,
+                                "target": render.label,
+                            },
+                            reference_image_bytes=product_reference_bytes,
+                            reference_image_mime_type=product_reference_mime,
+                            reference_asset_public_id=str(product_primary_asset.public_id),
+                            reference_asset_id=str(product_primary_asset.id),
+                            funnel_id=funnel_id,
+                            product_id=str(funnel.product_id) if funnel.product_id else None,
+                            tags=["funnel", "testimonial", "social_comment", "attachment"],
+                        )
                     time_value = today
                     if isinstance(validated.get("meta"), dict):
                         meta_date = validated["meta"].get("date")
@@ -1865,7 +2197,6 @@ def generate_funnel_page_testimonials(
                         "name": validated["name"],
                         "text": validated["review"],
                         "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
-                        "attachmentUrl": _public_asset_url(str(attachment_asset.public_id)),
                         "meta": {
                             "time": time_value,
                             **({"followLabel": follow_label} if follow_label else {}),
@@ -1877,6 +2208,8 @@ def generate_funnel_page_testimonials(
                             else {}
                         ),
                     }
+                    if attachment_asset is not None:
+                        primary_comment["attachmentUrl"] = _public_asset_url(str(attachment_asset.public_id))
 
                     social_template = _next_social_card_variant(social_card_variant_index)
                     social_card_variant_index += 1
@@ -1944,7 +2277,9 @@ def generate_funnel_page_testimonials(
                             "publicId": str(asset.public_id),
                             "assetId": str(asset.id),
                             "avatarPublicId": str(avatar_asset.public_id),
-                            "attachmentPublicId": str(attachment_asset.public_id),
+                            "attachmentPublicId": (
+                                str(attachment_asset.public_id) if attachment_asset is not None else None
+                            ),
                             "replyAvatarPublicId": (
                                 str(reply_avatar_asset.public_id) if reply_avatar_asset else None
                             ),
@@ -1955,8 +2290,9 @@ def generate_funnel_page_testimonials(
                                 reply_payload["persona"] if reply_avatar_asset is not None else None
                             ),
                             "socialTemplate": social_template,
-                            "attachmentPrompt": social_attachment_prompt,
-                            "attachmentSceneMode": social_scene_mode,
+                            "attachmentPrompt": (social_attachment_prompt if attachment_asset is not None else None),
+                            "attachmentSceneMode": (social_scene_mode if attachment_asset is not None else None),
+                            "socialAttachmentOmitted": bool(omit_attachment),
                         }
                     )
     except TestimonialRenderError as exc:
@@ -1979,6 +2315,13 @@ def generate_funnel_page_testimonials(
         review_wall_images = _collect_sales_pdp_review_wall_images(groups)
         _sync_sales_pdp_guarantee_feed_images(
             base_puck,
+            review_wall_images=review_wall_images,
+        )
+        _sync_sales_pdp_reviews_from_testimonials(
+            base_puck,
+            product=product,
+            validated_testimonials=validated_testimonials,
+            today=today,
             review_wall_images=review_wall_images,
         )
 

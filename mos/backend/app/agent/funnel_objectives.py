@@ -305,6 +305,33 @@ def run_generate_page_draft_stream(
         )
         draft_version_id = persist_res.ui_details["draftVersionId"]
 
+        # 11) Generate + apply testimonials for template pages (Sales PDP / Pre-sales listicle).
+        # This is required for the template review systems to be populated.
+        if funnel_ctx.get("templateMode") and funnel_ctx.get("templateKind") in ("sales-pdp", "pre-sales-listicle"):
+            testimonials_res = yield from runtime.invoke_tool_stream(
+                handle=handle,
+                tool=TestimonialsGenerateAndApplyTool(),
+                raw_args={
+                    "orgId": org_id,
+                    "userId": user_id,
+                    "funnelId": funnel_id,
+                    "pageId": page_id,
+                    "draftVersionId": draft_version_id,
+                    "templateId": funnel_ctx.get("templateId"),
+                    "ideaWorkspaceId": docs_ctx.get("ideaWorkspaceId"),
+                    "model": model,
+                    "temperature": 0.3,
+                    "maxTokens": max_tokens,
+                    "synthetic": True,
+                    "agentRunId": handle.run_id,
+                },
+                client_id=client_id,
+                funnel_id=funnel_id,
+                page_id=page_id,
+            )
+            puck_data = testimonials_res.ui_details.get("puckData") or puck_data
+            draft_version_id = testimonials_res.ui_details.get("draftVersionId") or draft_version_id
+
         final = {
             "assistantMessage": assistant_message,
             "puckData": puck_data,

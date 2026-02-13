@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
@@ -59,6 +60,47 @@ def _extract_first_inline_image(response_json: dict[str, Any]) -> tuple[bytes, s
     raise TestimonialRenderError("Nano Banana did not return an image.")
 
 
+def _summarize_gemini_response_for_debug(response_json: Any) -> str:
+    if not isinstance(response_json, dict):
+        return f"type={type(response_json).__name__}"
+    try:
+        top_keys = sorted(list(response_json.keys()))[:20]
+        candidates = response_json.get("candidates") or []
+        candidate_count = len(candidates) if isinstance(candidates, list) else 0
+
+        finish_reasons: list[str] = []
+        part_kinds: list[str] = []
+        if isinstance(candidates, list):
+            for cand in candidates[:2]:
+                if not isinstance(cand, dict):
+                    continue
+                finish = cand.get("finishReason") or cand.get("finish_reason")
+                if isinstance(finish, str):
+                    finish_reasons.append(finish)
+                content = cand.get("content") if isinstance(cand.get("content"), dict) else None
+                parts = content.get("parts") if isinstance(content, dict) else None
+                if isinstance(parts, list):
+                    for part in parts[:6]:
+                        if not isinstance(part, dict):
+                            continue
+                        if "inlineData" in part or "inline_data" in part:
+                            part_kinds.append("inlineData")
+                        elif "text" in part:
+                            part_kinds.append("text")
+                        else:
+                            part_kinds.append(",".join(sorted(part.keys()))[:60])
+
+        bits = [
+            f"topKeys={top_keys}",
+            f"candidateCount={candidate_count}",
+            f"finishReasons={finish_reasons[:2]}",
+            f"partKinds={part_kinds[:12]}",
+        ]
+        return " ".join(bits)
+    except Exception as exc:  # noqa: BLE001
+        return f"failed_to_summarize_response error={type(exc).__name__}"
+
+
 def _generate_nano_image_bytes(
     *,
     model: str,
@@ -82,16 +124,29 @@ def _generate_nano_image_bytes(
         payload["generationConfig"] = {"imageConfig": image_config}
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    resp = httpx.post(
-        url,
-        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-        json=payload,
-        timeout=60.0,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    image_bytes, mime_type = _extract_first_inline_image(data)
-    return image_bytes, mime_type
+    retries = 2
+    last_summary: str | None = None
+    for attempt in range(retries + 1):
+        resp = httpx.post(
+            url,
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            json=payload,
+            timeout=60.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        try:
+            image_bytes, mime_type = _extract_first_inline_image(data)
+            return image_bytes, mime_type
+        except Exception as exc:  # noqa: BLE001
+            last_summary = _summarize_gemini_response_for_debug(data)
+            if attempt >= retries:
+                raise TestimonialRenderError(
+                    "Nano Banana did not return an image "
+                    f"(attempts={retries + 1}). {last_summary}"
+                ) from exc
+            time.sleep(0.6 * (attempt + 1))
+    raise TestimonialRenderError("Unreachable: Nano Banana retry loop exhausted.")
 
 
 def maybe_generate_review_card_assets(payload: dict[str, Any]) -> dict[str, Any]:
