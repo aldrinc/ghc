@@ -38,7 +38,7 @@ def test_first_design_system_sets_client_default(api_client: TestClient):
     assert client_after_second.json()["design_system_id"] == first_id
 
 
-def test_create_design_system_rejects_invalid_text_tokens(api_client: TestClient):
+def test_create_design_system_allows_text_tokens_coupled_to_brand(api_client: TestClient):
     client_resp = api_client.post("/clients", json={"name": "Design System Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
@@ -48,10 +48,9 @@ def test_create_design_system_rejects_invalid_text_tokens(api_client: TestClient
 
     resp = api_client.post(
         "/design-systems",
-        json={"name": "Invalid DS", "tokens": tokens, "clientId": client_id},
+        json={"name": "Brand Ink DS", "tokens": tokens, "clientId": client_id},
     )
-    assert resp.status_code == 422
-    assert "--color-text" in (resp.json().get("detail") or "")
+    assert resp.status_code == 201
 
 
 def test_update_design_system_rejects_invalid_text_tokens(api_client: TestClient):

@@ -60,6 +60,11 @@ def audit_design_system_tokens(tokens: dict[str, Any]) -> list[AuditFinding]:
         ("tokens.contrast.muted_on_page", "--color-muted", "--color-page-bg", 4.5),
         ("tokens.contrast.marquee_text_on_marquee_bg", "--marquee-text", "--marquee-bg", 4.5),
         ("tokens.contrast.cta_text_on_cta_bg", "--color-cta-text", "--color-cta", 3.0),
+        ("tokens.contrast.cta_text_on_pdp_cta_bg", "--color-cta-text", "--pdp-cta-bg", 3.0),
+        ("tokens.contrast.pdp_check_icon_on_pdp_check_bg", "--color-bg", "--pdp-check-bg", 3.0),
+        ("tokens.contrast.pdp_warning_icon_on_pdp_warning_bg", "--color-bg", "--pdp-warning-bg", 3.0),
+        ("tokens.contrast.pdp_cta_icon_on_pdp_white_96", "--pdp-cta-bg", "--pdp-white-96", 3.0),
+        ("tokens.contrast.pdp_header_cta_icon_on_cta_shell", "--color-cta-icon", "--color-cta-shell", 3.0),
     ]
 
     for check_id, fg_key, bg_key, threshold in checks:
@@ -240,7 +245,9 @@ def audit_page_contrast(*, url: str) -> dict[str, Any]:
 
   const borderFailures = [];
   const borderTargets = Array.from(
-    document.querySelectorAll(".optionCard,.sizeCard,.offerCard,.swatchCircle,.faqCard,.faqCardOpen,.urgency,.delayBar")
+    document.querySelectorAll(
+      '[class*="optionCard"],[class*="sizeCard"],[class*="offerCard"],[class*="swatchCircle"],[class*="faqCard"],[class*="faqCardOpen"],[class*="urgency"],[class*="delayBar"]'
+    )
   );
   for (const el of borderTargets) {
     if (!isVisible(el)) continue;
@@ -249,6 +256,7 @@ def audit_page_contrast(*, url: str) -> dict[str, Any]:
     if (bw <= 0) continue;
     const border = parseColor(style.borderTopColor);
     if (!border) continue;
+    if (border.a <= 0) continue;
     const bg = resolvedBackground(el);
     const borderRgb = composite(border, bg);
     const ratio = contrast(borderRgb, bg);
@@ -264,12 +272,40 @@ def audit_page_contrast(*, url: str) -> dict[str, Any]:
     }
   }
 
+  const nonTextFailures = [];
+  const nonTextChecks = [];
+  const nonTextTargets = Array.from(
+    document.querySelectorAll('[class*="selectedCheck"] > span,[class*="ctaIconCircle"],[class*="headerCtaIcon"]')
+  );
+  for (const el of nonTextTargets) {
+    if (!isVisible(el)) continue;
+    const style = getComputedStyle(el);
+    const fg = parseColor(style.color);
+    if (!fg) continue;
+    const bg = resolvedBackground(el);
+    const rendered = composite(fg, bg);
+    const ratio = contrast(rendered, bg);
+    const threshold = 3.0;
+    const rec = {
+      selector: cssPath(el),
+      color: style.color,
+      background: `rgb(${Math.round(bg.r)}, ${Math.round(bg.g)}, ${Math.round(bg.b)})`,
+      contrastRatio: ratio,
+      threshold,
+    };
+    nonTextChecks.push(rec);
+    if (ratio < threshold) nonTextFailures.push(rec);
+  }
+
   return {
     url: location.href,
     textCheckCount: textChecks.length,
     textFailureCount: textFailures.length,
+    nonTextCheckCount: nonTextChecks.length,
+    nonTextFailureCount: nonTextFailures.length,
     borderFailureCount: borderFailures.length,
     textFailures: textFailures.slice(0, 200),
+    nonTextFailures: nonTextFailures.slice(0, 200),
     borderFailures: borderFailures.slice(0, 200),
   };
 }"""

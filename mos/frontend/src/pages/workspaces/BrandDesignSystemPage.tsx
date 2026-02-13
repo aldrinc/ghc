@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useDesignSystems, useCreateDesignSystem, useUpdateDesignSystem, useDeleteDesignSystem } from "@/api/designSystems";
@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
+import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 import type { DesignSystem } from "@/types/designSystems";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
@@ -343,12 +346,19 @@ const DEFAULT_TOKENS = (() => {
   }
 })();
 
-const DESIGN_SYSTEM_PROMPT = `Create a comprehensive design system JSON for our Sales PDP template.
-- Output ONLY valid JSON.
-- Match this schema: { dataTheme, fontUrls, cssVars, funnelDefaults, brand }.
-- Use the cssVars keys from the template exactly.
-- Prefer values as strings with units when needed.
-Brand details: [describe your brand here].`;
+const DESIGN_SYSTEM_PROMPT = `Update our DESIGN SYSTEM TEMPLATE for a specific brand.
+- Output ONLY valid JSON (no markdown).
+- Start from the provided template JSON and change ONLY a small set of tokens needed to match the brand.
+- Keep dataTheme: "light" (do not generate dark mode tokens).
+- Keep layout/geometry tokens (sizes/spacing/radii/type scale) unchanged unless explicitly requested.
+- Prefer minimal "accent swaps" first:
+  - CTA: --color-cta, --color-cta-icon (and only if needed: --color-cta-text, --pdp-cta-bg, --pdp-check-bg)
+  - Marquee: --marquee-bg, --marquee-text
+  - Badges: --badge-strip-bg, --badge-text-color, --badge-strip-border
+  - Section backgrounds: --hero-bg, --pitch-bg (optional: --color-page-bg)
+- Maintain accessibility: CTA text must stay readable on the CTA background; marquee text must stay readable on marquee background; keep surfaces light.
+Brand details: [describe your brand, industry, vibe, and any required colors/fonts].
+Return the full updated tokens JSON (same shape/keys as the template).`;
 
 function formatTokens(tokens: unknown) {
   const value = tokens && typeof tokens === "object" ? tokens : DEFAULT_TOKENS;
@@ -363,6 +373,68 @@ function countCssVars(tokens: unknown) {
   if (!tokens || typeof tokens !== "object") return 0;
   const vars = (tokens as { cssVars?: Record<string, unknown> }).cssVars;
   return vars && typeof vars === "object" ? Object.keys(vars).length : 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeCssVars(tokens: unknown): Record<string, string> {
+  if (!isRecord(tokens)) return {};
+  const vars = tokens.cssVars;
+  if (!isRecord(vars)) return {};
+  const normalized: Record<string, string> = {};
+  for (const [key, value] of Object.entries(vars)) {
+    if (typeof value === "string" || typeof value === "number") {
+      normalized[key] = String(value);
+    }
+  }
+  return normalized;
+}
+
+function normalizeFontUrls(tokens: unknown): string[] {
+  if (!isRecord(tokens) || !Array.isArray(tokens.fontUrls)) return [];
+  return tokens.fontUrls
+    .filter((url) => typeof url === "string")
+    .map((url) => url.trim())
+    .filter(Boolean);
+}
+
+function normalizeBrand(tokens: unknown): { name?: string; logoAssetPublicId?: string; logoAlt?: string } {
+  if (!isRecord(tokens) || !isRecord(tokens.brand)) return {};
+  const brand = tokens.brand;
+  const name = typeof brand.name === "string" && brand.name.trim() ? brand.name.trim() : undefined;
+  const logoAssetPublicId =
+    typeof brand.logoAssetPublicId === "string" && brand.logoAssetPublicId.trim()
+      ? brand.logoAssetPublicId.trim()
+      : undefined;
+  const logoAlt = typeof brand.logoAlt === "string" && brand.logoAlt.trim() ? brand.logoAlt.trim() : undefined;
+  return { name, logoAssetPublicId, logoAlt };
+}
+
+function isColorLikeCssValue(raw: string): boolean {
+  const value = raw.trim().toLowerCase();
+  if (!value) return false;
+  if (value === "transparent" || value === "currentcolor") return true;
+  if (value.startsWith("#")) return true;
+  if (value.startsWith("rgb(") || value.startsWith("rgba(")) return true;
+  if (value.startsWith("hsl(") || value.startsWith("hsla(")) return true;
+  if (value.startsWith("color-mix(")) return true;
+  const varMatch = value.match(/^var\((--[^,\s)]+)/);
+  if (!varMatch) return false;
+  const ref = varMatch[1] || "";
+  return (
+    ref.includes("color") ||
+    ref.includes("bg") ||
+    ref.includes("text") ||
+    ref.includes("border") ||
+    ref.includes("foreground") ||
+    ref.includes("surface") ||
+    ref.includes("overlay") ||
+    ref.includes("ring") ||
+    ref.includes("outline") ||
+    ref.includes("pdp-")
+  );
 }
 
 function parseTokens(raw: string): { value?: Record<string, unknown>; error?: string } {
@@ -395,12 +467,111 @@ export function BrandDesignSystemPage() {
   const [draftTokens, setDraftTokens] = useState(formatTokens(DEFAULT_TOKENS));
   const [tokensError, setTokensError] = useState<string | null>(null);
 
+  const [previewDesignSystemId, setPreviewDesignSystemId] = useState("");
+  const [varsFilter, setVarsFilter] = useState("");
+  const [logoErrored, setLogoErrored] = useState(false);
+
   const designSystemOptions = useMemo(
     () => [
       { label: "Workspace default", value: "" },
       ...designSystems.map((ds) => ({ label: ds.name, value: ds.id })),
     ],
     [designSystems]
+  );
+
+  useEffect(() => {
+    setPreviewDesignSystemId("");
+    setVarsFilter("");
+    setLogoErrored(false);
+  }, [workspace?.id]);
+
+  useEffect(() => {
+    if (!designSystems.length) return;
+    setPreviewDesignSystemId((current) => {
+      if (current) return current;
+      const active = client?.design_system_id || "";
+      return active || designSystems[0]?.id || "";
+    });
+  }, [client?.design_system_id, designSystems]);
+
+  const previewDesignSystem = useMemo(
+    () => designSystems.find((ds) => ds.id === previewDesignSystemId) ?? null,
+    [designSystems, previewDesignSystemId]
+  );
+  const previewTokens = previewDesignSystem?.tokens;
+  const previewCssVars = useMemo(() => normalizeCssVars(previewTokens), [previewTokens]);
+  const previewCssVarEntries = useMemo(
+    () => Object.entries(previewCssVars).sort(([a], [b]) => a.localeCompare(b)),
+    [previewCssVars]
+  );
+  const previewFilteredCssVarEntries = useMemo(() => {
+    const term = varsFilter.trim().toLowerCase();
+    if (!term) return previewCssVarEntries;
+    return previewCssVarEntries.filter(([key, value]) => {
+      const hay = `${key} ${value}`.toLowerCase();
+      return hay.includes(term);
+    });
+  }, [previewCssVarEntries, varsFilter]);
+
+  const previewBrand = useMemo(() => normalizeBrand(previewTokens), [previewTokens]);
+  const previewFontUrls = useMemo(() => normalizeFontUrls(previewTokens), [previewTokens]);
+
+  useEffect(() => {
+    setLogoErrored(false);
+  }, [previewBrand.logoAssetPublicId, previewDesignSystemId]);
+
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  const previewLogoSrc =
+    previewBrand.logoAssetPublicId && apiBaseUrl
+      ? `${apiBaseUrl.replace(/\/$/, "")}/public/assets/${previewBrand.logoAssetPublicId}`
+      : undefined;
+
+  const coreColorKeys = useMemo(
+    () => [
+      "--color-page-bg",
+      "--color-brand",
+      "--color-bg",
+      "--color-text",
+      "--color-muted",
+      "--color-border",
+      "--color-soft",
+      "--focus-outline-color",
+      "--color-cta",
+      "--color-cta-text",
+      "--color-cta-shell",
+      "--color-cta-icon",
+      "--hero-bg",
+      "--marquee-bg",
+      "--wall-button-bg",
+      "--reviews-card-bg",
+    ],
+    []
+  );
+  const coreColors = useMemo(
+    () =>
+      coreColorKeys
+        .map((key) => ({ key, value: previewCssVars[key] }))
+        .filter((entry) => typeof entry.value === "string" && entry.value),
+    [coreColorKeys, previewCssVars]
+  );
+  const allColorVars = useMemo(
+    () =>
+      previewCssVarEntries.filter(([key, value]) => {
+        const keyLower = key.toLowerCase();
+        const keySignals =
+          keyLower.includes("color") ||
+          keyLower.includes("-bg") ||
+          keyLower.includes("bg") ||
+          keyLower.includes("border") ||
+          keyLower.includes("text") ||
+          keyLower.includes("foreground") ||
+          keyLower.includes("muted") ||
+          keyLower.includes("overlay") ||
+          keyLower.includes("ring") ||
+          keyLower.includes("outline");
+        return keySignals && isColorLikeCssValue(value);
+      }),
+    [previewCssVarEntries]
   );
 
   const openCreate = () => {
@@ -491,6 +662,458 @@ export function BrandDesignSystemPage() {
             This design system powers funnel pages unless a funnel or page overrides it.
           </div>
         </div>
+      </div>
+
+      <div className="ds-card ds-card--md space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-content">Design system visualizer</div>
+            <div className="text-xs text-content-muted">
+              Visualize logo, colors, and typography for a specific token set without changing workspace defaults.
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="min-w-[260px]">
+              <Select
+                value={previewDesignSystemId}
+                onValueChange={(value) => setPreviewDesignSystemId(value)}
+                options={[{ label: "Select design system…", value: "" }, ...designSystems.map((ds) => ({ label: ds.name, value: ds.id }))]}
+                disabled={isLoading || !designSystems.length}
+              />
+            </div>
+            {previewDesignSystem ? (
+              <Button variant="secondary" size="sm" onClick={() => openEdit(previewDesignSystem)}>
+                Edit
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        {previewDesignSystemId && !previewDesignSystem ? (
+          <div className="rounded-md border border-border bg-surface-2 p-3 text-sm text-danger">
+            Selected design system not found. It may have been deleted.
+          </div>
+        ) : null}
+
+        {!previewDesignSystem ? (
+          <div className="rounded-md border border-dashed border-border bg-surface-2 p-4 text-sm text-content-muted">
+            {isLoading
+              ? "Loading design systems…"
+              : designSystems.length
+                ? "Select a design system to preview."
+                : "Create a design system to preview its tokens here."}
+          </div>
+        ) : (
+          <Tabs defaultValue="preview">
+            <TabsList className="shadow-none">
+              <TabsTrigger value="preview" className="data-[selected]:shadow-none">
+                Preview
+              </TabsTrigger>
+              <TabsTrigger value="tokens" className="data-[selected]:shadow-none">
+                CSS vars
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="preview" flush>
+              <DesignSystemProvider tokens={previewTokens}>
+                <div
+                  className="rounded-md overflow-hidden"
+                  style={{
+                    backgroundColor: "var(--color-page-bg)",
+                    color: "var(--color-text)",
+                  }}
+                >
+                  <div className="p-4">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div
+                          className="grid size-14 place-items-center overflow-hidden border"
+                          style={{
+                            borderColor: "var(--color-border)",
+                            borderRadius: "var(--radius-md)",
+                            backgroundColor: "var(--color-bg)",
+                          }}
+                        >
+                          {previewLogoSrc && !logoErrored ? (
+                            <img
+                              src={previewLogoSrc}
+                              alt={previewBrand.logoAlt || previewBrand.name || "Logo"}
+                              className="h-full w-full object-contain"
+                              onError={() => setLogoErrored(true)}
+                            />
+                          ) : (
+                            <div
+                              className="px-2 text-center text-[11px] font-semibold"
+                              style={{ color: "var(--color-muted)" }}
+                            >
+                              Logo
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-[240px]">
+                          <div className="text-lg font-semibold" style={{ fontFamily: "var(--font-heading)" }}>
+                            {previewBrand.name || previewDesignSystem.name}
+                          </div>
+                          <div className="mt-1 space-y-1 text-[11px]" style={{ color: "var(--color-muted)" }}>
+                            <div>
+                              <span className="font-semibold" style={{ color: "var(--color-text)" }}>
+                                logoAssetPublicId:
+                              </span>{" "}
+                              <span className="font-mono" style={{ color: "var(--color-text)" }}>
+                                {previewBrand.logoAssetPublicId || "Not set"}
+                              </span>
+                            </div>
+                            {!apiBaseUrl ? (
+                              <div className="text-danger">
+                                Missing `VITE_API_BASE_URL` so the logo image preview cannot be loaded.
+                              </div>
+                            ) : logoErrored && previewBrand.logoAssetPublicId ? (
+                              <div className="text-danger">
+                                Unable to load logo from <span className="font-mono">{previewLogoSrc}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-xs" style={{ color: "var(--color-muted)" }}>
+                        <div>
+                          <span className="font-semibold" style={{ color: "var(--color-text)" }}>
+                            Theme:
+                          </span>{" "}
+                          <span className="font-mono">
+                            {(isRecord(previewTokens) &&
+                              typeof previewTokens.dataTheme === "string" &&
+                              previewTokens.dataTheme) ||
+                              "unspecified"}
+                          </span>
+                        </div>
+                        <div className="mt-1">
+                          <span className="font-semibold" style={{ color: "var(--color-text)" }}>
+                            Fonts:
+                          </span>{" "}
+                          <span className="font-mono">{previewFontUrls.length || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      <div
+                        className="inline-flex items-center justify-center px-6 py-3 font-semibold"
+                        style={{
+                          backgroundColor: "var(--color-cta)",
+                          color: "var(--color-cta-text)",
+                          borderRadius: "999px",
+                          fontFamily: "var(--font-cta)",
+                          fontWeight: "var(--cta-font-weight)",
+                          letterSpacing: "var(--cta-letter-spacing)",
+                        }}
+                      >
+                        CTA preview
+                      </div>
+                      <div
+                        className="inline-flex items-center justify-center px-4 py-3 font-semibold"
+                        style={{
+                          backgroundColor: "var(--color-soft)",
+                          color: "var(--color-brand)",
+                          borderRadius: "999px",
+                          border: "1px solid var(--color-border)",
+                          fontFamily: "var(--font-sans)",
+                        }}
+                      >
+                        Secondary
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t" style={{ borderColor: "var(--color-border)" }} />
+
+                  <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+                    <div className="p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-semibold" style={{ color: "var(--color-text)" }}>
+                          Core palette
+                        </div>
+                        <div className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                          {coreColors.length} tokens
+                        </div>
+                      </div>
+                      {coreColors.length ? (
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {coreColors.map(({ key, value }) => (
+                            <div
+                              key={key}
+                              className="rounded-lg border p-3"
+                              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg)" }}
+                            >
+                              <div
+                                className="h-10 w-full rounded-md"
+                                style={{
+                                  backgroundColor: `var(${key})`,
+                                  border: "1px solid var(--color-border)",
+                                }}
+                              />
+                              <div className="mt-2">
+                                <div className="font-mono text-[11px]" style={{ color: "var(--color-text)" }}>
+                                  {key}
+                                </div>
+                                <div className="font-mono text-[11px] break-all" style={{ color: "var(--color-muted)" }}>
+                                  {value}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="mt-2 text-sm" style={{ color: "var(--color-muted)" }}>
+                          No core color tokens found.
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4 lg:border-l" style={{ borderColor: "var(--color-border)" }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-semibold" style={{ color: "var(--color-text)" }}>
+                          Typography
+                        </div>
+                        <div className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                          <span className="font-mono">
+                            {previewCssVars["--font-sans"] ? "fonts set" : "fonts missing"}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-3">
+                        <div
+                          style={{
+                            fontFamily: "var(--font-heading)",
+                            fontSize: "var(--h2)",
+                            lineHeight: "var(--heading-line)",
+                            fontWeight: "var(--heading-weight)",
+                            letterSpacing: "var(--hero-title-letter-spacing)",
+                            color: "var(--color-brand)",
+                          }}
+                        >
+                          Heading preview
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: "var(--font-sans)",
+                            fontSize: "var(--text-base)",
+                            lineHeight: "var(--line)",
+                            color: "var(--color-text)",
+                          }}
+                        >
+                          Body preview. This is a quick way to sanity check font pairing, base size, and line height.
+                        </div>
+                        <div
+                          style={{
+                            fontFamily: "var(--font-sans)",
+                            fontSize: "var(--hero-subtitle-size)",
+                            lineHeight: "var(--hero-subtitle-line)",
+                            fontWeight: "var(--hero-subtitle-weight)",
+                            color: "var(--color-muted)",
+                          }}
+                        >
+                          Subtitle preview
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-2 text-[11px]" style={{ color: "var(--color-muted)" }}>
+                        <div>
+                          <span className="font-semibold" style={{ color: "var(--color-text)" }}>
+                            --font-sans:
+                          </span>{" "}
+                          <span className="font-mono break-all">{previewCssVars["--font-sans"] || "Not set"}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold" style={{ color: "var(--color-text)" }}>
+                            --font-heading:
+                          </span>{" "}
+                          <span className="font-mono break-all">{previewCssVars["--font-heading"] || "Not set"}</span>
+                        </div>
+                        <div>
+                          <span className="font-semibold" style={{ color: "var(--color-text)" }}>
+                            --font-cta:
+                          </span>{" "}
+                          <span className="font-mono break-all">{previewCssVars["--font-cta"] || "Not set"}</span>
+                        </div>
+                      </div>
+
+                      <div className="mt-6">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs font-semibold" style={{ color: "var(--color-text)" }}>
+                            Spacing, radius, shadow
+                          </div>
+                          <div className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                            <span className="font-mono">{previewCssVars["--radius-md"] || "unset"}</span>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 space-y-2">
+                          {([
+                            "--space-1",
+                            "--space-2",
+                            "--space-3",
+                            "--space-4",
+                            "--space-5",
+                            "--space-6",
+                            "--space-7",
+                            "--space-8",
+                          ] as const)
+                            .filter((key) => Boolean(previewCssVars[key]))
+                            .slice(0, 6)
+                            .map((key) => (
+                              <div key={key} className="flex items-center gap-3">
+                                <div className="w-24 font-mono text-[11px]" style={{ color: "var(--color-muted)" }}>
+                                  {key}
+                                </div>
+                                <div className="w-16 font-mono text-[11px]" style={{ color: "var(--color-muted)" }}>
+                                  {previewCssVars[key]}
+                                </div>
+                                <div
+                                  className="h-2 rounded-full"
+                                  style={{ width: `var(${key})`, backgroundColor: "var(--color-brand)" }}
+                                />
+                              </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-4 grid grid-cols-3 gap-3">
+                          {(["--radius-sm", "--radius-md", "--radius-lg"] as const)
+                            .filter((key) => Boolean(previewCssVars[key]))
+                            .map((key) => (
+                              <div
+                                key={key}
+                                className="h-16 border"
+                                style={{
+                                  borderColor: "var(--color-border)",
+                                  backgroundColor: "var(--color-soft)",
+                                  borderRadius: `var(${key})`,
+                                }}
+                                title={`${key}: ${previewCssVars[key]}`}
+                              />
+                            ))}
+                        </div>
+
+                        {previewCssVars["--shadow-sm"] ? (
+                          <div className="mt-4 text-[11px]" style={{ color: "var(--color-muted)" }}>
+                            <span className="font-semibold" style={{ color: "var(--color-text)" }}>
+                              --shadow-sm:
+                            </span>{" "}
+                            <span className="font-mono break-all">{previewCssVars["--shadow-sm"]}</span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  {allColorVars.length ? (
+                    <details className="border-t" style={{ borderColor: "var(--color-border)" }}>
+                      <summary
+                        className="cursor-pointer px-4 py-3 text-xs font-semibold"
+                        style={{ color: "var(--color-text)" }}
+                      >
+                        All color-like vars ({allColorVars.length})
+                      </summary>
+                      <div className="px-4 pb-4">
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                          {allColorVars.slice(0, 60).map(([key, value]) => (
+                            <div
+                              key={key}
+                              className="rounded-lg border p-3"
+                              style={{ borderColor: "var(--color-border)", backgroundColor: "var(--color-bg)" }}
+                            >
+                              <div
+                                className="h-10 w-full rounded-md"
+                                style={{
+                                  backgroundColor: `var(${key})`,
+                                  border: "1px solid var(--color-border)",
+                                }}
+                              />
+                              <div className="mt-2">
+                                <div className="font-mono text-[11px]" style={{ color: "var(--color-text)" }}>
+                                  {key}
+                                </div>
+                                <div className="font-mono text-[11px] break-all" style={{ color: "var(--color-muted)" }}>
+                                  {value}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {allColorVars.length > 60 ? (
+                          <div className="mt-2 text-xs" style={{ color: "var(--color-muted)" }}>
+                            Showing first 60. Use the CSS vars tab to filter and view all tokens.
+                          </div>
+                        ) : null}
+                      </div>
+                    </details>
+                  ) : null}
+                </div>
+              </DesignSystemProvider>
+            </TabsContent>
+
+            <TabsContent value="tokens" flush>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-xs text-content-muted">
+                    <span className="font-semibold text-content">{previewFilteredCssVarEntries.length}</span>{" "}
+                    vars
+                    {varsFilter.trim() ? (
+                      <>
+                        {" "}
+                        (filtered from{" "}
+                        <span className="font-semibold text-content">{previewCssVarEntries.length}</span>)
+                      </>
+                    ) : null}
+                  </div>
+                  <div className="w-full sm:w-[360px]">
+                    <Input
+                      value={varsFilter}
+                      onChange={(e) => setVarsFilter(e.target.value)}
+                      placeholder="Filter (e.g. color, hero, radius, cta)"
+                    />
+                  </div>
+                </div>
+
+                {!previewCssVarEntries.length ? (
+                  <div className="rounded-md border border-border bg-surface-2 p-4 text-sm text-danger">
+                    This design system has no `cssVars` object.
+                  </div>
+                ) : (
+                  <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHeadCell className="w-[300px]">Variable</TableHeadCell>
+                        <TableHeadCell>Value</TableHeadCell>
+                        <TableHeadCell className="w-[120px]">Action</TableHeadCell>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {previewFilteredCssVarEntries.map(([key, value]) => (
+                        <TableRow key={key}>
+                          <TableCell className="font-mono text-[11px] text-content">{key}</TableCell>
+                          <TableCell className="font-mono text-[11px] text-content-muted break-all">{value}</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => copyToClipboard(`${key}: ${value}`, "CSS var")}
+                            >
+                              Copy
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
 
       <div className="ds-card ds-card--md space-y-3">

@@ -38,14 +38,14 @@ export class BlockErrorBoundary extends Component<Props, State> {
     const { blockType, blockId } = this.props;
     const message = this.state.error.message || "Unknown render error";
     return (
-      <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-900">
-        <div className="font-semibold">Block failed to render</div>
-        <div className="mt-1 font-mono text-xs">
+      <div className="rounded-lg border border-danger/30 bg-danger/10 p-4 text-sm text-content">
+        <div className="font-semibold text-danger">Block failed to render</div>
+        <div className="mt-1 font-mono text-xs text-content-muted">
           {blockType}
           {blockId ? `#${blockId}` : ""}
         </div>
         <div className="mt-2 whitespace-pre-wrap">{message}</div>
-        <div className="mt-3 text-xs text-red-800">
+        <div className="mt-3 text-xs text-content-muted">
           Fix this block&apos;s `config` / `configJson` fields, or regenerate the page draft.
         </div>
       </div>

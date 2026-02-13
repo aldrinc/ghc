@@ -32,6 +32,20 @@ type Props = {
   themeJson?: string;
 };
 
+// Keep layout geometry consistent with the base template.
+// Brand design systems can still change colors and font families.
+const LOCKED_TEMPLATE_CSS_VARS = new Set([
+  "--container-max",
+  "--container-pad",
+  "--marquee-border",
+  "--marquee-font-size",
+  "--marquee-font-weight",
+  "--marquee-gap",
+  "--marquee-height",
+  "--marquee-letter-spacing",
+  "--marquee-pad-x",
+]);
+
 function toCssVarName(key: string): string {
   const trimmed = key.trim();
   if (trimmed.startsWith("--")) return trimmed;
@@ -140,13 +154,17 @@ export function PreSalesPage({ anchorId, theme, themeJson, content, children }: 
     if (designSystemTokens?.cssVars) {
       for (const [rawKey, rawValue] of Object.entries(designSystemTokens.cssVars)) {
         if (rawValue === undefined || rawValue === null) continue;
-        style[toCssVarName(rawKey)] = String(rawValue);
+        const cssVarName = toCssVarName(rawKey);
+        if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue;
+        style[cssVarName] = String(rawValue);
       }
     }
     if (explicitTheme?.tokens) {
       for (const [rawKey, rawValue] of Object.entries(resolvedTheme.tokens ?? {})) {
         if (rawValue === undefined || rawValue === null) continue;
-        style[toCssVarName(rawKey)] = String(rawValue);
+        const cssVarName = toCssVarName(rawKey);
+        if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue;
+        style[cssVarName] = String(rawValue);
       }
     }
     return style;

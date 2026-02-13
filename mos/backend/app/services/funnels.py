@@ -9,6 +9,7 @@ import hashlib
 import os
 import re
 import mimetypes
+import time
 from typing import Any, Optional
 
 import httpx
@@ -397,6 +398,54 @@ def _extract_first_inline_image(response_json: dict[str, Any]) -> tuple[bytes, s
     raise RuntimeError("Gemini response did not include inline image data")
 
 
+def _summarize_gemini_response_for_debug(response_json: Any) -> str:
+    if not isinstance(response_json, dict):
+        return f"type={type(response_json).__name__}"
+    try:
+        top_keys = sorted(list(response_json.keys()))[:20]
+        candidates = response_json.get("candidates") or []
+        candidate_count = len(candidates) if isinstance(candidates, list) else 0
+
+        finish_reasons: list[str] = []
+        part_kinds: list[str] = []
+        if isinstance(candidates, list):
+            for cand in candidates[:3]:
+                if not isinstance(cand, dict):
+                    continue
+                finish = cand.get("finishReason") or cand.get("finish_reason")
+                if isinstance(finish, str):
+                    finish_reasons.append(finish)
+                content = cand.get("content") if isinstance(cand.get("content"), dict) else None
+                parts = content.get("parts") if isinstance(content, dict) else None
+                if isinstance(parts, list):
+                    for part in parts[:6]:
+                        if not isinstance(part, dict):
+                            continue
+                        if "inlineData" in part or "inline_data" in part:
+                            part_kinds.append("inlineData")
+                        elif "text" in part:
+                            part_kinds.append("text")
+                        else:
+                            part_kinds.append(",".join(sorted(part.keys()))[:60])
+
+        prompt_feedback = response_json.get("promptFeedback") or response_json.get("prompt_feedback")
+        block_reason = None
+        if isinstance(prompt_feedback, dict):
+            block_reason = prompt_feedback.get("blockReason") or prompt_feedback.get("block_reason")
+
+        bits = [
+            f"topKeys={top_keys}",
+            f"candidateCount={candidate_count}",
+            f"finishReasons={finish_reasons[:3]}",
+            f"partKinds={part_kinds[:12]}",
+        ]
+        if isinstance(block_reason, str) and block_reason.strip():
+            bits.append(f"blockReason={block_reason.strip()}")
+        return " ".join(bits)
+    except Exception as exc:  # noqa: BLE001
+        return f"failed_to_summarize_response error={type(exc).__name__}"
+
+
 def _gemini_image_references_enabled() -> bool:
     raw = os.getenv("GEMINI_IMAGE_REFERENCES_ENABLED", "")
     return raw.strip().lower() in {"1", "true", "yes", "on"}
@@ -437,16 +486,29 @@ def generate_gemini_image_bytes(
         payload["generationConfig"] = {"imageConfig": {"aspectRatio": aspect_ratio}}
 
     url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent"
-    resp = httpx.post(
-        url,
-        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-        json=payload,
-        timeout=60.0,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    image_bytes, mime_type = _extract_first_inline_image(data)
-    return image_bytes, mime_type
+    retries = 2
+    last_summary: str | None = None
+    for attempt in range(retries + 1):
+        resp = httpx.post(
+            url,
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            json=payload,
+            timeout=60.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        try:
+            image_bytes, mime_type = _extract_first_inline_image(data)
+            return image_bytes, mime_type
+        except Exception as exc:  # noqa: BLE001
+            last_summary = _summarize_gemini_response_for_debug(data)
+            if attempt >= retries:
+                raise RuntimeError(
+                    "Gemini response did not include inline image data "
+                    f"(attempts={retries + 1}). {last_summary}"
+                ) from exc
+            time.sleep(0.6 * (attempt + 1))
+    raise RuntimeError("Unreachable: Gemini image generation retry loop exhausted.")
 
 
 def _unsplash_access_key() -> str:

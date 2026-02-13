@@ -4,6 +4,7 @@ import colorsys
 import json
 import re
 from dataclasses import dataclass
+from copy import deepcopy
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
@@ -121,6 +122,13 @@ _LOCKED_LAYOUT_CSS_VAR_KEYS: frozenset[str] = frozenset(
         "--hero-title-size",
         "--hero-title-weight",
         "--line",
+        "--marquee-border",
+        "--marquee-font-size",
+        "--marquee-font-weight",
+        "--marquee-gap",
+        "--marquee-height",
+        "--marquee-letter-spacing",
+        "--marquee-pad-x",
         "--listicle-body-gap",
         "--listicle-body-line",
         "--listicle-body-size",
@@ -180,7 +188,7 @@ def _locked_layout_css_var_values() -> dict[str, Any]:
     return {key: css_vars[key] for key in sorted(_LOCKED_LAYOUT_CSS_VAR_KEYS)}
 
 
-def _build_prompt(
+def _build_full_prompt(
     *,
     ctx: DesignSystemGenerationContext,
     required_css_vars: list[str],
@@ -233,7 +241,13 @@ def _build_prompt(
             "- Pick fonts that match the brand; use Google Fonts URLs in fontUrls.",
             "- Create a distinctive, cohesive theme: update typography, base palette, CTA styling, and section backgrounds. Avoid minor tweaks.",
             "- Maintain good contrast for readability and accessibility.",
-            "- Use neutral ink colors for body copy: --color-text and --color-muted must NOT be set to var(--color-brand).",
+            "- Non-text UI contrast matters too (WCAG 2.1 1.4.11): ensure icon/indicator colors remain perceivable. "
+            "In our Sales PDP template this specifically includes: "
+            "--color-bg on --pdp-check-bg (selected option check icon), "
+            "--color-bg on --pdp-warning-bg (urgency icon), "
+            "--pdp-cta-bg on --pdp-white-96 (CTA arrow icon circles), "
+            "--color-cta-icon on --color-cta-shell (header CTA icon circle), "
+            "and --color-cta-text on --pdp-cta-bg (main CTA button).",
             "- Keep --color-text highly legible on --color-bg and --color-muted clearly readable on --color-bg.",
             "- Keep primary page/surface backgrounds light. Do NOT use dark/near-black values for these tokens: "
             "--color-page-bg, --color-bg, --hero-bg, --badge-strip-bg, --pitch-bg, "
@@ -246,6 +260,120 @@ def _build_prompt(
             f"requiredCssVars (must include all):\n{required_css_vars_json}",
             "",
             f"lockedLayoutCssVars (must match exactly):\n{locked_layout_css_vars_json}",
+        ]
+    )
+
+
+_MAX_TEMPLATE_PATCH_CSS_VAR_OVERRIDES = 40
+
+
+def _theme_lever_css_vars_snapshot(template_css_vars: dict[str, Any]) -> dict[str, Any]:
+    """
+    Small subset of template tokens the model can use as an anchor when producing a patch.
+    This keeps prompts smaller while still providing the "what are we starting from" context.
+    """
+
+    lever_keys = [
+        # Core palette/surfaces
+        "--color-brand",
+        "--color-text",
+        "--color-muted",
+        "--color-border",
+        "--color-soft",
+        "--color-page-bg",
+        "--color-bg",
+        # Conversion accents
+        "--color-cta",
+        "--color-cta-text",
+        "--color-cta-icon",
+        "--pdp-cta-bg",
+        "--pdp-check-bg",
+        # Accent bars/strips
+        "--marquee-bg",
+        "--marquee-text",
+        "--badge-strip-bg",
+        "--badge-text-color",
+        "--badge-strip-border",
+        # Main section surfaces
+        "--hero-bg",
+        "--pitch-bg",
+    ]
+    return {key: template_css_vars.get(key) for key in lever_keys if key in template_css_vars}
+
+
+def _build_template_patch_prompt(
+    *,
+    ctx: DesignSystemGenerationContext,
+    template_tokens: dict[str, Any],
+    template_css_var_keys: list[str],
+) -> str:
+    template_css_vars = template_tokens.get("cssVars")
+    if not isinstance(template_css_vars, dict) or not template_css_vars:
+        raise DesignSystemGenerationError("Design system base template must include a non-empty cssVars object.")
+
+    context_obj: dict[str, Any] = {
+        "brand": {
+            "name": ctx.client_name,
+            "industry": ctx.client_industry,
+            "story": ctx.brand_story,
+        },
+        "product": {
+            "id": ctx.product_id,
+            "name": ctx.product_name,
+            "description": ctx.product_description,
+            "category": ctx.product_category,
+            "primary_benefits": ctx.primary_benefits,
+            "feature_bullets": ctx.feature_bullets,
+            "guarantee_text": ctx.guarantee_text,
+            "disclaimers": ctx.disclaimers,
+        },
+        "business": {
+            "goals": ctx.goals,
+            "funnel_notes": ctx.funnel_notes,
+            "competitor_urls": ctx.competitor_urls,
+        },
+        "research": {
+            "precanon_step_summaries": ctx.precanon_step_summaries,
+        },
+    }
+
+    template_keys_json = json.dumps(template_css_var_keys, ensure_ascii=True)
+    locked_layout_keys_json = json.dumps(sorted(_LOCKED_LAYOUT_CSS_VAR_KEYS), ensure_ascii=True)
+    base_levers_json = json.dumps(_theme_lever_css_vars_snapshot(template_css_vars), ensure_ascii=True)
+    context_json = json.dumps(context_obj, ensure_ascii=True)
+
+    return "\n".join(
+        [
+            "You are updating our design system by PATCHING a base template (small deltas), not redesigning from scratch.",
+            "Output ONLY valid JSON.",
+            "",
+            "Output schema (JSON):",
+            "{ fontUrls?: string[], fontCss?: string, cssVars: [{ key: string, value: string|number }, ...] }",
+            "",
+            "Hard requirements:",
+            "- Return ONLY overrides in cssVars. Do NOT output every template token.",
+            "- Each cssVars[].key MUST be one of templateCssVarKeys (exact spelling).",
+            "- Do NOT override any key in lockedLayoutCssVarKeys (layout/geometry tokens).",
+            f"- Keep overrides small: ideally 6-16 keys, hard limit {_MAX_TEMPLATE_PATCH_CSS_VAR_OVERRIDES} keys.",
+            "- Values MUST be strings or numbers. Use CSS units where needed (e.g. '16px').",
+            "- Maintain accessibility: ensure readable contrast for CTA and marquee text on their backgrounds.",
+            "- Keep core page/surface backgrounds light (we do not support dark mode).",
+            "",
+            "Guidance (choose what to change based on brand context):",
+            "- Start by considering these groups, but only override what you need:",
+            "  - CTA: --color-cta, --color-cta-icon (and only if needed: --pdp-cta-bg, --pdp-check-bg, --color-cta-text)",
+            "  - Marquee: --marquee-bg, --marquee-text",
+            "  - Badges: --badge-strip-bg, --badge-text-color, --badge-strip-border",
+            "  - Section backgrounds: --hero-bg, --pitch-bg (optional: --color-page-bg)",
+            "- Beauty/skincare/cosmetics brands: avoid 'utility green' CTAs; prefer blush/mauve/berry accents and warm champagne bars.",
+            "",
+            f"Brand/product context JSON:\n{context_json}",
+            "",
+            f"Base theme lever snapshot (current values):\n{base_levers_json}",
+            "",
+            f"templateCssVarKeys (allowed keys):\n{template_keys_json}",
+            "",
+            f"lockedLayoutCssVarKeys (never override):\n{locked_layout_keys_json}",
         ]
     )
 
@@ -276,6 +404,56 @@ def _response_schema() -> dict[str, Any]:
             },
         },
         "required": ["dataTheme", "fontUrls", "cssVars", "funnelDefaults", "brand"],
+    }
+
+
+def _patch_response_schema() -> dict[str, Any]:
+    # Patch schema: small set of overrides, represented as an array of {key,value} objects.
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "fontUrls": {"type": "array", "items": {"type": "string"}},
+            "fontCss": {"type": "string"},
+            "cssVars": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "key": {"type": "string"},
+                        "value": {"oneOf": [{"type": "string"}, {"type": "number"}]},
+                    },
+                    "required": ["key", "value"],
+                },
+            },
+        },
+        "required": ["cssVars"],
+    }
+
+
+def _claude_patch_response_schema() -> dict[str, Any]:
+    # Keep this aligned with _patch_response_schema(), but use value: string to match Anthropic constraints.
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "fontUrls": {"type": "array", "items": {"type": "string"}},
+            "fontCss": {"type": "string"},
+            "cssVars": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "key": {"type": "string"},
+                        "value": {"type": "string"},
+                    },
+                    "required": ["key", "value"],
+                },
+            },
+        },
+        "required": ["cssVars"],
     }
 
 
@@ -393,8 +571,8 @@ def _validate_tokens(tokens: Any, *, required_css_vars: list[str]) -> dict[str, 
 
     _validate_locked_layout_css_vars(css_vars)
     _validate_light_background_tokens(css_vars)
-    _validate_text_tokens(css_vars)
     _validate_required_contrast_pairs(css_vars)
+    _validate_required_non_text_contrast_pairs(css_vars)
 
     funnel_defaults = tokens.get("funnelDefaults")
     if not isinstance(funnel_defaults, dict):
@@ -407,8 +585,10 @@ def _validate_tokens(tokens: Any, *, required_css_vars: list[str]) -> dict[str, 
     if not isinstance(brand_name, str) or not brand_name.strip():
         raise DesignSystemGenerationError("Design system tokens.brand.name must be a non-empty string.")
     logo_public_id = brand.get("logoAssetPublicId")
-    if not isinstance(logo_public_id, str):
-        raise DesignSystemGenerationError("Design system tokens.brand.logoAssetPublicId must be a string.")
+    if not isinstance(logo_public_id, str) or not logo_public_id.strip():
+        raise DesignSystemGenerationError(
+            "Design system tokens.brand.logoAssetPublicId must be a non-empty string."
+        )
 
     return tokens
 
@@ -433,13 +613,6 @@ _LIGHT_BACKGROUND_TOKEN_KEYS = (
 # "Light" but still flexible enough to allow pastel brand backgrounds.
 _MIN_BACKGROUND_RELATIVE_LUMINANCE = 0.65
 
-_TEXT_TOKEN_RULES = (
-    ("--color-text", 7.0),
-    ("--color-muted", 4.5),
-)
-
-_TEXT_TOKENS_MUST_DIFFER_FROM = "--color-brand"
-
 _REQUIRED_CONTRAST_PAIRS = (
     ("--color-text", "--color-bg", 7.0),
     ("--color-muted", "--color-bg", 4.5),
@@ -447,6 +620,19 @@ _REQUIRED_CONTRAST_PAIRS = (
     ("--pdp-brand-strong", "--color-bg", 4.5),
     ("--marquee-text", "--marquee-bg", 4.5),
     ("--color-cta-text", "--color-cta", 3.0),
+    # Sales PDP CTA button uses --pdp-cta-bg (not necessarily --color-cta).
+    ("--color-cta-text", "--pdp-cta-bg", 3.0),
+)
+
+_REQUIRED_NON_TEXT_CONTRAST_PAIRS: tuple[tuple[str, str, float, str], ...] = (
+    # Selected option check uses a white icon on --pdp-check-bg (see SalesPdpTemplate selectedCheck inline styles).
+    ("--color-bg", "--pdp-check-bg", 3.0, "Sales PDP selected option check icon"),
+    # Urgency icon uses white glyphs on --pdp-warning-bg (see IconWarning in SalesPdpTemplate).
+    ("--color-bg", "--pdp-warning-bg", 3.0, "Sales PDP urgency warning icon"),
+    # Arrow icons use currentColor set to --pdp-cta-bg inside light icon circles.
+    ("--pdp-cta-bg", "--pdp-white-96", 3.0, "Sales PDP CTA arrow icon circle"),
+    # Header CTA icon uses --color-cta-icon inside a light shell circle.
+    ("--color-cta-icon", "--color-cta-shell", 3.0, "Sales PDP header CTA icon circle"),
 )
 
 
@@ -519,49 +705,6 @@ def _contrast_ratio(*, a: tuple[int, int, int], b: tuple[int, int, int]) -> floa
     return (lighter + 0.05) / (darker + 0.05)
 
 
-def _validate_text_tokens(css_vars: dict[str, Any]) -> None:
-    bg_raw = css_vars.get("--color-bg")
-    if not isinstance(bg_raw, (str, int, float)):
-        raise DesignSystemGenerationError(
-            "Design system cssVars[--color-bg] must be a string or number to validate text contrast."
-        )
-    bg_resolved = _resolve_css_var_value(css_vars=css_vars, value=str(bg_raw), stack=["--color-bg"])
-    bg_rgba = _parse_css_color(bg_resolved)
-    bg_rgb = _blend_over_background(fg=bg_rgba, bg=(255, 255, 255, 1.0))
-
-    brand_raw = css_vars.get(_TEXT_TOKENS_MUST_DIFFER_FROM)
-    if not isinstance(brand_raw, (str, int, float)):
-        raise DesignSystemGenerationError(
-            f"Design system cssVars[{_TEXT_TOKENS_MUST_DIFFER_FROM}] must be a string or number to validate text tokens."
-        )
-    brand_resolved = _resolve_css_var_value(
-        css_vars=css_vars, value=str(brand_raw), stack=[_TEXT_TOKENS_MUST_DIFFER_FROM]
-    )
-    brand_rgb = _blend_over_background(fg=_parse_css_color(brand_resolved), bg=bg_rgba)
-
-    for key, min_ratio in _TEXT_TOKEN_RULES:
-        raw_value = css_vars.get(key)
-        if raw_value is None:
-            continue
-        if not isinstance(raw_value, (str, int, float)):
-            raise DesignSystemGenerationError(
-                f"Design system cssVars[{key}] must be a string or number. Received: {type(raw_value).__name__}."
-            )
-        resolved_value = _resolve_css_var_value(css_vars=css_vars, value=str(raw_value), stack=[key])
-        rendered_rgb = _blend_over_background(fg=_parse_css_color(resolved_value), bg=bg_rgba)
-        ratio = _contrast_ratio(a=rendered_rgb, b=bg_rgb)
-        if ratio < min_ratio:
-            raise DesignSystemGenerationError(
-                f"Design system cssVars[{key}] resolved to '{resolved_value}' with contrast ratio {ratio:.2f} "
-                f"against --color-bg; expected >= {min_ratio:.2f}."
-            )
-        if rendered_rgb == brand_rgb:
-            raise DesignSystemGenerationError(
-                f"Design system cssVars[{key}] must not resolve to the same rendered color as "
-                f"{_TEXT_TOKENS_MUST_DIFFER_FROM}. Use a neutral ink color for body copy."
-            )
-
-
 def _validate_required_contrast_pairs(css_vars: dict[str, Any]) -> None:
     for fg_key, bg_key, min_ratio in _REQUIRED_CONTRAST_PAIRS:
         fg_raw = css_vars.get(fg_key)
@@ -590,6 +733,43 @@ def _validate_required_contrast_pairs(css_vars: dict[str, Any]) -> None:
             raise DesignSystemGenerationError(
                 f"Design system contrast check failed for {fg_key} on {bg_key}: "
                 f"resolved '{fg_resolved}' on '{bg_resolved}' with ratio {ratio:.2f}; "
+                f"expected >= {min_ratio:.2f}."
+            )
+
+
+def _validate_required_non_text_contrast_pairs(css_vars: dict[str, Any]) -> None:
+    """
+    Enforce contrast for UI graphics/icons (WCAG 2.1 1.4.11 Non-text Contrast).
+    These checks are intentionally explicit and template-driven.
+    """
+
+    for fg_key, bg_key, min_ratio, label in _REQUIRED_NON_TEXT_CONTRAST_PAIRS:
+        fg_raw = css_vars.get(fg_key)
+        bg_raw = css_vars.get(bg_key)
+        if fg_raw is None or bg_raw is None:
+            raise DesignSystemGenerationError(
+                f"Design system cssVars missing required non-text contrast tokens for {label}: {fg_key} and/or {bg_key}."
+            )
+        if not isinstance(fg_raw, (str, int, float)):
+            raise DesignSystemGenerationError(
+                f"Design system cssVars[{fg_key}] must be a string or number for non-text contrast validation ({label})."
+            )
+        if not isinstance(bg_raw, (str, int, float)):
+            raise DesignSystemGenerationError(
+                f"Design system cssVars[{bg_key}] must be a string or number for non-text contrast validation ({label})."
+            )
+
+        fg_resolved = _resolve_css_var_value(css_vars=css_vars, value=str(fg_raw), stack=[fg_key])
+        bg_resolved = _resolve_css_var_value(css_vars=css_vars, value=str(bg_raw), stack=[bg_key])
+        fg_rgba = _parse_css_color(fg_resolved)
+        bg_rgba = _parse_css_color(bg_resolved)
+        bg_rgb = _blend_over_background(fg=bg_rgba, bg=(255, 255, 255, 1.0))
+        fg_rgb = _blend_over_background(fg=fg_rgba, bg=bg_rgba)
+        ratio = _contrast_ratio(a=fg_rgb, b=bg_rgb)
+        if ratio < min_ratio:
+            raise DesignSystemGenerationError(
+                f"Design system non-text contrast check failed for {label}: "
+                f"{fg_key} on {bg_key} resolved '{fg_resolved}' on '{bg_resolved}' with ratio {ratio:.2f}; "
                 f"expected >= {min_ratio:.2f}."
             )
 
@@ -782,14 +962,35 @@ def generate_design_system_tokens(
     ctx: DesignSystemGenerationContext,
     model: str | None = None,
     max_output_tokens: int = 9000,
+    mode: str = "template_patch",
 ) -> dict[str, Any]:
-    required_css_vars = _required_css_var_keys()
-    locked_layout_css_vars = _locked_layout_css_var_values()
-    prompt = _build_prompt(
-        ctx=ctx,
-        required_css_vars=required_css_vars,
-        locked_layout_css_vars=locked_layout_css_vars,
-    )
+    mode_clean = (mode or "").strip().lower()
+    if mode_clean in ("template_patch", "patch", "delta", "template"):
+        template_tokens = load_base_tokens_template()
+        template_css_var_keys = _required_css_var_keys()
+        prompt = _build_template_patch_prompt(
+            ctx=ctx,
+            template_tokens=template_tokens,
+            template_css_var_keys=template_css_var_keys,
+        )
+        response_schema = _patch_response_schema()
+        claude_schema = _claude_patch_response_schema()
+        apply_patch_to_template = True
+    elif mode_clean in ("full", "from_scratch", "scratch"):
+        required_css_vars = _required_css_var_keys()
+        locked_layout_css_vars = _locked_layout_css_var_values()
+        prompt = _build_full_prompt(
+            ctx=ctx,
+            required_css_vars=required_css_vars,
+            locked_layout_css_vars=locked_layout_css_vars,
+        )
+        response_schema = _response_schema()
+        claude_schema = _claude_response_schema()
+        apply_patch_to_template = False
+    else:
+        raise DesignSystemGenerationError(
+            f"Unsupported design system generation mode: {mode!r}. Expected 'template_patch' or 'full'."
+        )
 
     llm = LLMClient()
     model_id = model or llm.default_model
@@ -802,7 +1003,7 @@ def generate_design_system_tokens(
                 model=model_id,
                 system=None,
                 user_content=[{"type": "text", "text": prompt}],
-                output_schema=_claude_response_schema(),
+                output_schema=claude_schema,
                 max_tokens=max_output_tokens,
                 temperature=0.2,
             )
@@ -811,7 +1012,8 @@ def generate_design_system_tokens(
         tokens = response.get("parsed")
         if not isinstance(tokens, dict):
             raise DesignSystemGenerationError("Claude structured design system generation returned non-object tokens.")
-        tokens["cssVars"] = _coerce_css_vars_pairs(tokens.get("cssVars"))
+        if not apply_patch_to_template:
+            tokens["cssVars"] = _coerce_css_vars_pairs(tokens.get("cssVars"))
     else:
         params = LLMGenerationParams(
             model=model_id,
@@ -823,7 +1025,7 @@ def generate_design_system_tokens(
                 "json_schema": {
                     "name": "DesignSystemTokens",
                     "strict": True,
-                    "schema": _response_schema(),
+                    "schema": response_schema,
                 },
             },
         )
@@ -832,6 +1034,75 @@ def generate_design_system_tokens(
             tokens = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise DesignSystemGenerationError(f"Design system generation returned invalid JSON: {exc}") from exc
+
+    if apply_patch_to_template:
+        template_tokens = load_base_tokens_template()
+        if not isinstance(tokens, dict):
+            raise DesignSystemGenerationError("Design system patch generation returned non-object output.")
+
+        patch_font_urls = tokens.get("fontUrls")
+        patch_font_css = tokens.get("fontCss")
+        patch_css_vars = _coerce_css_vars_pairs(tokens.get("cssVars"))
+
+        if not patch_css_vars:
+            raise DesignSystemGenerationError("Design system patch must include at least one cssVars override.")
+        if len(patch_css_vars) > _MAX_TEMPLATE_PATCH_CSS_VAR_OVERRIDES:
+            raise DesignSystemGenerationError(
+                "Design system patch includes too many cssVars overrides. "
+                f"Received {len(patch_css_vars)}; expected <= {_MAX_TEMPLATE_PATCH_CSS_VAR_OVERRIDES}."
+            )
+
+        template_css_vars = template_tokens.get("cssVars")
+        if not isinstance(template_css_vars, dict) or not template_css_vars:
+            raise DesignSystemGenerationError("Design system base template must include a non-empty cssVars object.")
+
+        locked = sorted(key for key in patch_css_vars.keys() if key in _LOCKED_LAYOUT_CSS_VAR_KEYS)
+        if locked:
+            preview = ", ".join(locked[:25])
+            suffix = "" if len(locked) <= 25 else f" (+{len(locked) - 25} more)"
+            raise DesignSystemGenerationError(
+                "Design system patch attempted to override template-locked layout tokens. "
+                f"These keys are static to preserve template geometry: {preview}{suffix}."
+            )
+
+        unknown = sorted(key for key in patch_css_vars.keys() if key not in template_css_vars)
+        if unknown:
+            preview = ", ".join(unknown[:25])
+            suffix = "" if len(unknown) <= 25 else f" (+{len(unknown) - 25} more)"
+            raise DesignSystemGenerationError(
+                "Design system patch contains cssVars keys that do not exist in the base template. "
+                f"Unknown keys: {preview}{suffix}."
+            )
+
+        out = deepcopy(template_tokens)
+        out["dataTheme"] = "light"
+
+        if patch_font_urls is not None:
+            if not isinstance(patch_font_urls, list) or not all(
+                isinstance(u, str) and u.strip() for u in patch_font_urls
+            ):
+                raise DesignSystemGenerationError("Design system patch fontUrls must be a list of non-empty strings.")
+            out["fontUrls"] = [u.strip() for u in patch_font_urls]
+
+        if patch_font_css is not None:
+            if not isinstance(patch_font_css, str) or not patch_font_css.strip():
+                raise DesignSystemGenerationError(
+                    "Design system patch fontCss must be a non-empty string when provided (or omit it)."
+                )
+            out["fontCss"] = patch_font_css
+
+        out_css_vars = out.get("cssVars")
+        if not isinstance(out_css_vars, dict):
+            raise DesignSystemGenerationError("Design system base template cssVars must be a JSON object.")
+        for key, value in patch_css_vars.items():
+            out_css_vars[key] = value
+
+        brand = out.get("brand")
+        if not isinstance(brand, dict):
+            raise DesignSystemGenerationError("Design system base template must include a brand object.")
+        brand["name"] = ctx.client_name
+
+        return validate_design_system_tokens(out)
 
     tokens = validate_design_system_tokens(tokens)
     return tokens

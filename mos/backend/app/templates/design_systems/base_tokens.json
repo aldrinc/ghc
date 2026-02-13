@@ -34,8 +34,8 @@
     "--color-page-bg": "rgb(255, 249, 244)",
     "--color-brand": "#061a70",
     "--color-bg": "#ffffff",
-    "--color-text": "#1f2937",
-    "--color-muted": "rgba(31, 41, 55, 0.78)",
+    "--color-text": "var(--color-brand)",
+    "--color-muted": "rgba(6, 26, 112, 0.76)",
     "--color-border": "rgba(6, 26, 112, 0.18)",
     "--color-soft": "rgba(6, 26, 112, 0.06)",
     "--focus-outline-color": "rgba(6, 26, 112, 0.35)",
@@ -317,6 +317,6 @@
   },
   "brand": {
     "name": "Acme",
-    "logoAssetPublicId": ""
+    "logoAssetPublicId": "__LOGO_ASSET_PUBLIC_ID__"
   }
 }

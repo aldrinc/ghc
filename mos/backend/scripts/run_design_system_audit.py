@@ -79,6 +79,8 @@ def _markdown_summary(report: dict[str, Any]) -> str:
         lines.append(f"- URL: `{page['url']}`")
         lines.append(f"- Text checks: `{page['textCheckCount']}`")
         lines.append(f"- Text failures: `{page['textFailureCount']}`")
+        lines.append(f"- Non-text checks: `{page['nonTextCheckCount']}`")
+        lines.append(f"- Non-text failures: `{page['nonTextFailureCount']}`")
         lines.append(f"- Border failures: `{page['borderFailureCount']}`")
     lines.append("")
     return "\n".join(lines)
@@ -109,7 +111,7 @@ def main() -> int:
             page_url = f"{args.host}/f/{args.public_id}/{slug}"
             page_audits.append(audit_page_contrast(url=page_url))
 
-    page_failure_count = sum(p["textFailureCount"] + p["borderFailureCount"] for p in page_audits)
+    page_failure_count = sum(p["textFailureCount"] + p["nonTextFailureCount"] + p["borderFailureCount"] for p in page_audits)
     overall_status = "fail" if token_failures or page_failure_count else "pass"
 
     report = {

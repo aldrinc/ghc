@@ -51,31 +51,23 @@ def test_validate_tokens_allows_light_gradient_surface():
     _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
-def test_validate_tokens_rejects_body_text_coupled_to_brand():
+def test_validate_tokens_allows_body_text_coupled_to_brand():
     tokens = deepcopy(load_base_tokens_template())
     tokens["cssVars"]["--color-text"] = "var(--color-brand)"
-    with pytest.raises(
-        DesignSystemGenerationError,
-        match=r"cssVars\[--color-text\] must not resolve to the same rendered color as --color-brand",
-    ):
-        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+    _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
 def test_validate_tokens_rejects_low_contrast_muted_text():
     tokens = deepcopy(load_base_tokens_template())
     tokens["cssVars"]["--color-muted"] = "#cbd5e1"
-    with pytest.raises(DesignSystemGenerationError, match=r"cssVars\[--color-muted\].*contrast ratio"):
+    with pytest.raises(DesignSystemGenerationError, match=r"contrast check failed for --color-muted on --color-bg"):
         _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
-def test_validate_tokens_rejects_muted_text_coupled_to_brand():
+def test_validate_tokens_allows_muted_text_coupled_to_brand():
     tokens = deepcopy(load_base_tokens_template())
     tokens["cssVars"]["--color-muted"] = "var(--color-brand)"
-    with pytest.raises(
-        DesignSystemGenerationError,
-        match=r"cssVars\[--color-muted\] must not resolve to the same rendered color as --color-brand",
-    ):
-        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+    _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
 def test_validate_tokens_rejects_locked_layout_token_change():
@@ -96,3 +88,34 @@ def test_validate_tokens_allows_brand_color_change():
     tokens = deepcopy(load_base_tokens_template())
     tokens["cssVars"]["--color-brand"] = "#123456"
     _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+
+
+def test_validate_tokens_rejects_low_contrast_pdp_check_bg_for_white_icon():
+    tokens = deepcopy(load_base_tokens_template())
+    tokens["cssVars"]["--pdp-check-bg"] = "#E8F7F0"
+    with pytest.raises(
+        DesignSystemGenerationError,
+        match=r"non-text contrast check failed.*--color-bg on --pdp-check-bg",
+    ):
+        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+
+
+def test_validate_tokens_rejects_low_contrast_pdp_warning_bg_for_white_icon():
+    tokens = deepcopy(load_base_tokens_template())
+    tokens["cssVars"]["--pdp-warning-bg"] = "#FFF4E5"
+    with pytest.raises(
+        DesignSystemGenerationError,
+        match=r"non-text contrast check failed.*--color-bg on --pdp-warning-bg",
+    ):
+        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+
+
+def test_validate_tokens_rejects_low_contrast_cta_text_on_pdp_cta_bg():
+    tokens = deepcopy(load_base_tokens_template())
+    tokens["cssVars"]["--pdp-cta-bg"] = "#FFFFFF"
+    tokens["cssVars"]["--color-cta-text"] = "#FFFFFF"
+    with pytest.raises(
+        DesignSystemGenerationError,
+        match=r"contrast check failed for --color-cta-text on --pdp-cta-bg",
+    ):
+        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
