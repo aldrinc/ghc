@@ -5,7 +5,7 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Product, ProductOffer, ProductOfferPricePoint
+from app.db.models import Product, ProductOffer, ProductVariant
 
 
 class ProductsRepository:
@@ -68,31 +68,31 @@ class ProductOffersRepository:
         return offer
 
 
-class ProductOfferPricePointsRepository:
+class ProductVariantsRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def list_by_offer(self, *, offer_id: str) -> list[ProductOfferPricePoint]:
-        stmt = select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id == offer_id)
+    def list_by_product(self, *, product_id: str) -> list[ProductVariant]:
+        stmt = select(ProductVariant).where(ProductVariant.product_id == product_id)
         return list(self.session.scalars(stmt).all())
 
-    def get(self, *, price_point_id: str) -> Optional[ProductOfferPricePoint]:
-        stmt = select(ProductOfferPricePoint).where(ProductOfferPricePoint.id == price_point_id)
+    def get(self, *, variant_id: str) -> Optional[ProductVariant]:
+        stmt = select(ProductVariant).where(ProductVariant.id == variant_id)
         return self.session.scalars(stmt).first()
 
-    def create(self, *, offer_id: str, **fields: Any) -> ProductOfferPricePoint:
-        price_point = ProductOfferPricePoint(offer_id=offer_id, **fields)
-        self.session.add(price_point)
+    def create(self, *, product_id: str, **fields: Any) -> ProductVariant:
+        variant = ProductVariant(product_id=product_id, **fields)
+        self.session.add(variant)
         self.session.commit()
-        self.session.refresh(price_point)
-        return price_point
+        self.session.refresh(variant)
+        return variant
 
-    def update(self, *, price_point_id: str, **fields: Any) -> Optional[ProductOfferPricePoint]:
-        price_point = self.get(price_point_id=price_point_id)
-        if not price_point:
+    def update(self, *, variant_id: str, **fields: Any) -> Optional[ProductVariant]:
+        variant = self.get(variant_id=variant_id)
+        if not variant:
             return None
         for key, value in fields.items():
-            setattr(price_point, key, value)
+            setattr(variant, key, value)
         self.session.commit()
-        self.session.refresh(price_point)
-        return price_point
+        self.session.refresh(variant)
+        return variant

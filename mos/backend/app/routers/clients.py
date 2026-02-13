@@ -62,12 +62,11 @@ def get_client(
 
 
 def _serialize_active_product(product: Product) -> dict:
-    data = jsonable_encoder(product)
     return {
-        "id": data["id"],
-        "name": data["name"],
-        "client_id": data["client_id"],
-        "category": data.get("category"),
+        "id": str(product.id),
+        "title": product.title,
+        "client_id": str(product.client_id),
+        "product_type": product.product_type,
     }
 
 
@@ -271,11 +270,11 @@ async def start_client_onboarding(
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
-    product_fields: dict[str, object] = {"name": payload.product_name}
+    product_fields: dict[str, object] = {"title": payload.product_name}
     if payload.product_description is not None:
         product_fields["description"] = payload.product_description
     if payload.product_category is not None:
-        product_fields["category"] = payload.product_category
+        product_fields["product_type"] = payload.product_category
     if payload.primary_benefits is not None:
         product_fields["primary_benefits"] = payload.primary_benefits
     if payload.feature_bullets is not None:
@@ -292,7 +291,7 @@ async def start_client_onboarding(
     )
 
     offer_fields: dict[str, object] = {
-        "name": product.name,
+        "name": product.title,
         "business_model": "unspecified",
     }
     if payload.product_description is not None:
@@ -358,7 +357,7 @@ async def start_client_onboarding(
         "workflow_run_id": str(run.id),
         "temporal_workflow_id": handle.id,
         "product_id": str(product.id),
-        "product_name": product.name,
+        "product_name": product.title,
         "default_offer_id": str(default_offer.id),
     }
 

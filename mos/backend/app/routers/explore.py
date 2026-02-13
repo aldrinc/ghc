@@ -349,7 +349,7 @@ def _derive_explore_ad_copy(ad: Ad) -> tuple[str | None, str | None]:
     """Return display-ready (headline, body_text) for explore ads.
 
     Some dynamic/catalog ads come through with placeholder-only template strings like
-    `{{product.name}}`. Those are not useful in the UI, so we derive a better display
+    `{{product.title}}`. Those are not useful in the UI, so we derive a better display
     headline/body from the ad raw snapshot (e.g. card titles) when available.
 
     This function intentionally avoids guessing values; it only uses fields present

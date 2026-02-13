@@ -12,21 +12,18 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
 from app.db.repositories.assets import AssetsRepository
-from app.db.models import Asset
+from app.db.models import Asset, Product
 from app.db.repositories.products import (
-    ProductOffersRepository,
-    ProductOfferPricePointsRepository,
+    ProductVariantsRepository,
     ProductsRepository,
 )
 from app.services.assets import create_product_upload_asset
 from app.services.media_storage import MediaStorage
 from app.schemas.products import (
     ProductCreateRequest,
-    ProductOfferCreateRequest,
-    ProductOfferPricePointCreateRequest,
-    ProductOfferPricePointUpdateRequest,
-    ProductOfferUpdateRequest,
     ProductUpdateRequest,
+    ProductVariantCreateRequest,
+    ProductVariantUpdateRequest,
 )
 
 router = APIRouter(prefix="/products", tags=["products"])
@@ -144,12 +141,22 @@ def create_product(
     session: Session = Depends(get_session),
 ):
     fields: dict[str, object] = {
-        "name": payload.name,
+        "title": payload.title,
     }
     if payload.description is not None:
         fields["description"] = payload.description
-    if payload.category is not None:
-        fields["category"] = payload.category
+    if payload.handle is not None:
+        fields["handle"] = payload.handle
+    if payload.vendor is not None:
+        fields["vendor"] = payload.vendor
+    if payload.productType is not None:
+        fields["product_type"] = payload.productType
+    if payload.tags is not None:
+        fields["tags"] = payload.tags
+    if payload.templateSuffix is not None:
+        fields["template_suffix"] = payload.templateSuffix
+    if payload.publishedAt is not None:
+        fields["published_at"] = payload.publishedAt
     if payload.primaryBenefits is not None:
         fields["primary_benefits"] = payload.primaryBenefits
     if payload.featureBullets is not None:
@@ -171,19 +178,13 @@ def get_product(
     session: Session = Depends(get_session),
 ):
     products_repo = ProductsRepository(session)
-    offers_repo = ProductOffersRepository(session)
-    price_points_repo = ProductOfferPricePointsRepository(session)
+    variants_repo = ProductVariantsRepository(session)
 
     product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    offers = offers_repo.list_by_product(product_id=str(product.id))
-    offer_ids = [str(offer.id) for offer in offers]
-    price_points_by_offer: dict[str, list[dict]] = {}
-    for offer_id in offer_ids:
-        price_points = price_points_repo.list_by_offer(offer_id=offer_id)
-        price_points_by_offer[offer_id] = [jsonable_encoder(pp) for pp in price_points]
+    variants = variants_repo.list_by_product(product_id=str(product.id))
 
     primary_asset_url = None
     if product.primary_asset_id:
@@ -234,13 +235,7 @@ def get_product(
             {"assetBriefId": brief_id, "assets": assets}
             for brief_id, assets in grouped_by_brief.items()
         ],
-        "offers": [
-            {
-                **jsonable_encoder(offer),
-                "pricePoints": price_points_by_offer.get(str(offer.id), []),
-            }
-            for offer in offers
-        ],
+        "variants": [jsonable_encoder(variant) for variant in variants],
     }
 
 
@@ -335,12 +330,22 @@ def update_product(
 
     fields: dict[str, object] = {}
     fields_set = payload.model_fields_set
-    if payload.name is not None:
-        fields["name"] = payload.name
+    if payload.title is not None:
+        fields["title"] = payload.title
     if payload.description is not None:
         fields["description"] = payload.description
-    if payload.category is not None:
-        fields["category"] = payload.category
+    if payload.handle is not None:
+        fields["handle"] = payload.handle
+    if payload.vendor is not None:
+        fields["vendor"] = payload.vendor
+    if payload.productType is not None:
+        fields["product_type"] = payload.productType
+    if payload.tags is not None:
+        fields["tags"] = payload.tags
+    if payload.templateSuffix is not None:
+        fields["template_suffix"] = payload.templateSuffix
+    if payload.publishedAt is not None:
+        fields["published_at"] = payload.publishedAt
     if payload.primaryBenefits is not None:
         fields["primary_benefits"] = payload.primaryBenefits
     if payload.featureBullets is not None:
@@ -374,156 +379,150 @@ def update_product(
     return jsonable_encoder(updated)
 
 
-@router.post("/{product_id}/offers", status_code=status.HTTP_201_CREATED)
-def create_offer(
+@router.post("/{product_id}/variants", status_code=status.HTTP_201_CREATED)
+def create_variant(
     product_id: str,
-    payload: ProductOfferCreateRequest,
+    payload: ProductVariantCreateRequest,
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    if payload.productId != product_id:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="productId mismatch")
-
     products_repo = ProductsRepository(session)
     product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    fields: dict[str, object] = {
-        "name": payload.name,
-        "business_model": payload.businessModel,
-    }
-    if payload.description is not None:
-        fields["description"] = payload.description
-    if payload.differentiationBullets is not None:
-        fields["differentiation_bullets"] = payload.differentiationBullets
-    if payload.guaranteeText is not None:
-        fields["guarantee_text"] = payload.guaranteeText
-    if payload.optionsSchema is not None:
-        fields["options_schema"] = payload.optionsSchema
-
-    offers_repo = ProductOffersRepository(session)
-    offer = offers_repo.create(
-        org_id=auth.org_id,
-        client_id=str(product.client_id),
-        product_id=str(product.id),
-        **fields,
-    )
-    return jsonable_encoder(offer)
-
-
-@router.patch("/offers/{offer_id}")
-def update_offer(
-    offer_id: str,
-    payload: ProductOfferUpdateRequest,
-    auth: AuthContext = Depends(get_current_user),
-    session: Session = Depends(get_session),
-):
-    offers_repo = ProductOffersRepository(session)
-    offer = offers_repo.get(offer_id=offer_id)
-    if not offer or str(offer.org_id) != str(auth.org_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found")
-
-    fields: dict[str, object] = {}
-    if payload.name is not None:
-        fields["name"] = payload.name
-    if payload.description is not None:
-        fields["description"] = payload.description
-    if payload.businessModel is not None:
-        fields["business_model"] = payload.businessModel
-    if payload.differentiationBullets is not None:
-        fields["differentiation_bullets"] = payload.differentiationBullets
-    if payload.guaranteeText is not None:
-        fields["guarantee_text"] = payload.guaranteeText
-    if payload.optionsSchema is not None:
-        fields["options_schema"] = payload.optionsSchema
-
-    updated = offers_repo.update(offer_id=offer_id, **fields)
-    if not updated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found")
-    return jsonable_encoder(updated)
-
-
-@router.post("/offers/{offer_id}/price-points", status_code=status.HTTP_201_CREATED)
-def create_price_point(
-    offer_id: str,
-    payload: ProductOfferPricePointCreateRequest,
-    auth: AuthContext = Depends(get_current_user),
-    session: Session = Depends(get_session),
-):
-    if payload.offerId != offer_id:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="offerId mismatch")
-
-    offers_repo = ProductOffersRepository(session)
-    offer = offers_repo.get(offer_id=offer_id)
-    if not offer or str(offer.org_id) != str(auth.org_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found")
-
     if payload.provider and payload.provider not in _SUPPORTED_PRICE_PROVIDERS:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported price provider")
     if payload.externalPriceId and not payload.provider:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="externalPriceId requires provider",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="externalPriceId requires provider")
 
     fields: dict[str, object] = {
-        "label": payload.label,
-        "amount_cents": payload.amountCents,
+        "title": payload.title,
+        "price": payload.price,
         "currency": payload.currency,
     }
+    if payload.compareAtPrice is not None:
+        fields["compare_at_price"] = payload.compareAtPrice
     if payload.provider is not None:
         fields["provider"] = payload.provider
     if payload.externalPriceId is not None:
         fields["external_price_id"] = payload.externalPriceId
     if payload.optionValues is not None:
         fields["option_values"] = payload.optionValues
+    if payload.sku is not None:
+        fields["sku"] = payload.sku
+    if payload.barcode is not None:
+        fields["barcode"] = payload.barcode
+    if payload.requiresShipping is not None:
+        fields["requires_shipping"] = payload.requiresShipping
+    if payload.taxable is not None:
+        fields["taxable"] = payload.taxable
+    if payload.weight is not None:
+        fields["weight"] = payload.weight
+    if payload.weightUnit is not None:
+        fields["weight_unit"] = payload.weightUnit
+    if payload.inventoryQuantity is not None:
+        fields["inventory_quantity"] = payload.inventoryQuantity
+    if payload.inventoryPolicy is not None:
+        fields["inventory_policy"] = payload.inventoryPolicy
+    if payload.inventoryManagement is not None:
+        fields["inventory_management"] = payload.inventoryManagement
+    if payload.incoming is not None:
+        fields["incoming"] = payload.incoming
+    if payload.nextIncomingDate is not None:
+        fields["next_incoming_date"] = payload.nextIncomingDate
+    if payload.unitPrice is not None:
+        fields["unit_price"] = payload.unitPrice
+    if payload.unitPriceMeasurement is not None:
+        fields["unit_price_measurement"] = payload.unitPriceMeasurement
+    if payload.quantityRule is not None:
+        fields["quantity_rule"] = payload.quantityRule
+    if payload.quantityPriceBreaks is not None:
+        fields["quantity_price_breaks"] = payload.quantityPriceBreaks
 
-    price_points_repo = ProductOfferPricePointsRepository(session)
-    price_point = price_points_repo.create(offer_id=offer_id, **fields)
-    return jsonable_encoder(price_point)
+    variants_repo = ProductVariantsRepository(session)
+    variant = variants_repo.create(product_id=str(product.id), **fields)
+    return jsonable_encoder(variant)
 
 
-@router.patch("/price-points/{price_point_id}")
-def update_price_point(
-    price_point_id: str,
-    payload: ProductOfferPricePointUpdateRequest,
+@router.patch("/variants/{variant_id}")
+def update_variant(
+    variant_id: str,
+    payload: ProductVariantUpdateRequest,
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    price_points_repo = ProductOfferPricePointsRepository(session)
-    price_point = price_points_repo.get(price_point_id=price_point_id)
-    if not price_point:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Price point not found")
+    variants_repo = ProductVariantsRepository(session)
+    variant = variants_repo.get(variant_id=variant_id)
+    if not variant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
 
-    offers_repo = ProductOffersRepository(session)
-    offer = offers_repo.get(offer_id=str(price_point.offer_id))
-    if not offer or str(offer.org_id) != str(auth.org_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Offer not found")
-
-    if payload.provider and payload.provider not in _SUPPORTED_PRICE_PROVIDERS:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported price provider")
-    if payload.externalPriceId and not payload.provider and not price_point.provider:
+    if not variant.product_id:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="externalPriceId requires provider",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Variant is not linked to a product.",
         )
 
+    # Verify org ownership via the linked product.
+    product = session.scalars(
+        select(Product).where(Product.id == variant.product_id, Product.org_id == auth.org_id)
+    ).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+
+    fields_set = payload.model_fields_set
+    if payload.provider and payload.provider not in _SUPPORTED_PRICE_PROVIDERS:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported price provider")
+    if "externalPriceId" in fields_set and payload.externalPriceId and not payload.provider and not variant.provider:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="externalPriceId requires provider")
+
     fields: dict[str, object] = {}
-    if payload.label is not None:
-        fields["label"] = payload.label
-    if payload.amountCents is not None:
-        fields["amount_cents"] = payload.amountCents
+    if payload.title is not None:
+        fields["title"] = payload.title
+    if payload.price is not None:
+        fields["price"] = payload.price
     if payload.currency is not None:
         fields["currency"] = payload.currency
-    if payload.provider is not None:
+    if "compareAtPrice" in fields_set:
+        fields["compare_at_price"] = payload.compareAtPrice
+    if "provider" in fields_set:
         fields["provider"] = payload.provider
-    if payload.externalPriceId is not None:
+    if "externalPriceId" in fields_set:
         fields["external_price_id"] = payload.externalPriceId
-    if payload.optionValues is not None:
+    if "optionValues" in fields_set:
         fields["option_values"] = payload.optionValues
+    if "sku" in fields_set:
+        fields["sku"] = payload.sku
+    if "barcode" in fields_set:
+        fields["barcode"] = payload.barcode
+    if "requiresShipping" in fields_set:
+        fields["requires_shipping"] = payload.requiresShipping
+    if "taxable" in fields_set:
+        fields["taxable"] = payload.taxable
+    if "weight" in fields_set:
+        fields["weight"] = payload.weight
+    if "weightUnit" in fields_set:
+        fields["weight_unit"] = payload.weightUnit
+    if "inventoryQuantity" in fields_set:
+        fields["inventory_quantity"] = payload.inventoryQuantity
+    if "inventoryPolicy" in fields_set:
+        fields["inventory_policy"] = payload.inventoryPolicy
+    if "inventoryManagement" in fields_set:
+        fields["inventory_management"] = payload.inventoryManagement
+    if "incoming" in fields_set:
+        fields["incoming"] = payload.incoming
+    if "nextIncomingDate" in fields_set:
+        fields["next_incoming_date"] = payload.nextIncomingDate
+    if "unitPrice" in fields_set:
+        fields["unit_price"] = payload.unitPrice
+    if "unitPriceMeasurement" in fields_set:
+        fields["unit_price_measurement"] = payload.unitPriceMeasurement
+    if "quantityRule" in fields_set:
+        fields["quantity_rule"] = payload.quantityRule
+    if "quantityPriceBreaks" in fields_set:
+        fields["quantity_price_breaks"] = payload.quantityPriceBreaks
 
-    updated = price_points_repo.update(price_point_id=price_point_id, **fields)
+    updated = variants_repo.update(variant_id=variant_id, **fields)
     if not updated:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Price point not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
     return jsonable_encoder(updated)

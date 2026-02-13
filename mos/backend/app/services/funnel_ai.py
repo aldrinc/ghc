@@ -23,7 +23,7 @@ from app.db.models import (
     FunnelPageVersion,
     Product,
     ProductOffer,
-    ProductOfferPricePoint,
+    ProductVariant,
 )
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
@@ -100,6 +100,8 @@ def _required_template_component_types(
     if template_kind == "sales-pdp":
         candidates = {
             "SalesPdpPage",
+            "SalesPdpFaq",
+            "SalesPdpReviews",
             "SalesPdpReviewWall",
             "SalesPdpReviewSlider",
             "SalesPdpTemplate",
@@ -422,6 +424,7 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
         "SalesPdpComparison",
         "SalesPdpGuarantee",
         "SalesPdpFaq",
+        "SalesPdpReviews",
         "SalesPdpReviewWall",
         "SalesPdpFooter",
         "SalesPdpReviewSlider",
@@ -506,6 +509,21 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
                     f"SalesPdpHeader.{source}.cta must be an object with string label/href{id_suffix}. Received {_describe_value(cta)}."
                 )
 
+        elif comp_type == "SalesPdpReviews":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            if not isinstance(config.get("id"), str) or not config.get("id"):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.id must be a string{id_suffix}. Received {_describe_value(config.get('id'))}."
+                )
+            data = config.get("data")
+            if not isinstance(data, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data must be a JSON object{id_suffix}. Received {_describe_value(data)}."
+                )
+
         elif comp_type == "SalesPdpMarquee":
             if not isinstance(config, dict):
                 raise ValueError(
@@ -522,9 +540,14 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
                 raise ValueError(
                     f"SalesPdpFaq.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
                 )
+            faq_id = config.get("id")
             title = config.get("title")
             items = config.get("items")
-            if not isinstance(title, str):
+            if not isinstance(faq_id, str) or not faq_id:
+                raise ValueError(
+                    f"SalesPdpFaq.{source}.id must be a string{id_suffix}. Received {_describe_value(faq_id)}."
+                )
+            if not isinstance(title, str) or not title.strip():
                 raise ValueError(
                     f"SalesPdpFaq.{source}.title must be a string{id_suffix}. Received {_describe_value(title)}."
                 )
@@ -532,6 +555,23 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
                 raise ValueError(
                     f"SalesPdpFaq.{source}.items must be a list{id_suffix}. Received {_describe_value(items)}."
                 )
+            for idx, item in enumerate(items):
+                if not isinstance(item, dict):
+                    raise ValueError(
+                        f"SalesPdpFaq.{source}.items[{idx}] must be a JSON object{id_suffix}. Received {_describe_value(item)}."
+                    )
+                question = item.get("question")
+                answer = item.get("answer")
+                if not isinstance(question, str) or not question.strip():
+                    raise ValueError(
+                        f"SalesPdpFaq.{source}.items[{idx}].question must be a non-empty string{id_suffix}. "
+                        f"Received {_describe_value(question)}."
+                    )
+                if not isinstance(answer, str) or not answer.strip():
+                    raise ValueError(
+                        f"SalesPdpFaq.{source}.items[{idx}].answer must be a non-empty string{id_suffix}. "
+                        f"Received {_describe_value(answer)}."
+                    )
 
         elif comp_type == "SalesPdpFooter":
             if not isinstance(config, dict):
@@ -591,6 +631,24 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
                 raise ValueError(
                     f"SalesPdpHero.{source}.gallery must be an object{id_suffix}. Received {_describe_value(gallery)}."
                 )
+            free_gifts = gallery.get("freeGifts")
+            if not isinstance(free_gifts, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.gallery.freeGifts must be an object{id_suffix}. "
+                    f"Received {_describe_value(free_gifts)}."
+                )
+            icon = free_gifts.get("icon")
+            if not isinstance(icon, dict) or not isinstance(icon.get("alt"), str) or not icon.get("alt"):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.gallery.freeGifts.icon must be an object with string alt{id_suffix}. "
+                    f"Received {_describe_value(icon)}."
+                )
+            for key in ("title", "body", "ctaLabel"):
+                if not isinstance(free_gifts.get(key), str) or not free_gifts.get(key):
+                    raise ValueError(
+                        f"SalesPdpHero.{source}.gallery.freeGifts.{key} must be a string{id_suffix}. "
+                        f"Received {_describe_value(free_gifts.get(key))}."
+                    )
             slides = gallery.get("slides") if isinstance(gallery, dict) else None
             if not isinstance(slides, list) or not slides:
                 raise ValueError(
@@ -687,52 +745,56 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
                 component_type=comp_type,
                 id_suffix=id_suffix,
             )
-            if modals is not None:
-                size_chart = modals.get("sizeChart")
-                why_bundle = modals.get("whyBundle")
-                free_gifts = modals.get("freeGifts")
-                if not isinstance(size_chart, dict):
-                    raise ValueError(
-                        f"SalesPdpHero.{modals_source}.sizeChart must be an object{id_suffix}. "
-                        f"Received {_describe_value(size_chart)}."
-                    )
-                if not isinstance(why_bundle, dict):
-                    raise ValueError(
-                        f"SalesPdpHero.{modals_source}.whyBundle must be an object{id_suffix}. "
-                        f"Received {_describe_value(why_bundle)}."
-                    )
-                if not isinstance(free_gifts, dict):
-                    raise ValueError(
-                        f"SalesPdpHero.{modals_source}.freeGifts must be an object{id_suffix}. "
-                        f"Received {_describe_value(free_gifts)}."
-                    )
-                if not isinstance(size_chart.get("title"), str) or not isinstance(size_chart.get("note"), str):
-                    raise ValueError(
-                        f"SalesPdpHero.{modals_source}.sizeChart must include string title/note{id_suffix}. "
-                        f"Received {_describe_value(size_chart)}."
-                    )
-                sizes = size_chart.get("sizes")
-                if not isinstance(sizes, list) or not sizes:
-                    raise ValueError(
-                        f"SalesPdpHero.{modals_source}.sizeChart.sizes must be a non-empty list{id_suffix}. "
-                        f"Received {_describe_value(sizes)}."
-                    )
-                if not isinstance(why_bundle.get("title"), str) or not isinstance(why_bundle.get("body"), str):
-                    raise ValueError(
-                        f"SalesPdpHero.{modals_source}.whyBundle must include string title/body{id_suffix}. "
-                        f"Received {_describe_value(why_bundle)}."
-                    )
-                quotes = why_bundle.get("quotes")
-                if not isinstance(quotes, list):
-                    raise ValueError(
-                        f"SalesPdpHero.{modals_source}.whyBundle.quotes must be a list{id_suffix}. "
-                        f"Received {_describe_value(quotes)}."
-                    )
-                if not isinstance(free_gifts.get("title"), str) or not isinstance(free_gifts.get("body"), str):
-                    raise ValueError(
-                        f"SalesPdpHero.{modals_source}.freeGifts must include string title/body{id_suffix}. "
-                        f"Received {_describe_value(free_gifts)}."
-                    )
+            if modals is None:
+                raise ValueError(
+                    f"SalesPdpHero.modals/modalsJson is required{id_suffix}. "
+                    "This drives the size chart, why bundle, and free gifts dialogs."
+                )
+            size_chart = modals.get("sizeChart")
+            why_bundle = modals.get("whyBundle")
+            modal_free_gifts = modals.get("freeGifts")
+            if not isinstance(size_chart, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.sizeChart must be an object{id_suffix}. "
+                    f"Received {_describe_value(size_chart)}."
+                )
+            if not isinstance(why_bundle, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.whyBundle must be an object{id_suffix}. "
+                    f"Received {_describe_value(why_bundle)}."
+                )
+            if not isinstance(modal_free_gifts, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.freeGifts must be an object{id_suffix}. "
+                    f"Received {_describe_value(modal_free_gifts)}."
+                )
+            if not isinstance(size_chart.get("title"), str) or not isinstance(size_chart.get("note"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.sizeChart must include string title/note{id_suffix}. "
+                    f"Received {_describe_value(size_chart)}."
+                )
+            sizes = size_chart.get("sizes")
+            if not isinstance(sizes, list) or not sizes:
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.sizeChart.sizes must be a non-empty list{id_suffix}. "
+                    f"Received {_describe_value(sizes)}."
+                )
+            if not isinstance(why_bundle.get("title"), str) or not isinstance(why_bundle.get("body"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.whyBundle must include string title/body{id_suffix}. "
+                    f"Received {_describe_value(why_bundle)}."
+                )
+            quotes = why_bundle.get("quotes")
+            if not isinstance(quotes, list):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.whyBundle.quotes must be a list{id_suffix}. "
+                    f"Received {_describe_value(quotes)}."
+                )
+            if not isinstance(modal_free_gifts.get("title"), str) or not isinstance(modal_free_gifts.get("body"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.freeGifts must include string title/body{id_suffix}. "
+                    f"Received {_describe_value(modal_free_gifts)}."
+                )
 
 def _collect_config_json_contexts_all(puck_data: dict[str, Any]) -> list[_ConfigJsonContext]:
     contexts: list[_ConfigJsonContext] = []
@@ -806,6 +868,11 @@ def _apply_brand_logo_overrides_for_ai(
     logo_public_id = brand.get("logoAssetPublicId")
     if not isinstance(logo_public_id, str) or not logo_public_id.strip():
         raise ValueError("Design system brand.logoAssetPublicId is required to apply brand assets.")
+    logo_public_id = logo_public_id.strip()
+    if logo_public_id == "__LOGO_ASSET_PUBLIC_ID__":
+        raise ValueError(
+            "Design system brand.logoAssetPublicId is a placeholder and must be replaced with a real asset public id."
+        )
     assets_repo = AssetsRepository(session)
     asset = assets_repo.get_by_public_id(org_id=org_id, client_id=client_id, public_id=logo_public_id)
     if not asset:
@@ -921,9 +988,9 @@ def _text_mentions_product(text: str | None) -> bool:
 
 
 def _normalize_product_type(product: Product | None) -> str | None:
-    if not product or not isinstance(product.category, str):
+    if not product or not isinstance(product.product_type, str):
         return None
-    normalized = product.category.strip().lower()
+    normalized = product.product_type.strip().lower()
     return normalized or None
 
 
@@ -2027,10 +2094,10 @@ def _build_public_asset_url(public_id: str) -> str | None:
 def _serialize_product(product: Product, primary_asset: Asset | None = None) -> dict[str, Any]:
     payload = {
         "id": str(product.id),
-        "name": product.name,
+        "name": product.title,
         "description": product.description,
-        "category": product.category,
-        "product_type": product.category,
+        "category": product.product_type,
+        "product_type": product.product_type,
         "primary_benefits": product.primary_benefits or [],
         "feature_bullets": product.feature_bullets or [],
         "guarantee_text": product.guarantee_text,
@@ -2050,7 +2117,7 @@ def _serialize_product(product: Product, primary_asset: Asset | None = None) -> 
 
 
 def _serialize_offer(
-    offer: ProductOffer, price_points: list[ProductOfferPricePoint]
+    offer: ProductOffer, price_points: list[ProductVariant]
 ) -> dict[str, Any]:
     return {
         "id": str(offer.id),
@@ -2062,8 +2129,8 @@ def _serialize_offer(
         "options_schema": offer.options_schema,
         "price_points": [
             {
-                "label": point.label,
-                "amount_cents": point.amount_cents,
+                "label": point.title,
+                "amount_cents": point.price,
                 "currency": point.currency,
                 "provider": point.provider,
                 "external_price_id": point.external_price_id,
@@ -2115,7 +2182,7 @@ def _load_product_context(
             raise ValueError("Selected offer does not belong to the funnel product.")
         price_points = list(
             session.scalars(
-                select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id == offer.id)
+                select(ProductVariant).where(ProductVariant.offer_id == offer.id)
             ).all()
         )
         offer_payload = _serialize_offer(offer, price_points)
@@ -2774,13 +2841,15 @@ def generate_funnel_page_draft(
         structure_guidance = (
             "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
             "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
-            "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
+            "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals\n"
+            "- Do NOT override layout sizing tokens like containerMax/containerPad (or --container-max/--container-pad) in props.theme tokens; keep the template width\n\n"
         )
     elif template_component_kind == "pre-sales-listicle":
         structure_guidance = (
             "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
             "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
-            "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+            "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy\n"
+            "- Do NOT override layout sizing tokens like containerMax/containerPad (or --container-max/--container-pad) in props.theme tokens; keep the template width\n\n"
         )
     else:
         structure_guidance = (
@@ -2860,8 +2929,16 @@ def generate_funnel_page_draft(
     if template_mode and template_kind == "sales-pdp":
         template_config_guidance = (
             "Sales PDP config requirements:\n"
+            "- SalesPdpReviews.config MUST include: id, data.\n"
+            "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
+            "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
+            "- SalesPdpFaq.config MUST include: id, title, items[] (do not replace it with the primitive FAQ component).\n"
             "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
             "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
+            "Anchor id requirements:\n"
+            "- Do not change section ids or header nav href anchors.\n"
+            "- Keep SalesPdpStoryProblem.config.id = 'how-it-works' (Problem section; floating CTA triggers after this section).\n"
+            "- Keep SalesPdpHeader.config.nav href values pointing at the same section ids (e.g. '#how-it-works', '#guarantee', '#faq', '#reviews').\n\n"
         )
     elif template_mode and template_component_kind == "pre-sales-listicle":
         template_config_guidance = (
@@ -2870,7 +2947,6 @@ def generate_funnel_page_draft(
             "- PreSalesReasons.config MUST be an array of reasons: [{ number: number, title: string, body: string, image?: { alt:string, src?:string, assetPublicId?:string } }]\n"
             "- PreSalesMarquee.config MUST be an array of strings.\n"
             "- PreSalesPitch.config MUST be: { title: string, bullets: string[], image: { alt:string, src?:string, assetPublicId?:string }, cta?: { label: string, linkType?: 'external'|'funnelPage'|'nextPage', href?:string, targetPageId?:string } }\n"
-            "- PreSalesReviews.config MUST be: { slides: [{ text: string, author: string, images: [{ alt:string, src?:string, assetPublicId?:string }] }], autoAdvanceMs?: number }\n"
             "- PreSalesFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string } }\n"
             "- Do NOT use keys like headline/subheadline/ctaLabel/ctaLinkType/items/reasons/reviews/links/copyrightText inside PreSales* configs.\n\n"
         )
@@ -2888,21 +2964,21 @@ def generate_funnel_page_draft(
             "18) SalesPdpComparison: props { id, config, configJson? }\n"
             "19) SalesPdpGuarantee: props { id, config, configJson?, feedImages?, feedImagesJson? }\n"
             "20) SalesPdpFaq: props { id, config, configJson? }\n"
-            "21) SalesPdpReviewWall: props { id, config, configJson? }\n"
-            "22) SalesPdpFooter: props { id, config, configJson? }\n"
-            "23) SalesPdpReviewSlider: props { id, config, configJson? }\n"
+            "21) SalesPdpReviews: props { id, config, configJson? }\n"
+            "22) SalesPdpReviewWall: props { id, config, configJson? }\n"
+            "23) SalesPdpFooter: props { id, config, configJson? }\n"
+            "24) SalesPdpReviewSlider: props { id, config, configJson? }\n"
         )
     elif template_component_kind == "pre-sales-listicle":
         template_component = (
             "11) PreSalesPage: props { id, anchorId?, theme, themeJson?, content? }\n"
             "12) PreSalesHero: props { id, config, configJson? }\n"
             "13) PreSalesReasons: props { id, config, configJson? }\n"
-            "14) PreSalesReviews: props { id, config, configJson?, copy?, copyJson? }\n"
-            "15) PreSalesMarquee: props { id, config, configJson? }\n"
-            "16) PreSalesPitch: props { id, config, configJson? }\n"
-            "17) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
-            "18) PreSalesFooter: props { id, config, configJson? }\n"
-            "19) PreSalesFloatingCta: props { id, config, configJson? }\n"
+            "14) PreSalesMarquee: props { id, config, configJson? }\n"
+            "15) PreSalesPitch: props { id, config, configJson? }\n"
+            "16) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
+            "17) PreSalesFooter: props { id, config, configJson? }\n"
+            "18) PreSalesFloatingCta: props { id, config, configJson? }\n"
         )
     else:
         template_component = ""
@@ -3035,6 +3111,7 @@ def generate_funnel_page_draft(
                 "SalesPdpComparison",
                 "SalesPdpGuarantee",
                 "SalesPdpFaq",
+                "SalesPdpReviews",
                 "SalesPdpReviewWall",
                 "SalesPdpFooter",
                 "SalesPdpReviewSlider",
@@ -3492,13 +3569,15 @@ def stream_funnel_page_draft(
             structure_guidance = (
                 "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
                 "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
-                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
+                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals\n"
+                "- Do NOT override layout sizing tokens like containerMax/containerPad (or --container-max/--container-pad) in props.theme tokens; keep the template width\n\n"
             )
         elif template_component_kind == "pre-sales-listicle":
             structure_guidance = (
                 "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
                 "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
-                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy\n"
+                "- Do NOT override layout sizing tokens like containerMax/containerPad (or --container-max/--container-pad) in props.theme tokens; keep the template width\n\n"
             )
         else:
             structure_guidance = (
@@ -3553,8 +3632,16 @@ def stream_funnel_page_draft(
         if template_mode and template_kind == "sales-pdp":
             template_config_guidance = (
                 "Sales PDP config requirements:\n"
+                "- SalesPdpReviews.config MUST include: id, data.\n"
+                "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
+                "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
+                "- SalesPdpFaq.config MUST include: id, title, items[] (do not replace it with the primitive FAQ component).\n"
                 "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
                 "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
+                "Anchor id requirements:\n"
+                "- Do not change section ids or header nav href anchors.\n"
+                "- Keep SalesPdpStoryProblem.config.id = 'how-it-works' (Problem section; floating CTA triggers after this section).\n"
+                "- Keep SalesPdpHeader.config.nav href values pointing at the same section ids (e.g. '#how-it-works', '#guarantee', '#faq', '#reviews').\n\n"
             )
         elif template_mode and template_component_kind == "pre-sales-listicle":
             template_config_guidance = (
@@ -3563,7 +3650,6 @@ def stream_funnel_page_draft(
                 "- PreSalesReasons.config MUST be an array of reasons: [{ number: number, title: string, body: string, image?: { alt:string, src?:string, assetPublicId?:string } }]\n"
                 "- PreSalesMarquee.config MUST be an array of strings.\n"
                 "- PreSalesPitch.config MUST be: { title: string, bullets: string[], image: { alt:string, src?:string, assetPublicId?:string }, cta?: { label: string, linkType?: 'external'|'funnelPage'|'nextPage', href?:string, targetPageId?:string } }\n"
-                "- PreSalesReviews.config MUST be: { slides: [{ text: string, author: string, images: [{ alt:string, src?:string, assetPublicId?:string }] }], autoAdvanceMs?: number }\n"
                 "- PreSalesFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string } }\n"
                 "- Do NOT use keys like headline/subheadline/ctaLabel/ctaLinkType/items/reasons/reviews/links/copyrightText inside PreSales* configs.\n\n"
             )
@@ -3581,21 +3667,21 @@ def stream_funnel_page_draft(
                 "18) SalesPdpComparison: props { id, config, configJson? }\n"
                 "19) SalesPdpGuarantee: props { id, config, configJson?, feedImages?, feedImagesJson? }\n"
                 "20) SalesPdpFaq: props { id, config, configJson? }\n"
-                "21) SalesPdpReviewWall: props { id, config, configJson? }\n"
-                "22) SalesPdpFooter: props { id, config, configJson? }\n"
-                "23) SalesPdpReviewSlider: props { id, config, configJson? }\n"
+                "21) SalesPdpReviews: props { id, config, configJson? }\n"
+                "22) SalesPdpReviewWall: props { id, config, configJson? }\n"
+                "23) SalesPdpFooter: props { id, config, configJson? }\n"
+                "24) SalesPdpReviewSlider: props { id, config, configJson? }\n"
             )
         elif template_component_kind == "pre-sales-listicle":
             template_component = (
                 "11) PreSalesPage: props { id, anchorId?, theme, themeJson?, content? }\n"
                 "12) PreSalesHero: props { id, config, configJson? }\n"
                 "13) PreSalesReasons: props { id, config, configJson? }\n"
-                "14) PreSalesReviews: props { id, config, configJson?, copy?, copyJson? }\n"
-                "15) PreSalesMarquee: props { id, config, configJson? }\n"
-                "16) PreSalesPitch: props { id, config, configJson? }\n"
-                "17) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
-                "18) PreSalesFooter: props { id, config, configJson? }\n"
-                "19) PreSalesFloatingCta: props { id, config, configJson? }\n"
+                "14) PreSalesMarquee: props { id, config, configJson? }\n"
+                "15) PreSalesPitch: props { id, config, configJson? }\n"
+                "16) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
+                "17) PreSalesFooter: props { id, config, configJson? }\n"
+                "18) PreSalesFloatingCta: props { id, config, configJson? }\n"
             )
         else:
             template_component = ""
@@ -3730,6 +3816,7 @@ def stream_funnel_page_draft(
                     "SalesPdpComparison",
                     "SalesPdpGuarantee",
                     "SalesPdpFaq",
+                    "SalesPdpReviews",
                     "SalesPdpReviewWall",
                     "SalesPdpFooter",
                     "SalesPdpReviewSlider",

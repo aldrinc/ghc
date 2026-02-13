@@ -177,7 +177,7 @@ export function DocumentsPage() {
     const message = getErrorMessage(isWorkflowsError ? workflowsError : workflowDetailError);
     return (
       <div className="space-y-4">
-        <PageHeader title="Documents" description={`Research docs captured during onboarding for ${product.name}.`} />
+        <PageHeader title="Documents" description={`Research docs captured during onboarding for ${product.title}.`} />
         <div className="max-w-6xl mx-auto space-y-3">
           <EmptyState title="Failed to load documents" description={message} />
           <div className="flex justify-center">
@@ -200,7 +200,7 @@ export function DocumentsPage() {
   if (rowsError) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Documents" description={`Research docs captured during onboarding for ${product.name}.`} />
+        <PageHeader title="Documents" description={`Research docs captured during onboarding for ${product.title}.`} />
         <div className="max-w-6xl mx-auto space-y-3">
           <EmptyState title="Failed to build document list" description={rowsError} />
           <div className="flex justify-center">
@@ -224,7 +224,7 @@ export function DocumentsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Documents"
-        description={`Research docs captured during onboarding for ${product.name}.`}
+        description={`Research docs captured during onboarding for ${product.title}.`}
       />
 
       <div className="max-w-6xl mx-auto">

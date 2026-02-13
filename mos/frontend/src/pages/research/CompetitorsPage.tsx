@@ -62,7 +62,7 @@ export function CompetitorsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Competitors"
-        description={`Competitor signal and ad ingestion summaries for ${product.name}.`}
+        description={`Competitor signal and ad ingestion summaries for ${product.title}.`}
       />
 
       {isLoading ? (

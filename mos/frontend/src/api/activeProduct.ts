@@ -3,8 +3,8 @@ import { useApiClient, type ApiError } from "@/api/client";
 import { toast } from "@/components/ui/toast";
 import type { Product } from "@/types/products";
 
-export type ActiveProductSummary = Pick<Product, "id" | "name" | "client_id"> & {
-  category?: string | null;
+export type ActiveProductSummary = Pick<Product, "id" | "title" | "client_id"> & {
+  product_type?: string | null;
 };
 
 export type ActiveProductResponse = {
@@ -65,4 +65,3 @@ export function useSetActiveProduct() {
     },
   });
 }
-

@@ -593,7 +593,7 @@ export function ResearchPage() {
     <div className="space-y-4">
       <PageHeader
         title="Research"
-        description={`Ads and competitor brands for ${product.name}.`}
+        description={`Ads and competitor brands for ${product.title}.`}
       />
       <AdsIngestionRetryCallout clientId={workspace?.id} productId={product?.id} />
 

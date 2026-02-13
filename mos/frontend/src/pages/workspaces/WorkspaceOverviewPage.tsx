@@ -106,7 +106,7 @@ export function WorkspaceOverviewPage() {
       <PageHeader
         title={workspace.name}
         description={
-          workspace.industry ? `${product.name} · ${workspace.industry}` : `${product.name} · Workspace overview`
+          workspace.industry ? `${product.title} · ${workspace.industry}` : `${product.title} · Workspace overview`
         }
         actions={
           <div className="flex items-center gap-2">

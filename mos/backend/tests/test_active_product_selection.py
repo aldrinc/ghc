@@ -10,7 +10,7 @@ def test_active_product_defaults_when_only_one_product(api_client):
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
-    prod = api_client.post("/products", json={"clientId": client_id, "name": "Only Product"})
+    prod = api_client.post("/products", json={"clientId": client_id, "title": "Only Product"})
     assert prod.status_code == 201
     prod_id = prod.json()["id"]
 
@@ -24,11 +24,11 @@ def test_active_product_defaults_to_latest_and_persists(api_client, db_session, 
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
-    first = api_client.post("/products", json={"clientId": client_id, "name": "First Product"})
+    first = api_client.post("/products", json={"clientId": client_id, "title": "First Product"})
     assert first.status_code == 201
     first_id = first.json()["id"]
 
-    second = api_client.post("/products", json={"clientId": client_id, "name": "Second Product"})
+    second = api_client.post("/products", json={"clientId": client_id, "title": "Second Product"})
     assert second.status_code == 201
     second_id = second.json()["id"]
 
@@ -69,7 +69,7 @@ def test_set_active_product_rejects_cross_client_product(api_client):
     assert client_b.status_code == 201
     client_b_id = client_b.json()["id"]
 
-    prod_b = api_client.post("/products", json={"clientId": client_b_id, "name": "B Product"})
+    prod_b = api_client.post("/products", json={"clientId": client_b_id, "title": "B Product"})
     assert prod_b.status_code == 201
     prod_b_id = prod_b.json()["id"]
 
@@ -83,7 +83,7 @@ def test_active_product_recovers_from_stale_preference(api_client, db_session, a
     assert client_a.status_code == 201
     client_a_id = client_a.json()["id"]
 
-    prod_a = api_client.post("/products", json={"clientId": client_a_id, "name": "A Product"})
+    prod_a = api_client.post("/products", json={"clientId": client_a_id, "title": "A Product"})
     assert prod_a.status_code == 201
     prod_a_id = prod_a.json()["id"]
 
@@ -91,7 +91,7 @@ def test_active_product_recovers_from_stale_preference(api_client, db_session, a
     assert client_b.status_code == 201
     client_b_id = client_b.json()["id"]
 
-    prod_b = api_client.post("/products", json={"clientId": client_b_id, "name": "B Product"})
+    prod_b = api_client.post("/products", json={"clientId": client_b_id, "title": "B Product"})
     assert prod_b.status_code == 201
     prod_b_id = prod_b.json()["id"]
 

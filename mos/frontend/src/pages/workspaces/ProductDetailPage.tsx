@@ -7,8 +7,7 @@ import { DialogContent, DialogDescription, DialogRoot, DialogTitle, DialogClose 
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import {
-  useCreateOffer,
-  useCreatePricePoint,
+  useCreateVariant,
   useProduct,
   useProductAssets,
   useUpdateProduct,
@@ -56,107 +55,54 @@ export function ProductDetailPage() {
   const uploadProductAssets = useUploadProductAssets(productId || "");
   const assetInputRef = useRef<HTMLInputElement | null>(null);
 
-  const createOffer = useCreateOffer();
-  const createPricePoint = useCreatePricePoint();
-  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
-  const [isPricePointModalOpen, setIsPricePointModalOpen] = useState(false);
-  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+  const createVariant = useCreateVariant(productId || "");
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
 
-  const [offerName, setOfferName] = useState("");
-  const [offerDescription, setOfferDescription] = useState("");
-  const [offerBusinessModel, setOfferBusinessModel] = useState("one-time");
-  const [offerDifferentiationBullets, setOfferDifferentiationBullets] = useState("");
-  const [offerGuaranteeText, setOfferGuaranteeText] = useState("");
-  const [offerOptionsSchema, setOfferOptionsSchema] = useState("");
-
-  const [pricePointLabel, setPricePointLabel] = useState("");
-  const [pricePointAmount, setPricePointAmount] = useState("");
-  const [pricePointCurrency, setPricePointCurrency] = useState("usd");
-  const [pricePointProvider, setPricePointProvider] = useState("stripe");
-  const [pricePointExternalId, setPricePointExternalId] = useState("");
-  const [pricePointOptionValues, setPricePointOptionValues] = useState("");
+  const [variantTitle, setVariantTitle] = useState("");
+  const [variantPrice, setVariantPrice] = useState("");
+  const [variantCurrency, setVariantCurrency] = useState("usd");
+  const [variantProvider, setVariantProvider] = useState("stripe");
+  const [variantExternalId, setVariantExternalId] = useState("");
+  const [variantOptionValues, setVariantOptionValues] = useState("");
 
   useEffect(() => {
     if (!productDetail) return;
     selectProduct(productDetail.id, {
-      name: productDetail.name,
+      title: productDetail.title,
       client_id: productDetail.client_id,
-      category: productDetail.category ?? null,
+      product_type: productDetail.product_type ?? null,
     });
   }, [productDetail, selectProduct]);
 
-  const resetOfferForm = () => {
-    setOfferName("");
-    setOfferDescription("");
-    setOfferBusinessModel("one-time");
-    setOfferDifferentiationBullets("");
-    setOfferGuaranteeText("");
-    setOfferOptionsSchema("");
+  const resetVariantForm = () => {
+    setVariantTitle("");
+    setVariantPrice("");
+    setVariantCurrency("usd");
+    setVariantProvider("stripe");
+    setVariantExternalId("");
+    setVariantOptionValues("");
   };
 
-  const resetPricePointForm = () => {
-    setPricePointLabel("");
-    setPricePointAmount("");
-    setPricePointCurrency("usd");
-    setPricePointProvider("stripe");
-    setPricePointExternalId("");
-    setPricePointOptionValues("");
-  };
-
-  const handleCreateOffer = async (event: React.FormEvent) => {
+  const handleCreateVariant = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!workspace || !productId) return;
-    if (!offerName.trim() || !offerBusinessModel.trim()) {
-      toast.error("Offer name and business model are required.");
+    const price = Number(variantPrice);
+    if (!variantTitle.trim() || Number.isNaN(price) || price <= 0) {
+      toast.error("Variant title and price are required.");
       return;
     }
-    let optionsSchema: Record<string, unknown> | undefined;
-    if (offerOptionsSchema.trim()) {
-      try {
-        const parsed = JSON.parse(offerOptionsSchema);
-        if (!parsed || typeof parsed !== "object") {
-          throw new Error("Options schema must be a JSON object.");
-        }
-        optionsSchema = parsed as Record<string, unknown>;
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Invalid options schema JSON.");
-        return;
-      }
-    }
-    const payload = {
-      productId,
-      name: offerName.trim(),
-      description: offerDescription.trim() || undefined,
-      businessModel: offerBusinessModel.trim(),
-      differentiationBullets: offerDifferentiationBullets.trim() ? parseList(offerDifferentiationBullets) : undefined,
-      guaranteeText: offerGuaranteeText.trim() || undefined,
-      optionsSchema,
-    };
-    await createOffer.mutateAsync(payload);
-    resetOfferForm();
-    setIsOfferModalOpen(false);
-  };
-
-  const handleCreatePricePoint = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!productId || !selectedOfferId) return;
-    const amount = Number(pricePointAmount);
-    if (!pricePointLabel.trim() || Number.isNaN(amount) || amount <= 0) {
-      toast.error("Price point label and amount are required.");
-      return;
-    }
-    if (!pricePointCurrency.trim()) {
+    if (!variantCurrency.trim()) {
       toast.error("Currency is required.");
       return;
     }
-    if (pricePointExternalId.trim() && !pricePointProvider.trim()) {
+    if (variantExternalId.trim() && !variantProvider.trim()) {
       toast.error("Provider is required when external price ID is set.");
       return;
     }
     let optionValues: Record<string, unknown> | undefined;
-    if (pricePointOptionValues.trim()) {
+    if (variantOptionValues.trim()) {
       try {
-        const parsed = JSON.parse(pricePointOptionValues);
+        const parsed = JSON.parse(variantOptionValues);
         if (!parsed || typeof parsed !== "object") {
           throw new Error("Option values must be a JSON object.");
         }
@@ -166,19 +112,16 @@ export function ProductDetailPage() {
         return;
       }
     }
-    const payload = {
-      productId,
-      offerId: selectedOfferId,
-      label: pricePointLabel.trim(),
-      amountCents: amount,
-      currency: pricePointCurrency.trim(),
-      provider: pricePointProvider.trim() || undefined,
-      externalPriceId: pricePointExternalId.trim() || undefined,
+    await createVariant.mutateAsync({
+      title: variantTitle.trim(),
+      price,
+      currency: variantCurrency.trim(),
+      provider: variantProvider.trim() || undefined,
+      externalPriceId: variantExternalId.trim() || undefined,
       optionValues,
-    };
-    await createPricePoint.mutateAsync(payload);
-    resetPricePointForm();
-    setIsPricePointModalOpen(false);
+    });
+    resetVariantForm();
+    setIsVariantModalOpen(false);
   };
 
   const handleAssetUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -239,16 +182,15 @@ export function ProductDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={productDetail?.name || "Product detail"}
-        description={productDetail?.description || "Review product offers, assets, and pricing."}
+        title={productDetail?.title || "Product detail"}
+        description={productDetail?.description || "Review product variants, assets, and pricing."}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => navigate("/workspaces/products")}
-            >
+            <Button variant="secondary" size="sm" onClick={() => navigate("/workspaces/products")}>
               Back to products
             </Button>
-            <Button size="sm" onClick={() => setIsOfferModalOpen(true)} disabled={!productDetail}>
-              New offer
+            <Button size="sm" onClick={() => setIsVariantModalOpen(true)} disabled={!productDetail}>
+              New variant
             </Button>
           </div>
         }
@@ -266,8 +208,10 @@ export function ProductDetailPage() {
             <div className="rounded-md border border-border bg-surface-2 p-4">
               <div className="text-xs font-semibold uppercase text-content-muted">Overview</div>
               <div className="mt-2 text-sm text-content">
-                <div className="font-semibold">{productDetail.name}</div>
-                <div className="text-xs text-content-muted">{productDetail.category || "No category"}</div>
+                <div className="font-semibold">{productDetail.title}</div>
+                <div className="text-xs text-content-muted">
+                  {productDetail.product_type || "No product type"}
+                </div>
               </div>
               <div className="mt-3 grid gap-3 text-xs text-content-muted sm:grid-cols-2">
                 <div>
@@ -389,149 +333,72 @@ export function ProductDetailPage() {
           </div>
 
           <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="space-y-3">
-              {productDetail.offers.length ? (
-                productDetail.offers.map((offer) => (
-                  <div key={offer.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-semibold text-content">{offer.name}</div>
-                        <div className="text-xs text-content-muted">{offer.business_model}</div>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold uppercase text-content-muted">Variants</div>
+                <div className="text-xs text-content-muted">Pricing, provider, and option values.</div>
+              </div>
+              <Button size="sm" variant="secondary" onClick={() => setIsVariantModalOpen(true)}>
+                New variant
+              </Button>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              {productDetail.variants.length ? (
+                productDetail.variants.map((variant) => (
+                  <div key={variant.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-content truncate">{variant.title}</div>
+                        <div className="text-xs text-content-muted">
+                          {variant.price} {variant.currency.toUpperCase()}
+                          {variant.provider ? ` · ${variant.provider}` : ""}
+                        </div>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setSelectedOfferId(offer.id);
-                          setIsPricePointModalOpen(true);
-                        }}
-                      >
-                        New price point
-                      </Button>
+                      <div className="text-[10px] text-content-muted">{variant.id.slice(0, 8)}</div>
                     </div>
-                    <div className="text-xs text-content-muted">
-                      {offer.options_schema ? "Options schema set" : "No options schema"}
-                    </div>
-                    <div className="space-y-2">
-                      {offer.pricePoints?.length ? (
-                        offer.pricePoints.map((pricePoint) => (
-                          <div
-                            key={pricePoint.id}
-                            className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-xs"
-                          >
-                            <div className="font-semibold text-content">{pricePoint.label}</div>
-                            <div className="text-content-muted">
-                              {pricePoint.amount_cents} {pricePoint.currency.toUpperCase()}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <div className="text-xs text-content-muted">No price points yet.</div>
-                      )}
+                    <div className="grid gap-2 text-xs text-content-muted">
+                      <div>
+                        <span className="font-semibold text-content">External price ID:</span>{" "}
+                        {variant.external_price_id || "—"}
+                      </div>
+                      <div>
+                        <span className="font-semibold text-content">Option values:</span>{" "}
+                        {variant.option_values ? JSON.stringify(variant.option_values) : "—"}
+                      </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-content-muted">No offers yet.</div>
+                <div className="text-sm text-content-muted">No variants yet.</div>
               )}
             </div>
           </div>
         </div>
       )}
 
-      <DialogRoot open={isOfferModalOpen} onOpenChange={setIsOfferModalOpen}>
+      <DialogRoot open={isVariantModalOpen} onOpenChange={setIsVariantModalOpen}>
         <DialogContent>
-          <DialogTitle>New offer</DialogTitle>
-          <DialogDescription>Define an offer for the selected product.</DialogDescription>
-          <form className="space-y-3" onSubmit={handleCreateOffer}>
+          <DialogTitle>New variant</DialogTitle>
+          <DialogDescription>Attach pricing and (optionally) a Stripe or Shopify external ID.</DialogDescription>
+          <form className="space-y-3" onSubmit={handleCreateVariant}>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Name</label>
-              <Input placeholder="Offer name" value={offerName} onChange={(e) => setOfferName(e.target.value)} required />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Description</label>
+              <label className="text-xs font-semibold text-content">Title</label>
               <Input
-                placeholder="Optional description"
-                value={offerDescription}
-                onChange={(e) => setOfferDescription(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Business model</label>
-              <Input
-                placeholder="one-time, subscription"
-                value={offerBusinessModel}
-                onChange={(e) => setOfferBusinessModel(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Differentiation bullets</label>
-              <Input
-                placeholder="Comma-separated list"
-                value={offerDifferentiationBullets}
-                onChange={(e) => setOfferDifferentiationBullets(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Guarantee text</label>
-              <Input
-                placeholder="Optional guarantee statement"
-                value={offerGuaranteeText}
-                onChange={(e) => setOfferGuaranteeText(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Options schema (JSON)</label>
-              <textarea
-                className="min-h-[120px] w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content"
-                placeholder='{"size":{"label":"Size","options":["S","M","L"]}}'
-                value={offerOptionsSchema}
-                onChange={(e) => setOfferOptionsSchema(e.target.value)}
-              />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-1">
-              <DialogClose asChild>
-                <Button type="button" variant="secondary">
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button type="submit" disabled={!productId || createOffer.isPending}>
-                {createOffer.isPending ? "Creating…" : "Create offer"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </DialogRoot>
-
-      <DialogRoot open={isPricePointModalOpen} onOpenChange={setIsPricePointModalOpen}>
-        <DialogContent>
-          <DialogTitle>New price point</DialogTitle>
-          <DialogDescription>Attach a Stripe price ID and option values.</DialogDescription>
-          <form className="space-y-3" onSubmit={handleCreatePricePoint}>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Label</label>
-              <Input
-                placeholder="e.g. Medium / No add-on"
-                value={pricePointLabel}
-                onChange={(e) => setPricePointLabel(e.target.value)}
+                placeholder="e.g. Default"
+                value={variantTitle}
+                onChange={(e) => setVariantTitle(e.target.value)}
                 required
               />
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Amount (cents)</label>
+                <label className="text-xs font-semibold text-content">Price (cents)</label>
                 <Input
                   placeholder="4900"
-                  value={pricePointAmount}
-                  onChange={(e) => setPricePointAmount(e.target.value)}
+                  value={variantPrice}
+                  onChange={(e) => setVariantPrice(e.target.value)}
                   required
                 />
               </div>
@@ -539,8 +406,8 @@ export function ProductDetailPage() {
                 <label className="text-xs font-semibold text-content">Currency</label>
                 <Input
                   placeholder="usd"
-                  value={pricePointCurrency}
-                  onChange={(e) => setPricePointCurrency(e.target.value)}
+                  value={variantCurrency}
+                  onChange={(e) => setVariantCurrency(e.target.value)}
                   required
                 />
               </div>
@@ -550,17 +417,17 @@ export function ProductDetailPage() {
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-content">Provider</label>
                 <Input
-                  placeholder="stripe"
-                  value={pricePointProvider}
-                  onChange={(e) => setPricePointProvider(e.target.value)}
+                  placeholder="stripe | shopify"
+                  value={variantProvider}
+                  onChange={(e) => setVariantProvider(e.target.value)}
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Stripe price ID</label>
+                <label className="text-xs font-semibold text-content">External price ID</label>
                 <Input
-                  placeholder="price_..."
-                  value={pricePointExternalId}
-                  onChange={(e) => setPricePointExternalId(e.target.value)}
+                  placeholder="price_... or gid://shopify/ProductVariant/..."
+                  value={variantExternalId}
+                  onChange={(e) => setVariantExternalId(e.target.value)}
                 />
               </div>
             </div>
@@ -570,8 +437,8 @@ export function ProductDetailPage() {
               <textarea
                 className="min-h-[120px] w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content"
                 placeholder='{"size":"M","add_on":"none"}'
-                value={pricePointOptionValues}
-                onChange={(e) => setPricePointOptionValues(e.target.value)}
+                value={variantOptionValues}
+                onChange={(e) => setVariantOptionValues(e.target.value)}
               />
             </div>
 
@@ -581,8 +448,8 @@ export function ProductDetailPage() {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={!selectedOfferId || createPricePoint.isPending}>
-                {createPricePoint.isPending ? "Creating…" : "Create price point"}
+              <Button type="submit" disabled={!productId || createVariant.isPending}>
+                {createVariant.isPending ? "Creating…" : "Create variant"}
               </Button>
             </div>
           </form>

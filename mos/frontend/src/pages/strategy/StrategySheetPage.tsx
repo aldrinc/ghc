@@ -46,7 +46,7 @@ export function StrategySheetPage() {
     <div className="space-y-4">
       <PageHeader
         title="Strategy Sheet"
-        description={`Goal, hypothesis, channel plan, and messaging for ${product.name}.`}
+        description={`Goal, hypothesis, channel plan, and messaging for ${product.title}.`}
       >
         {strategyArtifact ? (
           <div className="text-xs text-content-muted">Strategy sheets are auto-approved and do not require sign-off.</div>

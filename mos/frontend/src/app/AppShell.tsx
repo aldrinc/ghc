@@ -241,7 +241,7 @@ export function AppShell() {
     return [
       { label: "Select product", value: "" },
       ...products.map((item) => ({
-        label: item.name,
+        label: item.title,
         value: item.id,
       })),
     ];

@@ -8,7 +8,7 @@ def test_upload_product_assets_returns_clear_error_when_media_storage_not_config
     product = Product(
         org_id=seed_data["client"].org_id,
         client_id=seed_data["client"].id,
-        name="Test Product",
+        title="Test Product",
     )
     db_session.add(product)
     db_session.commit()
@@ -22,4 +22,3 @@ def test_upload_product_assets_returns_clear_error_when_media_storage_not_config
     )
     assert resp.status_code == 500
     assert resp.json() == {"detail": "MEDIA_STORAGE_BUCKET is required"}
-

@@ -10,7 +10,7 @@ def _create_publish_ready_funnel(api_client: TestClient, *, funnel_name: str) ->
     client_resp = api_client.post("/clients", json={"name": f"{funnel_name} Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
-    product_resp = api_client.post("/products", json={"clientId": client_id, "name": f"{funnel_name} Product"})
+    product_resp = api_client.post("/products", json={"clientId": client_id, "title": f"{funnel_name} Product"})
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
 
@@ -52,7 +52,7 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     client_resp = api_client.post("/clients", json={"name": "Funnels Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
-    product_resp = api_client.post("/products", json={"clientId": client_id, "name": "Funnels Product"})
+    product_resp = api_client.post("/products", json={"clientId": client_id, "title": "Funnels Product"})
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
 
@@ -163,7 +163,7 @@ def test_funnel_public_preview_allows_approved_pages_before_publish(api_client: 
     client_resp = api_client.post("/clients", json={"name": "Preview Funnel Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
-    product_resp = api_client.post("/products", json={"clientId": client_id, "name": "Preview Product"})
+    product_resp = api_client.post("/products", json={"clientId": client_id, "title": "Preview Product"})
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
 
@@ -225,7 +225,7 @@ def test_public_funnel_commerce_requires_offers(api_client: TestClient):
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
-    product_resp = api_client.post("/products", json={"clientId": client_id, "name": "Commerce Product"})
+    product_resp = api_client.post("/products", json={"clientId": client_id, "title": "Commerce Product"})
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
 
@@ -238,7 +238,7 @@ def test_public_funnel_commerce_requires_offers(api_client: TestClient):
 
     commerce_resp = api_client.get(f"/public/funnels/{public_id}/commerce")
     assert commerce_resp.status_code == 409
-    assert commerce_resp.json()["detail"] == "Product offers are not configured for this funnel product."
+    assert commerce_resp.json()["detail"] == "Product variants are not configured for this funnel product."
 
 
 def test_public_funnel_commerce_requires_price_points(api_client: TestClient):
@@ -246,63 +246,21 @@ def test_public_funnel_commerce_requires_price_points(api_client: TestClient):
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
-    product_resp = api_client.post("/products", json={"clientId": client_id, "name": "Commerce Product"})
+    product_resp = api_client.post("/products", json={"clientId": client_id, "title": "Commerce Product"})
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
 
-    offer_resp = api_client.post(
-        f"/products/{product_id}/offers",
+    variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
         json={
-            "productId": product_id,
-            "name": "Starter Offer",
-            "businessModel": "one-time",
-        },
-    )
-    assert offer_resp.status_code == 201
-
-    funnel_resp = api_client.post(
-        "/funnels",
-        json={"clientId": client_id, "productId": product_id, "name": "Commerce Funnel"},
-    )
-    assert funnel_resp.status_code == 201
-    public_id = funnel_resp.json()["public_id"]
-
-    commerce_resp = api_client.get(f"/public/funnels/{public_id}/commerce")
-    assert commerce_resp.status_code == 409
-    assert commerce_resp.json()["detail"] == "Product offer price points are not configured for this funnel product."
-
-
-def test_public_funnel_commerce_returns_offers_and_price_points(api_client: TestClient):
-    client_resp = api_client.post("/clients", json={"name": "Commerce Client", "industry": "SaaS"})
-    assert client_resp.status_code == 201
-    client_id = client_resp.json()["id"]
-
-    product_resp = api_client.post("/products", json={"clientId": client_id, "name": "Commerce Product"})
-    assert product_resp.status_code == 201
-    product_id = product_resp.json()["id"]
-
-    offer_resp = api_client.post(
-        f"/products/{product_id}/offers",
-        json={
-            "productId": product_id,
-            "name": "Starter Offer",
-            "businessModel": "one-time",
-        },
-    )
-    assert offer_resp.status_code == 201
-    offer_id = offer_resp.json()["id"]
-
-    price_point_resp = api_client.post(
-        f"/products/offers/{offer_id}/price-points",
-        json={
-            "offerId": offer_id,
-            "label": "Default",
-            "amountCents": 9900,
+            "title": "Default",
+            "price": 9900,
             "currency": "usd",
-            "optionValues": {"size": "standard"},
+            "provider": "stripe",
+            "externalPriceId": "price_test_123",
         },
     )
-    assert price_point_resp.status_code == 201
+    assert variant_resp.status_code == 201
 
     funnel_resp = api_client.post(
         "/funnels",
@@ -314,10 +272,45 @@ def test_public_funnel_commerce_returns_offers_and_price_points(api_client: Test
     commerce_resp = api_client.get(f"/public/funnels/{public_id}/commerce")
     assert commerce_resp.status_code == 200
     payload = commerce_resp.json()
-    assert len(payload["offers"]) == 1
-    assert payload["offers"][0]["id"] == offer_id
-    assert len(payload["offers"][0]["pricePoints"]) == 1
-    assert "external_price_id" not in payload["offers"][0]["pricePoints"][0]
+    assert payload["product"]["variants_count"] == 1
+    assert len(payload["product"]["variants"]) == 1
+
+
+def test_public_funnel_commerce_returns_offers_and_price_points(api_client: TestClient):
+    client_resp = api_client.post("/clients", json={"name": "Commerce Client", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post("/products", json={"clientId": client_id, "title": "Commerce Product"})
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Default",
+            "price": 9900,
+            "currency": "usd",
+            "optionValues": {"size": "standard"},
+            "provider": "stripe",
+            "externalPriceId": "price_test_123",
+        },
+    )
+    assert variant_resp.status_code == 201
+
+    funnel_resp = api_client.post(
+        "/funnels",
+        json={"clientId": client_id, "productId": product_id, "name": "Commerce Funnel"},
+    )
+    assert funnel_resp.status_code == 201
+    public_id = funnel_resp.json()["public_id"]
+
+    commerce_resp = api_client.get(f"/public/funnels/{public_id}/commerce")
+    assert commerce_resp.status_code == 200
+    payload = commerce_resp.json()
+    assert payload["product"]["variants_count"] == 1
+    assert len(payload["product"]["variants"]) == 1
+    assert "external_price_id" not in payload["product"]["variants"][0]
 
 
 def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client: TestClient, monkeypatch):

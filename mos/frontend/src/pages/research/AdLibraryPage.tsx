@@ -167,7 +167,7 @@ export function AdLibraryPage() {
     <div className="space-y-4">
       <PageHeader
         title="Ad Library"
-        description={`Ads ingested during onboarding for ${product.name}, plus saved swipes for this workspace.`}
+        description={`Ads ingested during onboarding for ${product.title}, plus saved swipes for this workspace.`}
       />
 
       {apiError ? (

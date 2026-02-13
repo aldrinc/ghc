@@ -24,20 +24,20 @@ export function ProductsPage() {
   const createProduct = useCreateProduct();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
+  const [productType, setProductType] = useState("");
   const [primaryBenefits, setPrimaryBenefits] = useState("");
   const [featureBullets, setFeatureBullets] = useState("");
   const [guaranteeText, setGuaranteeText] = useState("");
   const [disclaimers, setDisclaimers] = useState("");
 
-  const canCreate = useMemo(() => Boolean(workspace && name.trim()), [workspace, name]);
+  const canCreate = useMemo(() => Boolean(workspace && title.trim()), [workspace, title]);
 
   const resetForm = () => {
-    setName("");
+    setTitle("");
     setDescription("");
-    setCategory("");
+    setProductType("");
     setPrimaryBenefits("");
     setFeatureBullets("");
     setGuaranteeText("");
@@ -49,9 +49,9 @@ export function ProductsPage() {
     if (!workspace) return;
     const payload = {
       clientId: workspace.id,
-      name: name.trim(),
+      title: title.trim(),
       description: description.trim() || undefined,
-      category: category.trim() || undefined,
+      productType: productType.trim() || undefined,
       primaryBenefits: primaryBenefits.trim() ? parseList(primaryBenefits) : undefined,
       featureBullets: featureBullets.trim() ? parseList(featureBullets) : undefined,
       guaranteeText: guaranteeText.trim() || undefined,
@@ -59,7 +59,11 @@ export function ProductsPage() {
     };
     const created = await createProduct.mutateAsync(payload);
     if (created?.id) {
-      selectProduct(created.id, { name: created.name, client_id: created.client_id, category: created.category });
+      selectProduct(created.id, {
+        title: created.title,
+        client_id: created.client_id,
+        product_type: created.product_type ?? null,
+      });
       navigate(`/workspaces/products/${created.id}`);
     }
     resetForm();
@@ -91,8 +95,8 @@ export function ProductsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHeadCell>Image</TableHeadCell>
-                  <TableHeadCell>Name</TableHeadCell>
-                  <TableHeadCell>Category</TableHeadCell>
+                  <TableHeadCell>Title</TableHeadCell>
+                  <TableHeadCell>Type</TableHeadCell>
                   <TableHeadCell>Benefits</TableHeadCell>
                   <TableHeadCell>Disclaimers</TableHeadCell>
                 </TableRow>
@@ -105,9 +109,9 @@ export function ProductsPage() {
                     className="cursor-pointer"
                     onClick={() => {
                       selectProduct(product.id, {
-                        name: product.name,
+                        title: product.title,
                         client_id: product.client_id,
-                        category: product.category,
+                        product_type: product.product_type ?? null,
                       });
                       navigate(`/workspaces/products/${product.id}`);
                     }}
@@ -117,7 +121,7 @@ export function ProductsPage() {
                         {product.primary_asset_url ? (
                           <img
                             src={product.primary_asset_url}
-                            alt={product.name}
+                            alt={product.title}
                             className="h-full w-full object-cover"
                           />
                         ) : (
@@ -125,8 +129,8 @@ export function ProductsPage() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="font-semibold text-content">{product.name}</TableCell>
-                    <TableCell className="text-xs text-content-muted">{product.category || "—"}</TableCell>
+                    <TableCell className="font-semibold text-content">{product.title}</TableCell>
+                    <TableCell className="text-xs text-content-muted">{product.product_type || "—"}</TableCell>
                     <TableCell className="text-xs text-content-muted">
                       {product.primary_benefits?.length ? product.primary_benefits.length : "—"}
                     </TableCell>
@@ -151,7 +155,7 @@ export function ProductsPage() {
       <DialogRoot open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent>
           <DialogTitle>New product</DialogTitle>
-          <DialogDescription>Define the core product that offers will reference.</DialogDescription>
+          <DialogDescription>Define a product and then attach variants for pricing.</DialogDescription>
           <form className="space-y-3" onSubmit={handleCreate}>
             {workspace ? (
               <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
@@ -161,8 +165,8 @@ export function ProductsPage() {
             ) : null}
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Name</label>
-              <Input placeholder="Product name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <label className="text-xs font-semibold text-content">Title</label>
+              <Input placeholder="Product title" value={title} onChange={(e) => setTitle(e.target.value)} required />
             </div>
 
             <div className="space-y-1">
@@ -171,8 +175,12 @@ export function ProductsPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Category</label>
-              <Input placeholder="e.g. Supplements, SaaS" value={category} onChange={(e) => setCategory(e.target.value)} />
+              <label className="text-xs font-semibold text-content">Product type</label>
+              <Input
+                placeholder="e.g. Supplements, SaaS"
+                value={productType}
+                onChange={(e) => setProductType(e.target.value)}
+              />
             </div>
 
             <div className="space-y-1">

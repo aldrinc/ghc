@@ -5,8 +5,8 @@ import { useProducts } from "@/api/products";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import type { Product } from "@/types/products";
 
-export type ProductSummary = Pick<Product, "id" | "name" | "client_id"> & {
-  category?: string | null;
+export type ProductSummary = Pick<Product, "id" | "title" | "client_id"> & {
+  product_type?: string | null;
 };
 
 type ProductContextValue = {
@@ -45,16 +45,16 @@ export function ProductProvider({ children }: { children: ReactNode }) {
       const optimisticProduct: ActiveProductSummary | undefined = match
         ? {
             id: match.id,
-            name: match.name,
+            title: match.title,
             client_id: match.client_id,
-            category: match.category ?? null,
+            product_type: match.product_type ?? null,
           }
-        : fallback?.name || fallback?.client_id || fallback?.category
+        : fallback?.title || fallback?.client_id || fallback?.product_type
         ? {
             id: productId,
-            name: fallback?.name || "Product",
+            title: fallback?.title || "Product",
             client_id: fallback?.client_id || clientId,
-            category: fallback?.category ?? null,
+            product_type: fallback?.product_type ?? null,
           }
         : undefined;
 

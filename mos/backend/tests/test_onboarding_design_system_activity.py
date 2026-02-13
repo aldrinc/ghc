@@ -24,9 +24,9 @@ def test_build_design_system_activity_creates_new_ds_each_run_and_sets_logo(monk
     product = Product(
         org_id=TEST_ORG_ID,
         client_id=client.id,
-        name="Glow Serum",
+        title="Glow Serum",
         description="A vitamin C serum for brighter skin.",
-        category="Skincare",
+        product_type="Skincare",
         primary_benefits=["Brighter skin", "Even tone"],
         feature_bullets=["15% vitamin C", "Fragrance-free"],
         disclaimers=["For external use only."],
@@ -147,7 +147,6 @@ def test_build_design_system_activity_creates_new_ds_each_run_and_sets_logo(monk
     assert len(seen_ctx) == 2
     assert seen_ctx[0].client_name == client.name
     assert seen_ctx[0].client_industry == client.industry
-    assert seen_ctx[0].product_name == product.name
+    assert seen_ctx[0].product_name == product.title
     assert seen_ctx[0].competitor_urls == payload.data["competitor_urls"]
     assert seen_ctx[0].precanon_step_summaries == {"04": "Deep research notes."}
-

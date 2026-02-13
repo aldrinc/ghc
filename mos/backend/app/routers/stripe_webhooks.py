@@ -85,8 +85,14 @@ async def stripe_webhook(
 
     metadata = session_obj.get("metadata") or {}
     funnel_id = _require_metadata(metadata, "funnel_id")
-    offer_id = _require_metadata(metadata, "offer_id")
-    price_point_id = _require_metadata(metadata, "price_point_id")
+    # New schema uses variant_id; keep price_point_id as a legacy alias.
+    variant_id = metadata.get("variant_id") or metadata.get("price_point_id")
+    if not variant_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing required metadata: variant_id",
+        )
+    offer_id = metadata.get("offer_id") or None
 
     funnel = session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
     if not funnel:
@@ -120,7 +126,7 @@ async def stripe_webhook(
         publication_id=publication_id,
         page_id=page_id,
         offer_id=offer_id,
-        price_point_id=price_point_id,
+        price_point_id=variant_id,
         stripe_session_id=stripe_session_id,
         stripe_payment_intent_id=payment_intent,
         amount_cents=amount_total,

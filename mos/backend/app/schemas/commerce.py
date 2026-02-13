@@ -7,8 +7,7 @@ from pydantic import AnyUrl, BaseModel
 
 class PublicCheckoutRequest(BaseModel):
     publicId: str
-    offerId: str
-    pricePointId: Optional[str] = None
+    variantId: Optional[str] = None
     selection: dict[str, Any]
     quantity: int
     successUrl: AnyUrl

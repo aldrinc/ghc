@@ -87,12 +87,9 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
 
     product_detail = api_client.get(f"/products/{product_id}")
     assert product_detail.status_code == 200
-    offers = product_detail.json().get("offers") or []
-    assert len(offers) == 1
-    assert offers[0]["id"] == default_offer_id
-    assert offers[0]["name"] == "Test Product"
-    assert offers[0]["business_model"] == "unspecified"
-    assert offers[0]["description"] == "A simple test product for onboarding."
+    product_payload = product_detail.json()
+    assert product_payload["title"] == "Test Product"
+    assert isinstance(product_payload.get("variants"), list)
 
     # Planning prereqs: campaign planning requires canon + metric schema artifacts to exist.
     # Use the test auth org (the DB may contain non-test orgs as well).

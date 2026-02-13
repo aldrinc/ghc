@@ -22,8 +22,7 @@ from app.db.models import (
     FunnelPage,
     FunnelPageVersion,
     Product,
-    ProductOffer,
-    ProductOfferPricePoint,
+    ProductVariant,
 )
 from app.db.repositories.funnels import (
     FunnelPageVersionsRepository,
@@ -334,46 +333,29 @@ def public_funnel_commerce(
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    offers = session.scalars(
-        select(ProductOffer).where(ProductOffer.product_id == product.id)
+    variants = session.scalars(
+        select(ProductVariant).where(ProductVariant.product_id == product.id)
     ).all()
-    if not offers:
+    if not variants:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Product offers are not configured for this funnel product.",
+            detail="Product variants are not configured for this funnel product.",
         )
-    offer_ids = [str(offer.id) for offer in offers]
-    price_points = (
-        session.scalars(
-            select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id.in_(offer_ids))
-        ).all()
-        if offer_ids
-        else []
-    )
-    if not price_points:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Product offer price points are not configured for this funnel product.",
-        )
-    price_points_by_offer: dict[str, list[dict]] = {}
-    for pp in price_points:
-        data = jsonable_encoder(pp)
+    serialized_variants: list[dict] = []
+    for variant in variants:
+        data = jsonable_encoder(variant)
         data.pop("external_price_id", None)
-        price_points_by_offer.setdefault(str(pp.offer_id), []).append(data)
+        serialized_variants.append(data)
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
         "publicId": str(funnel.public_id),
         "funnelId": str(funnel.id),
-        "product": jsonable_encoder(product),
-        "selectedOfferId": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
-        "offers": [
-            {
-                **jsonable_encoder(offer),
-                "pricePoints": price_points_by_offer.get(str(offer.id), []),
-            }
-            for offer in offers
-        ],
+        "product": {
+            **jsonable_encoder(product),
+            "variants": serialized_variants,
+            "variants_count": len(serialized_variants),
+        },
     }
 
 
@@ -393,68 +375,57 @@ def public_checkout(
             detail="Funnel has no product configured.",
         )
 
-    offer = session.scalars(
-        select(ProductOffer).where(
-            ProductOffer.id == payload.offerId,
-            ProductOffer.product_id == funnel.product_id,
-        )
-    ).first()
-    if not offer:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Offer not found for funnel product.",
-        )
-
-    price_point: ProductOfferPricePoint | None = None
-    if payload.pricePointId:
-        price_point = session.scalars(
-            select(ProductOfferPricePoint).where(
-                ProductOfferPricePoint.id == payload.pricePointId,
-                ProductOfferPricePoint.offer_id == offer.id,
+    variant: ProductVariant | None = None
+    if payload.variantId:
+        variant = session.scalars(
+            select(ProductVariant).where(
+                ProductVariant.id == payload.variantId,
+                ProductVariant.product_id == funnel.product_id,
             )
         ).first()
-        if not price_point:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Price point not found")
-        if price_point.option_values is None and payload.selection:
+        if not variant:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+        if variant.option_values is None and payload.selection:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Selection does not match price point options.",
+                detail="Selection does not match variant options.",
             )
-        if price_point.option_values is not None and payload.selection != price_point.option_values:
+        if variant.option_values is not None and payload.selection != variant.option_values:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Selection does not match price point options.",
+                detail="Selection does not match variant options.",
             )
     else:
         if not payload.selection:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="selection is required when pricePointId is not provided.",
+                detail="selection is required when variantId is not provided.",
             )
         candidates = session.scalars(
-            select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id == offer.id)
+            select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
         ).all()
-        matches = [pp for pp in candidates if pp.option_values == payload.selection]
+        matches = [item for item in candidates if item.option_values == payload.selection]
         if len(matches) != 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Selection does not resolve to a single price point.",
+                detail="Selection does not resolve to a single variant.",
             )
-        price_point = matches[0]
+        variant = matches[0]
 
-    if not price_point:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Price point resolution failed.")
+    if not variant:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Variant resolution failed.")
 
-    if not price_point.provider:
+    if not variant.provider:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Price point provider is required for checkout.",
+            detail="Variant provider is required for checkout.",
         )
     metadata = {
         "public_id": _metadata_value(payload.publicId, "publicId"),
         "funnel_id": _metadata_value(str(funnel.id), "funnelId"),
-        "offer_id": _metadata_value(payload.offerId, "offerId"),
-        "price_point_id": _metadata_value(str(price_point.id), "pricePointId"),
+        "variant_id": _metadata_value(str(variant.id), "variantId"),
+        # Legacy key kept for older webhooks/reporting paths.
+        "price_point_id": _metadata_value(str(variant.id), "pricePointId"),
         "page_id": _metadata_value(payload.pageId, "pageId"),
         "visitor_id": _metadata_value(payload.visitorId, "visitorId"),
         "session_id": _metadata_value(payload.sessionId, "sessionId"),
@@ -463,11 +434,11 @@ def public_checkout(
         "quantity": _metadata_value(str(payload.quantity), "quantity"),
     }
     metadata = {key: value for key, value in metadata.items() if value}
-    if price_point.provider == "stripe":
-        if not price_point.external_price_id:
+    if variant.provider == "stripe":
+        if not variant.external_price_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Stripe price ID is missing for this price point.",
+                detail="Stripe price ID is missing for this variant.",
             )
         if not settings.STRIPE_SECRET_KEY:
             raise HTTPException(
@@ -489,20 +460,20 @@ def public_checkout(
             mode="payment",
             success_url=str(payload.successUrl),
             cancel_url=str(payload.cancelUrl),
-            line_items=[{"price": price_point.external_price_id, "quantity": payload.quantity}],
+            line_items=[{"price": variant.external_price_id, "quantity": payload.quantity}],
             metadata=metadata,
         )
         return {"checkoutUrl": checkout_session.url, "sessionId": checkout_session.id}
 
-    if price_point.provider == "shopify":
-        if not price_point.external_price_id:
+    if variant.provider == "shopify":
+        if not variant.external_price_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Shopify variant GID is missing for this price point.",
+                detail="Shopify variant GID is missing for this variant.",
             )
         checkout = create_shopify_checkout(
             client_id=str(funnel.client_id),
-            variant_gid=price_point.external_price_id,
+            variant_gid=variant.external_price_id,
             quantity=payload.quantity,
             metadata=metadata,
         )

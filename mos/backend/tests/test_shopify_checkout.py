@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 
 from app.config import settings
-from app.db.models import Client, Funnel, FunnelOrder, Product, ProductOffer, ProductOfferPricePoint
+from app.db.models import Client, Funnel, FunnelOrder, Product, ProductVariant
 from app.routers import public_funnels
 
 
@@ -15,40 +15,28 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID):
     db_session.commit()
     db_session.refresh(client)
 
-    product = Product(org_id=org_id, client_id=client.id, name="Shopify Product")
+    product = Product(org_id=org_id, client_id=client.id, title="Shopify Product")
     db_session.add(product)
     db_session.commit()
     db_session.refresh(product)
 
-    offer = ProductOffer(
-        org_id=org_id,
-        client_id=client.id,
+    variant = ProductVariant(
         product_id=product.id,
-        name="Default Offer",
-        business_model="one_time",
-    )
-    db_session.add(offer)
-    db_session.commit()
-    db_session.refresh(offer)
-
-    price_point = ProductOfferPricePoint(
-        offer_id=offer.id,
-        label="Default",
-        amount_cents=2999,
+        title="Default",
+        price=2999,
         currency="USD",
         provider="shopify",
         external_price_id="gid://shopify/ProductVariant/123456789",
-        option_values={"offerId": "base"},
+        option_values=None,
     )
-    db_session.add(price_point)
+    db_session.add(variant)
     db_session.commit()
-    db_session.refresh(price_point)
+    db_session.refresh(variant)
 
     funnel = Funnel(
         org_id=org_id,
         client_id=client.id,
         product_id=product.id,
-        selected_offer_id=offer.id,
         name="Shopify Funnel",
         public_id=uuid4(),
     )
@@ -59,8 +47,7 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID):
     return {
         "client": client,
         "product": product,
-        "offer": offer,
-        "price_point": price_point,
+        "variant": variant,
         "funnel": funnel,
     }
 
@@ -83,9 +70,8 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
         "/public/checkout",
         json={
             "publicId": str(seeded["funnel"].public_id),
-            "offerId": str(seeded["offer"].id),
-            "pricePointId": str(seeded["price_point"].id),
-            "selection": {"offerId": "base"},
+            "variantId": str(seeded["variant"].id),
+            "selection": {},
             "quantity": 2,
             "successUrl": "https://funnel.example/success",
             "cancelUrl": "https://funnel.example/cancel",
@@ -107,7 +93,7 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     metadata = observed["metadata"]
     assert isinstance(metadata, dict)
     assert metadata["funnel_id"] == str(seeded["funnel"].id)
-    assert metadata["offer_id"] == str(seeded["offer"].id)
+    assert metadata["variant_id"] == str(seeded["variant"].id)
 
 
 def test_shopify_orders_webhook_persists_funnel_order(api_client, db_session, auth_context, monkeypatch):
@@ -126,8 +112,7 @@ def test_shopify_orders_webhook_persists_funnel_order(api_client, db_session, au
             "createdAt": "2026-02-12T10:00:00Z",
             "noteAttributes": {
                 "funnel_id": str(seeded["funnel"].id),
-                "offer_id": str(seeded["offer"].id),
-                "price_point_id": str(seeded["price_point"].id),
+                "price_point_id": str(seeded["variant"].id),
                 "quantity": "1",
                 "selection": '{"offerId":"base"}',
                 "utm": '{"source":"test"}',

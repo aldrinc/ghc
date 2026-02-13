@@ -133,9 +133,18 @@ class Product(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
     client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Shopify-aligned attribute name; stored in legacy DB column "name".
+    title: Mapped[str] = mapped_column("name", Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    category: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Shopify-aligned attribute name; stored in legacy DB column "category".
+    product_type: Mapped[Optional[str]] = mapped_column("category", Text, nullable=True)
+    handle: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    vendor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
+    template_suffix: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     primary_benefits: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
     )
@@ -176,17 +185,40 @@ class ProductOffer(Base):
     )
 
 
-class ProductOfferPricePoint(Base):
+class ProductVariant(Base):
     __tablename__ = "product_offer_price_points"
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    offer_id: Mapped[str] = mapped_column(ForeignKey("product_offers.id", ondelete="CASCADE"), nullable=False)
-    label: Mapped[str] = mapped_column(Text, nullable=False)
-    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Legacy relation (optional going forward); variants should primarily be linked via product_id.
+    offer_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("product_offers.id", ondelete="CASCADE"), nullable=True
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=True
+    )
+    # Shopify-aligned attribute names; stored in legacy DB columns.
+    title: Mapped[str] = mapped_column("label", Text, nullable=False)
+    price: Mapped[int] = mapped_column("amount_cents", Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(length=3), nullable=False)
     provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     external_price_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     option_values: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    compare_at_price: Mapped[Optional[int]] = mapped_column("compare_at_price_cents", Integer, nullable=True)
+    sku: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    barcode: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    requires_shipping: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    taxable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    weight: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    weight_unit: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    inventory_quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    inventory_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    inventory_management: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    incoming: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    next_incoming_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    unit_price: Mapped[Optional[int]] = mapped_column("unit_price_cents", Integer, nullable=True)
+    unit_price_measurement: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    quantity_rule: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    quantity_price_breaks: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSONB, nullable=True)
 
 
 class Campaign(Base):

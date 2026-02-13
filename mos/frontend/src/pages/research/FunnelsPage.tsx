@@ -51,8 +51,8 @@ export function FunnelsPage() {
         title="Funnels"
         description={
           workspace
-            ? product?.name
-              ? `Build and publish funnels for ${workspace.name} · ${product.name}.`
+            ? product?.title
+              ? `Build and publish funnels for ${workspace.name} · ${product.title}.`
               : `Select a product to build funnels for ${workspace.name}.`
             : "Select a workspace to create and manage funnels."
         }
@@ -77,7 +77,7 @@ export function FunnelsPage() {
             <div>
               <div className="text-sm font-semibold text-content">Funnels</div>
               <div className="text-xs text-content-muted">
-                {funnels.length} in {workspace.name} · {product.name}
+                {funnels.length} in {workspace.name} · {product.title}
               </div>
             </div>
             <div className="text-xs text-content-muted">Unlisted links (v1)</div>
@@ -126,8 +126,8 @@ export function FunnelsPage() {
             {workspace ? (
               <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
                 <div className="text-xs font-semibold uppercase text-content-muted">Product</div>
-                <div className={product?.name ? "font-semibold text-content" : "text-content-muted"}>
-                  {product?.name || "Select a product in the header"}
+                <div className={product?.title ? "font-semibold text-content" : "text-content-muted"}>
+                  {product?.title || "Select a product in the header"}
                 </div>
               </div>
             ) : null}

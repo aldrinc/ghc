@@ -144,8 +144,8 @@ export function CampaignsPage() {
         title="Campaigns"
         description={
           workspace
-            ? product?.name
-              ? `Viewing campaigns for ${workspace.name} · ${product.name}.`
+            ? product?.title
+              ? `Viewing campaigns for ${workspace.name} · ${product.title}.`
               : `Select a product to view campaigns for ${workspace.name}.`
             : "Manage campaigns across workspaces. Select a workspace to scope creation automatically."
         }
@@ -187,12 +187,12 @@ export function CampaignsPage() {
             <div className="text-sm font-semibold text-content">Campaigns</div>
             <div className="text-xs text-content-muted">
               {workspace
-                ? `${campaigns.length} for ${workspace.name}${product?.name ? ` · ${product.name}` : ""}`
+                ? `${campaigns.length} for ${workspace.name}${product?.title ? ` · ${product.title}` : ""}`
                 : `${campaigns.length} across all workspaces`}
             </div>
           </div>
           <div className="text-xs text-content-muted">
-            Scope: {workspace ? `${workspace.name}${product?.name ? ` · ${product.name}` : ""}` : "All workspaces"}
+            Scope: {workspace ? `${workspace.name}${product?.title ? ` · ${product.title}` : ""}` : "All workspaces"}
           </div>
         </div>
         {isLoading ? (
@@ -267,8 +267,8 @@ export function CampaignsPage() {
             {workspace ? (
               <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
                 <div className="text-xs font-semibold uppercase text-content-muted">Product</div>
-                <div className={product?.name ? "font-semibold text-content" : "text-content-muted"}>
-                  {product?.name || "Select a product in the header"}
+                <div className={product?.title ? "font-semibold text-content" : "text-content-muted"}>
+                  {product?.title || "Select a product in the header"}
                 </div>
               </div>
             ) : (
@@ -282,7 +282,7 @@ export function CampaignsPage() {
                       ? modalProducts.length
                         ? [
                             { label: "Select product", value: "" },
-                            ...modalProducts.map((item) => ({ label: item.name, value: item.id })),
+                            ...modalProducts.map((item) => ({ label: item.title, value: item.id })),
                           ]
                         : [{ label: isLoadingModalProducts ? "Loading products…" : "No products available", value: "" }]
                       : [{ label: "Select a workspace first", value: "" }]
