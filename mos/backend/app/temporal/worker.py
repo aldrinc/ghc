@@ -14,6 +14,7 @@ from app.temporal.workflows.campaign_intent import CampaignIntentWorkflow
 from app.temporal.workflows.campaign_funnel_generation import CampaignFunnelGenerationWorkflow
 from app.temporal.workflows.experiment_design import ExperimentDesignWorkflow
 from app.temporal.workflows.creative_production import CreativeProductionWorkflow
+from app.temporal.workflows.swipe_image_ad import SwipeImageAdWorkflow
 from app.temporal.workflows.experiment_cycle import ExperimentCycleWorkflow
 from app.temporal.workflows.playbook_update import PlaybookUpdateWorkflow
 from app.temporal.workflows.test_campaign import TestCampaignWorkflow
@@ -76,6 +77,9 @@ from app.temporal.activities.ad_breakdown_activities import (
     generate_ad_breakdown_activity,
     persist_teardown_from_breakdown_activity,
 )
+from app.temporal.activities.swipe_image_ad_activities import (
+    generate_swipe_image_ad_activity,
+)
 
 
 async def main() -> None:
@@ -93,6 +97,7 @@ async def main() -> None:
                 CampaignFunnelGenerationWorkflow,
                 ExperimentDesignWorkflow,
                 CreativeProductionWorkflow,
+                SwipeImageAdWorkflow,
                 ExperimentCycleWorkflow,
                 PlaybookUpdateWorkflow,
                 AdsIngestionWorkflow,
@@ -143,6 +148,7 @@ async def main() -> None:
                 list_ads_for_run_activity,
                 generate_ad_breakdown_activity,
                 persist_teardown_from_breakdown_activity,
+                generate_swipe_image_ad_activity,
             ],
             activity_executor=activity_executor,
         )
