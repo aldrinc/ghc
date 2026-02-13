@@ -16,7 +16,7 @@
 }
 
 /* -----------------------------
-   Sticky header (appears after...
+   Floating CTA bar (top on desktop, bottom on mobile; shows after "problem" section)
 ------------------------------ */
 
 .header {
@@ -98,21 +98,26 @@
   background: var(--color-cta);
   color: var(--color-cta-text);
   font-family: var(--font-cta);
+  font-size: 16px;
   font-weight: 800;
+  line-height: 1;
   letter-spacing: 0.03em;
   border-radius: 999px;
   padding: 10px 16px;
   border: none;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .headerCtaIcon {
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #0b8a2c;
+  background: var(--color-cta-shell);
+  color: var(--color-cta-icon);
   display: grid;
   place-items: center;
+  flex: 0 0 auto;
 }
 
 /* -----------------------------
@@ -1252,50 +1257,150 @@
   margin: 10px 0 0;
   color: var(--color-muted);
   font-size: 16px;
+  white-space: pre-line;
 }
 
 .toggle {
-  display: inline-flex;
-  border: 1px solid rgba(6, 26, 112, 0.22);
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  width: min(320px, 100%);
+  padding: 6px;
+  margin-top: 14px;
+  background: var(--color-cta);
   border-radius: 999px;
-  overflow: hidden;
-  margin-top: 12px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.12);
+}
+
+.toggle::before {
+  content: "";
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 6px;
+  width: calc(50% - 6px);
+  background: #ffffff;
+  border-radius: 999px;
+  transition: transform 220ms ease;
+}
+
+.toggle[data-mode="manual"]::before {
+  transform: translateX(100%);
 }
 
 .toggle button {
-  background: #ffffff;
+  position: relative;
+  z-index: 1;
+  background: transparent;
   border: none;
-  padding: 8px 12px;
-  font-size: 11px;
+  padding: 14px 12px;
+  font-size: 12px;
   font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
   cursor: pointer;
+  color: rgba(255, 255, 255, 0.88);
 }
 
-.toggleActive {
-  background: rgba(6, 26, 112, 0.08) !important;
+.toggle button[data-active="true"] {
+  color: var(--color-cta);
 }
 
-.reviewSlide {
+.reviewScrollWrap {
+  position: relative;
   max-width: 760px;
-  margin: 0 auto;
+  margin: 22px auto 0;
+}
+
+.reviewScrollHint {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  background: rgb(0, 27, 116);
+  color: #ffffff;
+  border-radius: 999px;
+  font-family: "Schibsted Grotesk", Arial, sans-serif;
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.reviewScrollPanel {
+  height: 560px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 62px 14px 14px;
   background: #ffffff;
   border: 1px solid rgba(6, 26, 112, 0.22);
   border-radius: 12px;
-  overflow: hidden;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.06);
 }
 
-.reviewSlide img {
-  width: 100%;
-  height: auto;
+.reviewScrollPanel:focus {
+  outline: none;
 }
 
-.reviewNav {
+.reviewScrollPanel:focus-visible {
+  outline: 2px solid rgba(0, 27, 116, 0.55);
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+
+.reviewScrollPanel {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.28) transparent;
+}
+
+.reviewScrollPanel::-webkit-scrollbar {
+  width: 10px;
+}
+
+.reviewScrollPanel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.reviewScrollPanel::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.reviewScrollPanel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.reviewScrollStack {
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
   gap: 18px;
-  margin-top: 12px;
+}
+
+.reviewTile {
+  display: block;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #ffffff;
+  border: 1px solid rgba(6, 26, 112, 0.18);
+}
+
+.reviewTile img {
+  width: 100%;
+  height: auto;
+  display: block;
 }
 
 /* Guarantee */
@@ -1368,6 +1473,10 @@
   position: relative;
   height: 100%;
   min-height: 0;
+  /* Match the original template: make the social proof column feel "zoomed in". */
+  transform: scale(1.2);
+  transform-origin: top left;
+  will-change: transform;
 }
 
 .manualScrollHint {
@@ -1680,6 +1789,7 @@
 
   .manualScrollPanelWrap {
     height: auto;
+    transform: none;
   }
 
   .manualScrollHint {
@@ -1699,7 +1809,12 @@
 
 @media (max-width: 560px) {
   .header {
-    top: 6px;
+    top: auto;
+    bottom: calc(6px + env(safe-area-inset-bottom));
+  }
+
+  .headerHidden {
+    transform: translateY(16px);
   }
 
   .nav {
@@ -1707,7 +1822,23 @@
   }
 
   .videoGrid {
-    grid-template-columns: 1fr;
+    display: flex;
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding-bottom: 10px;
+  }
+
+  .videoGrid::-webkit-scrollbar {
+    display: none;
+  }
+
+  .videoCard {
+    flex: 0 0 70%;
+    max-width: 260px;
+    scroll-snap-align: start;
   }
 
   .benefitsGrid {

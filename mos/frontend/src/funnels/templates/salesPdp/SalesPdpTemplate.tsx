@@ -47,6 +47,20 @@ type Props = {
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
 
+// Keep layout geometry consistent with the base template.
+// Brand design systems can still change colors and font families.
+const LOCKED_TEMPLATE_CSS_VARS = new Set([
+  "--container-max",
+  "--container-pad",
+  "--marquee-border",
+  "--marquee-font-size",
+  "--marquee-font-weight",
+  "--marquee-gap",
+  "--marquee-height",
+  "--marquee-letter-spacing",
+  "--marquee-pad-x",
+]);
+
 function toCssVarName(key: string): string {
   const trimmed = key.trim();
   if (trimmed.startsWith("--")) return trimmed;
@@ -641,13 +655,17 @@ export function SalesPdpPage({ anchorId, theme, themeJson, content, children }: 
     if (designSystemTokens?.cssVars) {
       for (const [rawKey, rawValue] of Object.entries(designSystemTokens.cssVars)) {
         if (rawValue === undefined || rawValue === null) continue
-        style[toCssVarName(rawKey)] = String(rawValue)
+        const cssVarName = toCssVarName(rawKey)
+        if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue
+        style[cssVarName] = String(rawValue)
       }
     }
     if (explicitTheme?.tokens) {
       for (const [rawKey, rawValue] of Object.entries(resolvedTheme.tokens)) {
         if (rawValue === undefined || rawValue === null) continue
-        style[toCssVarName(rawKey)] = String(rawValue)
+        const cssVarName = toCssVarName(rawKey)
+        if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue
+        style[cssVarName] = String(rawValue)
       }
     }
     return style
@@ -683,20 +701,39 @@ export function SalesPdpHeader({ config, configJson }: SalesPdpHeaderProps) {
         .map((href) => href.slice(1)),
     [resolvedConfig.nav]
   )
+  // The Sales PDP template treats the story "problem" section as the "how-it-works" anchor.
+  // Multiple parts of the template rely on this (e.g. styling), so we use it as the trigger
+  // for the floating CTA bar.
+  const showAfterSectionId = 'how-it-works'
 
   const [activeSection, setActiveSection] = useState<string | null>(navSectionIds[0] ?? null)
   const [showHeader, setShowHeader] = useState(false)
   const sectionRatioRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
-    const onScroll = () => {
-      setShowHeader(window.scrollY > 180)
+    const el = document.getElementById(showAfterSectionId)
+    if (!el) {
+      console.error(
+        `SalesPdpHeader: cannot find section #${showAfterSectionId}. ` +
+          "The Sales PDP floating CTA bar is configured to show after the story problem section."
+      )
+      setShowHeader(false)
+      return
     }
 
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (!entry) return
+        const pastTrigger = entry.isIntersecting || entry.boundingClientRect.top < 0
+        setShowHeader(pastTrigger)
+      },
+      { threshold: 0 }
+    )
+
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [showAfterSectionId])
 
   useEffect(() => {
     if (!navSectionIds.length) return
@@ -847,22 +884,9 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       setCheckoutError("Commerce data is not available.");
       return;
     }
-    if (!runtime.commerce.offers.length) {
-      setCheckoutError("Checkout is not configured for this funnel product. No product offers were found.");
-      return;
-    }
-    if (!runtime.commerce.offers.some((item) => Array.isArray(item.pricePoints) && item.pricePoints.length > 0)) {
-      setCheckoutError("Checkout is not configured for this funnel product. No offer price points were found.");
-      return;
-    }
-    const productOfferId = selectedOfferObj?.productOfferId;
-    if (!productOfferId) {
-      setCheckoutError("Selected offer is missing productOfferId in SalesPdpHero.purchase.offer.options.");
-      return;
-    }
-    const offer = runtime.commerce.offers.find((item) => item.id === productOfferId);
-    if (!offer) {
-      setCheckoutError("Selected offer is not available.");
+    const variants = runtime.commerce.product?.variants || [];
+    if (!variants.length) {
+      setCheckoutError("Checkout is not configured for this funnel product. No product variants were found.");
       return;
     }
     const selection = selectionFromIds({
@@ -870,22 +894,25 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       colorId: selectedColorObj?.id,
       offerId: selectedOfferObj?.id,
     });
-    const pricePoint = (offer.pricePoints || []).find((pp) => matchesOptionValues(pp.option_values, selection));
-    if (!pricePoint) {
-      setCheckoutError("No price point matches the selected options.");
+    const variant = variants.find((item) => matchesOptionValues(item.option_values, selection));
+    if (!variant) {
+      setCheckoutError("No variant matches the selected options.");
+      return;
+    }
+    if (!variant.provider) {
+      setCheckoutError("Checkout is not configured for this funnel product. Variant provider is missing.");
       return;
     }
 
     setIsCheckingOut(true);
     try {
-      runtime.trackEvent?.({ eventType: "cta_click", props: { offerId: offer.id, pricePointId: pricePoint.id } });
+      runtime.trackEvent?.({ eventType: "cta_click", props: { variantId: variant.id } });
       const response = await fetch(`${apiBaseUrl}/public/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           publicId: runtime.publicId,
-          offerId: offer.id,
-          pricePointId: pricePoint.id,
+          variantId: variant.id,
           selection,
           quantity: 1,
           successUrl: `${window.location.origin}${window.location.pathname}?checkout=success`,
@@ -1507,7 +1534,7 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
       if (!paused) {
         const maxScroll = panel.scrollHeight - panel.clientHeight
         if (maxScroll > 0) {
-          panel.scrollTop += delta * 0.015
+          panel.scrollTop += delta * 0.01
           if (panel.scrollTop >= maxScroll) {
             panel.scrollTop = 0
           }
@@ -1622,9 +1649,11 @@ export function SalesPdpFaq({ config, configJson }: SalesPdpFaqProps) {
 type SalesPdpReviewWallProps = {
   config?: ReviewWallConfig
   configJson?: string
+  hidden?: boolean
 }
 
-export function SalesPdpReviewWall({ config, configJson }: SalesPdpReviewWallProps) {
+export function SalesPdpReviewWall({ config, configJson, hidden }: SalesPdpReviewWallProps) {
+  if (hidden) return null
   const resolvedConfig = parseJson<ReviewWallConfig>(configJson) ?? config ?? salesPdpDefaults.config.reviewWall
   return (
     <section id={resolvedConfig.id} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
@@ -1794,18 +1823,70 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
       "SalesPdpReviewSlider config.toggle.auto/manual is required. Regenerate the sales page config."
     )
   }
+  if (!config?.slides?.length) {
+    throw new Error("SalesPdpReviewSlider config.slides must be a non-empty list. Regenerate the sales page config.")
+  }
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
-  const [index, setIndex] = useState(0)
+  const panelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    const panel = panelRef.current
+    if (!panel) return
     if (mode !== 'auto') return
-    const id = window.setInterval(() => {
-      setIndex((v) => clampIndex(v + 1, config.slides.length))
-    }, 3200)
-    return () => window.clearInterval(id)
-  }, [mode, config.slides.length])
 
-  const active = config.slides[index]
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (media.matches) return
+
+    let rafId = 0
+    let lastTime = 0
+    let paused = false
+
+    const step = (time: number) => {
+      if (!lastTime) lastTime = time
+      const delta = time - lastTime
+      lastTime = time
+
+      if (!paused) {
+        const maxScroll = panel.scrollHeight - panel.clientHeight
+        if (maxScroll > 0) {
+          panel.scrollTop += delta * 0.01
+          if (panel.scrollTop >= maxScroll) {
+            panel.scrollTop = 0
+          }
+        }
+      }
+
+      rafId = window.requestAnimationFrame(step)
+    }
+
+    const pause = () => {
+      paused = true
+    }
+
+    const resume = () => {
+      paused = false
+      lastTime = 0
+    }
+
+    panel.addEventListener('pointerenter', pause)
+    panel.addEventListener('pointerleave', resume)
+    panel.addEventListener('focusin', pause)
+    panel.addEventListener('focusout', resume)
+    panel.addEventListener('pointerdown', pause)
+    panel.addEventListener('pointerup', resume)
+
+    rafId = window.requestAnimationFrame(step)
+
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      panel.removeEventListener('pointerenter', pause)
+      panel.removeEventListener('pointerleave', resume)
+      panel.removeEventListener('focusin', pause)
+      panel.removeEventListener('focusout', resume)
+      panel.removeEventListener('pointerdown', pause)
+      panel.removeEventListener('pointerup', resume)
+    }
+  }, [mode, config.slides.length])
 
   return (
     <section className={`${styles.sectionBlue} ${styles.sectionPad}`}>
@@ -1813,17 +1894,21 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
         <div className={styles.reviewSliderHeader}>
           <h2>{config.title}</h2>
           <p>{config.body}</p>
-          <div className={styles.toggle} role="tablist" aria-label="Review slideshow mode">
+          <div className={styles.toggle} data-mode={mode} role="tablist" aria-label="Review feed mode">
             <button
               type="button"
-              className={mode === 'auto' ? styles.toggleActive : undefined}
+              role="tab"
+              aria-selected={mode === 'auto'}
+              data-active={mode === 'auto'}
               onClick={() => setMode('auto')}
             >
               {config.toggle.auto}
             </button>
             <button
               type="button"
-              className={mode === 'manual' ? styles.toggleActive : undefined}
+              role="tab"
+              aria-selected={mode === 'manual'}
+              data-active={mode === 'manual'}
               onClick={() => setMode('manual')}
             >
               {config.toggle.manual}
@@ -1831,28 +1916,40 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
           </div>
         </div>
 
-        <div className={styles.reviewSlide}>
-          <img src={resolveImageSrc(active)} alt={active.alt} />
-        </div>
+        <div className={styles.reviewScrollWrap}>
+          <div className={styles.reviewScrollHint} aria-hidden="true">
+            {config.hint}
+          </div>
 
-        <div className={styles.reviewNav}>
-          <button
-            type="button"
-            className={styles.circleIconBtn}
-            onClick={() => setIndex((v) => clampIndex(v - 1, config.slides.length))}
-            aria-label="Previous review"
+          <div
+            className={styles.reviewScrollPanel}
+            aria-label="Customer reviews feed"
+            tabIndex={0}
+            ref={panelRef}
           >
-            <IconChevron dir="left" />
-          </button>
-          <span style={{ fontWeight: 800, color: 'var(--color-brand)' }}>{config.hint}</span>
-          <button
-            type="button"
-            className={styles.circleIconBtn}
-            onClick={() => setIndex((v) => clampIndex(v + 1, config.slides.length))}
-            aria-label="Next review"
-          >
-            <IconChevron dir="right" />
-          </button>
+            <div className={styles.reviewScrollStack}>
+              {config.slides.map((slide, idx) => {
+                const src = resolveImageSrc(slide)
+                if (!src) {
+                  throw new Error(
+                    `SalesPdpReviewSlider slide ${idx + 1} is missing src/assetPublicId. Regenerate the sales page config.`
+                  )
+                }
+                return (
+                  <a
+                    key={`${src}-${idx}`}
+                    className={styles.reviewTile}
+                    href={src}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open review image ${idx + 1} in a new tab`}
+                  >
+                    <img src={src} alt={slide.alt} />
+                  </a>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </Container>
     </section>

@@ -538,6 +538,10 @@ export function PdpPage({ config, copy }: Props) {
         .map((href) => href.slice(1)),
     [config.hero.header.nav]
   )
+  // The Sales PDP template treats the story "problem" section as the "how-it-works" anchor.
+  // Multiple parts of the template rely on this (e.g. styling), so we use it as the trigger
+  // for the floating CTA bar.
+  const showAfterSectionId = 'how-it-works'
 
   const [selectedSize, setSelectedSize] = useState(sizeOptions[1]?.id ?? sizeOptions[0]?.id)
   const [selectedColor, setSelectedColor] = useState(colorOptions[0]?.id)
@@ -565,14 +569,29 @@ export function PdpPage({ config, copy }: Props) {
   const [showHeader, setShowHeader] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => {
-      setShowHeader(window.scrollY > 180)
+    const el = document.getElementById(showAfterSectionId)
+    if (!el) {
+      console.error(
+        `PdpPage: cannot find section #${showAfterSectionId}. ` +
+          "The Sales PDP floating CTA bar is configured to show after the story problem section."
+      )
+      setShowHeader(false)
+      return
     }
 
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (!entry) return
+        const pastTrigger = entry.isIntersecting || entry.boundingClientRect.top < 0
+        setShowHeader(pastTrigger)
+      },
+      { threshold: 0 }
+    )
+
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [showAfterSectionId])
 
   useEffect(() => {
     if (!navSectionIds.length) return
@@ -636,7 +655,7 @@ export function PdpPage({ config, copy }: Props) {
       if (!paused) {
         const maxScroll = panel.scrollHeight - panel.clientHeight
         if (maxScroll > 0) {
-          panel.scrollTop += delta * 0.015
+          panel.scrollTop += delta * 0.01
           if (panel.scrollTop >= maxScroll) {
             panel.scrollTop = 0
           }
@@ -1399,17 +1418,70 @@ function FaqAccordion({ items }: { items: Array<{ question: string; answer: stri
 
 export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlider'] }) {
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
-  const [index, setIndex] = useState(0)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+
+  if (!config?.slides?.length) {
+    throw new Error('ReviewSliderSection config.slides must be a non-empty list.')
+  }
 
   useEffect(() => {
+    const panel = panelRef.current
+    if (!panel) return
     if (mode !== 'auto') return
-    const id = window.setInterval(() => {
-      setIndex((v) => clampIndex(v + 1, config.slides.length))
-    }, 3200)
-    return () => window.clearInterval(id)
-  }, [mode, config.slides.length])
 
-  const active = config.slides[index]
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (media.matches) return
+
+    let rafId = 0
+    let lastTime = 0
+    let paused = false
+
+    const step = (time: number) => {
+      if (!lastTime) lastTime = time
+      const delta = time - lastTime
+      lastTime = time
+
+      if (!paused) {
+        const maxScroll = panel.scrollHeight - panel.clientHeight
+        if (maxScroll > 0) {
+          panel.scrollTop += delta * 0.01
+          if (panel.scrollTop >= maxScroll) {
+            panel.scrollTop = 0
+          }
+        }
+      }
+
+      rafId = window.requestAnimationFrame(step)
+    }
+
+    const pause = () => {
+      paused = true
+    }
+
+    const resume = () => {
+      paused = false
+      lastTime = 0
+    }
+
+    panel.addEventListener('pointerenter', pause)
+    panel.addEventListener('pointerleave', resume)
+    panel.addEventListener('focusin', pause)
+    panel.addEventListener('focusout', resume)
+    panel.addEventListener('pointerdown', pause)
+    panel.addEventListener('pointerup', resume)
+
+    rafId = window.requestAnimationFrame(step)
+
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      panel.removeEventListener('pointerenter', pause)
+      panel.removeEventListener('pointerleave', resume)
+      panel.removeEventListener('focusin', pause)
+      panel.removeEventListener('focusout', resume)
+      panel.removeEventListener('pointerdown', pause)
+      panel.removeEventListener('pointerup', resume)
+    }
+  }, [mode, config.slides.length])
 
   return (
     <section className={`${styles.sectionBlue} ${styles.sectionPad}`}>
@@ -1417,17 +1489,26 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
         <div className={styles.reviewSliderHeader}>
           <h2>{config.title}</h2>
           <p>{config.body}</p>
-          <div className={styles.toggle} role="tablist" aria-label="Review slideshow mode">
+          <div
+            className={styles.toggle}
+            data-mode={mode}
+            role="tablist"
+            aria-label="Review feed mode"
+          >
             <button
               type="button"
-              className={mode === 'auto' ? styles.toggleActive : undefined}
+              role="tab"
+              aria-selected={mode === 'auto'}
+              data-active={mode === 'auto'}
               onClick={() => setMode('auto')}
             >
               {config.toggle.auto}
             </button>
             <button
               type="button"
-              className={mode === 'manual' ? styles.toggleActive : undefined}
+              role="tab"
+              aria-selected={mode === 'manual'}
+              data-active={mode === 'manual'}
               onClick={() => setMode('manual')}
             >
               {config.toggle.manual}
@@ -1435,28 +1516,37 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
           </div>
         </div>
 
-        <div className={styles.reviewSlide}>
-          <img src={active.src} alt={active.alt} />
-        </div>
+        <div className={styles.reviewScrollWrap}>
+          <div className={styles.reviewScrollHint} aria-hidden="true">
+            {config.hint}
+          </div>
 
-        <div className={styles.reviewNav}>
-          <button
-            type="button"
-            className={styles.circleIconBtn}
-            onClick={() => setIndex((v) => clampIndex(v - 1, config.slides.length))}
-            aria-label="Previous review"
+          <div
+            className={styles.reviewScrollPanel}
+            aria-label="Customer reviews feed"
+            tabIndex={0}
+            ref={panelRef}
           >
-            <IconChevron dir="left" />
-          </button>
-          <span style={{ fontWeight: 800, color: 'var(--color-brand)' }}>{config.hint}</span>
-          <button
-            type="button"
-            className={styles.circleIconBtn}
-            onClick={() => setIndex((v) => clampIndex(v + 1, config.slides.length))}
-            aria-label="Next review"
-          >
-            <IconChevron dir="right" />
-          </button>
+            <div className={styles.reviewScrollStack}>
+              {config.slides.map((slide, idx) => {
+                if (!slide.src) {
+                  throw new Error(`ReviewSliderSection slide ${idx + 1} is missing src.`)
+                }
+                return (
+                  <a
+                    key={`${slide.src}-${idx}`}
+                    className={styles.reviewTile}
+                    href={slide.src}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open review image ${idx + 1} in a new tab`}
+                  >
+                    <img src={slide.src} alt={slide.alt} />
+                  </a>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </Container>
     </section>

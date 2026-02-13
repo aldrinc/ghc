@@ -18,6 +18,7 @@ import {
   SalesPdpVideos,
   salesPdpDefaults,
 } from "@/funnels/templates/salesPdp/SalesPdpTemplate";
+import { SalesPdpReviews } from "@/funnels/templates/salesPdp/SalesPdpReviews";
 import {
   PreSalesFloatingCta,
   PreSalesFooter,
@@ -798,6 +799,12 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           config: salesPdpDefaults.config.faq,
         },
         render: (props: Record<string, unknown>) => <SalesPdpFaq {...props} />,
+      },
+      SalesPdpReviews: {
+        fields: {
+          configJson: { type: "textarea" },
+        },
+        render: (props: Record<string, unknown>) => <SalesPdpReviews {...props} />,
       },
       SalesPdpReviewWall: {
         fields: {

@@ -37,6 +37,11 @@ def test_sales_template_validation_accepts_default_sales_hero_modal_shape():
     puck_data = _sales_template_puck_data()
     funnel_ai._validate_sales_pdp_component_configs(puck_data)
 
+def test_sales_template_requires_faq_component_type():
+    puck_data = _sales_template_puck_data()
+    required = funnel_ai._required_template_component_types(puck_data, template_kind="sales-pdp")
+    assert "SalesPdpFaq" in required
+
 
 def test_sales_template_validation_rejects_missing_free_gifts_modal_block():
     puck_data = _sales_template_puck_data()
