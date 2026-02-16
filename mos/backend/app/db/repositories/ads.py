@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import mimetypes
-from typing import Iterable, List, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Tuple
 
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
@@ -266,17 +266,25 @@ class AdsRepository(Repository):
         )
         self.session.commit()
 
-    def mark_ingest_failure(self, ingest_run_id: str, *, error: str, provider_run_id: Optional[str] = None) -> None:
-        self.session.execute(
-            update(AdIngestRun)
-            .where(AdIngestRun.id == ingest_run_id)
-            .values(
-                status=AdIngestStatusEnum.FAILED,
-                error=error[:5000],
-                provider_run_id=provider_run_id,
-                finished_at=datetime.now(timezone.utc),
-            )
-        )
+    def mark_ingest_failure(
+        self,
+        ingest_run_id: str,
+        *,
+        error: str,
+        provider_run_id: Optional[str] = None,
+        provider_dataset_id: Optional[str] = None,
+        items_count: Optional[int] = None,
+    ) -> None:
+        values: dict[str, Any] = {
+            "status": AdIngestStatusEnum.FAILED,
+            "error": error[:5000],
+            "provider_run_id": provider_run_id,
+            "provider_dataset_id": provider_dataset_id,
+            "finished_at": datetime.now(timezone.utc),
+        }
+        if items_count is not None:
+            values["items_count"] = int(items_count)
+        self.session.execute(update(AdIngestRun).where(AdIngestRun.id == ingest_run_id).values(**values))
         self.session.commit()
 
     def upsert_ad_library_page_total(

@@ -2,20 +2,17 @@ You make ONE static image ad from ONE competitor swipe image.
 
 INPUTS (DATA ONLY)
 <competitor_swipe_image>
-[Image input will be attached separately]
+[User uploads image]
 </competitor_swipe_image>
 
 <my_brand>
-[See SWIPE CONTEXT block provided separately]
+Brand name: [BRAND_NAME]
+Product: [PRODUCT]
+Audience: [AUDIENCE] (optional)
+Brand colors/fonts: [UNKNOWN if not given]
+Must-avoid claims: [UNKNOWN if not given]
+Assets: [PACKSHOT? LOGO?] (optional)
 </my_brand>
-
-<angle>
-[See SWIPE CONTEXT block provided separately]
-</angle>
-
-<research_copy_bank>
-[See SWIPE CONTEXT block provided separately]
-</research_copy_bank>
 
 RULES
 - ONE concept only. No options. No improvements.
@@ -46,19 +43,10 @@ A) TEXT I SEE (verbatim from competitor)
 
 B) NEW IMAGE PROMPT (MUST BE MARKDOWN)
 - Output the TEXT-TO-IMAGE PROMPT inside a Markdown fenced code block exactly like this:
-- The fenced code block is REQUIRED. Do not omit it. Use ```text as the opening fence.
-- Do not output any additional code fences besides the one required in this section.
 
 ```text
 [ONE dense generation-ready prompt that recreates the same composition for [BRAND_NAME]]
 Include: background, product placement, badge placement, typography zones, lighting, camera feel, realism,
-clean negative space for text.
-
-Copy direction:
-- Use emotional, raw, visceral punch-in-the-gut copy informed by the research copy bank for the given angle.
-- Create an open loop, elicit emotion, be simple, specific, novel, and stop-the-scroll.
-- Do NOT add facts not supported by the research copy bank or the visible competitor ad.
-
-Use placeholders as needed:
+clean negative space for text. Use placeholders as needed:
 [BRAND_LOGO], [PRODUCT_PACKSHOT], [HEADLINE], [SUBHEAD], [BODY], [EQUATION_LINE], [CTA], [DISCLAIMER].
 ```

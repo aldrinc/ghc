@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.enums import AdChannelEnum, AdStatusEnum
+from app.db.enums import AdChannelEnum, AdStatusEnum, MediaAssetTypeEnum
 from app.db.models import (
     Ad,
     AdFacts,
@@ -245,12 +245,26 @@ def _serialize_media_rows(ad_id: str, media_rows: list[tuple[MediaAsset, str | N
         metadata = getattr(media, "metadata_json", {}) or {}
         asset_type = getattr(media, "asset_type", None)
         asset_type_value = getattr(asset_type, "value", None) if asset_type is not None else None
-        preview_key = getattr(media, "preview_storage_key", None) or getattr(media, "storage_key", None)
+        is_video = asset_type == MediaAssetTypeEnum.VIDEO
+        preview_key = getattr(media, "preview_storage_key", None)
+        # Never fall back to the original video file for previews (it will be rendered as <img>).
+        if not preview_key and not is_video:
+            preview_key = getattr(media, "storage_key", None)
         media_key = getattr(media, "storage_key", None)
         preview_bucket = getattr(media, "preview_bucket", None) or getattr(media, "bucket", None) or storage.preview_bucket
         media_bucket = getattr(media, "bucket", None) or storage.bucket
         preview_url = storage.presign_get(bucket=preview_bucket, key=preview_key) if preview_key else None
         media_url = storage.presign_get(bucket=media_bucket, key=media_key) if media_key else None
+        mirror_status_raw = getattr(media, "mirror_status", None)
+        mirror_status = (
+            getattr(mirror_status_raw, "value", None)
+            if mirror_status_raw is not None
+            else None
+        ) or (str(mirror_status_raw) if mirror_status_raw is not None else None)
+        mirror_error = getattr(media, "mirror_error", None)
+        # If the original is stored but preview generation failed, the asset is still usable.
+        if mirror_status == "failed" and mirror_error == "preview_generation_failed" and media_key:
+            mirror_status = "partial"
         assets.append(
             {
                 "id": str(getattr(media, "id", "")),
@@ -260,12 +274,14 @@ def _serialize_media_rows(ad_id: str, media_rows: list[tuple[MediaAsset, str | N
                 "stored_url": getattr(media, "stored_url", None),
                 "storage_key": getattr(media, "storage_key", None),
                 "preview_storage_key": getattr(media, "preview_storage_key", None),
-                "mirror_status": getattr(media, "mirror_status", None),
+                "mirror_status": mirror_status,
+                "mirror_error": mirror_error,
                 "mime_type": getattr(media, "mime_type", None),
                 "width": getattr(media, "width", None),
                 "height": getattr(media, "height", None),
                 "duration_ms": getattr(media, "duration_ms", None),
-                "thumbnail_url": metadata.get("thumbnail_url") or metadata.get("preview_url") or preview_url,
+                # Prefer the mirrored preview when available; external thumbnail URLs can expire.
+                "thumbnail_url": preview_url or metadata.get("thumbnail_url") or metadata.get("preview_url"),
                 "preview_url": preview_url,
                 "media_url": media_url,
                 "metadata": metadata,

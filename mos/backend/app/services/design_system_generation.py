@@ -84,7 +84,6 @@ _LOCKED_LAYOUT_CSS_VAR_KEYS: frozenset[str] = frozenset(
         "--cta-font-size-lg",
         "--cta-font-size-md",
         "--cta-font-size-sm",
-        "--cta-font-weight",
         "--cta-height-lg",
         "--cta-height-md",
         "--cta-height-sm",
@@ -92,7 +91,6 @@ _LOCKED_LAYOUT_CSS_VAR_KEYS: frozenset[str] = frozenset(
         "--cta-icon-size-lg",
         "--cta-icon-size-md",
         "--cta-icon-size-sm",
-        "--cta-letter-spacing",
         "--cta-min-width-lg",
         "--cta-min-width-md",
         "--cta-min-width-sm",
@@ -107,7 +105,6 @@ _LOCKED_LAYOUT_CSS_VAR_KEYS: frozenset[str] = frozenset(
         "--heading-line",
         "--heading-size",
         "--heading-size-mobile",
-        "--heading-weight",
         "--hero-min-height",
         "--hero-pad-x",
         "--hero-pad-y",
@@ -116,7 +113,6 @@ _LOCKED_LAYOUT_CSS_VAR_KEYS: frozenset[str] = frozenset(
         "--hero-subtitle-max",
         "--hero-subtitle-size",
         "--hero-subtitle-weight",
-        "--hero-title-letter-spacing",
         "--hero-title-line",
         "--hero-title-max",
         "--hero-title-size",
@@ -127,12 +123,10 @@ _LOCKED_LAYOUT_CSS_VAR_KEYS: frozenset[str] = frozenset(
         "--marquee-font-weight",
         "--marquee-gap",
         "--marquee-height",
-        "--marquee-letter-spacing",
         "--marquee-pad-x",
         "--listicle-body-gap",
         "--listicle-body-line",
         "--listicle-body-size",
-        "--listicle-card-border",
         "--listicle-card-radius",
         "--listicle-content-pad-x",
         "--listicle-content-pad-x-mobile",
@@ -145,9 +139,6 @@ _LOCKED_LAYOUT_CSS_VAR_KEYS: frozenset[str] = frozenset(
         "--listicle-title-margin-bottom",
         "--listicle-title-size",
         "--listicle-title-size-mobile",
-        "--radius-lg",
-        "--radius-md",
-        "--radius-sm",
         "--reviews-card-pad",
         "--reviews-card-radius",
         "--reviews-card-width",
@@ -243,12 +234,10 @@ def _build_full_prompt(
             "- Maintain good contrast for readability and accessibility.",
             "- Non-text UI contrast matters too (WCAG 2.1 1.4.11): ensure icon/indicator colors remain perceivable. "
             "In our Sales PDP template this specifically includes: "
-            "--color-bg on --pdp-check-bg (selected option check icon), "
             "--color-bg on --pdp-warning-bg (urgency icon), "
-            "--pdp-cta-bg on --pdp-white-96 (CTA arrow icon circles), "
             "--color-cta-icon on --color-cta-shell (header CTA icon circle), "
             "and --color-cta-text on --pdp-cta-bg (main CTA button).",
-            "- Keep --color-text highly legible on --color-bg and --color-muted clearly readable on --color-bg.",
+            "- Keep --color-text highly legible on --color-bg.",
             "- Keep primary page/surface backgrounds light. Do NOT use dark/near-black values for these tokens: "
             "--color-page-bg, --color-bg, --hero-bg, --badge-strip-bg, --pitch-bg, "
             "--reviews-card-bg, --wall-card-bg, --pdp-surface-soft, --pdp-surface-muted, --pdp-swatch-bg.",
@@ -614,8 +603,6 @@ _LIGHT_BACKGROUND_TOKEN_KEYS = (
 _MIN_BACKGROUND_RELATIVE_LUMINANCE = 0.65
 
 _REQUIRED_CONTRAST_PAIRS = (
-    ("--color-text", "--color-bg", 7.0),
-    ("--color-muted", "--color-bg", 4.5),
     ("--color-brand", "--color-bg", 4.5),
     ("--pdp-brand-strong", "--color-bg", 4.5),
     ("--marquee-text", "--marquee-bg", 4.5),
@@ -625,12 +612,8 @@ _REQUIRED_CONTRAST_PAIRS = (
 )
 
 _REQUIRED_NON_TEXT_CONTRAST_PAIRS: tuple[tuple[str, str, float, str], ...] = (
-    # Selected option check uses a white icon on --pdp-check-bg (see SalesPdpTemplate selectedCheck inline styles).
-    ("--color-bg", "--pdp-check-bg", 3.0, "Sales PDP selected option check icon"),
     # Urgency icon uses white glyphs on --pdp-warning-bg (see IconWarning in SalesPdpTemplate).
     ("--color-bg", "--pdp-warning-bg", 3.0, "Sales PDP urgency warning icon"),
-    # Arrow icons use currentColor set to --pdp-cta-bg inside light icon circles.
-    ("--pdp-cta-bg", "--pdp-white-96", 3.0, "Sales PDP CTA arrow icon circle"),
     # Header CTA icon uses --color-cta-icon inside a light shell circle.
     ("--color-cta-icon", "--color-cta-shell", 3.0, "Sales PDP header CTA icon circle"),
 )

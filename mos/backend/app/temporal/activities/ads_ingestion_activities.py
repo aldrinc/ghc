@@ -16,6 +16,7 @@ from app.ads.normalization import derive_primary_domain, normalize_facebook_page
 from app.ads.types import NormalizeContext
 from app.db.enums import (
     AdChannelEnum,
+    AdIngestStatusEnum,
     AdStatusEnum,
     ProductBrandRelationshipSourceEnum,
     ProductBrandRelationshipTypeEnum,
@@ -178,6 +179,20 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 repo.mark_ingest_failure(
                     ingest_run.id,
                     error=f"build_requests_failed: {exc}",
+                    items_count=0,
+                )
+                ingest_runs.append(
+                    {
+                        "ad_ingest_run_id": ingest_run.id,
+                        "brand_channel_identity_id": identity.id,
+                        "items_count": 0,
+                        "provider_run_id": None,
+                        "provider_dataset_id": None,
+                        "requested_url": None,
+                        "actor_input": None,
+                        "status": AdIngestStatusEnum.FAILED.value,
+                        "error": f"build_requests_failed: {exc}",
+                    }
                 )
                 activity.logger.warning(
                     "ads_ingestion.ingest.requests_missing",
@@ -221,6 +236,20 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 repo.mark_ingest_failure(
                     ingest_run.id,
                     error="build_requests_empty",
+                    items_count=0,
+                )
+                ingest_runs.append(
+                    {
+                        "ad_ingest_run_id": ingest_run.id,
+                        "brand_channel_identity_id": identity.id,
+                        "items_count": 0,
+                        "provider_run_id": None,
+                        "provider_dataset_id": None,
+                        "requested_url": None,
+                        "actor_input": None,
+                        "status": AdIngestStatusEnum.FAILED.value,
+                        "error": "build_requests_empty",
+                    }
                 )
                 activity.logger.warning(
                     "ads_ingestion.ingest.requests_empty",
@@ -298,11 +327,32 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
                         "provider_dataset_id": provider_dataset_id,
                         "requested_url": requests[0].url if requests else None,
                         "actor_input": actor_input,
+                        "status": AdIngestStatusEnum.SUCCEEDED.value,
+                        "error": None,
                     }
                 )
             except Exception as exc:  # noqa: BLE001
                 repo.session.rollback()
-                repo.mark_ingest_failure(ingest_run.id, error=str(exc), provider_run_id=provider_run_id)
+                repo.mark_ingest_failure(
+                    ingest_run.id,
+                    error=str(exc),
+                    provider_run_id=provider_run_id,
+                    provider_dataset_id=provider_dataset_id,
+                    items_count=items_count,
+                )
+                ingest_runs.append(
+                    {
+                        "ad_ingest_run_id": ingest_run.id,
+                        "brand_channel_identity_id": identity.id,
+                        "items_count": items_count,
+                        "provider_run_id": provider_run_id,
+                        "provider_dataset_id": provider_dataset_id,
+                        "requested_url": requests[0].url if requests else None,
+                        "actor_input": actor_input,
+                        "status": AdIngestStatusEnum.FAILED.value,
+                        "error": str(exc),
+                    }
+                )
                 activity.logger.error(
                     "ads_ingestion.ingest.error",
                     extra={
@@ -311,12 +361,20 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
                         "error": str(exc),
                     },
                 )
-                raise
+                continue
 
-        total_items = sum(run.get("items_count", 0) for run in ingest_runs)
+        succeeded_runs = [r for r in ingest_runs if r.get("status") == AdIngestStatusEnum.SUCCEEDED.value]
+        failed_runs = [r for r in ingest_runs if r.get("status") == AdIngestStatusEnum.FAILED.value]
+        total_items = sum(run.get("items_count", 0) for run in succeeded_runs)
         status = "ok"
         reason = None
-        if total_items == 0:
+        if failed_runs and not succeeded_runs:
+            status = "failed"
+            reason = "all_identities_failed"
+        elif failed_runs:
+            status = "partial"
+            reason = "some_identities_failed"
+        elif total_items == 0:
             status = "empty"
             reason = "no_ads_returned"
             activity.logger.warning(
@@ -334,6 +392,12 @@ def ingest_ads_for_identities_activity(params: Dict[str, Any]) -> Dict[str, Any]
             "status": status,
             "reason": reason,
             "skipped_duplicates": skipped_duplicates,
+            "summary": {
+                "identity_count": len(identities),
+                "succeeded_runs": len(succeeded_runs),
+                "failed_runs": len(failed_runs),
+                "total_items": total_items,
+            },
         }
 
 

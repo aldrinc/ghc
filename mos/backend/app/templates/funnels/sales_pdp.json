@@ -588,7 +588,8 @@
                   "right": {
                     "image": {
                       "src": "/assets/ph-4x3.svg",
-                      "alt": "Customer photo"
+                      "alt": "Customer photo",
+                      "testimonialTemplate": "review_card"
                     },
                     "reviewCard": {
                       "name": "Maria Fig",
@@ -618,59 +619,73 @@
                 "feedImages": [
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 1"
+                    "alt": "Customer review 1",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 2"
+                    "alt": "Customer review 2",
+                    "testimonialTemplate": "social_comment"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 3"
+                    "alt": "Customer review 3",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 4"
+                    "alt": "Customer review 4",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 5"
+                    "alt": "Customer review 5",
+                    "testimonialTemplate": "social_comment"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 6"
+                    "alt": "Customer review 6",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 7"
+                    "alt": "Customer review 7",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 8"
+                    "alt": "Customer review 8",
+                    "testimonialTemplate": "social_comment"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 9"
+                    "alt": "Customer review 9",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 10"
+                    "alt": "Customer review 10",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 11"
+                    "alt": "Customer review 11",
+                    "testimonialTemplate": "social_comment"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 12"
+                    "alt": "Customer review 12",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 13"
+                    "alt": "Customer review 13",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 14"
+                    "alt": "Customer review 14",
+                    "testimonialTemplate": "social_comment"
                   }
                 ],
                 "id": "sales-pdp-guarantee"

@@ -138,6 +138,25 @@ class MediaMirrorService:
                 preview_bytes, preview_size = self._build_image_preview(download.content)
             elif preview_kind == MediaAssetTypeEnum.VIDEO:
                 preview_bytes, preview_size = self._build_video_preview(download.content)
+                # If ffmpeg isn't available (or fails), fall back to a provider-supplied thumbnail
+                # when present (e.g. Meta Ads Library `preview_url`).
+                if preview_bytes is None:
+                    metadata = getattr(media, "metadata_json", {}) or {}
+                    thumb_url: Optional[str] = None
+                    for key in ("thumbnail_url", "preview_url", "poster_url", "preview_image_url"):
+                        candidate = metadata.get(key)
+                        if isinstance(candidate, str) and candidate.strip():
+                            thumb_url = candidate.strip()
+                            break
+                    if thumb_url:
+                        try:
+                            thumb_download = self._download(thumb_url)
+                            preview_bytes, preview_size = self._build_image_preview(thumb_download.content)
+                        except Exception as exc:  # noqa: BLE001
+                            logger.warning(
+                                "media_mirror.preview_thumbnail_failed",
+                                extra={"error": str(exc), "thumbnail_url": thumb_url},
+                            )
 
             preview_key: Optional[str] = None
             if preview_bytes:
@@ -157,13 +176,15 @@ class MediaMirrorService:
 
             status = MediaMirrorStatusEnum.succeeded
             error_msg = None
+            preview_required = preview_kind in (MediaAssetTypeEnum.IMAGE, MediaAssetTypeEnum.SCREENSHOT)
             if preview_bytes is None:
-                if preview_kind == MediaAssetTypeEnum.VIDEO:
+                if preview_required:
+                    # Original was stored, but we couldn't generate a smaller preview.
+                    status = MediaMirrorStatusEnum.partial
+                    error_msg = "preview_generation_failed"
+                elif preview_kind == MediaAssetTypeEnum.VIDEO:
                     status = MediaMirrorStatusEnum.partial
                     error_msg = "preview_generation_skipped"
-                else:
-                    status = MediaMirrorStatusEnum.failed
-                    error_msg = "preview_generation_failed"
 
             media.sha256 = download.sha256
             media.mime_type = media.mime_type or mime

@@ -145,6 +145,7 @@ class Product(Base):
     )
     template_suffix: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    shopify_product_gid: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     primary_benefits: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
     )
@@ -219,6 +220,29 @@ class ProductVariant(Base):
     unit_price_measurement: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     quantity_rule: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     quantity_price_breaks: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSONB, nullable=True)
+
+
+class ProductOfferBonus(Base):
+    __tablename__ = "product_offer_bonuses"
+    __table_args__ = (
+        UniqueConstraint("offer_id", "bonus_product_id", name="uq_product_offer_bonuses_offer_bonus_product"),
+        sa.Index("idx_product_offer_bonuses_offer", "offer_id"),
+        sa.Index("idx_product_offer_bonuses_bonus_product", "bonus_product_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    offer_id: Mapped[str] = mapped_column(
+        ForeignKey("product_offers.id", ondelete="CASCADE"), nullable=False
+    )
+    bonus_product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class Campaign(Base):

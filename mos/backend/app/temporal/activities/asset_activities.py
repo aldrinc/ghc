@@ -121,7 +121,6 @@ def _build_image_prompt(
     if visual_guidelines:
         prompt_parts.append(f"Visual guidelines: {visual_guidelines}")
 
-    prompt_parts.append("Do not imitate any existing brand or copyrighted design.")
     return "\n".join(prompt_parts).strip()
 
 

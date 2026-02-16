@@ -81,7 +81,10 @@ class Settings(BaseSettings):
     MEDIA_STORAGE_ACCESS_KEY: str | None = None
     MEDIA_STORAGE_SECRET_KEY: str | None = None
     MEDIA_STORAGE_PREFIX: str = "dev"
-    MEDIA_STORAGE_PRESIGN_TTL_SECONDS: int = 900
+    # Presigned media URLs are used directly in the frontend (e.g. <img src="...">),
+    # so they must outlive lazy-loading / infinite-scroll sessions. Keep this <= 7 days
+    # (SigV4 presign max on most S3-compatible stores).
+    MEDIA_STORAGE_PRESIGN_TTL_SECONDS: int = 60 * 60 * 24 * 7
     MEDIA_STORAGE_USE_SSL: bool = True
     MEDIA_STORAGE_FORCE_PATH_STYLE: bool = True
 

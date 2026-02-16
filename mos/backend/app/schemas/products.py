@@ -17,6 +17,7 @@ class ProductCreateRequest(BaseModel):
     tags: Optional[list[str]] = None
     templateSuffix: Optional[str] = None
     publishedAt: Optional[datetime] = None
+    shopifyProductGid: Optional[str] = None
     primaryBenefits: Optional[list[str]] = None
     featureBullets: Optional[list[str]] = None
     guaranteeText: Optional[str] = None
@@ -32,6 +33,7 @@ class ProductUpdateRequest(BaseModel):
     tags: Optional[list[str]] = None
     templateSuffix: Optional[str] = None
     publishedAt: Optional[datetime] = None
+    shopifyProductGid: Optional[str] = None
     primaryBenefits: Optional[list[str]] = None
     featureBullets: Optional[list[str]] = None
     guaranteeText: Optional[str] = None
@@ -58,6 +60,10 @@ class ProductOfferUpdateRequest(BaseModel):
     optionsSchema: Optional[dict[str, Any]] = None
 
 
+class ProductOfferBonusCreateRequest(BaseModel):
+    bonusProductId: str
+
+
 class ProductOfferPricePointCreateRequest(BaseModel):
     offerId: str
     label: str
@@ -81,6 +87,7 @@ class ProductVariantCreateRequest(BaseModel):
     title: str
     price: int
     currency: str
+    offerId: Optional[str] = None
     compareAtPrice: Optional[int] = None
     provider: Optional[str] = None
     externalPriceId: Optional[str] = None
@@ -106,6 +113,7 @@ class ProductVariantUpdateRequest(BaseModel):
     title: Optional[str] = None
     price: Optional[int] = None
     currency: Optional[str] = None
+    offerId: Optional[str] = None
     compareAtPrice: Optional[int] = None
     provider: Optional[str] = None
     externalPriceId: Optional[str] = None

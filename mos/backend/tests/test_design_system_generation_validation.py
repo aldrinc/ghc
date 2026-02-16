@@ -57,11 +57,10 @@ def test_validate_tokens_allows_body_text_coupled_to_brand():
     _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
-def test_validate_tokens_rejects_low_contrast_muted_text():
+def test_validate_tokens_allows_low_contrast_muted_text():
     tokens = deepcopy(load_base_tokens_template())
     tokens["cssVars"]["--color-muted"] = "#cbd5e1"
-    with pytest.raises(DesignSystemGenerationError, match=r"contrast check failed for --color-muted on --color-bg"):
-        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+    _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
 def test_validate_tokens_allows_muted_text_coupled_to_brand():
@@ -77,11 +76,17 @@ def test_validate_tokens_rejects_locked_layout_token_change():
         _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
-def test_validate_tokens_rejects_unclear_layout_token_change():
+def test_validate_tokens_allows_unlocked_template_style_token_change():
     tokens = deepcopy(load_base_tokens_template())
     tokens["cssVars"]["--radius-md"] = "28px"
-    with pytest.raises(DesignSystemGenerationError, match=r"template-locked layout tokens.*--radius-md"):
-        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+    tokens["cssVars"]["--radius-sm"] = "12px"
+    tokens["cssVars"]["--radius-lg"] = "20px"
+    tokens["cssVars"]["--heading-weight"] = "600"
+    tokens["cssVars"]["--cta-font-weight"] = "800"
+    tokens["cssVars"]["--cta-letter-spacing"] = "0.02em"
+    tokens["cssVars"]["--marquee-letter-spacing"] = "0.01em"
+    tokens["cssVars"]["--hero-title-letter-spacing"] = "-0.05em"
+    _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
 def test_validate_tokens_allows_brand_color_change():
@@ -90,14 +95,10 @@ def test_validate_tokens_allows_brand_color_change():
     _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
-def test_validate_tokens_rejects_low_contrast_pdp_check_bg_for_white_icon():
+def test_validate_tokens_allows_low_contrast_pdp_check_bg_for_white_icon():
     tokens = deepcopy(load_base_tokens_template())
     tokens["cssVars"]["--pdp-check-bg"] = "#E8F7F0"
-    with pytest.raises(
-        DesignSystemGenerationError,
-        match=r"non-text contrast check failed.*--color-bg on --pdp-check-bg",
-    ):
-        _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+    _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
 def test_validate_tokens_rejects_low_contrast_pdp_warning_bg_for_white_icon():
@@ -108,6 +109,14 @@ def test_validate_tokens_rejects_low_contrast_pdp_warning_bg_for_white_icon():
         match=r"non-text contrast check failed.*--color-bg on --pdp-warning-bg",
     ):
         _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+
+
+def test_validate_tokens_allows_low_contrast_pdp_cta_icon_circle_pair():
+    tokens = deepcopy(load_base_tokens_template())
+    tokens["cssVars"]["--pdp-cta-bg"] = "#6FE3C1"
+    tokens["cssVars"]["--pdp-white-96"] = "rgba(255, 255, 255, 0.96)"
+    tokens["cssVars"]["--color-cta-text"] = "#061A70"
+    _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
 def test_validate_tokens_rejects_low_contrast_cta_text_on_pdp_cta_bg():

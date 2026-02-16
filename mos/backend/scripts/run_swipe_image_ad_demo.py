@@ -133,12 +133,10 @@ def main() -> int:
     context_block = build_swipe_context_block(
         brand_name=args.brand_name,
         product_name=args.product,
-        angle=args.angle,
         audience=None,
         brand_colors_fonts=None,
         must_avoid_claims=None,
         assets=None,
-        research_copy_bank=research_lines,
     )
 
     _ensure_gemini_configured()

@@ -27,6 +27,7 @@ from app.services import funnel_ai as funnel_ai
 
 
 DEFAULT_RULESET_VERSION = "v1"
+DEFAULT_TESTIMONIAL_RETRY_ATTEMPTS = 5
 
 
 def run_generate_page_draft_stream(
@@ -46,6 +47,7 @@ def run_generate_page_draft_stream(
     temperature: float = 0.2,
     max_tokens: Optional[int] = None,
     generate_images: bool = True,
+    generate_testimonials: bool = True,
     max_images: int = 3,
     copy_pack: Optional[str] = None,
     ruleset_version: str = DEFAULT_RULESET_VERSION,
@@ -77,6 +79,7 @@ def run_generate_page_draft_stream(
             "templateId": template_id,
             "ideaWorkspaceId": idea_workspace_id,
             "generateImages": generate_images,
+            "generateTestimonials": generate_testimonials,
             "maxImages": max_images,
         },
     )
@@ -306,31 +309,52 @@ def run_generate_page_draft_stream(
         draft_version_id = persist_res.ui_details["draftVersionId"]
 
         # 11) Generate + apply testimonials for template pages (Sales PDP / Pre-sales listicle).
-        # This is required for the template review systems to be populated.
-        if funnel_ctx.get("templateMode") and funnel_ctx.get("templateKind") in ("sales-pdp", "pre-sales-listicle"):
-            testimonials_res = yield from runtime.invoke_tool_stream(
-                handle=handle,
-                tool=TestimonialsGenerateAndApplyTool(),
-                raw_args={
-                    "orgId": org_id,
-                    "userId": user_id,
-                    "funnelId": funnel_id,
-                    "pageId": page_id,
-                    "draftVersionId": draft_version_id,
-                    "templateId": funnel_ctx.get("templateId"),
-                    "ideaWorkspaceId": docs_ctx.get("ideaWorkspaceId"),
-                    "model": model,
-                    "temperature": 0.3,
-                    "maxTokens": max_tokens,
-                    "synthetic": True,
-                    "agentRunId": handle.run_id,
-                },
-                client_id=client_id,
-                funnel_id=funnel_id,
-                page_id=page_id,
-            )
-            puck_data = testimonials_res.ui_details.get("puckData") or puck_data
-            draft_version_id = testimonials_res.ui_details.get("draftVersionId") or draft_version_id
+        # Retry this step in-place so a transient testimonials failure does not force
+        # draft/image regeneration for the whole page.
+        if (
+            generate_testimonials
+            and funnel_ctx.get("templateMode")
+            and funnel_ctx.get("templateKind") in ("sales-pdp", "pre-sales-listicle")
+        ):
+            testimonials_attempts = DEFAULT_TESTIMONIAL_RETRY_ATTEMPTS
+            for attempt in range(1, testimonials_attempts + 1):
+                try:
+                    testimonials_res = yield from runtime.invoke_tool_stream(
+                        handle=handle,
+                        tool=TestimonialsGenerateAndApplyTool(),
+                        raw_args={
+                            "orgId": org_id,
+                            "userId": user_id,
+                            "funnelId": funnel_id,
+                            "pageId": page_id,
+                            "draftVersionId": draft_version_id,
+                            "templateId": funnel_ctx.get("templateId"),
+                            "ideaWorkspaceId": docs_ctx.get("ideaWorkspaceId"),
+                            "model": model,
+                            "temperature": 0.3,
+                            "maxTokens": max_tokens,
+                            "synthetic": True,
+                            "agentRunId": handle.run_id,
+                        },
+                        client_id=client_id,
+                        funnel_id=funnel_id,
+                        page_id=page_id,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    if attempt >= testimonials_attempts:
+                        raise
+                    yield {
+                        "type": "status",
+                        "message": (
+                            "Testimonials generation failed on attempt "
+                            f"{attempt}/{testimonials_attempts}: {exc}. Retrying testimonials step."
+                        ),
+                    }
+                    continue
+
+                puck_data = testimonials_res.ui_details.get("puckData") or puck_data
+                draft_version_id = testimonials_res.ui_details.get("draftVersionId") or draft_version_id
+                break
 
         final = {
             "assistantMessage": assistant_message,
@@ -372,6 +396,7 @@ def run_generate_page_draft(
     temperature: float = 0.2,
     max_tokens: Optional[int] = None,
     generate_images: bool = True,
+    generate_testimonials: bool = True,
     max_images: int = 3,
     copy_pack: Optional[str] = None,
     ruleset_version: str = DEFAULT_RULESET_VERSION,
@@ -392,6 +417,7 @@ def run_generate_page_draft(
         temperature=temperature,
         max_tokens=max_tokens,
         generate_images=generate_images,
+        generate_testimonials=generate_testimonials,
         max_images=max_images,
         copy_pack=copy_pack,
         ruleset_version=ruleset_version,

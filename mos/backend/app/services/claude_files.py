@@ -218,6 +218,9 @@ def _enforce_no_additional_properties(schema: Dict[str, Any]) -> Dict[str, Any]:
         node_type = updated.get("type")
         is_object = node_type == "object" or (isinstance(node_type, list) and "object" in node_type)
         is_array = node_type == "array" or (isinstance(node_type, list) and "array" in node_type)
+        is_number = node_type in {"number", "integer"} or (
+            isinstance(node_type, list) and any(t in {"number", "integer"} for t in node_type)
+        )
 
         if is_object and "additionalProperties" not in updated:
             updated["additionalProperties"] = False
@@ -225,6 +228,11 @@ def _enforce_no_additional_properties(schema: Dict[str, Any]) -> Dict[str, Any]:
             # Anthropic structured outputs do not support maxItems/minItems today.
             updated.pop("maxItems", None)
             updated.pop("minItems", None)
+        if is_number:
+            # Anthropic structured outputs reject numeric bounds today (e.g. minimum/maximum).
+            # We enforce constraints in application-level validation instead.
+            for key in ("maximum", "minimum", "exclusiveMaximum", "exclusiveMinimum", "multipleOf"):
+                updated.pop(key, None)
 
         props = updated.get("properties")
         if isinstance(props, dict):

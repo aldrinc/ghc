@@ -9,6 +9,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterator, Optional
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from app.db.models import Asset, Funnel, FunnelPage, FunnelPageVersion, Product
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.funnels import create_funnel_image_asset, create_funnel_upload_asset
 from app.services.funnel_ai import _load_product_context
+from app.services.claude_files import call_claude_structured_message
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
 from app.testimonial_renderer.renderer import TestimonialRenderer
@@ -71,6 +73,7 @@ _MEDIA_SCENE_MODE_CYCLE = (
     _SCENE_MODE_NO_PEOPLE,
 )
 _SINGLE_SCENE_MODE_CYCLE = (_SCENE_MODE_WITH_PEOPLE, _SCENE_MODE_NO_PEOPLE)
+_MAX_TESTIMONIAL_IDENTITY_ATTEMPTS = int(os.getenv("FUNNEL_TESTIMONIAL_IDENTITY_ATTEMPTS", "1"))
 
 
 def _clean_single_line(text: str) -> str:
@@ -85,6 +88,7 @@ def _truncate(text: str, *, limit: int) -> str:
 
 
 _WORD_RE = re.compile(r"[A-Za-z]{3,}")
+_DISALLOWED_NAME_SUFFIX_RE = re.compile(r"\(\d+\)\s*$")
 _TOPIC_STOPWORDS = {
     "the",
     "and",
@@ -211,7 +215,7 @@ def _sync_sales_pdp_reviews_from_testimonials(
     product: Product,
     validated_testimonials: list[dict[str, Any]],
     today: str,
-    review_wall_images: Optional[list[dict[str, Any]]] = None,
+    review_media_images: Optional[list[dict[str, Any]]] = None,
 ) -> None:
     if not validated_testimonials:
         return
@@ -243,8 +247,8 @@ def _sync_sales_pdp_reviews_from_testimonials(
             created_at = f"{(base_date - timedelta(days=idx)).isoformat()}T00:00:00.000Z"
 
         media: list[dict[str, Any]] = []
-        if review_wall_images and idx < len(review_wall_images):
-            image = review_wall_images[idx]
+        if review_media_images and idx < len(review_media_images):
+            image = review_media_images[idx]
             asset_public_id = image.get("assetPublicId")
             if isinstance(asset_public_id, str) and asset_public_id.strip():
                 url = _public_asset_url(asset_public_id.strip())
@@ -371,124 +375,11 @@ def _normalize_identity_key(value: str) -> str:
     return " ".join(value.strip().lower().split())
 
 
-def _append_identity_suffix(*, base: str, suffix: str, limit: int) -> str:
-    if len(suffix) >= limit:
+def _assert_no_numeric_disambiguation_suffix(*, field_label: str, value: str) -> None:
+    if _DISALLOWED_NAME_SUFFIX_RE.search(value):
         raise TestimonialGenerationError(
-            f"Unable to disambiguate testimonial identity because suffix exceeds max length ({limit})."
+            f"{field_label} cannot use numeric disambiguation suffixes like '(2)'."
         )
-    truncated_base = base[: limit - len(suffix)].rstrip()
-    if not truncated_base:
-        raise TestimonialGenerationError(
-            "Unable to disambiguate testimonial identity because the base value is empty after truncation."
-        )
-    return f"{truncated_base}{suffix}"
-
-
-def _make_identity_unique(
-    *,
-    label: str,
-    raw_value: str,
-    idx: int,
-    seen: dict[str, int],
-    max_length: int,
-) -> tuple[str, bool]:
-    value = _clean_single_line(raw_value)
-    key = _normalize_identity_key(value)
-    if key not in seen:
-        seen[key] = idx
-        return value, False
-
-    attempt = 2
-    while attempt <= 200:
-        suffix = f" ({attempt})"
-        candidate = _append_identity_suffix(base=value, suffix=suffix, limit=max_length)
-        candidate_key = _normalize_identity_key(candidate)
-        if candidate_key not in seen:
-            seen[candidate_key] = idx
-            return candidate, True
-        attempt += 1
-
-    previous_position = seen[key] + 1
-    raise TestimonialGenerationError(
-        f"Unable to disambiguate duplicate testimonial {label} at position {idx + 1} "
-        f"(first seen at position {previous_position}): {value!r}."
-    )
-
-
-def _repair_distinct_testimonial_identities(
-    validated_testimonials: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    seen_names: dict[str, int] = {}
-    seen_personas: dict[str, int] = {}
-    repairs: list[dict[str, Any]] = []
-
-    def repair_field(
-        *,
-        testimonial: dict[str, Any],
-        field_path: tuple[str, ...],
-        label: str,
-        max_length: int,
-        idx: int,
-        seen: dict[str, int],
-    ) -> None:
-        node: Any = testimonial
-        for key in field_path[:-1]:
-            node = node[key]
-        leaf = field_path[-1]
-        original = node[leaf]
-        repaired, changed = _make_identity_unique(
-            label=label,
-            raw_value=original,
-            idx=idx,
-            seen=seen,
-            max_length=max_length,
-        )
-        if changed:
-            node[leaf] = repaired
-            repairs.append(
-                {
-                    "position": idx + 1,
-                    "field": ".".join(field_path),
-                    "from": original,
-                    "to": repaired,
-                }
-            )
-
-    for idx, testimonial in enumerate(validated_testimonials):
-        repair_field(
-            testimonial=testimonial,
-            field_path=("name",),
-            label="name",
-            max_length=80,
-            idx=idx,
-            seen=seen_names,
-        )
-        repair_field(
-            testimonial=testimonial,
-            field_path=("persona",),
-            label="persona",
-            max_length=240,
-            idx=idx,
-            seen=seen_personas,
-        )
-        repair_field(
-            testimonial=testimonial,
-            field_path=("reply", "name"),
-            label="name",
-            max_length=80,
-            idx=idx,
-            seen=seen_names,
-        )
-        repair_field(
-            testimonial=testimonial,
-            field_path=("reply", "persona"),
-            label="persona",
-            max_length=240,
-            idx=idx,
-            seen=seen_personas,
-        )
-
-    return repairs
 
 
 def _assert_distinct_testimonial_identities(validated_testimonials: list[dict[str, Any]]) -> None:
@@ -517,6 +408,149 @@ def _assert_distinct_testimonial_identities(validated_testimonials: list[dict[st
         register_identity(label="persona", raw_value=persona, idx=idx, seen=seen_personas)
         register_identity(label="name", raw_value=reply_name, idx=idx, seen=seen_names)
         register_identity(label="persona", raw_value=reply_persona, idx=idx, seen=seen_personas)
+
+
+def _repair_distinct_testimonial_identities(
+    validated_testimonials: list[dict[str, Any]],
+) -> list[dict[str, Any]] | None:
+    repaired = copy.deepcopy(validated_testimonials)
+
+    def _normalize_space(value: Any) -> str:
+        if not isinstance(value, str):
+            return ""
+        return " ".join(value.strip().split())
+
+    def _hint(value: Any, *, max_words: int = 4, max_len: int = 28) -> str | None:
+        compact = _normalize_space(value)
+        if not compact:
+            return None
+        compact = re.sub(r"[^A-Za-z0-9 '&-]", "", compact)
+        if not compact:
+            return None
+        words = compact.split()
+        if not words:
+            return None
+        return " ".join(words[:max_words])[:max_len].strip()
+
+    def _candidate_name(base: str, hint_text: str) -> str:
+        candidate = f"{base} ({hint_text})"
+        if len(candidate) > 80:
+            overflow = len(candidate) - 80
+            trimmed_hint = hint_text[:-overflow].strip() if overflow < len(hint_text) else ""
+            candidate = f"{base} ({trimmed_hint})" if trimmed_hint else base
+        return candidate
+
+    def _candidate_persona(base: str, hint_text: str) -> str:
+        candidate = f"{base} | {hint_text}"
+        if len(candidate) > 220:
+            overflow = len(candidate) - 220
+            trimmed_hint = hint_text[:-overflow].strip() if overflow < len(hint_text) else ""
+            candidate = f"{base} | {trimmed_hint}" if trimmed_hint else base
+        return candidate
+
+    seen_names: set[str] = set()
+    seen_personas: set[str] = set()
+
+    for testimonial in repaired:
+        reply = testimonial.get("reply")
+        if not isinstance(reply, dict):
+            return None
+
+        base_name = _normalize_space(testimonial.get("name"))
+        base_persona = _normalize_space(testimonial.get("persona"))
+        reply_name = _normalize_space(reply.get("name"))
+        reply_persona = _normalize_space(reply.get("persona"))
+        if not base_name or not base_persona or not reply_name or not reply_persona:
+            return None
+
+        meta = testimonial.get("meta")
+        location_hint = _hint(meta.get("location")) if isinstance(meta, dict) else None
+        primary_name_hints = [
+            location_hint,
+            _hint(testimonial.get("persona"), max_words=3),
+            _hint(reply.get("name"), max_words=2),
+            _hint(reply.get("persona"), max_words=3),
+            _hint(testimonial.get("review"), max_words=3),
+        ]
+        primary_persona_hints = [
+            location_hint,
+            _hint(testimonial.get("name"), max_words=3),
+            _hint(reply.get("persona"), max_words=3),
+            _hint(reply.get("name"), max_words=2),
+        ]
+        reply_name_hints = [
+            location_hint,
+            _hint(reply.get("persona"), max_words=3),
+            _hint(testimonial.get("name"), max_words=2),
+            _hint(testimonial.get("persona"), max_words=3),
+        ]
+        reply_persona_hints = [
+            location_hint,
+            _hint(reply.get("name"), max_words=2),
+            _hint(testimonial.get("persona"), max_words=3),
+            _hint(testimonial.get("name"), max_words=2),
+        ]
+
+        def _resolve_name(value: str, hints: list[str | None], seen: set[str]) -> str | None:
+            normalized = _normalize_identity_key(value)
+            if normalized not in seen:
+                seen.add(normalized)
+                return value
+            for raw_hint in hints:
+                if not raw_hint:
+                    continue
+                candidate = _candidate_name(value, raw_hint)
+                candidate = _normalize_space(candidate)
+                if not candidate:
+                    continue
+                try:
+                    _assert_no_numeric_disambiguation_suffix(field_label="Testimonial name", value=candidate)
+                except TestimonialGenerationError:
+                    continue
+                normalized_candidate = _normalize_identity_key(candidate)
+                if normalized_candidate in seen:
+                    continue
+                seen.add(normalized_candidate)
+                return candidate
+            return None
+
+        def _resolve_persona(value: str, hints: list[str | None], seen: set[str]) -> str | None:
+            normalized = _normalize_identity_key(value)
+            if normalized not in seen:
+                seen.add(normalized)
+                return value
+            for raw_hint in hints:
+                if not raw_hint:
+                    continue
+                candidate = _candidate_persona(value, raw_hint)
+                candidate = _normalize_space(candidate)
+                if not candidate:
+                    continue
+                normalized_candidate = _normalize_identity_key(candidate)
+                if normalized_candidate in seen:
+                    continue
+                seen.add(normalized_candidate)
+                return candidate
+            return None
+
+        resolved_name = _resolve_name(base_name, primary_name_hints, seen_names)
+        resolved_persona = _resolve_persona(base_persona, primary_persona_hints, seen_personas)
+        resolved_reply_name = _resolve_name(reply_name, reply_name_hints, seen_names)
+        resolved_reply_persona = _resolve_persona(reply_persona, reply_persona_hints, seen_personas)
+        if not resolved_name or not resolved_persona or not resolved_reply_name or not resolved_reply_persona:
+            return None
+
+        if _normalize_identity_key(resolved_name) == _normalize_identity_key(resolved_reply_name):
+            return None
+        if _normalize_identity_key(resolved_persona) == _normalize_identity_key(resolved_reply_persona):
+            return None
+
+        testimonial["name"] = resolved_name
+        testimonial["persona"] = resolved_persona
+        reply["name"] = resolved_reply_name
+        reply["persona"] = resolved_reply_persona
+
+    return repaired
 
 
 def _select_pov(*parts: str) -> str:
@@ -1238,6 +1272,55 @@ def _collect_sales_pdp_review_wall_images(groups: list[_TestimonialGroup]) -> li
     return images
 
 
+def _collect_sales_pdp_review_slider_images(groups: list[_TestimonialGroup]) -> list[dict[str, Any]]:
+    images: list[dict[str, Any]] = []
+    for group in groups:
+        for render in group.renders:
+            if render.label.startswith("sales_pdp.reviewSlider.slides"):
+                images.append(render.image)
+    return images
+
+
+def _select_sales_pdp_reviews_payload_testimonials(
+    *,
+    groups: list[_TestimonialGroup],
+    validated_testimonials: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    if len(groups) != len(validated_testimonials):
+        raise TestimonialGenerationError(
+            "Unable to build SalesPdpReviews payload because testimonial target count does not match generated testimonials."
+        )
+
+    slider_only: list[dict[str, Any]] = []
+    for idx, group in enumerate(groups):
+        if group.label.startswith("sales_pdp.reviewSlider.slides"):
+            slider_only.append(copy.deepcopy(validated_testimonials[idx]))
+    if slider_only:
+        return slider_only
+
+    # If there is no review-slider-specific testimonial set, derive a distinct reviews feed
+    # from reply identities/text so SalesPdpReviews does not mirror risk-free wall entries.
+    derived: list[dict[str, Any]] = []
+    for testimonial in validated_testimonials:
+        item = copy.deepcopy(testimonial)
+        reply = item.get("reply")
+        if isinstance(reply, dict):
+            reply_name = reply.get("name")
+            if isinstance(reply_name, str) and reply_name.strip():
+                item["name"] = reply_name.strip()
+            reply_persona = reply.get("persona")
+            if isinstance(reply_persona, str) and reply_persona.strip():
+                item["persona"] = reply_persona.strip()
+            reply_text = reply.get("text")
+            if isinstance(reply_text, str) and reply_text.strip():
+                item["review"] = reply_text.strip()
+            reply_avatar_prompt = reply.get("avatarPrompt")
+            if isinstance(reply_avatar_prompt, str) and reply_avatar_prompt.strip():
+                item["avatarPrompt"] = reply_avatar_prompt.strip()
+        derived.append(item)
+    return derived
+
+
 def _sync_sales_pdp_guarantee_feed_images(
     puck_data: dict[str, Any],
     *,
@@ -1261,6 +1344,16 @@ def _sync_sales_pdp_guarantee_feed_images(
             "SalesPdpGuarantee requires SalesPdpReviewWall tiles to populate review feed images."
         )
 
+    primary_image = copy.deepcopy(review_wall_images[0])
+    if not isinstance(primary_image, dict):
+        raise TestimonialGenerationError(
+            "SalesPdpGuarantee feed image payload is invalid: first review wall image must be an object."
+        )
+    if not isinstance(primary_image.get("testimonialTemplate"), str) or not str(
+        primary_image.get("testimonialTemplate")
+    ).strip():
+        primary_image["testimonialTemplate"] = "review_card"
+
     for props in guarantee_props:
         feed_images = copy.deepcopy(review_wall_images)
         raw_feed_json = props.get("feedImagesJson")
@@ -1271,6 +1364,33 @@ def _sync_sales_pdp_guarantee_feed_images(
             props["feedImages"] = feed_images
             if "feedImagesJson" in props:
                 props.pop("feedImagesJson", None)
+
+        config = props.get("config")
+        if isinstance(config, dict):
+            right = config.get("right")
+            if not isinstance(right, dict):
+                right = {}
+                config["right"] = right
+            right["image"] = copy.deepcopy(primary_image)
+
+        raw_config_json = props.get("configJson")
+        if isinstance(raw_config_json, str):
+            try:
+                parsed = json.loads(raw_config_json)
+            except json.JSONDecodeError as exc:
+                raise TestimonialGenerationError(
+                    f"SalesPdpGuarantee.configJson must be valid JSON: {exc}"
+                ) from exc
+            if not isinstance(parsed, dict):
+                raise TestimonialGenerationError(
+                    "SalesPdpGuarantee.configJson must decode to a JSON object."
+                )
+            right = parsed.get("right")
+            if not isinstance(right, dict):
+                right = {}
+                parsed["right"] = right
+            right["image"] = copy.deepcopy(primary_image)
+            props["configJson"] = json.dumps(parsed, ensure_ascii=False)
 
 
 def _extract_copy_lines(puck_data: dict[str, Any]) -> str:
@@ -1416,8 +1536,10 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
     name = payload.get("name")
     if not isinstance(name, str) or not name.strip():
         raise TestimonialGenerationError("Testimonial name must be a non-empty string.")
-    if len(name.strip()) > 80:
+    cleaned_name = name.strip()
+    if len(cleaned_name) > 80:
         raise TestimonialGenerationError("Testimonial name must be 80 characters or fewer.")
+    _assert_no_numeric_disambiguation_suffix(field_label="Testimonial name", value=cleaned_name)
     review = payload.get("review")
     if not isinstance(review, str) or not review.strip():
         raise TestimonialGenerationError("Testimonial review must be a non-empty string.")
@@ -1458,8 +1580,13 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
     reply_name = reply.get("name")
     if not isinstance(reply_name, str) or not reply_name.strip():
         raise TestimonialGenerationError("Testimonial reply.name must be a non-empty string.")
-    if len(reply_name.strip()) > 80:
+    cleaned_reply_name = reply_name.strip()
+    if len(cleaned_reply_name) > 80:
         raise TestimonialGenerationError("Testimonial reply.name must be 80 characters or fewer.")
+    _assert_no_numeric_disambiguation_suffix(
+        field_label="Testimonial reply.name",
+        value=cleaned_reply_name,
+    )
     reply_persona = reply.get("persona")
     if not isinstance(reply_persona, str) or not reply_persona.strip():
         raise TestimonialGenerationError("Testimonial reply.persona must be a non-empty string.")
@@ -1491,7 +1618,7 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
         raise TestimonialGenerationError(
             "Testimonial reply.reactionCount must be a non-negative integer."
         )
-    if _normalize_identity_key(reply_name) == _normalize_identity_key(name):
+    if _normalize_identity_key(cleaned_reply_name) == _normalize_identity_key(cleaned_name):
         raise TestimonialGenerationError(
             "Testimonial reply.name must be different from the primary testimonial name."
         )
@@ -1524,7 +1651,7 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
             except ValueError as exc:
                 raise TestimonialGenerationError("meta.date must be YYYY-MM-DD.") from exc
     return {
-        "name": name.strip(),
+        "name": cleaned_name,
         "verified": verified,
         "rating": rating,
         "review": review.strip(),
@@ -1533,7 +1660,7 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "heroImagePrompt": hero_prompt.strip(),
         "mediaPrompts": cleaned_media_prompts,
         "reply": {
-            "name": reply_name.strip(),
+            "name": cleaned_reply_name,
             "persona": reply_persona.strip(),
             "text": reply_text.strip(),
             "avatarPrompt": reply_avatar_prompt.strip(),
@@ -1544,7 +1671,20 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _build_testimonial_prompt(*, count: int, copy: str, product_context: str, today: str) -> str:
+def _build_testimonial_prompt(
+    *,
+    count: int,
+    copy: str,
+    product_context: str,
+    today: str,
+    uniqueness_nonce: str | None = None,
+) -> str:
+    nonce_instruction = ""
+    if isinstance(uniqueness_nonce, str) and uniqueness_nonce.strip():
+        nonce_instruction = (
+            "- Uniqueness nonce: "
+            f"{uniqueness_nonce.strip()}. Use it only as an internal variation cue and never output it.\n"
+        )
     return (
         "You are generating synthetic customer testimonials for a landing page.\n"
         "Output JSON only. Do not include markdown or commentary.\n"
@@ -1567,9 +1707,11 @@ def _build_testimonial_prompt(*, count: int, copy: str, product_context: str, to
         "- Do not reference photos/pictures/screenshots/attachments in the review or reply text (the testimonial may render with or without media).\n"
         "- avatarPrompt and heroImagePrompt must be unique per testimonial.\n"
         "- Do not reuse names or personas across testimonials.\n"
+        "- Never append numeric disambiguation suffixes to names (for example: '(2)', '(3)').\n"
         "- meta.location (optional) should be <= 120 characters.\n"
         f"- meta.date (optional) must be YYYY-MM-DD; today is {today}.\n"
         "- Keep claims compliant; avoid medical promises or unrealistic outcomes.\n"
+        f"{nonce_instruction}"
         "- Do not mention being AI or synthetic.\n\n"
         "Product context:\n"
         f"{product_context}\n"
@@ -1722,7 +1864,6 @@ def generate_funnel_page_testimonials(
     llm = LLMClient()
     model_id = model or llm.default_model
     today = datetime.now(timezone.utc).date().isoformat()
-    testimonials: list[dict[str, Any]] = []
     batch_size = 6
     sales_review_wall_social_index = 0
     social_card_variant_index = 0
@@ -1744,51 +1885,103 @@ def generate_funnel_page_testimonials(
     social_comment_index = 0
     review_card_index = 0
 
-    for start in range(0, len(groups), batch_size):
-        batch = groups[start : start + batch_size]
-        prompt = _build_testimonial_prompt(
-            count=len(batch),
-            copy=copy_text,
-            product_context=product_context,
-            today=today,
+    if _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS <= 0:
+        raise TestimonialGenerationError(
+            "FUNNEL_TESTIMONIAL_IDENTITY_ATTEMPTS must be greater than zero."
         )
-
-        params = LLMGenerationParams(
-            model=model_id,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            use_reasoning=True,
-            use_web_search=False,
-            response_format={
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "Testimonials",
-                    "strict": True,
-                    "schema": _testimonial_output_schema(len(batch)),
-                },
-            },
-        )
-        raw = llm.generate_text(prompt, params=params)
-        parsed = _parse_testimonials_response(raw, model_id=model_id)
-        batch_items = parsed.get("testimonials")
-        if not isinstance(batch_items, list):
-            raise TestimonialGenerationError("Testimonials response must include a testimonials array.")
-        if len(batch_items) != len(batch):
-            raise TestimonialGenerationError(
-                f"Expected {len(batch)} testimonials, received {len(batch_items)}."
-            )
-        testimonials.extend(batch_items)
 
     validated_testimonials: list[dict[str, Any]] = []
-    for idx, raw in enumerate(testimonials):
+    for identity_attempt in range(1, _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS + 1):
+        testimonials: list[dict[str, Any]] = []
+        attempt_temperature = min(max(float(temperature), 0.0) + 0.1 * (identity_attempt - 1), 0.9)
+        attempt_nonce = f"{funnel_id}:{page_id}:{resolved_template_id}:{identity_attempt}:{uuid4().hex[:8]}"
+
+        for batch_idx, start in enumerate(range(0, len(groups), batch_size)):
+            batch = groups[start : start + batch_size]
+            prompt = _build_testimonial_prompt(
+                count=len(batch),
+                copy=copy_text,
+                product_context=product_context,
+                today=today,
+                uniqueness_nonce=f"{attempt_nonce}:batch:{batch_idx}",
+            )
+
+            parsed: dict[str, Any]
+            if isinstance(model_id, str) and model_id.lower().startswith("claude"):
+                # LLMClient's Anthropic path currently ignores response_format/json_schema.
+                # Use Anthropic structured outputs directly so we never accept partial/invalid JSON.
+                claude_max_tokens = int(max_tokens) if max_tokens else 16_000
+                resp = call_claude_structured_message(
+                    model=model_id,
+                    system=None,
+                    user_content=[{"type": "text", "text": prompt}],
+                    output_schema=_testimonial_output_schema(len(batch)),
+                    max_tokens=claude_max_tokens,
+                    temperature=attempt_temperature,
+                )
+                parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
+                if not isinstance(parsed_value, dict):
+                    raise TestimonialGenerationError("Claude structured testimonials response was not a JSON object.")
+                parsed = parsed_value
+            else:
+                params = LLMGenerationParams(
+                    model=model_id,
+                    max_tokens=max_tokens,
+                    temperature=attempt_temperature,
+                    use_reasoning=True,
+                    use_web_search=False,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "Testimonials",
+                            "strict": True,
+                            "schema": _testimonial_output_schema(len(batch)),
+                        },
+                    },
+                )
+                raw = llm.generate_text(prompt, params=params)
+                parsed = _parse_testimonials_response(raw, model_id=model_id)
+            batch_items = parsed.get("testimonials")
+            if not isinstance(batch_items, list):
+                raise TestimonialGenerationError("Testimonials response must include a testimonials array.")
+            if len(batch_items) != len(batch):
+                raise TestimonialGenerationError(
+                    f"Expected {len(batch)} testimonials, received {len(batch_items)}."
+                )
+            testimonials.extend(batch_items)
+
+        candidate_validated: list[dict[str, Any]] = []
+        for idx, raw in enumerate(testimonials):
+            try:
+                candidate_validated.append(_validate_testimonial_payload(raw or {}))
+            except TestimonialGenerationError as exc:
+                raise TestimonialGenerationError(
+                    f"Invalid testimonial payload at position {idx + 1}: {exc}"
+                ) from exc
+
         try:
-            validated_testimonials.append(_validate_testimonial_payload(raw or {}))
+            _assert_distinct_testimonial_identities(candidate_validated)
         except TestimonialGenerationError as exc:
-            raise TestimonialGenerationError(
-                f"Invalid testimonial payload at position {idx + 1}: {exc}"
-            ) from exc
-    identity_repairs = _repair_distinct_testimonial_identities(validated_testimonials)
-    _assert_distinct_testimonial_identities(validated_testimonials)
+            is_duplicate_identity_error = "duplicate testimonial" in str(exc).lower()
+            if not is_duplicate_identity_error:
+                raise
+
+            repaired_identities = _repair_distinct_testimonial_identities(candidate_validated)
+            if repaired_identities is not None:
+                _assert_distinct_testimonial_identities(repaired_identities)
+                candidate_validated = repaired_identities
+            elif identity_attempt >= _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS:
+                raise
+            else:
+                continue
+
+        validated_testimonials = candidate_validated
+        break
+
+    if not validated_testimonials:
+        raise TestimonialGenerationError(
+            "Unable to generate distinct testimonial identities after configured retries."
+        )
 
     generated: list[dict[str, Any]] = []
     try:
@@ -2313,6 +2506,11 @@ def generate_funnel_page_testimonials(
 
     if template_kind == "sales-pdp":
         review_wall_images = _collect_sales_pdp_review_wall_images(groups)
+        review_slider_images = _collect_sales_pdp_review_slider_images(groups)
+        reviews_payload_testimonials = _select_sales_pdp_reviews_payload_testimonials(
+            groups=groups,
+            validated_testimonials=validated_testimonials,
+        )
         _sync_sales_pdp_guarantee_feed_images(
             base_puck,
             review_wall_images=review_wall_images,
@@ -2320,9 +2518,9 @@ def generate_funnel_page_testimonials(
         _sync_sales_pdp_reviews_from_testimonials(
             base_puck,
             product=product,
-            validated_testimonials=validated_testimonials,
+            validated_testimonials=reviews_payload_testimonials,
             today=today,
-            review_wall_images=review_wall_images,
+            review_media_images=review_slider_images,
         )
 
     for ctx in contexts:
@@ -2337,7 +2535,7 @@ def generate_funnel_page_testimonials(
         "synthetic": synthetic,
         "testimonialsProvenance": {"source": "synthetic" if synthetic else "production"},
         "generatedTestimonials": generated,
-        "identityRepairs": identity_repairs,
+        "identityRepairs": [],
         "actorUserId": user_id,
         "ideaWorkspaceId": idea_workspace_id,
         "templateId": resolved_template_id,

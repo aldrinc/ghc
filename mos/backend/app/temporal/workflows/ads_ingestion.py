@@ -116,16 +116,30 @@ class AdsIngestionWorkflow:
                 "creative_analysis": None,
             }
 
-        ad_library_totals = await workflow.execute_activity(
-            fetch_ad_library_page_totals_activity,
-            {
-                "research_run_id": upsert_result["research_run_id"],
-                "brand_channel_identity_ids": identity_ids,
-            },
-            start_to_close_timeout=timedelta(minutes=30),
-            schedule_to_close_timeout=timedelta(minutes=45),
-            retry_policy=RetryPolicy(maximum_attempts=1),
-        )
+        ad_library_totals: Dict[str, Any] | None = None
+        try:
+            ad_library_totals = await workflow.execute_activity(
+                fetch_ad_library_page_totals_activity,
+                {
+                    "research_run_id": upsert_result["research_run_id"],
+                    "brand_channel_identity_ids": identity_ids,
+                },
+                start_to_close_timeout=timedelta(minutes=30),
+                schedule_to_close_timeout=timedelta(minutes=45),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+        except Exception as exc:  # noqa: BLE001
+            error_msg = str(exc)
+            workflow.logger.error(
+                "ads_ingestion.totals_activity_failed",
+                extra={
+                    "workflow_id": workflow.info().workflow_id,
+                    "run_id": workflow.info().run_id,
+                    "research_run_id": upsert_result.get("research_run_id"),
+                    "error": error_msg,
+                },
+            )
+            ad_library_totals = {"status": "failed", "error": error_msg}
 
         ingest_result: Dict[str, Any] = {}
         ingest_status: Optional[str] = None
@@ -162,17 +176,36 @@ class AdsIngestionWorkflow:
                 },
             )
 
-        selection_result = await workflow.execute_activity(
-            select_ads_for_context_activity,
-            {"research_run_id": upsert_result["research_run_id"]},
-            start_to_close_timeout=timedelta(minutes=2),
-            schedule_to_close_timeout=timedelta(minutes=5),
-            retry_policy=RetryPolicy(maximum_attempts=1),
-        )
-        selected_ad_ids = selection_result.get("ad_ids") if isinstance(selection_result, dict) else None
-        selection_meta = selection_result.get("selection") if isinstance(selection_result, dict) else None
+        selection_result: Dict[str, Any] | None = None
+        selected_ad_ids = None
+        selection_meta = None
+        selection_error = None
+        try:
+            selection_result = await workflow.execute_activity(
+                select_ads_for_context_activity,
+                {"research_run_id": upsert_result["research_run_id"]},
+                start_to_close_timeout=timedelta(minutes=2),
+                schedule_to_close_timeout=timedelta(minutes=5),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+            )
+            selected_ad_ids = selection_result.get("ad_ids") if isinstance(selection_result, dict) else None
+            selection_meta = selection_result.get("selection") if isinstance(selection_result, dict) else None
+        except Exception as exc:  # noqa: BLE001
+            selection_error = str(exc)
+            workflow.logger.error(
+                "ads_ingestion.select_ads_failed",
+                extra={
+                    "workflow_id": workflow.info().workflow_id,
+                    "run_id": workflow.info().run_id,
+                    "research_run_id": upsert_result.get("research_run_id"),
+                    "error": selection_error,
+                },
+            )
+            selection_result = {"error": selection_error}
 
-        creative_analysis = None
+        creative_analysis: Dict[str, Any] | None = None
+        if input.run_creative_analysis and not selected_ad_ids:
+            creative_analysis = {"skipped": True, "reason": "ad_selection_missing_or_failed", "error": selection_error}
         if input.run_creative_analysis and selected_ad_ids:
             handle = None
             try:
@@ -298,34 +331,63 @@ class AdsIngestionRetryWorkflow:
             ingest_status = ingest_result.get("status")
             ingest_reason = ingest_result.get("reason")
 
-        ad_library_totals = None
+        ad_library_totals: Dict[str, Any] | None = None
         if ingest_status != "skipped":
-            ad_library_totals = await workflow.execute_activity(
-                fetch_ad_library_page_totals_activity,
-                {
-                    "research_run_id": input.research_run_id,
-                    "brand_channel_identity_ids": input.brand_channel_identity_ids,
-                },
-                start_to_close_timeout=timedelta(minutes=30),
-                schedule_to_close_timeout=timedelta(minutes=45),
-                retry_policy=RetryPolicy(maximum_attempts=1),
-            )
+            try:
+                ad_library_totals = await workflow.execute_activity(
+                    fetch_ad_library_page_totals_activity,
+                    {
+                        "research_run_id": input.research_run_id,
+                        "brand_channel_identity_ids": input.brand_channel_identity_ids,
+                    },
+                    start_to_close_timeout=timedelta(minutes=30),
+                    schedule_to_close_timeout=timedelta(minutes=45),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+            except Exception as exc:  # noqa: BLE001
+                error_msg = str(exc)
+                workflow.logger.error(
+                    "ads_ingestion_retry.totals_activity_failed",
+                    extra={
+                        "workflow_id": workflow.info().workflow_id,
+                        "run_id": workflow.info().run_id,
+                        "research_run_id": input.research_run_id,
+                        "error": error_msg,
+                    },
+                )
+                ad_library_totals = {"status": "failed", "error": error_msg}
 
-        selection_result = None
+        selection_result: Dict[str, Any] | None = None
         selected_ad_ids = None
         selection_meta = None
+        selection_error = None
         if ingest_status != "skipped":
-            selection_result = await workflow.execute_activity(
-                select_ads_for_context_activity,
-                {"research_run_id": input.research_run_id},
-                start_to_close_timeout=timedelta(minutes=2),
-                schedule_to_close_timeout=timedelta(minutes=5),
-                retry_policy=RetryPolicy(maximum_attempts=1),
-            )
-            selected_ad_ids = selection_result.get("ad_ids") if isinstance(selection_result, dict) else None
-            selection_meta = selection_result.get("selection") if isinstance(selection_result, dict) else None
+            try:
+                selection_result = await workflow.execute_activity(
+                    select_ads_for_context_activity,
+                    {"research_run_id": input.research_run_id},
+                    start_to_close_timeout=timedelta(minutes=2),
+                    schedule_to_close_timeout=timedelta(minutes=5),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                )
+                selected_ad_ids = selection_result.get("ad_ids") if isinstance(selection_result, dict) else None
+                selection_meta = selection_result.get("selection") if isinstance(selection_result, dict) else None
+            except Exception as exc:  # noqa: BLE001
+                selection_error = str(exc)
+                workflow.logger.error(
+                    "ads_ingestion_retry.select_ads_failed",
+                    extra={
+                        "workflow_id": workflow.info().workflow_id,
+                        "run_id": workflow.info().run_id,
+                        "research_run_id": input.research_run_id,
+                        "error": selection_error,
+                    },
+                )
+                selection_result = {"error": selection_error}
 
-        creative_analysis = None
+        creative_analysis: Dict[str, Any] | None = None
+        if input.run_creative_analysis and not selected_ad_ids:
+            creative_analysis = {"skipped": True, "reason": "ad_selection_missing_or_failed", "error": selection_error}
         if input.run_creative_analysis and selected_ad_ids:
             handle = None
             try:

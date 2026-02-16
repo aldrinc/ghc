@@ -127,13 +127,33 @@ def _generate_nano_image_bytes(
     retries = 2
     last_summary: str | None = None
     for attempt in range(retries + 1):
-        resp = httpx.post(
-            url,
-            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-            json=payload,
-            timeout=60.0,
-        )
-        resp.raise_for_status()
+        try:
+            resp = httpx.post(
+                url,
+                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                json=payload,
+                timeout=60.0,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status == 429 and attempt < retries:
+                retry_after_raw = exc.response.headers.get("Retry-After") if exc.response is not None else None
+                try:
+                    retry_after = float(retry_after_raw) if retry_after_raw else 5.0 * (attempt + 1)
+                except ValueError:
+                    retry_after = 5.0 * (attempt + 1)
+                time.sleep(max(retry_after, 1.0))
+                continue
+            body = exc.response.text if exc.response is not None else ""
+            raise TestimonialRenderError(
+                f"Nano Banana request failed (status={status}): {body}"
+            ) from exc
+        except Exception as exc:  # noqa: BLE001
+            if attempt >= retries:
+                raise TestimonialRenderError(f"Nano Banana request failed: {exc}") from exc
+            time.sleep(0.6 * (attempt + 1))
+            continue
         data = resp.json()
         try:
             image_bytes, mime_type = _extract_first_inline_image(data)

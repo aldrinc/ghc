@@ -53,17 +53,13 @@ def audit_design_system_tokens(tokens: dict[str, Any]) -> list[AuditFinding]:
 
     checks: list[tuple[str, str, str, float]] = [
         ("tokens.contrast.body_on_bg", "--color-text", "--color-bg", 7.0),
-        ("tokens.contrast.muted_on_bg", "--color-muted", "--color-bg", 4.5),
         ("tokens.contrast.brand_on_bg", "--color-brand", "--color-bg", 4.5),
         ("tokens.contrast.pdp_brand_strong_on_bg", "--pdp-brand-strong", "--color-bg", 4.5),
         ("tokens.contrast.body_on_page", "--color-text", "--color-page-bg", 7.0),
-        ("tokens.contrast.muted_on_page", "--color-muted", "--color-page-bg", 4.5),
         ("tokens.contrast.marquee_text_on_marquee_bg", "--marquee-text", "--marquee-bg", 4.5),
         ("tokens.contrast.cta_text_on_cta_bg", "--color-cta-text", "--color-cta", 3.0),
         ("tokens.contrast.cta_text_on_pdp_cta_bg", "--color-cta-text", "--pdp-cta-bg", 3.0),
-        ("tokens.contrast.pdp_check_icon_on_pdp_check_bg", "--color-bg", "--pdp-check-bg", 3.0),
         ("tokens.contrast.pdp_warning_icon_on_pdp_warning_bg", "--color-bg", "--pdp-warning-bg", 3.0),
-        ("tokens.contrast.pdp_cta_icon_on_pdp_white_96", "--pdp-cta-bg", "--pdp-white-96", 3.0),
         ("tokens.contrast.pdp_header_cta_icon_on_cta_shell", "--color-cta-icon", "--color-cta-shell", 3.0),
     ]
 

@@ -5,7 +5,7 @@ from typing import Any, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import Product, ProductOffer, ProductVariant
+from app.db.models import Product, ProductOffer, ProductOfferBonus, ProductVariant
 
 
 class ProductsRepository:
@@ -66,6 +66,54 @@ class ProductOffersRepository:
         self.session.commit()
         self.session.refresh(offer)
         return offer
+
+
+class ProductOfferBonusesRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def list_by_offer(self, *, offer_id: str) -> list[ProductOfferBonus]:
+        stmt = (
+            select(ProductOfferBonus)
+            .where(ProductOfferBonus.offer_id == offer_id)
+            .order_by(ProductOfferBonus.position.asc(), ProductOfferBonus.created_at.asc())
+        )
+        return list(self.session.scalars(stmt).all())
+
+    def create(
+        self,
+        *,
+        org_id: str,
+        client_id: str,
+        offer_id: str,
+        bonus_product_id: str,
+        position: int,
+    ) -> ProductOfferBonus:
+        link = ProductOfferBonus(
+            org_id=org_id,
+            client_id=client_id,
+            offer_id=offer_id,
+            bonus_product_id=bonus_product_id,
+            position=position,
+        )
+        self.session.add(link)
+        self.session.commit()
+        self.session.refresh(link)
+        return link
+
+    def delete_by_offer_and_bonus_product(
+        self, *, offer_id: str, bonus_product_id: str
+    ) -> bool:
+        stmt = select(ProductOfferBonus).where(
+            ProductOfferBonus.offer_id == offer_id,
+            ProductOfferBonus.bonus_product_id == bonus_product_id,
+        )
+        link = self.session.scalars(stmt).first()
+        if not link:
+            return False
+        self.session.delete(link)
+        self.session.commit()
+        return True
 
 
 class ProductVariantsRepository:

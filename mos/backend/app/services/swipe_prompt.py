@@ -34,19 +34,22 @@ def build_swipe_context_block(
     *,
     brand_name: str,
     product_name: str,
-    angle: str,
     audience: str | None = None,
     brand_colors_fonts: str | None = None,
     must_avoid_claims: List[str] | None = None,
     assets: Dict[str, str] | None = None,
-    research_copy_bank: List[str] | None = None,
+    creative_concept: str | None = None,
+    channel: str | None = None,
+    angle: str | None = None,
+    hook: str | None = None,
+    constraints: List[str] | None = None,
+    tone_guidelines: List[str] | None = None,
+    visual_guidelines: List[str] | None = None,
 ) -> str:
     if not isinstance(brand_name, str) or not brand_name.strip():
         raise ValueError("brand_name is required to build swipe context block")
     if not isinstance(product_name, str) or not product_name.strip():
         raise ValueError("product_name is required to build swipe context block")
-    if not isinstance(angle, str) or not angle.strip():
-        raise ValueError("angle is required to build swipe context block")
 
     lines: List[str] = []
     lines.append("## SWIPE CONTEXT")
@@ -72,15 +75,39 @@ def build_swipe_context_block(
     else:
         lines.append("- [UNKNOWN]")
 
-    lines.append(f"Angle: {angle.strip()}")
+    lines.append("")
+    lines.append("## CREATIVE BRIEF CONTEXT")
+    lines.append(f"Creative concept: {_normalize_unknown(creative_concept)}")
+    lines.append(f"Channel: {_normalize_unknown(channel)}")
+    lines.append("Format: image.")
+    lines.append(f"Angle: {_normalize_unknown(angle)}")
+    lines.append(f"Hook: {_normalize_unknown(hook)}")
 
-    copy_bank = [s.strip() for s in (research_copy_bank or []) if isinstance(s, str) and s.strip()]
-    lines.append("Research copy bank (use for emotional, visceral, stop-the-scroll phrasing; do not invent facts):")
-    if copy_bank:
-        for entry in copy_bank[:50]:
-            lines.append(f"- {entry}")
-        if len(copy_bank) > 50:
-            lines.append(f"- [TRUNCATED: {len(copy_bank) - 50} more lines]")
+    cleaned_constraints = [item.strip() for item in (constraints or []) if isinstance(item, str) and item.strip()]
+    lines.append("Constraints:")
+    if cleaned_constraints:
+        for item in cleaned_constraints:
+            lines.append(f"- {item}")
+    else:
+        lines.append("- [UNKNOWN]")
+
+    cleaned_tone_guidelines = [
+        item.strip() for item in (tone_guidelines or []) if isinstance(item, str) and item.strip()
+    ]
+    lines.append("Tone guidelines:")
+    if cleaned_tone_guidelines:
+        for item in cleaned_tone_guidelines:
+            lines.append(f"- {item}")
+    else:
+        lines.append("- [UNKNOWN]")
+
+    cleaned_visual_guidelines = [
+        item.strip() for item in (visual_guidelines or []) if isinstance(item, str) and item.strip()
+    ]
+    lines.append("Visual guidelines:")
+    if cleaned_visual_guidelines:
+        for item in cleaned_visual_guidelines:
+            lines.append(f"- {item}")
     else:
         lines.append("- [UNKNOWN]")
 

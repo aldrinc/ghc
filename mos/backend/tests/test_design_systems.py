@@ -53,7 +53,7 @@ def test_create_design_system_allows_text_tokens_coupled_to_brand(api_client: Te
     assert resp.status_code == 201
 
 
-def test_update_design_system_rejects_invalid_text_tokens(api_client: TestClient):
+def test_update_design_system_allows_low_contrast_muted_text(api_client: TestClient):
     client_resp = api_client.post("/clients", json={"name": "Design System Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
@@ -72,8 +72,7 @@ def test_update_design_system_rejects_invalid_text_tokens(api_client: TestClient
         f"/design-systems/{design_system_id}",
         json={"tokens": invalid_tokens},
     )
-    assert update_resp.status_code == 422
-    assert "--color-muted" in (update_resp.json().get("detail") or "")
+    assert update_resp.status_code == 200
 
 
 def test_create_design_system_rejects_locked_layout_tokens(api_client: TestClient):

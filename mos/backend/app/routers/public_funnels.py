@@ -333,9 +333,10 @@ def public_funnel_commerce(
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    variants = session.scalars(
-        select(ProductVariant).where(ProductVariant.product_id == product.id)
-    ).all()
+    variants_query = select(ProductVariant).where(ProductVariant.product_id == product.id)
+    if funnel.selected_offer_id:
+        variants_query = variants_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
+    variants = session.scalars(variants_query).all()
     if not variants:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -377,12 +378,13 @@ def public_checkout(
 
     variant: ProductVariant | None = None
     if payload.variantId:
-        variant = session.scalars(
-            select(ProductVariant).where(
-                ProductVariant.id == payload.variantId,
-                ProductVariant.product_id == funnel.product_id,
-            )
-        ).first()
+        variant_query = select(ProductVariant).where(
+            ProductVariant.id == payload.variantId,
+            ProductVariant.product_id == funnel.product_id,
+        )
+        if funnel.selected_offer_id:
+            variant_query = variant_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
+        variant = session.scalars(variant_query).first()
         if not variant:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
         if variant.option_values is None and payload.selection:
@@ -401,9 +403,10 @@ def public_checkout(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="selection is required when variantId is not provided.",
             )
-        candidates = session.scalars(
-            select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
-        ).all()
+        candidates_query = select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
+        if funnel.selected_offer_id:
+            candidates_query = candidates_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
+        candidates = session.scalars(candidates_query).all()
         matches = [item for item in candidates if item.option_values == payload.selection]
         if len(matches) != 1:
             raise HTTPException(
@@ -423,6 +426,7 @@ def public_checkout(
     metadata = {
         "public_id": _metadata_value(payload.publicId, "publicId"),
         "funnel_id": _metadata_value(str(funnel.id), "funnelId"),
+        "offer_id": _metadata_value(str(funnel.selected_offer_id), "offerId") if funnel.selected_offer_id else None,
         "variant_id": _metadata_value(str(variant.id), "variantId"),
         # Legacy key kept for older webhooks/reporting paths.
         "price_point_id": _metadata_value(str(variant.id), "pricePointId"),

@@ -5,11 +5,11 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 
 from app.config import settings
-from app.db.models import Client, Funnel, FunnelOrder, Product, ProductVariant
+from app.db.models import Client, Funnel, FunnelOrder, Product, ProductOffer, ProductVariant
 from app.routers import public_funnels
 
 
-def _seed_shopify_funnel(*, db_session, org_id: UUID):
+def _seed_shopify_funnel(*, db_session, org_id: UUID, with_selected_offer: bool = False):
     client = Client(org_id=org_id, name="Shopify Client", industry="Retail")
     db_session.add(client)
     db_session.commit()
@@ -20,8 +20,22 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID):
     db_session.commit()
     db_session.refresh(product)
 
+    selected_offer = None
+    if with_selected_offer:
+        selected_offer = ProductOffer(
+            org_id=org_id,
+            client_id=client.id,
+            product_id=product.id,
+            name="Primary Offer",
+            business_model="one_time",
+        )
+        db_session.add(selected_offer)
+        db_session.commit()
+        db_session.refresh(selected_offer)
+
     variant = ProductVariant(
         product_id=product.id,
+        offer_id=selected_offer.id if selected_offer else None,
         title="Default",
         price=2999,
         currency="USD",
@@ -37,6 +51,7 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID):
         org_id=org_id,
         client_id=client.id,
         product_id=product.id,
+        selected_offer_id=selected_offer.id if selected_offer else None,
         name="Shopify Funnel",
         public_id=uuid4(),
     )
@@ -47,13 +62,18 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID):
     return {
         "client": client,
         "product": product,
+        "offer": selected_offer,
         "variant": variant,
         "funnel": funnel,
     }
 
 
 def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_context, monkeypatch):
-    seeded = _seed_shopify_funnel(db_session=db_session, org_id=UUID(auth_context.org_id))
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+    )
 
     observed: dict[str, object] = {}
 
@@ -94,6 +114,45 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     assert isinstance(metadata, dict)
     assert metadata["funnel_id"] == str(seeded["funnel"].id)
     assert metadata["variant_id"] == str(seeded["variant"].id)
+    assert metadata["offer_id"] == str(seeded["offer"].id)
+
+
+def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, db_session, auth_context):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+    )
+
+    secondary_offer = ProductOffer(
+        org_id=seeded["offer"].org_id,
+        client_id=seeded["offer"].client_id,
+        product_id=seeded["product"].id,
+        name="Secondary Offer",
+        business_model="one_time",
+    )
+    db_session.add(secondary_offer)
+    db_session.commit()
+    db_session.refresh(secondary_offer)
+
+    secondary_variant = ProductVariant(
+        product_id=seeded["product"].id,
+        offer_id=secondary_offer.id,
+        title="Other Offer Variant",
+        price=4999,
+        currency="USD",
+        provider="shopify",
+        external_price_id="gid://shopify/ProductVariant/999999999",
+        option_values={"offerId": "other"},
+    )
+    db_session.add(secondary_variant)
+    db_session.commit()
+
+    response = api_client.get(f"/public/funnels/{seeded['funnel'].public_id}/commerce")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["product"]["variants_count"] == 1
+    assert payload["product"]["variants"][0]["id"] == str(seeded["variant"].id)
 
 
 def test_shopify_orders_webhook_persists_funnel_order(api_client, db_session, auth_context, monkeypatch):

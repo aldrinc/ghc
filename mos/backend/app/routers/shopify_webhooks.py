@@ -120,7 +120,10 @@ def ingest_shopify_order_webhook(
 
     funnel_id = _parse_required_uuid(payload.noteAttributes.get("funnel_id"), "funnel_id")
     offer_id = _parse_optional_uuid(payload.noteAttributes.get("offer_id"), "offer_id")
-    price_point_id = _parse_optional_uuid(payload.noteAttributes.get("price_point_id"), "price_point_id")
+    price_point_id = _parse_optional_uuid(
+        payload.noteAttributes.get("variant_id") or payload.noteAttributes.get("price_point_id"),
+        "price_point_id",
+    )
     page_id = _parse_optional_uuid(payload.noteAttributes.get("page_id"), "page_id")
     visitor_id = payload.noteAttributes.get("visitor_id") or None
     session_id = payload.noteAttributes.get("session_id") or None

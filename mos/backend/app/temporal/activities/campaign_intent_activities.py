@@ -15,7 +15,6 @@ from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
 from app.services.funnels import generate_unique_slug
 from app.services.funnel_templates import get_funnel_template, apply_template_assets
 from app.agent.funnel_objectives import run_generate_page_draft
-from app.services.funnel_testimonials import generate_funnel_page_testimonials
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.design_systems import DesignSystemsRepository
@@ -246,6 +245,12 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         "funnel_id": str(funnel.id),
                     },
                 )
+                if generate_testimonials:
+                    log_activity(
+                        "funnel_page_testimonials",
+                        "started",
+                        payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
+                    )
                 try:
                     result = run_generate_page_draft(
                         session=session,
@@ -257,6 +262,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         current_puck_data=puck_data,
                         template_id=template_id,
                         idea_workspace_id=idea_workspace_id,
+                        generate_testimonials=generate_testimonials,
                     )
                     draft_version_id = result.get("draftVersionId") or ""
                     generated_images = result.get("generatedImages") or []
@@ -281,6 +287,25 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                             "funnel_id": str(funnel.id),
                         },
                     )
+                    if generate_testimonials:
+                        error_text = str(exc)
+                        if "testimonial" in error_text.lower():
+                            log_activity(
+                                "funnel_page_testimonials",
+                                "failed",
+                                error=error_text,
+                                payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
+                            )
+                        else:
+                            log_activity(
+                                "funnel_page_testimonials",
+                                "skipped",
+                                payload_in={
+                                    "page_id": str(page.id),
+                                    "funnel_id": str(funnel.id),
+                                    "reason": "Draft generation failed before testimonial step.",
+                                },
+                            )
                     raise
                 else:
                     log_activity(
@@ -292,50 +317,27 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                             "funnel_id": str(funnel.id),
                         },
                     )
-
-                if generate_testimonials:
-                    log_activity(
-                        "funnel_page_testimonials",
-                        "started",
-                        payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
-                    )
-                    try:
-                        generate_funnel_page_testimonials(
-                            session=session,
-                            org_id=org_id,
-                            user_id=str(actor_user_id),
-                            funnel_id=str(funnel.id),
-                            page_id=str(page.id),
-                            draft_version_id=draft_version_id,
-                            template_id=template_id,
-                            idea_workspace_id=idea_workspace_id,
-                            synthetic=True,
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        log_activity(
-                            "funnel_page_testimonials",
-                            "failed",
-                            error=str(exc),
-                            payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
-                        )
-                        raise
-                    else:
+                    if generate_testimonials:
                         log_activity(
                             "funnel_page_testimonials",
                             "completed",
-                            payload_out={"page_id": str(page.id), "funnel_id": str(funnel.id)},
+                            payload_out={
+                                "page_id": str(page.id),
+                                "funnel_id": str(funnel.id),
+                                "draft_version_id": draft_version_id,
+                                "mode": "inline_page_draft",
+                            },
                         )
-                else:
-                    log_activity(
-                        "funnel_page_testimonials",
-                        "skipped",
-                        payload_in={
-                            "page_id": str(page.id),
-                            "funnel_id": str(funnel.id),
-                            "reason": "Synthetic testimonials require explicit authorization; generation disabled by default.",
-                        },
-                    )
-
+                    else:
+                        log_activity(
+                            "funnel_page_testimonials",
+                            "skipped",
+                            payload_in={
+                                "page_id": str(page.id),
+                                "funnel_id": str(funnel.id),
+                                "reason": "Synthetic testimonials generation disabled for this run.",
+                            },
+                        )
         if created_pages:
             funnels_repo.update(
                 org_id=org_id,

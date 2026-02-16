@@ -219,10 +219,15 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
             base_puck = template.puck_data
 
         required_types: list[str] = []
-        if template is not None and isinstance(base_puck, dict):
-            required_types = sorted(
-                funnel_ai._required_template_component_types(base_puck, template_kind=template_kind)
-            )
+        if template is not None:
+            # Required components should track the active template definition, not the stored page puckData.
+            # Older funnels may have been created from a previous template structure; DraftApplyOverridesTool
+            # upgrades/merges them with the latest template before validation.
+            required_source = template.puck_data if isinstance(template.puck_data, dict) else base_puck
+            if isinstance(required_source, dict):
+                required_types = sorted(
+                    funnel_ai._required_template_component_types(required_source, template_kind=template_kind)
+                )
 
         allowed_types = sorted(
             _allowed_component_types(template_kind, template_mode=template is not None)
@@ -533,7 +538,15 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Prefer Unsplash for stock-appropriate imagery (lifestyle, generic product-in-use, backgrounds).\n"
                 "- To use Unsplash, set imageSource='unsplash' on the image object and include a prompt.\n"
                 "- Use AI generation only when stock imagery does not fit the need.\n"
-                "- Icon prompts (iconAssetPublicId) must be flat vector icons on transparent backgrounds.\n"
+                "- Icon prompts (iconAssetPublicId) must use this style template, replacing <subject> with the context item: "
+                "\"High-quality flat design icon of <subject>. Minimalist vector style with subtle depth. Clean thick lines, "
+                "soft pastel colors, flat lighting with a very subtle long shadow to add dimension. "
+                "Full-bleed composition where the icon symbol occupies nearly the entire frame with minimal padding. "
+                "Do not place the icon inside a badge, circle, tile, button, sticker, or any container shape. "
+                "Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. "
+                "Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.\"\n"
+                "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
+                "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
                 "- Do not set referenceAssetPublicId unless you are using one of the attached images listed above.\n"
                 "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n\n"
             )
@@ -962,6 +975,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         restored_sections = 0
         dropped_extra_sections = 0
         restored_testimonial_image_slots = 0
+        checkout_purchase_ids_aligned = 0
         dropped_extra_section_summaries: list[dict[str, str]] = []
         if args.templateKind and base_puck_for_restore is not None:
             page_type: str | None = None
@@ -1390,7 +1404,29 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             product=product,
             brand_logo_public_id=args.brandLogoAssetPublicId,
         )
-        funnel_ai._ensure_flat_vector_icon_prompts(puck_data=args.puckData, config_contexts=config_contexts)
+        if args.templateKind == "sales-pdp":
+            funnel_ai._enforce_sales_pdp_guarantee_testimonial_only_images(
+                puck_data=args.puckData,
+                config_contexts=config_contexts,
+            )
+        funnel_ai._ensure_flat_vector_icon_prompts(
+            puck_data=args.puckData,
+            config_contexts=config_contexts,
+            design_system_tokens=args.designSystemTokens if isinstance(args.designSystemTokens, dict) else None,
+        )
+        fallback_icon_puck = base_puck_for_restore if isinstance(base_puck_for_restore, dict) else None
+        if args.templateKind == "pre-sales-listicle":
+            funnel_ai._ensure_pre_sales_badge_icons(
+                puck_data=args.puckData,
+                config_contexts=config_contexts,
+                fallback_puck_data=fallback_icon_puck,
+            )
+            funnel_ai._apply_icon_remix_overrides_for_ai(
+                puck_data=args.puckData,
+                config_contexts=config_contexts,
+                fallback_puck_data=fallback_icon_puck,
+                design_system_tokens=args.designSystemTokens if isinstance(args.designSystemTokens, dict) else None,
+            )
 
         # Template pages often include image nodes inside config structures. The LLM occasionally deletes
         # src/iconSrc fields while leaving prompts empty, which makes image validation fail. Restore missing
@@ -1490,13 +1526,14 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             variants_query = select(ProductVariant).where(ProductVariant.product_id == product.id)
             if funnel.selected_offer_id:
                 variants_query = variants_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
+            variants_query = variants_query.order_by(ProductVariant.price.asc(), ProductVariant.title.asc(), ProductVariant.id.asc())
             variants = list(ctx.session.scalars(variants_query).all())
             if not variants:
                 raise ValueError(
                     "Checkout is not configured for this funnel product. No product variants were found."
                 )
 
-            def load_config(props: dict[str, Any], *, label: str) -> dict[str, Any]:
+            def load_config(props: dict[str, Any], *, label: str) -> tuple[dict[str, Any], str]:
                 raw = props.get("configJson")
                 if isinstance(raw, str) and raw.strip():
                     try:
@@ -1505,11 +1542,11 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                         raise ValueError(f"{label}.configJson must be valid JSON: {exc}") from exc
                     if not isinstance(parsed, dict):
                         raise ValueError(f"{label}.configJson must decode to a JSON object.")
-                    return parsed
+                    return parsed, "configJson"
                 cfg = props.get("config")
                 if not isinstance(cfg, dict):
                     raise ValueError(f"{label} is missing config/configJson.")
-                return cfg
+                return cfg, "config"
 
             hero_props: dict[str, Any] | None = None
             for obj in funnel_ai.walk_json(args.puckData):
@@ -1522,10 +1559,29 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             if hero_props is None:
                 raise ValueError("Checkout validation failed: SalesPdpHero block is missing from puckData.")
 
-            hero_cfg = load_config(hero_props, label="SalesPdpHero")
+            hero_cfg, hero_cfg_source = load_config(hero_props, label="SalesPdpHero")
             purchase = hero_cfg.get("purchase")
             if not isinstance(purchase, dict):
                 raise ValueError("Checkout validation failed: SalesPdpHero.config.purchase must be an object.")
+
+            variant_inputs: list[dict[str, Any]] = []
+            for variant in variants:
+                variant_inputs.append(
+                    {
+                        "title": variant.title,
+                        "amount_cents": variant.price,
+                        "option_values": variant.option_values,
+                    }
+                )
+            if funnel_ai._align_sales_pdp_purchase_options_to_variants(
+                purchase=purchase,
+                variants=variant_inputs,
+            ):
+                checkout_purchase_ids_aligned += 1
+                if hero_cfg_source == "configJson":
+                    hero_props["configJson"] = json.dumps(hero_cfg, ensure_ascii=False)
+                else:
+                    hero_props["config"] = hero_cfg
 
             def ids_from(options_path: list[str], *, label: str) -> list[str]:
                 node: Any = purchase
@@ -1631,6 +1687,10 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         funnel_ai._sync_config_json_contexts(config_contexts)
 
         applied = ["brand_logo", "product_images", "icon_prompts"]
+        if args.templateKind == "pre-sales-listicle":
+            applied.extend(["pre_sales_badge_icons", "icon_remix"])
+        if checkout_purchase_ids_aligned:
+            applied.append("checkout_purchase_ids")
         if restored_sections:
             applied.append("restore_base_sections")
         if dropped_extra_sections:

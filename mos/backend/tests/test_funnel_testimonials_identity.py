@@ -34,7 +34,7 @@ def _testimonial(
     }
 
 
-def test_repair_distinct_testimonial_identities_resolves_duplicates():
+def test_assert_distinct_testimonial_identities_rejects_duplicates():
     testimonials = [
         _testimonial(
             name="Marcus Chen",
@@ -50,18 +50,11 @@ def test_repair_distinct_testimonial_identities_resolves_duplicates():
         ),
     ]
 
-    repairs = funnel_testimonials._repair_distinct_testimonial_identities(testimonials)
-
-    assert repairs
-    funnel_testimonials._assert_distinct_testimonial_identities(testimonials)
-    assert testimonials[0]["name"] == "Marcus Chen"
-    assert testimonials[1]["name"] != "Marcus Chen"
-    assert testimonials[1]["reply"]["name"] != "Dana Flores"
-    assert testimonials[1]["persona"] != "Busy parent seeking easier routines."
-    assert testimonials[1]["reply"]["persona"] != "Friend comparing evening routines."
+    with pytest.raises(funnel_testimonials.TestimonialGenerationError, match="Duplicate testimonial name"):
+        funnel_testimonials._assert_distinct_testimonial_identities(testimonials)
 
 
-def test_repair_distinct_testimonial_identities_preserves_unique_values():
+def test_assert_distinct_testimonial_identities_accepts_unique_values():
     testimonials = [
         _testimonial(
             name="Marcus Chen",
@@ -77,12 +70,39 @@ def test_repair_distinct_testimonial_identities_preserves_unique_values():
         ),
     ]
 
-    repairs = funnel_testimonials._repair_distinct_testimonial_identities(testimonials)
-
-    assert repairs == []
     funnel_testimonials._assert_distinct_testimonial_identities(testimonials)
     assert testimonials[0]["name"] == "Marcus Chen"
     assert testimonials[1]["name"] == "Avery Patel"
+
+
+def test_validate_testimonial_payload_rejects_numeric_suffix_in_name():
+    payload = _testimonial(
+        name="Marcus Chen (2)",
+        persona="Busy parent seeking easier routines.",
+        reply_name="Dana Flores",
+        reply_persona="Friend comparing evening routines.",
+    )
+
+    with pytest.raises(
+        funnel_testimonials.TestimonialGenerationError,
+        match=r"Testimonial name cannot use numeric disambiguation suffixes",
+    ):
+        funnel_testimonials._validate_testimonial_payload(payload)
+
+
+def test_validate_testimonial_payload_rejects_numeric_suffix_in_reply_name():
+    payload = _testimonial(
+        name="Marcus Chen",
+        persona="Busy parent seeking easier routines.",
+        reply_name="Dana Flores (2)",
+        reply_persona="Friend comparing evening routines.",
+    )
+
+    with pytest.raises(
+        funnel_testimonials.TestimonialGenerationError,
+        match=r"Testimonial reply\.name cannot use numeric disambiguation suffixes",
+    ):
+        funnel_testimonials._validate_testimonial_payload(payload)
 
 
 def test_scene_mode_cycles_for_single_and_media_slots():

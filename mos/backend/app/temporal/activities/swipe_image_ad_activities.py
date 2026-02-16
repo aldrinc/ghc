@@ -34,6 +34,7 @@ from app.services.swipe_prompt import (
 
 # Reuse existing asset generation helpers to keep asset storage + product reference syncing consistent.
 from app.temporal.activities.asset_activities import (  # noqa: E402
+    _ProductReferenceAsset,
     _build_image_reference_text,
     _create_generated_asset_from_url,
     _ensure_remote_reference_asset_ids,
@@ -381,10 +382,10 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 error=error,
             )
 
-        log_activity(
-            "swipe_image_ad",
-            "started",
-            payload_in={
+    log_activity(
+        "swipe_image_ad",
+        "started",
+        payload_in={
             "asset_brief_id": asset_brief_id,
             "campaign_id": campaign_id,
             "company_swipe_id": company_swipe_id,
@@ -434,12 +435,22 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(requirement, dict):
             raise ValueError("Asset brief requirement must be an object.")
 
+        creative_concept_raw = brief.get("creativeConcept")
+        if not isinstance(creative_concept_raw, str) or not creative_concept_raw.strip():
+            raise ValueError("Asset brief is missing creativeConcept.")
+        creative_concept = creative_concept_raw.strip()
+
         channel_id = (requirement.get("channel") or "meta").strip()
         fmt = (requirement.get("format") or "image").strip()
-        angle = requirement.get("angle")
-        if not isinstance(angle, str) or not angle.strip():
-            raise ValueError("Asset brief requirement is missing angle (required for swipe prompt generation).")
-        hook = requirement.get("hook")
+        angle = requirement.get("angle") if isinstance(requirement.get("angle"), str) else None
+        hook = requirement.get("hook") if isinstance(requirement.get("hook"), str) else None
+        constraints = [item for item in (brief.get("constraints") or []) if isinstance(item, str) and item.strip()]
+        tone_guidelines = [
+            item for item in (brief.get("toneGuidelines") or []) if isinstance(item, str) and item.strip()
+        ]
+        visual_guidelines = [
+            item for item in (brief.get("visualGuidelines") or []) if isinstance(item, str) and item.strip()
+        ]
 
         # Creative brief / brand context.
         brand_ctx = _extract_brand_context(
@@ -456,12 +467,39 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         audience = _format_audience_from_canon(canon)
         brand_colors_fonts = _brand_colors_fonts_from_design_tokens(tokens)
         must_avoid_claims = _must_avoid_claims_from_canon(canon)
-        research_copy_bank = _research_copy_bank_from_canon(canon)
-        if not research_copy_bank:
-            raise ValueError(
-                "No research copy bank found in client canon (voiceOfCustomer/research_highlights/precanon_research). "
-                "Cannot generate research-grounded emotional copy."
+        brand_tokens = tokens.get("brand") if isinstance(tokens.get("brand"), dict) else {}
+        logo_asset_public_id_raw = brand_tokens.get("logoAssetPublicId")
+        logo_asset_public_id = (
+            logo_asset_public_id_raw.strip()
+            if isinstance(logo_asset_public_id_raw, str) and logo_asset_public_id_raw.strip()
+            else None
+        )
+        if isinstance(logo_asset_public_id, str) and logo_asset_public_id.startswith("__"):
+            logo_asset_public_id = None
+
+        # Prepare product references early so context can include concrete existing packshot details.
+        product_reference_assets = _select_product_reference_assets(
+            session=session,
+            org_id=org_id,
+            product_id=product_id,
+        )
+        # Always resync product references to creative service for this run.
+        # Cached creativeServiceReferenceAssetId values can be stale across different
+        # creative-service storage buckets and cause reference serialization failures.
+        product_reference_assets = [
+            _ProductReferenceAsset(
+                local_asset_id=reference.local_asset_id,
+                primary_url=reference.primary_url,
+                title=reference.title,
+                remote_asset_id=None,
             )
+            for reference in product_reference_assets
+        ]
+        context_assets: Dict[str, str] = {}
+        if logo_asset_public_id:
+            context_assets["BRAND_LOGO_ASSET_PUBLIC_ID"] = logo_asset_public_id
+        for idx, reference in enumerate(product_reference_assets[:3], start=1):
+            context_assets[f"PRODUCT_PACKSHOT_{idx}"] = reference.primary_url
 
         # Swipe image bytes.
         swipe_bytes, swipe_mime_type, swipe_source_url = _resolve_swipe_image(
@@ -475,12 +513,28 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         context_block = build_swipe_context_block(
             brand_name=str(client_name),
             product_name=str(product_title),
-            angle=(angle.strip() + (f" | Hook: {hook.strip()}" if isinstance(hook, str) and hook.strip() else "")),
             audience=audience,
             brand_colors_fonts=brand_colors_fonts,
             must_avoid_claims=must_avoid_claims,
-            assets=None,
-            research_copy_bank=research_copy_bank,
+            assets=context_assets or None,
+            creative_concept=creative_concept,
+            channel=channel_id,
+            angle=angle,
+            hook=hook,
+            constraints=constraints,
+            tone_guidelines=tone_guidelines,
+            visual_guidelines=visual_guidelines,
+        )
+
+        brief_context_signature = _stable_idempotency_key(
+            "swipe_brief_context_v1",
+            creative_concept,
+            channel_id,
+            angle.strip() if isinstance(angle, str) else "",
+            hook.strip() if isinstance(hook, str) else "",
+            "||".join(constraints),
+            "||".join(tone_guidelines),
+            "||".join(visual_guidelines),
         )
 
         # Run Gemini to generate the generation-ready image prompt.
@@ -507,11 +561,6 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             raise RuntimeError(f"Failed to parse swipe prompt output: {exc}") from exc
 
         # Prepare creative service references (product + swipe).
-        product_reference_assets = _select_product_reference_assets(
-            session=session,
-            org_id=org_id,
-            product_id=product_id,
-        )
         product_reference_remote_ids = _ensure_remote_reference_asset_ids(
             session=session,
             org_id=org_id,
@@ -547,6 +596,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 f"Competitor swipe layout reference (do not copy branding): {swipe_source_url}",
             ]
         ).strip()
+        reference_signature = _stable_idempotency_key(
+            "swipe_reference_assets_v1",
+            swipe_remote_asset_id,
+            *product_reference_remote_ids,
+        )
 
         idempotency_key = _stable_idempotency_key(
             org_id,
@@ -560,6 +614,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             str(render_count),
             model,
             prompt_sha,
+            brief_context_signature,
+            reference_signature,
         )
 
         image_payload = CreativeServiceImageAdsCreateIn(
@@ -605,6 +661,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipeRemoteAssetId": swipe_remote_asset_id,
                 "swipePromptModel": model,
                 "swipePromptTemplateSha256": prompt_sha,
+                "swipeBriefContextSignature": brief_context_signature,
                 "swipePromptMarkdownSha256": hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
                 "swipePromptMarkdownPreview": raw_output[:4000],
             }
