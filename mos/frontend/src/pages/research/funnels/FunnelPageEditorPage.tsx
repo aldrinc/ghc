@@ -13,6 +13,7 @@ import { createFunnelAiPlugin } from "@/funnels/puckAiPlugin";
 import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
 import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
+import { buildPublicFunnelPath } from "@/funnels/runtimeRouting";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -80,6 +81,12 @@ export function FunnelPageEditorPage() {
     const page = funnel?.pages?.find((p) => p.id === pageId);
     return page ? `${page.name} (${page.slug})` : "Page";
   }, [funnel?.pages, pageId]);
+  const publicPageHref = useMemo(() => {
+    const publicId = (funnel?.public_id || "").trim();
+    const slug = (metaSlug || pageDetail?.page.slug || "").trim();
+    if (!publicId || !slug) return null;
+    return buildPublicFunnelPath({ publicId, slug, rootMode: false });
+  }, [funnel?.public_id, metaSlug, pageDetail?.page.slug]);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
   const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
@@ -172,6 +179,15 @@ export function FunnelPageEditorPage() {
               ) : null}
               <MenuSeparator />
               <MenuItem onClick={() => setSettingsOpen(true)}>Edit settings</MenuItem>
+              <MenuItem
+                onClick={() => {
+                  if (!publicPageHref) return;
+                  window.open(publicPageHref, "_blank", "noreferrer");
+                }}
+                className={!publicPageHref ? "pointer-events-none opacity-60" : undefined}
+              >
+                Open public page
+              </MenuItem>
               <MenuSeparator />
               <MenuItem
                 onClick={() => {

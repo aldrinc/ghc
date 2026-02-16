@@ -105,6 +105,7 @@ export function useCreateFunnel() {
     mutationFn: (payload: {
       clientId: string;
       productId: string;
+      selectedOfferId?: string | null;
       name: string;
       description?: string;
       campaignId?: string | null;

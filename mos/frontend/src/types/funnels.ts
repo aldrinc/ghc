@@ -7,6 +7,7 @@ export type Funnel = {
   org_id: string;
   client_id: string;
   product_id?: string | null;
+  selected_offer_id?: string | null;
   campaign_id: string | null;
   experiment_spec_id?: string | null;
   design_system_id?: string | null;

@@ -10,6 +10,7 @@ export interface Product {
   tags: string[];
   template_suffix?: string | null;
   published_at?: string | null;
+  shopify_product_gid?: string | null;
   primary_benefits: string[];
   feature_bullets: string[];
   guarantee_text?: string | null;
@@ -73,6 +74,36 @@ export interface ProductAsset {
   is_primary: boolean;
 }
 
+export interface ProductOfferBonusProduct {
+  id: string;
+  title: string;
+  description?: string | null;
+  product_type?: string | null;
+  shopify_product_gid?: string | null;
+}
+
+export interface ProductOfferBonus {
+  id: string;
+  position: number;
+  created_at: string;
+  bonus_product: ProductOfferBonusProduct;
+}
+
+export interface ProductOffer {
+  id: string;
+  org_id: string;
+  client_id: string;
+  product_id?: string | null;
+  name: string;
+  description?: string | null;
+  business_model: string;
+  differentiation_bullets: string[];
+  guarantee_text?: string | null;
+  options_schema?: Record<string, unknown> | null;
+  created_at: string;
+  bonuses: ProductOfferBonus[];
+}
+
 export interface CreativeBriefAssetGroup {
   assetBriefId: string;
   assets: ProductAsset[];
@@ -82,4 +113,5 @@ export interface ProductDetail extends Product {
   variants: ProductVariant[];
   assets: ProductAsset[];
   creative_brief_assets: CreativeBriefAssetGroup[];
+  offers: ProductOffer[];
 }

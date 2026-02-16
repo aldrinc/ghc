@@ -454,7 +454,8 @@
       "right": {
         "image": {
           "src": "/assets/ph-4x3.svg",
-          "alt": "Customer photo"
+          "alt": "Customer photo",
+          "testimonialTemplate": "review_card"
         },
         "reviewCard": {
           "name": "Maria Fig",

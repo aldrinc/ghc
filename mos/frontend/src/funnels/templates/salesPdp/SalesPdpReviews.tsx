@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Search } from "lucide-react";
 
 /**
  * -----------------------------
@@ -467,10 +467,10 @@ function MediaGallery({ items }: { items: MediaAsset[] }) {
         <button
           type="button"
           aria-label="Scroll left"
-          onClick={() => scrollByPx(-420)}
+          onClick={() => scrollByPx(-640)}
           className="absolute left-1 top-1/2 z-10 -translate-y-1/2 rounded-full bg-overlay/80 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <ChevronLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5" strokeWidth={1.5} />
         </button>
       )}
 
@@ -478,20 +478,28 @@ function MediaGallery({ items }: { items: MediaAsset[] }) {
         <button
           type="button"
           aria-label="Scroll right"
-          onClick={() => scrollByPx(420)}
+          onClick={() => scrollByPx(640)}
           className="absolute right-1 top-1/2 z-10 -translate-y-1/2 rounded-full bg-overlay/80 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-overlay focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <ChevronRight className="h-5 w-5" />
+          <ArrowRight className="h-5 w-5" strokeWidth={1.5} />
         </button>
       )}
 
       <div
         ref={scrollerRef}
-        className="flex gap-2 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory gap-2 overflow-x-auto scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {items.map((m) => (
-          <div key={m.id} className="relative h-[118px] w-[165px] flex-none overflow-hidden rounded-lg bg-surface/60">
-            <img src={m.url} alt={m.alt ?? "Review media"} className="h-full w-full object-cover" loading="lazy" />
+          <div
+            key={m.id}
+            className="group relative aspect-[4/5] w-[min(72vw,320px)] flex-none snap-start overflow-hidden rounded-xl bg-surface/60 md:h-[220px] md:w-[320px] md:rounded-lg md:aspect-auto"
+          >
+            <img
+              src={m.url}
+              alt={m.alt ?? "Review media"}
+              className="h-full w-full object-cover transition-transform duration-150 ease-out group-hover:scale-105"
+              loading="lazy"
+            />
           </div>
         ))}
       </div>
@@ -642,7 +650,7 @@ function ReviewRow({ review }: { review: Review }) {
             {review.author.verifiedBuyer && (
               <div className="mt-1 inline-flex items-center gap-2 text-xs text-content-muted">
                 <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                  <Check className="h-3 w-3" />
+                  <Check className="h-3.5 w-3.5" />
                 </span>
                 Verified Buyer
               </div>
@@ -671,9 +679,15 @@ function ReviewRow({ review }: { review: Review }) {
         </div>
 
         {review.media?.length ? (
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-4 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:flex-wrap md:overflow-visible md:pb-0">
             {review.media.slice(0, 4).map((m) => (
-              <img key={m.id} src={m.url} alt={m.alt ?? "Review media"} className="h-20 w-28 rounded-md object-cover" loading="lazy" />
+              <img
+                key={m.id}
+                src={m.url}
+                alt={m.alt ?? "Review media"}
+                className="aspect-[4/5] w-[min(82vw,360px)] flex-none snap-start rounded-xl object-cover md:h-40 md:w-56 md:rounded-md md:aspect-auto"
+                loading="lazy"
+              />
             ))}
           </div>
         ) : null}
@@ -701,7 +715,7 @@ function Pagination({
         onClick={() => onPageChange(Math.max(1, page - 1))}
         className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-hover active:bg-active disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        <ChevronLeft className="h-4 w-4" />
+        <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
         Prev
       </button>
 
@@ -717,7 +731,7 @@ function Pagination({
         className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-hover active:bg-active disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         Next
-        <ChevronRight className="h-4 w-4" />
+        <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
       </button>
     </div>
   );

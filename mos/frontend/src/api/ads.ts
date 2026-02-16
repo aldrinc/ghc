@@ -15,6 +15,7 @@ export type AdsIngestionRetryRequest = {
   researchRunId: string;
   resultsLimit?: number;
   brandChannelIdentityIds?: string[];
+  failedOnly?: boolean;
   runCreativeAnalysis?: boolean;
   creativeAnalysisMaxAds?: number;
   creativeAnalysisConcurrency?: number;
@@ -24,6 +25,7 @@ export type AdsIngestionRetryResponse = {
   research_run_id: string;
   temporal_workflow_id: string;
   temporal_run_id: string;
+  brand_channel_identity_ids?: string[] | null;
 };
 
 export function useAdsApi() {

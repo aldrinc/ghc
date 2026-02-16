@@ -695,6 +695,25 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
                 const prompt = typeof item.prompt === "string" ? item.prompt : undefined;
                 const publicId = typeof item.publicId === "string" ? item.publicId : undefined;
                 const error = typeof item.error === "string" ? item.error : undefined;
+                const sourceRaw = typeof item.imageSource === "string" ? item.imageSource.trim().toLowerCase() : "";
+                const imageSource = sourceRaw === "ai" || sourceRaw === "unsplash" ? sourceRaw : null;
+                const referenceAssetPublicId =
+                  typeof item.referenceAssetPublicId === "string" ? item.referenceAssetPublicId : undefined;
+                const unsplashMeta =
+                  item.unsplash && typeof item.unsplash === "object"
+                    ? (item.unsplash as Record<string, unknown>)
+                    : null;
+                const unsplashUser =
+                  unsplashMeta?.user && typeof unsplashMeta.user === "object"
+                    ? (unsplashMeta.user as Record<string, unknown>)
+                    : null;
+                const unsplashLinks =
+                  unsplashMeta?.links && typeof unsplashMeta.links === "object"
+                    ? (unsplashMeta.links as Record<string, unknown>)
+                    : null;
+                const unsplashPhotographer =
+                  typeof unsplashUser?.name === "string" ? unsplashUser.name : undefined;
+                const unsplashPhotoLink = typeof unsplashLinks?.html === "string" ? unsplashLinks.html : undefined;
                 return (
                   <div key={`${publicId || "img"}-${idx}`} className="rounded-md border border-border bg-surface p-2 space-y-2">
                     {publicId ? (
@@ -708,7 +727,36 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
                         {error ? "Failed to generate image" : "No image"}
                       </div>
                     )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+                        Source: {imageSource === "unsplash" ? "Unsplash" : imageSource === "ai" ? "AI" : "Unknown"}
+                      </span>
+                      {referenceAssetPublicId ? (
+                        <span className="inline-flex items-center rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-content-muted">
+                          Reference image attached
+                        </span>
+                      ) : null}
+                    </div>
                     {prompt ? <div className="text-xs text-content-muted line-clamp-3">{prompt}</div> : null}
+                    {referenceAssetPublicId ? (
+                      <div className="text-xs text-content-muted break-all">Reference asset: {referenceAssetPublicId}</div>
+                    ) : imageSource === "ai" ? (
+                      <div className="text-xs text-content-muted">Reference asset: none</div>
+                    ) : null}
+                    {imageSource === "unsplash" && (unsplashPhotographer || unsplashPhotoLink) ? (
+                      <div className="text-xs text-content-muted">
+                        Unsplash
+                        {unsplashPhotographer ? ` by ${unsplashPhotographer}` : ""}
+                        {unsplashPhotoLink ? (
+                          <>
+                            {" · "}
+                            <a href={unsplashPhotoLink} target="_blank" rel="noreferrer" className="underline">
+                              Photo link
+                            </a>
+                          </>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {error ? <div className="text-xs text-danger">{error}</div> : null}
                   </div>
                 );

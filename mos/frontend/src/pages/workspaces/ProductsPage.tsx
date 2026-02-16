@@ -27,6 +27,7 @@ export function ProductsPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [productType, setProductType] = useState("");
+  const [shopifyProductGid, setShopifyProductGid] = useState("");
   const [primaryBenefits, setPrimaryBenefits] = useState("");
   const [featureBullets, setFeatureBullets] = useState("");
   const [guaranteeText, setGuaranteeText] = useState("");
@@ -38,6 +39,7 @@ export function ProductsPage() {
     setTitle("");
     setDescription("");
     setProductType("");
+    setShopifyProductGid("");
     setPrimaryBenefits("");
     setFeatureBullets("");
     setGuaranteeText("");
@@ -52,6 +54,7 @@ export function ProductsPage() {
       title: title.trim(),
       description: description.trim() || undefined,
       productType: productType.trim() || undefined,
+      shopifyProductGid: shopifyProductGid.trim() || undefined,
       primaryBenefits: primaryBenefits.trim() ? parseList(primaryBenefits) : undefined,
       featureBullets: featureBullets.trim() ? parseList(featureBullets) : undefined,
       guaranteeText: guaranteeText.trim() || undefined,
@@ -180,6 +183,15 @@ export function ProductsPage() {
                 placeholder="e.g. Supplements, SaaS"
                 value={productType}
                 onChange={(e) => setProductType(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Shopify product GID</label>
+              <Input
+                placeholder="gid://shopify/Product/1234567890"
+                value={shopifyProductGid}
+                onChange={(e) => setShopifyProductGid(e.target.value)}
               />
             </div>
 

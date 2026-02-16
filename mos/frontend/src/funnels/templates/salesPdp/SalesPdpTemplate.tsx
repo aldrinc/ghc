@@ -46,6 +46,10 @@ type Props = {
 };
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const URGENCY_MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  timeZone: "UTC",
+});
 
 // Keep layout geometry consistent with the base template.
 // Brand design systems can still change colors and font families.
@@ -126,6 +130,19 @@ function currency(n: number) {
   return `$${Math.round(n)}`
 }
 
+function resolveUrgencyMonthLabels(now: Date = new Date()) {
+  const currentYear = now.getUTCFullYear();
+  const currentMonthIndex = now.getUTCMonth();
+  const previousYear = currentMonthIndex === 0 ? currentYear - 1 : currentYear;
+  const previousMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
+  const currentMonthDate = new Date(Date.UTC(currentYear, currentMonthIndex, 1));
+  const previousMonthDate = new Date(Date.UTC(previousYear, previousMonthIndex, 1));
+  return {
+    previousMonthLabel: URGENCY_MONTH_FORMATTER.format(previousMonthDate).toUpperCase(),
+    currentMonthLabel: URGENCY_MONTH_FORMATTER.format(currentMonthDate).toUpperCase(),
+  };
+}
+
 function isRuleMatch(
   rules: Array<{ sizeId: string; colorId: string }> | undefined,
   sizeId: string,
@@ -204,18 +221,35 @@ function IconCheck({ size = 16 }: { size?: number }) {
   )
 }
 
-function IconChevron({ dir }: { dir: 'left' | 'right' }) {
-  const d = dir === 'left' ? 'M14 6l-6 6 6 6' : 'M10 6l6 6-6 6'
+function IconArrow({
+  dir,
+  size = 16,
+}: {
+  dir: 'left' | 'right'
+  size?: number
+}) {
   return (
     <svg
-      width="20"
-      height="20"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <path d={d} stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={dir === 'left' ? 'M19 12H7' : 'M5 12h12'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d={dir === 'left' ? 'M11 6l-6 6 6 6' : 'M13 6l6 6-6 6'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -231,26 +265,6 @@ function IconPlayTriangle({ size = 10 }: { size?: number }) {
       aria-hidden="true"
     >
       <path d="M9 7l10 5-10 5V7z" fill="currentColor" />
-    </svg>
-  )
-}
-
-function IconArrowRight({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path
-        d="M5 12h12"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M13 6l6 6-6 6"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   )
 }
@@ -357,7 +371,7 @@ function HeaderBar({
 }) {
   return (
     <div className={styles.header} aria-hidden={!visible}>
-      <Container>
+      <Container className={styles.headerContainer}>
         <div className={`${styles.headerInner} ${visible ? styles.headerVisible : styles.headerHidden}`}>
           <a className={styles.logo} href={config.logo.href ?? '#top'}>
             <img className={styles.logoImg} src={resolveImageSrc(config.logo)} alt={config.logo.alt} />
@@ -378,7 +392,7 @@ function HeaderBar({
           <a className={styles.headerCta} href={config.cta.href}>
             {config.cta.label}
             <span className={styles.headerCtaIcon} aria-hidden="true">
-              <IconArrowRight size={14} />
+              <IconArrow dir="right" size={14} />
             </span>
           </a>
         </div>
@@ -406,7 +420,7 @@ function Gallery({
       <div className={styles.galleryMain}>
         <img src={resolveImageSrc(active)} alt={active.alt} />
 
-        {freeGifts ? (
+        {freeGifts && index === 0 ? (
           <button
             type="button"
             className={styles.giftOverlay}
@@ -440,7 +454,7 @@ function Gallery({
           onClick={() => setIndex((v) => clampIndex(v - 1, slides.length))}
           aria-label="Previous image"
         >
-          <IconChevron dir="left" />
+          <IconArrow dir="left" size={18} />
         </button>
         <span className={styles.galleryCounter}>
           {index + 1} / {slides.length}
@@ -451,7 +465,7 @@ function Gallery({
           onClick={() => setIndex((v) => clampIndex(v + 1, slides.length))}
           aria-label="Next image"
         >
-          <IconChevron dir="right" />
+          <IconArrow dir="right" size={18} />
         </button>
       </div>
 
@@ -488,23 +502,23 @@ function SizeCard({
       onClick={onClick}
       aria-pressed={selected}
     >
-      {selected ? (
-        <span className={styles.selectedCheck} aria-hidden="true">
-          <span
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              width: 18,
-              height: 18,
-              borderRadius: 999,
-              background: 'var(--pdp-check-bg)',
-              color: 'var(--color-bg)',
-            }}
-          >
-            <IconCheck size={14} />
-          </span>
-        </span>
-      ) : null}
+	      {selected ? (
+	        <span className={styles.selectedCheck} aria-hidden="true">
+	          <span
+	            style={{
+	              display: 'grid',
+	              placeItems: 'center',
+	              width: 22,
+	              height: 22,
+	              borderRadius: 999,
+	              background: 'var(--pdp-check-bg)',
+	              color: 'var(--color-bg)',
+	            }}
+	          >
+	            <IconCheck size={18} />
+	          </span>
+	        </span>
+	      ) : null}
       <p className={styles.optionLabel}>{option.label}</p>
       <p className={styles.optionMeta}>
         {option.sizeIn}
@@ -535,23 +549,23 @@ function OfferCard({
       onClick={onClick}
       aria-pressed={selected}
     >
-      {selected ? (
-        <span className={styles.selectedCheck} aria-hidden="true">
-          <span
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              width: 18,
-              height: 18,
-              borderRadius: 999,
-              background: 'var(--pdp-check-bg)',
-              color: 'var(--color-bg)',
-            }}
-          >
-            <IconCheck size={14} />
-          </span>
-        </span>
-      ) : null}
+	      {selected ? (
+	        <span className={styles.selectedCheck} aria-hidden="true">
+	          <span
+	            style={{
+	              display: 'grid',
+	              placeItems: 'center',
+	              width: 22,
+	              height: 22,
+	              borderRadius: 999,
+	              background: 'var(--pdp-check-bg)',
+	              color: 'var(--color-bg)',
+	            }}
+	          >
+	            <IconCheck size={18} />
+	          </span>
+	        </span>
+	      ) : null}
 
       <img className={styles.offerCardImage} src={resolveImageSrc(option.image)} alt={option.image.alt} />
       <p className={styles.offerLabel}>{option.title}</p>
@@ -579,31 +593,34 @@ function ColorSwatch({
 
   return (
     <button type="button" className={styles.swatchBtn} onClick={onClick} aria-pressed={selected}>
-      <div
-        className={`${styles.swatchCircle} ${selected ? styles.swatchCircleSelected : ''}`}
-        style={background ? { background } : undefined}
-      >
-        {option.swatchImageSrc || option.swatchAssetPublicId ? (
-          <img
-            src={resolveAssetSrc(option.swatchAssetPublicId, option.swatchImageSrc)}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : null}
+      <div className={styles.swatchCircleWrap}>
+        <div
+          className={`${styles.swatchCircle} ${selected ? styles.swatchCircleSelected : ''}`}
+          style={background ? { background } : undefined}
+        >
+          {option.swatchImageSrc || option.swatchAssetPublicId ? (
+            <img
+              src={resolveAssetSrc(option.swatchAssetPublicId, option.swatchImageSrc)}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : null}
+        </div>
+
         {selected ? (
-          <span className={styles.selectedCheck} aria-hidden="true">
+          <span className={`${styles.selectedCheck} ${styles.selectedCheckSwatch}`} aria-hidden="true">
             <span
               style={{
                 display: 'grid',
                 placeItems: 'center',
-                width: 18,
-                height: 18,
+                width: 22,
+                height: 22,
                 borderRadius: 999,
                 background: 'var(--pdp-check-bg)',
                 color: 'var(--color-bg)',
               }}
             >
-              <IconCheck size={14} />
+              <IconCheck size={18} />
             </span>
           </span>
         ) : null}
@@ -800,7 +817,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
   const colorOptions = resolvedHero.purchase.color.options
   const offerOptions = resolvedHero.purchase.offer.options
 
-  const [selectedSize, setSelectedSize] = useState(sizeOptions[1]?.id ?? sizeOptions[0]?.id)
+  const [selectedSize, setSelectedSize] = useState(sizeOptions[0]?.id)
   const [selectedColor, setSelectedColor] = useState(colorOptions[0]?.id)
   const [selectedOffer, setSelectedOffer] = useState(offerOptions[1]?.id ?? offerOptions[0]?.id)
 
@@ -869,6 +886,16 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
     urgencyHighlightIndex >= 0
       ? urgencyMessage.slice(urgencyHighlightIndex + urgencyHighlight.length)
       : ''
+  const urgencyRows = useMemo(() => {
+    const rows = resolvedHero.purchase.cta.urgency.rows
+    if (rows.length < 2) return rows
+    const { previousMonthLabel, currentMonthLabel } = resolveUrgencyMonthLabels()
+    return rows.map((row, index) => {
+      if (index === 0) return { ...row, label: previousMonthLabel }
+      if (index === 1) return { ...row, label: currentMonthLabel }
+      return row
+    })
+  }, [resolvedHero.purchase.cta.urgency.rows])
 
   const handleCheckout = async () => {
     setCheckoutError(null);
@@ -1095,7 +1122,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                 {resolvedHero.purchase.benefits.map((b) => (
                   <div key={b.text} className={styles.benefit}>
                     <span className={styles.checkCircle} aria-hidden="true">
-                      <IconCheck size={16} />
+                      <IconCheck size={18} />
                     </span>
                     {b.text}
                   </div>
@@ -1104,16 +1131,14 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
               <div className={styles.divider} />
 
-              {/* Size */}
-              <div>
-                <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {resolvedHero.purchase.size.title} <span>{selectedSizeObj?.label}</span>
-                  </div>
-                  <button type="button" className={styles.helpLink} onClick={() => setOpenSizeChart(true)}>
-                    {resolvedHero.purchase.size.helpLinkLabel}
-                  </button>
-                </div>
+	              {/* Size */}
+	              <div>
+	                <div className={styles.sectionTitleRow}>
+	                  <div className={styles.stepTitle}>{resolvedHero.purchase.size.title}</div>
+	                  <button type="button" className={styles.helpLink} onClick={() => setOpenSizeChart(true)}>
+	                    {resolvedHero.purchase.size.helpLinkLabel}
+	                  </button>
+	                </div>
 
                 <div className={styles.optionGrid3}>
                   {sizeOptions.map((o) => (
@@ -1136,16 +1161,14 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
               <div className={styles.divider} />
 
-              {/* Color */}
-              <div>
-                <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {resolvedHero.purchase.color.title} <span>{selectedColorObj?.label}</span>
-                  </div>
-                </div>
-                <div className={styles.colorRow}>
-                  {colorOptions.map((c) => (
-                    <ColorSwatch
+	              {/* Color */}
+	              <div>
+	                <div className={styles.sectionTitleRow}>
+	                  <div className={styles.stepTitle}>{resolvedHero.purchase.color.title}</div>
+	                </div>
+	                <div className={styles.colorRow}>
+	                  {colorOptions.map((c) => (
+	                    <ColorSwatch
                       key={c.id}
                       option={c}
                       selected={c.id === selectedColor}
@@ -1164,53 +1187,51 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
               <div className={styles.divider} />
 
-              {/* Offer */}
-              <div>
-                <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {resolvedHero.purchase.offer.title} <span>{selectedOfferObj?.title}</span>
-                  </div>
-                </div>
-                <div className={styles.offerHelper}>
-                  {resolvedHero.purchase.offer.helperText}{' '}
-                  <button type="button" className={styles.seeWhy} onClick={() => setOpenWhyBundle(true)}>
-                    {resolvedHero.purchase.offer.seeWhyLabel}
+	              {/* Offer */}
+	              <div>
+	                <div className={styles.sectionTitleRow}>
+	                  <div className={styles.stepTitle}>{resolvedHero.purchase.offer.title}</div>
+	                </div>
+	                <div className={styles.offerHelper}>
+	                  {resolvedHero.purchase.offer.helperText}{' '}
+	                  <button type="button" className={styles.seeWhy} onClick={() => setOpenWhyBundle(true)}>
+	                    {resolvedHero.purchase.offer.seeWhyLabel}
                   </button>
                 </div>
 
-                <div className={styles.optionGrid3}>
-                  {offerOptions.map((o) => (
-                    <OfferCard
-                      key={o.id}
-                      option={o}
-                      selected={o.id === selectedOffer}
+	                <div className={styles.offerGrid}>
+	                  {offerOptions.map((o) => (
+	                    <OfferCard
+	                      key={o.id}
+	                      option={o}
+	                      selected={o.id === selectedOffer}
                       onClick={() => setSelectedOffer(o.id)}
                     />
                   ))}
                 </div>
 
-                <button type="button" className={styles.ctaButton} onClick={handleCheckout} disabled={isCheckingOut}>
-                  {isCheckingOut ? "Starting checkout…" : ctaLabel}
-                  <span className={styles.ctaIconCircle} aria-hidden="true">
-                    <IconArrowRight size={14} />
-                  </span>
-                </button>
+	                <button type="button" className={styles.ctaButton} onClick={handleCheckout} disabled={isCheckingOut}>
+	                  {isCheckingOut ? "Starting checkout…" : ctaLabel}
+	                  <span className={styles.ctaIconCircle} aria-hidden="true">
+	                    <IconArrow dir="right" size={24} />
+	                  </span>
+	                </button>
                 {checkoutError ? (
                   <div className={styles.stockNotice} role="alert">
                     {checkoutError}
                   </div>
                 ) : null}
 
-                <div className={styles.ctaSubBullets}>
-                  {resolvedHero.purchase.cta.subBullets.map((t) => (
-                    <span key={t}>
-                      <span className={styles.checkCircle} aria-hidden="true">
-                        <IconCheck size={12} />
-                      </span>
-                      {t}
-                    </span>
-                  ))}
-                </div>
+	                <div className={styles.ctaSubBullets}>
+	                  {resolvedHero.purchase.cta.subBullets.map((t) => (
+	                    <span key={t}>
+	                      <span className={styles.checkCircle} aria-hidden="true">
+	                        <IconCheck size={18} />
+	                      </span>
+	                      {t}
+	                    </span>
+	                  ))}
+	                </div>
 
                 <div className={styles.urgency}>
                   <div className={styles.urgencyTop}>
@@ -1230,9 +1251,9 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                     </div>
                   </div>
                   <div className={styles.urgencyRows}>
-                    {resolvedHero.purchase.cta.urgency.rows.map((r) => (
+                    {urgencyRows.map((r, index) => (
                       <div
-                        key={r.label}
+                        key={`${r.label}-${index}`}
                         className={`${styles.urgencyRow} ${
                           r.tone === 'highlight'
                             ? styles.urgencyRowHighlight
@@ -1273,7 +1294,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
             <tbody>
               {resolvedModals.sizeChart.sizes.map((s) => (
                 <tr key={s.label}>
-                  <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)', fontWeight: 800 }}>{s.label}</td>
+                  <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)', fontWeight: 700 }}>{s.label}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)' }}>{s.size}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)' }}>{s.idealFor}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)' }}>{s.weight}</td>
@@ -1304,7 +1325,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                 background: 'var(--pdp-black-03)',
               }}
             >
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>&ldquo;{q.text}&rdquo;</div>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>&ldquo;{q.text}&rdquo;</div>
               <div style={{ color: 'var(--pdp-black-65)' }}>— {q.author}</div>
             </div>
           ))}
@@ -1376,10 +1397,11 @@ function SalesPdpStorySection({
 }) {
   const sectionBg = section.bg === 'blue' ? styles.sectionBlue : styles.sectionPeach
   const layout = section.layout === 'textRight' ? 'textRight' : 'textLeft'
+  const gridLayoutClass = layout === 'textRight' ? styles.storyGridTextRight : styles.storyGridTextLeft
   return (
     <section id={section.id} className={`${sectionBg} ${styles.sectionPad} ${className ?? ''}`.trim()}>
-      <Container>
-        <div className={styles.storyGrid}>
+      <Container className={styles.storyContainerTight}>
+        <div className={`${styles.storyGrid} ${gridLayoutClass}`}>
           {layout === 'textRight' ? (
             <>
               <img className={styles.storyImage} src={resolveImageSrc(section.image)} alt={section.image.alt} />
@@ -1525,6 +1547,7 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
     let rafId = 0
     let lastTime = 0
     let paused = false
+    let scrollPos = panel.scrollTop
 
     const step = (time: number) => {
       if (!lastTime) lastTime = time
@@ -1534,11 +1557,17 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
       if (!paused) {
         const maxScroll = panel.scrollHeight - panel.clientHeight
         if (maxScroll > 0) {
-          panel.scrollTop += delta * 0.01
-          if (panel.scrollTop >= maxScroll) {
-            panel.scrollTop = 0
+          // Use a separate accumulator so sub-pixel deltas still make progress on browsers
+          // that quantize `scrollTop` to whole pixels.
+          scrollPos += delta * 0.008
+          if (scrollPos >= maxScroll) {
+            scrollPos = 0
           }
+          panel.scrollTop = scrollPos
         }
+      } else {
+        // Keep the accumulator aligned with manual scrolling while paused.
+        scrollPos = panel.scrollTop
       }
 
       rafId = window.requestAnimationFrame(step)
@@ -1551,6 +1580,7 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
     const resume = () => {
       paused = false
       lastTime = 0
+      scrollPos = panel.scrollTop
     }
 
     panel.addEventListener('pointerenter', pause)
@@ -1889,7 +1919,7 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
   }, [mode, config.slides.length])
 
   return (
-    <section className={`${styles.sectionBlue} ${styles.sectionPad}`}>
+    <section id={config.id} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
       <Container>
         <div className={styles.reviewSliderHeader}>
           <h2>{config.title}</h2>

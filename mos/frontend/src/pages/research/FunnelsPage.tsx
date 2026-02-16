@@ -1,12 +1,13 @@
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useFunnels, useCreateFunnel } from "@/api/funnels";
+import { useProduct } from "@/api/products";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 export function FunnelsPage() {
@@ -14,11 +15,25 @@ export function FunnelsPage() {
   const { workspace } = useWorkspace();
   const { product } = useProductContext();
   const clientId = workspace?.id;
+  const { data: productDetail } = useProduct(product?.id);
   const { data: funnels = [], isLoading } = useFunnels({ clientId, productId: product?.id });
   const createFunnel = useCreateFunnel();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedOfferId, setSelectedOfferId] = useState("");
+
+  useEffect(() => {
+    if (!isModalOpen) return;
+    if (!productDetail?.offers?.length) {
+      setSelectedOfferId("");
+      return;
+    }
+    setSelectedOfferId((current) => {
+      if (current && productDetail.offers.some((offer) => offer.id === current)) return current;
+      return productDetail.offers[0].id;
+    });
+  }, [isModalOpen, productDetail?.offers]);
 
   const canCreate = Boolean(clientId && product?.id && name.trim());
 
@@ -36,6 +51,7 @@ export function FunnelsPage() {
     const funnel = await createFunnel.mutateAsync({
       clientId,
       productId: product.id,
+      selectedOfferId: selectedOfferId || undefined,
       name: name.trim(),
       description: description.trim() || undefined,
     });
@@ -140,6 +156,23 @@ export function FunnelsPage() {
             <div className="space-y-1">
               <label className="text-xs font-semibold text-content">Description (optional)</label>
               <Input placeholder="Short note" value={description} onChange={(e) => setDescription(e.target.value)} />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Selected offer (optional)</label>
+              <select
+                className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
+                value={selectedOfferId}
+                onChange={(e) => setSelectedOfferId(e.target.value)}
+                disabled={!productDetail?.offers?.length}
+              >
+                <option value="">{productDetail?.offers?.length ? "No selected offer" : "No offers available"}</option>
+                {(productDetail?.offers || []).map((offer) => (
+                  <option key={offer.id} value={offer.id}>
+                    {offer.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="flex justify-end gap-2 pt-1">

@@ -7,9 +7,12 @@ import { DialogContent, DialogDescription, DialogRoot, DialogTitle, DialogClose 
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import {
+  useAddOfferBonus,
+  useCreateProductOffer,
   useCreateVariant,
   useProduct,
   useProductAssets,
+  useRemoveOfferBonus,
   useUpdateProduct,
   useUploadProductAssets,
 } from "@/api/products";
@@ -36,34 +39,37 @@ function assetLabel(asset: ProductAsset): string {
   return `Asset ${asset.id.slice(0, 8)}`;
 }
 
-function parseList(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export function ProductDetailPage() {
   const { productId } = useParams();
   const { workspace } = useWorkspace();
-  const { selectProduct } = useProductContext();
+  const { products, selectProduct } = useProductContext();
   const navigate = useNavigate();
 
   const { data: productDetail, isLoading: isLoadingDetail } = useProduct(productId);
   const { data: productAssets = [], isLoading: isLoadingAssets } = useProductAssets(productId);
   const updateProduct = useUpdateProduct(productId || "");
+  const createOffer = useCreateProductOffer(productId || "");
+  const addOfferBonus = useAddOfferBonus(productId || "");
+  const removeOfferBonus = useRemoveOfferBonus(productId || "");
   const uploadProductAssets = useUploadProductAssets(productId || "");
   const assetInputRef = useRef<HTMLInputElement | null>(null);
 
   const createVariant = useCreateVariant(productId || "");
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
 
   const [variantTitle, setVariantTitle] = useState("");
   const [variantPrice, setVariantPrice] = useState("");
   const [variantCurrency, setVariantCurrency] = useState("usd");
+  const [variantOfferId, setVariantOfferId] = useState("");
   const [variantProvider, setVariantProvider] = useState("stripe");
   const [variantExternalId, setVariantExternalId] = useState("");
   const [variantOptionValues, setVariantOptionValues] = useState("");
+  const [shopifyProductGidDraft, setShopifyProductGidDraft] = useState("");
+  const [offerName, setOfferName] = useState("");
+  const [offerBusinessModel, setOfferBusinessModel] = useState("one_time");
+  const [offerDescription, setOfferDescription] = useState("");
+  const [bonusSelectionByOffer, setBonusSelectionByOffer] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!productDetail) return;
@@ -72,15 +78,23 @@ export function ProductDetailPage() {
       client_id: productDetail.client_id,
       product_type: productDetail.product_type ?? null,
     });
+    setShopifyProductGidDraft(productDetail.shopify_product_gid || "");
   }, [productDetail, selectProduct]);
 
   const resetVariantForm = () => {
     setVariantTitle("");
     setVariantPrice("");
     setVariantCurrency("usd");
+    setVariantOfferId("");
     setVariantProvider("stripe");
     setVariantExternalId("");
     setVariantOptionValues("");
+  };
+
+  const resetOfferForm = () => {
+    setOfferName("");
+    setOfferBusinessModel("one_time");
+    setOfferDescription("");
   };
 
   const handleCreateVariant = async (event: React.FormEvent) => {
@@ -116,6 +130,7 @@ export function ProductDetailPage() {
       title: variantTitle.trim(),
       price,
       currency: variantCurrency.trim(),
+      offerId: variantOfferId.trim() || undefined,
       provider: variantProvider.trim() || undefined,
       externalPriceId: variantExternalId.trim() || undefined,
       optionValues,
@@ -151,11 +166,67 @@ export function ProductDetailPage() {
     updateProduct.mutate({ primaryAssetId: assetId });
   };
 
+  const handleSaveShopifyProductGid = () => {
+    if (!productDetail) return;
+    const next = shopifyProductGidDraft.trim();
+    updateProduct.mutate({ shopifyProductGid: next || null });
+  };
+
+  const handleCreateOffer = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!productId) return;
+    if (!offerName.trim()) {
+      toast.error("Offer name is required.");
+      return;
+    }
+    if (!offerBusinessModel.trim()) {
+      toast.error("Business model is required.");
+      return;
+    }
+    await createOffer.mutateAsync({
+      productId,
+      name: offerName.trim(),
+      businessModel: offerBusinessModel.trim(),
+      description: offerDescription.trim() || undefined,
+    });
+    resetOfferForm();
+    setIsOfferModalOpen(false);
+  };
+
+  const handleAddBonus = async (offerId: string) => {
+    const bonusProductId = (bonusSelectionByOffer[offerId] || "").trim();
+    if (!bonusProductId) {
+      toast.error("Select a bonus product.");
+      return;
+    }
+    await addOfferBonus.mutateAsync({ offerId, bonusProductId });
+    setBonusSelectionByOffer((prev) => ({ ...prev, [offerId]: "" }));
+  };
+
+  const handleRemoveBonus = async (offerId: string, bonusProductId: string) => {
+    await removeOfferBonus.mutateAsync({ offerId, bonusProductId });
+  };
+
   const primaryAssetId = productDetail?.primary_asset_id ?? null;
+  const bonusProductCandidates = useMemo(() => {
+    if (!productDetail) return [];
+    return products
+      .filter((item) => item.client_id === productDetail.client_id && item.id !== productDetail.id)
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        shopifyProductGid: item.shopify_product_gid || null,
+      }));
+  }, [productDetail, products]);
   const filteredAssets = useMemo(() => {
     if (!productId) return [] as ProductAsset[];
     return productAssets.filter((asset) => asset.product_id === productId);
   }, [productAssets, productId]);
+  const offerNameById = useMemo(() => {
+    const mapping = new Map<string, string>();
+    (productDetail?.offers || []).forEach((offer) => mapping.set(offer.id, offer.name));
+    return mapping;
+  }, [productDetail?.offers]);
   const orderedAssets = useMemo(() => {
     if (!primaryAssetId) return filteredAssets;
     const primary = filteredAssets.find((asset) => asset.id === primaryAssetId);
@@ -188,6 +259,9 @@ export function ProductDetailPage() {
           <div className="flex items-center gap-2">
             <Button variant="secondary" size="sm" onClick={() => navigate("/workspaces/products")}>
               Back to products
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setIsOfferModalOpen(true)} disabled={!productDetail}>
+              New offer
             </Button>
             <Button size="sm" onClick={() => setIsVariantModalOpen(true)} disabled={!productDetail}>
               New variant
@@ -222,6 +296,32 @@ export function ProductDetailPage() {
                   <div className="font-semibold text-content">Disclaimers</div>
                   {productDetail.disclaimers?.length ? productDetail.disclaimers.join(", ") : "—"}
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-border bg-surface-2 p-4 space-y-3">
+              <div>
+                <div className="text-xs font-semibold uppercase text-content-muted">Shopify Mapping</div>
+                <div className="text-xs text-content-muted">
+                  Required for bonus products and Shopify offer verification.
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Shopify product GID</label>
+                <Input
+                  placeholder="gid://shopify/Product/1234567890"
+                  value={shopifyProductGidDraft}
+                  onChange={(e) => setShopifyProductGidDraft(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveShopifyProductGid}
+                  disabled={updateProduct.isPending || shopifyProductGidDraft === (productDetail.shopify_product_gid || "")}
+                >
+                  {updateProduct.isPending ? "Saving…" : "Save Shopify mapping"}
+                </Button>
               </div>
             </div>
 
@@ -332,50 +432,199 @@ export function ProductDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase text-content-muted">Variants</div>
-                <div className="text-xs text-content-muted">Pricing, provider, and option values.</div>
+          <div className="space-y-6">
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase text-content-muted">Offers</div>
+                  <div className="text-xs text-content-muted">Primary package plus bonus products.</div>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => setIsOfferModalOpen(true)}>
+                  New offer
+                </Button>
               </div>
-              <Button size="sm" variant="secondary" onClick={() => setIsVariantModalOpen(true)}>
-                New variant
-              </Button>
-            </div>
 
-            <div className="mt-4 space-y-3">
-              {productDetail.variants.length ? (
-                productDetail.variants.map((variant) => (
-                  <div key={variant.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-content truncate">{variant.title}</div>
-                        <div className="text-xs text-content-muted">
-                          {variant.price} {variant.currency.toUpperCase()}
-                          {variant.provider ? ` · ${variant.provider}` : ""}
+              <div className="mt-4 space-y-3">
+                {productDetail.offers?.length ? (
+                  productDetail.offers.map((offer) => {
+                    const linkedBonusProductIds = new Set((offer.bonuses || []).map((bonus) => bonus.bonus_product.id));
+                    const addableBonuses = bonusProductCandidates.filter((candidate) => !linkedBonusProductIds.has(candidate.id));
+                    const selectedBonusProductId = bonusSelectionByOffer[offer.id] || "";
+                    return (
+                      <div key={offer.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-content truncate">{offer.name}</div>
+                            <div className="text-xs text-content-muted">{offer.business_model}</div>
+                            {offer.description ? <div className="text-xs text-content-muted mt-1">{offer.description}</div> : null}
+                          </div>
+                          <div className="text-[10px] text-content-muted">{offer.id.slice(0, 8)}</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-content">Bonuses</div>
+                          {offer.bonuses?.length ? (
+                            <div className="space-y-2">
+                              {offer.bonuses.map((bonus) => (
+                                <div
+                                  key={bonus.id}
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold text-content">{bonus.bonus_product.title}</div>
+                                    <div className="text-[11px] text-content-muted">
+                                      {bonus.bonus_product.shopify_product_gid || "Missing Shopify product GID"}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => handleRemoveBonus(offer.id, bonus.bonus_product.id)}
+                                    disabled={removeOfferBonus.isPending}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-content-muted">No bonuses attached.</div>
+                          )}
+                        </div>
+
+                        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                          <select
+                            className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
+                            value={selectedBonusProductId}
+                            onChange={(e) =>
+                              setBonusSelectionByOffer((prev) => ({
+                                ...prev,
+                                [offer.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Select bonus product</option>
+                            {addableBonuses.map((candidate) => (
+                              <option key={candidate.id} value={candidate.id} disabled={!candidate.shopifyProductGid}>
+                                {candidate.title}
+                                {candidate.shopifyProductGid ? "" : " (missing Shopify GID)"}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddBonus(offer.id)}
+                            disabled={!selectedBonusProductId || addOfferBonus.isPending}
+                          >
+                            {addOfferBonus.isPending ? "Adding…" : "Add bonus"}
+                          </Button>
                         </div>
                       </div>
-                      <div className="text-[10px] text-content-muted">{variant.id.slice(0, 8)}</div>
-                    </div>
-                    <div className="grid gap-2 text-xs text-content-muted">
-                      <div>
-                        <span className="font-semibold text-content">External price ID:</span>{" "}
-                        {variant.external_price_id || "—"}
+                    );
+                  })
+                ) : (
+                  <div className="text-sm text-content-muted">No offers yet.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase text-content-muted">Variants</div>
+                  <div className="text-xs text-content-muted">Pricing, provider, and option values.</div>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => setIsVariantModalOpen(true)}>
+                  New variant
+                </Button>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {productDetail.variants.length ? (
+                  productDetail.variants.map((variant) => (
+                    <div key={variant.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-content truncate">{variant.title}</div>
+                          <div className="text-xs text-content-muted">
+                            {variant.price} {variant.currency.toUpperCase()}
+                            {variant.provider ? ` · ${variant.provider}` : ""}
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-content-muted">{variant.id.slice(0, 8)}</div>
                       </div>
-                      <div>
-                        <span className="font-semibold text-content">Option values:</span>{" "}
-                        {variant.option_values ? JSON.stringify(variant.option_values) : "—"}
+                      <div className="grid gap-2 text-xs text-content-muted">
+                        <div>
+                          <span className="font-semibold text-content">External price ID:</span>{" "}
+                          {variant.external_price_id || "—"}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-content">Offer:</span>{" "}
+                          {variant.offer_id ? offerNameById.get(variant.offer_id) || variant.offer_id : "—"}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-content">Option values:</span>{" "}
+                          {variant.option_values ? JSON.stringify(variant.option_values) : "—"}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-sm text-content-muted">No variants yet.</div>
-              )}
+                  ))
+                ) : (
+                  <div className="text-sm text-content-muted">No variants yet.</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <DialogRoot open={isOfferModalOpen} onOpenChange={setIsOfferModalOpen}>
+        <DialogContent>
+          <DialogTitle>New offer</DialogTitle>
+          <DialogDescription>Create an offer package and attach bonus products after creation.</DialogDescription>
+          <form className="space-y-3" onSubmit={handleCreateOffer}>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Offer name</label>
+              <Input
+                placeholder="e.g. Buy 1 Get Bonus Stack"
+                value={offerName}
+                onChange={(e) => setOfferName(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Business model</label>
+              <Input
+                placeholder="one_time"
+                value={offerBusinessModel}
+                onChange={(e) => setOfferBusinessModel(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Description (optional)</label>
+              <Input
+                placeholder="Optional offer description"
+                value={offerDescription}
+                onChange={(e) => setOfferDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1">
+              <DialogClose asChild>
+                <Button type="button" variant="secondary">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button type="submit" disabled={!productId || createOffer.isPending}>
+                {createOffer.isPending ? "Creating…" : "Create offer"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </DialogRoot>
 
       <DialogRoot open={isVariantModalOpen} onOpenChange={setIsVariantModalOpen}>
         <DialogContent>
@@ -411,6 +660,25 @@ export function ProductDetailPage() {
                   required
                 />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Offer (optional)</label>
+              <select
+                className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
+                value={variantOfferId}
+                onChange={(e) => setVariantOfferId(e.target.value)}
+                disabled={!productDetail?.offers?.length}
+              >
+                <option value="">
+                  {productDetail?.offers?.length ? "No linked offer" : "No offers available"}
+                </option>
+                {(productDetail?.offers || []).map((offer) => (
+                  <option key={offer.id} value={offer.id}>
+                    {offer.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">

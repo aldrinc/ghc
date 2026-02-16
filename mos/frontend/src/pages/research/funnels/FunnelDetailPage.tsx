@@ -1,6 +1,7 @@
 import { useFunnel, useUpdateFunnel, useCreateFunnelPage, usePublishFunnel, useDisableFunnel, useEnableFunnel, useDuplicateFunnel, useFunnelTemplates, useUpdateFunnelPage } from "@/api/funnels";
 import { useApiClient } from "@/api/client";
 import { useDesignSystems } from "@/api/designSystems";
+import { useProduct } from "@/api/products";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,7 @@ export function FunnelDetailPage() {
   const { workspace } = useWorkspace();
   const { funnelId } = useParams();
   const { data: funnel, isLoading } = useFunnel(funnelId);
+  const { data: funnelProduct } = useProduct(funnel?.product_id || undefined);
   const { data: templates } = useFunnelTemplates();
   const { data: designSystems = [] } = useDesignSystems(funnel?.client_id || workspace?.id);
   const updateFunnel = useUpdateFunnel();
@@ -82,6 +84,11 @@ export function FunnelDetailPage() {
   const handleSetDesignSystem = (designSystemId: string) => {
     if (!funnelId) return;
     updateFunnel.mutate({ funnelId, payload: { designSystemId: designSystemId || null } });
+  };
+
+  const handleSetSelectedOffer = (selectedOfferId: string) => {
+    if (!funnelId) return;
+    updateFunnel.mutate({ funnelId, payload: { selectedOfferId: selectedOfferId || null } });
   };
 
   const designSystemOptions = useMemo(() => {
@@ -303,7 +310,7 @@ export function FunnelDetailPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Entry page</div>
                 <Select
@@ -320,6 +327,18 @@ export function FunnelDetailPage() {
                   onValueChange={handleSetDesignSystem}
                   options={designSystemOptions}
                   disabled={updateFunnel.isPending}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-content">Selected offer</div>
+                <Select
+                  value={funnel.selected_offer_id || ""}
+                  onValueChange={handleSetSelectedOffer}
+                  options={[
+                    { label: funnelProduct?.offers?.length ? "No selected offer" : "No offers available", value: "" },
+                    ...((funnelProduct?.offers || []).map((offer) => ({ label: offer.name, value: offer.id }))),
+                  ]}
+                  disabled={updateFunnel.isPending || !(funnelProduct?.offers?.length)}
                 />
               </div>
               <div className="space-y-1">

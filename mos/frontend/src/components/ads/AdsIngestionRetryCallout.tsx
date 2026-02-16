@@ -40,7 +40,12 @@ export function AdsIngestionRetryCallout({
   const adsResearchRunId =
     (research as any)?.ads_research_run_id || (research as any)?.adsResearchRunId || null;
 
-  const showRetry = Boolean(visible && clientId && productId && ingestionStatus === "failed");
+  const showRetry = Boolean(
+    visible &&
+      clientId &&
+      productId &&
+      (ingestionStatus === "failed" || ingestionStatus === "partial"),
+  );
   const canRetry = Boolean(adsResearchRunId);
 
   const handleRetry = useCallback(async () => {
@@ -77,7 +82,7 @@ export function AdsIngestionRetryCallout({
     <Callout
       variant="warning"
       size="sm"
-      title="Ads ingestion failed during onboarding"
+      title={ingestionStatus === "partial" ? "Ads ingestion partially failed during onboarding" : "Ads ingestion failed during onboarding"}
       actions={
         <Button
           type="button"

@@ -25,14 +25,12 @@
 
   display: grid;
   grid-template-columns: var(--listicle-media-width) minmax(0, 1fr);
-  align-items: start;
+  align-items: stretch;
 }
 
 .media {
   position: relative;
   min-height: var(--listicle-media-min-height);
-  aspect-ratio: 1 / 1;
-  align-self: start;
 }
 
 .image {

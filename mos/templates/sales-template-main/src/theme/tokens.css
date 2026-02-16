@@ -64,11 +64,7 @@
 
     Bumping the max width improves symmetry (50/50 columns) and readability.
   */
-  /*
-    Responsive container so PDP layouts don't feel overly narrow on large monitors.
-    Keeps existing ~1380px desktop geometry, but allows expanding up to 1760px.
-  */
-  --container-max: clamp(1380px, 92vw, 1760px);
+  --container-max: 1380px;
   --container-pad: 24px;
   --section-pad-y: 120px;
 

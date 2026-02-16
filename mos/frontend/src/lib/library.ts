@@ -78,6 +78,15 @@ export function mapMediaAssets(rawAssets: any[] | undefined | null): MediaAsset[
   const isProbablyRenderableImage = (url: string | undefined): url is string => {
     if (!url) return false;
     if (url.startsWith("data:image/")) return true;
+    // Prefer parsing the path extension so querystrings (e.g. presigned URLs) don't confuse detection.
+    try {
+      const parsed = new URL(url, "http://localhost");
+      const path = parsed.pathname.toLowerCase();
+      if (/\.(png|jpe?g|gif|webp|avif|bmp|svg)$/.test(path)) return true;
+      if (/\.(mp4|mov|m4v|webm|mkv|m3u8|ts)$/.test(path)) return false;
+    } catch {
+      // Fall back to heuristics below.
+    }
     // Best-effort: avoid using video URLs as <img> src (can render as blank tiles).
     return guessAssetType({ url }) === "image";
   };
@@ -96,13 +105,14 @@ export function mapMediaAssets(rawAssets: any[] | undefined | null): MediaAsset[
       if (!previewUrl && !fullUrl && normalizedStatus !== "pending") return null;
 
       if (type === "video") {
-        const posterCandidate = [
+        // Prefer mirrored previews over provider thumbnails (provider URLs can expire).
+        const posterUrl = [
+          toAbsoluteUrl(asset?.preview_url),
+          videoPosterFallback,
           toAbsoluteUrl(asset?.thumbnail_url),
           toAbsoluteUrl(asset?.preview_image_url),
           toAbsoluteUrl(asset?.poster_url),
-          toAbsoluteUrl(asset?.preview_url),
         ].find(isProbablyRenderableImage);
-        const posterUrl = posterCandidate || (isProbablyRenderableImage(videoPosterFallback) ? videoPosterFallback : undefined);
         return {
           type,
           url: fullUrl || previewUrl || "",

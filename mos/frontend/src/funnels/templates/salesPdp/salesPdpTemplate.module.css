@@ -20,6 +20,7 @@
   min-height: 100%;
   font-family: var(--font-sans);
   font-size: var(--text-base);
+  font-weight: 400;
   line-height: var(--line);
   color: var(--color-text);
   background: var(--color-page-bg);
@@ -27,12 +28,12 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-.root a {
+:where(.root) a {
   color: inherit;
   text-decoration: none;
 }
 
-.root a:hover {
+:where(.root) a:hover {
   text-decoration: underline;
 }
 
@@ -42,7 +43,7 @@
   display: block;
 }
 
-.root button {
+:where(.root) button {
   font: inherit;
 }
 
@@ -110,6 +111,72 @@
   --color-border: rgba(6, 26, 112, 0.18);
   --color-soft: rgba(6, 26, 112, 0.06);
 
+  /*
+    Design System Bridge
+    --------------------
+    The funnel runtime uses Tailwind semantic tokens (e.g. `bg-background`,
+    `bg-primary`, `text-content`, `border-border`) which are backed by CSS vars
+    like `--background`, `--primary`, `--text`, `--border`.
+
+    The Sales PDP template historically used its own token names (`--color-*`,
+    `--pdp-*`). When these semantic vars are missing, components fall back to the
+    app UI theme (Manus), which is why the Reviews component can look gray.
+
+    Map the semantic vars to this template’s palette so components inherit the
+    template style guide by default.
+  */
+  --background: var(--color-page-bg);
+  --foreground: var(--color-text);
+  --bg: var(--color-page-bg);
+  --surface: var(--color-bg);
+  --surface-2: var(--color-bg);
+  --surface-hover: var(--color-soft);
+
+  --text: var(--color-text);
+  --text-muted: var(--color-muted);
+  --subtle-foreground: var(--color-muted);
+
+  --border: var(--color-border);
+  --border-strong: var(--color-border);
+  --divider: var(--color-border);
+
+  --muted: var(--color-soft);
+  --muted-foreground: var(--color-muted);
+
+  --hover: var(--color-soft);
+  --active: var(--pdp-brand-12);
+
+  --primary: var(--color-brand);
+  --primary-foreground: #ffffff;
+
+  --secondary: var(--color-soft);
+  --secondary-foreground: var(--color-text);
+
+  --accent: var(--color-brand);
+  --accent-hover: var(--pdp-brand-90);
+  --accent-active: var(--pdp-brand-85);
+  --accent-contrast: #ffffff;
+
+  --selection: var(--color-brand);
+  --selection-foreground: #ffffff;
+
+  --disabled: var(--color-soft);
+  --disabled-foreground: var(--color-muted);
+
+  --input: var(--color-bg);
+  --input-border: var(--color-border);
+  --input-border-focus: var(--focus-outline-color);
+
+  --overlay: var(--modal-overlay-bg);
+  --shadow-color: var(--pdp-black-12);
+
+  --card: var(--color-bg);
+  --card-foreground: var(--color-text);
+  --popover: var(--color-bg);
+  --popover-foreground: var(--color-text);
+
+  --ring: var(--pdp-brand-22);
+
   /* Focus */
   --focus-outline-color: rgba(6, 26, 112, 0.35);
   --focus-outline-color-soft: rgba(6, 26, 112, 0.25);
@@ -130,11 +197,7 @@
 
     Bumping the max width improves symmetry (50/50 columns) and readability.
   */
-  /*
-    Responsive container so PDP layouts don't feel overly narrow on large monitors.
-    Keeps existing ~1380px desktop geometry, but allows expanding up to 1760px.
-  */
-  --container-max: clamp(1380px, 92vw, 1760px);
+  --container-max: 1380px;
   --container-pad: 24px;
   --section-pad-y: 120px;
 

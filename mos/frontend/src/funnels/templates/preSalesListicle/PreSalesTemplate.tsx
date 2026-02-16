@@ -37,6 +37,7 @@ type Props = {
 const LOCKED_TEMPLATE_CSS_VARS = new Set([
   "--container-max",
   "--container-pad",
+  "--listicle-title-letter-spacing",
   "--marquee-border",
   "--marquee-font-size",
   "--marquee-font-weight",
