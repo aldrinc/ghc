@@ -62,9 +62,7 @@ Define a deterministic audit for newly generated design systems so we can reject
 ### 4. Text Token Contrast Matrix
 - Evaluate at least:
   - `--color-text` vs `--color-bg`
-  - `--color-muted` vs `--color-bg`
   - `--color-text` vs `--color-page-bg`
-  - `--color-muted` vs `--color-page-bg`
 - Thresholds:
   - Normal text: >= 4.5:1
   - Long-form/body preferred target: >= 7.0:1 for `--color-text`
@@ -73,7 +71,6 @@ Define a deterministic audit for newly generated design systems so we can reject
 ### 5. Accent/Text Role Separation
 - Enforce semantic separation:
   - `--color-text` must not resolve to same rendered color as `--color-brand`
-  - `--color-muted` must not resolve to same rendered color as `--color-brand`
 - Fail on role coupling.
 
 ### 6. Template CSS Static Usage Audit
