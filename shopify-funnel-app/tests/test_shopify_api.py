@@ -76,3 +76,48 @@ def test_register_webhook_duplicate_error_without_existing_subscription_raises()
                 callback_url="https://example.ngrok.app/webhooks/app/uninstalled",
             )
         )
+
+
+def test_verify_product_exists_returns_product_payload():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        return {
+            "product": {
+                "id": "gid://shopify/Product/123",
+                "title": "Verified Product",
+                "handle": "verified-product",
+            }
+        }
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.verify_product_exists(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            product_gid="gid://shopify/Product/123",
+        )
+    )
+
+    assert result["id"] == "gid://shopify/Product/123"
+    assert result["title"] == "Verified Product"
+    assert result["handle"] == "verified-product"
+
+
+def test_verify_product_exists_raises_not_found_when_missing():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        return {"product": None}
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    with pytest.raises(ShopifyApiError, match="Product not found for GID"):
+        asyncio.run(
+            client.verify_product_exists(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                product_gid="gid://shopify/Product/123",
+            )
+        )

@@ -187,6 +187,43 @@ class ShopifyApiClient:
             raise ShopifyApiError(message="cartCreate response is missing cart.checkoutUrl")
         return cart_id, checkout_url
 
+    async def verify_product_exists(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gid: str,
+    ) -> dict[str, str]:
+        query = """
+        query productById($id: ID!) {
+            product(id: $id) {
+                id
+                title
+                handle
+            }
+        }
+        """
+        payload = {"query": query, "variables": {"id": product_gid}}
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload=payload,
+        )
+        product = response.get("product")
+        if not isinstance(product, dict):
+            raise ShopifyApiError(message=f"Product not found for GID: {product_gid}", status_code=404)
+
+        found_id = product.get("id")
+        title = product.get("title")
+        handle = product.get("handle")
+        if not isinstance(found_id, str) or not found_id:
+            raise ShopifyApiError(message="Product verification response is missing product.id")
+        if not isinstance(title, str) or not title:
+            raise ShopifyApiError(message="Product verification response is missing product.title")
+        if not isinstance(handle, str) or not handle:
+            raise ShopifyApiError(message="Product verification response is missing product.handle")
+        return {"id": found_id, "title": title, "handle": handle}
+
     async def _admin_graphql(
         self,
         *,

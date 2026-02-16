@@ -19,6 +19,8 @@ from app.schemas import (
     CreateCheckoutResponse,
     ForwardOrderPayload,
     InstallationResponse,
+    VerifyProductRequest,
+    VerifyProductResponse,
     UpdateInstallationRequest,
 )
 from app.security import (
@@ -218,45 +220,59 @@ def update_installation(
     return _serialize_installation(installation)
 
 
-def _resolve_checkout_installation(
+def _resolve_active_installation(
     *,
-    request: CreateCheckoutRequest,
+    client_id: str | None,
+    shop_domain: str | None,
     session: Session,
 ) -> ShopInstallation:
-    if request.clientId:
+    if client_id:
         matches = session.scalars(
             select(ShopInstallation).where(
-                ShopInstallation.client_id == request.clientId,
+                ShopInstallation.client_id == client_id,
                 ShopInstallation.uninstalled_at.is_(None),
             )
         ).all()
         if not matches:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No active Shopify installation found for clientId={request.clientId}",
+                detail=f"No active Shopify installation found for clientId={client_id}",
             )
         if len(matches) > 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=(
                     "Multiple active Shopify installations found for this clientId. "
-                    "Provide shopDomain explicitly in checkout requests."
+                    "Provide shopDomain explicitly."
                 ),
             )
-        installation = matches[0]
-    else:
-        normalized_shop = normalize_shop_domain(request.shopDomain or "")
-        installation = session.scalars(
-            select(ShopInstallation).where(
-                ShopInstallation.shop_domain == normalized_shop,
-                ShopInstallation.uninstalled_at.is_(None),
-            )
-        ).first()
-        if not installation:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No active Shopify installation found for shopDomain={normalized_shop}",
-            )
+        return matches[0]
+
+    normalized_shop = normalize_shop_domain(shop_domain or "")
+    installation = session.scalars(
+        select(ShopInstallation).where(
+            ShopInstallation.shop_domain == normalized_shop,
+            ShopInstallation.uninstalled_at.is_(None),
+        )
+    ).first()
+    if not installation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No active Shopify installation found for shopDomain={normalized_shop}",
+        )
+    return installation
+
+
+def _resolve_checkout_installation(
+    *,
+    request: CreateCheckoutRequest,
+    session: Session,
+) -> ShopInstallation:
+    installation = _resolve_active_installation(
+        client_id=request.clientId,
+        shop_domain=request.shopDomain,
+        session=session,
+    )
 
     if not installation.storefront_access_token:
         raise HTTPException(
@@ -267,6 +283,38 @@ def _resolve_checkout_installation(
             ),
         )
     return installation
+
+
+@app.post(
+    "/v1/catalog/products/verify",
+    response_model=VerifyProductResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def verify_catalog_product(
+    payload: VerifyProductRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+
+    try:
+        product = await shopify_api.verify_product_exists(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            product_gid=payload.productGid,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return VerifyProductResponse(
+        shopDomain=installation.shop_domain,
+        productGid=product["id"],
+        handle=product["handle"],
+        title=product["title"],
+    )
 
 
 def _coerce_attribute_map(attributes: dict[str, str]) -> list[dict[str, str]]:
