@@ -22,7 +22,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Reverting to VARCHAR(32) would truncate existing revision ids (0043+), so
-    # keep the widened column.
-    pass
-
+    raise RuntimeError(
+        "Refusing to shrink alembic_version.version_num back to VARCHAR(32); "
+        "0043+ revision ids exceed 32 chars and would be truncated."
+    )
