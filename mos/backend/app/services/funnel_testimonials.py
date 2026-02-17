@@ -1548,6 +1548,7 @@ def _testimonial_output_schema(count: int) -> dict[str, Any]:
                                 "location": {"type": "string"},
                                 "date": {"type": "string"},
                             },
+                            "required": ["location", "date"],
                         },
                     },
                     "required": [
@@ -1560,6 +1561,7 @@ def _testimonial_output_schema(count: int) -> dict[str, Any]:
                         "heroImagePrompt",
                         "mediaPrompts",
                         "reply",
+                        "meta",
                     ],
                 },
             }
@@ -1773,8 +1775,8 @@ def _build_testimonial_prompt(
         "- avatarPrompt and heroImagePrompt must be unique per testimonial.\n"
         "- Do not reuse names or personas across testimonials (reviewers or replies).\n"
         "- Never append numeric disambiguation suffixes to names (for example: '(2)', '(3)').\n"
-        "- meta.location (optional) should be <= 120 characters.\n"
-        f"- meta.date (optional) must be YYYY-MM-DD; today is {today}.\n"
+        "- meta.location should be <= 120 characters.\n"
+        f"- meta.date must be YYYY-MM-DD; today is {today}.\n"
         "- Keep claims compliant; avoid medical promises or unrealistic outcomes.\n"
         f"{nonce_instruction}"
         "- Do not mention being AI or synthetic.\n\n"
@@ -2661,8 +2663,8 @@ def generate_funnel_page_testimonials(
                             "replyAvatarPublicId": (
                                 str(reply_avatar_asset.public_id) if reply_avatar_asset else None
                             ),
-                            "replyName": (reply_payload["name"] if replies else None),
-                            "replyPersona": (reply_payload["persona"] if replies else None),
+                            "replyName": (reply_payload["name"] if replies_public else None),
+                            "replyPersona": (reply_payload["persona"] if replies_public else None),
                             "socialTemplate": social_template,
                             "attachmentPrompt": (social_attachment_prompt if attachment_asset is not None else None),
                             "attachmentSceneMode": (social_scene_mode if attachment_asset is not None else None),
