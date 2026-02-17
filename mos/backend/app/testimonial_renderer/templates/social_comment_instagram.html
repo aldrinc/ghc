@@ -25,7 +25,22 @@
             return;
           }
           img.addEventListener('load', () => resolve(), { once: true });
-          img.addEventListener('error', () => reject(new Error('Failed to load image.')), { once: true });
+          img.addEventListener(
+            'error',
+            () => {
+              const src = String(img.currentSrc || img.src || '');
+              let summary = src;
+              if (src.startsWith('data:')) {
+                const comma = src.indexOf(',');
+                const header = comma >= 0 ? src.slice(0, comma) : src.slice(0, 80);
+                summary = `${header},... (len=${src.length})`;
+              } else if (src.length > 200) {
+                summary = `${src.slice(0, 200)}...`;
+              }
+              reject(new Error('Failed to load image (src=' + summary + ').'));
+            },
+            { once: true }
+          );
         });
 
       const initials = (value) => {
