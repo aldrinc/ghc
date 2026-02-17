@@ -3,6 +3,9 @@
   background: var(--marquee-bg);
   border-top: 1px solid var(--marquee-border);
   border-bottom: 1px solid var(--marquee-border);
+  /* Keep the marquee band above any positioned carousel UI that might overlap it. */
+  position: relative;
+  z-index: 3;
 }
 
 .viewport {
