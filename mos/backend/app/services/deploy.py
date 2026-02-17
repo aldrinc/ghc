@@ -385,8 +385,7 @@ def build_funnel_artifact_payload(
         FunnelPage,
         FunnelPageSlugRedirect,
         Product,
-        ProductOffer,
-        ProductOfferPricePoint,
+        ProductVariant,
     )
     from app.db.repositories.funnels import FunnelPublicRepository
     from app.services.design_systems import resolve_design_system_tokens
@@ -455,32 +454,22 @@ def build_funnel_artifact_payload(
             select(Product).where(Product.id == funnel.product_id, Product.org_id == funnel.org_id)
         ).first()
         if product:
-            offers = session.scalars(select(ProductOffer).where(ProductOffer.product_id == product.id)).all()
-            offer_ids = [str(offer.id) for offer in offers]
-            price_points = (
-                session.scalars(
-                    select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id.in_(offer_ids))
-                ).all()
-                if offer_ids
-                else []
-            )
-            price_points_by_offer: dict[str, list[dict[str, Any]]] = {}
-            for price_point in price_points:
-                data = jsonable_encoder(price_point)
+            variants = session.scalars(
+                select(ProductVariant).where(ProductVariant.product_id == product.id)
+            ).all()
+            serialized_variants: list[dict[str, Any]] = []
+            for variant in variants:
+                data = jsonable_encoder(variant)
                 data.pop("external_price_id", None)
-                price_points_by_offer.setdefault(str(price_point.offer_id), []).append(data)
+                serialized_variants.append(data)
             commerce_payload = {
                 "publicId": str(funnel.public_id),
                 "funnelId": str(funnel.id),
-                "product": jsonable_encoder(product),
-                "selectedOfferId": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
-                "offers": [
-                    {
-                        **jsonable_encoder(offer),
-                        "pricePoints": price_points_by_offer.get(str(offer.id), []),
-                    }
-                    for offer in offers
-                ],
+                "product": {
+                    **jsonable_encoder(product),
+                    "variants": serialized_variants,
+                    "variants_count": len(serialized_variants),
+                },
             }
 
     return {

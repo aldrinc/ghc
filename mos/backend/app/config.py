@@ -52,6 +52,9 @@ class Settings(BaseSettings):
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
+    SHOPIFY_CHECKOUT_APP_BASE_URL: str | None = None
+    SHOPIFY_CHECKOUT_APP_API_TOKEN: str | None = None
+    SHOPIFY_ORDER_WEBHOOK_SECRET: str | None = None
 
     META_GRAPH_API_VERSION: str | None = None
     META_GRAPH_API_BASE_URL: str = "https://graph.facebook.com"
@@ -60,6 +63,17 @@ class Settings(BaseSettings):
     META_PAGE_ID: str | None = None
     META_INSTAGRAM_ACTOR_ID: str | None = None
 
+    CREATIVE_SERVICE_BASE_URL: str | None = None
+    CREATIVE_SERVICE_BEARER_TOKEN: str | None = None
+    CREATIVE_SERVICE_TIMEOUT_SECONDS: float = 30.0
+    CREATIVE_SERVICE_POLL_INTERVAL_SECONDS: float = 2.0
+    CREATIVE_SERVICE_POLL_TIMEOUT_SECONDS: float = 300.0
+    CREATIVE_SERVICE_VIDEO_POLL_TIMEOUT_SECONDS: float = 1200.0
+    CREATIVE_SERVICE_MAX_VIDEO_TURNS: int = 3
+    CREATIVE_SERVICE_ASSETS_PER_BRIEF: int = 6
+    CREATIVE_SERVICE_RETENTION_DAYS: int = 60
+    CREATIVE_SERVICE_PRODUCT_ASSET_CONTEXT_LIMIT: int = 6
+
     MEDIA_STORAGE_BUCKET: str | None = None
     MEDIA_STORAGE_PREVIEW_BUCKET: str | None = None
     MEDIA_STORAGE_ENDPOINT: str | None = None
@@ -67,7 +81,10 @@ class Settings(BaseSettings):
     MEDIA_STORAGE_ACCESS_KEY: str | None = None
     MEDIA_STORAGE_SECRET_KEY: str | None = None
     MEDIA_STORAGE_PREFIX: str = "dev"
-    MEDIA_STORAGE_PRESIGN_TTL_SECONDS: int = 900
+    # Presigned media URLs are used directly in the frontend (e.g. <img src="...">),
+    # so they must outlive lazy-loading / infinite-scroll sessions. Keep this <= 7 days
+    # (SigV4 presign max on most S3-compatible stores).
+    MEDIA_STORAGE_PRESIGN_TTL_SECONDS: int = 60 * 60 * 24 * 7
     MEDIA_STORAGE_USE_SSL: bool = True
     MEDIA_STORAGE_FORCE_PATH_STYLE: bool = True
 

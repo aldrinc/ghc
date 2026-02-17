@@ -403,8 +403,8 @@ class LLMClient:
             }
             if max_tokens:
                 request_kwargs["max_output_tokens"] = max_tokens
-            if temperature is not None:
-                request_kwargs["temperature"] = temperature
+            # Some OpenAI Responses models reject `temperature`. Since our non-streaming Responses path
+            # also omits temperature, keep the streaming path consistent to avoid hard 400s.
             if use_web_search:
                 request_kwargs["tools"] = [{"type": "web_search"}]
                 request_kwargs["include"] = include

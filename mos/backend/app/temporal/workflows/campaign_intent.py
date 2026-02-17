@@ -36,21 +36,10 @@ class CampaignIntentWorkflow:
     def __init__(self) -> None:
         self.strategy_sheet: Optional[Dict[str, Any]] = None
         self.experiment_specs: List[Dict[str, Any]] = []
-        self._strategy_approved = False
         self._approved_experiment_ids: List[str] = []
         self._rejected_experiment_ids: List[str] = []
         self._approved_asset_brief_ids: List[str] = []
         self._stop_requested = False
-
-    @workflow.signal
-    def approve_strategy_sheet(self, payload: Any) -> None:
-        approved = payload if isinstance(payload, bool) else bool(payload.get("approved", False))
-        updated_strategy_sheet = None
-        if isinstance(payload, dict):
-            updated_strategy_sheet = payload.get("updated_strategy_sheet") or payload.get("updatedStrategy")
-        if approved and updated_strategy_sheet:
-            self.strategy_sheet = updated_strategy_sheet
-        self._strategy_approved = approved
 
     @workflow.signal
     def approve_experiments(self, payload: Any) -> None:
@@ -122,8 +111,6 @@ class CampaignIntentWorkflow:
             schedule_to_close_timeout=timedelta(minutes=5),
         )
 
-        await workflow.wait_condition(lambda: self._strategy_approved)
-
         specs_result = await workflow.execute_activity(
             build_experiment_specs_activity,
             {
@@ -137,8 +124,22 @@ class CampaignIntentWorkflow:
         )
         self.experiment_specs = specs_result.get("experiment_specs") if isinstance(specs_result, dict) else []
 
+        # Human gate: require explicit experiment approval before moving downstream (e.g. funnel generation).
+        await workflow.wait_condition(
+            lambda: len(self._approved_experiment_ids) > 0 or len(self._rejected_experiment_ids) > 0 or self._stop_requested
+        )
+        if self._stop_requested:
+            return {
+                "campaign_id": campaign_id,
+                "strategy_sheet": self.strategy_sheet,
+                "experiment_specs": specs_result,
+                "status": "stopped",
+            }
+
         return {
             "campaign_id": campaign_id,
             "strategy_sheet": self.strategy_sheet,
             "experiment_specs": specs_result,
+            "approved_experiment_ids": self._approved_experiment_ids,
+            "rejected_experiment_ids": self._rejected_experiment_ids,
         }

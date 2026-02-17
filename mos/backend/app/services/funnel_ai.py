@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import base64
 import json
+import re
 import time
 import uuid
 from collections.abc import Iterator
@@ -22,7 +23,8 @@ from app.db.models import (
     FunnelPageVersion,
     Product,
     ProductOffer,
-    ProductOfferPricePoint,
+    ProductOfferBonus,
+    ProductVariant,
 )
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
@@ -40,6 +42,7 @@ _ASSISTANT_MESSAGE_MAX_CHARS = 600
 _REPAIR_PREVIOUS_RESPONSE_MAX_CHARS = 4000
 _CLAUDE_MAX_OUTPUT_TOKENS = 64000
 _MAX_AI_ATTACHMENTS = 8
+_MAX_PAGE_IMAGE_GENERATIONS = 50
 _VISION_ALLOWED_MIME_TYPES = {
     "image/png",
     "image/jpeg",
@@ -48,6 +51,11 @@ _VISION_ALLOWED_MIME_TYPES = {
     "image/gif",
 }
 
+_NO_TEXT_IMAGE_DIRECTIVE = (
+    "Do not include any text, words, letters, numbers, captions, labels, logos, watermarks, "
+    "signatures, or UI elements anywhere in the image."
+)
+
 
 class AiAttachmentError(Exception):
     pass
@@ -55,6 +63,19 @@ class AiAttachmentError(Exception):
 
 _CONFIG_JSON_IMAGE_KEYS = ("configJson", "feedImagesJson")
 _PLACEHOLDER_SRC_MARKERS = ("/assets/ph-", "/assets/placeholder")
+_URGENCY_SOLD_OUT_PATTERN = re.compile(r"\bsold\s*out\b", re.IGNORECASE)
+_URGENCY_NEARLY_SOLD_PATTERN = re.compile(r"\b\d{1,3}%\s*sold\b", re.IGNORECASE)
+_URGENCY_SELLING_OUT_PATTERN = re.compile(r"\bselling\s+out\b", re.IGNORECASE)
+_CSS_VAR_REFERENCE_PATTERN = re.compile(r"^var\(\s*(--[a-z0-9\-_]+)\s*\)$", re.IGNORECASE)
+_CSS_HEX_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE)
+_ICON_COLOR_TOKEN_KEYS: tuple[tuple[str, str], ...] = (
+    ("primary", "--color-brand"),
+    ("accent", "--color-cta"),
+    ("icon", "--color-cta-icon"),
+    ("surface", "--badge-strip-bg"),
+    ("background", "--color-bg"),
+)
+_ICON_REQUIRED_COLOR_ROLES: frozenset[str] = frozenset({"primary", "accent", "background"})
 
 
 @dataclass
@@ -98,6 +119,8 @@ def _required_template_component_types(
     if template_kind == "sales-pdp":
         candidates = {
             "SalesPdpPage",
+            "SalesPdpFaq",
+            "SalesPdpReviews",
             "SalesPdpReviewWall",
             "SalesPdpReviewSlider",
             "SalesPdpTemplate",
@@ -114,6 +137,1342 @@ def _required_template_component_types(
 
     base_counts = _count_component_types(base_puck_data)
     return {comp_type for comp_type in candidates if base_counts.get(comp_type, 0) > 0}
+
+
+def _infer_template_component_kind(template_kind: str | None, base_puck_data: dict[str, Any]) -> str | None:
+    """
+    Some template ids have multiple underlying implementations (e.g. older templates built from
+    SalesPdp*/PreSales* blocks vs newer templates built purely from primitive blocks).
+
+    We only enable the specialized "template component" guidance when the base page actually
+    contains those template-specific blocks.
+    """
+
+    if not template_kind:
+        return None
+    base_counts = _count_component_types(base_puck_data)
+    if template_kind == "sales-pdp":
+        if base_counts.get("SalesPdpPage", 0) > 0 or base_counts.get("SalesPdpTemplate", 0) > 0:
+            return "sales-pdp"
+        return None
+    if template_kind == "pre-sales-listicle":
+        if base_counts.get("PreSalesPage", 0) > 0 or base_counts.get("PreSalesTemplate", 0) > 0:
+            return "pre-sales-listicle"
+        return None
+    return None
+
+
+def _describe_value(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return f"bool({value})"
+    if isinstance(value, (int, float)):
+        return f"number({value})"
+    if isinstance(value, str):
+        return f"string({value[:120]!r})"
+    if isinstance(value, list):
+        return f"list(len={len(value)})"
+    if isinstance(value, dict):
+        keys = list(value.keys())[:12]
+        return f"object(keys={keys})"
+    return f"{type(value).__name__}({str(value)[:120]!r})"
+
+
+def _validate_pre_sales_listicle_component_configs(puck_data: dict[str, Any]) -> None:
+    """
+    Ensure PreSales* blocks won't crash the editor/runtime due to basic shape issues.
+
+    This is intentionally minimal: validate container types + a few required keys that are
+    directly accessed by the frontend components.
+    """
+
+    supported_types = {
+        "PreSalesTemplate",
+        "PreSalesPage",
+        "PreSalesHero",
+        "PreSalesReasons",
+        "PreSalesReviews",
+        "PreSalesMarquee",
+        "PreSalesPitch",
+        "PreSalesReviewWall",
+        "PreSalesFooter",
+        "PreSalesFloatingCta",
+    }
+
+    def load_config(props: dict[str, Any]) -> tuple[Any, str] | None:
+        raw_json = props.get("configJson")
+        if isinstance(raw_json, str) and raw_json.strip():
+            try:
+                return json.loads(raw_json), "configJson"
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"configJson must be valid JSON: {exc}") from exc
+        if "config" in props and props.get("config") is not None:
+            return props.get("config"), "config"
+        return None
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        if comp_type not in supported_types:
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        loaded = load_config(props)
+        if not loaded:
+            continue
+        config, source = loaded
+        block_id = props.get("id")
+        id_suffix = f" (id={block_id})" if isinstance(block_id, str) and block_id else ""
+
+        if comp_type == "PreSalesHero":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesHero.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            hero = config.get("hero")
+            badges = config.get("badges")
+            if not isinstance(hero, dict) or not isinstance(hero.get("title"), str) or not isinstance(hero.get("subtitle"), str):
+                raise ValueError(
+                    f"PreSalesHero.{source}.hero must be an object with string title/subtitle{id_suffix}. Received {_describe_value(hero)}."
+                )
+            if not isinstance(badges, list):
+                raise ValueError(
+                    f"PreSalesHero.{source}.badges must be a list{id_suffix}. Received {_describe_value(badges)}."
+                )
+        elif comp_type == "PreSalesReasons":
+            if not isinstance(config, list):
+                raise ValueError(
+                    f"PreSalesReasons.{source} must be a JSON array{id_suffix}. Received {_describe_value(config)}."
+                )
+        elif comp_type == "PreSalesMarquee":
+            if not isinstance(config, list):
+                raise ValueError(
+                    f"PreSalesMarquee.{source} must be a JSON array{id_suffix}. Received {_describe_value(config)}."
+                )
+        elif comp_type == "PreSalesPitch":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesPitch.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            bullets = config.get("bullets")
+            image = config.get("image")
+            if not isinstance(bullets, list):
+                raise ValueError(
+                    f"PreSalesPitch.{source}.bullets must be a list{id_suffix}. Received {_describe_value(bullets)}."
+                )
+            if not isinstance(image, dict) or not isinstance(image.get("alt"), str):
+                raise ValueError(
+                    f"PreSalesPitch.{source}.image must be an object with string alt{id_suffix}. Received {_describe_value(image)}."
+                )
+        elif comp_type == "PreSalesReviews":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesReviews.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            slides = config.get("slides")
+            if not isinstance(slides, list):
+                raise ValueError(
+                    f"PreSalesReviews.{source}.slides must be a list{id_suffix}. Received {_describe_value(slides)}."
+                )
+            for idx, slide in enumerate(slides):
+                if not isinstance(slide, dict):
+                    raise ValueError(
+                        f"PreSalesReviews.{source}.slides[{idx}] must be an object{id_suffix}. Received {_describe_value(slide)}."
+                    )
+                images = slide.get("images")
+                if not isinstance(images, list) or not images:
+                    raise ValueError(
+                        f"PreSalesReviews.{source}.slides[{idx}].images must be a non-empty list{id_suffix}. "
+                        f"Received {_describe_value(images)}."
+                    )
+                for jdx, img in enumerate(images):
+                    if not isinstance(img, dict) or not isinstance(img.get("alt"), str) or not img.get("alt"):
+                        raise ValueError(
+                            f"PreSalesReviews.{source}.slides[{idx}].images[{jdx}] must be an object with string alt{id_suffix}. "
+                            f"Received {_describe_value(img)}."
+                        )
+        elif comp_type == "PreSalesReviewWall":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesReviewWall.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            columns = config.get("columns")
+            if not isinstance(columns, list):
+                raise ValueError(
+                    f"PreSalesReviewWall.{source}.columns must be a list{id_suffix}. Received {_describe_value(columns)}."
+                )
+        elif comp_type == "PreSalesFooter":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesFooter.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            logo = config.get("logo")
+            if not isinstance(logo, dict) or not isinstance(logo.get("alt"), str):
+                raise ValueError(
+                    f"PreSalesFooter.{source}.logo must be an object with string alt{id_suffix}. Received {_describe_value(logo)}."
+                )
+        elif comp_type == "PreSalesFloatingCta":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesFloatingCta.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            if not isinstance(config.get("label"), str):
+                raise ValueError(
+                    f"PreSalesFloatingCta.{source}.label must be a string{id_suffix}. Received {_describe_value(config.get('label'))}."
+                )
+        elif comp_type == "PreSalesTemplate":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"PreSalesTemplate.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            # Minimal keys that are directly dereferenced by the frontend template.
+            required_keys = ("hero", "badges", "reasons", "marquee", "pitch", "reviews", "reviewsWall", "footer", "floatingCta")
+            missing = [k for k in required_keys if k not in config]
+            if missing:
+                missing_str = ", ".join(missing)
+                raise ValueError(f"PreSalesTemplate.{source} missing required keys: {missing_str}{id_suffix}.")
+
+
+def _extract_pre_sales_hero_badges(tree: Any) -> list[dict[str, Any]] | None:
+    for obj in walk_json(tree):
+        if not isinstance(obj, dict) or obj.get("type") != "PreSalesHero":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        config = props.get("config")
+        if isinstance(config, dict):
+            badges = config.get("badges")
+            if isinstance(badges, list):
+                return badges
+        raw_config_json = props.get("configJson")
+        if isinstance(raw_config_json, str) and raw_config_json.strip():
+            try:
+                parsed = json.loads(raw_config_json)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                badges = parsed.get("badges")
+                if isinstance(badges, list):
+                    return badges
+    return None
+
+
+def _repair_pre_sales_badge_icons(
+    *,
+    badges: list[Any],
+    fallback_badges: list[dict[str, Any]],
+) -> bool:
+    changed = False
+    for idx, badge in enumerate(badges):
+        if not isinstance(badge, dict):
+            continue
+        if idx >= len(fallback_badges):
+            continue
+        fallback = fallback_badges[idx]
+        if not isinstance(fallback, dict):
+            continue
+        has_icon_src = isinstance(badge.get("iconSrc"), str) and bool(badge.get("iconSrc").strip())
+        has_icon_asset = isinstance(badge.get("iconAssetPublicId"), str) and bool(
+            badge.get("iconAssetPublicId").strip()
+        )
+        has_prompt = isinstance(badge.get("prompt"), str) and bool(badge.get("prompt").strip())
+        if not has_icon_src and not has_icon_asset:
+            fallback_icon_asset = fallback.get("iconAssetPublicId")
+            if not has_prompt and isinstance(fallback_icon_asset, str) and fallback_icon_asset.strip():
+                badge["iconAssetPublicId"] = fallback_icon_asset.strip()
+                changed = True
+            fallback_icon_src = fallback.get("iconSrc")
+            if isinstance(fallback_icon_src, str) and fallback_icon_src.strip():
+                badge["iconSrc"] = fallback_icon_src.strip()
+                changed = True
+        icon_alt = badge.get("iconAlt")
+        if not isinstance(icon_alt, str) or not icon_alt.strip():
+            fallback_icon_alt = fallback.get("iconAlt")
+            if isinstance(fallback_icon_alt, str) and fallback_icon_alt.strip():
+                badge["iconAlt"] = fallback_icon_alt.strip()
+                changed = True
+    return changed
+
+
+def _ensure_pre_sales_badge_icons(
+    *,
+    puck_data: dict[str, Any],
+    config_contexts: list[_ConfigJsonContext],
+    fallback_puck_data: dict[str, Any] | None,
+) -> None:
+    if not fallback_puck_data:
+        return
+    fallback_badges = _extract_pre_sales_hero_badges(fallback_puck_data)
+    if not fallback_badges:
+        return
+    current_badges = _extract_pre_sales_hero_badges(puck_data)
+    if current_badges:
+        _repair_pre_sales_badge_icons(badges=current_badges, fallback_badges=fallback_badges)
+    for ctx in config_contexts:
+        if ctx.component_type != "PreSalesHero":
+            continue
+        if not isinstance(ctx.parsed, dict):
+            continue
+        badges = ctx.parsed.get("badges")
+        if not isinstance(badges, list):
+            continue
+        if _repair_pre_sales_badge_icons(badges=badges, fallback_badges=fallback_badges):
+            ctx.dirty = True
+
+
+def _clean_non_empty_string(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned if cleaned else None
+
+
+def _normalize_lookup_key(value: Any) -> str | None:
+    cleaned = _clean_non_empty_string(value)
+    if not cleaned:
+        return None
+    return re.sub(r"\s+", " ", cleaned).strip().lower()
+
+
+def _normalize_icon_src_key(value: Any) -> str | None:
+    cleaned = _clean_non_empty_string(value)
+    if not cleaned:
+        return None
+    normalized = cleaned.split("?", 1)[0].split("#", 1)[0].strip().lower()
+    return normalized if normalized else None
+
+
+def _collect_icon_reference_index(
+    tree: Any,
+) -> tuple[dict[str, str], dict[str, str], dict[str, str], list[dict[str, str]]]:
+    by_src: dict[str, str] = {}
+    by_alt: dict[str, str] = {}
+    by_label: dict[str, str] = {}
+    entries: list[dict[str, str]] = []
+    seen_entries: set[tuple[str, str]] = set()
+
+    for _, obj in _walk_json_with_path(tree, "root"):
+        if not isinstance(obj, dict):
+            continue
+        if _is_testimonial_image(obj):
+            continue
+        asset_key = _resolve_image_asset_key(obj)
+        if asset_key != "iconAssetPublicId":
+            continue
+        public_id = _clean_non_empty_string(
+            obj.get("iconAssetPublicId") or obj.get("referenceAssetPublicId") or obj.get("reference_asset_public_id")
+        )
+        if not public_id:
+            continue
+        src_key = _normalize_icon_src_key(obj.get("iconSrc"))
+        if src_key and src_key not in by_src:
+            by_src[src_key] = public_id
+        alt_key = _normalize_lookup_key(obj.get("iconAlt") or obj.get("alt"))
+        if alt_key and alt_key not in by_alt:
+            by_alt[alt_key] = public_id
+        label_key = _normalize_lookup_key(obj.get("label"))
+        if label_key and label_key not in by_label:
+            by_label[label_key] = public_id
+        if src_key:
+            entry = (src_key, public_id)
+            if entry not in seen_entries:
+                entries.append({"iconSrc": src_key, "iconAssetPublicId": public_id})
+                seen_entries.add(entry)
+
+    return by_src, by_alt, by_label, entries
+
+
+def _merge_icon_reference_index(
+    *,
+    tree: Any,
+    by_src: dict[str, str],
+    by_alt: dict[str, str],
+    by_label: dict[str, str],
+    entries: list[dict[str, str]],
+) -> None:
+    src_map, alt_map, label_map, source_entries = _collect_icon_reference_index(tree)
+    for key, value in src_map.items():
+        by_src.setdefault(key, value)
+    for key, value in alt_map.items():
+        by_alt.setdefault(key, value)
+    for key, value in label_map.items():
+        by_label.setdefault(key, value)
+
+    seen_entries = {(item["iconSrc"], item["iconAssetPublicId"]) for item in entries}
+    for item in source_entries:
+        pair = (item["iconSrc"], item["iconAssetPublicId"])
+        if pair in seen_entries:
+            continue
+        entries.append(item)
+        seen_entries.add(pair)
+
+
+def _looks_like_css_color_value(value: str) -> bool:
+    cleaned = value.strip()
+    if not cleaned:
+        return False
+    if _CSS_HEX_COLOR_PATTERN.match(cleaned):
+        return True
+    lowered = cleaned.lower()
+    function_prefixes = ("rgb(", "rgba(", "hsl(", "hsla(", "oklch(", "oklab(", "lab(", "lch(")
+    return any(lowered.startswith(prefix) and lowered.endswith(")") for prefix in function_prefixes)
+
+
+def _resolve_css_color_token(
+    css_vars: dict[str, Any],
+    key: str,
+    *,
+    seen: set[str] | None = None,
+) -> str | None:
+    local_seen = set(seen or set())
+    if key in local_seen:
+        return None
+    local_seen.add(key)
+    raw_value = css_vars.get(key)
+    if raw_value is None:
+        return None
+    value = str(raw_value).strip()
+    if not value:
+        return None
+    match = _CSS_VAR_REFERENCE_PATTERN.match(value)
+    if match:
+        return _resolve_css_color_token(css_vars, match.group(1), seen=local_seen)
+    if _looks_like_css_color_value(value):
+        return value
+    return None
+
+
+def _collect_icon_palette_colors(design_system_tokens: dict[str, Any] | None) -> dict[str, str]:
+    if not isinstance(design_system_tokens, dict):
+        return {}
+    css_vars = design_system_tokens.get("cssVars")
+    if not isinstance(css_vars, dict):
+        return {}
+
+    palette: dict[str, str] = {}
+    for label, key in _ICON_COLOR_TOKEN_KEYS:
+        color = _resolve_css_color_token(css_vars, key)
+        if color:
+            palette[label] = color
+    return palette
+
+
+def _append_icon_palette_prompt(
+    prompt: str,
+    palette: dict[str, str],
+    *,
+    include_remix_instruction: bool = True,
+) -> str:
+    base_prompt = prompt.strip()
+    if not base_prompt or not palette:
+        return base_prompt
+
+    lowered = base_prompt.lower()
+    if all(color.lower() in lowered for color in palette.values()):
+        return base_prompt
+
+    palette_text = ", ".join(f"{label} {color}" for label, color in palette.items())
+    tail = (
+        "Match the source icon style while remixing the icon content."
+        if include_remix_instruction
+        else "Use only these brand colors for fills, strokes, and shadows."
+    )
+    return f"{base_prompt} Use this exact brand color palette for the icon: {palette_text}. {tail}"
+
+
+def _apply_icon_remix_overrides_for_ai(
+    *,
+    puck_data: dict[str, Any],
+    config_contexts: list[_ConfigJsonContext],
+    fallback_puck_data: dict[str, Any] | None,
+    design_system_tokens: dict[str, Any] | None,
+) -> None:
+    by_src: dict[str, str] = {}
+    by_alt: dict[str, str] = {}
+    by_label: dict[str, str] = {}
+    index_entries: list[dict[str, str]] = []
+
+    if fallback_puck_data:
+        _merge_icon_reference_index(
+            tree=fallback_puck_data,
+            by_src=by_src,
+            by_alt=by_alt,
+            by_label=by_label,
+            entries=index_entries,
+        )
+    _merge_icon_reference_index(
+        tree=puck_data,
+        by_src=by_src,
+        by_alt=by_alt,
+        by_label=by_label,
+        entries=index_entries,
+    )
+
+    icon_palette = _collect_icon_palette_colors(design_system_tokens)
+    missing_reference_paths: list[str] = []
+    icon_prompt_count = 0
+
+    def update_tree(tree: Any, *, base_path: str, ctx: _ConfigJsonContext | None = None) -> None:
+        nonlocal icon_prompt_count
+        changed = False
+        for path, obj in _walk_json_with_path(tree, base_path):
+            if not isinstance(obj, dict):
+                continue
+            if _is_testimonial_image(obj):
+                continue
+            asset_key = _resolve_image_asset_key(obj)
+            if asset_key != "iconAssetPublicId":
+                continue
+            prompt = obj.get("prompt")
+            if not isinstance(prompt, str) or not prompt.strip():
+                continue
+
+            icon_prompt_count += 1
+            reference_public_id = _clean_non_empty_string(
+                obj.get("referenceAssetPublicId") or obj.get("reference_asset_public_id")
+            )
+            if not reference_public_id:
+                reference_public_id = _clean_non_empty_string(obj.get("iconAssetPublicId"))
+            if not reference_public_id:
+                src_key = _normalize_icon_src_key(obj.get("iconSrc"))
+                alt_key = _normalize_lookup_key(obj.get("iconAlt") or obj.get("alt"))
+                label_key = _normalize_lookup_key(obj.get("label"))
+                if src_key and src_key in by_src:
+                    reference_public_id = by_src[src_key]
+                elif alt_key and alt_key in by_alt:
+                    reference_public_id = by_alt[alt_key]
+                elif label_key and label_key in by_label:
+                    reference_public_id = by_label[label_key]
+
+            if not reference_public_id:
+                details = [path]
+                icon_src = _clean_non_empty_string(obj.get("iconSrc"))
+                icon_label = _clean_non_empty_string(obj.get("label"))
+                if icon_src:
+                    details.append(f"iconSrc={icon_src}")
+                if icon_label:
+                    details.append(f"label={icon_label}")
+                missing_reference_paths.append(", ".join(details))
+                continue
+
+            if obj.get("referenceAssetPublicId") != reference_public_id:
+                obj["referenceAssetPublicId"] = reference_public_id
+                changed = True
+            # Icon remix prompts must always route through AI when we pin a reference image.
+            if obj.get("imageSource") != "ai":
+                obj["imageSource"] = "ai"
+                changed = True
+            if "reference_asset_public_id" in obj:
+                obj.pop("reference_asset_public_id", None)
+                changed = True
+            if "image_source" in obj:
+                obj.pop("image_source", None)
+                changed = True
+            if isinstance(obj.get("iconAssetPublicId"), str) and obj.get("iconAssetPublicId").strip():
+                obj.pop("iconAssetPublicId", None)
+                changed = True
+            if obj.get("assetPublicId"):
+                obj.pop("assetPublicId", None)
+                changed = True
+
+            updated_prompt = _append_icon_palette_prompt(prompt, icon_palette)
+            if updated_prompt != prompt:
+                obj["prompt"] = updated_prompt
+                changed = True
+        if ctx and changed:
+            ctx.dirty = True
+
+    update_tree(puck_data, base_path="puckData")
+    for ctx in config_contexts:
+        update_tree(ctx.parsed, base_path=f"{ctx.component_type}.{ctx.key}", ctx=ctx)
+
+    if icon_prompt_count == 0:
+        return
+    missing_required_roles = [role for role in sorted(_ICON_REQUIRED_COLOR_ROLES) if role not in icon_palette]
+    if missing_required_roles:
+        required_color_keys = ", ".join(
+            key for role, key in _ICON_COLOR_TOKEN_KEYS if role in _ICON_REQUIRED_COLOR_ROLES
+        )
+        missing_roles_text = ", ".join(missing_required_roles)
+        raise ValueError(
+            "Icon remix generation requires brand color tokens in design_system_tokens.cssVars. "
+            f"Missing usable values for color roles [{missing_roles_text}] from: {required_color_keys}."
+        )
+    if missing_reference_paths:
+        details = "\n".join(f"- {item}" for item in missing_reference_paths[:12])
+        available_lines = "\n".join(
+            f"- {item['iconSrc']} -> {item['iconAssetPublicId']}" for item in index_entries[:12]
+        )
+        if not available_lines:
+            available_lines = "- none"
+        raise ValueError(
+            "Icon remix generation requires a base icon reference for every icon prompt. "
+            "Unable to resolve referenceAssetPublicId for:\n"
+            f"{details}\n"
+            "Available template icon references:\n"
+            f"{available_lines}"
+        )
+
+
+def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
+    """
+    Ensure SalesPdp* blocks won't crash the editor/runtime due to basic shape issues.
+
+    This is intentionally minimal: validate container types + a few required keys that are
+    directly accessed by the frontend components.
+    """
+
+    supported_types = {
+        "SalesPdpTemplate",
+        "SalesPdpPage",
+        "SalesPdpHeader",
+        "SalesPdpHero",
+        "SalesPdpVideos",
+        "SalesPdpMarquee",
+        "SalesPdpStoryProblem",
+        "SalesPdpStorySolution",
+        "SalesPdpComparison",
+        "SalesPdpGuarantee",
+        "SalesPdpFaq",
+        "SalesPdpReviews",
+        "SalesPdpReviewWall",
+        "SalesPdpFooter",
+        "SalesPdpReviewSlider",
+    }
+
+    def load_config(props: dict[str, Any]) -> tuple[Any, str] | None:
+        raw_json = props.get("configJson")
+        if isinstance(raw_json, str) and raw_json.strip():
+            try:
+                return json.loads(raw_json), "configJson"
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"configJson must be valid JSON: {exc}") from exc
+        if "config" in props and props.get("config") is not None:
+            return props.get("config"), "config"
+        return None
+
+    def load_optional_object_prop(
+        *,
+        props: dict[str, Any],
+        object_key: str,
+        json_key: str,
+        component_type: str,
+        id_suffix: str,
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        raw_json = props.get(json_key)
+        if isinstance(raw_json, str) and raw_json.strip():
+            try:
+                parsed = json.loads(raw_json)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{component_type}.{json_key} must be valid JSON{id_suffix}: {exc}") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError(
+                    f"{component_type}.{json_key} must decode to a JSON object{id_suffix}. "
+                    f"Received {_describe_value(parsed)}."
+                )
+            return parsed, json_key
+
+        value = props.get(object_key)
+        if value is None:
+            return None, None
+        if not isinstance(value, dict):
+            raise ValueError(
+                f"{component_type}.{object_key} must be a JSON object{id_suffix}. "
+                f"Received {_describe_value(value)}."
+            )
+        return value, object_key
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        if comp_type not in supported_types:
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        loaded = load_config(props)
+        if not loaded:
+            continue
+        config, source = loaded
+        block_id = props.get("id")
+        id_suffix = f" (id={block_id})" if isinstance(block_id, str) and block_id else ""
+
+        if comp_type == "SalesPdpHeader":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpHeader.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            logo = config.get("logo")
+            nav = config.get("nav")
+            cta = config.get("cta")
+            if not isinstance(logo, dict) or not isinstance(logo.get("alt"), str) or not logo.get("alt"):
+                raise ValueError(
+                    f"SalesPdpHeader.{source}.logo must be an object with string alt{id_suffix}. Received {_describe_value(logo)}."
+                )
+            if not isinstance(nav, list):
+                raise ValueError(
+                    f"SalesPdpHeader.{source}.nav must be a list{id_suffix}. Received {_describe_value(nav)}."
+                )
+            if not isinstance(cta, dict) or not isinstance(cta.get("label"), str) or not isinstance(cta.get("href"), str):
+                raise ValueError(
+                    f"SalesPdpHeader.{source}.cta must be an object with string label/href{id_suffix}. Received {_describe_value(cta)}."
+                )
+
+        elif comp_type == "SalesPdpReviews":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            if not isinstance(config.get("id"), str) or not config.get("id"):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.id must be a string{id_suffix}. Received {_describe_value(config.get('id'))}."
+                )
+            data = config.get("data")
+            if not isinstance(data, dict):
+                raise ValueError(
+                    f"SalesPdpReviews.{source}.data must be a JSON object{id_suffix}. Received {_describe_value(data)}."
+                )
+
+        elif comp_type == "SalesPdpMarquee":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpMarquee.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            items = config.get("items")
+            if not isinstance(items, list):
+                raise ValueError(
+                    f"SalesPdpMarquee.{source}.items must be a list{id_suffix}. Received {_describe_value(items)}."
+                )
+
+        elif comp_type == "SalesPdpFaq":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpFaq.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            faq_id = config.get("id")
+            title = config.get("title")
+            items = config.get("items")
+            if not isinstance(faq_id, str) or not faq_id:
+                raise ValueError(
+                    f"SalesPdpFaq.{source}.id must be a string{id_suffix}. Received {_describe_value(faq_id)}."
+                )
+            if not isinstance(title, str) or not title.strip():
+                raise ValueError(
+                    f"SalesPdpFaq.{source}.title must be a string{id_suffix}. Received {_describe_value(title)}."
+                )
+            if not isinstance(items, list):
+                raise ValueError(
+                    f"SalesPdpFaq.{source}.items must be a list{id_suffix}. Received {_describe_value(items)}."
+                )
+            for idx, item in enumerate(items):
+                if not isinstance(item, dict):
+                    raise ValueError(
+                        f"SalesPdpFaq.{source}.items[{idx}] must be a JSON object{id_suffix}. Received {_describe_value(item)}."
+                    )
+                question = item.get("question")
+                answer = item.get("answer")
+                if not isinstance(question, str) or not question.strip():
+                    raise ValueError(
+                        f"SalesPdpFaq.{source}.items[{idx}].question must be a non-empty string{id_suffix}. "
+                        f"Received {_describe_value(question)}."
+                    )
+                if not isinstance(answer, str) or not answer.strip():
+                    raise ValueError(
+                        f"SalesPdpFaq.{source}.items[{idx}].answer must be a non-empty string{id_suffix}. "
+                        f"Received {_describe_value(answer)}."
+                    )
+
+        elif comp_type == "SalesPdpFooter":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpFooter.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            logo = config.get("logo")
+            if not isinstance(logo, dict) or not isinstance(logo.get("alt"), str) or not logo.get("alt"):
+                raise ValueError(
+                    f"SalesPdpFooter.{source}.logo must be an object with string alt{id_suffix}. Received {_describe_value(logo)}."
+                )
+            copyright_text = config.get("copyright")
+            if not isinstance(copyright_text, str):
+                raise ValueError(
+                    f"SalesPdpFooter.{source}.copyright must be a string{id_suffix}. Received {_describe_value(copyright_text)}."
+                )
+
+        elif comp_type == "SalesPdpReviewSlider":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpReviewSlider.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            toggle = config.get("toggle")
+            slides = config.get("slides")
+            if not isinstance(config.get("title"), str) or not isinstance(config.get("body"), str) or not isinstance(config.get("hint"), str):
+                raise ValueError(
+                    f"SalesPdpReviewSlider.{source} must include string title/body/hint{id_suffix}. Received {_describe_value(config)}."
+                )
+            if not isinstance(toggle, dict) or not isinstance(toggle.get("auto"), str) or not isinstance(toggle.get("manual"), str):
+                raise ValueError(
+                    f"SalesPdpReviewSlider.{source}.toggle must be an object with string auto/manual{id_suffix}. Received {_describe_value(toggle)}."
+                )
+            if not isinstance(slides, list) or not slides:
+                raise ValueError(
+                    f"SalesPdpReviewSlider.{source}.slides must be a non-empty list{id_suffix}. Received {_describe_value(slides)}."
+                )
+            for idx, slide in enumerate(slides):
+                if not isinstance(slide, dict) or not isinstance(slide.get("alt"), str) or not slide.get("alt"):
+                    raise ValueError(
+                        f"SalesPdpReviewSlider.{source}.slides[{idx}] must be an image object with string alt{id_suffix}. "
+                        f"Received {_describe_value(slide)}."
+                    )
+
+        elif comp_type == "SalesPdpHero":
+            if not isinstance(config, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source} must be a JSON object{id_suffix}. Received {_describe_value(config)}."
+                )
+            header = config.get("header")
+            gallery = config.get("gallery")
+            purchase = config.get("purchase")
+            if not isinstance(header, dict) or not isinstance(header.get("logo"), dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.header must be an object{id_suffix}. Received {_describe_value(header)}."
+                )
+            if not isinstance(gallery, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.gallery must be an object{id_suffix}. Received {_describe_value(gallery)}."
+                )
+            free_gifts = gallery.get("freeGifts")
+            if not isinstance(free_gifts, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.gallery.freeGifts must be an object{id_suffix}. "
+                    f"Received {_describe_value(free_gifts)}."
+                )
+            icon = free_gifts.get("icon")
+            if not isinstance(icon, dict) or not isinstance(icon.get("alt"), str) or not icon.get("alt"):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.gallery.freeGifts.icon must be an object with string alt{id_suffix}. "
+                    f"Received {_describe_value(icon)}."
+                )
+            for key in ("title", "body", "ctaLabel"):
+                if not isinstance(free_gifts.get(key), str) or not free_gifts.get(key):
+                    raise ValueError(
+                        f"SalesPdpHero.{source}.gallery.freeGifts.{key} must be a string{id_suffix}. "
+                        f"Received {_describe_value(free_gifts.get(key))}."
+                    )
+            slides = gallery.get("slides") if isinstance(gallery, dict) else None
+            if not isinstance(slides, list) or not slides:
+                raise ValueError(
+                    f"SalesPdpHero.{source}.gallery.slides must be a non-empty list{id_suffix}. Received {_describe_value(slides)}."
+                )
+            for idx, slide in enumerate(slides):
+                if not isinstance(slide, dict) or not isinstance(slide.get("alt"), str) or not slide.get("alt"):
+                    raise ValueError(
+                        f"SalesPdpHero.{source}.gallery.slides[{idx}] must be an image object with string alt{id_suffix}. "
+                        f"Received {_describe_value(slide)}."
+                    )
+            if not isinstance(purchase, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase must be an object{id_suffix}. Received {_describe_value(purchase)}."
+                )
+            if not isinstance(purchase.get("title"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.title must be a string{id_suffix}. Received {_describe_value(purchase.get('title'))}."
+                )
+            for key in ("faqPills", "benefits"):
+                value = purchase.get(key)
+                if not isinstance(value, list):
+                    raise ValueError(
+                        f"SalesPdpHero.{source}.purchase.{key} must be a list{id_suffix}. Received {_describe_value(value)}."
+                    )
+            size = purchase.get("size")
+            color = purchase.get("color")
+            offer = purchase.get("offer")
+            cta = purchase.get("cta")
+            if not isinstance(size, dict) or not isinstance(size.get("options"), list) or not size.get("options"):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.size.options must be a non-empty list{id_suffix}. Received {_describe_value(size)}."
+                )
+            if not isinstance(color, dict) or not isinstance(color.get("options"), list) or not color.get("options"):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.color.options must be a non-empty list{id_suffix}. Received {_describe_value(color)}."
+                )
+            if not isinstance(offer, dict) or not isinstance(offer.get("options"), list) or not offer.get("options"):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.offer.options must be a non-empty list{id_suffix}. Received {_describe_value(offer)}."
+                )
+            if not isinstance(cta, dict) or not isinstance(cta.get("labelTemplate"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{source}.purchase.cta.labelTemplate must be a string{id_suffix}. Received {_describe_value(cta)}."
+                )
+
+            size_options = size.get("options") if isinstance(size, dict) else None
+            if isinstance(size_options, list):
+                for idx, opt in enumerate(size_options):
+                    if not isinstance(opt, dict) or not isinstance(opt.get("id"), str) or not isinstance(opt.get("label"), str):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.size.options[{idx}] must be an object with string id/label{id_suffix}. "
+                            f"Received {_describe_value(opt)}."
+                        )
+
+            color_options = color.get("options") if isinstance(color, dict) else None
+            if isinstance(color_options, list):
+                for idx, opt in enumerate(color_options):
+                    if not isinstance(opt, dict) or not isinstance(opt.get("id"), str) or not isinstance(opt.get("label"), str):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.color.options[{idx}] must be an object with string id/label{id_suffix}. "
+                            f"Received {_describe_value(opt)}."
+                        )
+
+            offer_options = offer.get("options") if isinstance(offer, dict) else None
+            if isinstance(offer_options, list):
+                for idx, opt in enumerate(offer_options):
+                    if not isinstance(opt, dict):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.offer.options[{idx}] must be an object{id_suffix}. Received {_describe_value(opt)}."
+                        )
+                    if not isinstance(opt.get("id"), str) or not isinstance(opt.get("title"), str):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.offer.options[{idx}] must include string id/title{id_suffix}. "
+                            f"Received {_describe_value(opt)}."
+                        )
+                    image = opt.get("image")
+                    if not isinstance(image, dict) or not isinstance(image.get("alt"), str) or not image.get("alt"):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.offer.options[{idx}].image must be an object with string alt{id_suffix}. "
+                            f"Received {_describe_value(image)}."
+                        )
+                    price = opt.get("price")
+                    if not isinstance(price, (int, float)):
+                        raise ValueError(
+                            f"SalesPdpHero.{source}.purchase.offer.options[{idx}].price must be a number{id_suffix}. "
+                            f"Received {_describe_value(price)}."
+                        )
+
+            modals, modals_source = load_optional_object_prop(
+                props=props,
+                object_key="modals",
+                json_key="modalsJson",
+                component_type=comp_type,
+                id_suffix=id_suffix,
+            )
+            if modals is None:
+                raise ValueError(
+                    f"SalesPdpHero.modals/modalsJson is required{id_suffix}. "
+                    "This drives the size chart, why bundle, and free gifts dialogs."
+                )
+            size_chart = modals.get("sizeChart")
+            why_bundle = modals.get("whyBundle")
+            modal_free_gifts = modals.get("freeGifts")
+            if not isinstance(size_chart, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.sizeChart must be an object{id_suffix}. "
+                    f"Received {_describe_value(size_chart)}."
+                )
+            if not isinstance(why_bundle, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.whyBundle must be an object{id_suffix}. "
+                    f"Received {_describe_value(why_bundle)}."
+                )
+            if not isinstance(modal_free_gifts, dict):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.freeGifts must be an object{id_suffix}. "
+                    f"Received {_describe_value(modal_free_gifts)}."
+                )
+            if not isinstance(size_chart.get("title"), str) or not isinstance(size_chart.get("note"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.sizeChart must include string title/note{id_suffix}. "
+                    f"Received {_describe_value(size_chart)}."
+                )
+            sizes = size_chart.get("sizes")
+            if not isinstance(sizes, list) or not sizes:
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.sizeChart.sizes must be a non-empty list{id_suffix}. "
+                    f"Received {_describe_value(sizes)}."
+                )
+            if not isinstance(why_bundle.get("title"), str) or not isinstance(why_bundle.get("body"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.whyBundle must include string title/body{id_suffix}. "
+                    f"Received {_describe_value(why_bundle)}."
+                )
+            quotes = why_bundle.get("quotes")
+            if not isinstance(quotes, list):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.whyBundle.quotes must be a list{id_suffix}. "
+                    f"Received {_describe_value(quotes)}."
+                )
+            if not isinstance(modal_free_gifts.get("title"), str) or not isinstance(modal_free_gifts.get("body"), str):
+                raise ValueError(
+                    f"SalesPdpHero.{modals_source}.freeGifts must include string title/body{id_suffix}. "
+                    f"Received {_describe_value(modal_free_gifts)}."
+                )
+
+
+def _resolve_sales_pdp_urgency_month_labels(now: datetime | None = None) -> tuple[str, str]:
+    current = now or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        current = current.replace(tzinfo=timezone.utc)
+    else:
+        current = current.astimezone(timezone.utc)
+    current_month_label = current.strftime("%B").upper()
+    previous_month = 12 if current.month == 1 else current.month - 1
+    previous_year = current.year - 1 if current.month == 1 else current.year
+    previous_month_label = datetime(previous_year, previous_month, 1, tzinfo=timezone.utc).strftime("%B").upper()
+    return previous_month_label, current_month_label
+
+
+def _iter_sales_pdp_hero_configs(puck_data: dict[str, Any]) -> Iterator[tuple[int, dict[str, Any], dict[str, Any], str]]:
+    index = 0
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict) or obj.get("type") != "SalesPdpHero":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        raw_config_json = props.get("configJson")
+        if isinstance(raw_config_json, str) and raw_config_json.strip():
+            try:
+                parsed_config = json.loads(raw_config_json)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"SalesPdpHero.configJson must be valid JSON: {exc}") from exc
+            if not isinstance(parsed_config, dict):
+                raise ValueError(
+                    "SalesPdpHero.configJson must decode to a JSON object. "
+                    f"Received {_describe_value(parsed_config)}."
+                )
+            yield index, props, parsed_config, "configJson"
+            index += 1
+            continue
+
+        config = props.get("config")
+        if config is None:
+            continue
+        if not isinstance(config, dict):
+            raise ValueError(f"SalesPdpHero.config must be a JSON object. Received {_describe_value(config)}.")
+        yield index, props, config, "config"
+        index += 1
+
+
+def _extract_sales_pdp_urgency_config(config: dict[str, Any]) -> dict[str, Any] | None:
+    purchase = config.get("purchase")
+    if not isinstance(purchase, dict):
+        return None
+    cta = purchase.get("cta")
+    if not isinstance(cta, dict):
+        return None
+    urgency = cta.get("urgency")
+    if not isinstance(urgency, dict):
+        return None
+    return urgency
+
+
+def _humanize_option_id(value: str) -> str:
+    cleaned = value.strip().replace("_", "-").lower()
+    if not cleaned:
+        return value
+    if cleaned == "onesize":
+        return "One Size"
+    parts = [part for part in cleaned.split("-") if part]
+    if not parts:
+        return value
+    return " ".join(part.capitalize() for part in parts)
+
+
+def _ordered_intersection_with_fallback(existing_ids: list[str], valid_ids: list[str]) -> list[str]:
+    valid_set = set(valid_ids)
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for value in existing_ids:
+        if value in valid_set and value not in seen:
+            ordered.append(value)
+            seen.add(value)
+    for value in valid_ids:
+        if value not in seen:
+            ordered.append(value)
+            seen.add(value)
+    return ordered
+
+
+def _align_sales_pdp_purchase_options_to_variants(
+    *,
+    purchase: dict[str, Any],
+    variants: list[dict[str, Any]],
+) -> bool:
+    if not isinstance(purchase, dict):
+        raise ValueError("SalesPdpHero.purchase must be an object to align checkout option ids.")
+    if not isinstance(variants, list) or not variants:
+        raise ValueError("At least one product variant is required to align checkout option ids.")
+
+    size_ids: list[str] = []
+    color_ids: list[str] = []
+    offer_ids: list[str] = []
+    offer_variant_defaults: dict[str, tuple[str | None, float | None]] = {}
+
+    for idx, variant in enumerate(variants):
+        if not isinstance(variant, dict):
+            raise ValueError(f"Variant #{idx + 1} must be an object.")
+        option_values = variant.get("option_values")
+        if not isinstance(option_values, dict):
+            raise ValueError(
+                "Every product variant must include option_values with sizeId/colorId/offerId."
+            )
+        size_id = _clean_non_empty_string(option_values.get("sizeId"))
+        color_id = _clean_non_empty_string(option_values.get("colorId"))
+        offer_id = _clean_non_empty_string(option_values.get("offerId"))
+        if not size_id or not color_id or not offer_id:
+            raise ValueError(
+                "Every product variant option_values must include non-empty sizeId/colorId/offerId strings."
+            )
+        if size_id not in size_ids:
+            size_ids.append(size_id)
+        if color_id not in color_ids:
+            color_ids.append(color_id)
+        if offer_id not in offer_ids:
+            offer_ids.append(offer_id)
+            title_raw = variant.get("title")
+            title = _clean_non_empty_string(title_raw) if isinstance(title_raw, str) else None
+            amount_cents = variant.get("amount_cents")
+            price_value: float | None = None
+            if isinstance(amount_cents, (int, float)):
+                price_value = round(float(amount_cents) / 100.0, 2)
+            offer_variant_defaults[offer_id] = (title, price_value)
+
+    size_cfg = purchase.get("size")
+    color_cfg = purchase.get("color")
+    offer_cfg = purchase.get("offer")
+    if not isinstance(size_cfg, dict) or not isinstance(color_cfg, dict) or not isinstance(offer_cfg, dict):
+        raise ValueError("SalesPdpHero.purchase must include size/color/offer objects.")
+
+    size_options = size_cfg.get("options")
+    color_options = color_cfg.get("options")
+    offer_options = offer_cfg.get("options")
+    if not isinstance(size_options, list) or not isinstance(color_options, list) or not isinstance(offer_options, list):
+        raise ValueError("SalesPdpHero.purchase size/color/offer options must all be lists.")
+
+    before = json.dumps(purchase, ensure_ascii=False, sort_keys=True)
+
+    def extract_existing_ids(options: list[Any]) -> list[str]:
+        ids: list[str] = []
+        for option in options:
+            if not isinstance(option, dict):
+                continue
+            option_id = _clean_non_empty_string(option.get("id"))
+            if option_id:
+                ids.append(option_id)
+        return ids
+
+    target_size_ids = _ordered_intersection_with_fallback(extract_existing_ids(size_options), size_ids)
+    target_color_ids = _ordered_intersection_with_fallback(extract_existing_ids(color_options), color_ids)
+    target_offer_ids = _ordered_intersection_with_fallback(extract_existing_ids(offer_options), offer_ids)
+
+    def build_option_list(
+        *,
+        options: list[Any],
+        target_ids: list[str],
+        ensure_size_fields: bool = False,
+    ) -> list[dict[str, Any]]:
+        by_id: dict[str, dict[str, Any]] = {}
+        pool: list[dict[str, Any]] = []
+        for option in options:
+            if not isinstance(option, dict):
+                continue
+            pool.append(option)
+            option_id = _clean_non_empty_string(option.get("id"))
+            if option_id and option_id not in by_id:
+                by_id[option_id] = option
+
+        rebuilt: list[dict[str, Any]] = []
+        pool_index = 0
+        for target_id in target_ids:
+            source = by_id.get(target_id)
+            matched_existing_id = source is not None
+            if source is None:
+                source = pool[pool_index] if pool_index < len(pool) else {}
+                pool_index += 1
+            option = dict(source) if isinstance(source, dict) else {}
+            option["id"] = target_id
+
+            label = _clean_non_empty_string(option.get("label"))
+            if (not label) or (not matched_existing_id):
+                option["label"] = _humanize_option_id(target_id)
+
+            if ensure_size_fields:
+                if not isinstance(option.get("sizeIn"), str):
+                    option["sizeIn"] = ""
+                if not isinstance(option.get("sizeCm"), str):
+                    option["sizeCm"] = ""
+
+            rebuilt.append(option)
+
+        return rebuilt
+
+    size_cfg["options"] = build_option_list(options=size_options, target_ids=target_size_ids, ensure_size_fields=True)
+    color_cfg["options"] = build_option_list(options=color_options, target_ids=target_color_ids, ensure_size_fields=False)
+
+    offer_by_id: dict[str, dict[str, Any]] = {}
+    offer_pool: list[dict[str, Any]] = []
+    for option in offer_options:
+        if not isinstance(option, dict):
+            continue
+        offer_pool.append(option)
+        option_id = _clean_non_empty_string(option.get("id"))
+        if option_id and option_id not in offer_by_id:
+            offer_by_id[option_id] = option
+
+    rebuilt_offer_options: list[dict[str, Any]] = []
+    offer_pool_index = 0
+    for offer_id in target_offer_ids:
+        source = offer_by_id.get(offer_id)
+        matched_existing_id = source is not None
+        if source is None:
+            source = offer_pool[offer_pool_index] if offer_pool_index < len(offer_pool) else {}
+            offer_pool_index += 1
+        option = dict(source) if isinstance(source, dict) else {}
+        option["id"] = offer_id
+
+        default_title, default_price = offer_variant_defaults.get(offer_id, (None, None))
+        title = _clean_non_empty_string(option.get("title"))
+        if (not title) or (not matched_existing_id):
+            option["title"] = default_title or _humanize_option_id(offer_id)
+
+        if not isinstance(option.get("price"), (int, float)):
+            if default_price is None:
+                raise ValueError(
+                    f"SalesPdpHero.purchase.offer.options entry for offerId={offer_id} is missing numeric price."
+                )
+            option["price"] = default_price
+
+        image = option.get("image")
+        if not isinstance(image, dict):
+            image = {}
+            option["image"] = image
+        image_alt = _clean_non_empty_string(image.get("alt"))
+        if not image_alt:
+            image["alt"] = "Package option image"
+
+        rebuilt_offer_options.append(option)
+
+    offer_cfg["options"] = rebuilt_offer_options
+
+    after = json.dumps(purchase, ensure_ascii=False, sort_keys=True)
+    return before != after
+
+
+def _enforce_sales_pdp_urgency_month_rows(
+    *,
+    puck_data: dict[str, Any],
+    reference_puck_data: dict[str, Any] | None,
+    now: datetime | None = None,
+) -> None:
+    previous_month_label, current_month_label = _resolve_sales_pdp_urgency_month_labels(now)
+
+    reference_rows_by_id: dict[str, list[dict[str, Any]]] = {}
+    reference_rows_by_index: list[list[dict[str, Any]]] = []
+    reference_messages_by_id: dict[str, str] = {}
+    reference_messages_by_index: list[str] = []
+
+    if reference_puck_data is not None:
+        for ref_index, ref_props, ref_config, _ in _iter_sales_pdp_hero_configs(reference_puck_data):
+            ref_urgency = _extract_sales_pdp_urgency_config(ref_config)
+            if not isinstance(ref_urgency, dict):
+                continue
+            ref_rows = ref_urgency.get("rows")
+            if isinstance(ref_rows, list):
+                while len(reference_rows_by_index) <= ref_index:
+                    reference_rows_by_index.append([])
+                reference_rows_by_index[ref_index] = ref_rows
+                ref_id = ref_props.get("id")
+                if isinstance(ref_id, str) and ref_id:
+                    reference_rows_by_id[ref_id] = ref_rows
+            ref_message = ref_urgency.get("message")
+            if isinstance(ref_message, str) and ref_message.strip():
+                while len(reference_messages_by_index) <= ref_index:
+                    reference_messages_by_index.append("")
+                cleaned = ref_message.strip()
+                reference_messages_by_index[ref_index] = cleaned
+                ref_id = ref_props.get("id")
+                if isinstance(ref_id, str) and ref_id:
+                    reference_messages_by_id[ref_id] = cleaned
+
+    has_sales_hero = False
+    for index, props, config, source in _iter_sales_pdp_hero_configs(puck_data):
+        has_sales_hero = True
+        hero_id = props.get("id")
+        id_suffix = f" (id={hero_id})" if isinstance(hero_id, str) and hero_id else ""
+        urgency = _extract_sales_pdp_urgency_config(config)
+        if not isinstance(urgency, dict):
+            raise ValueError(
+                f"SalesPdpHero{'.configJson' if source == 'configJson' else '.config'}.purchase.cta.urgency must be an object{id_suffix}."
+            )
+
+        message = urgency.get("message")
+        valid_message = isinstance(message, str) and bool(message.strip()) and bool(
+            _URGENCY_SELLING_OUT_PATTERN.search(message)
+        )
+        if not valid_message:
+            reference_message = ""
+            if isinstance(hero_id, str) and hero_id and hero_id in reference_messages_by_id:
+                reference_message = reference_messages_by_id[hero_id]
+            elif index < len(reference_messages_by_index):
+                reference_message = reference_messages_by_index[index]
+            elif reference_messages_by_index:
+                reference_message = reference_messages_by_index[0]
+            if not reference_message or not _URGENCY_SELLING_OUT_PATTERN.search(reference_message):
+                raise ValueError(
+                    "SalesPdpHero.purchase.cta.urgency.message must describe selling out "
+                    f"and cannot be replaced with generic availability/shipping copy{id_suffix}."
+                )
+            urgency["message"] = reference_message
+        elif isinstance(message, str):
+            urgency["message"] = message.strip()
+
+        rows = urgency.get("rows")
+        candidate_row_sets: list[list[dict[str, Any]]] = []
+        if isinstance(rows, list):
+            candidate_row_sets.append([row for row in rows if isinstance(row, dict)])
+        if isinstance(hero_id, str) and hero_id and hero_id in reference_rows_by_id:
+            candidate_row_sets.append([row for row in reference_rows_by_id[hero_id] if isinstance(row, dict)])
+        if index < len(reference_rows_by_index):
+            candidate_row_sets.append([row for row in reference_rows_by_index[index] if isinstance(row, dict)])
+        elif reference_rows_by_index:
+            candidate_row_sets.append([row for row in reference_rows_by_index[0] if isinstance(row, dict)])
+
+        sold_out_value: str | None = None
+        nearly_sold_value: str | None = None
+        for candidate_rows in candidate_row_sets:
+            for row in candidate_rows:
+                value = row.get("value")
+                if not isinstance(value, str) or not value.strip():
+                    continue
+                cleaned = value.strip()
+                if sold_out_value is None and _URGENCY_SOLD_OUT_PATTERN.search(cleaned):
+                    sold_out_value = cleaned
+                if nearly_sold_value is None and _URGENCY_NEARLY_SOLD_PATTERN.search(cleaned):
+                    nearly_sold_value = cleaned
+            if sold_out_value and nearly_sold_value:
+                break
+
+        if sold_out_value is None or nearly_sold_value is None:
+            raise ValueError(
+                "SalesPdpHero.purchase.cta.urgency.rows must include one 'Sold Out' value and one "
+                f"'99% Sold' style value with percentages{id_suffix}."
+            )
+
+        urgency["rows"] = [
+            {"label": previous_month_label, "value": sold_out_value, "tone": "muted"},
+            {"label": current_month_label, "value": nearly_sold_value, "tone": "highlight"},
+        ]
+
+        if source == "configJson":
+            props["configJson"] = json.dumps(config, ensure_ascii=False)
+        else:
+            props["config"] = config
+
+    if not has_sales_hero:
+        raise ValueError("SalesPdpHero block is required to enforce urgency month rows.")
 
 
 def _collect_config_json_contexts_all(puck_data: dict[str, Any]) -> list[_ConfigJsonContext]:
@@ -188,6 +1547,11 @@ def _apply_brand_logo_overrides_for_ai(
     logo_public_id = brand.get("logoAssetPublicId")
     if not isinstance(logo_public_id, str) or not logo_public_id.strip():
         raise ValueError("Design system brand.logoAssetPublicId is required to apply brand assets.")
+    logo_public_id = logo_public_id.strip()
+    if logo_public_id == "__LOGO_ASSET_PUBLIC_ID__":
+        raise ValueError(
+            "Design system brand.logoAssetPublicId is a placeholder and must be replaced with a real asset public id."
+        )
     assets_repo = AssetsRepository(session)
     asset = assets_repo.get_by_public_id(org_id=org_id, client_id=client_id, public_id=logo_public_id)
     if not asset:
@@ -228,6 +1592,122 @@ _BOOK_DEVICE_KEYWORDS = (
     "kindle",
 )
 
+_STOCK_SCENE_KEYWORDS = (
+    "lifestyle",
+    "at home",
+    "home setting",
+    "kitchen",
+    "living room",
+    "office",
+    "workspace",
+    "outdoor",
+    "street",
+    "city",
+    "natural light",
+    "candid",
+    "authentic",
+    "realistic",
+    "wellness",
+    "portrait",
+    "person",
+    "woman",
+    "man",
+    "family",
+    "group",
+    "background",
+    "environment",
+)
+
+_AI_GRAPHIC_STYLE_KEYWORDS = (
+    "vector",
+    "icon",
+    "illustration",
+    "infographic",
+    "diagram",
+    "flat design",
+    "line art",
+    "logo",
+    "white background",
+    "solid background",
+)
+
+_PRODUCT_EXACTNESS_KEYWORDS = (
+    "include the product prominently",
+    "product photo",
+    "product shot",
+    "close-up",
+    "close up",
+    "studio shot",
+    "packaging",
+    "hero product",
+    "on white background",
+    "technical detail",
+    "e-commerce",
+)
+
+_STOCK_SCENE_COMPLEXITY_KEYWORDS = (
+    "concept",
+    "tracking",
+    "progress",
+    "before and after",
+    "split screen",
+    "collage",
+    "mockup",
+    "visible in corner",
+)
+
+_STOCK_PROMPT_MAX_WORDS = 16
+_STOCK_PROMPT_MAX_COMMAS = 2
+
+_ICON_STYLE_PROMPT_TEMPLATE = (
+    "High-quality flat design icon of {subject}. Minimalist vector style with subtle depth. "
+    "Clean thick lines, soft pastel colors, flat lighting with a very subtle long shadow to add dimension. "
+    "Full-bleed composition where the icon symbol occupies nearly the entire frame with minimal padding. "
+    "Do not place the icon inside a badge, circle, tile, button, sticker, or any container shape. "
+    "Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. "
+    "Crisp vector graphics, dribbble aesthetic, professional UI asset. "
+    "No text, no blur."
+)
+_ICON_SUBJECT_PROMPT_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"(?i)\bicon\s+of\s+([^.;\n]+)"),
+    re.compile(r"(?i)\bicon\s*[:\-]\s*([^.;\n]+)"),
+)
+_ICON_STYLE_NOISE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"(?i)\bhigh-quality\b"),
+    re.compile(r"(?i)\bflat(?:\s+design|\s+vector)?\b"),
+    re.compile(r"(?i)\bminimalist(?:\s+vector)?(?:\s+style)?\b"),
+    re.compile(r"(?i)\bsubtle\s+depth\b"),
+    re.compile(r"(?i)\bclean\s+thick\s+lines\b"),
+    re.compile(r"(?i)\bsoft\s+pastel\s+colors?\b"),
+    re.compile(r"(?i)\bflat\s+lighting\b"),
+    re.compile(r"(?i)\bvery\s+subtle\s+long\s+shadow\b"),
+    re.compile(r"(?i)\b(?:to\s+add\s+dimension|add\s+dimension)\b"),
+    re.compile(r"(?i)\bsolid\s+white\s+background\b"),
+    re.compile(r"(?i)\bwhite\s+background\b"),
+    re.compile(r"(?i)\btransparent(?:\s+background)?\b"),
+    re.compile(r"(?i)\b(?:checkered|checkerboard)(?:\s+pattern|\s+background)?\b"),
+    re.compile(r"(?i)\bline\s+art(?:\s+style)?\b"),
+    re.compile(r"(?i)\bcrisp\s+vector\s+graphics\b"),
+    re.compile(r"(?i)\bdribbble\s+aesthetic\b"),
+    re.compile(r"(?i)\bprofessional\s+ui\s+asset\b"),
+    re.compile(r"(?i)\bno\s+text\b"),
+    re.compile(r"(?i)\bno\s+blur\b"),
+)
+_ICON_GENERIC_SUBJECTS: frozenset[str] = frozenset(
+    {
+        "icon",
+        "badge",
+        "symbol",
+        "logo",
+        "graphic",
+        "illustration",
+        "image",
+        "asset",
+        "ui",
+        "ui asset",
+    }
+)
+
 
 def _text_mentions_product(text: str | None) -> bool:
     if not isinstance(text, str) or not text.strip():
@@ -237,9 +1717,9 @@ def _text_mentions_product(text: str | None) -> bool:
 
 
 def _normalize_product_type(product: Product | None) -> str | None:
-    if not product or not isinstance(product.category, str):
+    if not product or not isinstance(product.product_type, str):
         return None
-    normalized = product.category.strip().lower()
+    normalized = product.product_type.strip().lower()
     return normalized or None
 
 
@@ -250,21 +1730,98 @@ def _product_prompt_mentions_devices(prompt: str | None) -> bool:
     return any(keyword in lowered for keyword in _BOOK_DEVICE_KEYWORDS)
 
 
+def _has_explicit_image_source(obj: dict[str, Any]) -> bool:
+    if "imageSource" in obj and obj.get("imageSource") is not None:
+        return True
+    if "image_source" in obj and obj.get("image_source") is not None:
+        return True
+    return False
+
+
+def _prompt_mentions_product_terms(prompt: str) -> bool:
+    lowered = prompt.lower()
+    for keyword in _PRODUCT_KEYWORDS:
+        if re.search(rf"\b{re.escape(keyword)}s?\b", lowered):
+            return True
+    return False
+
+
+def _is_stock_scene_prompt_too_specific(prompt: str) -> bool:
+    lowered = prompt.lower()
+    words = re.findall(r"[a-z0-9']+", lowered)
+    if len(words) > _STOCK_PROMPT_MAX_WORDS:
+        return True
+    if lowered.count(",") > _STOCK_PROMPT_MAX_COMMAS:
+        return True
+    if any(keyword in lowered for keyword in _STOCK_SCENE_COMPLEXITY_KEYWORDS):
+        return True
+    return False
+
+
+def _recommend_image_source(
+    *,
+    prompt: str,
+    asset_key: str,
+    reference_public_id: str | None,
+) -> tuple[str, str]:
+    if asset_key == "iconAssetPublicId":
+        return "ai", "Icon prompts are generated by AI."
+    if reference_public_id:
+        return "ai", "referenceAssetPublicId requires AI generation."
+
+    lowered = prompt.lower()
+    if any(keyword in lowered for keyword in _AI_GRAPHIC_STYLE_KEYWORDS):
+        return "ai", "Graphic/icon/diagram prompts are generated by AI."
+    if _prompt_mentions_product_terms(prompt) or any(keyword in lowered for keyword in _PRODUCT_EXACTNESS_KEYWORDS):
+        return "ai", "Prompt references product-specific visuals."
+    if any(keyword in lowered for keyword in _STOCK_SCENE_KEYWORDS):
+        if _is_stock_scene_prompt_too_specific(prompt):
+            return "ai", "Prompt is too specific for reliable stock search; use AI."
+        return "unsplash", "Prompt is a generic stock-suitable scene."
+    return "ai", "Default to AI when stock suitability is unclear."
+
+
 def _book_prompt_suffix() -> str:
     return "Show a physical printed book. No tablets, phones, e-readers, or screens."
 
 
 def _build_product_context_prompt(text: str, product_type: str | None) -> str:
     cleaned = " ".join(text.split())
+    # Avoid passing title-cased marketing headlines verbatim, which can encourage image models
+    # to render that exact phrase as on-image text.
+    cleaned = cleaned.lower()
     if len(cleaned) > 220:
         cleaned = cleaned[:217].rstrip() + "..."
     base = "Contextual lifestyle scene"
     if cleaned:
-        base = f"{base} reflecting: {cleaned}"
-    base = f"{base}. Include the product prominently."
+        base = f"{base}. Theme: {cleaned}."
+    base = f"{base} Include the product prominently. {_NO_TEXT_IMAGE_DIRECTIVE}"
     if product_type == "book":
         base = f"{base} {_book_prompt_suffix()}"
     return base
+
+
+def _build_sales_pdp_offer_option_prompt(option_title: str | None, *, product_type: str | None) -> str:
+    cleaned_title = " ".join(option_title.split()).lower() if isinstance(option_title, str) else ""
+    base = (
+        "Package option product image. Use the referenced product image as the exact same product identity, "
+        "materials, colorway, and branding. Show the product clearly and only vary quantity/composition for this offer."
+    )
+    if cleaned_title:
+        base = f"{base} Offer: {cleaned_title}."
+    base = f"{base} {_NO_TEXT_IMAGE_DIRECTIVE}"
+    if product_type == "book":
+        base = f"{base} {_book_prompt_suffix()}"
+    return base
+
+
+def _append_no_text_directive(prompt: str) -> str:
+    """Ensure AI image prompts explicitly forbid on-image text."""
+    if not isinstance(prompt, str):
+        return prompt
+    if "no visible text" in prompt.lower() or _NO_TEXT_IMAGE_DIRECTIVE.lower() in prompt.lower():
+        return prompt
+    return f"{prompt}\n\n{_NO_TEXT_IMAGE_DIRECTIVE}"
 
 
 def _collect_product_image_public_ids(
@@ -390,14 +1947,79 @@ def _apply_product_prompt(
         image["alt"] = alt
 
 
+def _clean_icon_subject_text(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = " ".join(value.split())
+    if not cleaned:
+        return None
+    cleaned = re.sub(r"(?i)\b(?:icon|badge|symbol|logo)\b", " ", cleaned)
+    cleaned = re.sub(r"\s{2,}", " ", cleaned).strip(" ,.;:-")
+    if not cleaned:
+        return None
+    if cleaned.isupper() and any(ch.isalpha() for ch in cleaned):
+        cleaned = cleaned.title()
+    if cleaned.lower() in _ICON_GENERIC_SUBJECTS:
+        return None
+    return cleaned
+
+
+def _derive_icon_subject_from_metadata(obj: dict[str, Any]) -> str | None:
+    for key in ("iconAlt", "alt", "label", "title"):
+        subject = _clean_icon_subject_text(obj.get(key))
+        if subject:
+            return subject
+    return None
+
+
+def _derive_icon_subject_from_prompt(prompt: str) -> str | None:
+    collapsed = " ".join(prompt.split())
+    if not collapsed:
+        return None
+    collapsed = collapsed.replace(_NO_TEXT_IMAGE_DIRECTIVE, " ")
+
+    for pattern in _ICON_SUBJECT_PROMPT_PATTERNS:
+        match = pattern.search(collapsed)
+        if match:
+            subject = _clean_icon_subject_text(match.group(1))
+            if subject:
+                return subject
+
+    candidate = collapsed
+    for pattern in _ICON_STYLE_NOISE_PATTERNS:
+        candidate = pattern.sub(" ", candidate)
+    candidate = re.sub(r"\s{2,}", " ", candidate).strip(" ,.;:-")
+    return _clean_icon_subject_text(candidate)
+
+
+def _build_styled_icon_prompt(*, subject: str) -> str:
+    return _ICON_STYLE_PROMPT_TEMPLATE.format(subject=subject)
+
+
+def _normalize_icon_prompt(*, prompt: str, obj: dict[str, Any], path: str) -> str:
+    subject = _derive_icon_subject_from_metadata(obj) or _derive_icon_subject_from_prompt(prompt)
+    if not subject:
+        raise ValueError(
+            "Icon prompt normalization requires a clear icon subject. "
+            f"Unable to infer subject at {path}. "
+            "Provide iconAlt/alt/label or a prompt phrased like 'icon of <subject>'."
+        )
+    return _build_styled_icon_prompt(subject=subject)
+
+
 def _ensure_flat_vector_icon_prompts(
     *,
     puck_data: dict[str, Any],
     config_contexts: list[_ConfigJsonContext],
+    design_system_tokens: dict[str, Any] | None = None,
 ) -> None:
+    icon_palette = _collect_icon_palette_colors(design_system_tokens)
+    icon_prompt_count = 0
+
     def update_tree(tree: Any) -> bool:
+        nonlocal icon_prompt_count
         changed = False
-        for _, obj in _walk_json_with_path(tree, "root"):
+        for path, obj in _walk_json_with_path(tree, "root"):
             if not isinstance(obj, dict):
                 continue
             if _is_testimonial_image(obj):
@@ -408,17 +2030,40 @@ def _ensure_flat_vector_icon_prompts(
             prompt = obj.get("prompt")
             if not isinstance(prompt, str) or not prompt.strip():
                 continue
-            lowered = prompt.lower()
-            if "vector" in lowered and "transparent" in lowered:
-                continue
-            obj["prompt"] = f"{prompt.strip()} Flat vector icon, transparent background."
-            changed = True
+            icon_prompt_count += 1
+            updated_prompt = _normalize_icon_prompt(prompt=prompt, obj=obj, path=path)
+            updated_prompt = _append_icon_palette_prompt(
+                updated_prompt,
+                icon_palette,
+                include_remix_instruction=False,
+            )
+            if updated_prompt != prompt:
+                obj["prompt"] = updated_prompt
+                changed = True
+            if obj.get("aspectRatio") != "1:1":
+                obj["aspectRatio"] = "1:1"
+                changed = True
+            if "aspect_ratio" in obj:
+                obj.pop("aspect_ratio", None)
+                changed = True
         return changed
 
     update_tree(puck_data)
     for ctx in config_contexts:
         if update_tree(ctx.parsed):
             ctx.dirty = True
+    if icon_prompt_count == 0:
+        return
+    missing_required_roles = [role for role in sorted(_ICON_REQUIRED_COLOR_ROLES) if role not in icon_palette]
+    if missing_required_roles:
+        required_color_keys = ", ".join(
+            key for role, key in _ICON_COLOR_TOKEN_KEYS if role in _ICON_REQUIRED_COLOR_ROLES
+        )
+        missing_roles_text = ", ".join(missing_required_roles)
+        raise ValueError(
+            "Icon generation requires brand color tokens in design_system_tokens.cssVars. "
+            f"Missing usable values for color roles [{missing_roles_text}] from: {required_color_keys}."
+        )
 
 
 def _apply_product_image_overrides_for_ai(
@@ -478,6 +2123,26 @@ def _apply_product_image_overrides_for_ai(
                             public_id=product_public_ids[idx % len(product_public_ids)],
                             alt="Product image",
                         )
+                purchase = hero.get("purchase") if isinstance(hero, dict) else None
+                offer = purchase.get("offer") if isinstance(purchase, dict) else None
+                offer_options = offer.get("options") if isinstance(offer, dict) else None
+                if isinstance(offer_options, list):
+                    for option in offer_options:
+                        if not isinstance(option, dict):
+                            continue
+                        image = option.get("image")
+                        if not isinstance(image, dict):
+                            continue
+                        option_title = option.get("title") if isinstance(option.get("title"), str) else None
+                        prompt_hint = _build_sales_pdp_offer_option_prompt(option_title, product_type=product_type)
+                        image["prompt"] = prompt_hint
+                        _apply_product_reference_prompt(
+                            image,
+                            public_id=product_public_ids[0],
+                            prompt_hint=prompt_hint,
+                            product_type=product_type,
+                            alt="Package option image",
+                        )
                 if ctx:
                     ctx.dirty = True
                 continue
@@ -499,8 +2164,6 @@ def _apply_product_image_overrides_for_ai(
                         )
                         if ctx:
                             ctx.dirty = True
-
-        return
 
     if template_kind == "pre-sales-listicle":
         for comp_type, config, ctx in iter_component_configs({"PreSalesHero", "PreSalesReasons", "PreSalesPitch"}):
@@ -529,15 +2192,20 @@ def _apply_product_image_overrides_for_ai(
                         title = reason.get("title")
                         body = reason.get("body")
                         text = " ".join([str(title or ""), str(body or "")]).strip()
-                        if _text_mentions_product(text):
-                            prompt_hint = _build_product_context_prompt(text, product_type)
-                            _apply_product_reference_prompt(
-                                image,
-                                public_id=product_public_ids[0],
-                                prompt_hint=prompt_hint,
-                                product_type=product_type,
-                                alt="Product in use",
-                            )
+                        if not text:
+                            text = str(product.title or "").strip()
+                        if not text:
+                            text = str(product.description or "").strip()
+                        if not text:
+                            text = "product lifestyle scene"
+                        prompt_hint = _build_product_context_prompt(text, product_type)
+                        _apply_product_reference_prompt(
+                            image,
+                            public_id=product_public_ids[0],
+                            prompt_hint=prompt_hint,
+                            product_type=product_type,
+                            alt="Product in use",
+                        )
                     if ctx:
                         ctx.dirty = True
                 continue
@@ -559,6 +2227,124 @@ def _apply_product_image_overrides_for_ai(
                         )
                         if ctx:
                             ctx.dirty = True
+
+    # Generic support for templates that use primitive Image components (not SalesPdp*/PreSales*).
+    #
+    # We only fill obvious "product image" slots so we do not accidentally overwrite icons or other
+    # decorative imagery. These slots are expected to have no src/assetPublicId and an alt/id that
+    # clearly indicates a product image placeholder.
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict) or obj.get("type") != "Image":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        if props.get("assetPublicId") or props.get("src") or props.get("referenceAssetPublicId"):
+            continue
+        alt = props.get("alt")
+        cid = props.get("id")
+        alt_str = str(alt or "")
+        cid_str = str(cid or "")
+        looks_like_product_slot = "product" in alt_str.lower() or "hero_image" in cid_str.lower()
+        if not looks_like_product_slot:
+            continue
+        if not product_public_ids:
+            raise ValueError("No product image assets available for funnel generation.")
+        props["assetPublicId"] = product_public_ids[0]
+        if not alt_str.strip():
+            props["alt"] = "Product image"
+
+
+def _normalize_sales_pdp_testimonial_image(
+    image: dict[str, Any],
+    *,
+    default_template: str = "review_card",
+) -> bool:
+    changed = False
+    if not _is_testimonial_image(image):
+        image["testimonialTemplate"] = default_template
+        changed = True
+
+    # Risk-free testimonial visuals must be sourced from testimonial rendering, never
+    # from regular AI/Unsplash image prompt flows.
+    for key in (
+        "prompt",
+        "imageSource",
+        "image_source",
+        "referenceAssetPublicId",
+        "reference_asset_public_id",
+    ):
+        if key in image:
+            image.pop(key, None)
+            changed = True
+    return changed
+
+
+def _enforce_sales_pdp_guarantee_testimonial_only_images(
+    *,
+    puck_data: dict[str, Any],
+    config_contexts: list[_ConfigJsonContext],
+) -> None:
+    def normalize_guarantee_config(config: dict[str, Any]) -> bool:
+        changed = False
+        right = config.get("right")
+        if isinstance(right, dict):
+            image = right.get("image")
+            if isinstance(image, dict):
+                if _normalize_sales_pdp_testimonial_image(image, default_template="review_card"):
+                    changed = True
+        return changed
+
+    def normalize_feed_images(feed_images: list[Any]) -> bool:
+        changed = False
+        for item in feed_images:
+            if not isinstance(item, dict):
+                continue
+            if _normalize_sales_pdp_testimonial_image(item, default_template="review_card"):
+                changed = True
+        return changed
+
+    for ctx in config_contexts:
+        if ctx.component_type == "SalesPdpGuarantee":
+            if ctx.key == "configJson" and isinstance(ctx.parsed, dict):
+                if normalize_guarantee_config(ctx.parsed):
+                    ctx.dirty = True
+            elif ctx.key == "feedImagesJson" and isinstance(ctx.parsed, list):
+                if normalize_feed_images(ctx.parsed):
+                    ctx.dirty = True
+            continue
+
+        if ctx.component_type == "SalesPdpTemplate" and ctx.key == "configJson" and isinstance(ctx.parsed, dict):
+            guarantee = ctx.parsed.get("guarantee")
+            if isinstance(guarantee, dict):
+                if normalize_guarantee_config(guarantee):
+                    ctx.dirty = True
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+
+        if comp_type == "SalesPdpGuarantee":
+            config = props.get("config")
+            if isinstance(config, dict):
+                normalize_guarantee_config(config)
+            feed_images = props.get("feedImages")
+            if isinstance(feed_images, list):
+                normalize_feed_images(feed_images)
+            continue
+
+        if comp_type == "SalesPdpTemplate":
+            config = props.get("config")
+            if isinstance(config, dict):
+                guarantee = config.get("guarantee")
+                if isinstance(guarantee, dict):
+                    normalize_guarantee_config(guarantee)
+
+
 def _get_image_src_for_asset_key(obj: dict[str, Any], asset_key: str) -> Any:
     if asset_key == "iconAssetPublicId":
         return obj.get("iconSrc")
@@ -568,7 +2354,9 @@ def _get_image_src_for_asset_key(obj: dict[str, Any], asset_key: str) -> Any:
         return obj.get("thumbSrc")
     if asset_key == "swatchAssetPublicId":
         return obj.get("swatchImageSrc")
-    return obj.get("src")
+    # Some template configs (e.g., SalesPdpReviews review media) use `url` for images.
+    # Treat it as a valid source so we don't incorrectly fail template image validation.
+    return obj.get("src") or obj.get("url")
 
 
 def _is_placeholder_src(value: str) -> bool:
@@ -642,6 +2430,13 @@ def _collect_image_plans(
     puck_data: dict[str, Any],
     config_contexts: list[_ConfigJsonContext],
 ) -> list[dict[str, Any]]:
+    # Sales PDP guarantee visuals are testimonial-rendered assets, not prompt-driven image slots.
+    # Normalize them up front so all downstream image planning treats them as testimonial targets.
+    _enforce_sales_pdp_guarantee_testimonial_only_images(
+        puck_data=puck_data,
+        config_contexts=config_contexts,
+    )
+
     plans: list[dict[str, Any]] = []
 
     def iter_plans(root: Any, base_path: str, *, skip_image_components: bool) -> None:
@@ -656,6 +2451,12 @@ def _collect_image_plans(
                     target = _extract_image_prompt_target(props, "assetPublicId")
                     if target:
                         prompt, reference_public_id, image_source, aspect_ratio = target
+                        explicit_source = _has_explicit_image_source(props)
+                        suggested_source, suggested_reason = _recommend_image_source(
+                            prompt=prompt,
+                            asset_key="assetPublicId",
+                            reference_public_id=reference_public_id,
+                        )
                         plans.append(
                             {
                                 "path": f"{path}.props",
@@ -664,6 +2465,13 @@ def _collect_image_plans(
                                 "imageSource": image_source,
                                 "referenceAssetPublicId": reference_public_id,
                                 "aspectRatio": aspect_ratio,
+                                "routingExplicit": explicit_source,
+                                "routingSuggestedImageSource": suggested_source,
+                                "routingReason": (
+                                    f"Explicit imageSource='{image_source}' was provided."
+                                    if explicit_source
+                                    else suggested_reason
+                                ),
                             }
                         )
                 continue
@@ -679,6 +2487,12 @@ def _collect_image_plans(
             target = _extract_image_prompt_target(obj, asset_key)
             if target:
                 prompt, reference_public_id, image_source, aspect_ratio = target
+                explicit_source = _has_explicit_image_source(obj)
+                suggested_source, suggested_reason = _recommend_image_source(
+                    prompt=prompt,
+                    asset_key=asset_key,
+                    reference_public_id=reference_public_id,
+                )
                 plans.append(
                     {
                         "path": path,
@@ -687,6 +2501,13 @@ def _collect_image_plans(
                         "imageSource": image_source,
                         "referenceAssetPublicId": reference_public_id,
                         "aspectRatio": aspect_ratio,
+                        "routingExplicit": explicit_source,
+                        "routingSuggestedImageSource": suggested_source,
+                        "routingReason": (
+                            f"Explicit imageSource='{image_source}' was provided."
+                            if explicit_source
+                            else suggested_reason
+                        ),
                     }
                 )
 
@@ -696,38 +2517,28 @@ def _collect_image_plans(
     return plans
 
 
-def _seed_unsplash_usage(
+def _auto_route_image_sources(
     *,
     puck_data: dict[str, Any],
     config_contexts: list[_ConfigJsonContext],
-    max_items: int = 2,
 ) -> int:
-    seeded = 0
-
-    def try_seed(*, allow_product_prompts: bool) -> None:
-        nonlocal seeded
-        for obj, asset_key, prompt, reference_public_id, image_source, _, ctx in _iter_ai_image_prompt_targets(
-            puck_data
-        ):
-            if seeded >= max_items:
-                return
-            if image_source != "ai":
-                continue
-            if reference_public_id:
-                continue
-            if asset_key == "iconAssetPublicId":
-                continue
-            if not allow_product_prompts and _text_mentions_product(prompt):
-                continue
-            obj["imageSource"] = "unsplash"
-            if ctx:
-                ctx.dirty = True
-            seeded += 1
-
-    try_seed(allow_product_prompts=False)
-    if seeded == 0:
-        try_seed(allow_product_prompts=True)
-    return seeded
+    _ = config_contexts
+    routed = 0
+    for obj, asset_key, prompt, reference_public_id, image_source, _, ctx in _iter_ai_image_prompt_targets(puck_data):
+        if _has_explicit_image_source(obj):
+            continue
+        recommended_source, _ = _recommend_image_source(
+            prompt=prompt,
+            asset_key=asset_key,
+            reference_public_id=reference_public_id,
+        )
+        if recommended_source == image_source:
+            continue
+        obj["imageSource"] = recommended_source
+        if ctx:
+            ctx.dirty = True
+        routed += 1
+    return routed
 
 
 def _ensure_unsplash_usage(
@@ -738,23 +2549,9 @@ def _ensure_unsplash_usage(
 ) -> list[dict[str, Any]]:
     if not plans:
         return plans
-    eligible = [
-        plan
-        for plan in plans
-        if plan.get("imageSource") == "ai"
-        and not plan.get("referenceAssetPublicId")
-        and plan.get("assetKey") != "iconAssetPublicId"
-    ]
-    if not eligible:
+    routed = _auto_route_image_sources(puck_data=puck_data, config_contexts=config_contexts)
+    if routed == 0:
         return plans
-    unsplash_count = sum(1 for plan in plans if plan.get("imageSource") == "unsplash")
-    if unsplash_count > 0:
-        return plans
-    seeded = _seed_unsplash_usage(puck_data=puck_data, config_contexts=config_contexts)
-    if seeded == 0:
-        raise ValueError(
-            "Unsplash usage is required. Mark stock-appropriate images with imageSource='unsplash' and a prompt."
-        )
     return _collect_image_plans(puck_data=puck_data, config_contexts=config_contexts)
 
 
@@ -1266,10 +3063,10 @@ def _build_public_asset_url(public_id: str) -> str | None:
 def _serialize_product(product: Product, primary_asset: Asset | None = None) -> dict[str, Any]:
     payload = {
         "id": str(product.id),
-        "name": product.name,
+        "name": product.title,
         "description": product.description,
-        "category": product.category,
-        "product_type": product.category,
+        "category": product.product_type,
+        "product_type": product.product_type,
         "primary_benefits": product.primary_benefits or [],
         "feature_bullets": product.feature_bullets or [],
         "guarantee_text": product.guarantee_text,
@@ -1289,7 +3086,7 @@ def _serialize_product(product: Product, primary_asset: Asset | None = None) -> 
 
 
 def _serialize_offer(
-    offer: ProductOffer, price_points: list[ProductOfferPricePoint]
+    offer: ProductOffer, price_points: list[ProductVariant], bonuses: list[dict[str, Any]]
 ) -> dict[str, Any]:
     return {
         "id": str(offer.id),
@@ -1299,10 +3096,11 @@ def _serialize_offer(
         "differentiation_bullets": offer.differentiation_bullets or [],
         "guarantee_text": offer.guarantee_text,
         "options_schema": offer.options_schema,
+        "bonuses": bonuses,
         "price_points": [
             {
-                "label": point.label,
-                "amount_cents": point.amount_cents,
+                "label": point.title,
+                "amount_cents": point.price,
                 "currency": point.currency,
                 "provider": point.provider,
                 "external_price_id": point.external_price_id,
@@ -1354,10 +3152,43 @@ def _load_product_context(
             raise ValueError("Selected offer does not belong to the funnel product.")
         price_points = list(
             session.scalars(
-                select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id == offer.id)
+                select(ProductVariant).where(ProductVariant.offer_id == offer.id)
             ).all()
         )
-        offer_payload = _serialize_offer(offer, price_points)
+        bonus_links = list(
+            session.scalars(
+                select(ProductOfferBonus)
+                .where(ProductOfferBonus.offer_id == offer.id)
+                .order_by(ProductOfferBonus.position.asc(), ProductOfferBonus.created_at.asc())
+            ).all()
+        )
+        bonus_products = (
+            list(
+                session.scalars(
+                    select(Product).where(
+                        Product.id.in_([link.bonus_product_id for link in bonus_links]),
+                        Product.org_id == org_id,
+                        Product.client_id == client_id,
+                    )
+                ).all()
+            )
+            if bonus_links
+            else []
+        )
+        bonus_product_map = {str(item.id): item for item in bonus_products}
+        serialized_bonuses: list[dict[str, Any]] = []
+        for link in bonus_links:
+            bonus_product = bonus_product_map.get(str(link.bonus_product_id))
+            if not bonus_product:
+                raise ValueError("Offer bonus references an invalid product.")
+            serialized_bonuses.append(
+                {
+                    "id": str(link.id),
+                    "position": link.position,
+                    "product": _serialize_product(bonus_product),
+                }
+            )
+        offer_payload = _serialize_offer(offer, price_points, serialized_bonuses)
 
     primary_asset: Asset | None = None
     if product.primary_asset_id:
@@ -1641,7 +3472,12 @@ def _extract_image_prompt_target(
             raise AiAttachmentError("Image referenceAssetPublicId must be a non-empty string.")
     asset_public_id = obj.get(asset_key)
     if asset_public_id and reference_public_id:
-        raise AiAttachmentError(f"Image cannot set both {asset_key} and referenceAssetPublicId.")
+        if isinstance(asset_public_id, str) and asset_public_id.strip() == reference_public_id:
+            # Normalize duplicated references so planning can proceed with reference-guided generation.
+            obj.pop(asset_key, None)
+            asset_public_id = None
+        else:
+            raise AiAttachmentError(f"Image cannot set both {asset_key} and referenceAssetPublicId.")
     if asset_public_id:
         return None
     image_source = _normalize_image_source(obj.get("imageSource") or obj.get("image_source"))
@@ -1747,6 +3583,39 @@ def _count_ai_image_targets(puck_data: dict[str, Any]) -> int:
     return sum(1 for _ in _iter_ai_image_prompt_targets(puck_data))
 
 
+def _resolve_image_generation_count(
+    *,
+    puck_data: dict[str, Any],
+    image_plans: list[dict[str, Any]] | None = None,
+    cap: int = _MAX_PAGE_IMAGE_GENERATIONS,
+) -> int:
+    total_images_needed = _count_ai_image_targets(puck_data)
+    if total_images_needed <= cap:
+        return total_images_needed
+
+    if image_plans is None:
+        config_contexts = _collect_config_json_contexts_all(puck_data)
+        image_plans = _collect_image_plans(puck_data=puck_data, config_contexts=config_contexts)
+
+    sample_paths: list[str] = []
+    for plan in image_plans:
+        path = plan.get("path")
+        if not isinstance(path, str) or not path.strip() or path in sample_paths:
+            continue
+        sample_paths.append(path)
+        if len(sample_paths) >= 12:
+            break
+
+    sample = ""
+    if sample_paths:
+        sample = "\nExample image paths:\n" + "\n".join(f"- {path}" for path in sample_paths)
+
+    raise ValueError(
+        f"Refusing to generate {total_images_needed} images for a single page. "
+        f"Cap is {cap}. Reduce image prompts before retrying.{sample}"
+    )
+
+
 def _fill_ai_images(
     *,
     session: Session,
@@ -1781,6 +3650,7 @@ def _fill_ai_images(
                     tags=["funnel", "funnel_page_image", "unsplash"],
                 )
             elif reference_public_id:
+                prompt = _append_no_text_directive(prompt)
                 ref_asset, ref_bytes, ref_mime = _load_reference_image(
                     session=session,
                     org_id=org_id,
@@ -1806,6 +3676,7 @@ def _fill_ai_images(
                     tags=["funnel", "funnel_page_image"],
                 )
             else:
+                prompt = _append_no_text_directive(prompt)
                 asset = create_funnel_image_asset(
                     session=session,
                     org_id=org_id,
@@ -1817,7 +3688,15 @@ def _fill_ai_images(
                     product_id=product_id,
                     tags=["funnel", "funnel_page_image"],
                 )
+            # Mark as resolved so future validation/scans don't treat it as an image prompt target.
             obj[asset_key] = str(asset.public_id)
+            obj.pop("referenceAssetPublicId", None)
+            obj.pop("reference_asset_public_id", None)
+            obj.pop("prompt", None)
+            obj.pop("imageSource", None)
+            obj.pop("image_source", None)
+            obj.pop("aspectRatio", None)
+            obj.pop("aspect_ratio", None)
             if ctx:
                 ctx.dirty = True
                 touched_contexts.append(ctx)
@@ -1967,22 +3846,33 @@ def generate_funnel_page_draft(
     if template_mode and base_puck is None:
         base_puck = template.puck_data
 
+    template_component_kind: str | None = None
+    if template_mode and isinstance(base_puck, dict):
+        template_component_kind = _infer_template_component_kind(template_kind, base_puck)
+
     if not template_mode:
         structure_guidance = (
             "- Use Section as the top-level blocks in puckData.content (do not place bare Heading/Text directly at the root)\n"
             "- Use Columns inside Sections for two-column layouts (image + copy)\n\n"
         )
-    elif template_kind == "sales-pdp":
+    elif template_component_kind == "sales-pdp":
         structure_guidance = (
             "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
             "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
-            "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
+            "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals\n"
+            "- Do NOT override layout sizing tokens like containerMax/containerPad (or --container-max/--container-pad) in props.theme tokens; keep the template width\n\n"
         )
-    else:
+    elif template_component_kind == "pre-sales-listicle":
         structure_guidance = (
             "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
             "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
-            "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+            "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy\n"
+            "- Do NOT override layout sizing tokens like containerMax/containerPad (or --container-max/--container-pad) in props.theme tokens; keep the template width\n\n"
+        )
+    else:
+        structure_guidance = (
+            "- Preserve the template's existing top-level structure in puckData.content.\n"
+            "- Do not introduce new component types; only edit props fields.\n\n"
         )
     header_footer_guidance = (
         "Header/Footer guidance:\n"
@@ -2030,6 +3920,7 @@ def generate_funnel_page_draft(
         template_image_guidance = (
             "Template image prompts:\n"
             "- Add a `prompt` on every image object inside props.config/props.modals/props.copy that should be generated.\n"
+            "- Generated images MUST NOT contain visible text. Do not ask for text overlays, headlines, labels, captions, watermarks, UI, or logos.\n"
             "- Do NOT add prompts to brand logos (logo objects). Keep logo assetPublicId intact.\n"
             "- Do NOT add prompts to testimonial images (objects with testimonialTemplate); those are rendered separately.\n"
             "- Leave the corresponding *AssetPublicId field empty so the backend can generate and fill it.\n"
@@ -2037,14 +3928,25 @@ def generate_funnel_page_draft(
             "- Prefer Unsplash for stock-appropriate imagery (lifestyle, generic product-in-use, backgrounds).\n"
             "- To use Unsplash, set imageSource='unsplash' on the image object and include a prompt.\n"
             "- Use AI generation only when stock imagery does not fit the need.\n"
-            "- Icon prompts (iconAssetPublicId) must be flat vector icons on transparent backgrounds.\n"
-            "- Do not set referenceAssetPublicId unless you are using one of the attached images listed above.\n"
-            "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n\n"
+            "- Icon prompts (iconAssetPublicId) must use this style template, replacing <subject> with the context item: "
+            "\"High-quality flat design icon of <subject>. Minimalist vector style with subtle depth. Clean thick lines, "
+            "soft pastel colors, flat lighting with a very subtle long shadow to add dimension. "
+            "Full-bleed composition where the icon symbol occupies nearly the entire frame with minimal padding. "
+            "Do not place the icon inside a badge, circle, tile, button, sticker, or any container shape. "
+            "Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. "
+            "Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.\"\n"
+            "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
+            "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
+            "- Set referenceAssetPublicId only when intentionally basing generation on a known source image.\n"
+            "- Allowed referenceAssetPublicId sources: attached image public ids, or product.primary_image.public_id from Product context when available.\n"
+            "- If referenceAssetPublicId is set: keep assetPublicId empty and include a prompt that preserves the same product identity.\n\n"
         )
         if template_kind == "sales-pdp":
             template_image_guidance += (
                 "Sales PDP product imagery:\n"
                 "- Hero/gallery imagery must show the product clearly.\n"
+                "- SalesPdpHero.config.purchase.offer.options[].image must use referenceAssetPublicId=product.primary_image.public_id when that id is available.\n"
+                "- Package option prompts should keep the same product identity and only vary quantity/composition per offer tier.\n"
                 "- Any section that calls out the product should include the product in the image.\n\n"
             )
         if template_kind == "pre-sales-listicle":
@@ -2057,12 +3959,33 @@ def generate_funnel_page_draft(
     if template_mode and template_kind == "sales-pdp":
         template_config_guidance = (
             "Sales PDP config requirements:\n"
+            "- SalesPdpReviews.config MUST include: id, data.\n"
+            "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
+            "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
+            "- SalesPdpFaq.config MUST include: id, title, items[] (do not replace it with the primitive FAQ component).\n"
             "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
+            "- SalesPdpHero.config.purchase.cta.urgency.rows MUST stay as exactly two month rows: previous month and current month.\n"
+            "- Urgency row 1 (previous month) must use Sold Out copy with sold-count data; row 2 (current month) must use nearly sold copy (e.g., 99% Sold with counts).\n"
+            "- Do not replace monthly sold-out urgency rows with availability/shipping labels like IN STOCK, SHIPPING, Available Now, or Fast & Free.\n"
             "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
+            "Anchor id requirements:\n"
+            "- Do not change section ids or header nav href anchors.\n"
+            "- Keep SalesPdpStoryProblem.config.id = 'how-it-works' (Problem section; floating CTA triggers after this section).\n"
+            "- Keep SalesPdpHeader.config.nav href values pointing at the same section ids (e.g. '#how-it-works', '#guarantee', '#faq', '#reviews').\n\n"
+        )
+    elif template_mode and template_component_kind == "pre-sales-listicle":
+        template_config_guidance = (
+            "Pre-sales listicle config requirements:\n"
+            "- PreSalesHero.config MUST be: { hero: { title: string, subtitle: string, media?: { type:'image', alt:string, src?:string, assetPublicId?:string } | { type:'video', srcMp4:string, poster?:string, alt?:string, assetPublicId?:string } }, badges: [] }\n"
+            "- PreSalesReasons.config MUST be an array of reasons: [{ number: number, title: string, body: string, image?: { alt:string, src?:string, assetPublicId?:string } }]\n"
+            "- PreSalesMarquee.config MUST be an array of strings.\n"
+            "- PreSalesPitch.config MUST be: { title: string, bullets: string[], image: { alt:string, src?:string, assetPublicId?:string }, cta?: { label: string, linkType?: 'external'|'funnelPage'|'nextPage', href?:string, targetPageId?:string } }\n"
+            "- PreSalesFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string } }\n"
+            "- Do NOT use keys like headline/subheadline/ctaLabel/ctaLinkType/items/reasons/reviews/links/copyrightText inside PreSales* configs.\n\n"
         )
     if not template_mode:
         template_component = ""
-    elif template_kind == "sales-pdp":
+    elif template_component_kind == "sales-pdp":
         template_component = (
             "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
             "12) SalesPdpHeader: props { id, config, configJson? }\n"
@@ -2074,22 +3997,24 @@ def generate_funnel_page_draft(
             "18) SalesPdpComparison: props { id, config, configJson? }\n"
             "19) SalesPdpGuarantee: props { id, config, configJson?, feedImages?, feedImagesJson? }\n"
             "20) SalesPdpFaq: props { id, config, configJson? }\n"
-            "21) SalesPdpReviewWall: props { id, config, configJson? }\n"
-            "22) SalesPdpFooter: props { id, config, configJson? }\n"
-            "23) SalesPdpReviewSlider: props { id, config, configJson? }\n"
+            "21) SalesPdpReviews: props { id, config, configJson? }\n"
+            "22) SalesPdpReviewWall: props { id, config, configJson? }\n"
+            "23) SalesPdpFooter: props { id, config, configJson? }\n"
+            "24) SalesPdpReviewSlider: props { id, config, configJson? }\n"
         )
-    else:
+    elif template_component_kind == "pre-sales-listicle":
         template_component = (
             "11) PreSalesPage: props { id, anchorId?, theme, themeJson?, content? }\n"
             "12) PreSalesHero: props { id, config, configJson? }\n"
             "13) PreSalesReasons: props { id, config, configJson? }\n"
-            "14) PreSalesReviews: props { id, config, configJson?, copy?, copyJson? }\n"
-            "15) PreSalesMarquee: props { id, config, configJson? }\n"
-            "16) PreSalesPitch: props { id, config, configJson? }\n"
-            "17) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
-            "18) PreSalesFooter: props { id, config, configJson? }\n"
-            "19) PreSalesFloatingCta: props { id, config, configJson? }\n"
+            "14) PreSalesMarquee: props { id, config, configJson? }\n"
+            "15) PreSalesPitch: props { id, config, configJson? }\n"
+            "16) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
+            "17) PreSalesFooter: props { id, config, configJson? }\n"
+            "18) PreSalesFloatingCta: props { id, config, configJson? }\n"
         )
+    else:
+        template_component = ""
 
     page_label = "sales page"
     if template_kind == "pre-sales-listicle":
@@ -2133,6 +4058,7 @@ def generate_funnel_page_draft(
             "ComponentData shape:\n"
             "- Every component must be an object with keys: type, props\n"
             "- props should include a string id (unique per component)\n\n"
+            "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
             "Available primitives (component types) and their props:\n"
             "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
             "   - purpose: 'header' | 'section' | 'footer'\n"
@@ -2155,8 +4081,9 @@ def generate_funnel_page_draft(
             "6) Image: props { id, prompt, alt, imageSource?, assetPublicId?, referenceAssetPublicId?, src?, radius? }\n"
             "   - imageSource: 'ai' (default) | 'unsplash'\n"
             "   - radius: 'none' | 'md' | 'lg'\n"
+            "   - Never request or include on-image text overlays (no words/letters/numbers) in generated images\n"
             "   - If imageSource='unsplash': include prompt and leave assetPublicId empty (no referenceAssetPublicId)\n"
-            "   - If referenceAssetPublicId is set: include prompt and leave assetPublicId empty\n"
+            "   - If referenceAssetPublicId is set: include prompt, leave assetPublicId empty, and keep the same product identity as the reference image\n"
             "7) Button: props { id, label, variant?, size?, width?, align?, linkType?, targetPageId?, href? }\n"
             "   - variant: 'primary' | 'secondary'\n"
             "   - size: 'sm' | 'md' | 'lg'\n"
@@ -2205,7 +4132,7 @@ def generate_funnel_page_draft(
         "Testimonials",
         "FAQ",
     }
-    if template_kind == "sales-pdp":
+    if template_component_kind == "sales-pdp":
         allowed_types.update(
             {
                 "SalesPdpPage",
@@ -2218,13 +4145,14 @@ def generate_funnel_page_draft(
                 "SalesPdpComparison",
                 "SalesPdpGuarantee",
                 "SalesPdpFaq",
+                "SalesPdpReviews",
                 "SalesPdpReviewWall",
                 "SalesPdpFooter",
                 "SalesPdpReviewSlider",
                 "SalesPdpTemplate",
             }
         )
-    elif template_kind == "pre-sales-listicle":
+    elif template_component_kind == "pre-sales-listicle":
         allowed_types.update(
             {
                 "PreSalesPage",
@@ -2340,7 +4268,7 @@ def generate_funnel_page_draft(
         _ensure_block_ids(puck_data)
 
     if template_mode and isinstance(base_puck, dict):
-        required_types = _required_template_component_types(base_puck, template_kind=template_kind)
+        required_types = _required_template_component_types(base_puck, template_kind=template_component_kind)
         if required_types:
             generated_counts = _count_component_types(puck_data)
             missing_types = sorted(
@@ -2418,6 +4346,15 @@ def generate_funnel_page_draft(
         if not isinstance(desc, str):
             root_props["description"] = ""
 
+    if template_component_kind == "pre-sales-listicle":
+        _validate_pre_sales_listicle_component_configs(puck_data)
+    elif template_component_kind == "sales-pdp":
+        _enforce_sales_pdp_urgency_month_rows(
+            puck_data=puck_data,
+            reference_puck_data=base_puck if isinstance(base_puck, dict) else None,
+        )
+        _validate_sales_pdp_component_configs(puck_data)
+
     design_system_tokens = resolve_design_system_tokens(
         session=session,
         org_id=org_id,
@@ -2449,11 +4386,33 @@ def generate_funnel_page_draft(
         client_id=str(funnel.client_id),
         puck_data=puck_data,
         config_contexts=config_contexts,
-        template_kind=template_kind,
+        template_kind=template_component_kind,
         product=product,
         brand_logo_public_id=brand_logo_public_id,
     )
-    _ensure_flat_vector_icon_prompts(puck_data=puck_data, config_contexts=config_contexts)
+    if template_component_kind == "sales-pdp":
+        _enforce_sales_pdp_guarantee_testimonial_only_images(
+            puck_data=puck_data,
+            config_contexts=config_contexts,
+        )
+    _ensure_flat_vector_icon_prompts(
+        puck_data=puck_data,
+        config_contexts=config_contexts,
+        design_system_tokens=design_system_tokens if isinstance(design_system_tokens, dict) else None,
+    )
+    fallback_icon_puck = base_puck if isinstance(base_puck, dict) else current_puck_data
+    if template_component_kind == "pre-sales-listicle":
+        _ensure_pre_sales_badge_icons(
+            puck_data=puck_data,
+            config_contexts=config_contexts,
+            fallback_puck_data=fallback_icon_puck,
+        )
+        _apply_icon_remix_overrides_for_ai(
+            puck_data=puck_data,
+            config_contexts=config_contexts,
+            fallback_puck_data=fallback_icon_puck,
+            design_system_tokens=design_system_tokens if isinstance(design_system_tokens, dict) else None,
+        )
     if template_mode and generate_images:
         _validate_required_template_images(puck_data=puck_data, config_contexts=config_contexts)
     image_plans: list[dict[str, Any]] = []
@@ -2468,16 +4427,19 @@ def generate_funnel_page_draft(
     _sync_config_json_contexts(config_contexts)
 
     generated_images: list[dict[str, Any]] = []
+    requested_image_count = 0
     if generate_images:
-        total_images_needed = _count_ai_image_targets(puck_data)
-        max_images = total_images_needed
+        requested_image_count = _resolve_image_generation_count(
+            puck_data=puck_data,
+            image_plans=image_plans,
+        )
         try:
             _, generated_images = _fill_ai_images(
                 session=session,
                 org_id=org_id,
                 client_id=str(funnel.client_id),
                 puck_data=puck_data,
-                max_images=max_images,
+                max_images=requested_image_count,
                 funnel_id=funnel_id,
                 product_id=str(funnel.product_id) if funnel.product_id else None,
             )
@@ -2492,7 +4454,8 @@ def generate_funnel_page_draft(
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "generatedImages": generated_images,
         "imagePlans": image_plans,
-        "requestedImageCount": max_images,
+        "requestedImageCount": requested_image_count,
+        "appliedImageGenerationCap": _MAX_PAGE_IMAGE_GENERATIONS,
         "actorUserId": user_id,
         "ideaWorkspaceId": resolved_workspace_id,
         "templateId": resolved_template_id,
@@ -2647,22 +4610,33 @@ def stream_funnel_page_draft(
         if template_mode and base_puck is None:
             base_puck = template.puck_data
 
+        template_component_kind: str | None = None
+        if template_mode and isinstance(base_puck, dict):
+            template_component_kind = _infer_template_component_kind(template_kind, base_puck)
+
         if not template_mode:
             structure_guidance = (
                 "- Use Section as the top-level blocks in puckData.content (do not place bare Heading/Text directly at the root)\n"
                 "- Use Columns inside Sections for two-column layouts (image + copy)\n\n"
             )
-        elif template_kind == "sales-pdp":
+        elif template_component_kind == "sales-pdp":
             structure_guidance = (
                 "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
                 "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
-                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
+                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals\n"
+                "- Do NOT override layout sizing tokens like containerMax/containerPad (or --container-max/--container-pad) in props.theme tokens; keep the template width\n\n"
             )
-        else:
+        elif template_component_kind == "pre-sales-listicle":
             structure_guidance = (
                 "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
                 "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
-                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+                "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy\n"
+                "- Do NOT override layout sizing tokens like containerMax/containerPad (or --container-max/--container-pad) in props.theme tokens; keep the template width\n\n"
+            )
+        else:
+            structure_guidance = (
+                "- Preserve the template's existing top-level structure in puckData.content.\n"
+                "- Do not introduce new component types; only edit props fields.\n\n"
             )
         header_footer_guidance = (
             "Header/Footer guidance:\n"
@@ -2685,6 +4659,7 @@ def stream_funnel_page_draft(
                 template_image_guidance = (
                     "Template image prompts:\n"
                     "- Add a `prompt` on every image object inside props.config/props.modals/props.copy that should be generated.\n"
+                    "- Generated images MUST NOT contain visible text. Do not ask for text overlays, headlines, labels, captions, watermarks, UI, or logos.\n"
                     "- Do NOT add prompts to brand logos (logo objects). Keep logo assetPublicId intact.\n"
                     "- Do NOT add prompts to testimonial images (objects with testimonialTemplate); those are rendered separately.\n"
                     "- Leave the corresponding *AssetPublicId field empty so the backend can generate and fill it.\n"
@@ -2692,14 +4667,25 @@ def stream_funnel_page_draft(
                     "- Prefer Unsplash for stock-appropriate imagery (lifestyle, generic product-in-use, backgrounds).\n"
                     "- To use Unsplash, set imageSource='unsplash' on the image object and include a prompt.\n"
                     "- Use AI generation only when stock imagery does not fit the need.\n"
-                    "- Icon prompts (iconAssetPublicId) must be flat vector icons on transparent backgrounds.\n"
-                    "- Do not set referenceAssetPublicId unless you are using one of the attached images listed above.\n"
-                    "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n\n"
+                    "- Icon prompts (iconAssetPublicId) must use this style template, replacing <subject> with the context item: "
+                    "\"High-quality flat design icon of <subject>. Minimalist vector style with subtle depth. Clean thick lines, "
+                    "soft pastel colors, flat lighting with a very subtle long shadow to add dimension. "
+                    "Full-bleed composition where the icon symbol occupies nearly the entire frame with minimal padding. "
+                    "Do not place the icon inside a badge, circle, tile, button, sticker, or any container shape. "
+                    "Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. "
+                    "Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.\"\n"
+                    "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
+                    "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
+                    "- Set referenceAssetPublicId only when intentionally basing generation on a known source image.\n"
+                    "- Allowed referenceAssetPublicId sources: attached image public ids, or product.primary_image.public_id from Product context when available.\n"
+                    "- If referenceAssetPublicId is set: keep assetPublicId empty and include a prompt that preserves the same product identity.\n\n"
                 )
                 if template_kind == "sales-pdp":
                     template_image_guidance += (
                         "Sales PDP product imagery:\n"
                         "- Hero/gallery imagery must show the product clearly.\n"
+                        "- SalesPdpHero.config.purchase.offer.options[].image must use referenceAssetPublicId=product.primary_image.public_id when that id is available.\n"
+                        "- Package option prompts should keep the same product identity and only vary quantity/composition per offer tier.\n"
                         "- Any section that calls out the product should include the product in the image.\n\n"
                     )
                 if template_kind == "pre-sales-listicle":
@@ -2712,12 +4698,33 @@ def stream_funnel_page_draft(
         if template_mode and template_kind == "sales-pdp":
             template_config_guidance = (
                 "Sales PDP config requirements:\n"
+                "- SalesPdpReviews.config MUST include: id, data.\n"
+                "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
+                "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
+                "- SalesPdpFaq.config MUST include: id, title, items[] (do not replace it with the primitive FAQ component).\n"
                 "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
+                "- SalesPdpHero.config.purchase.cta.urgency.rows MUST stay as exactly two month rows: previous month and current month.\n"
+                "- Urgency row 1 (previous month) must use Sold Out copy with sold-count data; row 2 (current month) must use nearly sold copy (e.g., 99% Sold with counts).\n"
+                "- Do not replace monthly sold-out urgency rows with availability/shipping labels like IN STOCK, SHIPPING, Available Now, or Fast & Free.\n"
                 "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
+                "Anchor id requirements:\n"
+                "- Do not change section ids or header nav href anchors.\n"
+                "- Keep SalesPdpStoryProblem.config.id = 'how-it-works' (Problem section; floating CTA triggers after this section).\n"
+                "- Keep SalesPdpHeader.config.nav href values pointing at the same section ids (e.g. '#how-it-works', '#guarantee', '#faq', '#reviews').\n\n"
+            )
+        elif template_mode and template_component_kind == "pre-sales-listicle":
+            template_config_guidance = (
+                "Pre-sales listicle config requirements:\n"
+                "- PreSalesHero.config MUST be: { hero: { title: string, subtitle: string, media?: { type:'image', alt:string, src?:string, assetPublicId?:string } | { type:'video', srcMp4:string, poster?:string, alt?:string, assetPublicId?:string } }, badges: [] }\n"
+                "- PreSalesReasons.config MUST be an array of reasons: [{ number: number, title: string, body: string, image?: { alt:string, src?:string, assetPublicId?:string } }]\n"
+                "- PreSalesMarquee.config MUST be an array of strings.\n"
+                "- PreSalesPitch.config MUST be: { title: string, bullets: string[], image: { alt:string, src?:string, assetPublicId?:string }, cta?: { label: string, linkType?: 'external'|'funnelPage'|'nextPage', href?:string, targetPageId?:string } }\n"
+                "- PreSalesFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string } }\n"
+                "- Do NOT use keys like headline/subheadline/ctaLabel/ctaLinkType/items/reasons/reviews/links/copyrightText inside PreSales* configs.\n\n"
             )
         if not template_mode:
             template_component = ""
-        elif template_kind == "sales-pdp":
+        elif template_component_kind == "sales-pdp":
             template_component = (
                 "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
                 "12) SalesPdpHeader: props { id, config, configJson? }\n"
@@ -2729,22 +4736,24 @@ def stream_funnel_page_draft(
                 "18) SalesPdpComparison: props { id, config, configJson? }\n"
                 "19) SalesPdpGuarantee: props { id, config, configJson?, feedImages?, feedImagesJson? }\n"
                 "20) SalesPdpFaq: props { id, config, configJson? }\n"
-                "21) SalesPdpReviewWall: props { id, config, configJson? }\n"
-                "22) SalesPdpFooter: props { id, config, configJson? }\n"
-                "23) SalesPdpReviewSlider: props { id, config, configJson? }\n"
+                "21) SalesPdpReviews: props { id, config, configJson? }\n"
+                "22) SalesPdpReviewWall: props { id, config, configJson? }\n"
+                "23) SalesPdpFooter: props { id, config, configJson? }\n"
+                "24) SalesPdpReviewSlider: props { id, config, configJson? }\n"
             )
-        else:
+        elif template_component_kind == "pre-sales-listicle":
             template_component = (
                 "11) PreSalesPage: props { id, anchorId?, theme, themeJson?, content? }\n"
                 "12) PreSalesHero: props { id, config, configJson? }\n"
                 "13) PreSalesReasons: props { id, config, configJson? }\n"
-                "14) PreSalesReviews: props { id, config, configJson?, copy?, copyJson? }\n"
-                "15) PreSalesMarquee: props { id, config, configJson? }\n"
-                "16) PreSalesPitch: props { id, config, configJson? }\n"
-                "17) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
-                "18) PreSalesFooter: props { id, config, configJson? }\n"
-                "19) PreSalesFloatingCta: props { id, config, configJson? }\n"
+                "14) PreSalesMarquee: props { id, config, configJson? }\n"
+                "15) PreSalesPitch: props { id, config, configJson? }\n"
+                "16) PreSalesReviewWall: props { id, config, configJson?, copy?, copyJson? }\n"
+                "17) PreSalesFooter: props { id, config, configJson? }\n"
+                "18) PreSalesFloatingCta: props { id, config, configJson? }\n"
             )
+        else:
+            template_component = ""
 
         page_label = "sales page"
         if template_kind == "pre-sales-listicle":
@@ -2785,16 +4794,17 @@ def stream_funnel_page_draft(
                 "Structure guidance:\n"
                 f"{structure_guidance}"
                 f"{header_footer_guidance}"
-                "ComponentData shape:\n"
-                "- Every component must be an object with keys: type, props\n"
-                "- props should include a string id (unique per component)\n\n"
-                "Available primitives (component types) and their props:\n"
-                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
-                "   - purpose: 'header' | 'section' | 'footer'\n"
-                "   - layout: 'full' | 'contained' | 'card'\n"
-                "     - full = full-width background, content constrained to containerWidth\n"
-                "     - contained = background constrained to containerWidth (no card styling)\n"
-                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
+	                "ComponentData shape:\n"
+	                "- Every component must be an object with keys: type, props\n"
+	                "- props should include a string id (unique per component)\n\n"
+	                "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
+	                "Available primitives (component types) and their props:\n"
+	                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+	                "   - purpose: 'header' | 'section' | 'footer'\n"
+	                "   - layout: 'full' | 'contained' | 'card'\n"
+	                "     - full = full-width background, content constrained to containerWidth\n"
+	                "     - contained = background constrained to containerWidth (no card styling)\n"
+	                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
                 "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
                 "   - content is a slot: ComponentData[]\n"
                 "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
@@ -2810,8 +4820,9 @@ def stream_funnel_page_draft(
                 "6) Image: props { id, prompt, alt, imageSource?, assetPublicId?, referenceAssetPublicId?, src?, radius? }\n"
                 "   - imageSource: 'ai' (default) | 'unsplash'\n"
                 "   - radius: 'none' | 'md' | 'lg'\n"
+                "   - Never request or include on-image text overlays (no words/letters/numbers) in generated images\n"
                 "   - If imageSource='unsplash': include prompt and leave assetPublicId empty (no referenceAssetPublicId)\n"
-                "   - If referenceAssetPublicId is set: include prompt and leave assetPublicId empty\n"
+                "   - If referenceAssetPublicId is set: include prompt, leave assetPublicId empty, and keep the same product identity as the reference image\n"
                 "7) Button: props { id, label, variant?, size?, width?, align?, linkType?, targetPageId?, href? }\n"
                 "   - variant: 'primary' | 'secondary'\n"
                 "   - size: 'sm' | 'md' | 'lg'\n"
@@ -2862,7 +4873,7 @@ def stream_funnel_page_draft(
             "Testimonials",
             "FAQ",
         }
-        if template_kind == "sales-pdp":
+        if template_component_kind == "sales-pdp":
             allowed_types.update(
                 {
                     "SalesPdpPage",
@@ -2875,13 +4886,14 @@ def stream_funnel_page_draft(
                     "SalesPdpComparison",
                     "SalesPdpGuarantee",
                     "SalesPdpFaq",
+                    "SalesPdpReviews",
                     "SalesPdpReviewWall",
                     "SalesPdpFooter",
                     "SalesPdpReviewSlider",
                     "SalesPdpTemplate",
                 }
             )
-        elif template_kind == "pre-sales-listicle":
+        elif template_component_kind == "pre-sales-listicle":
             allowed_types.update(
                 {
                     "PreSalesPage",
@@ -2972,7 +4984,7 @@ def stream_funnel_page_draft(
             _ensure_block_ids(puck_data)
 
         if template_mode and isinstance(base_puck, dict):
-            required_types = _required_template_component_types(base_puck, template_kind=template_kind)
+            required_types = _required_template_component_types(base_puck, template_kind=template_component_kind)
             if required_types:
                 generated_counts = _count_component_types(puck_data)
                 missing_types = sorted(
@@ -3054,6 +5066,15 @@ def stream_funnel_page_draft(
             if not isinstance(desc, str):
                 root_props["description"] = ""
 
+        if template_component_kind == "pre-sales-listicle":
+            _validate_pre_sales_listicle_component_configs(puck_data)
+        elif template_component_kind == "sales-pdp":
+            _enforce_sales_pdp_urgency_month_rows(
+                puck_data=puck_data,
+                reference_puck_data=base_puck if isinstance(base_puck, dict) else None,
+            )
+            _validate_sales_pdp_component_configs(puck_data)
+
         design_system_tokens = resolve_design_system_tokens(
             session=session,
             org_id=org_id,
@@ -3085,11 +5106,33 @@ def stream_funnel_page_draft(
             client_id=str(funnel.client_id),
             puck_data=puck_data,
             config_contexts=config_contexts,
-            template_kind=template_kind,
+            template_kind=template_component_kind,
             product=product,
             brand_logo_public_id=brand_logo_public_id,
         )
-        _ensure_flat_vector_icon_prompts(puck_data=puck_data, config_contexts=config_contexts)
+        if template_component_kind == "sales-pdp":
+            _enforce_sales_pdp_guarantee_testimonial_only_images(
+                puck_data=puck_data,
+                config_contexts=config_contexts,
+            )
+        _ensure_flat_vector_icon_prompts(
+            puck_data=puck_data,
+            config_contexts=config_contexts,
+            design_system_tokens=design_system_tokens if isinstance(design_system_tokens, dict) else None,
+        )
+        fallback_icon_puck = base_puck if isinstance(base_puck, dict) else current_puck_data
+        if template_component_kind == "pre-sales-listicle":
+            _ensure_pre_sales_badge_icons(
+                puck_data=puck_data,
+                config_contexts=config_contexts,
+                fallback_puck_data=fallback_icon_puck,
+            )
+            _apply_icon_remix_overrides_for_ai(
+                puck_data=puck_data,
+                config_contexts=config_contexts,
+                fallback_puck_data=fallback_icon_puck,
+                design_system_tokens=design_system_tokens if isinstance(design_system_tokens, dict) else None,
+            )
         if template_mode and generate_images:
             _validate_required_template_images(puck_data=puck_data, config_contexts=config_contexts)
         image_plans: list[dict[str, Any]] = []
@@ -3104,17 +5147,20 @@ def stream_funnel_page_draft(
         _sync_config_json_contexts(config_contexts)
 
         generated_images: list[dict[str, Any]] = []
+        requested_image_count = 0
         if generate_images:
             yield {"type": "status", "status": "generating_images"}
-            total_images_needed = _count_ai_image_targets(puck_data)
-            max_images = total_images_needed
+            requested_image_count = _resolve_image_generation_count(
+                puck_data=puck_data,
+                image_plans=image_plans,
+            )
             try:
                 _, generated_images = _fill_ai_images(
                     session=session,
                     org_id=org_id,
                     client_id=str(funnel.client_id),
                     puck_data=puck_data,
-                    max_images=max_images,
+                    max_images=requested_image_count,
                     funnel_id=funnel_id,
                     product_id=str(funnel.product_id) if funnel.product_id else None,
                 )
@@ -3131,13 +5177,15 @@ def stream_funnel_page_draft(
                 "prompt": prompt,
                 "messages": conversation,
                 "model": model_id,
-                "temperature": temperature,
-                "generatedAt": datetime.now(timezone.utc).isoformat(),
-                "generatedImages": generated_images,
-                "imagePlans": image_plans,
-                "actorUserId": user_id,
-            },
-        )
+                    "temperature": temperature,
+                    "generatedAt": datetime.now(timezone.utc).isoformat(),
+                    "generatedImages": generated_images,
+                    "imagePlans": image_plans,
+                    "requestedImageCount": requested_image_count,
+                    "appliedImageGenerationCap": _MAX_PAGE_IMAGE_GENERATIONS,
+                    "actorUserId": user_id,
+                },
+            )
         session.add(version)
         session.commit()
         session.refresh(version)

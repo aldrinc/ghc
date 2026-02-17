@@ -265,8 +265,8 @@
       }
     },
     "videos": {
-      "badge": "37,000+ DOG PARENTS LOVE US!",
-      "title": "See Why We're The Most Shared Pee Pad On Facebook",
+      "badge": "CUSTOMERS LOVE THIS",
+      "title": "See It In Action",
       "videos": [
         {
           "id": "v1",
@@ -454,7 +454,8 @@
       "right": {
         "image": {
           "src": "/assets/ph-4x3.svg",
-          "alt": "Customer photo"
+          "alt": "Customer photo",
+          "testimonialTemplate": "review_card"
         },
         "reviewCard": {
           "name": "Maria Fig",
@@ -515,7 +516,7 @@
       "id": "reviews",
       "badge": "VET RECOMMENDED",
       "title": "What Our Customers Are Saying",
-      "ratingLabel": "37,893 - 5 STAR REVIEWS",
+      "ratingLabel": "Verified customer reviews",
       "showMoreLabel": "Show more reviews",
       "tiles": [
         {
@@ -635,9 +636,9 @@
     "footer": {
       "logo": {
         "src": "/assets/puppypad-logo.svg",
-        "alt": "PuppyPad"
+        "alt": "Brand logo"
       },
-      "copyright": "© 2026 PuppyPad"
+      "copyright": "© All rights reserved."
     },
     "modals": {
       "sizeChart": {
@@ -690,7 +691,7 @@
   },
   "copy": {
     "common": {
-      "starsAriaLabelTemplate": "{rating} out of 5 stars"
+      "starsAriaLabelTemplate": "{rating} out of five stars"
     },
     "modal": {
       "closeAriaLabel": "Close dialog",

@@ -2,6 +2,7 @@ import { useFunnel, useUpdateFunnel, useCreateFunnelPage, usePublishFunnel, useD
 import { useApiClient } from "@/api/client";
 import { useDeployWorkloadDomains } from "@/api/deploy";
 import { useDesignSystems } from "@/api/designSystems";
+import { useProduct } from "@/api/products";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ export function FunnelDetailPage() {
   const { workspace } = useWorkspace();
   const { funnelId } = useParams();
   const { data: funnel, isLoading } = useFunnel(funnelId);
+  const { data: funnelProduct } = useProduct(funnel?.product_id || undefined);
   const { data: templates } = useFunnelTemplates();
   const { data: designSystems = [] } = useDesignSystems(funnel?.client_id || workspace?.id);
   const updateFunnel = useUpdateFunnel();
@@ -90,6 +92,11 @@ export function FunnelDetailPage() {
   const handleSetDesignSystem = (designSystemId: string) => {
     if (!funnelId) return;
     updateFunnel.mutate({ funnelId, payload: { designSystemId: designSystemId || null } });
+  };
+
+  const handleSetSelectedOffer = (selectedOfferId: string) => {
+    if (!funnelId) return;
+    updateFunnel.mutate({ funnelId, payload: { selectedOfferId: selectedOfferId || null } });
   };
 
   const designSystemOptions = useMemo(() => {
@@ -408,7 +415,7 @@ export function FunnelDetailPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Entry page</div>
                 <Select
@@ -425,6 +432,18 @@ export function FunnelDetailPage() {
                   onValueChange={handleSetDesignSystem}
                   options={designSystemOptions}
                   disabled={updateFunnel.isPending}
+                />
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-content">Selected offer</div>
+                <Select
+                  value={funnel.selected_offer_id || ""}
+                  onValueChange={handleSetSelectedOffer}
+                  options={[
+                    { label: funnelProduct?.offers?.length ? "No selected offer" : "No offers available", value: "" },
+                    ...((funnelProduct?.offers || []).map((offer) => ({ label: offer.name, value: offer.id }))),
+                  ]}
+                  disabled={updateFunnel.isPending || !(funnelProduct?.offers?.length)}
                 />
               </div>
               <div className="space-y-1">
@@ -542,11 +561,11 @@ export function FunnelDetailPage() {
                 <div className="text-sm font-semibold text-content">Pages</div>
                 <div className="text-xs text-content-muted">{funnel.pages.length} pages</div>
               </div>
-              <div className="text-xs text-content-muted">Set next page wiring, approve each page, then publish</div>
+              <div className="text-xs text-content-muted">Set next page wiring, then publish</div>
             </div>
             <ul className="divide-y divide-border">
               {funnel.pages.map((page) => {
-                const isApproved = Boolean(page.latestApprovedVersionId);
+                const hasDraft = Boolean(page.latestDraftVersionId);
                 const nextPageOptions = [
                   { label: "No next page", value: "" },
                   ...funnel.pages
@@ -567,7 +586,7 @@ export function FunnelDetailPage() {
                           >
                             {page.name}
                           </Link>
-                          <Badge tone={isApproved ? "success" : "warning"}>{isApproved ? "approved" : "needs approval"}</Badge>
+                          <Badge tone={hasDraft ? "neutral" : "warning"}>{hasDraft ? "draft" : "no saved version"}</Badge>
                         </div>
                         <div className="text-xs text-content-muted">
                           Slug: <span className="font-mono">{page.slug}</span>

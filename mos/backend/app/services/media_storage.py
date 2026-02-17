@@ -57,6 +57,10 @@ class MediaStorage:
             config=Config(
                 s3={"addressing_style": addressing_style},
                 signature_version="s3v4",
+                # Avoid flaky generation runs due to transient object-store latency.
+                connect_timeout=10,
+                read_timeout=300,
+                retries={"max_attempts": 5, "mode": "standard"},
             ),
         )
 

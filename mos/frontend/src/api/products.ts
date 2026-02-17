@@ -2,7 +2,14 @@ import { useAuth } from "@clerk/clerk-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
 import { toast } from "@/components/ui/toast";
-import type { Product, ProductAsset, ProductDetail, ProductOffer, ProductOfferPricePoint } from "@/types/products";
+import type {
+  Product,
+  ProductAsset,
+  ProductDetail,
+  ProductOffer,
+  ProductOfferBonus,
+  ProductVariant,
+} from "@/types/products";
 
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
@@ -50,9 +57,10 @@ export function useCreateProduct() {
   return useMutation({
     mutationFn: (payload: {
       clientId: string;
-      name: string;
+      title: string;
       description?: string;
-      category?: string;
+      productType?: string;
+      shopifyProductGid?: string;
       primaryBenefits?: string[];
       featureBullets?: string[];
       guaranteeText?: string;
@@ -75,9 +83,10 @@ export function useUpdateProduct(productId: string) {
 
   return useMutation({
     mutationFn: (payload: {
-      name?: string;
+      title?: string;
       description?: string | null;
-      category?: string | null;
+      productType?: string | null;
+      shopifyProductGid?: string | null;
       primaryBenefits?: string[] | null;
       featureBullets?: string[] | null;
       guaranteeText?: string | null;
@@ -159,7 +168,57 @@ export function useUploadProductAssets(productId: string) {
   });
 }
 
-export function useCreateOffer() {
+export function useCreateVariant(productId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      title: string;
+      price: number;
+      currency: string;
+      offerId?: string;
+      compareAtPrice?: number;
+      provider?: string;
+      externalPriceId?: string;
+      optionValues?: Record<string, unknown>;
+      sku?: string;
+      barcode?: string;
+      requiresShipping?: boolean;
+      taxable?: boolean;
+      weight?: number;
+      weightUnit?: string;
+      inventoryQuantity?: number;
+      inventoryPolicy?: string;
+      inventoryManagement?: string;
+      incoming?: boolean;
+      nextIncomingDate?: string;
+      unitPrice?: number;
+      unitPriceMeasurement?: Record<string, unknown>;
+      quantityRule?: Record<string, unknown>;
+      quantityPriceBreaks?: Record<string, unknown>[];
+    }) => post<ProductVariant>(`/products/${productId}/variants`, payload),
+    onSuccess: () => {
+      toast.success("Variant created");
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create variant";
+      toast.error(message);
+    },
+  });
+}
+
+export function useProductOffers(productId?: string) {
+  const { get } = useApiClient();
+  return useQuery<ProductOffer[]>({
+    queryKey: ["products", "offers", productId],
+    queryFn: () => get(`/products/${productId}/offers`),
+    enabled: Boolean(productId),
+  });
+}
+
+export function useCreateProductOffer(productId: string) {
   const { post } = useApiClient();
   const queryClient = useQueryClient();
 
@@ -172,10 +231,11 @@ export function useCreateOffer() {
       differentiationBullets?: string[];
       guaranteeText?: string;
       optionsSchema?: Record<string, unknown>;
-    }) => post<ProductOffer>(`/products/${payload.productId}/offers`, payload),
-    onSuccess: (offer) => {
+    }) => post<ProductOffer>(`/products/${productId}/offers`, payload),
+    onSuccess: () => {
       toast.success("Offer created");
-      queryClient.invalidateQueries({ queryKey: ["products", "detail", offer.product_id] });
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+      queryClient.invalidateQueries({ queryKey: ["products", "offers", productId] });
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to create offer";
@@ -184,36 +244,124 @@ export function useCreateOffer() {
   });
 }
 
-export function useCreatePricePoint() {
-  const { post } = useApiClient();
+export function useUpdateProductOffer(offerId: string, productIdForInvalidation?: string) {
+  const { request } = useApiClient();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (payload: {
-      offerId: string;
-      label: string;
-      amountCents: number;
-      currency: string;
-      provider?: string;
-      externalPriceId?: string;
-      optionValues?: Record<string, unknown>;
-      productId: string;
+      name?: string;
+      description?: string | null;
+      businessModel?: string | null;
+      differentiationBullets?: string[] | null;
+      guaranteeText?: string | null;
+      optionsSchema?: Record<string, unknown> | null;
     }) =>
-      post<ProductOfferPricePoint>(`/products/offers/${payload.offerId}/price-points`, {
-        offerId: payload.offerId,
-        label: payload.label,
-        amountCents: payload.amountCents,
-        currency: payload.currency,
-        provider: payload.provider,
-        externalPriceId: payload.externalPriceId,
-        optionValues: payload.optionValues,
+      request<ProductOffer>(`/products/offers/${offerId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
       }),
-    onSuccess: (_pricePoint, variables) => {
-      toast.success("Price point created");
-      queryClient.invalidateQueries({ queryKey: ["products", "detail", variables.productId] });
+    onSuccess: () => {
+      toast.success("Offer updated");
+      if (productIdForInvalidation) {
+        queryClient.invalidateQueries({ queryKey: ["products", "detail", productIdForInvalidation] });
+        queryClient.invalidateQueries({ queryKey: ["products", "offers", productIdForInvalidation] });
+      }
     },
     onError: (err: ApiError | Error) => {
-      const message = "message" in err ? err.message : err?.message || "Failed to create price point";
+      const message = "message" in err ? err.message : err?.message || "Failed to update offer";
+      toast.error(message);
+    },
+  });
+}
+
+export function useAddOfferBonus(productIdForInvalidation?: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { offerId: string; bonusProductId: string }) =>
+      post<ProductOfferBonus>(`/products/offers/${payload.offerId}/bonuses`, {
+        bonusProductId: payload.bonusProductId,
+      }),
+    onSuccess: () => {
+      toast.success("Bonus added");
+      if (productIdForInvalidation) {
+        queryClient.invalidateQueries({ queryKey: ["products", "detail", productIdForInvalidation] });
+        queryClient.invalidateQueries({ queryKey: ["products", "offers", productIdForInvalidation] });
+      }
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to add bonus";
+      toast.error(message);
+    },
+  });
+}
+
+export function useRemoveOfferBonus(productIdForInvalidation?: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { offerId: string; bonusProductId: string }) =>
+      request<{ ok: boolean }>(`/products/offers/${payload.offerId}/bonuses/${payload.bonusProductId}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      toast.success("Bonus removed");
+      if (productIdForInvalidation) {
+        queryClient.invalidateQueries({ queryKey: ["products", "detail", productIdForInvalidation] });
+        queryClient.invalidateQueries({ queryKey: ["products", "offers", productIdForInvalidation] });
+      }
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to remove bonus";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateVariant(variantId: string, productIdForInvalidation?: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      title?: string;
+      price?: number;
+      currency?: string;
+      compareAtPrice?: number | null;
+      provider?: string | null;
+      externalPriceId?: string | null;
+      optionValues?: Record<string, unknown> | null;
+      sku?: string | null;
+      barcode?: string | null;
+      requiresShipping?: boolean | null;
+      taxable?: boolean | null;
+      weight?: number | null;
+      weightUnit?: string | null;
+      inventoryQuantity?: number | null;
+      inventoryPolicy?: string | null;
+      inventoryManagement?: string | null;
+      incoming?: boolean | null;
+      nextIncomingDate?: string | null;
+      unitPrice?: number | null;
+      unitPriceMeasurement?: Record<string, unknown> | null;
+      quantityRule?: Record<string, unknown> | null;
+      quantityPriceBreaks?: Record<string, unknown>[] | null;
+    }) =>
+      request<ProductVariant>(`/products/variants/${variantId}`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      }),
+    onSuccess: () => {
+      toast.success("Variant updated");
+      if (productIdForInvalidation) {
+        queryClient.invalidateQueries({ queryKey: ["products", "detail", productIdForInvalidation] });
+      }
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to update variant";
       toast.error(message);
     },
   });

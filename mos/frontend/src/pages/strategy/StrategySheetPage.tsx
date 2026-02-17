@@ -1,9 +1,7 @@
 import { useMemo } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { useLatestArtifact } from "@/api/artifacts";
-import { useWorkflows, useWorkflowSignal } from "@/api/workflows";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import type { StrategySheet } from "@/types/artifacts";
@@ -16,23 +14,6 @@ export function StrategySheetPage() {
     productId: product?.id,
     type: "strategy_sheet",
   });
-  const { data: workflows = [], isLoading: workflowsLoading } = useWorkflows();
-
-  const planningWorkflow = useMemo(
-    () =>
-      workflows
-        .filter(
-          (wf) =>
-            wf.client_id === workspace?.id &&
-            (!product?.id || wf.product_id === product.id) &&
-            wf.kind === "campaign_planning"
-        )
-        .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0],
-    [workflows, workspace?.id, product?.id]
-  );
-  const strategySignal = useWorkflowSignal(planningWorkflow?.id);
-  const approvalDisabled =
-    workflowsLoading || !planningWorkflow || planningWorkflow.status !== "running" || strategySignal.isPending;
 
   const strategy = useMemo(() => (strategyArtifact?.data || {}) as StrategySheet, [strategyArtifact?.data]);
   const channelPlan = strategy?.channelPlan || [];
@@ -65,33 +46,10 @@ export function StrategySheetPage() {
     <div className="space-y-4">
       <PageHeader
         title="Strategy Sheet"
-        description={`Goal, hypothesis, channel plan, and messaging for ${product.name}.`}
-        actions={
-          strategyArtifact ? (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() =>
-                !approvalDisabled &&
-                strategySignal.mutate({ signal: "approve-strategy", body: { approved: true } })
-              }
-              disabled={approvalDisabled}
-            >
-              {strategySignal.isPending ? "Sending…" : "Approve strategy"}
-            </Button>
-          ) : null
-        }
+        description={`Goal, hypothesis, channel plan, and messaging for ${product.title}.`}
       >
         {strategyArtifact ? (
-          <div className="text-xs text-content-muted">
-            {workflowsLoading
-              ? "Checking workflow status…"
-              : !planningWorkflow
-              ? "Start a campaign planning workflow for this workspace to enable strategy approval."
-              : planningWorkflow.status !== "running"
-              ? "Approval is disabled because the latest campaign planning run is not active."
-              : "Approving sends a signal to generate angles using canon and metric schema."}
-          </div>
+          <div className="text-xs text-content-muted">Strategy sheets are auto-approved and do not require sign-off.</div>
         ) : null}
       </PageHeader>
 
@@ -99,7 +57,7 @@ export function StrategySheetPage() {
         <div className="ds-card ds-card--md text-sm text-content-muted shadow-none">Loading strategy…</div>
       ) : !strategyArtifact ? (
         <div className="ds-card ds-card--md ds-card--empty text-sm shadow-none">
-          No strategy sheet generated yet. Approve the planning workflow to populate this page.
+          No strategy sheet generated yet. Start campaign planning to populate this page.
         </div>
       ) : (
         <div className="space-y-4 ds-card ds-card--md shadow-none">

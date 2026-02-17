@@ -1,11 +1,12 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useActiveProduct, useSetActiveProduct, type ActiveProductSummary } from "@/api/activeProduct";
 import { useProducts } from "@/api/products";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { clearActiveProduct, loadActiveProduct, saveActiveProduct } from "@/lib/products";
 import type { Product } from "@/types/products";
 
-export type ProductSummary = Pick<Product, "id" | "name" | "client_id"> & {
-  category?: string | null;
+export type ProductSummary = Pick<Product, "id" | "title" | "client_id"> & {
+  product_type?: string | null;
 };
 
 type ProductContextValue = {
@@ -21,71 +22,75 @@ const ProductContext = createContext<ProductContextValue | undefined>(undefined)
 
 export function ProductProvider({ children }: { children: ReactNode }) {
   const { workspace } = useWorkspace();
-  const { data: products = [], isLoading, refetch } = useProducts(workspace?.id);
-  const [product, setProduct] = useState<ProductSummary | null>(() => loadActiveProduct(workspace?.id));
+  const clientId = workspace?.id;
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!workspace?.id) {
-      setProduct(null);
-      clearActiveProduct();
-      return;
-    }
-    setProduct(loadActiveProduct(workspace.id));
-  }, [workspace?.id]);
+  const { data: products = [], isLoading: isLoadingProducts, refetch: refetchProducts } = useProducts(clientId);
+  const {
+    data: activeProductData,
+    isLoading: isLoadingActiveProduct,
+    refetch: refetchActiveProduct,
+  } = useActiveProduct(clientId);
+  const setActiveProduct = useSetActiveProduct();
 
-  useEffect(() => {
-    if (!workspace?.id || !product) return;
-    const exists = products.some((item) => item.id === product.id);
-    if (!exists) {
-      setProduct(null);
-      clearActiveProduct(workspace.id);
-    }
-  }, [product, products, workspace?.id]);
+  const product = activeProductData?.active_product ?? null;
 
   const selectProduct = useCallback(
     (productId: string, fallback?: Partial<ProductSummary>) => {
-      if (!workspace?.id) return;
+      if (!clientId) return;
+      if (!productId) return;
+      if (product?.id === productId) return;
+
       const match = products.find((item) => item.id === productId);
-      if (!match && !fallback) return;
-      const next: ProductSummary = match
+      const optimisticProduct: ActiveProductSummary | undefined = match
         ? {
             id: match.id,
-            name: match.name,
+            title: match.title,
             client_id: match.client_id,
-            category: match.category ?? null,
+            product_type: match.product_type ?? null,
           }
-        : {
+        : fallback?.title || fallback?.client_id || fallback?.product_type
+        ? {
             id: productId,
-            name: fallback?.name || "Product",
-            client_id: fallback?.client_id || workspace.id,
-            category: fallback?.category ?? null,
-          };
-      setProduct(next);
-      saveActiveProduct(workspace.id, next);
+            title: fallback?.title || "Product",
+            client_id: fallback?.client_id || clientId,
+            product_type: fallback?.product_type ?? null,
+          }
+        : undefined;
+
+      setActiveProduct.mutate({ clientId, productId, optimisticProduct });
     },
-    [products, workspace?.id]
+    [clientId, product?.id, products, setActiveProduct]
   );
 
   const clearProduct = useCallback(() => {
-    if (!workspace?.id) {
-      setProduct(null);
-      clearActiveProduct();
-      return;
-    }
-    setProduct(null);
-    clearActiveProduct(workspace.id);
-  }, [workspace?.id]);
+    if (!clientId) return;
+    queryClient.removeQueries({ queryKey: ["clients", "active-product", clientId] });
+    refetchActiveProduct();
+  }, [clientId, queryClient, refetchActiveProduct]);
 
   const value = useMemo(
     () => ({
       product,
       products,
-      isLoading,
+      isLoading: isLoadingProducts || isLoadingActiveProduct,
       selectProduct,
       clearProduct,
-      refetch,
+      refetch: () => {
+        refetchProducts();
+        refetchActiveProduct();
+      },
     }),
-    [product, products, isLoading, selectProduct, clearProduct, refetch]
+    [
+      product,
+      products,
+      isLoadingProducts,
+      isLoadingActiveProduct,
+      selectProduct,
+      clearProduct,
+      refetchProducts,
+      refetchActiveProduct,
+    ]
   );
 
   return <ProductContext.Provider value={value}>{children}</ProductContext.Provider>;

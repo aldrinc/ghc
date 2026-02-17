@@ -300,9 +300,9 @@ def build_design_system_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             client_name=str(client.name),
             client_industry=str(client.industry) if client.industry else None,
             brand_story=brand_story.strip(),
-            product_name=str(product.name),
+            product_name=str(product.title),
             product_description=str(product.description) if product.description else None,
-            product_category=str(product.category) if product.category else None,
+            product_category=str(product.product_type) if product.product_type else None,
             primary_benefits=list(product.primary_benefits or []),
             feature_bullets=list(product.feature_bullets or []),
             guarantee_text=str(product.guarantee_text) if product.guarantee_text else None,
@@ -332,7 +332,7 @@ def build_design_system_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     prompt=_build_logo_prompt(
                         client_name=str(client.name),
                         industry=str(client.industry) if client.industry else None,
-                        product_name=str(product.name),
+                        product_name=str(product.title),
                         story=brand_story.strip(),
                     ),
                     # Gemini image API only supports a fixed set of aspect ratios; 21:9 gives a wide wordmark-friendly canvas.
@@ -361,7 +361,7 @@ def build_design_system_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             brand_tokens["logoAlt"] = str(client.name)
 
         ds_name = (
-            f"Onboarding design system ({product.name}) "
+            f"Onboarding design system ({product.title}) "
             f"{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}"
         )
         ds_repo = DesignSystemsRepository(session)

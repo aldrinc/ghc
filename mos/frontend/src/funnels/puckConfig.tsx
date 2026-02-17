@@ -18,6 +18,7 @@ import {
   SalesPdpVideos,
   salesPdpDefaults,
 } from "@/funnels/templates/salesPdp/SalesPdpTemplate";
+import { SalesPdpReviews } from "@/funnels/templates/salesPdp/SalesPdpReviews";
 import {
   PreSalesFloatingCta,
   PreSalesFooter,
@@ -31,6 +32,7 @@ import {
   PreSalesTemplate,
   preSalesDefaults,
 } from "@/funnels/templates/preSalesListicle/PreSalesTemplate";
+import { BlockErrorBoundary } from "@/funnels/BlockErrorBoundary";
 import type { PublicFunnelCommerce } from "@/types/commerce";
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
@@ -84,6 +86,28 @@ export function resolveRuntimePagePath(runtime: FunnelRuntimeContextValue, slug:
 type PageOption = { label: string; value: string };
 
 type ContainerWidth = "sm" | "md" | "lg" | "xl";
+
+function safeJsonStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return "";
+  }
+}
+
+function withBlockBoundary<T extends Record<string, unknown>>(
+  blockType: string,
+  render: (props: T) => ReactNode
+): (props: T) => ReactNode {
+  return (props: T) => {
+    const id = typeof props.id === "string" ? props.id : undefined;
+    return (
+      <BlockErrorBoundary blockType={blockType} blockId={id} resetKey={safeJsonStringify(props)}>
+        {render(props)}
+      </BlockErrorBoundary>
+    );
+  };
+}
 
 function containerWidthClass(width?: ContainerWidth): string {
   switch (width) {
@@ -776,6 +800,12 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         },
         render: (props: Record<string, unknown>) => <SalesPdpFaq {...props} />,
       },
+      SalesPdpReviews: {
+        fields: {
+          configJson: { type: "textarea" },
+        },
+        render: (props: Record<string, unknown>) => <SalesPdpReviews {...props} />,
+      },
       SalesPdpReviewWall: {
         fields: {
           configJson: { type: "textarea" },
@@ -838,7 +868,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
             badges: preSalesDefaults.config.badges,
           },
         },
-        render: (props: Record<string, unknown>) => <PreSalesHero {...props} />,
+        render: withBlockBoundary("PreSalesHero", (props: Record<string, unknown>) => <PreSalesHero {...props} />),
       },
       PreSalesReasons: {
         fields: {
@@ -847,7 +877,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: preSalesDefaults.config.reasons,
         },
-        render: (props: Record<string, unknown>) => <PreSalesReasons {...props} />,
+        render: withBlockBoundary("PreSalesReasons", (props: Record<string, unknown>) => <PreSalesReasons {...props} />),
       },
       PreSalesReviews: {
         fields: {
@@ -858,7 +888,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           config: preSalesDefaults.config.reviews,
           copy: preSalesDefaults.copy,
         },
-        render: (props: Record<string, unknown>) => <PreSalesReviews {...props} />,
+        render: withBlockBoundary("PreSalesReviews", (props: Record<string, unknown>) => <PreSalesReviews {...props} />),
       },
       PreSalesMarquee: {
         fields: {
@@ -867,7 +897,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: preSalesDefaults.config.marquee,
         },
-        render: (props: Record<string, unknown>) => <PreSalesMarquee {...props} />,
+        render: withBlockBoundary("PreSalesMarquee", (props: Record<string, unknown>) => <PreSalesMarquee {...props} />),
       },
       PreSalesPitch: {
         fields: {
@@ -876,7 +906,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: preSalesDefaults.config.pitch,
         },
-        render: (props: Record<string, unknown>) => <PreSalesPitch {...props} />,
+        render: withBlockBoundary("PreSalesPitch", (props: Record<string, unknown>) => <PreSalesPitch {...props} />),
       },
       PreSalesReviewWall: {
         fields: {
@@ -887,7 +917,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           config: preSalesDefaults.config.reviewsWall,
           copy: preSalesDefaults.copy,
         },
-        render: (props: Record<string, unknown>) => <PreSalesReviewWall {...props} />,
+        render: withBlockBoundary("PreSalesReviewWall", (props: Record<string, unknown>) => <PreSalesReviewWall {...props} />),
       },
       PreSalesFooter: {
         fields: {
@@ -896,7 +926,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: preSalesDefaults.config.footer,
         },
-        render: (props: Record<string, unknown>) => <PreSalesFooter {...props} />,
+        render: withBlockBoundary("PreSalesFooter", (props: Record<string, unknown>) => <PreSalesFooter {...props} />),
       },
       PreSalesFloatingCta: {
         fields: {
@@ -905,7 +935,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
         defaultProps: {
           config: preSalesDefaults.config.floatingCta,
         },
-        render: (props: Record<string, unknown>) => <PreSalesFloatingCta {...props} />,
+        render: withBlockBoundary("PreSalesFloatingCta", (props: Record<string, unknown>) => <PreSalesFloatingCta {...props} />),
       },
       PreSalesTemplate: {
         fields: {
@@ -918,7 +948,7 @@ export function createFunnelPuckConfig(pageOptions: PageOption[] = []): Config {
           copy: preSalesDefaults.copy,
           theme: preSalesDefaults.theme,
         },
-        render: (props: Record<string, unknown>) => <PreSalesTemplate {...props} />,
+        render: withBlockBoundary("PreSalesTemplate", (props: Record<string, unknown>) => <PreSalesTemplate {...props} />),
       },
       Spacer: {
         fields: {

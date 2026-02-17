@@ -7,10 +7,12 @@ import { DialogContent, DialogDescription, DialogRoot, DialogTitle, DialogClose 
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import {
-  useCreateOffer,
-  useCreatePricePoint,
+  useAddOfferBonus,
+  useCreateProductOffer,
+  useCreateVariant,
   useProduct,
   useProductAssets,
+  useRemoveOfferBonus,
   useUpdateProduct,
   useUploadProductAssets,
 } from "@/api/products";
@@ -37,126 +39,84 @@ function assetLabel(asset: ProductAsset): string {
   return `Asset ${asset.id.slice(0, 8)}`;
 }
 
-function parseList(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
 export function ProductDetailPage() {
   const { productId } = useParams();
   const { workspace } = useWorkspace();
-  const { selectProduct } = useProductContext();
+  const { products, selectProduct } = useProductContext();
   const navigate = useNavigate();
 
   const { data: productDetail, isLoading: isLoadingDetail } = useProduct(productId);
   const { data: productAssets = [], isLoading: isLoadingAssets } = useProductAssets(productId);
   const updateProduct = useUpdateProduct(productId || "");
+  const createOffer = useCreateProductOffer(productId || "");
+  const addOfferBonus = useAddOfferBonus(productId || "");
+  const removeOfferBonus = useRemoveOfferBonus(productId || "");
   const uploadProductAssets = useUploadProductAssets(productId || "");
   const assetInputRef = useRef<HTMLInputElement | null>(null);
 
-  const createOffer = useCreateOffer();
-  const createPricePoint = useCreatePricePoint();
+  const createVariant = useCreateVariant(productId || "");
+  const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
-  const [isPricePointModalOpen, setIsPricePointModalOpen] = useState(false);
-  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
 
+  const [variantTitle, setVariantTitle] = useState("");
+  const [variantPrice, setVariantPrice] = useState("");
+  const [variantCurrency, setVariantCurrency] = useState("usd");
+  const [variantOfferId, setVariantOfferId] = useState("");
+  const [variantProvider, setVariantProvider] = useState("stripe");
+  const [variantExternalId, setVariantExternalId] = useState("");
+  const [variantOptionValues, setVariantOptionValues] = useState("");
+  const [shopifyProductGidDraft, setShopifyProductGidDraft] = useState("");
   const [offerName, setOfferName] = useState("");
+  const [offerBusinessModel, setOfferBusinessModel] = useState("one_time");
   const [offerDescription, setOfferDescription] = useState("");
-  const [offerBusinessModel, setOfferBusinessModel] = useState("one-time");
-  const [offerDifferentiationBullets, setOfferDifferentiationBullets] = useState("");
-  const [offerGuaranteeText, setOfferGuaranteeText] = useState("");
-  const [offerOptionsSchema, setOfferOptionsSchema] = useState("");
-
-  const [pricePointLabel, setPricePointLabel] = useState("");
-  const [pricePointAmount, setPricePointAmount] = useState("");
-  const [pricePointCurrency, setPricePointCurrency] = useState("usd");
-  const [pricePointProvider, setPricePointProvider] = useState("stripe");
-  const [pricePointExternalId, setPricePointExternalId] = useState("");
-  const [pricePointOptionValues, setPricePointOptionValues] = useState("");
+  const [bonusSelectionByOffer, setBonusSelectionByOffer] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!productDetail) return;
     selectProduct(productDetail.id, {
-      name: productDetail.name,
+      title: productDetail.title,
       client_id: productDetail.client_id,
-      category: productDetail.category ?? null,
+      product_type: productDetail.product_type ?? null,
     });
+    setShopifyProductGidDraft(productDetail.shopify_product_gid || "");
   }, [productDetail, selectProduct]);
+
+  const resetVariantForm = () => {
+    setVariantTitle("");
+    setVariantPrice("");
+    setVariantCurrency("usd");
+    setVariantOfferId("");
+    setVariantProvider("stripe");
+    setVariantExternalId("");
+    setVariantOptionValues("");
+  };
 
   const resetOfferForm = () => {
     setOfferName("");
+    setOfferBusinessModel("one_time");
     setOfferDescription("");
-    setOfferBusinessModel("one-time");
-    setOfferDifferentiationBullets("");
-    setOfferGuaranteeText("");
-    setOfferOptionsSchema("");
   };
 
-  const resetPricePointForm = () => {
-    setPricePointLabel("");
-    setPricePointAmount("");
-    setPricePointCurrency("usd");
-    setPricePointProvider("stripe");
-    setPricePointExternalId("");
-    setPricePointOptionValues("");
-  };
-
-  const handleCreateOffer = async (event: React.FormEvent) => {
+  const handleCreateVariant = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!workspace || !productId) return;
-    if (!offerName.trim() || !offerBusinessModel.trim()) {
-      toast.error("Offer name and business model are required.");
+    const price = Number(variantPrice);
+    if (!variantTitle.trim() || Number.isNaN(price) || price <= 0) {
+      toast.error("Variant title and price are required.");
       return;
     }
-    let optionsSchema: Record<string, unknown> | undefined;
-    if (offerOptionsSchema.trim()) {
-      try {
-        const parsed = JSON.parse(offerOptionsSchema);
-        if (!parsed || typeof parsed !== "object") {
-          throw new Error("Options schema must be a JSON object.");
-        }
-        optionsSchema = parsed as Record<string, unknown>;
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Invalid options schema JSON.");
-        return;
-      }
-    }
-    const payload = {
-      productId,
-      name: offerName.trim(),
-      description: offerDescription.trim() || undefined,
-      businessModel: offerBusinessModel.trim(),
-      differentiationBullets: offerDifferentiationBullets.trim() ? parseList(offerDifferentiationBullets) : undefined,
-      guaranteeText: offerGuaranteeText.trim() || undefined,
-      optionsSchema,
-    };
-    await createOffer.mutateAsync(payload);
-    resetOfferForm();
-    setIsOfferModalOpen(false);
-  };
-
-  const handleCreatePricePoint = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!productId || !selectedOfferId) return;
-    const amount = Number(pricePointAmount);
-    if (!pricePointLabel.trim() || Number.isNaN(amount) || amount <= 0) {
-      toast.error("Price point label and amount are required.");
-      return;
-    }
-    if (!pricePointCurrency.trim()) {
+    if (!variantCurrency.trim()) {
       toast.error("Currency is required.");
       return;
     }
-    if (pricePointExternalId.trim() && !pricePointProvider.trim()) {
+    if (variantExternalId.trim() && !variantProvider.trim()) {
       toast.error("Provider is required when external price ID is set.");
       return;
     }
     let optionValues: Record<string, unknown> | undefined;
-    if (pricePointOptionValues.trim()) {
+    if (variantOptionValues.trim()) {
       try {
-        const parsed = JSON.parse(pricePointOptionValues);
+        const parsed = JSON.parse(variantOptionValues);
         if (!parsed || typeof parsed !== "object") {
           throw new Error("Option values must be a JSON object.");
         }
@@ -166,19 +126,17 @@ export function ProductDetailPage() {
         return;
       }
     }
-    const payload = {
-      productId,
-      offerId: selectedOfferId,
-      label: pricePointLabel.trim(),
-      amountCents: amount,
-      currency: pricePointCurrency.trim(),
-      provider: pricePointProvider.trim() || undefined,
-      externalPriceId: pricePointExternalId.trim() || undefined,
+    await createVariant.mutateAsync({
+      title: variantTitle.trim(),
+      price,
+      currency: variantCurrency.trim(),
+      offerId: variantOfferId.trim() || undefined,
+      provider: variantProvider.trim() || undefined,
+      externalPriceId: variantExternalId.trim() || undefined,
       optionValues,
-    };
-    await createPricePoint.mutateAsync(payload);
-    resetPricePointForm();
-    setIsPricePointModalOpen(false);
+    });
+    resetVariantForm();
+    setIsVariantModalOpen(false);
   };
 
   const handleAssetUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -208,11 +166,67 @@ export function ProductDetailPage() {
     updateProduct.mutate({ primaryAssetId: assetId });
   };
 
+  const handleSaveShopifyProductGid = () => {
+    if (!productDetail) return;
+    const next = shopifyProductGidDraft.trim();
+    updateProduct.mutate({ shopifyProductGid: next || null });
+  };
+
+  const handleCreateOffer = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!productId) return;
+    if (!offerName.trim()) {
+      toast.error("Offer name is required.");
+      return;
+    }
+    if (!offerBusinessModel.trim()) {
+      toast.error("Business model is required.");
+      return;
+    }
+    await createOffer.mutateAsync({
+      productId,
+      name: offerName.trim(),
+      businessModel: offerBusinessModel.trim(),
+      description: offerDescription.trim() || undefined,
+    });
+    resetOfferForm();
+    setIsOfferModalOpen(false);
+  };
+
+  const handleAddBonus = async (offerId: string) => {
+    const bonusProductId = (bonusSelectionByOffer[offerId] || "").trim();
+    if (!bonusProductId) {
+      toast.error("Select a bonus product.");
+      return;
+    }
+    await addOfferBonus.mutateAsync({ offerId, bonusProductId });
+    setBonusSelectionByOffer((prev) => ({ ...prev, [offerId]: "" }));
+  };
+
+  const handleRemoveBonus = async (offerId: string, bonusProductId: string) => {
+    await removeOfferBonus.mutateAsync({ offerId, bonusProductId });
+  };
+
   const primaryAssetId = productDetail?.primary_asset_id ?? null;
+  const bonusProductCandidates = useMemo(() => {
+    if (!productDetail) return [];
+    return products
+      .filter((item) => item.client_id === productDetail.client_id && item.id !== productDetail.id)
+      .map((item) => ({
+        id: item.id,
+        title: item.title,
+        shopifyProductGid: item.shopify_product_gid || null,
+      }));
+  }, [productDetail, products]);
   const filteredAssets = useMemo(() => {
     if (!productId) return [] as ProductAsset[];
     return productAssets.filter((asset) => asset.product_id === productId);
   }, [productAssets, productId]);
+  const offerNameById = useMemo(() => {
+    const mapping = new Map<string, string>();
+    (productDetail?.offers || []).forEach((offer) => mapping.set(offer.id, offer.name));
+    return mapping;
+  }, [productDetail?.offers]);
   const orderedAssets = useMemo(() => {
     if (!primaryAssetId) return filteredAssets;
     const primary = filteredAssets.find((asset) => asset.id === primaryAssetId);
@@ -239,16 +253,18 @@ export function ProductDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={productDetail?.name || "Product detail"}
-        description={productDetail?.description || "Review product offers, assets, and pricing."}
+        title={productDetail?.title || "Product detail"}
+        description={productDetail?.description || "Review product variants, assets, and pricing."}
         actions={
           <div className="flex items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={() => navigate("/workspaces/products")}
-            >
+            <Button variant="secondary" size="sm" onClick={() => navigate("/workspaces/products")}>
               Back to products
             </Button>
-            <Button size="sm" onClick={() => setIsOfferModalOpen(true)} disabled={!productDetail}>
+            <Button size="sm" variant="secondary" onClick={() => setIsOfferModalOpen(true)} disabled={!productDetail}>
               New offer
+            </Button>
+            <Button size="sm" onClick={() => setIsVariantModalOpen(true)} disabled={!productDetail}>
+              New variant
             </Button>
           </div>
         }
@@ -266,8 +282,10 @@ export function ProductDetailPage() {
             <div className="rounded-md border border-border bg-surface-2 p-4">
               <div className="text-xs font-semibold uppercase text-content-muted">Overview</div>
               <div className="mt-2 text-sm text-content">
-                <div className="font-semibold">{productDetail.name}</div>
-                <div className="text-xs text-content-muted">{productDetail.category || "No category"}</div>
+                <div className="font-semibold">{productDetail.title}</div>
+                <div className="text-xs text-content-muted">
+                  {productDetail.product_type || "No product type"}
+                </div>
               </div>
               <div className="mt-3 grid gap-3 text-xs text-content-muted sm:grid-cols-2">
                 <div>
@@ -278,6 +296,32 @@ export function ProductDetailPage() {
                   <div className="font-semibold text-content">Disclaimers</div>
                   {productDetail.disclaimers?.length ? productDetail.disclaimers.join(", ") : "—"}
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-border bg-surface-2 p-4 space-y-3">
+              <div>
+                <div className="text-xs font-semibold uppercase text-content-muted">Shopify Mapping</div>
+                <div className="text-xs text-content-muted">
+                  Required for bonus products and Shopify offer verification.
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Shopify product GID</label>
+                <Input
+                  placeholder="gid://shopify/Product/1234567890"
+                  value={shopifyProductGidDraft}
+                  onChange={(e) => setShopifyProductGidDraft(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={handleSaveShopifyProductGid}
+                  disabled={updateProduct.isPending || shopifyProductGidDraft === (productDetail.shopify_product_gid || "")}
+                >
+                  {updateProduct.isPending ? "Saving…" : "Save Shopify mapping"}
+                </Button>
               </div>
             </div>
 
@@ -388,52 +432,147 @@ export function ProductDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-surface p-4">
-            <div className="space-y-3">
-              {productDetail.offers.length ? (
-                productDetail.offers.map((offer) => (
-                  <div key={offer.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-semibold text-content">{offer.name}</div>
-                        <div className="text-xs text-content-muted">{offer.business_model}</div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setSelectedOfferId(offer.id);
-                          setIsPricePointModalOpen(true);
-                        }}
-                      >
-                        New price point
-                      </Button>
-                    </div>
-                    <div className="text-xs text-content-muted">
-                      {offer.options_schema ? "Options schema set" : "No options schema"}
-                    </div>
-                    <div className="space-y-2">
-                      {offer.pricePoints?.length ? (
-                        offer.pricePoints.map((pricePoint) => (
-                          <div
-                            key={pricePoint.id}
-                            className="flex items-center justify-between rounded-md border border-border bg-surface px-3 py-2 text-xs"
-                          >
-                            <div className="font-semibold text-content">{pricePoint.label}</div>
-                            <div className="text-content-muted">
-                              {pricePoint.amount_cents} {pricePoint.currency.toUpperCase()}
-                            </div>
+          <div className="space-y-6">
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase text-content-muted">Offers</div>
+                  <div className="text-xs text-content-muted">Primary package plus bonus products.</div>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => setIsOfferModalOpen(true)}>
+                  New offer
+                </Button>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {productDetail.offers?.length ? (
+                  productDetail.offers.map((offer) => {
+                    const linkedBonusProductIds = new Set((offer.bonuses || []).map((bonus) => bonus.bonus_product.id));
+                    const addableBonuses = bonusProductCandidates.filter((candidate) => !linkedBonusProductIds.has(candidate.id));
+                    const selectedBonusProductId = bonusSelectionByOffer[offer.id] || "";
+                    return (
+                      <div key={offer.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-content truncate">{offer.name}</div>
+                            <div className="text-xs text-content-muted">{offer.business_model}</div>
+                            {offer.description ? <div className="text-xs text-content-muted mt-1">{offer.description}</div> : null}
                           </div>
-                        ))
-                      ) : (
-                        <div className="text-xs text-content-muted">No price points yet.</div>
-                      )}
+                          <div className="text-[10px] text-content-muted">{offer.id.slice(0, 8)}</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold text-content">Bonuses</div>
+                          {offer.bonuses?.length ? (
+                            <div className="space-y-2">
+                              {offer.bonuses.map((bonus) => (
+                                <div
+                                  key={bonus.id}
+                                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface px-3 py-2"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold text-content">{bonus.bonus_product.title}</div>
+                                    <div className="text-[11px] text-content-muted">
+                                      {bonus.bonus_product.shopify_product_gid || "Missing Shopify product GID"}
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => handleRemoveBonus(offer.id, bonus.bonus_product.id)}
+                                    disabled={removeOfferBonus.isPending}
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-content-muted">No bonuses attached.</div>
+                          )}
+                        </div>
+
+                        <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                          <select
+                            className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
+                            value={selectedBonusProductId}
+                            onChange={(e) =>
+                              setBonusSelectionByOffer((prev) => ({
+                                ...prev,
+                                [offer.id]: e.target.value,
+                              }))
+                            }
+                          >
+                            <option value="">Select bonus product</option>
+                            {addableBonuses.map((candidate) => (
+                              <option key={candidate.id} value={candidate.id} disabled={!candidate.shopifyProductGid}>
+                                {candidate.title}
+                                {candidate.shopifyProductGid ? "" : " (missing Shopify GID)"}
+                              </option>
+                            ))}
+                          </select>
+                          <Button
+                            size="sm"
+                            onClick={() => handleAddBonus(offer.id)}
+                            disabled={!selectedBonusProductId || addOfferBonus.isPending}
+                          >
+                            {addOfferBonus.isPending ? "Adding…" : "Add bonus"}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-sm text-content-muted">No offers yet.</div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border bg-surface p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase text-content-muted">Variants</div>
+                  <div className="text-xs text-content-muted">Pricing, provider, and option values.</div>
+                </div>
+                <Button size="sm" variant="secondary" onClick={() => setIsVariantModalOpen(true)}>
+                  New variant
+                </Button>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {productDetail.variants.length ? (
+                  productDetail.variants.map((variant) => (
+                    <div key={variant.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-content truncate">{variant.title}</div>
+                          <div className="text-xs text-content-muted">
+                            {variant.price} {variant.currency.toUpperCase()}
+                            {variant.provider ? ` · ${variant.provider}` : ""}
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-content-muted">{variant.id.slice(0, 8)}</div>
+                      </div>
+                      <div className="grid gap-2 text-xs text-content-muted">
+                        <div>
+                          <span className="font-semibold text-content">External price ID:</span>{" "}
+                          {variant.external_price_id || "—"}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-content">Offer:</span>{" "}
+                          {variant.offer_id ? offerNameById.get(variant.offer_id) || variant.offer_id : "—"}
+                        </div>
+                        <div>
+                          <span className="font-semibold text-content">Option values:</span>{" "}
+                          {variant.option_values ? JSON.stringify(variant.option_values) : "—"}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-sm text-content-muted">No offers yet.</div>
-              )}
+                  ))
+                ) : (
+                  <div className="text-sm text-content-muted">No variants yet.</div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -442,26 +581,22 @@ export function ProductDetailPage() {
       <DialogRoot open={isOfferModalOpen} onOpenChange={setIsOfferModalOpen}>
         <DialogContent>
           <DialogTitle>New offer</DialogTitle>
-          <DialogDescription>Define an offer for the selected product.</DialogDescription>
+          <DialogDescription>Create an offer package and attach bonus products after creation.</DialogDescription>
           <form className="space-y-3" onSubmit={handleCreateOffer}>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Name</label>
-              <Input placeholder="Offer name" value={offerName} onChange={(e) => setOfferName(e.target.value)} required />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Description</label>
+              <label className="text-xs font-semibold text-content">Offer name</label>
               <Input
-                placeholder="Optional description"
-                value={offerDescription}
-                onChange={(e) => setOfferDescription(e.target.value)}
+                placeholder="e.g. Buy 1 Get Bonus Stack"
+                value={offerName}
+                onChange={(e) => setOfferName(e.target.value)}
+                required
               />
             </div>
 
             <div className="space-y-1">
               <label className="text-xs font-semibold text-content">Business model</label>
               <Input
-                placeholder="one-time, subscription"
+                placeholder="one_time"
                 value={offerBusinessModel}
                 onChange={(e) => setOfferBusinessModel(e.target.value)}
                 required
@@ -469,30 +604,11 @@ export function ProductDetailPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Differentiation bullets</label>
+              <label className="text-xs font-semibold text-content">Description (optional)</label>
               <Input
-                placeholder="Comma-separated list"
-                value={offerDifferentiationBullets}
-                onChange={(e) => setOfferDifferentiationBullets(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Guarantee text</label>
-              <Input
-                placeholder="Optional guarantee statement"
-                value={offerGuaranteeText}
-                onChange={(e) => setOfferGuaranteeText(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Options schema (JSON)</label>
-              <textarea
-                className="min-h-[120px] w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content"
-                placeholder='{"size":{"label":"Size","options":["S","M","L"]}}'
-                value={offerOptionsSchema}
-                onChange={(e) => setOfferOptionsSchema(e.target.value)}
+                placeholder="Optional offer description"
+                value={offerDescription}
+                onChange={(e) => setOfferDescription(e.target.value)}
               />
             </div>
 
@@ -510,28 +626,28 @@ export function ProductDetailPage() {
         </DialogContent>
       </DialogRoot>
 
-      <DialogRoot open={isPricePointModalOpen} onOpenChange={setIsPricePointModalOpen}>
+      <DialogRoot open={isVariantModalOpen} onOpenChange={setIsVariantModalOpen}>
         <DialogContent>
-          <DialogTitle>New price point</DialogTitle>
-          <DialogDescription>Attach a Stripe price ID and option values.</DialogDescription>
-          <form className="space-y-3" onSubmit={handleCreatePricePoint}>
+          <DialogTitle>New variant</DialogTitle>
+          <DialogDescription>Attach pricing and (optionally) a Stripe or Shopify external ID.</DialogDescription>
+          <form className="space-y-3" onSubmit={handleCreateVariant}>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Label</label>
+              <label className="text-xs font-semibold text-content">Title</label>
               <Input
-                placeholder="e.g. Medium / No add-on"
-                value={pricePointLabel}
-                onChange={(e) => setPricePointLabel(e.target.value)}
+                placeholder="e.g. Default"
+                value={variantTitle}
+                onChange={(e) => setVariantTitle(e.target.value)}
                 required
               />
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Amount (cents)</label>
+                <label className="text-xs font-semibold text-content">Price (cents)</label>
                 <Input
                   placeholder="4900"
-                  value={pricePointAmount}
-                  onChange={(e) => setPricePointAmount(e.target.value)}
+                  value={variantPrice}
+                  onChange={(e) => setVariantPrice(e.target.value)}
                   required
                 />
               </div>
@@ -539,28 +655,47 @@ export function ProductDetailPage() {
                 <label className="text-xs font-semibold text-content">Currency</label>
                 <Input
                   placeholder="usd"
-                  value={pricePointCurrency}
-                  onChange={(e) => setPricePointCurrency(e.target.value)}
+                  value={variantCurrency}
+                  onChange={(e) => setVariantCurrency(e.target.value)}
                   required
                 />
               </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-content">Offer (optional)</label>
+              <select
+                className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
+                value={variantOfferId}
+                onChange={(e) => setVariantOfferId(e.target.value)}
+                disabled={!productDetail?.offers?.length}
+              >
+                <option value="">
+                  {productDetail?.offers?.length ? "No linked offer" : "No offers available"}
+                </option>
+                {(productDetail?.offers || []).map((offer) => (
+                  <option key={offer.id} value={offer.id}>
+                    {offer.name}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-content">Provider</label>
                 <Input
-                  placeholder="stripe"
-                  value={pricePointProvider}
-                  onChange={(e) => setPricePointProvider(e.target.value)}
+                  placeholder="stripe | shopify"
+                  value={variantProvider}
+                  onChange={(e) => setVariantProvider(e.target.value)}
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-content">Stripe price ID</label>
+                <label className="text-xs font-semibold text-content">External price ID</label>
                 <Input
-                  placeholder="price_..."
-                  value={pricePointExternalId}
-                  onChange={(e) => setPricePointExternalId(e.target.value)}
+                  placeholder="price_... or gid://shopify/ProductVariant/..."
+                  value={variantExternalId}
+                  onChange={(e) => setVariantExternalId(e.target.value)}
                 />
               </div>
             </div>
@@ -570,8 +705,8 @@ export function ProductDetailPage() {
               <textarea
                 className="min-h-[120px] w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content"
                 placeholder='{"size":"M","add_on":"none"}'
-                value={pricePointOptionValues}
-                onChange={(e) => setPricePointOptionValues(e.target.value)}
+                value={variantOptionValues}
+                onChange={(e) => setVariantOptionValues(e.target.value)}
               />
             </div>
 
@@ -581,8 +716,8 @@ export function ProductDetailPage() {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={!selectedOfferId || createPricePoint.isPending}>
-                {createPricePoint.isPending ? "Creating…" : "Create price point"}
+              <Button type="submit" disabled={!productId || createVariant.isPending}>
+                {createVariant.isPending ? "Creating…" : "Create variant"}
               </Button>
             </div>
           </form>

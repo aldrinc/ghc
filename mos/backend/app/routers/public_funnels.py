@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from urllib.parse import urlparse
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.encoders import jsonable_encoder
@@ -21,8 +22,7 @@ from app.db.models import (
     FunnelPage,
     FunnelPageVersion,
     Product,
-    ProductOffer,
-    ProductOfferPricePoint,
+    ProductVariant,
 )
 from app.db.repositories.funnels import (
     FunnelPageVersionsRepository,
@@ -34,6 +34,7 @@ from app.schemas.commerce import PublicCheckoutRequest
 from app.schemas.funnels import PublicEventsIngestRequest
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.media_storage import MediaStorage
+from app.services.shopify_checkout import create_shopify_checkout
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -106,24 +107,27 @@ def _metadata_value(value: object, key: str) -> str:
 
 def _preview_page_map(*, session: Session, funnel_id: str) -> dict[str, str]:
     """
-    For unpublished funnels, we treat "preview" pages as those with an approved version.
+    For unpublished funnels, we treat "preview" pages as those with at least one saved version
+    (draft or approved).
     """
 
-    approved_page_ids = set(
+    preview_page_ids = set(
         str(page_id)
         for page_id in session.scalars(
             select(FunnelPageVersion.page_id)
             .join(FunnelPage, FunnelPage.id == FunnelPageVersion.page_id)
             .where(
                 FunnelPage.funnel_id == funnel_id,
-                FunnelPageVersion.status == FunnelPageVersionStatusEnum.approved,
+                FunnelPageVersion.status.in_(
+                    [FunnelPageVersionStatusEnum.draft, FunnelPageVersionStatusEnum.approved]
+                ),
             )
             .distinct()
         ).all()
     )
     pages_repo = FunnelPagesRepository(session)
     pages = pages_repo.list(funnel_id=funnel_id)
-    return {str(page.id): page.slug for page in pages if str(page.id) in approved_page_ids}
+    return {str(page.id): page.slug for page in pages if str(page.id) in preview_page_ids}
 
 
 @router.get("/funnels/{public_id}/meta")
@@ -166,7 +170,7 @@ def public_funnel_meta(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
     entry_slug = page_map.get(str(funnel.entry_page_id))
     if not entry_slug:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not approved")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page has no saved version")
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
@@ -226,7 +230,7 @@ def public_funnel_page(
             "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
         }
 
-    # Preview mode: allow viewing approved pages even if the funnel hasn't been published yet.
+    # Preview mode: allow viewing pages with draft or approved versions even if the funnel hasn't been published yet.
     page = session.scalars(
         select(FunnelPage).where(FunnelPage.funnel_id == funnel.id, FunnelPage.slug == slug)
     ).first()
@@ -238,9 +242,11 @@ def public_funnel_page(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
 
     versions_repo = FunnelPageVersionsRepository(session)
+    draft = versions_repo.latest_for_page(page_id=str(page.id), status=FunnelPageVersionStatusEnum.draft)
     approved = versions_repo.latest_for_page(page_id=str(page.id), status=FunnelPageVersionStatusEnum.approved)
-    if not approved:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not approved")
+    version = draft or approved
+    if not version:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page has no saved version")
 
     page_map = _preview_page_map(session=session, funnel_id=str(funnel.id))
     design_system_tokens = resolve_design_system_tokens(
@@ -256,7 +262,7 @@ def public_funnel_page(
         "publicationId": publication_id,
         "pageId": str(page.id),
         "slug": page.slug,
-        "puckData": approved.puck_data,
+        "puckData": version.puck_data,
         "pageMap": page_map,
         "designSystemTokens": design_system_tokens,
         "nextPageId": str(page.next_page_id) if page.next_page_id else None,
@@ -290,12 +296,12 @@ def public_funnel_graph(
             "links": [jsonable_encoder(link) for link in links],
         }
 
-    # Preview mode: only return approved pages for the graph.
+    # Preview mode: only return pages that have at least one saved version (draft or approved) for the graph.
     page_map = _preview_page_map(session=session, funnel_id=str(funnel.id))
     if not funnel.entry_page_id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not found")
     if str(funnel.entry_page_id) not in page_map:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page not approved")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry page has no saved version")
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
@@ -327,36 +333,30 @@ def public_funnel_commerce(
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
-    offers = session.scalars(
-        select(ProductOffer).where(ProductOffer.product_id == product.id)
-    ).all()
-    offer_ids = [str(offer.id) for offer in offers]
-    price_points = (
-        session.scalars(
-            select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id.in_(offer_ids))
-        ).all()
-        if offer_ids
-        else []
-    )
-    price_points_by_offer: dict[str, list[dict]] = {}
-    for pp in price_points:
-        data = jsonable_encoder(pp)
+    variants_query = select(ProductVariant).where(ProductVariant.product_id == product.id)
+    if funnel.selected_offer_id:
+        variants_query = variants_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
+    variants = session.scalars(variants_query).all()
+    if not variants:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product variants are not configured for this funnel product.",
+        )
+    serialized_variants: list[dict] = []
+    for variant in variants:
+        data = jsonable_encoder(variant)
         data.pop("external_price_id", None)
-        price_points_by_offer.setdefault(str(pp.offer_id), []).append(data)
+        serialized_variants.append(data)
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
         "publicId": str(funnel.public_id),
         "funnelId": str(funnel.id),
-        "product": jsonable_encoder(product),
-        "selectedOfferId": str(funnel.selected_offer_id) if funnel.selected_offer_id else None,
-        "offers": [
-            {
-                **jsonable_encoder(offer),
-                "pricePoints": price_points_by_offer.get(str(offer.id), []),
-            }
-            for offer in offers
-        ],
+        "product": {
+            **jsonable_encoder(product),
+            "variants": serialized_variants,
+            "variants_count": len(serialized_variants),
+        },
     }
 
 
@@ -376,94 +376,60 @@ def public_checkout(
             detail="Funnel has no product configured.",
         )
 
-    offer = session.scalars(
-        select(ProductOffer).where(
-            ProductOffer.id == payload.offerId,
-            ProductOffer.product_id == funnel.product_id,
+    variant: ProductVariant | None = None
+    if payload.variantId:
+        variant_query = select(ProductVariant).where(
+            ProductVariant.id == payload.variantId,
+            ProductVariant.product_id == funnel.product_id,
         )
-    ).first()
-    if not offer:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Offer not found for funnel product.",
-        )
-
-    price_point: ProductOfferPricePoint | None = None
-    if payload.pricePointId:
-        price_point = session.scalars(
-            select(ProductOfferPricePoint).where(
-                ProductOfferPricePoint.id == payload.pricePointId,
-                ProductOfferPricePoint.offer_id == offer.id,
-            )
-        ).first()
-        if not price_point:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Price point not found")
-        if price_point.option_values is None and payload.selection:
+        if funnel.selected_offer_id:
+            variant_query = variant_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
+        variant = session.scalars(variant_query).first()
+        if not variant:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+        if variant.option_values is None and payload.selection:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Selection does not match price point options.",
+                detail="Selection does not match variant options.",
             )
-        if price_point.option_values is not None and payload.selection != price_point.option_values:
+        if variant.option_values is not None and payload.selection != variant.option_values:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Selection does not match price point options.",
+                detail="Selection does not match variant options.",
             )
     else:
         if not payload.selection:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="selection is required when pricePointId is not provided.",
+                detail="selection is required when variantId is not provided.",
             )
-        candidates = session.scalars(
-            select(ProductOfferPricePoint).where(ProductOfferPricePoint.offer_id == offer.id)
-        ).all()
-        matches = [pp for pp in candidates if pp.option_values == payload.selection]
+        candidates_query = select(ProductVariant).where(ProductVariant.product_id == funnel.product_id)
+        if funnel.selected_offer_id:
+            candidates_query = candidates_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
+        candidates = session.scalars(candidates_query).all()
+        matches = [item for item in candidates if item.option_values == payload.selection]
         if len(matches) != 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Selection does not resolve to a single price point.",
+                detail="Selection does not resolve to a single variant.",
             )
-        price_point = matches[0]
+        variant = matches[0]
 
-    if not price_point:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Price point resolution failed.")
+    if not variant:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Variant resolution failed.")
 
-    if not price_point.provider:
+    if not variant.provider:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Price point provider is required for checkout.",
+            detail="Variant provider is required for checkout.",
         )
-    if price_point.provider != "stripe":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Unsupported checkout provider.",
-        )
-    if not price_point.external_price_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Stripe price ID is missing for this price point.",
-        )
-    if not settings.STRIPE_SECRET_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Stripe is not configured.",
-        )
-
-    allowed_hosts = _allowed_hosts(request)
-    if not allowed_hosts:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Host header is required for checkout.",
-        )
-    _validate_return_url(str(payload.successUrl), allowed_hosts, "successUrl")
-    _validate_return_url(str(payload.cancelUrl), allowed_hosts, "cancelUrl")
-
-    stripe.api_key = settings.STRIPE_SECRET_KEY
     metadata = {
         "public_id": _metadata_value(payload.publicId, "publicId"),
         "funnel_id": _metadata_value(str(funnel.id), "funnelId"),
-        "offer_id": _metadata_value(payload.offerId, "offerId"),
-        "price_point_id": _metadata_value(str(price_point.id), "pricePointId"),
+        "offer_id": _metadata_value(str(funnel.selected_offer_id), "offerId") if funnel.selected_offer_id else None,
+        "variant_id": _metadata_value(str(variant.id), "variantId"),
+        # Legacy key kept for older webhooks/reporting paths.
+        "price_point_id": _metadata_value(str(variant.id), "pricePointId"),
         "page_id": _metadata_value(payload.pageId, "pageId"),
         "visitor_id": _metadata_value(payload.visitorId, "visitorId"),
         "session_id": _metadata_value(payload.sessionId, "sessionId"),
@@ -472,15 +438,55 @@ def public_checkout(
         "quantity": _metadata_value(str(payload.quantity), "quantity"),
     }
     metadata = {key: value for key, value in metadata.items() if value}
+    if variant.provider == "stripe":
+        if not variant.external_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Stripe price ID is missing for this variant.",
+            )
+        if not settings.STRIPE_SECRET_KEY:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Stripe is not configured.",
+            )
+        stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    checkout_session = stripe.checkout.Session.create(
-        mode="payment",
-        success_url=str(payload.successUrl),
-        cancel_url=str(payload.cancelUrl),
-        line_items=[{"price": price_point.external_price_id, "quantity": payload.quantity}],
-        metadata=metadata,
+        allowed_hosts = _allowed_hosts(request)
+        if not allowed_hosts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Host header is required for checkout.",
+            )
+        _validate_return_url(str(payload.successUrl), allowed_hosts, "successUrl")
+        _validate_return_url(str(payload.cancelUrl), allowed_hosts, "cancelUrl")
+
+        checkout_session = stripe.checkout.Session.create(
+            mode="payment",
+            success_url=str(payload.successUrl),
+            cancel_url=str(payload.cancelUrl),
+            line_items=[{"price": variant.external_price_id, "quantity": payload.quantity}],
+            metadata=metadata,
+        )
+        return {"checkoutUrl": checkout_session.url, "sessionId": checkout_session.id}
+
+    if variant.provider == "shopify":
+        if not variant.external_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopify variant GID is missing for this variant.",
+            )
+        checkout = create_shopify_checkout(
+            client_id=str(funnel.client_id),
+            variant_gid=variant.external_price_id,
+            quantity=payload.quantity,
+            metadata=metadata,
+        )
+        return {"checkoutUrl": checkout["checkoutUrl"], "sessionId": checkout["cartId"]}
+
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Unsupported checkout provider.",
     )
-    return {"checkoutUrl": checkout_session.url, "sessionId": checkout_session.id}
 
 
 @router.post("/events")
@@ -497,8 +503,28 @@ def ingest_public_events(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Batch must share publicationId")
     publication_id = next(iter(publication_ids))
 
-    funnel = session.scalars(select(Funnel).where(Funnel.active_publication_id == publication_id)).first()
+    try:
+        publication_uuid = UUID(str(publication_id))
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="publicationId must be a valid UUID.",
+        ) from exc
+
+    funnel = session.scalars(
+        select(Funnel).where(Funnel.active_publication_id == publication_uuid)
+    ).first()
     if not funnel:
+        # Preview mode: publicationId is the funnel id (see _publication_id_for_public_response()).
+        # Unpublished funnels cannot persist events because funnel_events.publication_id is a FK.
+        preview_funnel = session.scalars(
+            select(Funnel).where(
+                Funnel.id == publication_uuid,
+                Funnel.active_publication_id.is_(None),
+            )
+        ).first()
+        if preview_funnel:
+            return {"ingested": 0}
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publication not found")
 
     host = request.headers.get("host")
@@ -517,7 +543,7 @@ def ingest_public_events(
                 client_id=funnel.client_id,
                 campaign_id=funnel.campaign_id,
                 funnel_id=funnel.id,
-                publication_id=publication_id,
+                publication_id=publication_uuid,
                 page_id=ev.pageId,
                 event_type=event_type,
                 visitor_id=ev.visitorId,

@@ -3,7 +3,7 @@
   "name": "Pre-Sales Listicle (PuppyPad)",
   "description": "Exact visual clone of the PuppyPad listicle pre-sales page.",
   "previewImage": null,
-  "assetBasePath": "templates/pre-sales-template-main/public",
+  "assetBasePath": "templates/pre-sales-template-main/public/assets",
   "assetPrefix": "/assets/",
   "puckData": {
     "root": {

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import mimetypes
-from typing import Iterable, List, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Tuple
 
 from sqlalchemy import select, update, func
 from sqlalchemy.orm import Session
@@ -32,6 +32,7 @@ from app.db.models import (
     Ad,
     AdAssetLink,
     AdIngestRun,
+    AdLibraryPageTotal,
     AdCreative,
     AdCreativeMembership,
     AdFacts,
@@ -265,18 +266,112 @@ class AdsRepository(Repository):
         )
         self.session.commit()
 
-    def mark_ingest_failure(self, ingest_run_id: str, *, error: str, provider_run_id: Optional[str] = None) -> None:
-        self.session.execute(
-            update(AdIngestRun)
-            .where(AdIngestRun.id == ingest_run_id)
-            .values(
-                status=AdIngestStatusEnum.FAILED,
-                error=error[:5000],
-                provider_run_id=provider_run_id,
-                finished_at=datetime.now(timezone.utc),
-            )
-        )
+    def mark_ingest_failure(
+        self,
+        ingest_run_id: str,
+        *,
+        error: str,
+        provider_run_id: Optional[str] = None,
+        provider_dataset_id: Optional[str] = None,
+        items_count: Optional[int] = None,
+    ) -> None:
+        values: dict[str, Any] = {
+            "status": AdIngestStatusEnum.FAILED,
+            "error": error[:5000],
+            "provider_run_id": provider_run_id,
+            "provider_dataset_id": provider_dataset_id,
+            "finished_at": datetime.now(timezone.utc),
+        }
+        if items_count is not None:
+            values["items_count"] = int(items_count)
+        self.session.execute(update(AdIngestRun).where(AdIngestRun.id == ingest_run_id).values(**values))
         self.session.commit()
+
+    def upsert_ad_library_page_total(
+        self,
+        *,
+        org_id: str,
+        research_run_id: str,
+        brand_id: str,
+        brand_channel_identity_id: str,
+        channel: AdChannelEnum,
+        query_key: str,
+        active_status: Optional[str],
+        input_url: str,
+        total_count: int,
+        page_id: Optional[str] = None,
+        page_name: Optional[str] = None,
+        provider: str = "APIFY",
+        provider_actor_id: Optional[str] = None,
+        provider_run_id: Optional[str] = None,
+        provider_dataset_id: Optional[str] = None,
+        actor_input: Optional[dict] = None,
+        raw_result: Optional[dict] = None,
+    ) -> AdLibraryPageTotal:
+        """
+        Persist a deterministic "total ads" snapshot for a given page identity and query.
+
+        We key uniqueness by (research_run_id, brand_channel_identity_id, query_key) so the workflow
+        can store multiple totals per run (e.g. active vs inactive, or different URL filters) without
+        overwriting.
+        """
+        stmt = (
+            insert(AdLibraryPageTotal)
+            .values(
+                org_id=org_id,
+                research_run_id=research_run_id,
+                brand_id=brand_id,
+                brand_channel_identity_id=brand_channel_identity_id,
+                channel=channel,
+                query_key=query_key,
+                active_status=active_status,
+                input_url=input_url,
+                total_count=total_count,
+                page_id=page_id,
+                page_name=page_name,
+                provider=provider,
+                provider_actor_id=provider_actor_id,
+                provider_run_id=provider_run_id,
+                provider_dataset_id=provider_dataset_id,
+                actor_input=actor_input,
+                raw_result=raw_result,
+            )
+            .on_conflict_do_update(
+                index_elements=[
+                    AdLibraryPageTotal.research_run_id,
+                    AdLibraryPageTotal.brand_channel_identity_id,
+                    AdLibraryPageTotal.query_key,
+                ],
+                set_={
+                    "active_status": active_status,
+                    "input_url": input_url,
+                    "total_count": total_count,
+                    "page_id": page_id,
+                    "page_name": page_name,
+                    "provider": provider,
+                    "provider_actor_id": provider_actor_id,
+                    "provider_run_id": provider_run_id,
+                    "provider_dataset_id": provider_dataset_id,
+                    "actor_input": actor_input,
+                    "raw_result": raw_result,
+                    "updated_at": func.now(),
+                },
+            )
+            .returning(AdLibraryPageTotal)
+        )
+        row = self.session.execute(stmt).scalar_one()
+        self.session.commit()
+        self.session.refresh(row)
+        return row
+
+    def ad_library_page_totals_for_run(
+        self, *, research_run_id: str, query_key: str
+    ) -> list[AdLibraryPageTotal]:
+        stmt = select(AdLibraryPageTotal).where(
+            AdLibraryPageTotal.research_run_id == research_run_id,
+            AdLibraryPageTotal.query_key == query_key,
+        )
+        return list(self.session.scalars(stmt).all())
 
     def upsert_ad_with_assets(
         self,

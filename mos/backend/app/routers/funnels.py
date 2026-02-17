@@ -324,12 +324,12 @@ def get_funnel(
 
     pages = pages_repo.list(funnel_id=funnel_id)
     page_summaries = []
-    all_approved = True
+    all_ready = True
     for page in pages:
         draft = versions_repo.latest_for_page(page_id=str(page.id), status=FunnelPageVersionStatusEnum.draft)
         approved = versions_repo.latest_for_page(page_id=str(page.id), status=FunnelPageVersionStatusEnum.approved)
-        if not approved:
-            all_approved = False
+        if not draft and not approved:
+            all_ready = False
         page_summaries.append(
             {
                 **jsonable_encoder(page),
@@ -338,7 +338,7 @@ def get_funnel(
             }
         )
 
-    can_publish = bool(funnel.entry_page_id) and bool(pages) and all_approved
+    can_publish = bool(funnel.entry_page_id) and bool(pages) and all_ready
     return {
         **jsonable_encoder(funnel),
         "pages": page_summaries,
@@ -766,42 +766,6 @@ def update_page(
 
     updated = pages_repo.update(page_id=page_id, **update_fields)
     return jsonable_encoder(updated)
-
-
-@router.post("/{funnel_id}/pages/{page_id}/approve", status_code=status.HTTP_201_CREATED)
-def approve_page(
-    funnel_id: str,
-    page_id: str,
-    auth: AuthContext = Depends(get_current_user),
-    session: Session = Depends(get_session),
-):
-    funnels_repo = FunnelsRepository(session)
-    if not funnels_repo.get(org_id=auth.org_id, funnel_id=funnel_id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
-
-    pages_repo = FunnelPagesRepository(session)
-    page = pages_repo.get(funnel_id=funnel_id, page_id=page_id)
-    if not page:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
-
-    versions_repo = FunnelPageVersionsRepository(session)
-    draft = versions_repo.latest_for_page(page_id=str(page.id), status=FunnelPageVersionStatusEnum.draft)
-    if not draft:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="No draft version to approve")
-
-    approved = FunnelPageVersion(
-        page_id=page.id,
-        status=FunnelPageVersionStatusEnum.approved,
-        puck_data=draft.puck_data,
-        source=draft.source,
-        ai_metadata=draft.ai_metadata,
-        created_at=datetime.now(timezone.utc),
-    )
-    page.review_status = FunnelPageReviewStatusEnum.approved
-    session.add(approved)
-    session.commit()
-    session.refresh(approved)
-    return jsonable_encoder(approved)
 
 
 @router.post("/{funnel_id}/publish", status_code=status.HTTP_201_CREATED)

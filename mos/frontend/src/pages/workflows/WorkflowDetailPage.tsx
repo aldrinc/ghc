@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useAssets } from "@/api/assets";
 import { useWorkflowDetail, useWorkflowSignal } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
-import type { ResearchArtifactRef } from "@/types/common";
+import type { Asset, ResearchArtifactRef } from "@/types/common";
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -31,7 +32,7 @@ function truncate(text?: string, max = 120) {
 export function WorkflowDetailPage() {
   const { workflowId } = useParams();
   const { data, isLoading, isError, refetch } = useWorkflowDetail(workflowId);
-  const signal = useWorkflowSignal(workflowId);
+  const workflowSignal = useWorkflowSignal(workflowId);
   const { product, products, selectProduct } = useProductContext();
 
   const run = data?.run;
@@ -46,7 +47,8 @@ export function WorkflowDetailPage() {
   const stepSummaries = (data?.precanon_research?.step_summaries as Record<string, string> | undefined) || {};
   const canonStory = (data?.client_canon?.data?.brand as any)?.story as string | undefined;
   const isOnboarding = run?.kind === "client_onboarding";
-  const isCampaignPlanning = run?.kind === "campaign_planning";
+  const isCampaignPlanning = run?.kind === "campaign_planning" || run?.kind === "campaign_intent";
+  const isCreativeProduction = run?.kind === "creative_production";
   const approvalsDisabled = !run || run.status !== "running";
   const strategyData = (data?.strategy_sheet?.data || {}) as any;
   const channelPlan = (strategyData.channelPlan as any[]) || [];
@@ -57,6 +59,105 @@ export function WorkflowDetailPage() {
   const assetBriefArtifacts = data?.asset_briefs || [];
   const latestLog = data?.logs?.[0];
 
+  const experimentSpecs = useMemo(() => {
+    const latest = experimentArtifacts?.[0] as any;
+    const data = (latest?.data || {}) as any;
+    const specs = data.experimentSpecs || data.experiment_specs || [];
+    if (!Array.isArray(specs)) return [];
+    return specs.filter((spec: any) => spec && typeof spec === "object" && String(spec.id || "").trim());
+  }, [experimentArtifacts]);
+
+  const assetBriefs = useMemo(() => {
+    const map = new Map<string, any>();
+    assetBriefArtifacts.forEach((art: any) => {
+      const data = (art?.data || {}) as any;
+      const briefs = data.asset_briefs || data.assetBriefs || [];
+      if (!Array.isArray(briefs)) return;
+      briefs.forEach((brief: any) => {
+        if (!brief || typeof brief !== "object") return;
+        const id = String(brief.id || "").trim();
+        if (!id || map.has(id)) return;
+        map.set(id, brief);
+      });
+    });
+    return Array.from(map.values());
+  }, [assetBriefArtifacts]);
+
+  const [selectedExperimentIds, setSelectedExperimentIds] = useState<string[]>([]);
+  useEffect(() => {
+    setSelectedExperimentIds((prev) => prev.filter((id) => experimentSpecs.some((spec: any) => spec.id === id)));
+  }, [experimentSpecs]);
+
+  const allExperimentIds = useMemo(
+    () => experimentSpecs.map((spec: any) => String(spec.id || "")).filter(Boolean),
+    [experimentSpecs]
+  );
+  const allExperimentsSelected =
+    allExperimentIds.length > 0 && allExperimentIds.every((id) => selectedExperimentIds.includes(id));
+  const toggleExperimentSelection = (id: string) => {
+    setSelectedExperimentIds((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+  const toggleAllExperiments = () => {
+    setSelectedExperimentIds(allExperimentsSelected ? [] : allExperimentIds);
+  };
+
+  const generatedAssetIds = useMemo(() => {
+    const ids = new Set<string>();
+    (data?.logs || []).forEach((log) => {
+      if (log.step !== "asset_generation" || log.status !== "completed") return;
+      const out = log.payload_out as any;
+      const assetIds = out?.asset_ids;
+      if (!Array.isArray(assetIds)) return;
+      assetIds.forEach((id: any) => {
+        if (typeof id === "string" && id.trim()) ids.add(id.trim());
+      });
+    });
+    return Array.from(ids);
+  }, [data?.logs]);
+
+  const { data: assets = [] } = useAssets(
+    { campaignId: run?.campaign_id || undefined },
+    { enabled: Boolean(isCreativeProduction && run?.campaign_id && generatedAssetIds.length) }
+  );
+  const generatedAssets: Asset[] = useMemo(() => {
+    if (!generatedAssetIds.length) return [];
+    const idSet = new Set(generatedAssetIds);
+    return (assets || []).filter((asset) => idSet.has(asset.id));
+  }, [assets, generatedAssetIds]);
+
+  const [approvedAssetIds, setApprovedAssetIds] = useState<Set<string>>(new Set());
+  const [rejectedAssetIds, setRejectedAssetIds] = useState<Set<string>>(new Set());
+
+  const toggleApprovedAsset = (id: string) => {
+    setApprovedAssetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setRejectedAssetIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
+  const toggleRejectedAsset = (id: string) => {
+    setRejectedAssetIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setApprovedAssetIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  };
+
   useEffect(() => {
     if (!run || run.status !== "running") return;
     const interval = window.setInterval(() => {
@@ -64,17 +165,21 @@ export function WorkflowDetailPage() {
     }, 15000);
     return () => window.clearInterval(interval);
   }, [run?.status, refetch]);
-
-  const handleApproveCanon = () => {
-    signal.mutate({ signal: "approve-canon", body: { approved: true } });
+  const handleApproveExperiments = () => {
+    workflowSignal.mutate({
+      signal: "approve-experiments",
+      body: { approved_ids: selectedExperimentIds, rejected_ids: [] },
+    });
   };
 
-  const handleApproveMetric = () => {
-    signal.mutate({ signal: "approve-metric-schema", body: { approved: true } });
-  };
-
-  const handleApproveStrategy = () => {
-    signal.mutate({ signal: "approve-strategy", body: { approved: true } });
+  const handleApproveAssets = () => {
+    workflowSignal.mutate({
+      signal: "approve-assets",
+      body: {
+        approved_ids: Array.from(approvedAssetIds),
+        rejected_ids: Array.from(rejectedAssetIds),
+      },
+    });
   };
 
   return (
@@ -84,7 +189,7 @@ export function WorkflowDetailPage() {
         description={
           runProduct?.name
             ? `Inspect research artifacts for ${runProduct.name}.`
-            : "Inspect research artifacts and send approvals to unblock downstream steps."
+            : "Inspect research artifacts and unblock any required gates."
         }
       />
 
@@ -183,55 +288,77 @@ export function WorkflowDetailPage() {
             <div className="ds-card ds-card--md shadow-none">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-content">Review & approvals</div>
+                  <div className="text-sm font-semibold text-content">Review & gates</div>
                   <div className="text-xs text-content-muted">
                     {isOnboarding
-                      ? "Approve canon and metric schema to let onboarding finish."
-                      : isCampaignPlanning
-                      ? "Review the strategy sheet and approve to continue."
-                      : "This workflow type has no manual approvals."}
+                      ? "Onboarding is automatic and does not require approvals."
+                      : isCreativeProduction
+                        ? "Creative production waits for asset approvals."
+                        : isCampaignPlanning
+                          ? "Campaign planning waits for experiment approvals."
+                          : "This workflow type has no manual gates."}
                   </div>
                 </div>
               </div>
               {isOnboarding ? (
-                <div className="mt-3 space-y-2 text-sm">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={handleApproveCanon}
-                    disabled={approvalsDisabled || signal.isPending}
-                  >
-                    {signal.isPending ? "Sending…" : "Approve canon"}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleApproveMetric}
-                    disabled={approvalsDisabled || signal.isPending}
-                  >
-                    {signal.isPending ? "Sending…" : "Approve metric schema"}
-                  </Button>
+                <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
+                  No action required. This run will proceed automatically as activities complete.
+                </div>
+              ) : isCampaignPlanning ? (
+                <div className="mt-3 space-y-3 text-sm">
+                  {experimentSpecs.length ? (
+                    <>
+                      <div className="flex flex-wrap items-center gap-4 text-xs text-content-muted">
+                        <label className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border border-border bg-surface text-accent"
+                            checked={allExperimentsSelected}
+                            onChange={toggleAllExperiments}
+                          />
+                          <span>Select all</span>
+                        </label>
+                        <span>{selectedExperimentIds.length} selected</span>
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        onClick={handleApproveExperiments}
+                        disabled={approvalsDisabled || workflowSignal.isPending || selectedExperimentIds.length === 0}
+                      >
+                        {workflowSignal.isPending ? "Sending…" : "Approve selected experiments"}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
+                      No experiment specs available yet.
+                    </div>
+                  )}
                   {approvalsDisabled ? (
                     <div className="text-xs text-content-muted">Approvals disabled because the run is not active.</div>
                   ) : null}
                 </div>
-              ) : isCampaignPlanning ? (
+              ) : isCreativeProduction ? (
                 <div className="mt-3 space-y-2 text-sm">
                   <Button
                     variant="primary"
                     size="sm"
-                    onClick={handleApproveStrategy}
-                    disabled={approvalsDisabled || signal.isPending}
+                    onClick={handleApproveAssets}
+                    disabled={
+                      approvalsDisabled ||
+                      workflowSignal.isPending ||
+                      (approvedAssetIds.size === 0 && rejectedAssetIds.size === 0)
+                    }
                   >
-                    {signal.isPending ? "Sending…" : "Approve strategy sheet"}
+                    {workflowSignal.isPending ? "Sending…" : "Send asset approvals"}
                   </Button>
-                  {approvalsDisabled ? (
-                    <div className="text-xs text-content-muted">Approvals disabled because the run is not active.</div>
-                  ) : null}
+                  <div className="text-xs text-content-muted">
+                    {approvedAssetIds.size} approved · {rejectedAssetIds.size} rejected
+                  </div>
                 </div>
               ) : (
                 <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
-                  This workflow type has no manual approvals.
+                  This workflow type has no manual gates.
                 </div>
               )}
             </div>
@@ -278,7 +405,7 @@ export function WorkflowDetailPage() {
             </div>
           ) : null}
 
-          {isCampaignPlanning && experimentArtifacts?.length ? (
+          {isCampaignPlanning && experimentSpecs.length ? (
             <div className="ds-card ds-card--md p-0 shadow-none">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
@@ -287,26 +414,39 @@ export function WorkflowDetailPage() {
                 </div>
               </div>
               <div className="space-y-3 p-4 text-sm">
-                {experimentArtifacts.map((art) => {
-                  const specs = (art.data as any)?.experimentSpecs || [];
-                  return specs.map((exp: any) => (
-                    <div key={`${art.id}-${exp.id}`} className="ds-card ds-card--sm bg-surface-2">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-content">{exp.name || exp.id}</div>
-                        <span className="text-xs text-content-muted font-mono">{exp.id}</span>
-                      </div>
-                      <div className="mt-1 text-xs text-content-muted">{truncate(exp.hypothesis, 200)}</div>
-                      <div className="mt-2 text-xs text-content-muted">
-                        Metrics: {(exp.metricIds || []).join(", ") || "—"} · Variants: {(exp.variants || []).length}
+                {experimentSpecs.map((exp: any) => {
+                  const id = String(exp.id || "").trim();
+                  if (!id) return null;
+                  const isSelected = selectedExperimentIds.includes(id);
+                  return (
+                    <div key={id} className="ds-card ds-card--sm bg-surface-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <label className="flex items-start gap-3">
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 h-4 w-4 rounded border border-border bg-surface text-accent"
+                            checked={isSelected}
+                            onChange={() => toggleExperimentSelection(id)}
+                          />
+                          <div>
+                            <div className="text-sm font-semibold text-content">{exp.name || id}</div>
+                            <div className="mt-1 text-xs text-content-muted">{truncate(exp.hypothesis, 200)}</div>
+                            <div className="mt-2 text-xs text-content-muted">
+                              Metrics: {(exp.metricIds || []).join(", ") || "—"} · Variants:{" "}
+                              {(exp.variants || []).length}
+                            </div>
+                          </div>
+                        </label>
+                        <span className="text-xs text-content-muted font-mono">{id}</span>
                       </div>
                     </div>
-                  ));
+                  );
                 })}
               </div>
             </div>
           ) : null}
 
-          {isCampaignPlanning && assetBriefArtifacts?.length ? (
+          {isCampaignPlanning && assetBriefs.length ? (
             <div className="ds-card ds-card--md p-0 shadow-none">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
@@ -315,32 +455,92 @@ export function WorkflowDetailPage() {
                 </div>
               </div>
               <div className="space-y-3 p-4 text-sm">
-                {assetBriefArtifacts.map((art) => {
-                  const briefs = (art.data as any)?.asset_briefs || [];
-                  return briefs.map((brief: any) => {
-                    const requirements = brief.requirements || [];
-                    return (
-                      <div key={brief.id} className="ds-card ds-card--sm bg-surface-2">
-                        <div className="flex items-center justify-between">
-                          <div className="text-sm font-semibold text-content">{brief.creativeConcept || brief.id}</div>
-                          <span className="text-xs text-content-muted font-mono">{brief.id}</span>
-                        </div>
-                        <div className="mt-1 text-xs text-content-muted">
-                          Angle: {brief.experimentId || "—"} · Requirements: {requirements.length}
-                        </div>
-                        {requirements.length ? (
-                          <div className="mt-2 text-xs text-content-muted">
-                            {requirements.map((r: any, idx: number) => (
-                              <div key={idx}>
-                                • {r.channel} / {r.format} {r.angle ? `– ${r.angle}` : ""} {r.hook ? `(${truncate(r.hook, 60)})` : ""}
-                              </div>
-                            ))}
-                          </div>
-                        ) : null}
+                {assetBriefs.map((brief: any) => {
+                  const requirements = Array.isArray(brief.requirements) ? brief.requirements : [];
+                  return (
+                    <div key={brief.id} className="ds-card ds-card--sm bg-surface-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-semibold text-content">{brief.creativeConcept || brief.id}</div>
+                        <span className="text-xs text-content-muted font-mono">{brief.id}</span>
                       </div>
-                    );
-                  });
+                      <div className="mt-1 text-xs text-content-muted">
+                        Angle: {brief.experimentId || "—"} · Requirements: {requirements.length}
+                      </div>
+                      {requirements.length ? (
+                        <div className="mt-2 text-xs text-content-muted">
+                          {requirements.map((r: any, idx: number) => (
+                            <div key={idx}>
+                              • {r.channel} / {r.format} {r.angle ? `– ${r.angle}` : ""}{" "}
+                              {r.hook ? `(${truncate(r.hook, 60)})` : ""}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
                 })}
+              </div>
+            </div>
+          ) : null}
+
+          {isCreativeProduction ? (
+            <div className="ds-card ds-card--md p-0 shadow-none">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-content">Generated assets</div>
+                  <div className="text-xs text-content-muted">Approve or reject to finish creative production.</div>
+                </div>
+              </div>
+              <div className="p-4">
+                {generatedAssets.length ? (
+                  <div className="space-y-3">
+                    {generatedAssets.map((asset) => (
+                      <div key={asset.id} className="ds-card ds-card--sm bg-surface-2">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="flex items-start gap-3">
+                            <img
+                              src={`/public/assets/${asset.public_id}`}
+                              alt={asset.id}
+                              className="h-20 w-20 rounded-md object-cover border border-border"
+                              loading="lazy"
+                            />
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-content">Asset</div>
+                              <div className="mt-1 text-xs text-content-muted font-mono break-all">{asset.id}</div>
+                              <div className="mt-2 text-xs text-content-muted">Status: {asset.status}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs text-content">
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border border-border bg-surface text-accent"
+                                checked={approvedAssetIds.has(asset.id)}
+                                onChange={() => toggleApprovedAsset(asset.id)}
+                              />
+                              <span>Approve</span>
+                            </label>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border border-border bg-surface text-accent"
+                                checked={rejectedAssetIds.has(asset.id)}
+                                onChange={() => toggleRejectedAsset(asset.id)}
+                              />
+                              <span>Reject</span>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : generatedAssetIds.length ? (
+                  <div className="text-sm text-content-muted">Loading generated assets…</div>
+                ) : (
+                  <div className="text-sm text-content-muted">
+                    No generated assets recorded yet. Wait for asset generation steps to complete.
+                  </div>
+                )}
               </div>
             </div>
           ) : null}

@@ -54,6 +54,28 @@ export interface Artifact {
   created_at: string;
 }
 
+export interface Asset {
+  id: string;
+  org_id: string;
+  client_id: string;
+  campaign_id?: string | null;
+  experiment_id?: string | null;
+  product_id?: string | null;
+  funnel_id?: string | null;
+  public_id: string;
+  asset_kind: string;
+  channel_id: string;
+  format: string;
+  status: string;
+  storage_key?: string | null;
+  content_type?: string | null;
+  width?: number | null;
+  height?: number | null;
+  file_status?: string | null;
+  created_at: string;
+  tags?: string[];
+}
+
 export interface ResearchArtifactRef {
   step_key: string;
   title?: string;

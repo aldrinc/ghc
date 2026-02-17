@@ -25,7 +25,7 @@ export const siteConfig: SiteConfig = {
 
   copy: {
     common: {
-      starsAriaLabelTemplate: '{rating} out of 5 stars',
+      starsAriaLabelTemplate: '{rating} out of five stars',
     },
     modal: {
       closeAriaLabel: 'Close dialog',
@@ -247,7 +247,7 @@ export const siteConfig: SiteConfig = {
     },
 
     videos: {
-      badge: '37,000+ DOG PARENTS LOVE US!',
+      badge: 'CUSTOMERS LOVE THIS',
       title: "See Why We're The Most Shared Pee Pad On Facebook",
       videos: [
         { id: 'v1', thumbnail: { src: '/assets/ph-3x4.svg', alt: 'Video testimonial 1' } },
@@ -369,14 +369,21 @@ export const siteConfig: SiteConfig = {
     },
 
     reviewSlider: {
-      title: 'Over 37,000 — 5 Star Reviews',
-      body: 'Tap a review to enlarge. Toggle auto/manual to control the slideshow.',
-      hint: 'Click Reviews to Enlarge',
+      id: 'reviews',
+      title: 'Over 37,000 - 5 Star Reviews',
+      body: `Click one of the reviews to see it more clearly.\nAll these reviews have either come from Facebook or Trustpilot\n\n(Reviews scrolling automatically - switch to browse at your own pace)`,
+      hint: 'Tap any review to enlarge',
       toggle: { auto: 'Auto', manual: 'Manual' },
       slides: [
         { src: '/assets/reviews-preview.webp', alt: 'Review collage' },
-        { src: '/assets/ph-16x9.svg', alt: 'Placeholder review slide' },
-        { src: '/assets/ph-16x9.svg', alt: 'Placeholder review slide' },
+        { src: '/assets/ph-3x4.svg', alt: 'Customer review 1' },
+        { src: '/assets/reason5.webp', alt: 'Customer review 2' },
+        { src: '/assets/ph-3x4.svg', alt: 'Customer review 3' },
+        { src: '/assets/ph-3x4.svg', alt: 'Customer review 4' },
+        { src: '/assets/reason5.webp', alt: 'Customer review 5' },
+        { src: '/assets/ph-3x4.svg', alt: 'Customer review 6' },
+        { src: '/assets/ph-3x4.svg', alt: 'Customer review 7' },
+        { src: '/assets/reason5.webp', alt: 'Customer review 8' },
       ],
     },
 
@@ -445,10 +452,10 @@ export const siteConfig: SiteConfig = {
     },
 
     reviewWall: {
-      id: 'reviews',
+      id: 'reviews-wall',
       badge: 'VET RECOMMENDED',
       title: 'What Our Customers Are Saying',
-      ratingLabel: '37,893 - 5 STAR REVIEWS',
+      ratingLabel: 'Verified customer reviews',
       showMoreLabel: 'Show more reviews',
       tiles: Array.from({ length: 14 }).map((_, i) => ({
         id: `tile-${i + 1}`,
@@ -460,8 +467,8 @@ export const siteConfig: SiteConfig = {
     },
 
     footer: {
-      logo: { src: '/assets/puppypad-logo.svg', alt: 'PuppyPad' },
-      copyright: '© 2026 PuppyPad',
+      logo: { src: '/assets/puppypad-logo.svg', alt: 'Brand logo' },
+      copyright: '© All rights reserved.',
     },
 
     modals: {

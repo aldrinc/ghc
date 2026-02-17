@@ -3,7 +3,6 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/components/ui/toast";
@@ -51,7 +50,6 @@ type StoredAiState = {
   prompt?: string;
   messages?: FunnelAIChatMessage[];
   generateImages?: boolean;
-  maxImages?: string;
 };
 
 function readStoredAiState(key: string | null): StoredAiState | null {
@@ -166,7 +164,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
   const [aiMessages, setAiMessages] = useState<FunnelAIChatMessage[]>([]);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiGenerateImages, setAiGenerateImages] = useState(true);
-  const [aiMaxImages, setAiMaxImages] = useState("3");
   const [aiIsGenerating, setAiIsGenerating] = useState(false);
   const [aiStreamText, setAiStreamText] = useState<string | null>(null);
   const [aiRawStreamText, setAiRawStreamText] = useState<string | null>(null);
@@ -199,12 +196,10 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       setAiMessages(Array.isArray(stored.messages) ? stored.messages : []);
       setAiPrompt(typeof stored.prompt === "string" ? stored.prompt : "");
       setAiGenerateImages(typeof stored.generateImages === "boolean" ? stored.generateImages : true);
-      setAiMaxImages(typeof stored.maxImages === "string" ? stored.maxImages : "3");
     } else {
       setAiMessages([]);
       setAiPrompt("");
       setAiGenerateImages(true);
-      setAiMaxImages("3");
     }
     setAiStreamText(null);
     setAiRawStreamText(null);
@@ -225,9 +220,8 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       prompt: aiPrompt,
       messages: aiMessages,
       generateImages: aiGenerateImages,
-      maxImages: aiMaxImages,
     });
-  }, [storageKey, aiPrompt, aiMessages, aiGenerateImages, aiMaxImages]);
+  }, [storageKey, aiPrompt, aiMessages, aiGenerateImages]);
 
   useEffect(() => {
     return () => {
@@ -344,8 +338,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
       toast.error("Wait for image uploads to finish.");
       return;
     }
-    const parsedMaxImages = Number.parseInt(aiMaxImages, 10);
-    const maxImages = Number.isFinite(parsedMaxImages) ? Math.max(0, Math.min(10, parsedMaxImages)) : 3;
 
     setAiPrompt("");
     setAiMessages((prev) => [...prev, { role: "user", content: prompt }]);
@@ -418,7 +410,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
             templateId,
             ideaWorkspaceId,
             generateImages: aiGenerateImages,
-            maxImages,
           }),
           signal: controller.signal,
         });
@@ -457,7 +448,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
             templateId,
             ideaWorkspaceId,
             generateImages: aiGenerateImages,
-            maxImages,
           }),
           signal: controller.signal,
         });
@@ -606,18 +596,6 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
             />
             Generate images
           </label>
-          <div className="flex items-center gap-2">
-            <span>Max images</span>
-            <Input
-              type="number"
-              value={aiMaxImages}
-              onChange={(e) => setAiMaxImages(e.target.value)}
-              min={0}
-              max={10}
-              className="h-8 w-20 px-2 py-1 text-xs"
-              disabled={!aiGenerateImages}
-            />
-          </div>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -717,6 +695,25 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
                 const prompt = typeof item.prompt === "string" ? item.prompt : undefined;
                 const publicId = typeof item.publicId === "string" ? item.publicId : undefined;
                 const error = typeof item.error === "string" ? item.error : undefined;
+                const sourceRaw = typeof item.imageSource === "string" ? item.imageSource.trim().toLowerCase() : "";
+                const imageSource = sourceRaw === "ai" || sourceRaw === "unsplash" ? sourceRaw : null;
+                const referenceAssetPublicId =
+                  typeof item.referenceAssetPublicId === "string" ? item.referenceAssetPublicId : undefined;
+                const unsplashMeta =
+                  item.unsplash && typeof item.unsplash === "object"
+                    ? (item.unsplash as Record<string, unknown>)
+                    : null;
+                const unsplashUser =
+                  unsplashMeta?.user && typeof unsplashMeta.user === "object"
+                    ? (unsplashMeta.user as Record<string, unknown>)
+                    : null;
+                const unsplashLinks =
+                  unsplashMeta?.links && typeof unsplashMeta.links === "object"
+                    ? (unsplashMeta.links as Record<string, unknown>)
+                    : null;
+                const unsplashPhotographer =
+                  typeof unsplashUser?.name === "string" ? unsplashUser.name : undefined;
+                const unsplashPhotoLink = typeof unsplashLinks?.html === "string" ? unsplashLinks.html : undefined;
                 return (
                   <div key={`${publicId || "img"}-${idx}`} className="rounded-md border border-border bg-surface p-2 space-y-2">
                     {publicId ? (
@@ -730,7 +727,36 @@ function AiAssistantPanel({ funnelId, pageId, templateId, ideaWorkspaceId, apiBa
                         {error ? "Failed to generate image" : "No image"}
                       </div>
                     )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-content-muted">
+                        Source: {imageSource === "unsplash" ? "Unsplash" : imageSource === "ai" ? "AI" : "Unknown"}
+                      </span>
+                      {referenceAssetPublicId ? (
+                        <span className="inline-flex items-center rounded-full border border-border bg-surface-2 px-2 py-0.5 text-[11px] font-semibold text-content-muted">
+                          Reference image attached
+                        </span>
+                      ) : null}
+                    </div>
                     {prompt ? <div className="text-xs text-content-muted line-clamp-3">{prompt}</div> : null}
+                    {referenceAssetPublicId ? (
+                      <div className="text-xs text-content-muted break-all">Reference asset: {referenceAssetPublicId}</div>
+                    ) : imageSource === "ai" ? (
+                      <div className="text-xs text-content-muted">Reference asset: none</div>
+                    ) : null}
+                    {imageSource === "unsplash" && (unsplashPhotographer || unsplashPhotoLink) ? (
+                      <div className="text-xs text-content-muted">
+                        Unsplash
+                        {unsplashPhotographer ? ` by ${unsplashPhotographer}` : ""}
+                        {unsplashPhotoLink ? (
+                          <>
+                            {" · "}
+                            <a href={unsplashPhotoLink} target="_blank" rel="noreferrer" className="underline">
+                              Photo link
+                            </a>
+                          </>
+                        ) : null}
+                      </div>
+                    ) : null}
                     {error ? <div className="text-xs text-danger">{error}</div> : null}
                   </div>
                 );

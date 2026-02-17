@@ -105,6 +105,7 @@ export function useCreateFunnel() {
     mutationFn: (payload: {
       clientId: string;
       productId: string;
+      selectedOfferId?: string | null;
       name: string;
       description?: string;
       campaignId?: string | null;
@@ -280,24 +281,6 @@ export function useSaveFunnelDraft() {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to save draft";
-      toast.error(message);
-    },
-  });
-}
-
-export function useApproveFunnelPage() {
-  const { post } = useApiClient();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ funnelId, pageId }: { funnelId: string; pageId: string }) =>
-      post<FunnelPageVersion>(`/funnels/${funnelId}/pages/${pageId}/approve`),
-    onSuccess: (_data, vars) => {
-      toast.success("Page approved");
-      queryClient.invalidateQueries({ queryKey: ["funnels", "page", vars.funnelId, vars.pageId] });
-      queryClient.invalidateQueries({ queryKey: ["funnels", "detail", vars.funnelId] });
-    },
-    onError: (err: ApiError | Error) => {
-      const message = "message" in err ? err.message : err?.message || "Failed to approve page";
       toast.error(message);
     },
   });

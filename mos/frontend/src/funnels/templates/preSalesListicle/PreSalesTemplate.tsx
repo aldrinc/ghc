@@ -32,6 +32,21 @@ type Props = {
   themeJson?: string;
 };
 
+// Keep layout geometry consistent with the base template.
+// Brand design systems can still change colors and font families.
+const LOCKED_TEMPLATE_CSS_VARS = new Set([
+  "--container-max",
+  "--container-pad",
+  "--listicle-title-letter-spacing",
+  "--marquee-border",
+  "--marquee-font-size",
+  "--marquee-font-weight",
+  "--marquee-gap",
+  "--marquee-height",
+  "--marquee-letter-spacing",
+  "--marquee-pad-x",
+]);
+
 function toCssVarName(key: string): string {
   const trimmed = key.trim();
   if (trimmed.startsWith("--")) return trimmed;
@@ -46,6 +61,41 @@ function parseJson<T>(raw?: string): T | null {
   } catch {
     return null;
   }
+}
+
+function parseJsonMaybeNested(raw?: string): unknown | null {
+  const parsed = parseJson<unknown>(raw);
+  if (typeof parsed !== "string") return parsed;
+  const trimmed = parsed.trim();
+  if (!trimmed) return parsed;
+  const looksLikeJson =
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) || (trimmed.startsWith("[") && trimmed.endsWith("]"));
+  if (!looksLikeJson) return parsed;
+  return parseJson<unknown>(trimmed) ?? parsed;
+}
+
+function coerceJsonProp(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  return parseJsonMaybeNested(value) ?? value;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function describeValue(value: unknown): string {
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  if (Array.isArray(value)) return `array(len=${value.length})`;
+  if (typeof value === "object") {
+    const keys = Object.keys(value as Record<string, unknown>).slice(0, 12);
+    return `object(keys=${keys.join(",")}${keys.length === 12 ? ",…" : ""})`;
+  }
+  return `${typeof value}(${String(value).slice(0, 120)})`;
+}
+
+function invariant(condition: unknown, message: string): asserts condition {
+  if (!condition) throw new Error(message);
 }
 
 function resolveCopy(copy?: UiCopy, copyJson?: string): UiCopy {
@@ -68,6 +118,15 @@ type HeroSectionConfig = {
   hero: ListicleConfig["hero"];
   badges: ListicleConfig["badges"];
 };
+
+function isHeroSectionConfig(value: unknown): value is HeroSectionConfig {
+  if (!isRecord(value)) return false;
+  const hero = value.hero;
+  if (!isRecord(hero)) return false;
+  if (typeof hero.title !== "string") return false;
+  if (typeof hero.subtitle !== "string") return false;
+  return Array.isArray(value.badges);
+}
 
 type PreSalesPageProps = {
   anchorId?: string;
@@ -96,13 +155,17 @@ export function PreSalesPage({ anchorId, theme, themeJson, content, children }: 
     if (designSystemTokens?.cssVars) {
       for (const [rawKey, rawValue] of Object.entries(designSystemTokens.cssVars)) {
         if (rawValue === undefined || rawValue === null) continue;
-        style[toCssVarName(rawKey)] = String(rawValue);
+        const cssVarName = toCssVarName(rawKey);
+        if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue;
+        style[cssVarName] = String(rawValue);
       }
     }
     if (explicitTheme?.tokens) {
       for (const [rawKey, rawValue] of Object.entries(resolvedTheme.tokens ?? {})) {
         if (rawValue === undefined || rawValue === null) continue;
-        style[toCssVarName(rawKey)] = String(rawValue);
+        const cssVarName = toCssVarName(rawKey);
+        if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue;
+        style[cssVarName] = String(rawValue);
       }
     }
     return style;
@@ -129,13 +192,25 @@ type PreSalesHeroProps = {
 };
 
 export function PreSalesHero({ config, configJson }: PreSalesHeroProps) {
+  const parsed = parseJsonMaybeNested(configJson);
+  if (parsed !== null) {
+    invariant(
+      isHeroSectionConfig(parsed),
+      `PreSalesHero.configJson must be a JSON object like { hero: { title, subtitle, media? }, badges: [] }. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(config);
   const resolvedConfig =
-    parseJson<HeroSectionConfig>(configJson) ??
-    config ??
-    {
+    (parsed as HeroSectionConfig | null) ??
+    (coercedConfig as HeroSectionConfig | undefined) ??
+    ({
       hero: preSalesDefaults.config.hero,
       badges: preSalesDefaults.config.badges,
-    };
+    } satisfies HeroSectionConfig);
+  invariant(
+    isHeroSectionConfig(resolvedConfig),
+    `PreSalesHero.config must be an object like { hero: { title, subtitle, media? }, badges: [] }. Received ${describeValue(resolvedConfig)}.`
+  );
 
   return (
     <Hero
@@ -153,8 +228,22 @@ type PreSalesReasonsProps = {
 };
 
 export function PreSalesReasons({ config, configJson }: PreSalesReasonsProps) {
+  const parsed = parseJsonMaybeNested(configJson);
+  if (parsed !== null) {
+    invariant(
+      Array.isArray(parsed),
+      `PreSalesReasons.configJson must be a JSON array of reasons. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(config);
   const resolvedConfig =
-    parseJson<ListicleConfig["reasons"]>(configJson) ?? config ?? preSalesDefaults.config.reasons;
+    (parsed as ListicleConfig["reasons"] | null) ??
+    (coercedConfig as ListicleConfig["reasons"] | undefined) ??
+    preSalesDefaults.config.reasons;
+  invariant(
+    Array.isArray(resolvedConfig),
+    `PreSalesReasons.config must be an array of reasons. Received ${describeValue(resolvedConfig)}.`
+  );
   return <Reasons reasons={resolvedConfig} />;
 }
 
@@ -166,8 +255,22 @@ type PreSalesReviewsProps = {
 };
 
 export function PreSalesReviews({ config, configJson, copy, copyJson }: PreSalesReviewsProps) {
+  const parsed = parseJsonMaybeNested(configJson);
+  if (parsed !== null) {
+    invariant(
+      isRecord(parsed) && Array.isArray(parsed.slides),
+      `PreSalesReviews.configJson must be a JSON object like { slides: [] }. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(config);
   const resolvedConfig =
-    parseJson<ListicleConfig["reviews"]>(configJson) ?? config ?? preSalesDefaults.config.reviews;
+    (parsed as ListicleConfig["reviews"] | null) ??
+    (coercedConfig as ListicleConfig["reviews"] | undefined) ??
+    preSalesDefaults.config.reviews;
+  invariant(
+    isRecord(resolvedConfig) && Array.isArray(resolvedConfig.slides),
+    `PreSalesReviews.config must be an object like { slides: [] }. Received ${describeValue(resolvedConfig)}.`
+  );
   const resolvedCopy = resolveCopy(copy, copyJson);
   return (
     <Reviews
@@ -184,8 +287,22 @@ type PreSalesMarqueeProps = {
 };
 
 export function PreSalesMarquee({ config, configJson }: PreSalesMarqueeProps) {
+  const parsed = parseJsonMaybeNested(configJson);
+  if (parsed !== null) {
+    invariant(
+      Array.isArray(parsed),
+      `PreSalesMarquee.configJson must be a JSON array of strings. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(config);
   const resolvedConfig =
-    parseJson<ListicleConfig["marquee"]>(configJson) ?? config ?? preSalesDefaults.config.marquee;
+    (parsed as ListicleConfig["marquee"] | null) ??
+    (coercedConfig as ListicleConfig["marquee"] | undefined) ??
+    preSalesDefaults.config.marquee;
+  invariant(
+    Array.isArray(resolvedConfig),
+    `PreSalesMarquee.config must be an array of strings. Received ${describeValue(resolvedConfig)}.`
+  );
   return <Marquee items={resolvedConfig} />;
 }
 
@@ -195,7 +312,25 @@ type PreSalesPitchProps = {
 };
 
 export function PreSalesPitch({ config, configJson }: PreSalesPitchProps) {
-  const resolvedConfig = parseJson<ListicleConfig["pitch"]>(configJson) ?? config ?? preSalesDefaults.config.pitch;
+  const parsed = parseJsonMaybeNested(configJson);
+  if (parsed !== null) {
+    invariant(
+      isRecord(parsed) && typeof parsed.title === "string" && Array.isArray(parsed.bullets) && isRecord(parsed.image),
+      `PreSalesPitch.configJson must be a JSON object like { title: string, bullets: string[], image: {...} }. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(config);
+  const resolvedConfig =
+    (parsed as ListicleConfig["pitch"] | null) ??
+    (coercedConfig as ListicleConfig["pitch"] | undefined) ??
+    preSalesDefaults.config.pitch;
+  invariant(
+    isRecord(resolvedConfig) &&
+      typeof resolvedConfig.title === "string" &&
+      Array.isArray(resolvedConfig.bullets) &&
+      isRecord(resolvedConfig.image),
+    `PreSalesPitch.config must be an object like { title: string, bullets: string[], image: {...} }. Received ${describeValue(resolvedConfig)}.`
+  );
   return <Pitch pitch={resolvedConfig} />;
 }
 
@@ -207,8 +342,22 @@ type PreSalesReviewWallProps = {
 };
 
 export function PreSalesReviewWall({ config, configJson, copy, copyJson }: PreSalesReviewWallProps) {
+  const parsed = parseJsonMaybeNested(configJson);
+  if (parsed !== null) {
+    invariant(
+      isRecord(parsed) && typeof parsed.title === "string" && Array.isArray(parsed.columns),
+      `PreSalesReviewWall.configJson must be a JSON object like { title: string, columns: [...] }. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(config);
   const resolvedConfig =
-    parseJson<ListicleConfig["reviewsWall"]>(configJson) ?? config ?? preSalesDefaults.config.reviewsWall;
+    (parsed as ListicleConfig["reviewsWall"] | null) ??
+    (coercedConfig as ListicleConfig["reviewsWall"] | undefined) ??
+    preSalesDefaults.config.reviewsWall;
+  invariant(
+    isRecord(resolvedConfig) && typeof resolvedConfig.title === "string" && Array.isArray(resolvedConfig.columns),
+    `PreSalesReviewWall.config must be an object like { title: string, columns: [...] }. Received ${describeValue(resolvedConfig)}.`
+  );
   const resolvedCopy = resolveCopy(copy, copyJson);
   return <ReviewWall wall={resolvedConfig} modalCopy={resolvedCopy.modal} />;
 }
@@ -219,7 +368,22 @@ type PreSalesFooterProps = {
 };
 
 export function PreSalesFooter({ config, configJson }: PreSalesFooterProps) {
-  const resolvedConfig = parseJson<ListicleConfig["footer"]>(configJson) ?? config ?? preSalesDefaults.config.footer;
+  const parsed = parseJsonMaybeNested(configJson);
+  if (parsed !== null) {
+    invariant(
+      isRecord(parsed) && isRecord(parsed.logo) && typeof parsed.logo.alt === "string",
+      `PreSalesFooter.configJson must be a JSON object like { logo: { alt: string, ... } }. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(config);
+  const resolvedConfig =
+    (parsed as ListicleConfig["footer"] | null) ??
+    (coercedConfig as ListicleConfig["footer"] | undefined) ??
+    preSalesDefaults.config.footer;
+  invariant(
+    isRecord(resolvedConfig) && isRecord(resolvedConfig.logo) && typeof resolvedConfig.logo.alt === "string",
+    `PreSalesFooter.config must be an object like { logo: { alt: string, ... } }. Received ${describeValue(resolvedConfig)}.`
+  );
   return <Footer footer={resolvedConfig} />;
 }
 
@@ -229,13 +393,60 @@ type PreSalesFloatingCtaProps = {
 };
 
 export function PreSalesFloatingCta({ config, configJson }: PreSalesFloatingCtaProps) {
+  const parsed = parseJsonMaybeNested(configJson);
+  if (parsed !== null) {
+    invariant(
+      isRecord(parsed) && typeof parsed.label === "string",
+      `PreSalesFloatingCta.configJson must be a JSON object like { label: string, ... }. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(config);
   const resolvedConfig =
-    parseJson<ListicleConfig["floatingCta"]>(configJson) ?? config ?? preSalesDefaults.config.floatingCta;
+    (parsed as ListicleConfig["floatingCta"] | null) ??
+    (coercedConfig as ListicleConfig["floatingCta"] | undefined) ??
+    preSalesDefaults.config.floatingCta;
+  invariant(
+    isRecord(resolvedConfig) && typeof resolvedConfig.label === "string",
+    `PreSalesFloatingCta.config must be an object like { label: string, ... }. Received ${describeValue(resolvedConfig)}.`
+  );
   return <FloatingCta cta={resolvedConfig} />;
 }
 
 export function PreSalesTemplate(props: Props) {
-  const resolvedConfig = parseJson<ListicleConfig>(props.configJson) ?? props.config ?? preSalesDefaults.config;
+  const parsed = parseJsonMaybeNested(props.configJson);
+  if (parsed !== null) {
+    invariant(
+      isRecord(parsed) &&
+        isRecord(parsed.hero) &&
+        typeof parsed.hero.title === "string" &&
+        Array.isArray(parsed.badges) &&
+        Array.isArray(parsed.reasons) &&
+        Array.isArray(parsed.marquee) &&
+        isRecord(parsed.pitch) &&
+        isRecord(parsed.reviews) &&
+        isRecord(parsed.reviewsWall) &&
+        isRecord(parsed.footer) &&
+        isRecord(parsed.floatingCta),
+      `PreSalesTemplate.configJson must be a JSON object like ListicleConfig. Received ${describeValue(parsed)}.`
+    );
+  }
+  const coercedConfig = coerceJsonProp(props.config);
+  const resolvedConfig =
+    (parsed as ListicleConfig | null) ?? (coercedConfig as ListicleConfig | undefined) ?? preSalesDefaults.config;
+  invariant(
+    isRecord(resolvedConfig) &&
+      isRecord(resolvedConfig.hero) &&
+      typeof resolvedConfig.hero.title === "string" &&
+      Array.isArray(resolvedConfig.badges) &&
+      Array.isArray(resolvedConfig.reasons) &&
+      Array.isArray(resolvedConfig.marquee) &&
+      isRecord(resolvedConfig.pitch) &&
+      isRecord(resolvedConfig.reviews) &&
+      isRecord(resolvedConfig.reviewsWall) &&
+      isRecord(resolvedConfig.footer) &&
+      isRecord(resolvedConfig.floatingCta),
+    `PreSalesTemplate.config must be a ListicleConfig object. Received ${describeValue(resolvedConfig)}.`
+  );
   const resolvedCopy = resolveCopy(props.copy, props.copyJson);
   const resolvedTheme = parseJson<ThemeConfig>(props.themeJson) ?? props.theme ?? preSalesDefaults.theme;
 

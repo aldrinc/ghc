@@ -93,6 +93,7 @@ class AdsIngestionRetryRequest(BaseModel):
     research_run_id: str = Field(..., alias="researchRunId")
     results_limit: Optional[int] = Field(default=None, alias="resultsLimit")
     brand_channel_identity_ids: Optional[List[str]] = Field(default=None, alias="brandChannelIdentityIds")
+    failed_only: bool = Field(default=False, alias="failedOnly")
     run_creative_analysis: bool = Field(default=False, alias="runCreativeAnalysis")
     creative_analysis_max_ads: Optional[int] = Field(default=None, alias="creativeAnalysisMaxAds")
     creative_analysis_concurrency: Optional[int] = Field(default=None, alias="creativeAnalysisConcurrency")

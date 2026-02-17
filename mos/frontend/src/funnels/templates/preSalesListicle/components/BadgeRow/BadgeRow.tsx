@@ -7,13 +7,15 @@ export function BadgeRow({ badges }: { badges: Badge[] }) {
     <div className={styles.row}>
       {badges.map((b) => (
         <div key={`${b.label}-${b.value ?? ''}`} className={styles.badge}>
-          <img
-            className={styles.icon}
-            src={resolveAssetSrc(b.iconAssetPublicId, b.iconSrc)}
-            alt={b.iconAlt}
-            loading="eager"
-            decoding="async"
-          />
+          <div className={styles.iconFrame}>
+            <img
+              className={styles.icon}
+              src={resolveAssetSrc(b.iconAssetPublicId, b.iconSrc)}
+              alt={b.iconAlt}
+              loading="eager"
+              decoding="async"
+            />
+          </div>
           <div className={styles.text}>
             {b.value ? <span className={styles.value}>{b.value}</span> : null}
             <span className={styles.label}>{b.label}</span>

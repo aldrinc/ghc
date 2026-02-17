@@ -133,9 +133,19 @@ class Product(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
     client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
-    name: Mapped[str] = mapped_column(Text, nullable=False)
+    # Shopify-aligned attribute name; stored in legacy DB column "name".
+    title: Mapped[str] = mapped_column("name", Text, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    category: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # Shopify-aligned attribute name; stored in legacy DB column "category".
+    product_type: Mapped[Optional[str]] = mapped_column("category", Text, nullable=True)
+    handle: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    vendor: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
+    template_suffix: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    shopify_product_gid: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     primary_benefits: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
     )
@@ -176,17 +186,63 @@ class ProductOffer(Base):
     )
 
 
-class ProductOfferPricePoint(Base):
+class ProductVariant(Base):
     __tablename__ = "product_offer_price_points"
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
-    offer_id: Mapped[str] = mapped_column(ForeignKey("product_offers.id", ondelete="CASCADE"), nullable=False)
-    label: Mapped[str] = mapped_column(Text, nullable=False)
-    amount_cents: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Legacy relation (optional going forward); variants should primarily be linked via product_id.
+    offer_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("product_offers.id", ondelete="CASCADE"), nullable=True
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=True
+    )
+    # Shopify-aligned attribute names; stored in legacy DB columns.
+    title: Mapped[str] = mapped_column("label", Text, nullable=False)
+    price: Mapped[int] = mapped_column("amount_cents", Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(length=3), nullable=False)
     provider: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     external_price_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     option_values: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    compare_at_price: Mapped[Optional[int]] = mapped_column("compare_at_price_cents", Integer, nullable=True)
+    sku: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    barcode: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    requires_shipping: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    taxable: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=sa.text("true"))
+    weight: Mapped[Optional[Numeric]] = mapped_column(Numeric, nullable=True)
+    weight_unit: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    inventory_quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    inventory_policy: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    inventory_management: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    incoming: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    next_incoming_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    unit_price: Mapped[Optional[int]] = mapped_column("unit_price_cents", Integer, nullable=True)
+    unit_price_measurement: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    quantity_rule: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    quantity_price_breaks: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSONB, nullable=True)
+
+
+class ProductOfferBonus(Base):
+    __tablename__ = "product_offer_bonuses"
+    __table_args__ = (
+        UniqueConstraint("offer_id", "bonus_product_id", name="uq_product_offer_bonuses_offer_bonus_product"),
+        sa.Index("idx_product_offer_bonuses_offer", "offer_id"),
+        sa.Index("idx_product_offer_bonuses_bonus_product", "bonus_product_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    offer_id: Mapped[str] = mapped_column(
+        ForeignKey("product_offers.id", ondelete="CASCADE"), nullable=False
+    )
+    bonus_product_id: Mapped[str] = mapped_column(
+        ForeignKey("products.id", ondelete="CASCADE"), nullable=False
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class Campaign(Base):
@@ -696,7 +752,11 @@ class Experiment(Base):
 
 class Asset(Base):
     __tablename__ = "assets"
-    __table_args__ = (UniqueConstraint("public_id", name="uq_assets_public_id"),)
+    __table_args__ = (
+        UniqueConstraint("public_id", name="uq_assets_public_id"),
+        sa.Index("idx_assets_product_created", "product_id", "created_at"),
+        sa.Index("idx_assets_expires_at", "expires_at"),
+    )
 
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
@@ -744,6 +804,160 @@ class Asset(Base):
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
     )
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CreativeServiceRun(Base):
+    __tablename__ = "creative_service_runs"
+    __table_args__ = (
+        sa.Index("idx_creative_service_runs_org_created", "org_id", "created_at"),
+        sa.Index("idx_creative_service_runs_org_product", "org_id", "product_id"),
+        sa.Index("idx_creative_service_runs_org_brief", "org_id", "asset_brief_id"),
+        sa.Index(
+            "uq_creative_service_runs_remote_job",
+            "remote_job_id",
+            unique=True,
+            postgresql_where=sa.text("remote_job_id IS NOT NULL"),
+        ),
+        sa.Index(
+            "uq_creative_service_runs_idempotency_key",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=sa.text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"), nullable=True
+    )
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    workflow_run_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    asset_brief_id: Mapped[str] = mapped_column(Text, nullable=False)
+    requirement_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    variant_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    service_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    operation_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="queued")
+    remote_job_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    remote_session_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    request_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    response_payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    error_detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    retention_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CreativeServiceTurn(Base):
+    __tablename__ = "creative_service_turns"
+    __table_args__ = (
+        UniqueConstraint("run_id", "remote_turn_id", name="uq_creative_service_turns_run_remote_turn"),
+        sa.Index("idx_creative_service_turns_run_idx", "run_id", "turn_index"),
+        sa.Index(
+            "uq_creative_service_turns_idempotency_key",
+            "idempotency_key",
+            unique=True,
+            postgresql_where=sa.text("idempotency_key IS NOT NULL"),
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("creative_service_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    turn_index: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="queued")
+    remote_turn_id: Mapped[str] = mapped_column(Text, nullable=False)
+    idempotency_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    request_payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    response_payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    error_detail: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    retention_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class CreativeServiceEvent(Base):
+    __tablename__ = "creative_service_events"
+    __table_args__ = (
+        sa.Index("idx_creative_service_events_run_occurred", "run_id", "occurred_at"),
+        sa.Index("idx_creative_service_events_retention", "retention_expires_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("creative_service_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    turn_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("creative_service_turns.id", ondelete="SET NULL"), nullable=True
+    )
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    retention_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class CreativeServiceOutput(Base):
+    __tablename__ = "creative_service_outputs"
+    __table_args__ = (
+        sa.Index("idx_creative_service_outputs_run_kind", "run_id", "output_kind"),
+        sa.Index("idx_creative_service_outputs_local_asset", "local_asset_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("creative_service_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    turn_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("creative_service_turns.id", ondelete="SET NULL"), nullable=True
+    )
+    output_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    output_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    remote_asset_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    primary_uri: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    primary_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    prompt_used: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    local_asset_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("assets.id", ondelete="SET NULL"), nullable=True
+    )
+    retention_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -1395,6 +1609,29 @@ class BrandUserPreference(Base):
     )
 
 
+class ClientUserPreference(Base):
+    __tablename__ = "client_user_preferences"
+    __table_args__ = (
+        UniqueConstraint("org_id", "user_external_id", "client_id", name="uq_client_user_pref"),
+        sa.Index("idx_client_user_pref_user", "org_id", "user_external_id"),
+        sa.Index("idx_client_user_pref_client", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    user_external_id: Mapped[str] = mapped_column(Text, nullable=False)
+    active_product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ResearchRun(Base):
     __tablename__ = "research_runs"
 
@@ -1589,6 +1826,54 @@ class AdIngestRun(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AdLibraryPageTotal(Base):
+    __tablename__ = "ad_library_page_totals"
+    __table_args__ = (
+        UniqueConstraint(
+            "research_run_id",
+            "brand_channel_identity_id",
+            "query_key",
+            name="uq_ad_library_page_totals_run_identity_query",
+        ),
+        sa.Index("idx_ad_library_page_totals_org", "org_id"),
+        sa.Index("idx_ad_library_page_totals_run", "research_run_id"),
+        sa.Index("idx_ad_library_page_totals_brand", "brand_id"),
+        sa.Index("idx_ad_library_page_totals_channel", "channel"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    research_run_id: Mapped[str] = mapped_column(
+        ForeignKey("research_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    brand_id: Mapped[str] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), nullable=False)
+    brand_channel_identity_id: Mapped[str] = mapped_column(
+        ForeignKey("brand_channel_identities.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    channel: Mapped[AdChannelEnum] = mapped_column(
+        Enum(AdChannelEnum, name="ad_channel"), nullable=False
+    )
+    query_key: Mapped[str] = mapped_column(Text, nullable=False)
+    active_status: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    input_url: Mapped[str] = mapped_column(Text, nullable=False)
+    total_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    page_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    page_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provider: Mapped[str] = mapped_column(Text, nullable=False, server_default="APIFY")
+    provider_actor_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provider_run_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    provider_dataset_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    actor_input: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    raw_result: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class Ad(Base):

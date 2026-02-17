@@ -15,7 +15,7 @@ from app.agent.runtime import BaseTool
 from app.agent.types import ToolContext, ToolResult
 from app.config import settings
 from app.db.enums import FunnelPageReviewStatusEnum, FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
-from app.db.models import Funnel, FunnelPage, FunnelPageVersion, Product
+from app.db.models import Funnel, FunnelPage, FunnelPageVersion, Product, ProductVariant
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.claude_files import build_document_blocks, call_claude_structured_message
@@ -39,7 +39,41 @@ def _resolve_template_kind(template_id: str) -> _ObjectiveTemplateKind | None:
     return None
 
 
-def _allowed_component_types(template_kind: str | None) -> set[str]:
+def _allowed_component_types(template_kind: str | None, *, template_mode: bool = False) -> set[str]:
+    # Template pages should preserve structure, so restrict "creative" primitives to avoid
+    # the LLM inserting extra sections/blocks that are not part of the template.
+    if template_mode and template_kind == "sales-pdp":
+        return {
+            "SalesPdpPage",
+            "SalesPdpHeader",
+            "SalesPdpHero",
+            "SalesPdpVideos",
+            "SalesPdpMarquee",
+            "SalesPdpStoryProblem",
+            "SalesPdpStorySolution",
+            "SalesPdpComparison",
+            "SalesPdpGuarantee",
+            "SalesPdpFaq",
+            "SalesPdpReviews",
+            "SalesPdpReviewWall",
+            "SalesPdpFooter",
+            "SalesPdpReviewSlider",
+            "SalesPdpTemplate",
+        }
+    if template_mode and template_kind == "pre-sales-listicle":
+        return {
+            "PreSalesPage",
+            "PreSalesHero",
+            "PreSalesReasons",
+            "PreSalesReviews",
+            "PreSalesMarquee",
+            "PreSalesPitch",
+            "PreSalesReviewWall",
+            "PreSalesFooter",
+            "PreSalesFloatingCta",
+            "PreSalesTemplate",
+        }
+
     allowed = {
         "Section",
         "Columns",
@@ -65,6 +99,7 @@ def _allowed_component_types(template_kind: str | None) -> set[str]:
                 "SalesPdpComparison",
                 "SalesPdpGuarantee",
                 "SalesPdpFaq",
+                "SalesPdpReviews",
                 "SalesPdpReviewWall",
                 "SalesPdpFooter",
                 "SalesPdpReviewSlider",
@@ -184,12 +219,19 @@ class ContextLoadFunnelTool(BaseTool[ContextLoadFunnelArgs]):
             base_puck = template.puck_data
 
         required_types: list[str] = []
-        if template is not None and isinstance(base_puck, dict):
-            required_types = sorted(
-                funnel_ai._required_template_component_types(base_puck, template_kind=template_kind)
-            )
+        if template is not None:
+            # Required components should track the active template definition, not the stored page puckData.
+            # Older funnels may have been created from a previous template structure; DraftApplyOverridesTool
+            # upgrades/merges them with the latest template before validation.
+            required_source = template.puck_data if isinstance(template.puck_data, dict) else base_puck
+            if isinstance(required_source, dict):
+                required_types = sorted(
+                    funnel_ai._required_template_component_types(required_source, template_kind=template_kind)
+                )
 
-        allowed_types = sorted(_allowed_component_types(template_kind))
+        allowed_types = sorted(
+            _allowed_component_types(template_kind, template_mode=template is not None)
+        )
 
         template_ctx = _TemplateContext(
             template_id=resolved_template_id,
@@ -418,6 +460,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
 
         template_kind = args.templateKind
         template_mode = bool(args.templateMode)
+        template_component_kind: str | None = None
+        if template_mode and isinstance(args.basePuckData, dict):
+            template_component_kind = funnel_ai._infer_template_component_kind(template_kind, args.basePuckData)
 
         # Layout guidance varies based on template mode.
         if not template_mode:
@@ -425,17 +470,24 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Use Section as the top-level blocks in puckData.content (do not place bare Heading/Text directly at the root)\n"
                 "- Use Columns inside Sections for two-column layouts (image + copy)\n\n"
             )
-        elif template_kind == "sales-pdp":
+        elif template_component_kind == "sales-pdp":
             structure_guidance = (
                 "- Use SalesPdpPage as the ONLY top-level block in puckData.content\n"
                 "- Put all SalesPdp* sections inside SalesPdpPage.props.content (slot)\n"
+                "- Do NOT add primitives like Section/Columns/Heading/Text/Spacer in template mode\n"
                 "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.modals / props.theme\n\n"
             )
-        else:
+        elif template_component_kind == "pre-sales-listicle":
             structure_guidance = (
                 "- Use PreSalesPage as the ONLY top-level block in puckData.content\n"
                 "- Put all PreSales* sections inside PreSalesPage.props.content (slot)\n"
+                "- Do NOT add primitives like Section/Columns/Heading/Text/Spacer in template mode\n"
                 "- Preserve the overall section order; update copy/images inside each section's props.config / props.copy / props.theme\n\n"
+            )
+        else:
+            structure_guidance = (
+                "- Preserve the template's existing top-level structure in puckData.content.\n"
+                "- Do not introduce new component types; only edit props fields.\n\n"
             )
 
         header_footer_guidance = (
@@ -486,7 +538,15 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Prefer Unsplash for stock-appropriate imagery (lifestyle, generic product-in-use, backgrounds).\n"
                 "- To use Unsplash, set imageSource='unsplash' on the image object and include a prompt.\n"
                 "- Use AI generation only when stock imagery does not fit the need.\n"
-                "- Icon prompts (iconAssetPublicId) must be flat vector icons on transparent backgrounds.\n"
+                "- Icon prompts (iconAssetPublicId) must use this style template, replacing <subject> with the context item: "
+                "\"High-quality flat design icon of <subject>. Minimalist vector style with subtle depth. Clean thick lines, "
+                "soft pastel colors, flat lighting with a very subtle long shadow to add dimension. "
+                "Full-bleed composition where the icon symbol occupies nearly the entire frame with minimal padding. "
+                "Do not place the icon inside a badge, circle, tile, button, sticker, or any container shape. "
+                "Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. "
+                "Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.\"\n"
+                "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
+                "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
                 "- Do not set referenceAssetPublicId unless you are using one of the attached images listed above.\n"
                 "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n\n"
             )
@@ -504,16 +564,35 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 )
 
         template_config_guidance = ""
-        if template_mode and template_kind == "sales-pdp":
+        if template_mode and template_component_kind == "sales-pdp":
             template_config_guidance = (
                 "Sales PDP config requirements:\n"
-                "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
-                "- Do not use review wall keys (badge/tiles) inside reviewSlider config.\n\n"
+                "- SalesPdpHeader.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string, href?:string }, nav: [{ label:string, href:string }], cta: { label:string, href:string } }\n"
+                "- SalesPdpHero.config MUST be: { header: { ...same as SalesPdpHeader.config }, gallery: { watchInAction: { label:string }, slides: [{ alt:string, src?:string, assetPublicId?:string, thumbSrc?:string, thumbAssetPublicId?:string }], freeGifts: { icon:{ alt:string, src?:string, assetPublicId?:string }, title:string, body:string, ctaLabel:string } }, purchase: { faqPills: [{ label:string, answer:string }], title:string, benefits:[{ text:string }], size:{ title:string, helpLinkLabel:string, options:[{ id:string, label:string, sizeIn:string, sizeCm:string }], shippingDelayLabel:string }, color:{ title:string, options:[{ id:string, label:string, swatch?:string, swatchImageSrc?:string, swatchAssetPublicId?:string }], outOfStockTitle:string, outOfStockBody:string }, offer:{ title:string, helperText:string, seeWhyLabel:string, options:[{ id:string, title:string, image:{ alt:string, src?:string, assetPublicId?:string }, price:number, compareAt?:number, saveLabel?:string, productOfferId?:string } ] }, cta:{ labelTemplate:string, subBullets:string[], urgency:{ message:string, rows:[{ label:string, value:string, tone?:'muted'|'highlight' }] } }, outOfStock?:[{ sizeId:string, colorId:string }], shippingDelay?:[{ sizeId:string, colorId:string }] } }\n"
+                "- SalesPdpHero.modals MUST be: { sizeChart: { title:string, sizes:[{ label:string, size:string, idealFor:string, weight:string }], note:string }, whyBundle: { title:string, body:string, quotes:[{ text:string, author:string }] }, freeGifts: { title:string, body:string } }\n"
+                "- Checkout requirement: purchase size/color/offer option ids MUST match productContext.selected_offer.price_points[].option_values keys (sizeId/colorId/offerId). Do NOT invent ids.\n"
+                "- SalesPdpMarquee.config MUST be: { items: string[], repeat?: number }\n"
+                "- SalesPdpFaq.config MUST be: { title: string, items: [{ question: string, answer: string }] }\n"
+                "- SalesPdpReviews.config MUST be: { id: string, data: object }\n"
+                "- SalesPdpFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string }, copyright: string }\n"
+                "- SalesPdpReviewSlider.config MUST be: { title: string, body: string, hint: string, toggle: { auto: string, manual: string }, slides: [{ alt: string, src?: string, assetPublicId?: string }] }\n"
+                "- Do NOT use legacy keys like headline/subheadline/trustBadges/ctaLabel/ctaLinkType/reviews inside SalesPdp* configs.\n\n"
+            )
+        elif template_mode and template_component_kind == "pre-sales-listicle":
+            template_config_guidance = (
+                "Pre-sales listicle config requirements:\n"
+                "- PreSalesHero.config MUST be: { hero: { title: string, subtitle: string, media?: { type:'image', alt:string, src?:string, assetPublicId?:string } | { type:'video', srcMp4:string, poster?:string, alt?:string, assetPublicId?:string } }, badges: [] }\n"
+                "- PreSalesReasons.config MUST be an array of reasons: [{ number: number, title: string, body: string, image?: { alt:string, src?:string, assetPublicId?:string } }]\n"
+                "- PreSalesMarquee.config MUST be an array of strings.\n"
+                "- PreSalesPitch.config MUST be: { title: string, bullets: string[], image: { alt:string, src?:string, assetPublicId?:string }, cta?: { label: string, linkType?: 'external'|'funnelPage'|'nextPage', href?:string, targetPageId?:string } }\n"
+                "- PreSalesReviews.config MUST be: { slides: [{ text: string, author: string, images: [{ alt:string, src?:string, assetPublicId?:string }] }], autoAdvanceMs?: number }\n"
+                "- PreSalesFooter.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string } }\n"
+                "- Do NOT use keys like headline/subheadline/ctaLabel/ctaLinkType/items/reasons/reviews/links/copyrightText inside PreSales* configs.\n\n"
             )
 
         if not template_mode:
             template_component = ""
-        elif template_kind == "sales-pdp":
+        elif template_component_kind == "sales-pdp":
             template_component = (
                 "11) SalesPdpPage: props { id, anchorId?, theme, themeJson?, content? }\n"
                 "12) SalesPdpHeader: props { id, config, configJson? }\n"
@@ -525,11 +604,12 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "18) SalesPdpComparison: props { id, config, configJson? }\n"
                 "19) SalesPdpGuarantee: props { id, config, configJson?, feedImages?, feedImagesJson? }\n"
                 "20) SalesPdpFaq: props { id, config, configJson? }\n"
-                "21) SalesPdpReviewWall: props { id, config, configJson? }\n"
-                "22) SalesPdpFooter: props { id, config, configJson? }\n"
-                "23) SalesPdpReviewSlider: props { id, config, configJson? }\n"
+                "21) SalesPdpReviews: props { id, config, configJson? }\n"
+                "22) SalesPdpReviewWall: props { id, config, configJson? }\n"
+                "23) SalesPdpFooter: props { id, config, configJson? }\n"
+                "24) SalesPdpReviewSlider: props { id, config, configJson? }\n"
             )
-        else:
+        elif template_component_kind == "pre-sales-listicle":
             template_component = (
                 "11) PreSalesPage: props { id, anchorId?, theme, themeJson?, content? }\n"
                 "12) PreSalesHero: props { id, config, configJson? }\n"
@@ -541,8 +621,68 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "18) PreSalesFooter: props { id, config, configJson? }\n"
                 "19) PreSalesFloatingCta: props { id, config, configJson? }\n"
             )
+        else:
+            template_component = ""
 
         page_label = "sales page" if template_kind != "pre-sales-listicle" else "pre-sales listicle page"
+
+        layout_guidance = ""
+        if not template_mode:
+            layout_guidance = (
+                "Layout guidance:\n"
+                "- Default to Section.layout='full' for most sections (do not place bare Heading/Text directly at the root)\n"
+                "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
+                "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
+            )
+        else:
+            # In template mode we preserve the template layout and only update copy/config fields.
+            layout_guidance = (
+                "Layout guidance:\n"
+                "- Preserve the template layout and section order.\n"
+                "- Do NOT add new sections or new component types; only edit existing template component props.\n\n"
+            )
+
+        available_components_block = ""
+        if template_mode and template_component:
+            available_components_block = "Available template components (component types) and their props:\n" f"{template_component}\n"
+        else:
+            available_components_block = (
+                "Available primitives (component types) and their props:\n"
+                "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
+                "   - purpose: 'header' | 'section' | 'footer'\n"
+                "   - layout: 'full' | 'contained' | 'card'\n"
+                "     - full = full-width background, content constrained to containerWidth\n"
+                "     - contained = background constrained to containerWidth (no card styling)\n"
+                "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
+                "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
+                "   - content is a slot: ComponentData[]\n"
+                "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
+                "   - left/right are slots: ComponentData[]\n"
+                "3) Heading: props { id, text, level?, align? }\n"
+                "   - level: 1|2|3|4 (H1-H4)\n"
+                "   - align: 'left' | 'center'\n"
+                "4) Text: props { id, text, size?, tone?, align? }\n"
+                "   - size: 'sm' | 'md' | 'lg'\n"
+                "   - tone: 'default' | 'muted'\n"
+                "   - align: 'left' | 'center'\n"
+                "5) Spacer: props { id, height }\n"
+                "6) Image: props { id, prompt, alt, imageSource?, assetPublicId?, referenceAssetPublicId?, src?, radius? }\n"
+                "   - imageSource: 'ai' (default) | 'unsplash'\n"
+                "   - radius: 'none' | 'md' | 'lg'\n"
+                "   - If imageSource='unsplash': include prompt and leave assetPublicId empty (no referenceAssetPublicId)\n"
+                "   - If referenceAssetPublicId is set: include prompt and leave assetPublicId empty\n"
+                "7) Button: props { id, label, variant?, size?, width?, align?, linkType?, targetPageId?, href? }\n"
+                "   - variant: 'primary' | 'secondary'\n"
+                "   - size: 'sm' | 'md' | 'lg'\n"
+                "   - width: 'auto' | 'full'\n"
+                "   - align: 'left' | 'center' | 'right'\n"
+                "   - If linkType='funnelPage': include targetPageId\n"
+                "   - If linkType='external': include href\n"
+                "8) FeatureGrid: props { id, title?, columns?, features? }\n"
+                "9) Testimonials: props { id, title?, testimonials? }\n"
+                "10) FAQ: props { id, title?, items? }\n"
+                f"{template_component}\n"
+            )
 
         system_content = (
             f"You are generating content for a Puck editor {page_label}.\n\n"
@@ -564,10 +704,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             "- High-converting direct-response structure (clear promise, benefits, proof, objections/FAQ, repeated CTA)\n"
             "- Be specific and scannable (short paragraphs, bullets)\n"
             "- Use ethical persuasion; avoid fear-mongering\n\n"
-            "Layout guidance:\n"
-            "- Default to Section.layout='full' for most sections (do not place bare Heading/Text directly at the root)\n"
-            "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
-            "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
+            f"{layout_guidance}"
             f"{context_guidance}"
             f"{copy_pack_guidance}"
             f"{args.productContext}"
@@ -581,41 +718,8 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             "ComponentData shape:\n"
             "- Every component must be an object with keys: type, props\n"
             "- props should include a string id (unique per component)\n\n"
-            "Available primitives (component types) and their props:\n"
-            "1) Section: props { id, purpose?, layout?, containerWidth?, variant?, padding?, content? }\n"
-            "   - purpose: 'header' | 'section' | 'footer'\n"
-            "   - layout: 'full' | 'contained' | 'card'\n"
-            "     - full = full-width background, content constrained to containerWidth\n"
-            "     - contained = background constrained to containerWidth (no card styling)\n"
-            "     - card = contained card with border/rounding/shadow (avoid for modern landing pages)\n"
-            "   - containerWidth: 'sm' | 'md' | 'lg' | 'xl'\n"
-            "   - content is a slot: ComponentData[]\n"
-            "2) Columns: props { id, ratio?, gap?, left?, right? }\n"
-            "   - left/right are slots: ComponentData[]\n"
-            "3) Heading: props { id, text, level?, align? }\n"
-            "   - level: 1|2|3|4 (H1-H4)\n"
-            "   - align: 'left' | 'center'\n"
-            "4) Text: props { id, text, size?, tone?, align? }\n"
-            "   - size: 'sm' | 'md' | 'lg'\n"
-            "   - tone: 'default' | 'muted'\n"
-            "   - align: 'left' | 'center'\n"
-            "5) Spacer: props { id, height }\n"
-            "6) Image: props { id, prompt, alt, imageSource?, assetPublicId?, referenceAssetPublicId?, src?, radius? }\n"
-            "   - imageSource: 'ai' (default) | 'unsplash'\n"
-            "   - radius: 'none' | 'md' | 'lg'\n"
-            "   - If imageSource='unsplash': include prompt and leave assetPublicId empty (no referenceAssetPublicId)\n"
-            "   - If referenceAssetPublicId is set: include prompt and leave assetPublicId empty\n"
-            "7) Button: props { id, label, variant?, size?, width?, align?, linkType?, targetPageId?, href? }\n"
-            "   - variant: 'primary' | 'secondary'\n"
-            "   - size: 'sm' | 'md' | 'lg'\n"
-            "   - width: 'auto' | 'full'\n"
-            "   - align: 'left' | 'center' | 'right'\n"
-            "   - If linkType='funnelPage': include targetPageId\n"
-            "   - If linkType='external': include href\n"
-            "8) FeatureGrid: props { id, title?, columns?, features? }\n"
-            "9) Testimonials: props { id, title?, testimonials? }\n"
-            "10) FAQ: props { id, title?, items? }\n"
-            f"{template_component}\n"
+            "- Do NOT double-encode JSON: only *Json fields (e.g., configJson) may contain JSON strings. props.config must be a JSON object/array, not a JSON-encoded string.\n\n"
+            f"{available_components_block}"
             "Root props (optional):\n"
             "- root.props.title\n"
             "- root.props.description\n\n"
@@ -639,7 +743,10 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         base_prompt_parts = [system_content] + [f"{m['role'].upper()}: {m['content']}" for m in conversation]
         compiled_prompt = "\n\n".join(base_prompt_parts + ["Return JSON now."])
 
-        allowed_types = _allowed_component_types(template_kind)
+        allowed_types = _allowed_component_types(
+            template_component_kind if template_mode else template_kind,
+            template_mode=template_mode,
+        )
 
         params = LLMGenerationParams(
             model=model_id,
@@ -861,13 +968,109 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         if not product:
             raise ValueError("Product not found")
 
+        base_puck_for_restore: dict[str, Any] | None = (
+            args.basePuckData if isinstance(args.basePuckData, dict) else None
+        )
+
         restored_sections = 0
-        if args.templateKind and args.basePuckData and isinstance(args.basePuckData, dict):
+        dropped_extra_sections = 0
+        restored_testimonial_image_slots = 0
+        checkout_purchase_ids_aligned = 0
+        dropped_extra_section_summaries: list[dict[str, str]] = []
+        if args.templateKind and base_puck_for_restore is not None:
             page_type: str | None = None
             if args.templateKind == "sales-pdp":
                 page_type = "SalesPdpPage"
             elif args.templateKind == "pre-sales-listicle":
                 page_type = "PreSalesPage"
+
+            def _restore_pre_sales_review_image_slots(
+                current_component: dict[str, Any], base_component: dict[str, Any]
+            ) -> int:
+                """
+                Pre-sales testimonial media rendering requires 3 image slots per review slide.
+                Restore missing/malformed slide image objects from the base template deterministically.
+                """
+
+                def _slides_for(component: dict[str, Any]) -> list[Any] | None:
+                    comp_type = component.get("type")
+                    props = component.get("props")
+                    if not isinstance(props, dict):
+                        return None
+                    config = props.get("config")
+                    if not isinstance(config, dict):
+                        return None
+                    if comp_type == "PreSalesReviews":
+                        slides = config.get("slides")
+                        return slides if isinstance(slides, list) else None
+                    if comp_type == "PreSalesTemplate":
+                        reviews = config.get("reviews")
+                        if not isinstance(reviews, dict):
+                            return None
+                        slides = reviews.get("slides")
+                        return slides if isinstance(slides, list) else None
+                    return None
+
+                cslides = _slides_for(current_component)
+                bslides = _slides_for(base_component)
+                if not isinstance(cslides, list) or not isinstance(bslides, list):
+                    return 0
+
+                restored_local = 0
+                if len(cslides) < len(bslides):
+                    for idx in range(len(cslides), len(bslides)):
+                        base_slide = bslides[idx]
+                        if not isinstance(base_slide, dict):
+                            continue
+                        cslides.append(deepcopy(base_slide))
+                        base_images = base_slide.get("images")
+                        if isinstance(base_images, list):
+                            restored_local += min(3, len(base_images))
+
+                for idx, base_slide in enumerate(bslides):
+                    cur_slide = cslides[idx]
+                    if not isinstance(base_slide, dict):
+                        continue
+                    if not isinstance(cur_slide, dict):
+                        cslides[idx] = deepcopy(base_slide)
+                        base_images = base_slide.get("images")
+                        if isinstance(base_images, list):
+                            restored_local += min(3, len(base_images))
+                        continue
+
+                    base_images = base_slide.get("images")
+                    if not isinstance(base_images, list) or len(base_images) < 3:
+                        continue
+
+                    cur_images = cur_slide.get("images")
+                    if not isinstance(cur_images, list):
+                        cur_slide["images"] = deepcopy(base_images[:3])
+                        restored_local += min(3, len(base_images))
+                        continue
+
+                    # Ensure the first 3 image slots exist and are valid objects.
+                    for image_idx in range(3):
+                        if image_idx >= len(base_images):
+                            break
+                        base_image = base_images[image_idx]
+                        if not isinstance(base_image, dict):
+                            continue
+                        if image_idx >= len(cur_images):
+                            cur_images.append(deepcopy(base_image))
+                            restored_local += 1
+                            continue
+                        cur_image = cur_images[image_idx]
+                        if not isinstance(cur_image, dict):
+                            cur_images[image_idx] = deepcopy(base_image)
+                            restored_local += 1
+                            continue
+                        alt = cur_image.get("alt")
+                        if not isinstance(alt, str) or not alt.strip():
+                            base_alt = base_image.get("alt")
+                            if isinstance(base_alt, str) and base_alt.strip():
+                                cur_image["alt"] = base_alt
+
+                return restored_local
 
             def find_page(puck: dict[str, Any], type_name: str) -> Optional[dict[str, Any]]:
                 content = puck.get("content")
@@ -878,9 +1081,213 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                         return item
                 return None
 
+            def _load_object_prop(
+                props: dict[str, Any],
+                *,
+                object_key: str,
+                json_key: str,
+                label: str,
+            ) -> tuple[dict[str, Any] | None, str | None]:
+                raw_json = props.get(json_key)
+                if isinstance(raw_json, str) and raw_json.strip():
+                    try:
+                        parsed = json.loads(raw_json)
+                    except json.JSONDecodeError as exc:
+                        raise ValueError(f"{label}.{json_key} must be valid JSON: {exc}") from exc
+                    if not isinstance(parsed, dict):
+                        raise ValueError(f"{label}.{json_key} must decode to a JSON object.")
+                    return parsed, json_key
+                value = props.get(object_key)
+                if isinstance(value, dict):
+                    return value, object_key
+                return None, None
+
+            def _persist_object_prop(
+                props: dict[str, Any],
+                *,
+                source: str | None,
+                object_key: str,
+                json_key: str,
+                value: dict[str, Any],
+            ) -> None:
+                if source == json_key:
+                    props[json_key] = json.dumps(value, ensure_ascii=False)
+                    return
+                props[object_key] = value
+
+            def _restore_sales_pdp_required_fields(candidate: dict[str, Any], base_child: dict[str, Any]) -> None:
+                """
+                Ensure template-required nested fields exist so the sales PDP renders correctly.
+                We only fill missing pieces from the base template; we do not overwrite existing values.
+                """
+
+                if args.templateKind != "sales-pdp":
+                    return
+                if candidate.get("type") not in ("SalesPdpHero", "SalesPdpReviews"):
+                    return
+                cprops = candidate.get("props")
+                bprops = base_child.get("props")
+                if not isinstance(cprops, dict) or not isinstance(bprops, dict):
+                    return
+
+                if candidate.get("type") == "SalesPdpReviews":
+                    base_cfg, _ = _load_object_prop(bprops, object_key="config", json_key="configJson", label="SalesPdpReviews")
+                    if not isinstance(base_cfg, dict):
+                        return
+                    cur_cfg, cur_source = _load_object_prop(cprops, object_key="config", json_key="configJson", label="SalesPdpReviews")
+                    if not isinstance(cur_cfg, dict):
+                        cur_cfg = {}
+                    if "id" not in cur_cfg and isinstance(base_cfg.get("id"), str):
+                        cur_cfg["id"] = base_cfg["id"]
+                    if "data" not in cur_cfg and isinstance(base_cfg.get("data"), dict):
+                        cur_cfg["data"] = deepcopy(base_cfg["data"])
+                    _persist_object_prop(cprops, source=cur_source, object_key="config", json_key="configJson", value=cur_cfg)
+                    return
+
+                # SalesPdpHero required fields: gallery.freeGifts + modals.
+                base_cfg, _ = _load_object_prop(bprops, object_key="config", json_key="configJson", label="SalesPdpHero")
+                cur_cfg, cur_cfg_source = _load_object_prop(cprops, object_key="config", json_key="configJson", label="SalesPdpHero")
+                if not isinstance(base_cfg, dict) or not isinstance(cur_cfg, dict):
+                    return
+
+                base_gallery = base_cfg.get("gallery")
+                cur_gallery = cur_cfg.get("gallery")
+                if isinstance(base_gallery, dict):
+                    if not isinstance(cur_gallery, dict):
+                        cur_cfg["gallery"] = deepcopy(base_gallery)
+                    else:
+                        base_free = base_gallery.get("freeGifts")
+                        cur_free = cur_gallery.get("freeGifts")
+                        if isinstance(base_free, dict):
+                            if not isinstance(cur_free, dict):
+                                cur_gallery["freeGifts"] = deepcopy(base_free)
+                            else:
+                                # Fill missing/invalid keys.
+                                if "icon" in base_free and not isinstance(cur_free.get("icon"), dict):
+                                    cur_free["icon"] = deepcopy(base_free.get("icon"))
+                                for key in ("title", "body", "ctaLabel"):
+                                    if key in base_free and not isinstance(cur_free.get(key), str):
+                                        cur_free[key] = base_free.get(key)
+
+                _persist_object_prop(cprops, source=cur_cfg_source, object_key="config", json_key="configJson", value=cur_cfg)
+
+                base_modals, _ = _load_object_prop(bprops, object_key="modals", json_key="modalsJson", label="SalesPdpHero")
+                cur_modals, cur_modals_source = _load_object_prop(cprops, object_key="modals", json_key="modalsJson", label="SalesPdpHero")
+                if isinstance(base_modals, dict):
+                    if not isinstance(cur_modals, dict):
+                        cur_modals = deepcopy(base_modals)
+                    else:
+                        for key in ("sizeChart", "whyBundle", "freeGifts"):
+                            if key not in cur_modals and key in base_modals:
+                                cur_modals[key] = deepcopy(base_modals[key])
+                if isinstance(cur_modals, dict):
+                    _persist_object_prop(
+                        cprops,
+                        source=cur_modals_source,
+                        object_key="modals",
+                        json_key="modalsJson",
+                        value=cur_modals,
+                    )
+
+            # Merge the current base page puckData with the latest template structure so new template
+            # blocks (e.g. reviews/free gifts) are not lost when regenerating existing pages.
+            template = get_funnel_template(args.templateKind)
+            template_puck = template.puck_data if template else None
+            if not isinstance(template_puck, dict):
+                raise ValueError(f"Template {args.templateKind} puckData is missing or invalid.")
+            base_puck_for_restore = deepcopy(base_puck_for_restore)
+            upgraded_base_sections = 0
+            dropped_upgraded_base_sections = 0
+
+            if page_type:
+                base_page = find_page(base_puck_for_restore, page_type)
+                tmpl_page = find_page(template_puck, page_type)
+                if tmpl_page is not None and base_page is None:
+                    # If the stored base is missing the page root, reset to the template's page.
+                    base_puck_for_restore["content"] = deepcopy(template_puck.get("content", []))
+                    upgraded_base_sections = 1
+                elif isinstance(base_page, dict) and isinstance(tmpl_page, dict):
+                    base_props = base_page.get("props")
+                    tmpl_props = tmpl_page.get("props")
+                    if isinstance(base_props, dict) and isinstance(tmpl_props, dict):
+                        tmpl_page_id = tmpl_props.get("id")
+                        if isinstance(tmpl_page_id, str) and tmpl_page_id.strip():
+                            base_props["id"] = tmpl_page_id
+                        for key, value in tmpl_props.items():
+                            if key == "content":
+                                continue
+                            if key not in base_props:
+                                base_props[key] = deepcopy(value)
+
+                        cur_children = base_props.get("content")
+                        tmpl_children = tmpl_props.get("content")
+                        if isinstance(cur_children, list) and isinstance(tmpl_children, list):
+                            current_by_id: dict[str, dict[str, Any]] = {}
+                            current_by_type: dict[str, list[dict[str, Any]]] = {}
+                            for child in cur_children:
+                                if not isinstance(child, dict):
+                                    continue
+                                ctype = child.get("type")
+                                cprops = child.get("props")
+                                cid = cprops.get("id") if isinstance(cprops, dict) else None
+                                if isinstance(cid, str) and cid.strip() and cid not in current_by_id:
+                                    current_by_id[cid] = child
+                                if isinstance(ctype, str) and ctype:
+                                    current_by_type.setdefault(ctype, []).append(child)
+
+                            used_ids: set[str] = set()
+                            merged: list[Any] = []
+                            for tmpl_child in tmpl_children:
+                                if not isinstance(tmpl_child, dict):
+                                    merged.append(deepcopy(tmpl_child))
+                                    continue
+                                ttype = tmpl_child.get("type")
+                                tprops = tmpl_child.get("props")
+                                tid = tprops.get("id") if isinstance(tprops, dict) else None
+
+                                candidate: dict[str, Any] | None = None
+                                if isinstance(ttype, str) and ttype:
+                                    if isinstance(tid, str) and tid.strip() and tid in current_by_id:
+                                        by_id = current_by_id[tid]
+                                        if isinstance(by_id, dict) and by_id.get("type") == ttype:
+                                            candidate = by_id
+                                    if candidate is None and current_by_type.get(ttype):
+                                        candidate = current_by_type[ttype].pop(0)
+
+                                if candidate is None:
+                                    merged.append(deepcopy(tmpl_child))
+                                    upgraded_base_sections += 1
+                                    continue
+
+                                cprops = candidate.get("props")
+                                if isinstance(tid, str) and tid.strip() and isinstance(cprops, dict):
+                                    cprops["id"] = tid
+                                cid = cprops.get("id") if isinstance(cprops, dict) else None
+                                if isinstance(cid, str) and cid.strip():
+                                    used_ids.add(cid)
+
+                                _restore_sales_pdp_required_fields(candidate, tmpl_child)
+
+                                if args.templateKind == "pre-sales-listicle":
+                                    restored_testimonial_image_slots += _restore_pre_sales_review_image_slots(
+                                        candidate, tmpl_child
+                                    )
+                                merged.append(candidate)
+
+                            for child in cur_children:
+                                if not isinstance(child, dict):
+                                    continue
+                                cprops = child.get("props")
+                                cid = cprops.get("id") if isinstance(cprops, dict) else None
+                                if isinstance(cid, str) and cid.strip() and cid in used_ids:
+                                    continue
+                                dropped_upgraded_base_sections += 1
+
+                            base_props["content"] = merged
+
             if page_type:
                 cur_page = find_page(args.puckData, page_type)
-                base_page = find_page(args.basePuckData, page_type)
+                base_page = find_page(base_puck_for_restore, page_type)
                 if base_page is not None and cur_page is None:
                     raise ValueError(f"Template page component {page_type} missing from generated puckData.")
 
@@ -925,10 +1332,13 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                             bid = bprops.get("id") if isinstance(bprops, dict) else None
 
                             candidate: dict[str, Any] | None = None
-                            if isinstance(bid, str) and bid.strip() and bid in current_by_id:
-                                candidate = current_by_id[bid]
-                            elif isinstance(btype, str) and btype and current_by_type.get(btype):
-                                candidate = current_by_type[btype].pop(0)
+                            if isinstance(btype, str) and btype:
+                                if isinstance(bid, str) and bid.strip() and bid in current_by_id:
+                                    by_id = current_by_id[bid]
+                                    if isinstance(by_id, dict) and by_id.get("type") == btype:
+                                        candidate = by_id
+                                if candidate is None and current_by_type.get(btype):
+                                    candidate = current_by_type[btype].pop(0)
 
                             if candidate is None:
                                 merged.append(deepcopy(base_child))
@@ -942,9 +1352,17 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                             cid = cprops.get("id") if isinstance(cprops, dict) else None
                             if isinstance(cid, str) and cid.strip():
                                 used_ids.add(cid)
+
+                            _restore_sales_pdp_required_fields(candidate, base_child)
+
+                            if args.templateKind == "pre-sales-listicle":
+                                restored_testimonial_image_slots += _restore_pre_sales_review_image_slots(
+                                    candidate, base_child
+                                )
                             merged.append(candidate)
 
-                        # Append any extra generated sections not present in the base template.
+                        # Drop any extra generated sections not present in the base template.
+                        # Template mode should preserve structure; extra blocks are not allowed.
                         for child in cur_children:
                             if not isinstance(child, dict):
                                 continue
@@ -952,7 +1370,14 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                             cid = cprops.get("id") if isinstance(cprops, dict) else None
                             if isinstance(cid, str) and cid.strip() and cid in used_ids:
                                 continue
-                            merged.append(child)
+                            dropped_extra_sections += 1
+                            if len(dropped_extra_section_summaries) < 10:
+                                dropped_extra_section_summaries.append(
+                                    {
+                                        "type": str(child.get("type") or ""),
+                                        "id": str(cid or ""),
+                                    }
+                                )
 
                         cur_props["content"] = merged
 
@@ -979,13 +1404,35 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             product=product,
             brand_logo_public_id=args.brandLogoAssetPublicId,
         )
-        funnel_ai._ensure_flat_vector_icon_prompts(puck_data=args.puckData, config_contexts=config_contexts)
+        if args.templateKind == "sales-pdp":
+            funnel_ai._enforce_sales_pdp_guarantee_testimonial_only_images(
+                puck_data=args.puckData,
+                config_contexts=config_contexts,
+            )
+        funnel_ai._ensure_flat_vector_icon_prompts(
+            puck_data=args.puckData,
+            config_contexts=config_contexts,
+            design_system_tokens=args.designSystemTokens if isinstance(args.designSystemTokens, dict) else None,
+        )
+        fallback_icon_puck = base_puck_for_restore if isinstance(base_puck_for_restore, dict) else None
+        if args.templateKind == "pre-sales-listicle":
+            funnel_ai._ensure_pre_sales_badge_icons(
+                puck_data=args.puckData,
+                config_contexts=config_contexts,
+                fallback_puck_data=fallback_icon_puck,
+            )
+            funnel_ai._apply_icon_remix_overrides_for_ai(
+                puck_data=args.puckData,
+                config_contexts=config_contexts,
+                fallback_puck_data=fallback_icon_puck,
+                design_system_tokens=args.designSystemTokens if isinstance(args.designSystemTokens, dict) else None,
+            )
 
         # Template pages often include image nodes inside config structures. The LLM occasionally deletes
         # src/iconSrc fields while leaving prompts empty, which makes image validation fail. Restore missing
         # non-placeholder src values from the base template puckData deterministically.
         restored = 0
-        if args.basePuckData and isinstance(args.basePuckData, dict):
+        if base_puck_for_restore is not None:
             def set_src(target: dict[str, Any], *, asset_key: str, value: str) -> None:
                 if asset_key == "iconAssetPublicId":
                     target["iconSrc"] = value
@@ -1067,7 +1514,166 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
 
                 return 0
 
-            restored = restore_missing_src(args.puckData, args.basePuckData)
+            restored = restore_missing_src(args.puckData, base_puck_for_restore)
+
+        if args.templateKind == "sales-pdp":
+            funnel = ctx.session.scalars(
+                select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+            ).first()
+            if not funnel:
+                raise ValueError("Funnel not found")
+
+            variants_query = select(ProductVariant).where(ProductVariant.product_id == product.id)
+            if funnel.selected_offer_id:
+                variants_query = variants_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
+            variants_query = variants_query.order_by(ProductVariant.price.asc(), ProductVariant.title.asc(), ProductVariant.id.asc())
+            variants = list(ctx.session.scalars(variants_query).all())
+            if not variants:
+                raise ValueError(
+                    "Checkout is not configured for this funnel product. No product variants were found."
+                )
+
+            def load_config(props: dict[str, Any], *, label: str) -> tuple[dict[str, Any], str]:
+                raw = props.get("configJson")
+                if isinstance(raw, str) and raw.strip():
+                    try:
+                        parsed = json.loads(raw)
+                    except json.JSONDecodeError as exc:
+                        raise ValueError(f"{label}.configJson must be valid JSON: {exc}") from exc
+                    if not isinstance(parsed, dict):
+                        raise ValueError(f"{label}.configJson must decode to a JSON object.")
+                    return parsed, "configJson"
+                cfg = props.get("config")
+                if not isinstance(cfg, dict):
+                    raise ValueError(f"{label} is missing config/configJson.")
+                return cfg, "config"
+
+            hero_props: dict[str, Any] | None = None
+            for obj in funnel_ai.walk_json(args.puckData):
+                if not isinstance(obj, dict) or obj.get("type") != "SalesPdpHero":
+                    continue
+                props = obj.get("props")
+                if isinstance(props, dict):
+                    hero_props = props
+                    break
+            if hero_props is None:
+                raise ValueError("Checkout validation failed: SalesPdpHero block is missing from puckData.")
+
+            hero_cfg, hero_cfg_source = load_config(hero_props, label="SalesPdpHero")
+            purchase = hero_cfg.get("purchase")
+            if not isinstance(purchase, dict):
+                raise ValueError("Checkout validation failed: SalesPdpHero.config.purchase must be an object.")
+
+            variant_inputs: list[dict[str, Any]] = []
+            for variant in variants:
+                variant_inputs.append(
+                    {
+                        "title": variant.title,
+                        "amount_cents": variant.price,
+                        "option_values": variant.option_values,
+                    }
+                )
+            if funnel_ai._align_sales_pdp_purchase_options_to_variants(
+                purchase=purchase,
+                variants=variant_inputs,
+            ):
+                checkout_purchase_ids_aligned += 1
+                if hero_cfg_source == "configJson":
+                    hero_props["configJson"] = json.dumps(hero_cfg, ensure_ascii=False)
+                else:
+                    hero_props["config"] = hero_cfg
+
+            def ids_from(options_path: list[str], *, label: str) -> list[str]:
+                node: Any = purchase
+                for key in options_path:
+                    if not isinstance(node, dict):
+                        raise ValueError(f"Checkout validation failed: {label} must be an object.")
+                    node = node.get(key)
+                if not isinstance(node, list) or not node:
+                    raise ValueError(f"Checkout validation failed: {label} must be a non-empty list.")
+                ids: list[str] = []
+                for item in node:
+                    if isinstance(item, dict) and isinstance(item.get("id"), str) and item["id"].strip():
+                        ids.append(item["id"].strip())
+                if not ids:
+                    raise ValueError(f"Checkout validation failed: {label} contains no valid id values.")
+                return ids
+
+            size_ids = ids_from(["size", "options"], label="SalesPdpHero.purchase.size.options")
+            color_ids = ids_from(["color", "options"], label="SalesPdpHero.purchase.color.options")
+            offer_ids = ids_from(["offer", "options"], label="SalesPdpHero.purchase.offer.options")
+
+            valid_sizes: set[str] = set()
+            valid_colors: set[str] = set()
+            valid_offers: set[str] = set()
+            valid_selections: dict[tuple[str, str, str], str] = {}
+            for variant in variants:
+                option_values = variant.option_values
+                if not isinstance(option_values, dict):
+                    raise ValueError(
+                        "Checkout is not configured for this funnel product. "
+                        "Every product variant must include option_values (sizeId/colorId/offerId)."
+                    )
+                size_id = option_values.get("sizeId")
+                color_id = option_values.get("colorId")
+                offer_id = option_values.get("offerId")
+                if not all(isinstance(v, str) and v.strip() for v in (size_id, color_id, offer_id)):
+                    raise ValueError(
+                        "Checkout is not configured for this funnel product. "
+                        "Every product variant option_values must include non-empty sizeId/colorId/offerId strings."
+                    )
+                key = (size_id.strip(), color_id.strip(), offer_id.strip())
+                if key in valid_selections:
+                    raise ValueError(
+                        "Checkout is not configured for this funnel product. "
+                        "Duplicate variant option_values detected for selection="
+                        + json.dumps({"sizeId": key[0], "colorId": key[1], "offerId": key[2]}, separators=(",", ":"))
+                    )
+                valid_selections[key] = str(variant.id)
+                valid_sizes.add(key[0])
+                valid_colors.add(key[1])
+                valid_offers.add(key[2])
+
+            invalid_size_ids = sorted({v for v in size_ids if v not in valid_sizes})
+            invalid_color_ids = sorted({v for v in color_ids if v not in valid_colors})
+            invalid_offer_ids = sorted({v for v in offer_ids if v not in valid_offers})
+            if invalid_size_ids or invalid_color_ids or invalid_offer_ids:
+                details: list[str] = []
+                if invalid_size_ids:
+                    details.append(
+                        "sizeIds not present in product variants: " + ", ".join(invalid_size_ids)
+                    )
+                if invalid_color_ids:
+                    details.append(
+                        "colorIds not present in product variants: " + ", ".join(invalid_color_ids)
+                    )
+                if invalid_offer_ids:
+                    details.append(
+                        "offerIds not present in product variants: " + ", ".join(invalid_offer_ids)
+                    )
+                raise ValueError(
+                    "Checkout validation failed: SalesPdpHero.purchase option ids do not match configured product variants. "
+                    + "; ".join(details)
+                )
+
+            missing_combos: list[str] = []
+            for size_id in size_ids:
+                for color_id in color_ids:
+                    for offer_id in offer_ids:
+                        if (size_id, color_id, offer_id) not in valid_selections:
+                            if len(missing_combos) < 12:
+                                missing_combos.append(
+                                    json.dumps(
+                                        {"sizeId": size_id, "colorId": color_id, "offerId": offer_id},
+                                        separators=(",", ":"),
+                                    )
+                                )
+            if missing_combos:
+                raise ValueError(
+                    "Checkout validation failed: SalesPdpHero.purchase options include selections that do not map to any product variant. "
+                    "Missing variants for selections: "
+                    + ", ".join(missing_combos)
+                )
 
         root_props = args.puckData.get("root", {}).get("props") if isinstance(args.puckData.get("root"), dict) else None
         if isinstance(root_props, dict):
@@ -1081,14 +1687,25 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         funnel_ai._sync_config_json_contexts(config_contexts)
 
         applied = ["brand_logo", "product_images", "icon_prompts"]
+        if args.templateKind == "pre-sales-listicle":
+            applied.extend(["pre_sales_badge_icons", "icon_remix"])
+        if checkout_purchase_ids_aligned:
+            applied.append("checkout_purchase_ids")
         if restored_sections:
             applied.append("restore_base_sections")
+        if dropped_extra_sections:
+            applied.append("drop_extra_sections")
+        if restored_testimonial_image_slots:
+            applied.append("restore_testimonial_image_slots")
         if restored:
             applied.append("restore_base_images")
         ui_details = {
             "puckData": args.puckData,
             "applied": applied,
             "restoredSectionCount": restored_sections,
+            "droppedExtraSectionCount": dropped_extra_sections,
+            "droppedExtraSectionSummaries": dropped_extra_section_summaries,
+            "restoredTestimonialImageSlotCount": restored_testimonial_image_slots,
             "restoredImageCount": restored,
         }
         llm_output = json.dumps({"applied": ui_details["applied"]}, separators=(",", ":"))
@@ -1117,6 +1734,18 @@ class DraftValidateTool(BaseTool[DraftValidateArgs]):
 
         errors: list[str] = []
         warnings: list[str] = []
+
+        # Template-specific config validation to prevent drafts that crash the frontend at runtime.
+        if args.templateKind == "pre-sales-listicle":
+            try:
+                funnel_ai._validate_pre_sales_listicle_component_configs(args.puckData)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(str(exc))
+        if args.templateKind == "sales-pdp":
+            try:
+                funnel_ai._validate_sales_pdp_component_configs(args.puckData)
+            except Exception as exc:  # noqa: BLE001
+                errors.append(str(exc))
 
         allowed_set = set(args.allowedTypes or [])
         if allowed_set:
@@ -1202,6 +1831,8 @@ class ImagesGenerateArgs(BaseModel):
     funnelId: str
     productId: Optional[str] = None
     puckData: dict[str, Any]
+    # Deprecated: kept for request compatibility. Generation now uses all required image targets
+    # (up to funnel_ai._MAX_PAGE_IMAGE_GENERATIONS).
     maxImages: int = 3
 
 
@@ -1214,13 +1845,15 @@ class ImagesGenerateTool(BaseTool[ImagesGenerateArgs]):
             raise ValueError("orgId mismatch")
 
         generated_images: list[dict[str, Any]] = []
-        if args.maxImages <= 0:
-            ui_details = {"generatedImages": [], "puckData": args.puckData}
-            return ToolResult(llm_output=json.dumps({"generated": 0}), ui_details=ui_details, attachments=[])
-
-        # Cap generation by requested maxImages.
-        total_needed = funnel_ai._count_ai_image_targets(args.puckData)
-        max_images = min(args.maxImages, total_needed) if total_needed > 0 else 0
+        config_contexts = funnel_ai._collect_config_json_contexts_all(args.puckData)
+        image_plans = funnel_ai._collect_image_plans(puck_data=args.puckData, config_contexts=config_contexts)
+        max_images = funnel_ai._resolve_image_generation_count(
+            puck_data=args.puckData,
+            image_plans=image_plans,
+        )
+        if max_images == 0:
+            ui_details = {"generatedImages": [], "puckData": args.puckData, "maxImages": 0}
+            return ToolResult(llm_output=json.dumps({"generated": 0, "maxImages": 0}), ui_details=ui_details, attachments=[])
 
         try:
             _, generated_images = funnel_ai._fill_ai_images(
@@ -1289,6 +1922,7 @@ class DraftPersistVersionTool(BaseTool[DraftPersistVersionArgs]):
             "generatedImages": args.generatedImages,
             "imagePlans": args.imagePlans,
             "requestedImageCount": len(args.imagePlans),
+            "appliedImageGenerationCap": funnel_ai._MAX_PAGE_IMAGE_GENERATIONS,
             "actorUserId": args.userId,
             "ideaWorkspaceId": args.ideaWorkspaceId,
             "templateId": args.templateId,
@@ -1409,7 +2043,7 @@ class PublishValidateReadyTool(BaseTool[PublishValidateReadyArgs]):
 
         errors: list[str] = []
         warnings: list[str] = []
-        pages_missing_approval: list[dict[str, Any]] = []
+        pages_missing_version: list[dict[str, Any]] = []
         synthetic_pages: list[dict[str, Any]] = []
         broken_links: list[dict[str, Any]] = []
 
@@ -1422,6 +2056,14 @@ class PublishValidateReadyTool(BaseTool[PublishValidateReadyArgs]):
             errors.append("Entry page not set.")
 
         for page in pages:
+            draft = ctx.session.scalars(
+                select(FunnelPageVersion)
+                .where(
+                    FunnelPageVersion.page_id == page.id,
+                    FunnelPageVersion.status == FunnelPageVersionStatusEnum.draft,
+                )
+                .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
+            ).first()
             approved = ctx.session.scalars(
                 select(FunnelPageVersion)
                 .where(
@@ -1430,19 +2072,20 @@ class PublishValidateReadyTool(BaseTool[PublishValidateReadyArgs]):
                 )
                 .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
             ).first()
-            if not approved:
-                pages_missing_approval.append({"pageId": str(page.id), "pageName": page.name})
+            version = draft or approved
+            if not version:
+                pages_missing_version.append({"pageId": str(page.id), "pageName": page.name})
                 continue
 
-            md = approved.ai_metadata if isinstance(approved.ai_metadata, dict) else {}
+            md = version.ai_metadata if isinstance(version.ai_metadata, dict) else {}
             is_synth = bool(md.get("kind") == "testimonial_generation" and md.get("synthetic") is True)
             prov = md.get("testimonialsProvenance")
             if isinstance(prov, dict) and prov.get("source") == "synthetic":
                 is_synth = True
             if is_synth:
-                synthetic_pages.append({"pageId": str(page.id), "pageName": page.name, "versionId": str(approved.id)})
+                synthetic_pages.append({"pageId": str(page.id), "pageName": page.name, "versionId": str(version.id)})
 
-            for link in extract_internal_links(approved.puck_data):
+            for link in extract_internal_links(version.puck_data):
                 if link.to_page_id not in page_id_set:
                     broken_links.append(
                         {
@@ -1477,8 +2120,8 @@ class PublishValidateReadyTool(BaseTool[PublishValidateReadyArgs]):
                         }
                     )
 
-        if pages_missing_approval:
-            errors.append(f"{len(pages_missing_approval)} page(s) are not approved.")
+        if pages_missing_version:
+            errors.append(f"{len(pages_missing_version)} page(s) have no saved version.")
         if broken_links:
             errors.append(f"{len(broken_links)} broken internal link(s) detected.")
         if (
@@ -1493,7 +2136,7 @@ class PublishValidateReadyTool(BaseTool[PublishValidateReadyArgs]):
             "ok": ok,
             "errors": errors,
             "warnings": warnings,
-            "pagesMissingApproval": pages_missing_approval,
+            "pagesMissingVersion": pages_missing_version,
             "pagesWithSyntheticTestimonials": synthetic_pages,
             "brokenInternalLinks": broken_links,
         }

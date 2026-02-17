@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from functools import lru_cache
 from datetime import date
+import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
@@ -12,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
-from app.db.enums import AdChannelEnum, AdStatusEnum
+from app.db.enums import AdChannelEnum, AdStatusEnum, MediaAssetTypeEnum
 from app.db.models import (
     Ad,
     AdFacts,
@@ -28,6 +29,7 @@ from app.db.repositories.ads import AdsRepository
 from app.services.media_storage import MediaStorage
 
 router = APIRouter(prefix="/explore", tags=["explore"])
+_ALLOWED_AD_MEDIA_TYPES = {"IMAGE", "VIDEO"}
 
 # Cache storage client to avoid rebuilding per request.
 @lru_cache()
@@ -243,12 +245,26 @@ def _serialize_media_rows(ad_id: str, media_rows: list[tuple[MediaAsset, str | N
         metadata = getattr(media, "metadata_json", {}) or {}
         asset_type = getattr(media, "asset_type", None)
         asset_type_value = getattr(asset_type, "value", None) if asset_type is not None else None
-        preview_key = getattr(media, "preview_storage_key", None) or getattr(media, "storage_key", None)
+        is_video = asset_type == MediaAssetTypeEnum.VIDEO
+        preview_key = getattr(media, "preview_storage_key", None)
+        # Never fall back to the original video file for previews (it will be rendered as <img>).
+        if not preview_key and not is_video:
+            preview_key = getattr(media, "storage_key", None)
         media_key = getattr(media, "storage_key", None)
         preview_bucket = getattr(media, "preview_bucket", None) or getattr(media, "bucket", None) or storage.preview_bucket
         media_bucket = getattr(media, "bucket", None) or storage.bucket
         preview_url = storage.presign_get(bucket=preview_bucket, key=preview_key) if preview_key else None
         media_url = storage.presign_get(bucket=media_bucket, key=media_key) if media_key else None
+        mirror_status_raw = getattr(media, "mirror_status", None)
+        mirror_status = (
+            getattr(mirror_status_raw, "value", None)
+            if mirror_status_raw is not None
+            else None
+        ) or (str(mirror_status_raw) if mirror_status_raw is not None else None)
+        mirror_error = getattr(media, "mirror_error", None)
+        # If the original is stored but preview generation failed, the asset is still usable.
+        if mirror_status == "failed" and mirror_error == "preview_generation_failed" and media_key:
+            mirror_status = "partial"
         assets.append(
             {
                 "id": str(getattr(media, "id", "")),
@@ -258,18 +274,138 @@ def _serialize_media_rows(ad_id: str, media_rows: list[tuple[MediaAsset, str | N
                 "stored_url": getattr(media, "stored_url", None),
                 "storage_key": getattr(media, "storage_key", None),
                 "preview_storage_key": getattr(media, "preview_storage_key", None),
-                "mirror_status": getattr(media, "mirror_status", None),
+                "mirror_status": mirror_status,
+                "mirror_error": mirror_error,
                 "mime_type": getattr(media, "mime_type", None),
                 "width": getattr(media, "width", None),
                 "height": getattr(media, "height", None),
                 "duration_ms": getattr(media, "duration_ms", None),
-                "thumbnail_url": metadata.get("thumbnail_url") or metadata.get("preview_url") or preview_url,
+                # Prefer the mirrored preview when available; external thumbnail URLs can expire.
+                "thumbnail_url": preview_url or metadata.get("thumbnail_url") or metadata.get("preview_url"),
                 "preview_url": preview_url,
                 "media_url": media_url,
                 "metadata": metadata,
             }
         )
     return assets
+
+
+_TEMPLATE_ONLY_RE = re.compile(r"^\W*(\{\{\s*[^}]+\s*\}\}\W*)+$")
+
+
+def _extract_text(value: Any) -> str | None:
+    if not value:
+        return None
+    if isinstance(value, str):
+        text = value.strip()
+        return text or None
+    if isinstance(value, dict):
+        # Meta Ads Library snapshots may represent body text as {"text": "..."}.
+        for key in ("text", "value", "content"):
+            candidate = value.get(key)
+            if isinstance(candidate, str):
+                text = candidate.strip()
+                if text:
+                    return text
+    return None
+
+
+def _is_template_only_text(value: Any) -> bool:
+    text = _extract_text(value)
+    if not text:
+        return False
+    return bool(_TEMPLATE_ONLY_RE.match(text))
+
+
+def _unique_preserve_order(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for v in values:
+        key = v.strip()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(key)
+    return out
+
+
+def _summarize_texts(values: list[str], *, limit: int = 3) -> str | None:
+    values = _unique_preserve_order(values)
+    if not values:
+        return None
+    if len(values) <= limit:
+        return " | ".join(values)
+    head = " | ".join(values[:limit])
+    return f"{head} (+{len(values) - limit} more)"
+
+
+def _extract_snapshot_card_texts(snapshot: Any, keys: tuple[str, ...]) -> list[str]:
+    if not isinstance(snapshot, dict):
+        return []
+    cards = snapshot.get("cards") or []
+    if not isinstance(cards, list):
+        return []
+
+    out: list[str] = []
+    for card in cards:
+        if not isinstance(card, dict):
+            continue
+        for key in keys:
+            candidate = _extract_text(card.get(key))
+            if not candidate:
+                continue
+            if _is_template_only_text(candidate):
+                continue
+            out.append(candidate)
+            break
+    return out
+
+
+def _derive_explore_ad_copy(ad: Ad) -> tuple[str | None, str | None]:
+    """Return display-ready (headline, body_text) for explore ads.
+
+    Some dynamic/catalog ads come through with placeholder-only template strings like
+    `{{product.title}}`. Those are not useful in the UI, so we derive a better display
+    headline/body from the ad raw snapshot (e.g. card titles) when available.
+
+    This function intentionally avoids guessing values; it only uses fields present
+    in the stored raw payload.
+    """
+
+    headline = _extract_text(ad.headline)
+    body_text = _extract_text(ad.body_text)
+    needs_headline = (not headline) or _is_template_only_text(headline)
+    needs_body = (not body_text) or _is_template_only_text(body_text)
+    if not (needs_headline or needs_body):
+        return headline, body_text
+
+    raw = getattr(ad, "raw_json", None) or {}
+    snapshot = raw.get("snapshot") if isinstance(raw, dict) else None
+    snapshot = snapshot if isinstance(snapshot, dict) else {}
+
+    derived_headline = headline
+    derived_body = body_text
+
+    if needs_headline:
+        # Prefer card titles for carousel/catalog ads.
+        title_candidates: list[str] = []
+        snapshot_title = _extract_text(snapshot.get("title"))
+        if snapshot_title and not _is_template_only_text(snapshot_title):
+            title_candidates.append(snapshot_title)
+        title_candidates.extend(
+            _extract_snapshot_card_texts(snapshot, ("title", "headline", "name"))
+        )
+        derived_headline = _summarize_texts(title_candidates)
+
+    if needs_body:
+        body_candidates: list[str] = []
+        snapshot_body = _extract_text(snapshot.get("body"))
+        if snapshot_body and not _is_template_only_text(snapshot_body):
+            body_candidates.append(snapshot_body)
+        body_candidates.extend(_extract_snapshot_card_texts(snapshot, ("body", "description")))
+        derived_body = body_candidates[0] if body_candidates else None
+
+    return derived_headline, derived_body
 
 
 @router.get("/ads")
@@ -283,6 +419,7 @@ def explore_ads(
     research_run_id: str | None = Query(default=None, alias="researchRunId"),
     country_codes: list[str] = Query(default_factory=list, alias="countryCodes"),
     language_codes: list[str] = Query(default_factory=list, alias="languageCodes"),
+    media_types: list[str] = Query(default_factory=list, alias="mediaTypes"),
     min_days_active: int | None = Query(default=None, ge=0),
     max_days_active: int | None = Query(default=None, ge=0),
     start_date_from: date | None = Query(default=None),
@@ -367,6 +504,18 @@ def explore_ads(
     language_codes = [l.upper() for l in language_codes if l]
     if language_codes:
         filters.append(AdFacts.language_codes.overlap(language_codes))
+    normalized_media_types = [value.strip().upper() for value in media_types if value and value.strip()]
+    if normalized_media_types:
+        unique_media_types = list(dict.fromkeys(normalized_media_types))
+        unsupported_media_types = sorted(set(unique_media_types) - _ALLOWED_AD_MEDIA_TYPES)
+        if unsupported_media_types:
+            allowed = ", ".join(sorted(_ALLOWED_AD_MEDIA_TYPES))
+            invalid = ", ".join(unsupported_media_types)
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported mediaTypes values: {invalid}. Allowed values: {allowed}",
+            )
+        filters.append(AdFacts.media_types.overlap(unique_media_types))
     if min_days_active is not None:
         filters.append(AdFacts.days_active >= min_days_active)
     if max_days_active is not None:
@@ -496,6 +645,7 @@ def explore_ads(
         brand = brand_map.get(str(ad.brand_id))
         media_assets = _serialize_media_rows(ad_id, media_map.get(ad_id, []))
         score = score_map.get(ad_id)
+        headline, primary_text = _derive_explore_ad_copy(ad)
         results.append(
             {
                 "ad_id": ad_id,
@@ -508,8 +658,8 @@ def explore_ads(
                 "cta_text": ad.cta_text,
                 "landing_url": ad.landing_url,
                 "destination_domain": ad.destination_domain,
-                "headline": ad.headline,
-                "primary_text": ad.body_text,
+                "headline": headline,
+                "primary_text": primary_text,
                 "start_date": ad.started_running_at.isoformat() if ad.started_running_at else None,
                 "end_date": ad.ended_running_at.isoformat() if ad.ended_running_at else None,
                 "first_seen_at": ad.first_seen_at.isoformat() if ad.first_seen_at else None,

@@ -17,6 +17,11 @@ type Props = {
   copy: UiCopy
 }
 
+const URGENCY_MONTH_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  month: 'long',
+  timeZone: 'UTC',
+})
+
 function clampIndex(next: number, length: number) {
   if (length <= 0) return 0
   if (next < 0) return length - 1
@@ -26,6 +31,19 @@ function clampIndex(next: number, length: number) {
 
 function currency(n: number) {
   return `$${Math.round(n)}`
+}
+
+function resolveUrgencyMonthLabels(now: Date = new Date()) {
+  const currentYear = now.getUTCFullYear()
+  const currentMonthIndex = now.getUTCMonth()
+  const previousYear = currentMonthIndex === 0 ? currentYear - 1 : currentYear
+  const previousMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1
+  const currentMonthDate = new Date(Date.UTC(currentYear, currentMonthIndex, 1))
+  const previousMonthDate = new Date(Date.UTC(previousYear, previousMonthIndex, 1))
+  return {
+    previousMonthLabel: URGENCY_MONTH_FORMATTER.format(previousMonthDate).toUpperCase(),
+    currentMonthLabel: URGENCY_MONTH_FORMATTER.format(currentMonthDate).toUpperCase(),
+  }
 }
 
 function isRuleMatch(
@@ -106,18 +124,35 @@ function IconCheck({ size = 16 }: { size?: number }) {
   )
 }
 
-function IconChevron({ dir }: { dir: 'left' | 'right' }) {
-  const d = dir === 'left' ? 'M14 6l-6 6 6 6' : 'M10 6l6 6-6 6'
+function IconArrow({
+  dir,
+  size = 16,
+}: {
+  dir: 'left' | 'right'
+  size?: number
+}) {
   return (
     <svg
-      width="20"
-      height="20"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <path d={d} stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={dir === 'left' ? 'M19 12H7' : 'M5 12h12'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d={dir === 'left' ? 'M11 6l-6 6 6 6' : 'M13 6l6 6-6 6'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -133,26 +168,6 @@ function IconPlayTriangle({ size = 10 }: { size?: number }) {
       aria-hidden="true"
     >
       <path d="M9 7l10 5-10 5V7z" fill="currentColor" />
-    </svg>
-  )
-}
-
-function IconArrowRight({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path
-        d="M5 12h12"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M13 6l6 6-6 6"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   )
 }
@@ -259,7 +274,7 @@ function HeaderBar({
 }) {
   return (
     <div className={styles.header} aria-hidden={!visible}>
-      <Container>
+      <Container className={styles.headerContainer}>
         <div className={`${styles.headerInner} ${visible ? styles.headerVisible : styles.headerHidden}`}>
           <a className={styles.logo} href={config.logo.href ?? '#top'}>
             <img className={styles.logoImg} src={config.logo.src} alt={config.logo.alt} />
@@ -280,7 +295,7 @@ function HeaderBar({
           <a className={styles.headerCta} href={config.cta.href}>
             {config.cta.label}
             <span className={styles.headerCtaIcon} aria-hidden="true">
-              <IconArrowRight size={14} />
+              <IconArrow dir="right" size={14} />
             </span>
           </a>
         </div>
@@ -308,7 +323,7 @@ function Gallery({
       <div className={styles.galleryMain}>
         <img src={active.src} alt={active.alt} />
 
-        {freeGifts ? (
+        {freeGifts && index === 0 ? (
           <button
             type="button"
             className={styles.giftOverlay}
@@ -342,7 +357,7 @@ function Gallery({
           onClick={() => setIndex((v) => clampIndex(v - 1, slides.length))}
           aria-label="Previous image"
         >
-          <IconChevron dir="left" />
+          <IconArrow dir="left" size={18} />
         </button>
         <span className={styles.galleryCounter}>
           {index + 1} / {slides.length}
@@ -353,7 +368,7 @@ function Gallery({
           onClick={() => setIndex((v) => clampIndex(v + 1, slides.length))}
           aria-label="Next image"
         >
-          <IconChevron dir="right" />
+          <IconArrow dir="right" size={18} />
         </button>
       </div>
 
@@ -396,14 +411,14 @@ function SizeCard({
             style={{
               display: 'grid',
               placeItems: 'center',
-              width: 18,
-              height: 18,
+              width: 22,
+              height: 22,
               borderRadius: 999,
               background: '#1f8f2e',
               color: '#ffffff',
             }}
           >
-            <IconCheck size={14} />
+            <IconCheck size={18} />
           </span>
         </span>
       ) : null}
@@ -443,14 +458,14 @@ function OfferCard({
             style={{
               display: 'grid',
               placeItems: 'center',
-              width: 18,
-              height: 18,
+              width: 22,
+              height: 22,
               borderRadius: 999,
               background: '#1f8f2e',
               color: '#ffffff',
             }}
           >
-            <IconCheck size={14} />
+            <IconCheck size={18} />
           </span>
         </span>
       ) : null}
@@ -481,27 +496,30 @@ function ColorSwatch({
 
   return (
     <button type="button" className={styles.swatchBtn} onClick={onClick} aria-pressed={selected}>
-      <div
-        className={`${styles.swatchCircle} ${selected ? styles.swatchCircleSelected : ''}`}
-        style={background ? { background } : undefined}
-      >
-        {option.swatchImageSrc ? (
-          <img src={option.swatchImageSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : null}
+      <div className={styles.swatchCircleWrap}>
+        <div
+          className={`${styles.swatchCircle} ${selected ? styles.swatchCircleSelected : ''}`}
+          style={background ? { background } : undefined}
+        >
+          {option.swatchImageSrc ? (
+            <img src={option.swatchImageSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : null}
+        </div>
+
         {selected ? (
-          <span className={styles.selectedCheck} aria-hidden="true">
+          <span className={`${styles.selectedCheck} ${styles.selectedCheckSwatch}`} aria-hidden="true">
             <span
               style={{
                 display: 'grid',
                 placeItems: 'center',
-                width: 18,
-                height: 18,
+                width: 22,
+                height: 22,
                 borderRadius: 999,
                 background: '#1f8f2e',
                 color: '#ffffff',
               }}
             >
-              <IconCheck size={14} />
+              <IconCheck size={18} />
             </span>
           </span>
         ) : null}
@@ -538,8 +556,12 @@ export function PdpPage({ config, copy }: Props) {
         .map((href) => href.slice(1)),
     [config.hero.header.nav]
   )
+  // The Sales PDP template treats the story "problem" section as the "how-it-works" anchor.
+  // Multiple parts of the template rely on this (e.g. styling), so we use it as the trigger
+  // for the floating CTA bar.
+  const showAfterSectionId = 'how-it-works'
 
-  const [selectedSize, setSelectedSize] = useState(sizeOptions[1]?.id ?? sizeOptions[0]?.id)
+  const [selectedSize, setSelectedSize] = useState(sizeOptions[0]?.id)
   const [selectedColor, setSelectedColor] = useState(colorOptions[0]?.id)
   const [selectedOffer, setSelectedOffer] = useState(offerOptions[1]?.id ?? offerOptions[0]?.id)
   const [activeSection, setActiveSection] = useState<string | null>(navSectionIds[0] ?? null)
@@ -565,14 +587,29 @@ export function PdpPage({ config, copy }: Props) {
   const [showHeader, setShowHeader] = useState(false)
 
   useEffect(() => {
-    const onScroll = () => {
-      setShowHeader(window.scrollY > 180)
+    const el = document.getElementById(showAfterSectionId)
+    if (!el) {
+      console.error(
+        `PdpPage: cannot find section #${showAfterSectionId}. ` +
+          "The Sales PDP floating CTA bar is configured to show after the story problem section."
+      )
+      setShowHeader(false)
+      return
     }
 
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (!entry) return
+        const pastTrigger = entry.isIntersecting || entry.boundingClientRect.top < 0
+        setShowHeader(pastTrigger)
+      },
+      { threshold: 0 }
+    )
+
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [showAfterSectionId])
 
   useEffect(() => {
     if (!navSectionIds.length) return
@@ -617,31 +654,38 @@ export function PdpPage({ config, copy }: Props) {
     return () => observer.disconnect()
   }, [navSectionIds])
 
-  useEffect(() => {
-    const panel = manualScrollPanelRef.current
-    if (!panel) return
+	  useEffect(() => {
+	    const panel = manualScrollPanelRef.current
+	    if (!panel) return
 
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
     if (media.matches) return
 
-    let rafId = 0
-    let lastTime = 0
-    let paused = false
+	    let rafId = 0
+	    let lastTime = 0
+	    let paused = false
+	    let scrollPos = panel.scrollTop
 
     const step = (time: number) => {
       if (!lastTime) lastTime = time
       const delta = time - lastTime
       lastTime = time
 
-      if (!paused) {
-        const maxScroll = panel.scrollHeight - panel.clientHeight
-        if (maxScroll > 0) {
-          panel.scrollTop += delta * 0.015
-          if (panel.scrollTop >= maxScroll) {
-            panel.scrollTop = 0
-          }
-        }
-      }
+	      if (!paused) {
+	        const maxScroll = panel.scrollHeight - panel.clientHeight
+	        if (maxScroll > 0) {
+	          // Use a separate accumulator so sub-pixel deltas still make progress on browsers
+	          // that quantize `scrollTop` to whole pixels.
+	          scrollPos += delta * 0.008
+	          if (scrollPos >= maxScroll) {
+	            scrollPos = 0
+	          }
+	          panel.scrollTop = scrollPos
+	        }
+	      } else {
+	        // Keep the accumulator aligned with manual scrolling while paused.
+	        scrollPos = panel.scrollTop
+	      }
 
       rafId = window.requestAnimationFrame(step)
     }
@@ -650,10 +694,11 @@ export function PdpPage({ config, copy }: Props) {
       paused = true
     }
 
-    const resume = () => {
-      paused = false
-      lastTime = 0
-    }
+	    const resume = () => {
+	      paused = false
+	      lastTime = 0
+	      scrollPos = panel.scrollTop
+	    }
 
     panel.addEventListener('pointerenter', pause)
     panel.addEventListener('pointerleave', resume)
@@ -675,14 +720,6 @@ export function PdpPage({ config, copy }: Props) {
     }
   }, [])
 
-  const selectedSizeObj = useMemo(
-    () => sizeOptions.find((o) => o.id === selectedSize) ?? sizeOptions[0],
-    [sizeOptions, selectedSize]
-  )
-  const selectedColorObj = useMemo(
-    () => colorOptions.find((o) => o.id === selectedColor) ?? colorOptions[0],
-    [colorOptions, selectedColor]
-  )
   const selectedOfferObj = useMemo(
     () => offerOptions.find((o) => o.id === selectedOffer) ?? offerOptions[0],
     [offerOptions, selectedOffer]
@@ -717,6 +754,16 @@ export function PdpPage({ config, copy }: Props) {
     urgencyHighlightIndex >= 0
       ? urgencyMessage.slice(urgencyHighlightIndex + urgencyHighlight.length)
       : ''
+  const urgencyRows = useMemo(() => {
+    const rows = config.hero.purchase.cta.urgency.rows
+    if (rows.length < 2) return rows
+    const { previousMonthLabel, currentMonthLabel } = resolveUrgencyMonthLabels()
+    return rows.map((row, index) => {
+      if (index === 0) return { ...row, label: previousMonthLabel }
+      if (index === 1) return { ...row, label: currentMonthLabel }
+      return row
+    })
+  }, [config.hero.purchase.cta.urgency.rows])
 
   const handlePillPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
@@ -877,7 +924,7 @@ export function PdpPage({ config, copy }: Props) {
                 {config.hero.purchase.benefits.map((b) => (
                   <div key={b.text} className={styles.benefit}>
                     <span className={styles.checkCircle} aria-hidden="true">
-                      <IconCheck size={16} />
+                      <IconCheck size={18} />
                     </span>
                     {b.text}
                   </div>
@@ -889,9 +936,7 @@ export function PdpPage({ config, copy }: Props) {
               {/* Size */}
               <div>
                 <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {config.hero.purchase.size.title} <span>{selectedSizeObj?.label}</span>
-                  </div>
+                  <div className={styles.stepTitle}>{config.hero.purchase.size.title}</div>
                   <button type="button" className={styles.helpLink} onClick={() => setOpenSizeChart(true)}>
                     {config.hero.purchase.size.helpLinkLabel}
                   </button>
@@ -921,9 +966,7 @@ export function PdpPage({ config, copy }: Props) {
               {/* Color */}
               <div>
                 <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {config.hero.purchase.color.title} <span>{selectedColorObj?.label}</span>
-                  </div>
+                  <div className={styles.stepTitle}>{config.hero.purchase.color.title}</div>
                 </div>
                 <div className={styles.colorRow}>
                   {colorOptions.map((c) => (
@@ -949,9 +992,7 @@ export function PdpPage({ config, copy }: Props) {
               {/* Offer */}
               <div>
                 <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {config.hero.purchase.offer.title} <span>{selectedOfferObj?.title}</span>
-                  </div>
+                  <div className={styles.stepTitle}>{config.hero.purchase.offer.title}</div>
                 </div>
                 <div className={styles.offerHelper}>
                   {config.hero.purchase.offer.helperText}{' '}
@@ -960,7 +1001,7 @@ export function PdpPage({ config, copy }: Props) {
                   </button>
                 </div>
 
-                <div className={styles.optionGrid3}>
+                <div className={styles.offerGrid}>
                   {offerOptions.map((o) => (
                     <OfferCard
                       key={o.id}
@@ -974,7 +1015,7 @@ export function PdpPage({ config, copy }: Props) {
                 <button type="button" className={styles.ctaButton}>
                   {ctaLabel}
                   <span className={styles.ctaIconCircle} aria-hidden="true">
-                    <IconArrowRight size={14} />
+                    <IconArrow dir="right" size={24} />
                   </span>
                 </button>
 
@@ -982,7 +1023,7 @@ export function PdpPage({ config, copy }: Props) {
                   {config.hero.purchase.cta.subBullets.map((t) => (
                     <span key={t}>
                       <span className={styles.checkCircle} aria-hidden="true">
-                        <IconCheck size={12} />
+                        <IconCheck size={18} />
                       </span>
                       {t}
                     </span>
@@ -1007,9 +1048,9 @@ export function PdpPage({ config, copy }: Props) {
                   </div>
                 </div>
                   <div className={styles.urgencyRows}>
-                    {config.hero.purchase.cta.urgency.rows.map((r) => (
+                    {urgencyRows.map((r, index) => (
                       <div
-                        key={r.label}
+                        key={`${r.label}-${index}`}
                         className={`${styles.urgencyRow} ${
                           r.tone === 'highlight'
                             ? styles.urgencyRowHighlight
@@ -1049,8 +1090,12 @@ export function PdpPage({ config, copy }: Props) {
         id={config.story.problem.id}
         className={`${config.story.problem.bg === 'blue' ? styles.sectionBlue : styles.sectionPeach} ${styles.sectionPad}`}
       >
-        <Container>
-          <div className={styles.storyGrid}>
+        <Container className={styles.storyContainerTight}>
+          <div
+            className={`${styles.storyGrid} ${
+              config.story.problem.layout === 'textRight' ? styles.storyGridTextRight : styles.storyGridTextLeft
+            }`}
+          >
             {config.story.problem.layout === 'textRight' ? (
               <>
                 <img className={styles.storyImage} src={config.story.problem.image.src} alt={config.story.problem.image.alt} />
@@ -1071,8 +1116,12 @@ export function PdpPage({ config, copy }: Props) {
         id={config.story.solution.id}
         className={`${config.story.solution.bg === 'blue' ? styles.sectionBlue : styles.sectionPeach} ${styles.sectionPad} ${styles.solutionSection}`}
       >
-        <Container>
-          <div className={styles.storyGrid}>
+        <Container className={styles.storyContainerTight}>
+          <div
+            className={`${styles.storyGrid} ${
+              config.story.solution.layout === 'textRight' ? styles.storyGridTextRight : styles.storyGridTextLeft
+            }`}
+          >
             {config.story.solution.layout === 'textRight' ? (
               <>
                 <img className={styles.storyImage} src={config.story.solution.image.src} alt={config.story.solution.image.alt} />
@@ -1210,37 +1259,8 @@ export function PdpPage({ config, copy }: Props) {
         </Container>
       </section>
 
-      {/* REVIEW WALL */}
-      <section id={config.reviewWall.id} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
-        <Container>
-          <div className={styles.reviewWallHeader}>
-            <div className={styles.sectionBadge}>{config.reviewWall.badge}</div>
-            <h2 className={styles.sectionHeading} style={{ marginBottom: 10 }}>
-              {config.reviewWall.title}
-            </h2>
-            <div className={styles.ratingRow}>
-              <img
-                className={styles.ratingImage}
-                src="https://cdn.shopify.com/s/files/1/0433/0510/7612/files/StarRating.svg?v=1754231046"
-                alt="5 star rating"
-              />
-              {config.reviewWall.ratingLabel}
-            </div>
-          </div>
-
-          <div className={styles.masonry}>
-            {config.reviewWall.tiles.map((t) => (
-              <div key={t.id} className={styles.tile}>
-                <img src={t.image.src} alt={t.image.alt} />
-              </div>
-            ))}
-          </div>
-
-          <button type="button" className={styles.showMore}>
-            {config.reviewWall.showMoreLabel}
-          </button>
-        </Container>
-      </section>
+      {/* REVIEWS */}
+      <ReviewSliderSection config={config.reviewSlider} />
 
       {/* FOOTER */}
       <footer className={`${styles.sectionPeach} ${styles.footer}`}>
@@ -1271,7 +1291,7 @@ export function PdpPage({ config, copy }: Props) {
             <tbody>
               {config.modals.sizeChart.sizes.map((s) => (
                 <tr key={s.label}>
-                  <td style={{ padding: 10, borderBottom: '1px solid rgba(0,0,0,0.08)', fontWeight: 800 }}>{s.label}</td>
+                  <td style={{ padding: 10, borderBottom: '1px solid rgba(0,0,0,0.08)', fontWeight: 700 }}>{s.label}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>{s.size}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>{s.idealFor}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>{s.weight}</td>
@@ -1302,7 +1322,7 @@ export function PdpPage({ config, copy }: Props) {
                 background: 'rgba(0,0,0,0.03)',
               }}
             >
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>&ldquo;{q.text}&rdquo;</div>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>&ldquo;{q.text}&rdquo;</div>
               <div style={{ color: 'rgba(0,0,0,0.65)' }}>— {q.author}</div>
             </div>
           ))}
@@ -1399,35 +1419,97 @@ function FaqAccordion({ items }: { items: Array<{ question: string; answer: stri
 
 export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlider'] }) {
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
-  const [index, setIndex] = useState(0)
+  const panelRef = useRef<HTMLDivElement | null>(null)
+
+  if (!config?.slides?.length) {
+    throw new Error('ReviewSliderSection config.slides must be a non-empty list.')
+  }
 
   useEffect(() => {
+    const panel = panelRef.current
+    if (!panel) return
     if (mode !== 'auto') return
-    const id = window.setInterval(() => {
-      setIndex((v) => clampIndex(v + 1, config.slides.length))
-    }, 3200)
-    return () => window.clearInterval(id)
+
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (media.matches) return
+
+    let rafId = 0
+    let lastTime = 0
+    let paused = false
+
+    const step = (time: number) => {
+      if (!lastTime) lastTime = time
+      const delta = time - lastTime
+      lastTime = time
+
+      if (!paused) {
+        const maxScroll = panel.scrollHeight - panel.clientHeight
+        if (maxScroll > 0) {
+          panel.scrollTop += delta * 0.01
+          if (panel.scrollTop >= maxScroll) {
+            panel.scrollTop = 0
+          }
+        }
+      }
+
+      rafId = window.requestAnimationFrame(step)
+    }
+
+    const pause = () => {
+      paused = true
+    }
+
+    const resume = () => {
+      paused = false
+      lastTime = 0
+    }
+
+    panel.addEventListener('pointerenter', pause)
+    panel.addEventListener('pointerleave', resume)
+    panel.addEventListener('focusin', pause)
+    panel.addEventListener('focusout', resume)
+    panel.addEventListener('pointerdown', pause)
+    panel.addEventListener('pointerup', resume)
+
+    rafId = window.requestAnimationFrame(step)
+
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      panel.removeEventListener('pointerenter', pause)
+      panel.removeEventListener('pointerleave', resume)
+      panel.removeEventListener('focusin', pause)
+      panel.removeEventListener('focusout', resume)
+      panel.removeEventListener('pointerdown', pause)
+      panel.removeEventListener('pointerup', resume)
+    }
   }, [mode, config.slides.length])
 
-  const active = config.slides[index]
-
   return (
-    <section className={`${styles.sectionBlue} ${styles.sectionPad}`}>
+    <section id={config.id} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
       <Container>
         <div className={styles.reviewSliderHeader}>
           <h2>{config.title}</h2>
           <p>{config.body}</p>
-          <div className={styles.toggle} role="tablist" aria-label="Review slideshow mode">
+          <div
+            className={styles.toggle}
+            data-mode={mode}
+            role="tablist"
+            aria-label="Review feed mode"
+          >
             <button
               type="button"
-              className={mode === 'auto' ? styles.toggleActive : undefined}
+              role="tab"
+              aria-selected={mode === 'auto'}
+              data-active={mode === 'auto'}
               onClick={() => setMode('auto')}
             >
               {config.toggle.auto}
             </button>
             <button
               type="button"
-              className={mode === 'manual' ? styles.toggleActive : undefined}
+              role="tab"
+              aria-selected={mode === 'manual'}
+              data-active={mode === 'manual'}
               onClick={() => setMode('manual')}
             >
               {config.toggle.manual}
@@ -1435,28 +1517,37 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
           </div>
         </div>
 
-        <div className={styles.reviewSlide}>
-          <img src={active.src} alt={active.alt} />
-        </div>
+        <div className={styles.reviewScrollWrap}>
+          <div className={styles.reviewScrollHint} aria-hidden="true">
+            {config.hint}
+          </div>
 
-        <div className={styles.reviewNav}>
-          <button
-            type="button"
-            className={styles.circleIconBtn}
-            onClick={() => setIndex((v) => clampIndex(v - 1, config.slides.length))}
-            aria-label="Previous review"
+          <div
+            className={styles.reviewScrollPanel}
+            aria-label="Customer reviews feed"
+            tabIndex={0}
+            ref={panelRef}
           >
-            <IconChevron dir="left" />
-          </button>
-          <span style={{ fontWeight: 800, color: 'var(--color-brand)' }}>{config.hint}</span>
-          <button
-            type="button"
-            className={styles.circleIconBtn}
-            onClick={() => setIndex((v) => clampIndex(v + 1, config.slides.length))}
-            aria-label="Next review"
-          >
-            <IconChevron dir="right" />
-          </button>
+            <div className={styles.reviewScrollStack}>
+              {config.slides.map((slide, idx) => {
+                if (!slide.src) {
+                  throw new Error(`ReviewSliderSection slide ${idx + 1} is missing src.`)
+                }
+                return (
+                  <a
+                    key={`${slide.src}-${idx}`}
+                    className={styles.reviewTile}
+                    href={slide.src}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open review image ${idx + 1} in a new tab`}
+                  >
+                    <img src={slide.src} alt={slide.alt} />
+                  </a>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </Container>
     </section>

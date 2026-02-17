@@ -57,7 +57,7 @@ export function WorkspaceOnboardingPage() {
 
             <div className="mt-6 space-y-3">
               {[
-                "Capture product details and goals",
+                "Capture key details and goals",
                 "Run baseline research and canon generation",
                 "Prepare strategy + angle scaffolds",
               ].map((item) => (
@@ -67,13 +67,9 @@ export function WorkspaceOnboardingPage() {
                 </div>
               ))}
             </div>
-
-            <div className="mt-6 rounded-lg border border-border-strong bg-surface-hover px-4 py-3 text-sm text-content-muted">
-              <span className="font-semibold text-content">Tip:</span> You can rerun onboarding anytime to refresh research or adjust positioning.
-            </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-surface p-6 shadow-none">
+          <div className="rounded-xl border border-border bg-surface p-6 shadow-none lg:h-[clamp(560px,calc(100vh-240px),760px)] lg:overflow-hidden">
             <OnboardingWizard variant="page" triggerLabel="Start onboarding" onCompleted={handleComplete} />
           </div>
         </div>

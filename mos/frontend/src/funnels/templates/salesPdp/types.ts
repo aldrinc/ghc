@@ -190,6 +190,7 @@ export type ComparisonConfig = {
 }
 
 export type ReviewSliderConfig = {
+  id?: string
   title: string
   body: string
   hint: string

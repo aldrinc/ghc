@@ -147,6 +147,8 @@
   --badge-strip-gap: clamp(22px, 4vw, 64px);
 
   --badge-icon-size: 60px;
+  --badge-icon-radius: 10px;
+  --badge-icon-zoom: 1;
   --badge-text-color: var(--color-brand);
   --badge-text-weight: 600;
   --badge-value-size: clamp(14px, 1.7vw, 25px);
@@ -178,8 +180,8 @@
 
   --listicle-number-size: 50px;
   --listicle-number-offset: 16px;
-  --listicle-number-bg: var(--color-brand);
-  --listicle-number-fg: #ffffff;
+  --listicle-number-bg: var(--color-cta);
+  --listicle-number-fg: var(--color-cta-text);
   --listicle-number-font-size: 32px;
 
   --listicle-content-pad-x: 40px;
@@ -193,7 +195,7 @@
   --listicle-title-line: 1.2;
   --listicle-title-color: rgb(0, 27, 116);
   --listicle-title-margin-bottom: 20px;
-  --listicle-title-letter-spacing: 0;
+  --listicle-title-letter-spacing: 0.015em;
 
   --listicle-body-size: clamp(16px, 2.3vw, 20px);
   --listicle-body-line: 1.5;

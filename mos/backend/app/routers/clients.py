@@ -2,18 +2,21 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
+from app.db.models import ClientUserPreference, Product
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.design_systems import DesignSystemsRepository
-from app.db.repositories.products import ProductsRepository
+from app.db.repositories.products import ProductOffersRepository, ProductsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
+from app.schemas.preferences import ActiveProductUpdateRequest
 from app.schemas.common import ClientCreate
 from app.schemas.clients import ClientDeleteRequest, ClientUpdateRequest
 from app.schemas.onboarding import OnboardingStartRequest
@@ -56,6 +59,131 @@ def get_client(
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     return jsonable_encoder(client)
+
+
+def _serialize_active_product(product: Product) -> dict:
+    return {
+        "id": str(product.id),
+        "title": product.title,
+        "client_id": str(product.client_id),
+        "product_type": product.product_type,
+    }
+
+
+@router.get("/{client_id}/active-product")
+def get_active_product(
+    client_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    clients_repo = ClientsRepository(session)
+    client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
+    if not client:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+
+    pref = session.scalar(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == auth.org_id,
+            ClientUserPreference.client_id == client_id,
+            ClientUserPreference.user_external_id == auth.user_id,
+        )
+    )
+
+    active_product: Product | None = None
+    if pref and pref.active_product_id:
+        active_product = session.scalar(
+            select(Product).where(
+                Product.org_id == auth.org_id,
+                Product.id == pref.active_product_id,
+            )
+        )
+        if not active_product or str(active_product.client_id) != str(client_id):
+            pref.active_product_id = None
+            pref.updated_at = func.now()
+            session.commit()
+            active_product = None
+
+    if not active_product:
+        active_product = session.scalar(
+            select(Product)
+            .where(Product.org_id == auth.org_id, Product.client_id == client_id)
+            .order_by(Product.created_at.desc(), Product.id.asc())
+            .limit(1)
+        )
+        if not active_product:
+            return {"active_product_id": None, "active_product": None}
+
+        if pref:
+            pref.active_product_id = active_product.id
+            pref.updated_at = func.now()
+        else:
+            session.add(
+                ClientUserPreference(
+                    org_id=auth.org_id,
+                    client_id=client_id,
+                    user_external_id=auth.user_id,
+                    active_product_id=active_product.id,
+                )
+            )
+        session.commit()
+
+    return {
+        "active_product_id": str(active_product.id),
+        "active_product": _serialize_active_product(active_product),
+    }
+
+
+@router.put("/{client_id}/active-product")
+def set_active_product(
+    client_id: str,
+    payload: ActiveProductUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    clients_repo = ClientsRepository(session)
+    client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
+    if not client:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+
+    product = session.scalar(
+        select(Product).where(
+            Product.org_id == auth.org_id,
+            Product.id == payload.product_id,
+        )
+    )
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    if str(product.client_id) != str(client_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product must belong to the selected client.",
+        )
+
+    pref = session.scalar(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == auth.org_id,
+            ClientUserPreference.client_id == client_id,
+            ClientUserPreference.user_external_id == auth.user_id,
+        )
+    )
+    if pref:
+        pref.active_product_id = product.id
+        pref.updated_at = func.now()
+    else:
+        session.add(
+            ClientUserPreference(
+                org_id=auth.org_id,
+                client_id=client_id,
+                user_external_id=auth.user_id,
+                active_product_id=product.id,
+            )
+        )
+    session.commit()
+
+    return {
+        "active_product_id": str(product.id),
+        "active_product": _serialize_active_product(product),
+    }
 
 
 @router.patch("/{client_id}")
@@ -136,16 +264,17 @@ async def start_client_onboarding(
     onboarding_repo = OnboardingPayloadsRepository(session)
     clients_repo = ClientsRepository(session)
     products_repo = ProductsRepository(session)
+    offers_repo = ProductOffersRepository(session)
 
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
-    product_fields: dict[str, object] = {"name": payload.product_name}
+    product_fields: dict[str, object] = {"title": payload.product_name}
     if payload.product_description is not None:
         product_fields["description"] = payload.product_description
     if payload.product_category is not None:
-        product_fields["category"] = payload.product_category
+        product_fields["product_type"] = payload.product_category
     if payload.primary_benefits is not None:
         product_fields["primary_benefits"] = payload.primary_benefits
     if payload.feature_bullets is not None:
@@ -161,8 +290,27 @@ async def start_client_onboarding(
         **product_fields,
     )
 
+    offer_fields: dict[str, object] = {
+        "name": product.title,
+        "business_model": "unspecified",
+    }
+    if payload.product_description is not None:
+        offer_fields["description"] = payload.product_description
+    if payload.primary_benefits:
+        offer_fields["differentiation_bullets"] = payload.primary_benefits
+    if payload.guarantee_text is not None:
+        offer_fields["guarantee_text"] = payload.guarantee_text
+
+    default_offer = offers_repo.create(
+        org_id=auth.org_id,
+        client_id=client_id,
+        product_id=str(product.id),
+        **offer_fields,
+    )
+
     payload_data = payload.model_dump()
     payload_data["product_id"] = str(product.id)
+    payload_data["default_offer_id"] = str(default_offer.id)
 
     onboarding_payload = onboarding_repo.create(
         org_id=auth.org_id,
@@ -209,7 +357,8 @@ async def start_client_onboarding(
         "workflow_run_id": str(run.id),
         "temporal_workflow_id": handle.id,
         "product_id": str(product.id),
-        "product_name": product.name,
+        "product_name": product.title,
+        "default_offer_id": str(default_offer.id),
     }
 
 
@@ -261,10 +410,7 @@ async def start_campaign_intent(
         artifact_type=ArtifactTypeEnum.metric_schema,
     )
     wf_repo = WorkflowsRepository(session)
-    approvals_ok = wf_repo.has_onboarding_approvals(
-        org_id=auth.org_id, client_id=client_id, product_id=product_id
-    )
-    if (not canon or not metric) and not approvals_ok:
+    if not canon or not metric:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Complete client onboarding (canon + metric schema) before starting campaign intent.",

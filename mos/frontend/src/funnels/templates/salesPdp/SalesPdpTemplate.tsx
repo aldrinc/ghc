@@ -46,6 +46,24 @@ type Props = {
 };
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const URGENCY_MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
+  month: "long",
+  timeZone: "UTC",
+});
+
+// Keep layout geometry consistent with the base template.
+// Brand design systems can still change colors and font families.
+const LOCKED_TEMPLATE_CSS_VARS = new Set([
+  "--container-max",
+  "--container-pad",
+  "--marquee-border",
+  "--marquee-font-size",
+  "--marquee-font-weight",
+  "--marquee-gap",
+  "--marquee-height",
+  "--marquee-letter-spacing",
+  "--marquee-pad-x",
+]);
 
 function toCssVarName(key: string): string {
   const trimmed = key.trim();
@@ -110,6 +128,19 @@ function clampIndex(next: number, length: number) {
 
 function currency(n: number) {
   return `$${Math.round(n)}`
+}
+
+function resolveUrgencyMonthLabels(now: Date = new Date()) {
+  const currentYear = now.getUTCFullYear();
+  const currentMonthIndex = now.getUTCMonth();
+  const previousYear = currentMonthIndex === 0 ? currentYear - 1 : currentYear;
+  const previousMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
+  const currentMonthDate = new Date(Date.UTC(currentYear, currentMonthIndex, 1));
+  const previousMonthDate = new Date(Date.UTC(previousYear, previousMonthIndex, 1));
+  return {
+    previousMonthLabel: URGENCY_MONTH_FORMATTER.format(previousMonthDate).toUpperCase(),
+    currentMonthLabel: URGENCY_MONTH_FORMATTER.format(currentMonthDate).toUpperCase(),
+  };
 }
 
 function isRuleMatch(
@@ -190,18 +221,35 @@ function IconCheck({ size = 16 }: { size?: number }) {
   )
 }
 
-function IconChevron({ dir }: { dir: 'left' | 'right' }) {
-  const d = dir === 'left' ? 'M14 6l-6 6 6 6' : 'M10 6l6 6-6 6'
+function IconArrow({
+  dir,
+  size = 16,
+}: {
+  dir: 'left' | 'right'
+  size?: number
+}) {
   return (
     <svg
-      width="20"
-      height="20"
+      width={size}
+      height={size}
       viewBox="0 0 24 24"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <path d={d} stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d={dir === 'left' ? 'M19 12H7' : 'M5 12h12'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <path
+        d={dir === 'left' ? 'M11 6l-6 6 6 6' : 'M13 6l6 6-6 6'}
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -217,26 +265,6 @@ function IconPlayTriangle({ size = 10 }: { size?: number }) {
       aria-hidden="true"
     >
       <path d="M9 7l10 5-10 5V7z" fill="currentColor" />
-    </svg>
-  )
-}
-
-function IconArrowRight({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path
-        d="M5 12h12"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M13 6l6 6-6 6"
-        stroke="currentColor"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   )
 }
@@ -343,7 +371,7 @@ function HeaderBar({
 }) {
   return (
     <div className={styles.header} aria-hidden={!visible}>
-      <Container>
+      <Container className={styles.headerContainer}>
         <div className={`${styles.headerInner} ${visible ? styles.headerVisible : styles.headerHidden}`}>
           <a className={styles.logo} href={config.logo.href ?? '#top'}>
             <img className={styles.logoImg} src={resolveImageSrc(config.logo)} alt={config.logo.alt} />
@@ -364,7 +392,7 @@ function HeaderBar({
           <a className={styles.headerCta} href={config.cta.href}>
             {config.cta.label}
             <span className={styles.headerCtaIcon} aria-hidden="true">
-              <IconArrowRight size={14} />
+              <IconArrow dir="right" size={14} />
             </span>
           </a>
         </div>
@@ -392,7 +420,7 @@ function Gallery({
       <div className={styles.galleryMain}>
         <img src={resolveImageSrc(active)} alt={active.alt} />
 
-        {freeGifts ? (
+        {freeGifts && index === 0 ? (
           <button
             type="button"
             className={styles.giftOverlay}
@@ -426,7 +454,7 @@ function Gallery({
           onClick={() => setIndex((v) => clampIndex(v - 1, slides.length))}
           aria-label="Previous image"
         >
-          <IconChevron dir="left" />
+          <IconArrow dir="left" size={18} />
         </button>
         <span className={styles.galleryCounter}>
           {index + 1} / {slides.length}
@@ -437,14 +465,14 @@ function Gallery({
           onClick={() => setIndex((v) => clampIndex(v + 1, slides.length))}
           aria-label="Next image"
         >
-          <IconChevron dir="right" />
+          <IconArrow dir="right" size={18} />
         </button>
       </div>
 
       <div className={styles.thumbRow} role="tablist" aria-label="Image thumbnails">
         {slides.map((s, i) => (
           <button
-            key={s.src + i}
+            key={`${s.assetPublicId ?? s.src ?? 'slide'}-${i}`}
             type="button"
             className={`${styles.thumb} ${i === index ? styles.thumbSelected : ''}`}
             onClick={() => setIndex(i)}
@@ -474,23 +502,23 @@ function SizeCard({
       onClick={onClick}
       aria-pressed={selected}
     >
-      {selected ? (
-        <span className={styles.selectedCheck} aria-hidden="true">
-          <span
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              width: 18,
-              height: 18,
-              borderRadius: 999,
-              background: 'var(--pdp-check-bg)',
-              color: 'var(--color-bg)',
-            }}
-          >
-            <IconCheck size={14} />
-          </span>
-        </span>
-      ) : null}
+	      {selected ? (
+	        <span className={styles.selectedCheck} aria-hidden="true">
+	          <span
+	            style={{
+	              display: 'grid',
+	              placeItems: 'center',
+	              width: 22,
+	              height: 22,
+	              borderRadius: 999,
+	              background: 'var(--pdp-check-bg)',
+	              color: 'var(--color-bg)',
+	            }}
+	          >
+	            <IconCheck size={18} />
+	          </span>
+	        </span>
+	      ) : null}
       <p className={styles.optionLabel}>{option.label}</p>
       <p className={styles.optionMeta}>
         {option.sizeIn}
@@ -521,23 +549,23 @@ function OfferCard({
       onClick={onClick}
       aria-pressed={selected}
     >
-      {selected ? (
-        <span className={styles.selectedCheck} aria-hidden="true">
-          <span
-            style={{
-              display: 'grid',
-              placeItems: 'center',
-              width: 18,
-              height: 18,
-              borderRadius: 999,
-              background: 'var(--pdp-check-bg)',
-              color: 'var(--color-bg)',
-            }}
-          >
-            <IconCheck size={14} />
-          </span>
-        </span>
-      ) : null}
+	      {selected ? (
+	        <span className={styles.selectedCheck} aria-hidden="true">
+	          <span
+	            style={{
+	              display: 'grid',
+	              placeItems: 'center',
+	              width: 22,
+	              height: 22,
+	              borderRadius: 999,
+	              background: 'var(--pdp-check-bg)',
+	              color: 'var(--color-bg)',
+	            }}
+	          >
+	            <IconCheck size={18} />
+	          </span>
+	        </span>
+	      ) : null}
 
       <img className={styles.offerCardImage} src={resolveImageSrc(option.image)} alt={option.image.alt} />
       <p className={styles.offerLabel}>{option.title}</p>
@@ -565,31 +593,34 @@ function ColorSwatch({
 
   return (
     <button type="button" className={styles.swatchBtn} onClick={onClick} aria-pressed={selected}>
-      <div
-        className={`${styles.swatchCircle} ${selected ? styles.swatchCircleSelected : ''}`}
-        style={background ? { background } : undefined}
-      >
-        {option.swatchImageSrc || option.swatchAssetPublicId ? (
-          <img
-            src={resolveAssetSrc(option.swatchAssetPublicId, option.swatchImageSrc)}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        ) : null}
+      <div className={styles.swatchCircleWrap}>
+        <div
+          className={`${styles.swatchCircle} ${selected ? styles.swatchCircleSelected : ''}`}
+          style={background ? { background } : undefined}
+        >
+          {option.swatchImageSrc || option.swatchAssetPublicId ? (
+            <img
+              src={resolveAssetSrc(option.swatchAssetPublicId, option.swatchImageSrc)}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : null}
+        </div>
+
         {selected ? (
-          <span className={styles.selectedCheck} aria-hidden="true">
+          <span className={`${styles.selectedCheck} ${styles.selectedCheckSwatch}`} aria-hidden="true">
             <span
               style={{
                 display: 'grid',
                 placeItems: 'center',
-                width: 18,
-                height: 18,
+                width: 22,
+                height: 22,
                 borderRadius: 999,
                 background: 'var(--pdp-check-bg)',
                 color: 'var(--color-bg)',
               }}
             >
-              <IconCheck size={14} />
+              <IconCheck size={18} />
             </span>
           </span>
         ) : null}
@@ -641,13 +672,17 @@ export function SalesPdpPage({ anchorId, theme, themeJson, content, children }: 
     if (designSystemTokens?.cssVars) {
       for (const [rawKey, rawValue] of Object.entries(designSystemTokens.cssVars)) {
         if (rawValue === undefined || rawValue === null) continue
-        style[toCssVarName(rawKey)] = String(rawValue)
+        const cssVarName = toCssVarName(rawKey)
+        if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue
+        style[cssVarName] = String(rawValue)
       }
     }
     if (explicitTheme?.tokens) {
       for (const [rawKey, rawValue] of Object.entries(resolvedTheme.tokens)) {
         if (rawValue === undefined || rawValue === null) continue
-        style[toCssVarName(rawKey)] = String(rawValue)
+        const cssVarName = toCssVarName(rawKey)
+        if (LOCKED_TEMPLATE_CSS_VARS.has(cssVarName)) continue
+        style[cssVarName] = String(rawValue)
       }
     }
     return style
@@ -683,20 +718,39 @@ export function SalesPdpHeader({ config, configJson }: SalesPdpHeaderProps) {
         .map((href) => href.slice(1)),
     [resolvedConfig.nav]
   )
+  // The Sales PDP template treats the story "problem" section as the "how-it-works" anchor.
+  // Multiple parts of the template rely on this (e.g. styling), so we use it as the trigger
+  // for the floating CTA bar.
+  const showAfterSectionId = 'how-it-works'
 
   const [activeSection, setActiveSection] = useState<string | null>(navSectionIds[0] ?? null)
   const [showHeader, setShowHeader] = useState(false)
   const sectionRatioRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
-    const onScroll = () => {
-      setShowHeader(window.scrollY > 180)
+    const el = document.getElementById(showAfterSectionId)
+    if (!el) {
+      console.error(
+        `SalesPdpHeader: cannot find section #${showAfterSectionId}. ` +
+          "The Sales PDP floating CTA bar is configured to show after the story problem section."
+      )
+      setShowHeader(false)
+      return
     }
 
-    window.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    const obs = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0]
+        if (!entry) return
+        const pastTrigger = entry.isIntersecting || entry.boundingClientRect.top < 0
+        setShowHeader(pastTrigger)
+      },
+      { threshold: 0 }
+    )
+
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [showAfterSectionId])
 
   useEffect(() => {
     if (!navSectionIds.length) return
@@ -763,7 +817,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
   const colorOptions = resolvedHero.purchase.color.options
   const offerOptions = resolvedHero.purchase.offer.options
 
-  const [selectedSize, setSelectedSize] = useState(sizeOptions[1]?.id ?? sizeOptions[0]?.id)
+  const [selectedSize, setSelectedSize] = useState(sizeOptions[0]?.id)
   const [selectedColor, setSelectedColor] = useState(colorOptions[0]?.id)
   const [selectedOffer, setSelectedOffer] = useState(offerOptions[1]?.id ?? offerOptions[0]?.id)
 
@@ -832,6 +886,16 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
     urgencyHighlightIndex >= 0
       ? urgencyMessage.slice(urgencyHighlightIndex + urgencyHighlight.length)
       : ''
+  const urgencyRows = useMemo(() => {
+    const rows = resolvedHero.purchase.cta.urgency.rows
+    if (rows.length < 2) return rows
+    const { previousMonthLabel, currentMonthLabel } = resolveUrgencyMonthLabels()
+    return rows.map((row, index) => {
+      if (index === 0) return { ...row, label: previousMonthLabel }
+      if (index === 1) return { ...row, label: currentMonthLabel }
+      return row
+    })
+  }, [resolvedHero.purchase.cta.urgency.rows])
 
   const handleCheckout = async () => {
     setCheckoutError(null);
@@ -847,14 +911,9 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       setCheckoutError("Commerce data is not available.");
       return;
     }
-    const productOfferId = selectedOfferObj?.productOfferId;
-    if (!productOfferId) {
-      setCheckoutError("Selected offer is missing productOfferId.");
-      return;
-    }
-    const offer = runtime.commerce.offers.find((item) => item.id === productOfferId);
-    if (!offer) {
-      setCheckoutError("Selected offer is not available.");
+    const variants = runtime.commerce.product?.variants || [];
+    if (!variants.length) {
+      setCheckoutError("Checkout is not configured for this funnel product. No product variants were found.");
       return;
     }
     const selection = selectionFromIds({
@@ -862,22 +921,25 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       colorId: selectedColorObj?.id,
       offerId: selectedOfferObj?.id,
     });
-    const pricePoint = (offer.pricePoints || []).find((pp) => matchesOptionValues(pp.option_values, selection));
-    if (!pricePoint) {
-      setCheckoutError("No price point matches the selected options.");
+    const variant = variants.find((item) => matchesOptionValues(item.option_values, selection));
+    if (!variant) {
+      setCheckoutError("No variant matches the selected options.");
+      return;
+    }
+    if (!variant.provider) {
+      setCheckoutError("Checkout is not configured for this funnel product. Variant provider is missing.");
       return;
     }
 
     setIsCheckingOut(true);
     try {
-      runtime.trackEvent?.({ eventType: "cta_click", props: { offerId: offer.id, pricePointId: pricePoint.id } });
+      runtime.trackEvent?.({ eventType: "cta_click", props: { variantId: variant.id } });
       const response = await fetch(`${apiBaseUrl}/public/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           publicId: runtime.publicId,
-          offerId: offer.id,
-          pricePointId: pricePoint.id,
+          variantId: variant.id,
           selection,
           quantity: 1,
           successUrl: `${window.location.origin}${window.location.pathname}?checkout=success`,
@@ -1060,7 +1122,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                 {resolvedHero.purchase.benefits.map((b) => (
                   <div key={b.text} className={styles.benefit}>
                     <span className={styles.checkCircle} aria-hidden="true">
-                      <IconCheck size={16} />
+                      <IconCheck size={18} />
                     </span>
                     {b.text}
                   </div>
@@ -1069,16 +1131,14 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
               <div className={styles.divider} />
 
-              {/* Size */}
-              <div>
-                <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {resolvedHero.purchase.size.title} <span>{selectedSizeObj?.label}</span>
-                  </div>
-                  <button type="button" className={styles.helpLink} onClick={() => setOpenSizeChart(true)}>
-                    {resolvedHero.purchase.size.helpLinkLabel}
-                  </button>
-                </div>
+	              {/* Size */}
+	              <div>
+	                <div className={styles.sectionTitleRow}>
+	                  <div className={styles.stepTitle}>{resolvedHero.purchase.size.title}</div>
+	                  <button type="button" className={styles.helpLink} onClick={() => setOpenSizeChart(true)}>
+	                    {resolvedHero.purchase.size.helpLinkLabel}
+	                  </button>
+	                </div>
 
                 <div className={styles.optionGrid3}>
                   {sizeOptions.map((o) => (
@@ -1101,16 +1161,14 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
               <div className={styles.divider} />
 
-              {/* Color */}
-              <div>
-                <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {resolvedHero.purchase.color.title} <span>{selectedColorObj?.label}</span>
-                  </div>
-                </div>
-                <div className={styles.colorRow}>
-                  {colorOptions.map((c) => (
-                    <ColorSwatch
+	              {/* Color */}
+	              <div>
+	                <div className={styles.sectionTitleRow}>
+	                  <div className={styles.stepTitle}>{resolvedHero.purchase.color.title}</div>
+	                </div>
+	                <div className={styles.colorRow}>
+	                  {colorOptions.map((c) => (
+	                    <ColorSwatch
                       key={c.id}
                       option={c}
                       selected={c.id === selectedColor}
@@ -1129,53 +1187,51 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
               <div className={styles.divider} />
 
-              {/* Offer */}
-              <div>
-                <div className={styles.sectionTitleRow}>
-                  <div className={styles.stepTitle}>
-                    {resolvedHero.purchase.offer.title} <span>{selectedOfferObj?.title}</span>
-                  </div>
-                </div>
-                <div className={styles.offerHelper}>
-                  {resolvedHero.purchase.offer.helperText}{' '}
-                  <button type="button" className={styles.seeWhy} onClick={() => setOpenWhyBundle(true)}>
-                    {resolvedHero.purchase.offer.seeWhyLabel}
+	              {/* Offer */}
+	              <div>
+	                <div className={styles.sectionTitleRow}>
+	                  <div className={styles.stepTitle}>{resolvedHero.purchase.offer.title}</div>
+	                </div>
+	                <div className={styles.offerHelper}>
+	                  {resolvedHero.purchase.offer.helperText}{' '}
+	                  <button type="button" className={styles.seeWhy} onClick={() => setOpenWhyBundle(true)}>
+	                    {resolvedHero.purchase.offer.seeWhyLabel}
                   </button>
                 </div>
 
-                <div className={styles.optionGrid3}>
-                  {offerOptions.map((o) => (
-                    <OfferCard
-                      key={o.id}
-                      option={o}
-                      selected={o.id === selectedOffer}
+	                <div className={styles.offerGrid}>
+	                  {offerOptions.map((o) => (
+	                    <OfferCard
+	                      key={o.id}
+	                      option={o}
+	                      selected={o.id === selectedOffer}
                       onClick={() => setSelectedOffer(o.id)}
                     />
                   ))}
                 </div>
 
-                <button type="button" className={styles.ctaButton} onClick={handleCheckout} disabled={isCheckingOut}>
-                  {isCheckingOut ? "Starting checkout…" : ctaLabel}
-                  <span className={styles.ctaIconCircle} aria-hidden="true">
-                    <IconArrowRight size={14} />
-                  </span>
-                </button>
+	                <button type="button" className={styles.ctaButton} onClick={handleCheckout} disabled={isCheckingOut}>
+	                  {isCheckingOut ? "Starting checkout…" : ctaLabel}
+	                  <span className={styles.ctaIconCircle} aria-hidden="true">
+	                    <IconArrow dir="right" size={24} />
+	                  </span>
+	                </button>
                 {checkoutError ? (
                   <div className={styles.stockNotice} role="alert">
                     {checkoutError}
                   </div>
                 ) : null}
 
-                <div className={styles.ctaSubBullets}>
-                  {resolvedHero.purchase.cta.subBullets.map((t) => (
-                    <span key={t}>
-                      <span className={styles.checkCircle} aria-hidden="true">
-                        <IconCheck size={12} />
-                      </span>
-                      {t}
-                    </span>
-                  ))}
-                </div>
+	                <div className={styles.ctaSubBullets}>
+	                  {resolvedHero.purchase.cta.subBullets.map((t) => (
+	                    <span key={t}>
+	                      <span className={styles.checkCircle} aria-hidden="true">
+	                        <IconCheck size={18} />
+	                      </span>
+	                      {t}
+	                    </span>
+	                  ))}
+	                </div>
 
                 <div className={styles.urgency}>
                   <div className={styles.urgencyTop}>
@@ -1195,9 +1251,9 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                     </div>
                   </div>
                   <div className={styles.urgencyRows}>
-                    {resolvedHero.purchase.cta.urgency.rows.map((r) => (
+                    {urgencyRows.map((r, index) => (
                       <div
-                        key={r.label}
+                        key={`${r.label}-${index}`}
                         className={`${styles.urgencyRow} ${
                           r.tone === 'highlight'
                             ? styles.urgencyRowHighlight
@@ -1238,7 +1294,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
             <tbody>
               {resolvedModals.sizeChart.sizes.map((s) => (
                 <tr key={s.label}>
-                  <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)', fontWeight: 800 }}>{s.label}</td>
+                  <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)', fontWeight: 700 }}>{s.label}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)' }}>{s.size}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)' }}>{s.idealFor}</td>
                   <td style={{ padding: 10, borderBottom: '1px solid var(--pdp-black-08)' }}>{s.weight}</td>
@@ -1269,7 +1325,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                 background: 'var(--pdp-black-03)',
               }}
             >
-              <div style={{ fontWeight: 800, marginBottom: 6 }}>&ldquo;{q.text}&rdquo;</div>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>&ldquo;{q.text}&rdquo;</div>
               <div style={{ color: 'var(--pdp-black-65)' }}>— {q.author}</div>
             </div>
           ))}
@@ -1341,10 +1397,11 @@ function SalesPdpStorySection({
 }) {
   const sectionBg = section.bg === 'blue' ? styles.sectionBlue : styles.sectionPeach
   const layout = section.layout === 'textRight' ? 'textRight' : 'textLeft'
+  const gridLayoutClass = layout === 'textRight' ? styles.storyGridTextRight : styles.storyGridTextLeft
   return (
     <section id={section.id} className={`${sectionBg} ${styles.sectionPad} ${className ?? ''}`.trim()}>
-      <Container>
-        <div className={styles.storyGrid}>
+      <Container className={styles.storyContainerTight}>
+        <div className={`${styles.storyGrid} ${gridLayoutClass}`}>
           {layout === 'textRight' ? (
             <>
               <img className={styles.storyImage} src={resolveImageSrc(section.image)} alt={section.image.alt} />
@@ -1490,6 +1547,7 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
     let rafId = 0
     let lastTime = 0
     let paused = false
+    let scrollPos = panel.scrollTop
 
     const step = (time: number) => {
       if (!lastTime) lastTime = time
@@ -1499,11 +1557,17 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
       if (!paused) {
         const maxScroll = panel.scrollHeight - panel.clientHeight
         if (maxScroll > 0) {
-          panel.scrollTop += delta * 0.015
-          if (panel.scrollTop >= maxScroll) {
-            panel.scrollTop = 0
+          // Use a separate accumulator so sub-pixel deltas still make progress on browsers
+          // that quantize `scrollTop` to whole pixels.
+          scrollPos += delta * 0.008
+          if (scrollPos >= maxScroll) {
+            scrollPos = 0
           }
+          panel.scrollTop = scrollPos
         }
+      } else {
+        // Keep the accumulator aligned with manual scrolling while paused.
+        scrollPos = panel.scrollTop
       }
 
       rafId = window.requestAnimationFrame(step)
@@ -1516,6 +1580,7 @@ export function SalesPdpGuarantee({ config, configJson, feedImages, feedImagesJs
     const resume = () => {
       paused = false
       lastTime = 0
+      scrollPos = panel.scrollTop
     }
 
     panel.addEventListener('pointerenter', pause)
@@ -1614,9 +1679,11 @@ export function SalesPdpFaq({ config, configJson }: SalesPdpFaqProps) {
 type SalesPdpReviewWallProps = {
   config?: ReviewWallConfig
   configJson?: string
+  hidden?: boolean
 }
 
-export function SalesPdpReviewWall({ config, configJson }: SalesPdpReviewWallProps) {
+export function SalesPdpReviewWall({ config, configJson, hidden }: SalesPdpReviewWallProps) {
+  if (hidden) return null
   const resolvedConfig = parseJson<ReviewWallConfig>(configJson) ?? config ?? salesPdpDefaults.config.reviewWall
   return (
     <section id={resolvedConfig.id} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
@@ -1786,36 +1853,92 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
       "SalesPdpReviewSlider config.toggle.auto/manual is required. Regenerate the sales page config."
     )
   }
+  if (!config?.slides?.length) {
+    throw new Error("SalesPdpReviewSlider config.slides must be a non-empty list. Regenerate the sales page config.")
+  }
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
-  const [index, setIndex] = useState(0)
+  const panelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    const panel = panelRef.current
+    if (!panel) return
     if (mode !== 'auto') return
-    const id = window.setInterval(() => {
-      setIndex((v) => clampIndex(v + 1, config.slides.length))
-    }, 3200)
-    return () => window.clearInterval(id)
+
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
+    if (media.matches) return
+
+    let rafId = 0
+    let lastTime = 0
+    let paused = false
+
+    const step = (time: number) => {
+      if (!lastTime) lastTime = time
+      const delta = time - lastTime
+      lastTime = time
+
+      if (!paused) {
+        const maxScroll = panel.scrollHeight - panel.clientHeight
+        if (maxScroll > 0) {
+          panel.scrollTop += delta * 0.01
+          if (panel.scrollTop >= maxScroll) {
+            panel.scrollTop = 0
+          }
+        }
+      }
+
+      rafId = window.requestAnimationFrame(step)
+    }
+
+    const pause = () => {
+      paused = true
+    }
+
+    const resume = () => {
+      paused = false
+      lastTime = 0
+    }
+
+    panel.addEventListener('pointerenter', pause)
+    panel.addEventListener('pointerleave', resume)
+    panel.addEventListener('focusin', pause)
+    panel.addEventListener('focusout', resume)
+    panel.addEventListener('pointerdown', pause)
+    panel.addEventListener('pointerup', resume)
+
+    rafId = window.requestAnimationFrame(step)
+
+    return () => {
+      window.cancelAnimationFrame(rafId)
+      panel.removeEventListener('pointerenter', pause)
+      panel.removeEventListener('pointerleave', resume)
+      panel.removeEventListener('focusin', pause)
+      panel.removeEventListener('focusout', resume)
+      panel.removeEventListener('pointerdown', pause)
+      panel.removeEventListener('pointerup', resume)
+    }
   }, [mode, config.slides.length])
 
-  const active = config.slides[index]
-
   return (
-    <section className={`${styles.sectionBlue} ${styles.sectionPad}`}>
+    <section id={config.id} className={`${styles.sectionBlue} ${styles.sectionPad}`}>
       <Container>
         <div className={styles.reviewSliderHeader}>
           <h2>{config.title}</h2>
           <p>{config.body}</p>
-          <div className={styles.toggle} role="tablist" aria-label="Review slideshow mode">
+          <div className={styles.toggle} data-mode={mode} role="tablist" aria-label="Review feed mode">
             <button
               type="button"
-              className={mode === 'auto' ? styles.toggleActive : undefined}
+              role="tab"
+              aria-selected={mode === 'auto'}
+              data-active={mode === 'auto'}
               onClick={() => setMode('auto')}
             >
               {config.toggle.auto}
             </button>
             <button
               type="button"
-              className={mode === 'manual' ? styles.toggleActive : undefined}
+              role="tab"
+              aria-selected={mode === 'manual'}
+              data-active={mode === 'manual'}
               onClick={() => setMode('manual')}
             >
               {config.toggle.manual}
@@ -1823,28 +1946,40 @@ export function ReviewSliderSection({ config }: { config: PdpConfig['reviewSlide
           </div>
         </div>
 
-        <div className={styles.reviewSlide}>
-          <img src={resolveImageSrc(active)} alt={active.alt} />
-        </div>
+        <div className={styles.reviewScrollWrap}>
+          <div className={styles.reviewScrollHint} aria-hidden="true">
+            {config.hint}
+          </div>
 
-        <div className={styles.reviewNav}>
-          <button
-            type="button"
-            className={styles.circleIconBtn}
-            onClick={() => setIndex((v) => clampIndex(v - 1, config.slides.length))}
-            aria-label="Previous review"
+          <div
+            className={styles.reviewScrollPanel}
+            aria-label="Customer reviews feed"
+            tabIndex={0}
+            ref={panelRef}
           >
-            <IconChevron dir="left" />
-          </button>
-          <span style={{ fontWeight: 800, color: 'var(--color-brand)' }}>{config.hint}</span>
-          <button
-            type="button"
-            className={styles.circleIconBtn}
-            onClick={() => setIndex((v) => clampIndex(v + 1, config.slides.length))}
-            aria-label="Next review"
-          >
-            <IconChevron dir="right" />
-          </button>
+            <div className={styles.reviewScrollStack}>
+              {config.slides.map((slide, idx) => {
+                const src = resolveImageSrc(slide)
+                if (!src) {
+                  throw new Error(
+                    `SalesPdpReviewSlider slide ${idx + 1} is missing src/assetPublicId. Regenerate the sales page config.`
+                  )
+                }
+                return (
+                  <a
+                    key={`${src}-${idx}`}
+                    className={styles.reviewTile}
+                    href={src}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Open review image ${idx + 1} in a new tab`}
+                  >
+                    <img src={src} alt={slide.alt} />
+                  </a>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </Container>
     </section>

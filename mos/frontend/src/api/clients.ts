@@ -67,6 +67,7 @@ export function useStartOnboarding() {
         temporal_workflow_id: string;
         product_id: string;
         product_name?: string;
+        default_offer_id?: string;
       }>(`/clients/${clientId}/onboarding`, payload),
     onSuccess: () => {
       toast.success("Onboarding started");

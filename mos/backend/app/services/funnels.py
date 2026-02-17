@@ -9,6 +9,7 @@ import hashlib
 import os
 import re
 import mimetypes
+import time
 from typing import Any, Optional
 
 import httpx
@@ -149,9 +150,17 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
     if str(funnel.entry_page_id) not in page_id_set:
         raise ValueError("Entry page does not belong to funnel")
 
-    approved_by_page: dict[str, FunnelPageVersion] = {}
+    version_by_page: dict[str, FunnelPageVersion] = {}
     for page in pages:
-        version = session.scalars(
+        draft = session.scalars(
+            select(FunnelPageVersion)
+            .where(
+                FunnelPageVersion.page_id == page.id,
+                FunnelPageVersion.status == FunnelPageVersionStatusEnum.draft,
+            )
+            .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
+        ).first()
+        approved = session.scalars(
             select(FunnelPageVersion)
             .where(
                 FunnelPageVersion.page_id == page.id,
@@ -159,8 +168,9 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
             )
             .order_by(FunnelPageVersion.created_at.desc(), FunnelPageVersion.id.desc())
         ).first()
+        version = draft or approved
         if not version:
-            raise ValueError(f"Page '{page.name}' is not approved")
+            raise ValueError(f"Page '{page.name}' has no saved version to publish")
         # Compliance gate: prevent publishing synthetic testimonials in production.
         if settings.ENVIRONMENT.lower() in {"prod", "production"} and not settings.ALLOW_SYNTHETIC_TESTIMONIALS_IN_PRODUCTION:
             md = version.ai_metadata if isinstance(version.ai_metadata, dict) else {}
@@ -175,7 +185,7 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
                     f"Page '{page.name}' contains synthetic testimonials and cannot be published in production. "
                     "Replace with production testimonials or remove testimonials before publishing."
                 )
-        approved_by_page[str(page.id)] = version
+        version_by_page[str(page.id)] = version
 
     publication = FunnelPublication(
         funnel_id=funnel.id,
@@ -187,7 +197,7 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
 
     extracted_links: list[tuple[str, InternalLink]] = []
     for page in pages:
-        version = approved_by_page[str(page.id)]
+        version = version_by_page[str(page.id)]
         for link in extract_internal_links(version.puck_data):
             if link.to_page_id not in page_id_set:
                 raise ValueError(f"Invalid internal link target: {link.to_page_id}")
@@ -213,7 +223,7 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
             FunnelPublicationPage(
                 publication_id=publication.id,
                 page_id=page.id,
-                page_version_id=approved_by_page[str(page.id)].id,
+                page_version_id=version_by_page[str(page.id)].id,
                 slug_at_publish=page.slug,
             )
         )
@@ -274,6 +284,8 @@ def duplicate_funnel(
         if target_campaign and str(target_campaign.id) == str(source.campaign_id)
         else None,
         design_system_id=source.design_system_id,
+        product_id=source.product_id,
+        selected_offer_id=source.selected_offer_id,
         name=name or f"{source.name} (Copy)",
         description=source.description,
         status=FunnelStatusEnum.draft,
@@ -388,9 +400,70 @@ def _extract_first_inline_image(response_json: dict[str, Any]) -> tuple[bytes, s
     raise RuntimeError("Gemini response did not include inline image data")
 
 
+def _summarize_gemini_response_for_debug(response_json: Any) -> str:
+    if not isinstance(response_json, dict):
+        return f"type={type(response_json).__name__}"
+    try:
+        top_keys = sorted(list(response_json.keys()))[:20]
+        candidates = response_json.get("candidates") or []
+        candidate_count = len(candidates) if isinstance(candidates, list) else 0
+
+        finish_reasons: list[str] = []
+        part_kinds: list[str] = []
+        if isinstance(candidates, list):
+            for cand in candidates[:3]:
+                if not isinstance(cand, dict):
+                    continue
+                finish = cand.get("finishReason") or cand.get("finish_reason")
+                if isinstance(finish, str):
+                    finish_reasons.append(finish)
+                content = cand.get("content") if isinstance(cand.get("content"), dict) else None
+                parts = content.get("parts") if isinstance(content, dict) else None
+                if isinstance(parts, list):
+                    for part in parts[:6]:
+                        if not isinstance(part, dict):
+                            continue
+                        if "inlineData" in part or "inline_data" in part:
+                            part_kinds.append("inlineData")
+                        elif "text" in part:
+                            part_kinds.append("text")
+                        else:
+                            part_kinds.append(",".join(sorted(part.keys()))[:60])
+
+        prompt_feedback = response_json.get("promptFeedback") or response_json.get("prompt_feedback")
+        block_reason = None
+        if isinstance(prompt_feedback, dict):
+            block_reason = prompt_feedback.get("blockReason") or prompt_feedback.get("block_reason")
+
+        bits = [
+            f"topKeys={top_keys}",
+            f"candidateCount={candidate_count}",
+            f"finishReasons={finish_reasons[:3]}",
+            f"partKinds={part_kinds[:12]}",
+        ]
+        if isinstance(block_reason, str) and block_reason.strip():
+            bits.append(f"blockReason={block_reason.strip()}")
+        return " ".join(bits)
+    except Exception as exc:  # noqa: BLE001
+        return f"failed_to_summarize_response error={type(exc).__name__}"
+
+
 def _gemini_image_references_enabled() -> bool:
     raw = os.getenv("GEMINI_IMAGE_REFERENCES_ENABLED", "")
     return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+_DEFAULT_FUNNEL_IMAGE_MODEL = "gemini-3-pro-image-preview"
+
+
+def _resolve_funnel_image_model() -> str:
+    model = os.getenv("FUNNEL_IMAGE_MODEL") or os.getenv("NANO_BANANA_MODEL") or _DEFAULT_FUNNEL_IMAGE_MODEL
+    cleaned = str(model).strip()
+    if not cleaned:
+        raise RuntimeError(
+            "Funnel image model is not configured. Set FUNNEL_IMAGE_MODEL or NANO_BANANA_MODEL."
+        )
+    return cleaned
 
 
 def generate_gemini_image_bytes(
@@ -399,10 +472,11 @@ def generate_gemini_image_bytes(
     aspect_ratio: Optional[str] = None,
     reference_image_bytes: Optional[bytes] = None,
     reference_image_mime_type: Optional[str] = None,
-) -> tuple[bytes, str]:
+) -> tuple[bytes, str, str]:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")
+    model = _resolve_funnel_image_model()
 
     parts: list[dict[str, Any]] = []
     if reference_image_bytes is not None:
@@ -427,17 +501,48 @@ def generate_gemini_image_bytes(
     if aspect_ratio:
         payload["generationConfig"] = {"imageConfig": {"aspectRatio": aspect_ratio}}
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent"
-    resp = httpx.post(
-        url,
-        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-        json=payload,
-        timeout=60.0,
-    )
-    resp.raise_for_status()
-    data = resp.json()
-    image_bytes, mime_type = _extract_first_inline_image(data)
-    return image_bytes, mime_type
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    retries = 2
+    last_summary: str | None = None
+    for attempt in range(retries + 1):
+        try:
+            resp = httpx.post(
+                url,
+                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                json=payload,
+                timeout=60.0,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status == 429 and attempt < retries:
+                retry_after_raw = exc.response.headers.get("Retry-After") if exc.response is not None else None
+                try:
+                    retry_after = float(retry_after_raw) if retry_after_raw else 5.0 * (attempt + 1)
+                except ValueError:
+                    retry_after = 5.0 * (attempt + 1)
+                time.sleep(max(retry_after, 1.0))
+                continue
+            body = exc.response.text if exc.response is not None else ""
+            raise RuntimeError(f"Gemini image request failed (status={status}): {body}") from exc
+        except Exception as exc:  # noqa: BLE001
+            if attempt >= retries:
+                raise RuntimeError(f"Gemini image request failed: {exc}") from exc
+            time.sleep(0.6 * (attempt + 1))
+            continue
+        data = resp.json()
+        try:
+            image_bytes, mime_type = _extract_first_inline_image(data)
+            return image_bytes, mime_type, model
+        except Exception as exc:  # noqa: BLE001
+            last_summary = _summarize_gemini_response_for_debug(data)
+            if attempt >= retries:
+                raise RuntimeError(
+                    f"Gemini image model '{model}' response did not include inline image data "
+                    f"(attempts={retries + 1}). {last_summary}"
+                ) from exc
+            time.sleep(0.6 * (attempt + 1))
+    raise RuntimeError("Unreachable: Gemini image generation retry loop exhausted.")
 
 
 def _unsplash_access_key() -> str:
@@ -645,7 +750,7 @@ def create_funnel_image_asset(
     product_id: Optional[str] = None,
     tags: Optional[list[str]] = None,
 ) -> Asset:
-    image_bytes, mime_type = generate_gemini_image_bytes(
+    image_bytes, mime_type, image_model = generate_gemini_image_bytes(
         prompt=prompt,
         aspect_ratio=aspect_ratio,
         reference_image_bytes=reference_image_bytes,
@@ -678,7 +783,7 @@ def create_funnel_image_asset(
         "prompt": prompt,
         "aspectRatio": aspect_ratio,
         "usageContext": usage_context or {},
-        "model": "gemini-2.5-flash-image",
+        "model": image_model,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "sha256": sha256,
     }

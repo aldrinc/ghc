@@ -43,8 +43,7 @@ curl -i "${authz[@]}" "${json[@]}" -d '{}' "${API_BASE}/campaigns/<campaign_id>/
 ```bash
 curl -i "${authz[@]}" "${API_BASE}/workflows"
 curl -i "${authz[@]}" "${API_BASE}/workflows/<workflow_run_id>/logs"
-curl -i "${authz[@]}" "${json[@]}" -d '{"approved":true}' "${API_BASE}/workflows/<workflow_run_id>/signals/approve-strategy"
-curl -i "${authz[@]}" "${json[@]}" -d '{"approved":true}' "${API_BASE}/workflows/<workflow_run_id>/signals/approve-metric-schema"
+curl -i "${authz[@]}" "${json[@]}" -d '{"approved_ids":["exp-1"],"rejected_ids":[]}' "${API_BASE}/workflows/<workflow_run_id>/signals/approve-experiments"
 curl -i "${authz[@]}" "${json[@]}" -d '{"approved_ids":[],"rejected_ids":[]}' "${API_BASE}/workflows/<workflow_run_id>/signals/approve-assets"
 ```
 

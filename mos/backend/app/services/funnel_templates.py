@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from functools import lru_cache
 from copy import deepcopy
 import mimetypes
 from pathlib import Path
@@ -58,7 +57,6 @@ def _load_template(path: Path) -> FunnelTemplate:
     )
 
 
-@lru_cache(maxsize=1)
 def _load_templates() -> dict[str, FunnelTemplate]:
     templates: dict[str, FunnelTemplate] = {}
     directory = _template_dir()
@@ -126,6 +124,11 @@ def _apply_brand_logo_overrides(
     logo_public_id = brand.get("logoAssetPublicId")
     if not isinstance(logo_public_id, str) or not logo_public_id.strip():
         raise ValueError("Design system brand.logoAssetPublicId is required to apply brand assets.")
+    logo_public_id = logo_public_id.strip()
+    if logo_public_id == "__LOGO_ASSET_PUBLIC_ID__":
+        raise ValueError(
+            "Design system brand.logoAssetPublicId is a placeholder and must be replaced with a real asset public id."
+        )
 
     assets_repo = AssetsRepository(session)
     asset = assets_repo.get_by_public_id(org_id=org_id, client_id=client_id, public_id=logo_public_id)

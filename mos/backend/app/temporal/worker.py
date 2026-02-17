@@ -14,6 +14,7 @@ from app.temporal.workflows.campaign_intent import CampaignIntentWorkflow
 from app.temporal.workflows.campaign_funnel_generation import CampaignFunnelGenerationWorkflow
 from app.temporal.workflows.experiment_design import ExperimentDesignWorkflow
 from app.temporal.workflows.creative_production import CreativeProductionWorkflow
+from app.temporal.workflows.swipe_image_ad import SwipeImageAdWorkflow
 from app.temporal.workflows.experiment_cycle import ExperimentCycleWorkflow
 from app.temporal.workflows.playbook_update import PlaybookUpdateWorkflow
 from app.temporal.workflows.test_campaign import TestCampaignWorkflow
@@ -66,13 +67,18 @@ from app.temporal.activities.signal_activities import (
 from app.temporal.activities.playbook_activities import update_playbook_from_reports_activity
 from app.temporal.activities.ads_ingestion_activities import (
     upsert_brands_and_identities_activity,
+    fetch_ad_library_page_totals_activity,
     ingest_ads_for_identities_activity,
+    select_ads_for_context_activity,
     build_ads_context_activity,
     list_ads_for_run_activity,
 )
 from app.temporal.activities.ad_breakdown_activities import (
     generate_ad_breakdown_activity,
     persist_teardown_from_breakdown_activity,
+)
+from app.temporal.activities.swipe_image_ad_activities import (
+    generate_swipe_image_ad_activity,
 )
 
 
@@ -91,6 +97,7 @@ async def main() -> None:
                 CampaignFunnelGenerationWorkflow,
                 ExperimentDesignWorkflow,
                 CreativeProductionWorkflow,
+                SwipeImageAdWorkflow,
                 ExperimentCycleWorkflow,
                 PlaybookUpdateWorkflow,
                 AdsIngestionWorkflow,
@@ -134,11 +141,14 @@ async def main() -> None:
                 build_experiment_report_activity,
                 update_playbook_from_reports_activity,
                 upsert_brands_and_identities_activity,
+                fetch_ad_library_page_totals_activity,
                 ingest_ads_for_identities_activity,
+                select_ads_for_context_activity,
                 build_ads_context_activity,
                 list_ads_for_run_activity,
                 generate_ad_breakdown_activity,
                 persist_teardown_from_breakdown_activity,
+                generate_swipe_image_ad_activity,
             ],
             activity_executor=activity_executor,
         )

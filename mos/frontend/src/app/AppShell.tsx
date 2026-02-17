@@ -241,7 +241,7 @@ export function AppShell() {
     return [
       { label: "Select product", value: "" },
       ...products.map((item) => ({
-        label: item.name,
+        label: item.title,
         value: item.id,
       })),
     ];
@@ -426,8 +426,8 @@ export function AppShell() {
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="bg-background text-foreground">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-background px-4 pr-4 text-sm md:px-6">
+      <SidebarInset className="bg-surface text-foreground">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 pr-4 text-sm md:px-6">
           <div className="flex items-center gap-3">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="h-5" />
@@ -459,7 +459,7 @@ export function AppShell() {
             />
           </div>
         </header>
-        <div className="flex flex-1 flex-col overflow-y-auto bg-background px-4 py-4 md:px-6 md:py-6">
+        <div className="flex flex-1 flex-col overflow-y-auto bg-surface px-4 py-4 md:px-6 md:py-6">
           <Outlet />
         </div>
       </SidebarInset>

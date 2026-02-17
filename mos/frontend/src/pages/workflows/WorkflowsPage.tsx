@@ -120,8 +120,8 @@ export function WorkflowsPage() {
       <PageHeader
         title="Workflows"
         description={
-          product?.name
-            ? `Monitor workflow runs for ${product.name}.`
+          product?.title
+            ? `Monitor workflow runs for ${product.title}.`
             : "Monitor workflow runs with filters and quick actions."
         }
         actions={

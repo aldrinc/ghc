@@ -11,6 +11,7 @@ export type ExploreAdsParams = {
   researchRunId?: string;
   countryCodes?: string[];
   languageCodes?: string[];
+  mediaTypes?: string[];
   minDaysActive?: number;
   maxDaysActive?: number;
   startDateFrom?: string;
@@ -80,6 +81,7 @@ export function useExploreApi() {
       if (params?.researchRunId) search.set("researchRunId", params.researchRunId);
       params?.countryCodes?.forEach((value) => search.append("countryCodes", value));
       params?.languageCodes?.forEach((value) => search.append("languageCodes", value));
+      params?.mediaTypes?.forEach((value) => search.append("mediaTypes", value));
       if (params?.minDaysActive !== undefined) search.set("min_days_active", params.minDaysActive.toString());
       if (params?.maxDaysActive !== undefined) search.set("max_days_active", params.maxDaysActive.toString());
       if (params?.startDateFrom) search.set("start_date_from", params.startDateFrom);

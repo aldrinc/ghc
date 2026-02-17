@@ -2,8 +2,8 @@ import type { Product } from "@/types/products";
 
 const STORAGE_KEY = "mos_active_product";
 
-type StoredProduct = Pick<Product, "id" | "name" | "client_id"> & {
-  category?: string | null;
+type StoredProduct = Pick<Product, "id" | "title" | "client_id"> & {
+  product_type?: string | null;
 };
 
 type StoredState = Record<string, StoredProduct>;

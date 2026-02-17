@@ -317,6 +317,6 @@
   },
   "brand": {
     "name": "Acme",
-    "logoAssetPublicId": ""
+    "logoAssetPublicId": "__LOGO_ASSET_PUBLIC_ID__"
   }
 }

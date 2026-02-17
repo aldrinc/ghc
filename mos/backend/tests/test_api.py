@@ -1,8 +1,11 @@
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from uuid import UUID
 
 from app.auth import dependencies as auth_dependencies
 from app.db.deps import get_session
+from app.db.enums import ArtifactTypeEnum
+from app.db.models import Artifact
 from app.db.models import Org
 from app.main import app
 
@@ -56,7 +59,7 @@ def test_auth_creates_org_and_allows_client_create(db_session, monkeypatch):
         app.dependency_overrides.clear()
 
 
-def test_clients_campaigns_and_workflows(api_client, fake_temporal):
+def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, auth_context):
     client_resp = api_client.post("/clients", json={"name": "Client API", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
@@ -77,8 +80,53 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal):
     assert onboarding_resp.status_code == 200
     onboarding_run = onboarding_resp.json()["workflow_run_id"]
     product_id = onboarding_resp.json().get("product_id")
+    default_offer_id = onboarding_resp.json().get("default_offer_id")
     assert product_id
+    assert default_offer_id
     assert fake_temporal.started  # workflow kicked off
+
+    product_detail = api_client.get(f"/products/{product_id}")
+    assert product_detail.status_code == 200
+    product_payload = product_detail.json()
+    assert product_payload["title"] == "Test Product"
+    assert isinstance(product_payload.get("variants"), list)
+
+    # Planning prereqs: campaign planning requires canon + metric schema artifacts to exist.
+    # Use the test auth org (the DB may contain non-test orgs as well).
+    org_id = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+    db_session.add(
+        Artifact(
+            org_id=org_id,
+            client_id=client_uuid,
+            product_id=product_uuid,
+            type=ArtifactTypeEnum.client_canon,
+            data={"brand": {"story": "Test canon story"}},
+        )
+    )
+    db_session.add(
+        Artifact(
+            org_id=org_id,
+            client_id=client_uuid,
+            product_id=product_uuid,
+            type=ArtifactTypeEnum.metric_schema,
+            data={"kpis": [{"id": "kpi-1", "name": "CTR"}]},
+        )
+    )
+    db_session.commit()
+
+    # Sanity check: artifacts should be visible to the API session before planning starts.
+    canon_list = api_client.get(
+        f"/artifacts?clientId={client_id}&productId={product_id}&type=client_canon"
+    )
+    assert canon_list.status_code == 200
+    assert len(canon_list.json()) >= 1
+    metric_list = api_client.get(
+        f"/artifacts?clientId={client_id}&productId={product_id}&type=metric_schema"
+    )
+    assert metric_list.status_code == 200
+    assert len(metric_list.json()) >= 1
 
     campaign_resp = api_client.post(
         "/campaigns",
@@ -93,10 +141,6 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal):
     assert campaign_resp.status_code == 201
     campaign_id = campaign_resp.json()["id"]
 
-    # approvals to satisfy gating and simulate onboarding completion
-    api_client.post(f"/workflows/{onboarding_run}/signals/approve-canon", json={"approved": True})
-    api_client.post(f"/workflows/{onboarding_run}/signals/approve-metric-schema", json={"approved": True})
-
     plan_resp = api_client.post(f"/campaigns/{campaign_id}/plan", json={"goal": "grow"})
     assert plan_resp.status_code == 200
     planning_run = plan_resp.json()["workflow_run_id"]
@@ -108,20 +152,33 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal):
     assert onboarding_run in workflow_ids
     assert planning_run in workflow_ids
 
-    approve_resp = api_client.post(
+    # Strategy approval was removed; experiment approvals are now the gate.
+    removed_strategy_resp = api_client.post(
         f"/workflows/{planning_run}/signals/approve-strategy",
         json={"approved": True},
     )
-    assert approve_resp.status_code == 200
-    assert ("approve_strategy_sheet", ({"approved": True, "updated_strategy_sheet": None},)) in fake_temporal.signals
+    assert removed_strategy_resp.status_code == 410
+
+    approve_experiments_resp = api_client.post(
+        f"/workflows/{planning_run}/signals/approve-experiments",
+        json={"approved_ids": ["exp-1"], "rejected_ids": []},
+    )
+    assert approve_experiments_resp.status_code == 200
+    assert (
+        "approve_experiments",
+        ({"approved_ids": ["exp-1"], "rejected_ids": [], "edited_specs": None},),
+    ) in fake_temporal.signals
 
     # The API should also accept Temporal workflow IDs so operators can unblock runs from the Temporal UI.
     approve_by_temporal_id = api_client.post(
-        f"/workflows/{planning_temporal_id}/signals/approve-strategy",
-        json={"approved": True},
+        f"/workflows/{planning_temporal_id}/signals/approve-experiments",
+        json={"approved_ids": ["exp-2"], "rejected_ids": ["exp-3"]},
     )
     assert approve_by_temporal_id.status_code == 200
-    assert ("approve_strategy_sheet", ({"approved": True, "updated_strategy_sheet": None},)) in fake_temporal.signals
+    assert (
+        "approve_experiments",
+        ({"approved_ids": ["exp-2"], "rejected_ids": ["exp-3"], "edited_specs": None},),
+    ) in fake_temporal.signals
 
     logs_resp = api_client.get(f"/workflows/{onboarding_run}/logs")
     assert logs_resp.status_code == 200

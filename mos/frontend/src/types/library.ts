@@ -37,6 +37,11 @@ export type LibraryItem = {
   hookScore?: number;
   funnelStage?: string;
   media: MediaAsset[];
+  /**
+   * Raw payload from the API. Used to show the full ad record in detail view.
+   * Keep as `unknown` to avoid accidental coupling to a specific API shape.
+   */
+  raw?: unknown;
   scores?: {
     performanceScore?: number;
     performanceStars?: number;

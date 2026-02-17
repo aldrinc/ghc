@@ -15,15 +15,13 @@ function LoadingGrid() {
         >
           <div className="relative">
             <div className="aspect-[4/5] w-full bg-muted" />
-            <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3">
-              <div className="flex items-center justify-between gap-2">
-                <div className="h-5 w-24 rounded-full bg-black/20" />
-                <div className="h-5 w-16 rounded-full bg-black/20" />
-              </div>
-              <div className="h-4 w-20 rounded-full bg-black/20" />
-            </div>
           </div>
           <div className="space-y-2 px-3 pb-3 pt-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="h-4 w-24 rounded-full bg-muted" />
+              <div className="h-4 w-12 rounded-full bg-muted" />
+              <div className="h-4 w-16 rounded-full bg-muted" />
+            </div>
             <div className="h-3 w-3/4 rounded bg-muted" />
             <div className="h-3 w-5/6 rounded bg-muted" />
             <div className="h-3 w-1/2 rounded bg-muted" />

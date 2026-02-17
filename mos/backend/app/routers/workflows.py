@@ -11,6 +11,7 @@ from app.db.models import Asset
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 from app.db.repositories.workflows import WorkflowsRepository
+from app.google_clients import download_drive_text_file
 from app.temporal.client import get_temporal_client
 from temporalio.api.enums.v1 import WorkflowExecutionStatus
 
@@ -174,6 +175,63 @@ async def get_workflow_run(
     )
 
 
+@router.get("/{workflow_run_id}/research/{step_key}")
+def get_workflow_research_artifact(
+    workflow_run_id: str,
+    step_key: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    """
+    Return the *full* research artifact content for a given workflow + step.
+
+    The workflow detail endpoint returns only lightweight research artifact refs + summaries.
+    Full text is retrieved from the persisted Drive file on-demand so the UI can render the
+    complete document even while a workflow is still running (before client canon exists).
+    """
+    repo = WorkflowsRepository(session)
+    run = None
+    parsed_run_id = _maybe_uuid(workflow_run_id)
+    if parsed_run_id:
+        run = repo.get(org_id=auth.org_id, workflow_run_id=str(parsed_run_id))
+    if not run:
+        run = repo.get_by_temporal_workflow_id(org_id=auth.org_id, temporal_workflow_id=workflow_run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+
+    research_repo = ResearchArtifactsRepository(session)
+    record = research_repo.get_for_step(org_id=auth.org_id, workflow_run_id=str(run.id), step_key=step_key)
+    if not record:
+        raise HTTPException(status_code=404, detail="Research artifact not found for this step")
+
+    doc_url = getattr(record, "doc_url", None) or ""
+    doc_id = getattr(record, "doc_id", None) or ""
+    if not doc_id:
+        raise HTTPException(status_code=500, detail="Research artifact is missing a doc_id")
+
+    if isinstance(doc_url, str) and doc_url.startswith("drive-stub://"):
+        raise HTTPException(
+            status_code=409,
+            detail="Research artifact was persisted with a Drive stub; full content is unavailable.",
+        )
+
+    try:
+        content = download_drive_text_file(file_id=doc_id)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return jsonable_encoder(
+        {
+            "step_key": record.step_key,
+            "title": record.title,
+            "doc_url": record.doc_url,
+            "doc_id": record.doc_id,
+            "summary": record.summary,
+            "content": content,
+        }
+    )
+
+
 async def _get_handle(session: Session, auth: AuthContext, workflow_run_id: str):
     repo = WorkflowsRepository(session)
     run = None
@@ -199,18 +257,10 @@ async def approve_canon(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
-    await handle.signal(
-        "approve_canon",
-        {"approved": body.get("approved", False), "updated_canon": body.get("updatedCanon")},
+    raise HTTPException(
+        status_code=410,
+        detail="Canon approval has been removed. Client onboarding is auto-approved and no longer waits for canon approval.",
     )
-    repo.log_activity(
-        workflow_run_id=str(run.id),
-        step="approve_canon",
-        status="sent",
-        payload_in={"approved": body.get("approved", False)},
-    )
-    return {"ok": True}
 
 
 @router.post("/{workflow_run_id}/signals/approve-metric-schema")
@@ -220,18 +270,10 @@ async def approve_metric_schema(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
-    await handle.signal(
-        "approve_metric_schema",
-        {"approved": body.get("approved", False), "updated_schema": body.get("updatedSchema")},
+    raise HTTPException(
+        status_code=410,
+        detail="Metric schema approval has been removed. Client onboarding is auto-approved and no longer waits for metric schema approval.",
     )
-    repo.log_activity(
-        workflow_run_id=str(run.id),
-        step="approve_metric_schema",
-        status="sent",
-        payload_in={"approved": body.get("approved", False)},
-    )
-    return {"ok": True}
 
 
 @router.post("/{workflow_run_id}/signals/approve-strategy")
@@ -241,18 +283,10 @@ async def approve_strategy(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    repo, run, handle = await _get_handle(session, auth, workflow_run_id)
-    await handle.signal(
-        "approve_strategy_sheet",
-        {"approved": body.get("approved", False), "updated_strategy_sheet": body.get("updatedStrategy")},
+    raise HTTPException(
+        status_code=410,
+        detail="Strategy approval has been removed. Campaign planning and campaign intent now auto-approve the strategy sheet and wait for experiment approvals instead.",
     )
-    repo.log_activity(
-        workflow_run_id=str(run.id),
-        step="approve_strategy_sheet",
-        status="sent",
-        payload_in={"approved": body.get("approved", False)},
-    )
-    return {"ok": True}
 
 
 @router.post("/{workflow_run_id}/signals/approve-experiments")

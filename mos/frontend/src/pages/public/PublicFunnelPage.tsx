@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import type { PublicFunnelMeta, PublicFunnelPage as PublicFunnelPageType } from "@/types/funnels";
 import type { PublicFunnelCommerce } from "@/types/commerce";
 import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckConfig";
+import { normalizePuckData } from "@/funnels/puckData";
 import { buildPublicFunnelPath, getStandalonePublicId, isStandaloneRootModeForPublicId } from "@/funnels/runtimeRouting";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 
@@ -60,6 +61,21 @@ function getUtmParams(): Record<string, string> {
   return utm;
 }
 
+async function parsePublicError(resp: Response): Promise<string> {
+  let raw: unknown;
+  try {
+    raw = await resp.clone().json();
+  } catch {
+    raw = await resp.text();
+  }
+  const detail = (raw as { detail?: unknown })?.detail;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  const message = (raw as { message?: unknown })?.message;
+  if (typeof message === "string" && message.trim()) return message;
+  if (typeof raw === "string" && raw.trim()) return raw;
+  return resp.statusText || "Request failed";
+}
+
 export function PublicFunnelPage() {
   const { publicId: routePublicId, slug: routeSlug } = useParams();
   const standalonePublicId = getStandalonePublicId();
@@ -79,6 +95,10 @@ export function PublicFunnelPage() {
     () => getOrCreateId(sessionStorage, `funnel_session_id:${publicId || "unknown"}`),
     [publicId],
   );
+  const normalizedPuckData = useMemo(() => {
+    if (!page) return null;
+    return normalizePuckData(page.puckData, { designSystemTokens: page.designSystemTokens ?? null });
+  }, [page]);
 
   useEffect(() => {
     ensureNoIndex();
@@ -102,8 +122,7 @@ export function PublicFunnelPage() {
     fetch(`${apiBaseUrl}/public/funnels/${publicId}/commerce`)
       .then(async (resp) => {
         if (!resp.ok) {
-          const text = await resp.text();
-          throw new Error(text || resp.statusText);
+          throw new Error(await parsePublicError(resp));
         }
         return (await resp.json()) as PublicFunnelCommerce;
       })
@@ -120,8 +139,7 @@ export function PublicFunnelPage() {
     fetch(`${apiBaseUrl}/public/funnels/${publicId}/pages/${encodeURIComponent(effectiveSlug)}`)
       .then(async (resp) => {
         if (!resp.ok) {
-          const text = await resp.text();
-          throw new Error(text || resp.statusText);
+          throw new Error(await parsePublicError(resp));
         }
         return (await resp.json()) as PublicFunnelPageType;
       })
@@ -237,7 +255,7 @@ export function PublicFunnelPage() {
         }}
       >
         <DesignSystemProvider tokens={page.designSystemTokens}>
-          <Render config={runtimeConfig} data={page.puckData as unknown as Data} />
+          <Render config={runtimeConfig} data={(normalizedPuckData ?? page.puckData) as unknown as Data} />
         </DesignSystemProvider>
       </FunnelRuntimeProvider>
     </div>

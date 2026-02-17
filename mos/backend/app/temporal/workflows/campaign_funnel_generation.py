@@ -28,6 +28,7 @@ class CampaignFunnelGenerationInput:
     campaign_id: str
     experiment_ids: List[str]
     funnel_name_prefix: Optional[str] = None
+    generate_testimonials: bool = False
 
 
 @workflow.defn
@@ -63,6 +64,7 @@ class CampaignFunnelGenerationWorkflow:
                 "idea_workspace_id": workflow.info().workflow_id,
                 "actor_user_id": "workflow",
                 "generate_ai_drafts": True,
+                "generate_testimonials": bool(input.generate_testimonials),
                 "temporal_workflow_id": workflow.info().workflow_id,
                 "temporal_run_id": workflow.info().run_id,
             },

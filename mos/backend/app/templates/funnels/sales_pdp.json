@@ -3,7 +3,7 @@
   "name": "Sales PDP (PuppyPad)",
   "description": "Exact visual clone of the PuppyPad PDP sales page.",
   "previewImage": null,
-  "assetBasePath": "templates/sales-template-main/public",
+  "assetBasePath": "templates/sales-template-main/public/assets",
   "assetPrefix": "/assets/",
   "puckData": {
     "root": {
@@ -361,7 +361,7 @@
                 },
                 "copy": {
                   "common": {
-                    "starsAriaLabelTemplate": "{rating} out of 5 stars"
+                    "starsAriaLabelTemplate": "{rating} out of five stars"
                   },
                   "modal": {
                     "closeAriaLabel": "Close dialog",
@@ -382,15 +382,15 @@
               }
             },
             {
-              "type": "SalesPdpVideos",
-              "props": {
-                "config": {
-                  "badge": "37,000+ DOG PARENTS LOVE US!",
-                  "title": "See Why We're The Most Shared Pee Pad On Facebook",
-                  "videos": [
-                    {
-                      "id": "v1",
-                      "thumbnail": {
+                  "type": "SalesPdpVideos",
+                  "props": {
+                    "config": {
+                      "badge": "CUSTOMERS LOVE THIS",
+                      "title": "See It In Action",
+                      "videos": [
+                        {
+                          "id": "v1",
+                          "thumbnail": {
                         "src": "/assets/ph-3x4.svg",
                         "alt": "Video testimonial 1"
                       }
@@ -588,7 +588,8 @@
                   "right": {
                     "image": {
                       "src": "/assets/ph-4x3.svg",
-                      "alt": "Customer photo"
+                      "alt": "Customer photo",
+                      "testimonialTemplate": "review_card"
                     },
                     "reviewCard": {
                       "name": "Maria Fig",
@@ -618,59 +619,73 @@
                 "feedImages": [
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 1"
+                    "alt": "Customer review 1",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 2"
+                    "alt": "Customer review 2",
+                    "testimonialTemplate": "social_comment"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 3"
+                    "alt": "Customer review 3",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 4"
+                    "alt": "Customer review 4",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 5"
+                    "alt": "Customer review 5",
+                    "testimonialTemplate": "social_comment"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 6"
+                    "alt": "Customer review 6",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 7"
+                    "alt": "Customer review 7",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 8"
+                    "alt": "Customer review 8",
+                    "testimonialTemplate": "social_comment"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 9"
+                    "alt": "Customer review 9",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 10"
+                    "alt": "Customer review 10",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 11"
+                    "alt": "Customer review 11",
+                    "testimonialTemplate": "social_comment"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 12"
+                    "alt": "Customer review 12",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/reason5.webp",
-                    "alt": "Customer review 13"
+                    "alt": "Customer review 13",
+                    "testimonialTemplate": "review_card"
                   },
                   {
                     "src": "/assets/ph-3x4.svg",
-                    "alt": "Customer review 14"
+                    "alt": "Customer review 14",
+                    "testimonialTemplate": "social_comment"
                   }
                 ],
                 "id": "sales-pdp-guarantee"
@@ -713,13 +728,177 @@
               }
             },
             {
+              "type": "SalesPdpReviews",
+              "props": {
+                "config": {
+                  "id": "reviews",
+                  "data": {
+                    "productId": "infrared-sauna-blanket",
+                    "summary": {
+                      "averageRating": 4.9,
+                      "totalReviews": 2243,
+                      "breakdown": [
+                        { "rating": 5, "count": 2046 },
+                        { "rating": 4, "count": 162 },
+                        { "rating": 3, "count": 24 },
+                        { "rating": 2, "count": 7 },
+                        { "rating": 1, "count": 4 }
+                      ],
+                      "customersSay": "The Infrared Sauna Blanket offers a rejuvenating experience with benefits like detoxification, relaxation, and improved skin appearance. Users appreciate its quick heating, effective sweat delivery, and high-quality construction. The blanket is portable and easy to clean, making it a convenient wellness tool for home use.",
+                      "topics": [
+                        { "id": "pain", "label": "pain" },
+                        { "id": "length", "label": "length" },
+                        { "id": "size", "label": "size" },
+                        { "id": "fit", "label": "fit" },
+                        { "id": "results", "label": "results" },
+                        { "id": "material", "label": "material" },
+                        { "id": "smell", "label": "smell" },
+                        { "id": "bag", "label": "bag" },
+                        { "id": "heat", "label": "heat" },
+                        { "id": "sleep", "label": "sleep" },
+                        { "id": "setup", "label": "setup" },
+                        { "id": "cleaning", "label": "cleaning" }
+                      ],
+                      "mediaGallery": [
+                        {
+                          "id": "m1",
+                          "type": "image",
+                          "url": "https://images.unsplash.com/photo-1520975682071-a8bcd44b2d7a?auto=format&fit=crop&w=900&q=60",
+                          "alt": "Blanket photo"
+                        },
+                        {
+                          "id": "m2",
+                          "type": "image",
+                          "url": "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=900&q=60",
+                          "alt": "Blanket close-up"
+                        },
+                        {
+                          "id": "m3",
+                          "type": "image",
+                          "url": "https://images.unsplash.com/photo-1520975594319-4d681c0f9cbb?auto=format&fit=crop&w=900&q=60",
+                          "alt": "Packaging"
+                        },
+                        {
+                          "id": "m4",
+                          "type": "image",
+                          "url": "https://images.unsplash.com/photo-1520975890466-8e21b9b0e8ff?auto=format&fit=crop&w=900&q=60",
+                          "alt": "Bag detail"
+                        },
+                        {
+                          "id": "m5",
+                          "type": "image",
+                          "url": "https://images.unsplash.com/photo-1523413691479-671119f9bb9a?auto=format&fit=crop&w=900&q=60",
+                          "alt": "Product materials"
+                        },
+                        {
+                          "id": "m6",
+                          "type": "image",
+                          "url": "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=900&q=60",
+                          "alt": "Product in use"
+                        },
+                        {
+                          "id": "m7",
+                          "type": "image",
+                          "url": "https://images.unsplash.com/photo-1520975687844-6c3e0b7b0b09?auto=format&fit=crop&w=900&q=60",
+                          "alt": "Logo tag"
+                        },
+                        {
+                          "id": "m8",
+                          "type": "image",
+                          "url": "https://images.unsplash.com/photo-1520975741711-7b6b8a436b28?auto=format&fit=crop&w=900&q=60",
+                          "alt": "Zipper detail"
+                        }
+                      ]
+                    },
+                    "filters": {
+                      "ratings": [
+                        { "value": 5, "label": "5" },
+                        { "value": 4, "label": "4" },
+                        { "value": 3, "label": "3" },
+                        { "value": 2, "label": "2" },
+                        { "value": 1, "label": "1" }
+                      ],
+                      "countries": [
+                        { "code": "US", "label": "United States" },
+                        { "code": "CA", "label": "Canada" },
+                        { "code": "GB", "label": "United Kingdom" }
+                      ],
+                      "sorts": [
+                        { "value": "most_recent", "label": "Most recent" },
+                        { "value": "highest_rating", "label": "Highest rating" },
+                        { "value": "lowest_rating", "label": "Lowest rating" },
+                        { "value": "most_helpful", "label": "Most helpful" }
+                      ]
+                    },
+                    "pagination": { "page": 1, "pageSize": 10, "totalReviews": 2243, "totalPages": 225 },
+                    "reviews": [
+                      {
+                        "id": "r_1001",
+                        "rating": 5,
+                        "title": "Cant live without my Sauna Blanket!",
+                        "body": "I have had my Sauna Blanket for over 4 years now. I can not live without it. I suffer from insomnia but have the best night sleep after using it. After a long stressful day nothing relaxes me better than using it. I get compliments on how my skin just glows. My routine is to first use my copper brush and then hop in for 40 minutes. Easy to clean and store.",
+                        "createdAt": "2026-02-04T00:00:00.000Z",
+                        "author": { "name": "DENISE B.", "verifiedBuyer": true },
+                        "country": "US",
+                        "helpfulCount": 28,
+                        "topicIds": ["sleep", "results", "cleaning"]
+                      },
+                      {
+                        "id": "r_1002",
+                        "rating": 5,
+                        "title": "Heats fast and feels premium",
+                        "body": "Warm-up is quick and consistent. The materials feel durable and the zipper area holds up well. I use it a few times a week and it’s been an easy way to decompress after training.",
+                        "createdAt": "2026-01-28T00:00:00.000Z",
+                        "author": { "name": "MARCUS L.", "verifiedBuyer": true },
+                        "country": "CA",
+                        "helpfulCount": 11,
+                        "topicIds": ["heat", "material"],
+                        "media": [
+                          {
+                            "id": "rm_1",
+                            "type": "image",
+                            "url": "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=900&q=60",
+                            "alt": "Blanket close-up"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "r_1003",
+                        "rating": 4,
+                        "title": "Great results, a little bulky",
+                        "body": "I’m seeing solid results and love the overall experience. The only downside is that it’s a bit bulky to pack for travel, but at home it’s perfect. Cleaning is straightforward.",
+                        "createdAt": "2026-01-17T00:00:00.000Z",
+                        "author": { "name": "ALEX R.", "verifiedBuyer": true },
+                        "country": "US",
+                        "helpfulCount": 6,
+                        "topicIds": ["results", "bag"]
+                      },
+                      {
+                        "id": "r_1004",
+                        "rating": 5,
+                        "title": "Fits well and easy to store",
+                        "body": "I was worried about sizing, but it fits comfortably and I can fold it up without a fight. Using it after workouts has become part of my weekly routine.",
+                        "createdAt": "2026-01-05T00:00:00.000Z",
+                        "author": { "name": "PRIYA S.", "verifiedBuyer": false },
+                        "country": "GB",
+                        "helpfulCount": 3,
+                        "topicIds": ["fit", "size"]
+                      }
+                    ]
+                  }
+                },
+                "id": "sales-pdp-reviews"
+              }
+            },
+            {
               "type": "SalesPdpReviewWall",
               "props": {
+                "hidden": true,
                 "config": {
                   "id": "reviews",
                   "badge": "VET RECOMMENDED",
                   "title": "What Our Customers Are Saying",
-                  "ratingLabel": "37,893 - 5 STAR REVIEWS",
+                  "ratingLabel": "Verified customer reviews",
                   "showMoreLabel": "Show more reviews",
                   "tiles": [
                     {
@@ -845,9 +1024,9 @@
                 "config": {
                   "logo": {
                     "src": "/assets/puppypad-logo.svg",
-                    "alt": "PuppyPad"
+                    "alt": "Brand logo"
                   },
-                  "copyright": "© 2026 PuppyPad"
+                  "copyright": "© All rights reserved."
                 },
                 "id": "sales-pdp-footer"
               }
