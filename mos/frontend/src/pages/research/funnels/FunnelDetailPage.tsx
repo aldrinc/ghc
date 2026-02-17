@@ -429,21 +429,15 @@ export function FunnelDetailPage() {
               </div>
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Public link</div>
-                <div className="rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-xs text-content">
-                  {publicBase ? publicBase : "—"}
+                <div className="flex h-10 items-center rounded-md border border-border bg-surface-2 px-3 font-mono text-xs text-content">
+                  <span className="truncate">{publicBase ? publicBase : "—"}</span>
                 </div>
               </div>
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Deploy domains</div>
-                <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-xs text-content">
-                  {deployDomains.isLoading ? (
-                    <span className="text-content-muted">Loading…</span>
-                  ) : deployDomains.isError ? (
-                    <span className="text-danger">
-                      {(deployDomains.error as { message?: string })?.message || "Unable to load deploy domains."}
-                    </span>
-                  ) : deployDomains.data?.workload_found ? isEditingDeployDomains ? (
-                    <div className="space-y-2">
+                <div className="rounded-md border border-border bg-surface-2 text-xs text-content">
+                  {deployDomains.data?.workload_found && isEditingDeployDomains ? (
+                    <div className="px-3 py-2 space-y-2">
                       <div className="flex flex-wrap gap-1">
                         {deployDomainsDraft.length ? (
                           deployDomainsDraft.map((hostname) => (
@@ -496,31 +490,47 @@ export function FunnelDetailPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      {deployDomains.data.server_names.length ? (
-                        <div className="flex flex-wrap gap-1">
-                          {deployDomains.data.server_names.map((hostname) => (
-                            <a
-                              key={hostname}
-                              href={`${deployDomains.data?.https ? "https" : "http"}://${hostname}/`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content hover:bg-surface-3"
-                            >
-                              {hostname}
-                            </a>
-                          ))}
-                        </div>
+                    <div className="flex h-10 items-center justify-between gap-2 overflow-hidden px-3">
+                      {deployDomains.isLoading ? (
+                        <span className="truncate text-content-muted">Loading…</span>
+                      ) : deployDomains.isError ? (
+                        <span className="truncate text-danger">
+                          {(deployDomains.error as { message?: string })?.message || "Unable to load deploy domains."}
+                        </span>
+                      ) : deployDomains.data?.workload_found ? (
+                        <>
+                          {deployDomains.data.server_names.length ? (
+                            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+                              {deployDomains.data.server_names.map((hostname) => (
+                                <a
+                                  key={hostname}
+                                  href={`${deployDomains.data?.https ? "https" : "http"}://${hostname}/`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content hover:bg-surface-3"
+                                >
+                                  {hostname}
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="truncate text-content-muted">—</span>
+                          )}
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="secondary"
+                            onClick={startEditingDeployDomains}
+                            className="shrink-0"
+                          >
+                            Edit
+                          </Button>
+                        </>
                       ) : (
-                        <span className="text-content-muted">—</span>
+                        <span className="truncate text-content-muted">Not in plan yet</span>
                       )}
-                      <Button type="button" size="sm" variant="secondary" onClick={startEditingDeployDomains}>
-                        Edit
-                      </Button>
                     </div>
-                  ) : (
-                    <span className="text-content-muted">Not in plan yet</span>
-                  )}
+                  )
                 </div>
               </div>
             </div>
