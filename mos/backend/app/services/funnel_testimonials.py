@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import copy
 import json
 import os
@@ -789,6 +790,20 @@ def _load_reference_asset_bytes(asset: Asset) -> tuple[bytes, str]:
     return image_bytes, resolved_mime.split(";")[0].strip()
 
 
+def _should_soft_fail_gemini_missing_inline_data(exc: BaseException) -> bool:
+    """Treat Gemini 'no inline image data' responses as non-fatal in rendering flows.
+
+    We do NOT treat quota (429) as soft-fail; that should surface clearly so credits/limits
+    can be addressed in GCP. This only covers the case where Gemini returns 200 but doesn't
+    include an output image payload (often with finishReason=MALFORMED_FUNCTION_CALL).
+    """
+
+    msg = str(exc).lower()
+    if "status=429" in msg or "too many requests" in msg or "resource_exhausted" in msg:
+        return False
+    return "inline image data" in msg and ("did not include" in msg or "did not return" in msg)
+
+
 def _wall_template_sequence(total: int) -> list[str]:
     if total < 0:
         raise TestimonialGenerationError("Review wall image count cannot be negative.")
@@ -842,6 +857,27 @@ def _require_public_asset_base_url() -> str:
 def _public_asset_url(public_id: str) -> str:
     base_url = _require_public_asset_base_url()
     return f"{base_url}/public/assets/{public_id}"
+
+
+def _asset_data_url(asset: Asset) -> str:
+    """
+    Build a data: URL for an image asset by reading bytes directly from object storage.
+
+    This avoids relying on PUBLIC_ASSET_BASE_URL/http fetches during Playwright rendering,
+    which can be flaky in worker environments.
+    """
+
+    if not asset.storage_key:
+        raise TestimonialGenerationError("Asset is missing storage_key (cannot build data URL).")
+    storage = MediaStorage()
+    data, content_type = storage.download_bytes(key=asset.storage_key)
+    if not data:
+        raise TestimonialGenerationError(
+            f"Downloaded asset bytes are empty (publicId={asset.public_id})."
+        )
+    mime = (asset.content_type or content_type or "application/octet-stream").split(";")[0].strip()
+    encoded = base64.b64encode(data).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
 
 
 def _resolve_testimonial_template(image: dict[str, Any]) -> str:
@@ -1678,6 +1714,7 @@ def _build_testimonial_prompt(
     product_context: str,
     today: str,
     uniqueness_nonce: str | None = None,
+    reserved_names: list[str] | None = None,
 ) -> str:
     nonce_instruction = ""
     if isinstance(uniqueness_nonce, str) and uniqueness_nonce.strip():
@@ -1685,16 +1722,44 @@ def _build_testimonial_prompt(
             "- Uniqueness nonce: "
             f"{uniqueness_nonce.strip()}. Use it only as an internal variation cue and never output it.\n"
         )
+
+    reserved_instruction = ""
+    if reserved_names:
+        seen_reserved: set[str] = set()
+        cleaned_reserved: list[str] = []
+        for raw in reserved_names:
+            if not isinstance(raw, str):
+                continue
+            cleaned = _clean_single_line(raw)
+            if not cleaned:
+                continue
+            key = _normalize_identity_key(cleaned)
+            if key in seen_reserved:
+                continue
+            seen_reserved.add(key)
+            cleaned_reserved.append(cleaned[:80])
+            if len(cleaned_reserved) >= 80:
+                break
+        if cleaned_reserved:
+            reserved_lines = "\n".join(f"- {name}" for name in cleaned_reserved)
+            reserved_instruction = (
+                "Reserved names (do not use any of these names anywhere in the output, "
+                "including reply names):\n"
+                f"{reserved_lines}\n\n"
+            )
     return (
         "You are generating synthetic customer testimonials for a landing page.\n"
         "Output JSON only. Do not include markdown or commentary.\n"
         "Your response must be a single JSON object that starts with '{' and ends with '}'.\n"
         f"Return exactly {count} testimonials.\n\n"
+        f"{reserved_instruction}"
         "Rules:\n"
         "- Each review must be 1-3 sentences, <= 600 characters.\n"
         "- Names must be <= 80 characters.\n"
         "- rating is an integer 1-5.\n"
         "- verified is a boolean.\n"
+        "- All names must be globally unique across the entire output, including both reviewer names and reply names.\n"
+        "- No reply name may match any reviewer name.\n"
         "- Make each testimonial distinct (different personas, locations, and scenes).\n"
         "- persona should be a 1-2 sentence description of the reviewer (age range, context, motivation).\n"
         "- avatarPrompt should describe a realistic, candid portrait of that persona (no brand logos).\n"
@@ -1706,7 +1771,7 @@ def _build_testimonial_prompt(
         "- If the review references the product, include the product in at least one mediaPrompt using generic wording.\n"
         "- Do not reference photos/pictures/screenshots/attachments in the review or reply text (the testimonial may render with or without media).\n"
         "- avatarPrompt and heroImagePrompt must be unique per testimonial.\n"
-        "- Do not reuse names or personas across testimonials.\n"
+        "- Do not reuse names or personas across testimonials (reviewers or replies).\n"
         "- Never append numeric disambiguation suffixes to names (for example: '(2)', '(3)').\n"
         "- meta.location (optional) should be <= 120 characters.\n"
         f"- meta.date (optional) must be YYYY-MM-DD; today is {today}.\n"
@@ -1892,7 +1957,9 @@ def generate_funnel_page_testimonials(
 
     validated_testimonials: list[dict[str, Any]] = []
     for identity_attempt in range(1, _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS + 1):
-        testimonials: list[dict[str, Any]] = []
+        candidate_validated: list[dict[str, Any]] = []
+        reserved_names: list[str] = []
+        reserved_name_keys: set[str] = set()
         attempt_temperature = min(max(float(temperature), 0.0) + 0.1 * (identity_attempt - 1), 0.9)
         attempt_nonce = f"{funnel_id}:{page_id}:{resolved_template_id}:{identity_attempt}:{uuid4().hex[:8]}"
 
@@ -1904,6 +1971,7 @@ def generate_funnel_page_testimonials(
                 product_context=product_context,
                 today=today,
                 uniqueness_nonce=f"{attempt_nonce}:batch:{batch_idx}",
+                reserved_names=reserved_names,
             )
 
             parsed: dict[str, Any]
@@ -1948,16 +2016,35 @@ def generate_funnel_page_testimonials(
                 raise TestimonialGenerationError(
                     f"Expected {len(batch)} testimonials, received {len(batch_items)}."
                 )
-            testimonials.extend(batch_items)
 
-        candidate_validated: list[dict[str, Any]] = []
-        for idx, raw in enumerate(testimonials):
-            try:
-                candidate_validated.append(_validate_testimonial_payload(raw or {}))
-            except TestimonialGenerationError as exc:
-                raise TestimonialGenerationError(
-                    f"Invalid testimonial payload at position {idx + 1}: {exc}"
-                ) from exc
+            batch_validated: list[dict[str, Any]] = []
+            for idx, raw in enumerate(batch_items):
+                global_pos = len(candidate_validated) + idx + 1
+                try:
+                    batch_validated.append(_validate_testimonial_payload(raw or {}))
+                except TestimonialGenerationError as exc:
+                    raise TestimonialGenerationError(
+                        f"Invalid testimonial payload at position {global_pos}: {exc}"
+                    ) from exc
+            candidate_validated.extend(batch_validated)
+
+            # Feed identities from earlier batches back into later batches so we don't
+            # fail validation due to cross-batch repeats (reviewers or replies).
+            for item in batch_validated:
+                primary = item.get("name")
+                if isinstance(primary, str) and primary.strip():
+                    key = _normalize_identity_key(primary)
+                    if key and key not in reserved_name_keys:
+                        reserved_name_keys.add(key)
+                        reserved_names.append(primary.strip())
+                reply = item.get("reply")
+                if isinstance(reply, dict):
+                    reply_name = reply.get("name")
+                    if isinstance(reply_name, str) and reply_name.strip():
+                        key = _normalize_identity_key(reply_name)
+                        if key and key not in reserved_name_keys:
+                            reserved_name_keys.add(key)
+                            reserved_names.append(reply_name.strip())
 
         try:
             _assert_distinct_testimonial_identities(candidate_validated)
@@ -2125,6 +2212,7 @@ def generate_funnel_page_testimonials(
                         review_card_scene_index += 1
                         review_hero_prompt = None
                         hero_asset: Optional[Asset] = None
+                        hero_error: str | None = None
                         if not omit_hero:
                             review_hero_prompt = _build_testimonial_scene_prompt(
                                 scene_mode=review_scene_mode,
@@ -2151,50 +2239,69 @@ def generate_funnel_page_testimonials(
                                 raise TestimonialGenerationError(
                                     "Review card hero prompt was not generated even though hero rendering is enabled."
                                 )
-                            hero_asset = create_funnel_image_asset(
+                            try:
+                                hero_asset = create_funnel_image_asset(
+                                    session=session,
+                                    org_id=org_id,
+                                    client_id=str(funnel.client_id),
+                                    prompt=review_hero_prompt,
+                                    aspect_ratio="9:16",
+                                    usage_context={
+                                        "kind": "testimonial_review_hero",
+                                        "funnelId": funnel_id,
+                                        "pageId": page_id,
+                                        "target": render.label,
+                                    },
+                                    reference_image_bytes=product_reference_bytes,
+                                    reference_image_mime_type=product_reference_mime,
+                                    reference_asset_public_id=str(product_primary_asset.public_id),
+                                    reference_asset_id=str(product_primary_asset.id),
+                                    funnel_id=funnel_id,
+                                    product_id=str(funnel.product_id) if funnel.product_id else None,
+                                    tags=["funnel", "testimonial", "review_card", "hero"],
+                                )
+                            except Exception as exc:  # noqa: BLE001
+                                if _should_soft_fail_gemini_missing_inline_data(exc):
+                                    hero_asset = None
+                                    hero_error = str(exc)
+                                else:
+                                    raise
+
+                        review_avatar_asset: Optional[Asset] = None
+                        avatar_error: str | None = None
+                        try:
+                            review_avatar_asset = create_funnel_image_asset(
                                 session=session,
                                 org_id=org_id,
                                 client_id=str(funnel.client_id),
-                                prompt=review_hero_prompt,
-                                aspect_ratio="9:16",
+                                prompt=review_avatar_prompt,
+                                aspect_ratio="1:1",
                                 usage_context={
-                                    "kind": "testimonial_review_hero",
+                                    "kind": "testimonial_review_avatar",
                                     "funnelId": funnel_id,
                                     "pageId": page_id,
                                     "target": render.label,
                                 },
-                                reference_image_bytes=product_reference_bytes,
-                                reference_image_mime_type=product_reference_mime,
-                                reference_asset_public_id=str(product_primary_asset.public_id),
-                                reference_asset_id=str(product_primary_asset.id),
                                 funnel_id=funnel_id,
                                 product_id=str(funnel.product_id) if funnel.product_id else None,
-                                tags=["funnel", "testimonial", "review_card", "hero"],
+                                tags=["funnel", "testimonial", "review_card", "avatar"],
                             )
-                        review_avatar_asset = create_funnel_image_asset(
-                            session=session,
-                            org_id=org_id,
-                            client_id=str(funnel.client_id),
-                            prompt=review_avatar_prompt,
-                            aspect_ratio="1:1",
-                            usage_context={
-                                "kind": "testimonial_review_avatar",
-                                "funnelId": funnel_id,
-                                "pageId": page_id,
-                                "target": render.label,
-                            },
-                            funnel_id=funnel_id,
-                            product_id=str(funnel.product_id) if funnel.product_id else None,
-                            tags=["funnel", "testimonial", "review_card", "avatar"],
-                        )
+                        except Exception as exc:  # noqa: BLE001
+                            if _should_soft_fail_gemini_missing_inline_data(exc):
+                                review_avatar_asset = None
+                                avatar_error = str(exc)
+                            else:
+                                raise
+
                         payload: dict[str, Any] = {
                             "template": "review_card",
                             "name": validated["name"],
                             "verified": validated["verified"],
                             "rating": validated["rating"],
                             "review": validated["review"],
-                            "avatarUrl": _public_asset_url(str(review_avatar_asset.public_id)),
                         }
+                        if review_avatar_asset is not None:
+                            payload["avatarUrl"] = _public_asset_url(str(review_avatar_asset.public_id))
                         if hero_asset is not None:
                             payload["heroImageUrl"] = _public_asset_url(str(hero_asset.public_id))
                         if validated.get("meta") is not None:
@@ -2238,11 +2345,17 @@ def generate_funnel_page_testimonials(
                                 "heroSourcePublicId": (
                                     str(hero_asset.public_id) if hero_asset is not None else None
                                 ),
-                                "avatarSourcePublicId": str(review_avatar_asset.public_id),
+                                "avatarSourcePublicId": (
+                                    str(review_avatar_asset.public_id)
+                                    if review_avatar_asset is not None
+                                    else None
+                                ),
                                 "heroPrompt": review_hero_prompt,
                                 "avatarPrompt": review_avatar_prompt,
                                 "heroSceneMode": (review_scene_mode if hero_asset is not None else None),
                                 "reviewHeroOmitted": bool(omit_hero),
+                                "heroGenerationError": hero_error,
+                                "avatarGenerationError": avatar_error,
                             }
                         )
                         continue
@@ -2271,44 +2384,62 @@ def generate_funnel_page_testimonials(
                         include_text_screen_line=False,
                         prohibit_visible_text=True,
                     )
-                    avatar_asset = create_funnel_image_asset(
-                        session=session,
-                        org_id=org_id,
-                        client_id=str(funnel.client_id),
-                        prompt=social_avatar_prompt,
-                        aspect_ratio="1:1",
-                        usage_context={
-                            "kind": "testimonial_social_avatar",
-                            "funnelId": funnel_id,
-                            "pageId": page_id,
-                            "target": render.label,
-                        },
-                        funnel_id=funnel_id,
-                        product_id=str(funnel.product_id) if funnel.product_id else None,
-                        tags=["funnel", "testimonial", "social_comment", "avatar"],
-                    )
-                    attachment_asset: Optional[Asset] = None
-                    if not omit_attachment:
-                        attachment_asset = create_funnel_image_asset(
+                    avatar_asset: Optional[Asset] = None
+                    avatar_error: str | None = None
+                    try:
+                        avatar_asset = create_funnel_image_asset(
                             session=session,
                             org_id=org_id,
                             client_id=str(funnel.client_id),
-                            prompt=social_attachment_prompt,
-                            aspect_ratio="9:16",
+                            prompt=social_avatar_prompt,
+                            aspect_ratio="1:1",
                             usage_context={
-                                "kind": "testimonial_social_attachment",
+                                "kind": "testimonial_social_avatar",
                                 "funnelId": funnel_id,
                                 "pageId": page_id,
                                 "target": render.label,
                             },
-                            reference_image_bytes=product_reference_bytes,
-                            reference_image_mime_type=product_reference_mime,
-                            reference_asset_public_id=str(product_primary_asset.public_id),
-                            reference_asset_id=str(product_primary_asset.id),
                             funnel_id=funnel_id,
                             product_id=str(funnel.product_id) if funnel.product_id else None,
-                            tags=["funnel", "testimonial", "social_comment", "attachment"],
+                            tags=["funnel", "testimonial", "social_comment", "avatar"],
                         )
+                    except Exception as exc:  # noqa: BLE001
+                        if _should_soft_fail_gemini_missing_inline_data(exc):
+                            avatar_asset = None
+                            avatar_error = str(exc)
+                        else:
+                            raise
+
+                    attachment_asset: Optional[Asset] = None
+                    attachment_error: str | None = None
+                    if not omit_attachment:
+                        try:
+                            attachment_asset = create_funnel_image_asset(
+                                session=session,
+                                org_id=org_id,
+                                client_id=str(funnel.client_id),
+                                prompt=social_attachment_prompt,
+                                aspect_ratio="9:16",
+                                usage_context={
+                                    "kind": "testimonial_social_attachment",
+                                    "funnelId": funnel_id,
+                                    "pageId": page_id,
+                                    "target": render.label,
+                                },
+                                reference_image_bytes=product_reference_bytes,
+                                reference_image_mime_type=product_reference_mime,
+                                reference_asset_public_id=str(product_primary_asset.public_id),
+                                reference_asset_id=str(product_primary_asset.id),
+                                funnel_id=funnel_id,
+                                product_id=str(funnel.product_id) if funnel.product_id else None,
+                                tags=["funnel", "testimonial", "social_comment", "attachment"],
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            if _should_soft_fail_gemini_missing_inline_data(exc):
+                                attachment_asset = None
+                                attachment_error = str(exc)
+                            else:
+                                raise
                     time_value = today
                     if isinstance(validated.get("meta"), dict):
                         meta_date = validated["meta"].get("date")
@@ -2323,10 +2454,11 @@ def generate_funnel_page_testimonials(
                     follow_label = "Follow" if variant == 1 else None
                     reply_payload = validated["reply"]
                     reply_avatar_asset: Optional[Asset] = None
+                    reply_avatar_error: str | None = None
 
-                    def ensure_reply_avatar_asset() -> Asset:
-                        nonlocal reply_avatar_asset
-                        if reply_avatar_asset is not None:
+                    def ensure_reply_avatar_asset() -> Optional[Asset]:
+                        nonlocal reply_avatar_asset, reply_avatar_error
+                        if reply_avatar_asset is not None or reply_avatar_error is not None:
                             return reply_avatar_asset
                         reply_avatar_prompt = _build_distinct_avatar_prompt(
                             render_label=render.label,
@@ -2335,22 +2467,29 @@ def generate_funnel_page_testimonials(
                             direction=reply_payload["avatarPrompt"],
                             variant_label="social-reply-avatar",
                         )
-                        reply_avatar_asset = create_funnel_image_asset(
-                            session=session,
-                            org_id=org_id,
-                            client_id=str(funnel.client_id),
-                            prompt=reply_avatar_prompt,
-                            aspect_ratio="1:1",
-                            usage_context={
-                                "kind": "testimonial_social_reply_avatar",
-                                "funnelId": funnel_id,
-                                "pageId": page_id,
-                                "target": render.label,
-                            },
-                            funnel_id=funnel_id,
-                            product_id=str(funnel.product_id) if funnel.product_id else None,
-                            tags=["funnel", "testimonial", "social_comment", "reply_avatar"],
-                        )
+                        try:
+                            reply_avatar_asset = create_funnel_image_asset(
+                                session=session,
+                                org_id=org_id,
+                                client_id=str(funnel.client_id),
+                                prompt=reply_avatar_prompt,
+                                aspect_ratio="1:1",
+                                usage_context={
+                                    "kind": "testimonial_social_reply_avatar",
+                                    "funnelId": funnel_id,
+                                    "pageId": page_id,
+                                    "target": render.label,
+                                },
+                                funnel_id=funnel_id,
+                                product_id=str(funnel.product_id) if funnel.product_id else None,
+                                tags=["funnel", "testimonial", "social_comment", "reply_avatar"],
+                            )
+                        except Exception as exc:  # noqa: BLE001
+                            if _should_soft_fail_gemini_missing_inline_data(exc):
+                                reply_avatar_asset = None
+                                reply_avatar_error = str(exc)
+                            else:
+                                raise
                         return reply_avatar_asset
 
                     is_sales_review_wall = (
@@ -2362,34 +2501,35 @@ def generate_funnel_page_testimonials(
                         sales_review_wall_social_index += 1
                         if force_reply:
                             reply_avatar = ensure_reply_avatar_asset()
-                            replies = [
-                                {
-                                    "name": reply_payload["name"],
-                                    "text": reply_payload["text"],
-                                    "avatarUrl": _public_asset_url(str(reply_avatar.public_id)),
-                                    "meta": {"time": reply_payload["time"]},
-                                    "reactionCount": reply_payload["reactionCount"],
-                                }
-                            ]
+                            reply_entry: dict[str, Any] = {
+                                "name": reply_payload["name"],
+                                "text": reply_payload["text"],
+                                "meta": {"time": reply_payload["time"]},
+                                "reactionCount": reply_payload["reactionCount"],
+                            }
+                            if reply_avatar is not None:
+                                reply_entry["avatarUrl"] = _public_asset_url(str(reply_avatar.public_id))
+                            replies = [reply_entry]
                             view_replies_text = "View 1 reply"
 
                     if variant == 0:
                         reply_avatar = ensure_reply_avatar_asset()
+                        reply_entry = {
+                            "name": reply_payload["name"],
+                            "text": reply_payload["text"],
+                            "meta": {"time": reply_payload["time"]},
+                            "reactionCount": reply_payload["reactionCount"],
+                        }
+                        if reply_avatar is not None:
+                            reply_entry["avatarUrl"] = _public_asset_url(str(reply_avatar.public_id))
                         replies = [
-                            {
-                                "name": reply_payload["name"],
-                                "text": reply_payload["text"],
-                                "avatarUrl": _public_asset_url(str(reply_avatar.public_id)),
-                                "meta": {"time": reply_payload["time"]},
-                                "reactionCount": reply_payload["reactionCount"],
-                            }
+                            reply_entry
                         ]
                         view_replies_text = "View 1 reply"
 
                     primary_comment = {
                         "name": validated["name"],
                         "text": validated["review"],
-                        "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
                         "meta": {
                             "time": time_value,
                             **({"followLabel": follow_label} if follow_label else {}),
@@ -2401,6 +2541,8 @@ def generate_funnel_page_testimonials(
                             else {}
                         ),
                     }
+                    if avatar_asset is not None:
+                        primary_comment["avatarUrl"] = _public_asset_url(str(avatar_asset.public_id))
                     if attachment_asset is not None:
                         primary_comment["attachmentUrl"] = _public_asset_url(str(attachment_asset.public_id))
 
@@ -2417,10 +2559,11 @@ def generate_funnel_page_testimonials(
                                 location_value = location_raw.strip()
                         post_payload: dict[str, Any] = {
                             "username": username,
-                            "avatarUrl": _public_asset_url(str(avatar_asset.public_id)),
                             "likeCount": max(1, reaction_count * 3),
                             "dateLabel": time_value,
                         }
+                        if avatar_asset is not None:
+                            post_payload["avatarUrl"] = _public_asset_url(str(avatar_asset.public_id))
                         if location_value:
                             post_payload["location"] = location_value
                         payload = {
@@ -2469,23 +2612,24 @@ def generate_funnel_page_testimonials(
                             "payload": payload,
                             "publicId": str(asset.public_id),
                             "assetId": str(asset.id),
-                            "avatarPublicId": str(avatar_asset.public_id),
+                            "avatarPublicId": (
+                                str(avatar_asset.public_id) if avatar_asset is not None else None
+                            ),
                             "attachmentPublicId": (
                                 str(attachment_asset.public_id) if attachment_asset is not None else None
                             ),
                             "replyAvatarPublicId": (
                                 str(reply_avatar_asset.public_id) if reply_avatar_asset else None
                             ),
-                            "replyName": (
-                                reply_payload["name"] if reply_avatar_asset is not None else None
-                            ),
-                            "replyPersona": (
-                                reply_payload["persona"] if reply_avatar_asset is not None else None
-                            ),
+                            "replyName": (reply_payload["name"] if replies else None),
+                            "replyPersona": (reply_payload["persona"] if replies else None),
                             "socialTemplate": social_template,
                             "attachmentPrompt": (social_attachment_prompt if attachment_asset is not None else None),
                             "attachmentSceneMode": (social_scene_mode if attachment_asset is not None else None),
                             "socialAttachmentOmitted": bool(omit_attachment),
+                            "avatarGenerationError": avatar_error,
+                            "attachmentGenerationError": attachment_error,
+                            "replyAvatarGenerationError": reply_avatar_error,
                         }
                     )
     except TestimonialRenderError as exc:

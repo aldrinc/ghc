@@ -37,20 +37,6 @@
 
   <body class="bg-fbBg font-fb text-fbText antialiased">
     <div id="card" class="mx-auto w-full max-w-[430px] bg-white">
-      <div class="flex items-center gap-2 px-4 py-3">
-        <span id="header-title" class="text-[16px] font-semibold"></span>
-        <svg
-          id="header-icon"
-          viewBox="0 0 20 20"
-          class="h-4 w-4 text-fbMuted"
-          fill="currentColor"
-        >
-          <path
-            d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4Z"
-          />
-        </svg>
-      </div>
-      <div class="h-px bg-fbLine"></div>
       <div id="comment-section" class="pb-6"></div>
     </div>
 
@@ -68,6 +54,11 @@
           img.addEventListener('load', () => resolve(), { once: true });
           img.addEventListener('error', () => reject(new Error('Failed to load image.')), { once: true });
         });
+
+      const initials = (value) => {
+        const text = (value || '?').trim();
+        return text ? text.slice(0, 1).toUpperCase() : '?';
+      };
 
       const createIconButton = (svg, label) => {
         const button = document.createElement('button');
@@ -107,15 +98,22 @@
         return badge;
       };
 
-      const buildAvatar = (avatarUrl, sizeClass, imageList) => {
+      const buildAvatar = (comment, sizeClass, imageList) => {
         const wrapper = document.createElement('div');
-        wrapper.className = `mt-[2px] ${sizeClass} shrink-0 overflow-hidden rounded-full bg-[#DADDE1]`;
-        const img = document.createElement('img');
-        img.className = 'h-full w-full object-cover';
-        img.alt = 'Avatar';
-        img.src = avatarUrl;
-        wrapper.appendChild(img);
-        imageList.push(img);
+        wrapper.className = `mt-[2px] ${sizeClass} shrink-0 overflow-hidden rounded-full bg-[#DADDE1] flex items-center justify-center font-semibold text-neutral-700`;
+        if (comment.avatarUrl) {
+          const img = document.createElement('img');
+          img.className = 'h-full w-full object-cover';
+          img.alt = 'Avatar';
+          img.src = comment.avatarUrl;
+          wrapper.appendChild(img);
+          imageList.push(img);
+        } else {
+          const label = document.createElement('span');
+          label.textContent = initials(comment.name);
+          label.className = 'text-sm';
+          wrapper.appendChild(label);
+        }
         return wrapper;
       };
 
@@ -125,7 +123,7 @@
         container.className = `flex gap-3 px-4 ${isFirst ? 'pt-4' : 'pt-5'}`;
 
         const avatarSize = isReply ? 'h-9 w-9' : 'h-10 w-10';
-        const avatar = buildAvatar(comment.avatarUrl, avatarSize, imageList);
+        const avatar = buildAvatar(comment, avatarSize, imageList);
 
         const body = document.createElement('div');
         body.className = 'min-w-0 flex-1';
@@ -277,11 +275,6 @@
         if (!header || typeof header !== 'object') {
           throw new Error('header is required.');
         }
-
-        const headerTitle = document.getElementById('header-title');
-        const headerIcon = document.getElementById('header-icon');
-        headerTitle.textContent = header.title;
-        headerIcon.style.display = header.showSortIcon ? 'block' : 'none';
 
         const section = document.getElementById('comment-section');
         section.innerHTML = '';

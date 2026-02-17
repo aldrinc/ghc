@@ -171,7 +171,9 @@ def _validate_thread_comment(comment: Any, *, base_dir: Optional[Path], prefix: 
 
     name = _assert_string(comment.get("name"), f"{prefix}.name", _MAX_NAME_LENGTH)
     text = _assert_string(comment.get("text"), f"{prefix}.text", _MAX_COMMENT_LENGTH)
-    avatar_url = _resolve_image_url(comment.get("avatarUrl"), base_dir, f"{prefix}.avatarUrl")
+    avatar_url: str | None = None
+    if comment.get("avatarUrl") is not None:
+        avatar_url = _resolve_image_url(comment.get("avatarUrl"), base_dir, f"{prefix}.avatarUrl")
     meta = _validate_thread_meta(comment.get("meta"), f"{prefix}.meta")
 
     reaction_count: int | None = None
@@ -216,7 +218,9 @@ def _validate_instagram_post(post: Any, *, base_dir: Optional[Path]) -> dict[str
         if key not in allowed_keys:
             raise TestimonialRenderError(f"post contains unsupported key: {key}")
     username = _assert_string(post.get("username"), "post.username", _MAX_INSTAGRAM_USERNAME)
-    avatar_url = _resolve_image_url(post.get("avatarUrl"), base_dir, "post.avatarUrl")
+    avatar_url: str | None = None
+    if post.get("avatarUrl") is not None:
+        avatar_url = _resolve_image_url(post.get("avatarUrl"), base_dir, "post.avatarUrl")
     location = ""
     if post.get("location") is not None:
         location = _assert_string(post.get("location"), "post.location", 120)
