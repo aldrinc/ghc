@@ -66,10 +66,12 @@ class CreativeServiceClient:
         payload: CreativeServiceImageAdsCreateIn,
         idempotency_key: str,
     ) -> CreativeServiceImageAdsJob:
+        # Avoid sending null/empty reference fields when they're not provided.
+        # This keeps "prompt-only" image generation truly prompt-only at the API boundary.
         body = self._request_json(
             "POST",
             "/v1/marketing/image-ads",
-            json_payload=payload.model_dump(mode="json"),
+            json_payload=payload.model_dump(mode="json", exclude_none=True, exclude_defaults=True),
             idempotency_key=idempotency_key,
         )
         return self._parse_model(CreativeServiceImageAdsJob, body, context="create_image_ads")

@@ -1,19 +1,19 @@
 from __future__ import annotations
 
 import hashlib
-import mimetypes
 import os
 import time
 from typing import Any, Dict, List, Tuple
 
 import httpx
 import google.generativeai as genai
+from sqlalchemy import select
 from temporalio import activity
 
 from app.config import settings
 from app.db.base import session_scope
 from app.db.enums import ArtifactTypeEnum
-from app.db.models import DesignSystem
+from app.db.models import DesignSystem, Funnel, ProductOffer, ProductVariant
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.products import ProductsRepository
@@ -32,15 +32,11 @@ from app.services.swipe_prompt import (
     load_swipe_to_image_ad_prompt,
 )
 
-# Reuse existing asset generation helpers to keep asset storage + product reference syncing consistent.
+# Reuse existing asset generation helpers to keep asset storage consistent.
 from app.temporal.activities.asset_activities import (  # noqa: E402
-    _ProductReferenceAsset,
-    _build_image_reference_text,
     _create_generated_asset_from_url,
-    _ensure_remote_reference_asset_ids,
     _extract_brief,
     _retention_expires_at,
-    _select_product_reference_assets,
     _stable_idempotency_key,
     _validate_brief_scope,
 )
@@ -210,35 +206,6 @@ def _format_audience_from_canon(canon: Dict[str, Any]) -> str | None:
     return " | ".join(parts) if parts else None
 
 
-def _research_copy_bank_from_canon(canon: Dict[str, Any]) -> List[str]:
-    out: List[str] = []
-
-    voc = canon.get("voiceOfCustomer")
-    if isinstance(voc, dict):
-        for key in ("quotes", "objections", "triggers", "languagePatterns"):
-            items = voc.get(key)
-            if isinstance(items, list):
-                out.extend([str(x).strip() for x in items if isinstance(x, str) and x.strip()])
-
-    research_highlights = canon.get("research_highlights")
-    if isinstance(research_highlights, dict):
-        for step_key in sorted(research_highlights.keys()):
-            value = research_highlights.get(step_key)
-            if isinstance(value, str) and value.strip():
-                out.append(f"[precanon:{step_key}] {value.strip()}")
-
-    precanon = canon.get("precanon_research")
-    if isinstance(precanon, dict):
-        step_summaries = precanon.get("step_summaries")
-        if isinstance(step_summaries, dict):
-            for step_key in sorted(step_summaries.keys()):
-                value = step_summaries.get(step_key)
-                if isinstance(value, str) and value.strip():
-                    out.append(f"[precanon:{step_key}] {value.strip()}")
-
-    return out
-
-
 def _brand_colors_fonts_from_design_tokens(tokens: Dict[str, Any]) -> str | None:
     if not isinstance(tokens, dict) or not tokens:
         return None
@@ -277,6 +244,126 @@ def _must_avoid_claims_from_canon(canon: Dict[str, Any]) -> List[str]:
         if isinstance(items, list):
             out.extend([str(x).strip() for x in items if isinstance(x, str) and x.strip()])
     return out
+
+
+def _format_price(amount_cents: int, currency: str) -> str:
+    cleaned_currency = (currency or "").strip().upper()
+    if cleaned_currency == "USD":
+        if amount_cents % 100 == 0:
+            return f"${amount_cents // 100}"
+        return f"${amount_cents / 100:.2f}"
+    # Default: show currency code explicitly to avoid guessing locale formatting.
+    return f"{amount_cents / 100:.2f} {cleaned_currency or '[UNKNOWN]'}"
+
+
+def _build_product_offer_context_block(
+    *,
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    funnel_id: str | None,
+) -> tuple[str, str, dict[str, Any]]:
+    """
+    Build a deterministic block of offer/pricing context for Gemini so it can populate
+    price lines without inventing.
+    """
+
+    funnel: Funnel | None = None
+    selected_offer_id: str | None = None
+    if funnel_id:
+        funnel = session.get(Funnel, funnel_id)
+        if not funnel:
+            raise ValueError(f"Funnel not found: {funnel_id}")
+        selected_offer_id = str(funnel.selected_offer_id) if funnel.selected_offer_id else None
+
+    offers = list(
+        session.scalars(
+            select(ProductOffer)
+            .where(
+                ProductOffer.org_id == org_id,
+                ProductOffer.client_id == client_id,
+                ProductOffer.product_id == product_id,
+            )
+            .order_by(ProductOffer.created_at.desc())
+        ).all()
+    )
+
+    selected_offer: ProductOffer | None = None
+    if selected_offer_id:
+        selected_offer = next((item for item in offers if str(item.id) == selected_offer_id), None)
+        if not selected_offer:
+            raise ValueError(
+                "Selected offer does not exist for this product. "
+                f"funnel_id={funnel_id} selected_offer_id={selected_offer_id} product_id={product_id}"
+            )
+    else:
+        if not offers:
+            raise ValueError(
+                "No product offers found; cannot inject offer/pricing context. "
+                "Create at least one product offer with price points (e.g., via Shopify sync). "
+                f"product_id={product_id}"
+            )
+        if len(offers) > 1:
+            raise ValueError(
+                "Multiple product offers found but funnel.selected_offer_id is not set; cannot choose pricing context. "
+                f"funnel_id={funnel_id} product_id={product_id} offer_ids={[str(o.id) for o in offers]}"
+            )
+        selected_offer = offers[0]
+
+    price_points = list(
+        session.scalars(
+            select(ProductVariant).where(ProductVariant.offer_id == selected_offer.id).order_by(ProductVariant.price.asc())
+        ).all()
+    )
+    if not price_points:
+        raise ValueError(
+            "Selected offer has no price points; cannot inject offer/pricing context. "
+            f"offer_id={selected_offer.id} product_id={product_id}"
+        )
+
+    lines: list[str] = []
+    lines.append("## PRODUCT / OFFER CONTEXT")
+    lines.append(f"Offer name: {selected_offer.name}")
+    lines.append("Price points (use exact values; do not invent pricing):")
+    for point in price_points:
+        price = _format_price(int(point.price), str(point.currency))
+        compare_at = (
+            _format_price(int(point.compare_at_price), str(point.currency))
+            if point.compare_at_price is not None
+            else None
+        )
+        suffix = f" (compare at {compare_at})" if compare_at else ""
+        lines.append(f"- {point.title}: {price}{suffix}")
+    lines.append(
+        "If you include a price in the ad, choose ONE of the price points above (prefer the lowest unless the brief says otherwise)."
+    )
+    text = "\n".join(lines).strip()
+
+    signature = _stable_idempotency_key(
+        "swipe_offer_context_v1",
+        str(selected_offer.id),
+        *[
+            f"{point.title}|{int(point.price)}|{str(point.currency)}|{int(point.compare_at_price) if point.compare_at_price is not None else ''}"
+            for point in price_points
+        ],
+    )
+
+    metadata: dict[str, Any] = {
+        "offerId": str(selected_offer.id),
+        "offerName": selected_offer.name,
+        "pricePoints": [
+            {
+                "title": point.title,
+                "amountCents": int(point.price),
+                "currency": str(point.currency),
+                "compareAtPriceCents": int(point.compare_at_price) if point.compare_at_price is not None else None,
+            }
+            for point in price_points
+        ],
+        "signature": signature,
+    }
+    return text, signature, metadata
 
 
 def _poll_image_job(
@@ -342,9 +429,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     Generate ONE (or N) image ad(s) by adapting a competitor swipe image.
 
     Flow:
-      1) Use Gemini (vision) with the swipe prompt template to produce a dense generation-ready image prompt.
-      2) Send that prompt + reference images to the creative service (Freestyle) to render the final image(s).
-      3) Persist generated assets attached to the provided asset brief.
+      1) Use Gemini (vision) with the swipe prompt template + brand/brief context + the competitor swipe image to
+         produce a dense, generation-ready image prompt.
+      2) Extract ONLY the prompt from the Gemini markdown output (```text fenced block).
+      3) Send ONLY that extracted prompt to the creative service (Freestyle) to render the final image(s).
+      4) Persist generated assets attached to the provided asset brief.
     """
 
     org_id = params["org_id"]
@@ -462,44 +551,21 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         client_name = brand_ctx.get("client_name") or ""
         product_title = brand_ctx.get("product_title") or ""
         canon = brand_ctx.get("canon") if isinstance(brand_ctx.get("canon"), dict) else {}
-        tokens = brand_ctx.get("design_system_tokens") if isinstance(brand_ctx.get("design_system_tokens"), dict) else {}
+        tokens = (
+            brand_ctx.get("design_system_tokens") if isinstance(brand_ctx.get("design_system_tokens"), dict) else {}
+        )
 
         audience = _format_audience_from_canon(canon)
         brand_colors_fonts = _brand_colors_fonts_from_design_tokens(tokens)
         must_avoid_claims = _must_avoid_claims_from_canon(canon)
-        brand_tokens = tokens.get("brand") if isinstance(tokens.get("brand"), dict) else {}
-        logo_asset_public_id_raw = brand_tokens.get("logoAssetPublicId")
-        logo_asset_public_id = (
-            logo_asset_public_id_raw.strip()
-            if isinstance(logo_asset_public_id_raw, str) and logo_asset_public_id_raw.strip()
-            else None
-        )
-        if isinstance(logo_asset_public_id, str) and logo_asset_public_id.startswith("__"):
-            logo_asset_public_id = None
 
-        # Prepare product references early so context can include concrete existing packshot details.
-        product_reference_assets = _select_product_reference_assets(
+        offer_context_block, offer_context_signature, offer_context_metadata = _build_product_offer_context_block(
             session=session,
             org_id=org_id,
+            client_id=client_id,
             product_id=product_id,
+            funnel_id=funnel_id,
         )
-        # Always resync product references to creative service for this run.
-        # Cached creativeServiceReferenceAssetId values can be stale across different
-        # creative-service storage buckets and cause reference serialization failures.
-        product_reference_assets = [
-            _ProductReferenceAsset(
-                local_asset_id=reference.local_asset_id,
-                primary_url=reference.primary_url,
-                title=reference.title,
-                remote_asset_id=None,
-            )
-            for reference in product_reference_assets
-        ]
-        context_assets: Dict[str, str] = {}
-        if logo_asset_public_id:
-            context_assets["BRAND_LOGO_ASSET_PUBLIC_ID"] = logo_asset_public_id
-        for idx, reference in enumerate(product_reference_assets[:3], start=1):
-            context_assets[f"PRODUCT_PACKSHOT_{idx}"] = reference.primary_url
 
         # Swipe image bytes.
         swipe_bytes, swipe_mime_type, swipe_source_url = _resolve_swipe_image(
@@ -516,7 +582,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             audience=audience,
             brand_colors_fonts=brand_colors_fonts,
             must_avoid_claims=must_avoid_claims,
-            assets=context_assets or None,
+            assets=None,
             creative_concept=creative_concept,
             channel=channel_id,
             angle=angle,
@@ -525,6 +591,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             tone_guidelines=tone_guidelines,
             visual_guidelines=visual_guidelines,
         )
+        context_block = "\n\n".join([context_block, offer_context_block]).strip()
 
         brief_context_signature = _stable_idempotency_key(
             "swipe_brief_context_v1",
@@ -560,54 +627,12 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         except SwipePromptParseError as exc:
             raise RuntimeError(f"Failed to parse swipe prompt output: {exc}") from exc
 
-        # Prepare creative service references (product + swipe).
-        product_reference_remote_ids = _ensure_remote_reference_asset_ids(
-            session=session,
-            org_id=org_id,
-            creative_client=creative_client,
-            references=product_reference_assets,
-        )
-        product_reference_text = _build_image_reference_text(product_reference_assets)
-
-        # Upload swipe image to creative service.
-        ext = mimetypes.guess_extension(swipe_mime_type) or ".bin"
-        if ext == ".bin":
-            raise RuntimeError(f"Unable to infer file extension for swipe image mime type: {swipe_mime_type}")
-        swipe_file_name = f"swipe_{company_swipe_id or 'url'}{ext}"
-        uploaded_swipe = creative_client.upload_asset(
-            kind="image",
-            source="upload",
-            file_name=swipe_file_name,
-            file_bytes=swipe_bytes,
-            content_type=swipe_mime_type,
-            title="Competitor swipe reference",
-            description="Competitor swipe reference for layout/composition (do not copy branding)",
-            metadata_json={"source": "competitor_swipe", "companySwipeId": company_swipe_id, "sourceUrl": swipe_source_url},
-            generate_proxy=True,
-        )
-        swipe_remote_asset_id = (uploaded_swipe.id or "").strip()
-        if not swipe_remote_asset_id:
-            raise RuntimeError("Creative service returned an empty asset id for uploaded swipe reference image")
-
-        reference_asset_ids = [swipe_remote_asset_id, *product_reference_remote_ids]
-        reference_text = "\n\n".join(
-            [
-                product_reference_text,
-                f"Competitor swipe layout reference (do not copy branding): {swipe_source_url}",
-            ]
-        ).strip()
-        reference_signature = _stable_idempotency_key(
-            "swipe_reference_assets_v1",
-            swipe_remote_asset_id,
-            *product_reference_remote_ids,
-        )
-
         idempotency_key = _stable_idempotency_key(
             org_id,
             client_id,
             str(campaign_id or ""),
             asset_brief_id,
-            "swipe_image_ad_v1",
+            "swipe_image_ad_v2",
             str(requirement_index),
             str(company_swipe_id or swipe_source_url or ""),
             aspect_ratio,
@@ -615,13 +640,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             model,
             prompt_sha,
             brief_context_signature,
-            reference_signature,
+            offer_context_signature,
         )
 
         image_payload = CreativeServiceImageAdsCreateIn(
             prompt=image_prompt,
-            reference_text=reference_text,
-            reference_asset_ids=reference_asset_ids,
             count=render_count,
             aspect_ratio=aspect_ratio,
             client_request_id=idempotency_key,
@@ -658,10 +681,13 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "promptUsed": output.prompt_used,
                 "swipeCompanyId": company_swipe_id,
                 "swipeSourceUrl": swipe_source_url,
-                "swipeRemoteAssetId": swipe_remote_asset_id,
                 "swipePromptModel": model,
                 "swipePromptTemplateSha256": prompt_sha,
                 "swipeBriefContextSignature": brief_context_signature,
+                "swipeOfferContextSignature": offer_context_signature,
+                "swipeOfferId": offer_context_metadata.get("offerId"),
+                "swipeOfferName": offer_context_metadata.get("offerName"),
+                "swipeOfferPricePoints": offer_context_metadata.get("pricePoints"),
                 "swipePromptMarkdownSha256": hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
                 "swipePromptMarkdownPreview": raw_output[:4000],
             }
@@ -697,8 +723,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             payload_out={
                 "asset_ids": created_asset_ids,
                 "job_id": completed_job.id,
-                "prompt_sha256": prompt_sha,
                 "swipe_prompt_model": model,
+                "prompt_template_sha256": prompt_sha,
             },
         )
 
@@ -709,5 +735,4 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_prompt_markdown": raw_output,
             "swipe_prompt_model": model,
             "prompt_template_sha256": prompt_sha,
-            "reference_asset_ids": reference_asset_ids,
         }
