@@ -42,6 +42,14 @@ class ApplyPayload(BaseModel):
     plan_path: Optional[str] = Field(None, description="Optional plan file path (inside DEPLOY_ROOT_DIR)")
 
 
+class WorkloadDomainsResponse(BaseModel):
+    workload_name: str
+    plan_path: str
+    workload_found: bool
+    server_names: list[str]
+    https: Optional[bool] = None
+
+
 @router.get("/plans/latest")
 async def latest_plan(
     request: Request,
@@ -90,6 +98,31 @@ async def patch_workload(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/plans/workloads/domains", response_model=WorkloadDomainsResponse)
+async def get_workload_domains(
+    request: Request,
+    workload_name: str = Query(..., description="Workload name to locate inside the deploy plan"),
+    plan_path: Optional[str] = Query(default=None),
+    instance_name: Optional[str] = Query(default=None),
+    _auth: AuthContext = Depends(get_current_user),
+):
+    _require_internal_proxy(request)
+    try:
+        result = deploy_service.get_workload_domains_from_plan(
+            workload_name=workload_name,
+            plan_path=plan_path,
+            instance_name=instance_name,
+        )
+        return {
+            "workload_name": workload_name,
+            **result,
+        }
+    except deploy_service.DeployError as exc:
+        message = str(exc)
+        code = status.HTTP_404_NOT_FOUND if "No plan found" in message else status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=message) from exc
+
+
 @router.post("/plans/apply")
 async def apply_plan(
     request: Request,
@@ -113,4 +146,3 @@ async def apply_latest_plan_alias(
     Backwards-compatible alias for /deploy/plans/apply.
     """
     return await apply_plan(request=request, payload=payload, _auth=_auth)
-

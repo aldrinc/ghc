@@ -1,5 +1,6 @@
 import { useFunnel, useUpdateFunnel, useCreateFunnelPage, usePublishFunnel, useDisableFunnel, useEnableFunnel, useDuplicateFunnel, useFunnelTemplates, useUpdateFunnelPage } from "@/api/funnels";
 import { useApiClient } from "@/api/client";
+import { useDeployWorkloadDomains } from "@/api/deploy";
 import { useDesignSystems } from "@/api/designSystems";
 import { useProduct } from "@/api/products";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -16,10 +17,14 @@ const deployPlanPath = (import.meta.env.VITE_DEPLOY_PLAN_PATH || "").trim();
 const deployInstanceName = (import.meta.env.VITE_DEPLOY_INSTANCE_NAME || "").trim();
 const deployUpstreamBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_BASE_URL || "").trim();
 const deployUpstreamApiBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_API_BASE_URL || "").trim();
-const deployServerNames = (import.meta.env.VITE_DEPLOY_SERVER_NAMES || "")
-  .split(",")
-  .map((value: string) => value.trim())
-  .filter((value: string) => value.length > 0);
+
+type PatchWorkloadResponse = {
+  status: string;
+  base_plan_path: string;
+  updated_plan_path: string;
+  workload_name: string;
+  updated_count: number;
+};
 
 type DeployJobState = {
   jobId: string;
@@ -55,14 +60,17 @@ export function FunnelDetailPage() {
   const disable = useDisableFunnel();
   const enable = useEnableFunnel();
   const duplicate = useDuplicateFunnel();
-  const { get } = useApiClient();
+  const { get, post } = useApiClient();
 
   const [isPageModalOpen, setIsPageModalOpen] = useState(false);
   const [pageName, setPageName] = useState("");
   const [templateId, setTemplateId] = useState("");
-  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
-  const [publishServerNamesInput, setPublishServerNamesInput] = useState(deployServerNames.join(", "));
   const [deployJob, setDeployJob] = useState<DeployJobState | null>(null);
+  const [isEditingDeployDomains, setIsEditingDeployDomains] = useState(false);
+  const [deployDomainsDraft, setDeployDomainsDraft] = useState<string[]>([]);
+  const [deployDomainsInput, setDeployDomainsInput] = useState("");
+  const [deployDomainsSaveError, setDeployDomainsSaveError] = useState<string | null>(null);
+  const [isSavingDeployDomains, setIsSavingDeployDomains] = useState(false);
 
   const pageOptions = useMemo(() => {
     return funnel?.pages?.map((p) => ({ label: `${p.name} (${p.slug})`, value: p.id })) || [];
@@ -111,6 +119,125 @@ export function FunnelDetailPage() {
 
   const publicBase = funnel?.public_id ? `/f/${funnel.public_id}` : null;
   const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
+  const deployWorkloadName = funnel?.public_id ? `funnel-${funnel.public_id}` : undefined;
+
+  const deployDomains = useDeployWorkloadDomains({
+    workloadName: deployWorkloadName,
+    planPath: deployPlanPath || undefined,
+    instanceName: deployInstanceName || undefined,
+  });
+
+  const normalizeDeployDomainList = (values: string[]): string[] => {
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const raw of values) {
+      const token = (raw || "").trim().toLowerCase();
+      if (!token || seen.has(token)) continue;
+      seen.add(token);
+      out.push(token);
+    }
+    return out;
+  };
+
+  const parseDeployDomains = (raw: string): string[] => {
+    const tokens = raw
+      .split(/[,\s]+/g)
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const token of tokens) {
+      if (token.includes("://") || token.includes("/") || token.includes("?") || token.includes("#")) {
+        throw new Error("Domains must be hostnames only (e.g. example.com), not full URLs.");
+      }
+      if (seen.has(token)) continue;
+      seen.add(token);
+      out.push(token);
+    }
+    return out;
+  };
+
+  const startEditingDeployDomains = () => {
+    if (!deployDomains.data?.workload_found) return;
+    setDeployDomainsDraft(normalizeDeployDomainList(deployDomains.data.server_names || []));
+    setDeployDomainsInput("");
+    setDeployDomainsSaveError(null);
+    setIsEditingDeployDomains(true);
+  };
+
+  const cancelEditingDeployDomains = () => {
+    setIsEditingDeployDomains(false);
+    setDeployDomainsDraft([]);
+    setDeployDomainsInput("");
+    setDeployDomainsSaveError(null);
+  };
+
+  const addDeployDomainsFromInput = () => {
+    setDeployDomainsSaveError(null);
+    try {
+      const next = parseDeployDomains(deployDomainsInput);
+      if (!next.length) return;
+      setDeployDomainsDraft((current) => {
+        const merged = [...current];
+        const seen = new Set(current.map((d) => d.toLowerCase()));
+        for (const item of next) {
+          if (seen.has(item)) continue;
+          seen.add(item);
+          merged.push(item);
+        }
+        return merged;
+      });
+      setDeployDomainsInput("");
+    } catch (err) {
+      setDeployDomainsSaveError(err instanceof Error ? err.message : "Invalid deploy domains.");
+    }
+  };
+
+  const removeDeployDomain = (hostname: string) => {
+    setDeployDomainsDraft((current) => current.filter((d) => d !== hostname));
+  };
+
+  const saveDeployDomains = async () => {
+    setDeployDomainsSaveError(null);
+    if (!deployWorkloadName) {
+      setDeployDomainsSaveError("Deploy workload name is missing for this funnel.");
+      return;
+    }
+    const planPath = (deployDomains.data?.plan_path || "").trim();
+    if (!planPath) {
+      setDeployDomainsSaveError("No deploy plan is available to update.");
+      return;
+    }
+
+    setIsSavingDeployDomains(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("plan_path", planPath);
+      if (deployInstanceName) params.set("instance_name", deployInstanceName);
+      params.set("create_if_missing", "false");
+      params.set("in_place", "true");
+
+      await post<PatchWorkloadResponse>(`/deploy/plans/workloads?${params.toString()}`, {
+        name: deployWorkloadName,
+        service_config: {
+          server_names: deployDomainsDraft,
+          https: deployDomainsDraft.length > 0,
+        },
+      });
+
+      setIsEditingDeployDomains(false);
+      void deployDomains.refetch();
+    } catch (err) {
+      setDeployDomainsSaveError(
+        typeof (err as { message?: unknown })?.message === "string"
+          ? String((err as { message?: unknown }).message)
+          : "Failed to update deploy domains.",
+      );
+    } finally {
+      setIsSavingDeployDomains(false);
+    }
+  };
 
   const handlePublish = async (serverNames: string[]) => {
     if (!funnelId || !funnel) return;
@@ -140,6 +267,7 @@ export function FunnelDetailPage() {
     if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
 
     const response = await publish.mutateAsync({ funnelId, payload });
+    void deployDomains.refetch();
     const apply = response.deploy?.apply;
     const jobId = typeof apply?.jobId === "string" ? apply.jobId : "";
     const statusPath = typeof apply?.statusPath === "string" ? apply.statusPath : "";
@@ -154,29 +282,6 @@ export function FunnelDetailPage() {
         publicationId: typeof response.publicationId === "string" ? response.publicationId : null,
         error: null,
       });
-    }
-  };
-
-  const openPublishModal = () => {
-    setPublishServerNamesInput(deployServerNames.join(", "));
-    setIsPublishModalOpen(true);
-  };
-
-  const handlePublishSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const serverNames = Array.from(
-      new Set(
-        publishServerNamesInput
-          .split(",")
-          .map((value: string) => value.trim())
-          .filter((value: string) => value.length > 0)
-      )
-    );
-    try {
-      await handlePublish(serverNames);
-      setIsPublishModalOpen(false);
-    } catch {
-      // toast is handled by the mutation hook
     }
   };
 
@@ -240,8 +345,8 @@ export function FunnelDetailPage() {
             ) : null}
             <Button
               size="sm"
-              onClick={openPublishModal}
-              disabled={!funnel?.canPublish || publish.isPending}
+              onClick={() => void handlePublish(deployDomains.data?.server_names || [])}
+              disabled={!funnel?.canPublish || publish.isPending || deployDomains.isLoading}
             >
               {publish.isPending ? "Publishing…" : "Publish + Deploy"}
             </Button>
@@ -310,7 +415,7 @@ export function FunnelDetailPage() {
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Entry page</div>
                 <Select
@@ -343,8 +448,108 @@ export function FunnelDetailPage() {
               </div>
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Public link</div>
-                <div className="rounded-md border border-border bg-surface-2 px-3 py-2 font-mono text-xs text-content">
-                  {publicBase ? publicBase : "—"}
+                <div className="flex h-10 items-center rounded-md border border-border bg-surface-2 px-3 font-mono text-xs text-content">
+                  <span className="truncate">{publicBase ? publicBase : "—"}</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs font-semibold text-content">Deploy domains</div>
+                <div className="rounded-md border border-border bg-surface-2 text-xs text-content">
+                  {deployDomains.data?.workload_found && isEditingDeployDomains ? (
+                    <div className="px-3 py-2 space-y-2">
+                      <div className="flex flex-wrap gap-1">
+                        {deployDomainsDraft.length ? (
+                          deployDomainsDraft.map((hostname) => (
+                            <span
+                              key={hostname}
+                              className="inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content"
+                            >
+                              {hostname}
+                              <button
+                                type="button"
+                                onClick={() => removeDeployDomain(hostname)}
+                                className="ml-1 rounded-full px-1 text-content-muted hover:bg-surface-3 hover:text-content"
+                                aria-label={`Remove ${hostname}`}
+                              >
+                                x
+                              </button>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-content-muted">No domains</span>
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          value={deployDomainsInput}
+                          onChange={(e) => setDeployDomainsInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter") return;
+                            e.preventDefault();
+                            addDeployDomainsFromInput();
+                          }}
+                          placeholder="Add domain(s), comma or space separated"
+                          className="h-8 min-w-[220px] flex-1 font-mono text-[11px]"
+                        />
+                        <Button type="button" size="sm" variant="secondary" onClick={addDeployDomainsFromInput} disabled={!deployDomainsInput.trim()}>
+                          Add
+                        </Button>
+                      </div>
+
+                      {deployDomainsSaveError ? <div className="text-xs text-danger">{deployDomainsSaveError}</div> : null}
+
+                      <div className="flex items-center justify-end gap-2">
+                        <Button type="button" size="sm" variant="secondary" onClick={cancelEditingDeployDomains} disabled={isSavingDeployDomains}>
+                          Cancel
+                        </Button>
+                        <Button type="button" size="sm" onClick={() => void saveDeployDomains()} disabled={isSavingDeployDomains}>
+                          {isSavingDeployDomains ? "Saving…" : "Save"}
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex h-10 items-center justify-between gap-2 overflow-hidden px-3">
+                      {deployDomains.isLoading ? (
+                        <span className="truncate text-content-muted">Loading…</span>
+                      ) : deployDomains.isError ? (
+                        <span className="truncate text-danger">
+                          {(deployDomains.error as { message?: string })?.message || "Unable to load deploy domains."}
+                        </span>
+                      ) : deployDomains.data?.workload_found ? (
+                        <>
+                          {deployDomains.data.server_names.length ? (
+                            <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+                              {deployDomains.data.server_names.map((hostname) => (
+                                <a
+                                  key={hostname}
+                                  href={`${deployDomains.data?.https ? "https" : "http"}://${hostname}/`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content hover:bg-surface-3"
+                                >
+                                  {hostname}
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="truncate text-content-muted">—</span>
+                          )}
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="secondary"
+                            onClick={startEditingDeployDomains}
+                            className="shrink-0"
+                          >
+                            Edit
+                          </Button>
+                        </>
+                      ) : (
+                        <span className="truncate text-content-muted">Not in plan yet</span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -466,38 +671,6 @@ export function FunnelDetailPage() {
               </DialogClose>
               <Button type="submit" disabled={!pageName.trim() || createPage.isPending}>
                 {createPage.isPending ? "Creating…" : "Create page"}
-              </Button>
-            </div>
-          </form>
-        </DialogContent>
-      </DialogRoot>
-
-      <DialogRoot open={isPublishModalOpen} onOpenChange={setIsPublishModalOpen}>
-        <DialogContent>
-          <DialogTitle>Publish + Deploy</DialogTitle>
-          <DialogDescription>
-            Enter one or more domains to bind this deploy (comma separated). Leave blank for catch-all HTTP.
-          </DialogDescription>
-          <form className="space-y-3" onSubmit={handlePublishSubmit}>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-content">Deploy domains</label>
-              <Input
-                placeholder="landing.example.com, www.landing.example.com"
-                value={publishServerNamesInput}
-                onChange={(e) => setPublishServerNamesInput(e.target.value)}
-              />
-              <div className="text-xs text-content-muted">
-                Empty input deploys without host-specific TLS (HTTP catch-all).
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-1">
-              <DialogClose asChild>
-                <Button type="button" variant="secondary" disabled={publish.isPending}>
-                  Cancel
-                </Button>
-              </DialogClose>
-              <Button type="submit" disabled={publish.isPending}>
-                {publish.isPending ? "Publishing…" : "Publish"}
               </Button>
             </div>
           </form>
