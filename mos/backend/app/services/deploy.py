@@ -150,6 +150,85 @@ def get_latest_plan() -> dict[str, str]:
     return {"path": str(plan_path), "content": content}
 
 
+def get_workload_domains_from_plan(
+    *,
+    workload_name: str,
+    plan_path: str | None = None,
+    instance_name: str | None = None,
+) -> dict[str, Any]:
+    name = (workload_name or "").strip()
+    if not name:
+        raise DeployError("workload_name is required.")
+
+    base_plan_path = _assert_under_cloudhand(Path(plan_path)) if plan_path else _find_latest_plan()
+    if not base_plan_path or not base_plan_path.exists():
+        raise DeployError("No plan found.")
+
+    try:
+        plan = json.loads(base_plan_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise DeployError(f"Failed to read plan JSON: {exc}") from exc
+
+    new_spec = plan.get("new_spec") or {}
+    instances = new_spec.get("instances") or []
+    if not isinstance(instances, list):
+        raise DeployError("Plan new_spec.instances must be a list.")
+
+    found = False
+    server_names: list[str] = []
+    https: bool | None = None
+
+    for inst in instances:
+        if instance_name and inst.get("name") != instance_name:
+            continue
+        workloads = inst.get("workloads") or []
+        if not isinstance(workloads, list):
+            continue
+        for workload in workloads:
+            if (workload.get("name") or "").strip() != name:
+                continue
+            found = True
+
+            service_config = workload.get("service_config") or {}
+            if not isinstance(service_config, dict):
+                break
+
+            raw_server_names = service_config.get("server_names") or []
+            if raw_server_names is None:
+                raw_server_names = []
+            if not isinstance(raw_server_names, list):
+                raise DeployError("Workload service_config.server_names must be a list.")
+
+            cleaned: list[str] = []
+            seen: set[str] = set()
+            for raw in raw_server_names:
+                if not isinstance(raw, str):
+                    raise DeployError("Workload service_config.server_names entries must be strings.")
+                hostname = raw.strip()
+                if not hostname:
+                    continue
+                if hostname in seen:
+                    continue
+                seen.add(hostname)
+                cleaned.append(hostname)
+            server_names = cleaned
+
+            https_value = service_config.get("https")
+            if isinstance(https_value, bool):
+                https = https_value
+
+            break
+        if found:
+            break
+
+    return {
+        "plan_path": str(base_plan_path),
+        "workload_found": found,
+        "server_names": server_names,
+        "https": https,
+    }
+
+
 def save_plan(*, content: str, path: str | None = None) -> dict[str, str]:
     # Validate JSON early
     try:
