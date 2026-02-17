@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _backend_root = Path(__file__).resolve().parents[1]
 _project_root = _backend_root.parent.parent
 load_dotenv(_project_root / ".env", override=False)
+# Optional consolidated env (gitignored) used in local dev to store secrets outside repo-tracked env examples.
+load_dotenv(_project_root / ".env.local.consolidated", override=False)
 load_dotenv(_backend_root / ".env", override=True)
 
 
