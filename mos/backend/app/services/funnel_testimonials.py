@@ -2163,7 +2163,9 @@ def generate_funnel_page_testimonials(
                             "imageUrl": _public_asset_url(str(media_asset.public_id)),
                             "alt": f"Customer scene for {validated['name']}",
                         }
-                        image_bytes = renderer.render_png(payload)
+                        render_payload = dict(payload)
+                        render_payload["imageUrl"] = _asset_data_url(media_asset)
+                        image_bytes = renderer.render_png(render_payload)
                         asset = create_funnel_upload_asset(
                             session=session,
                             org_id=org_id,
@@ -2312,7 +2314,13 @@ def generate_funnel_page_testimonials(
                             "productContext": product_context,
                         }
 
-                        image_bytes = renderer.render_png(payload)
+                        render_payload = dict(payload)
+                        if review_avatar_asset is not None:
+                            render_payload["avatarUrl"] = _asset_data_url(review_avatar_asset)
+                        if hero_asset is not None:
+                            render_payload["heroImageUrl"] = _asset_data_url(hero_asset)
+
+                        image_bytes = renderer.render_png(render_payload)
                         asset = create_funnel_upload_asset(
                             session=session,
                             org_id=org_id,
@@ -2448,7 +2456,8 @@ def generate_funnel_page_testimonials(
 
                     seed = sum(ord(ch) for ch in render.label) + idx
                     variant = seed % 3
-                    replies = None
+                    replies_public: list[dict[str, Any]] | None = None
+                    replies_render: list[dict[str, Any]] | None = None
                     view_replies_text = None
                     reaction_count = 3 + (seed % 17)
                     follow_label = "Follow" if variant == 1 else None
@@ -2501,33 +2510,37 @@ def generate_funnel_page_testimonials(
                         sales_review_wall_social_index += 1
                         if force_reply:
                             reply_avatar = ensure_reply_avatar_asset()
-                            reply_entry: dict[str, Any] = {
+                            reply_entry_public: dict[str, Any] = {
                                 "name": reply_payload["name"],
                                 "text": reply_payload["text"],
                                 "meta": {"time": reply_payload["time"]},
                                 "reactionCount": reply_payload["reactionCount"],
                             }
+                            reply_entry_render = dict(reply_entry_public)
                             if reply_avatar is not None:
-                                reply_entry["avatarUrl"] = _public_asset_url(str(reply_avatar.public_id))
-                            replies = [reply_entry]
+                                reply_entry_public["avatarUrl"] = _public_asset_url(str(reply_avatar.public_id))
+                                reply_entry_render["avatarUrl"] = _asset_data_url(reply_avatar)
+                            replies_public = [reply_entry_public]
+                            replies_render = [reply_entry_render]
                             view_replies_text = "View 1 reply"
 
                     if variant == 0:
                         reply_avatar = ensure_reply_avatar_asset()
-                        reply_entry = {
+                        reply_entry_public = {
                             "name": reply_payload["name"],
                             "text": reply_payload["text"],
                             "meta": {"time": reply_payload["time"]},
                             "reactionCount": reply_payload["reactionCount"],
                         }
+                        reply_entry_render = dict(reply_entry_public)
                         if reply_avatar is not None:
-                            reply_entry["avatarUrl"] = _public_asset_url(str(reply_avatar.public_id))
-                        replies = [
-                            reply_entry
-                        ]
+                            reply_entry_public["avatarUrl"] = _public_asset_url(str(reply_avatar.public_id))
+                            reply_entry_render["avatarUrl"] = _asset_data_url(reply_avatar)
+                        replies_public = [reply_entry_public]
+                        replies_render = [reply_entry_render]
                         view_replies_text = "View 1 reply"
 
-                    primary_comment = {
+                    primary_comment_public = {
                         "name": validated["name"],
                         "text": validated["review"],
                         "meta": {
@@ -2536,15 +2549,25 @@ def generate_funnel_page_testimonials(
                         },
                         "reactionCount": reaction_count,
                         **(
-                            {"replies": replies, "viewRepliesText": view_replies_text}
-                            if replies
+                            {"replies": replies_public, "viewRepliesText": view_replies_text}
+                            if replies_public
+                            else {}
+                        ),
+                    }
+                    primary_comment_render = {
+                        **primary_comment_public,
+                        **(
+                            {"replies": replies_render, "viewRepliesText": view_replies_text}
+                            if replies_render
                             else {}
                         ),
                     }
                     if avatar_asset is not None:
-                        primary_comment["avatarUrl"] = _public_asset_url(str(avatar_asset.public_id))
+                        primary_comment_public["avatarUrl"] = _public_asset_url(str(avatar_asset.public_id))
+                        primary_comment_render["avatarUrl"] = _asset_data_url(avatar_asset)
                     if attachment_asset is not None:
-                        primary_comment["attachmentUrl"] = _public_asset_url(str(attachment_asset.public_id))
+                        primary_comment_public["attachmentUrl"] = _public_asset_url(str(attachment_asset.public_id))
+                        primary_comment_render["attachmentUrl"] = _asset_data_url(attachment_asset)
 
                     social_template = _next_social_card_variant(social_card_variant_index)
                     social_card_variant_index += 1
@@ -2562,27 +2585,44 @@ def generate_funnel_page_testimonials(
                             "likeCount": max(1, reaction_count * 3),
                             "dateLabel": time_value,
                         }
+                        post_payload_render = dict(post_payload)
                         if avatar_asset is not None:
                             post_payload["avatarUrl"] = _public_asset_url(str(avatar_asset.public_id))
+                            post_payload_render["avatarUrl"] = _asset_data_url(avatar_asset)
                         if location_value:
                             post_payload["location"] = location_value
+                            post_payload_render["location"] = location_value
                         payload = {
                             "template": "social_comment_instagram",
                             "post": post_payload,
-                            "comments": [primary_comment],
+                            "comments": [primary_comment_public],
+                        }
+                        render_payload = {
+                            "template": "social_comment_instagram",
+                            "post": post_payload_render,
+                            "comments": [primary_comment_render],
                         }
                     elif social_template == "social_comment_no_header":
                         payload = {
                             "template": "social_comment_no_header",
-                            "comments": [primary_comment],
+                            "comments": [primary_comment_public],
+                        }
+                        render_payload = {
+                            "template": "social_comment_no_header",
+                            "comments": [primary_comment_render],
                         }
                     else:
                         payload = {
                             "template": "social_comment",
                             "header": {"title": "All comments", "showSortIcon": variant != 2},
-                            "comments": [primary_comment],
+                            "comments": [primary_comment_public],
                         }
-                    image_bytes = renderer.render_png(payload)
+                        render_payload = {
+                            "template": "social_comment",
+                            "header": {"title": "All comments", "showSortIcon": variant != 2},
+                            "comments": [primary_comment_render],
+                        }
+                    image_bytes = renderer.render_png(render_payload)
                     asset = create_funnel_upload_asset(
                         session=session,
                         org_id=org_id,
