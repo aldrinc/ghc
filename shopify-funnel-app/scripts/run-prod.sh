@@ -10,8 +10,7 @@ fail() {
   exit 1
 }
 
-UVICORN_BIN="${SHOPIFY_FUNNEL_UVICORN_BIN:
--${APP_DIR}/.venv/bin/uvicorn}"
+UVICORN_BIN="${SHOPIFY_FUNNEL_UVICORN_BIN:-${APP_DIR}/.venv/bin/uvicorn}"
 if [[ ! -x "${UVICORN_BIN}" ]]; then
   fail "Uvicorn not found at '${UVICORN_BIN}'. Install dependencies into .venv (or set SHOPIFY_FUNNEL_UVICORN_BIN)."
 fi
