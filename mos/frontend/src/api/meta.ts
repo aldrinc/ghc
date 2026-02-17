@@ -21,6 +21,7 @@ type PipelineFilters = {
 };
 
 type RemoteFilters = {
+  adAccountId?: string;
   fields?: string;
   limit?: number;
   after?: string;
@@ -60,6 +61,7 @@ export function useMetaApi() {
 
   const buildRemotePath = (base: string, filters: RemoteFilters = {}) => {
     const params = new URLSearchParams();
+    if (filters.adAccountId) params.set("adAccountId", filters.adAccountId);
     if (filters.fields) params.set("fields", filters.fields);
     if (typeof filters.limit === "number") params.set("limit", filters.limit.toString());
     if (filters.after) params.set("after", filters.after);
