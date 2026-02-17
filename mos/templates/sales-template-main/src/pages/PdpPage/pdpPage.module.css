@@ -349,8 +349,8 @@
 }
 
 .circleIconBtn {
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   border: 1.5px solid var(--color-brand);
   background: var(--color-bg);
@@ -426,6 +426,16 @@
   - Auto slides horizontally
   - Pauses on hover/focus and when an answer is open
 */
+.pillMarqueeWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+
 .pillMarquee {
   /* Hide horizontal overflow like the marquee band */
   overflow-x: hidden;
@@ -433,8 +443,59 @@
   overflow-y: visible;
   min-width: 0;
   max-width: 100%;
-  padding-bottom: 6px;
-  margin-bottom: 16px;
+  padding-bottom: 0;
+  margin-bottom: 0;
+}
+
+.pillHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 10px 14px;
+  margin-left: 4px;
+  border-radius: 999px;
+  background: var(--color-brand);
+  color: #ffffff;
+  font-family: "Schibsted Grotesk", Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.14);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+
+.pillHintVisible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.pillHintPointer {
+  display: inline-block;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  line-height: 1.2;
+  will-change: transform;
+  animation: pillHintBounce 900ms ease-in-out infinite;
+}
+
+.pillHintText {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@keyframes pillHintBounce {
+  0%,
+  100% {
+    transform: translateY(-1px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
 }
 
 .pillMarqueeViewport {
@@ -493,6 +554,15 @@
   .pillMarqueeTrack {
     animation: none;
     transform: translateX(0);
+  }
+
+  .pillHint {
+    transition: none;
+    transform: none;
+  }
+
+  .pillHintPointer {
+    animation: none;
   }
 }
 
@@ -640,8 +710,8 @@
 .offerGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 16px;
+  gap: 16px;
+  margin-top: 18px;
 }
 
 .optionCard {
@@ -664,21 +734,21 @@
 }
 
 .sizeCard {
-  box-shadow: rgba(0, 0, 0, 0.06) 0 4px 10px 0;
+  box-shadow: none;
   color: rgb(0, 27, 116);
   display: block;
   font-family: var(--font-sans);
   font-size: 16px;
   font-weight: 400;
-  min-height: 120px;
-  line-height: 24px;
-  padding: 15px;
+  min-height: 110px;
+  line-height: 1.15;
+  padding: 12px 10px;
   text-align: center;
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
 .offerCard {
-  box-shadow: rgba(0, 0, 0, 0.06) 0 4px 10px 0;
+  box-shadow: none;
   color: rgb(0, 27, 116);
   display: flex;
   flex-direction: column;
@@ -688,13 +758,14 @@
   min-height: 210px;
   line-height: 24px;
   overflow: hidden;
+  padding: 18px 16px;
   text-align: center;
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
 }
 
-.sizeCard.optionCardSelected,
-.offerCard.optionCardSelected {
-  box-shadow: 0 0 0 1px var(--color-brand), rgba(0, 0, 0, 0.06) 0 4px 10px 0;
+.sizeCard.optionCardSelected {
+  box-shadow: none;
+  background-color: #ffffff;
 }
 
 .offerLabel {
@@ -713,7 +784,8 @@
 }
 
 .optionLabel {
-  font-size: 14px;
+  font-size: 18px;
+  line-height: 1.1;
   font-weight: 700;
   font-family: var(--font-sans);
   color: rgb(0, 27, 116);
@@ -723,8 +795,8 @@
 
 .optionMeta {
   margin: 6px 0 0;
-  font-size: 12px;
-  line-height: 1.2;
+  font-size: 14px;
+  line-height: 1.25;
   color: rgba(6, 26, 112, 0.8);
   font-weight: 400;
 }
@@ -871,9 +943,9 @@
   font-weight: 700;
   color: rgb(0, 27, 116);
   padding: 8px 0;
-  width: calc(100% + 24px);
-  margin-left: -12px;
-  margin-right: -12px;
+  width: calc(100% + 32px);
+  margin-left: -16px;
+  margin-right: -16px;
   border-radius: 0 0 5px 5px;
 }
 
@@ -898,6 +970,41 @@
   cursor: pointer;
   transition: transform 140ms ease, filter 140ms ease;
   text-transform: uppercase;
+}
+
+.ctaButtonHighlight {
+  animation: pdpCtaPulse 1200ms ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ctaButtonHighlight {
+    animation: none;
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--color-cta) 32%, transparent),
+      0 0 32px 14px color-mix(in srgb, var(--color-cta) 18%, transparent),
+      0 18px 44px rgba(0, 0, 0, 0.18);
+  }
+}
+
+@keyframes pdpCtaPulse {
+  0% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--color-cta) 32%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--color-cta) 18%, transparent),
+      0 0 0 rgba(0, 0, 0, 0);
+  }
+  35% {
+    box-shadow:
+      0 0 0 8px color-mix(in srgb, var(--color-cta) 32%, transparent),
+      0 0 32px 14px color-mix(in srgb, var(--color-cta) 18%, transparent),
+      0 18px 44px rgba(0, 0, 0, 0.18);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 color-mix(in srgb, var(--color-cta) 32%, transparent),
+      0 0 0 0 color-mix(in srgb, var(--color-cta) 18%, transparent),
+      0 0 0 rgba(0, 0, 0, 0);
+  }
 }
 
 .ctaButton:hover {
@@ -1879,6 +1986,26 @@
 }
 
 @media (max-width: 560px) {
+  .sectionTitleRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .helpLink {
+    font-size: 14px;
+    font-style: italic;
+  }
+
+  .optionLabel {
+    font-size: 16px;
+    line-height: 1.1;
+  }
+
+  .optionMeta {
+    font-size: 13px;
+  }
+
   .giftOverlayTitle {
     font-size: 14px;
   }
@@ -1896,10 +2023,10 @@
     transform: translateY(16px);
   }
 
-  /* Tighten the mobile sticky bar to better match the reference design:
-     the CTA should be more compact so we have breathing room inside the pill. */
+  /* Mobile sticky bar: match the reference by making the CTA/pill taller and
+     dropping the CTA font-weight. */
   .headerInner {
-    padding: 9px 12px;
+    padding: 8px 12px;
   }
 
   .headerContainer {
@@ -1920,20 +2047,26 @@
   }
 
   .logoImg {
-    height: 34px;
+    height: 32px;
   }
 
   .headerCta {
     gap: 8px;
-    font-size: 15px;
+    font-size: 14px;
+    font-weight: 700;
     letter-spacing: 0.02em;
-    padding: 9px 10px;
+    padding: 11px 12px;
     flex-shrink: 1;
   }
 
   .headerCtaIcon {
-    width: 20px;
-    height: 20px;
+    width: 22px;
+    height: 22px;
+  }
+
+  .headerCtaIcon svg {
+    width: 14px;
+    height: 14px;
   }
 
   .videoGrid {
@@ -1966,11 +2099,68 @@
 
   .offerGrid {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 14px;
   }
 
   .optionCard {
     padding: 12px 10px;
+  }
+
+  .sizeCard {
+    min-height: 104px;
+    padding: 10px 8px;
+  }
+
+  .sizeCard .selectedCheck {
+    /* Keep the check in the corner without covering the label. */
+    top: -6px;
+    right: -6px;
+  }
+
+  .offerCard {
+    display: grid;
+    grid-template-columns: 56px 1fr 34px;
+    grid-template-areas:
+      'image title check'
+      'image price check'
+      'save save save';
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 4px;
+    min-height: 0;
+    padding: 18px 14px;
+  }
+
+  .offerCardImage {
+    grid-area: image;
+    width: 44px;
+    height: 44px;
+    margin: 0;
+    justify-self: start;
+    align-self: center;
+  }
+
+  .offerLabel {
+    grid-area: title;
+    margin: 0;
+    justify-self: center;
+    text-align: center;
+  }
+
+  .price {
+    grid-area: price;
+    margin-top: 4px;
+    justify-self: center;
+    text-align: center;
+  }
+
+  .offerCard .selectedCheck {
+    grid-area: check;
+    position: static;
+    top: auto;
+    right: auto;
+    justify-self: end;
+    align-self: center;
   }
 
   .offerCardHasSave {
@@ -1978,9 +2168,10 @@
   }
 
   .saveBar {
-    width: calc(100% + 20px);
-    margin-left: -10px;
-    margin-right: -10px;
+    grid-area: save;
+    width: calc(100% + 28px);
+    margin-left: -14px;
+    margin-right: -14px;
   }
 
   .colorRow {
