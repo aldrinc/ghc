@@ -549,7 +549,7 @@ export function FunnelDetailPage() {
                         <span className="truncate text-content-muted">Not in plan yet</span>
                       )}
                     </div>
-                  )
+                  )}
                 </div>
               </div>
             </div>
