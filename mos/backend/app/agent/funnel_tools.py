@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from collections.abc import Generator
@@ -16,6 +17,7 @@ from app.agent.types import ToolContext, ToolResult
 from app.config import settings
 from app.db.enums import FunnelPageReviewStatusEnum, FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
 from app.db.models import Funnel, FunnelPage, FunnelPageVersion, Product, ProductVariant
+from app.db.repositories.agent_artifacts import AgentArtifactsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.claude_files import build_document_blocks, call_claude_structured_message
@@ -150,6 +152,29 @@ def _build_attachment_guidance(attachment_summaries: list[dict[str, Any]]) -> st
             line += f" [{item.get('width')}x{item.get('height')}]"
         lines.append(line)
     return "\n".join(lines) + "\n\n"
+
+
+_TRACE_TEXT_PREVIEW_MAX_CHARS = 4000
+
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _text_preview(text: str, *, limit: int = _TRACE_TEXT_PREVIEW_MAX_CHARS) -> str:
+    return text[:limit]
+
+
+def _persist_agent_artifact(
+    *,
+    ctx: ToolContext,
+    kind: str,
+    key: str | None,
+    data_json: dict[str, Any],
+) -> None:
+    if not ctx.tool_call_id:
+        raise RuntimeError("ToolContext.tool_call_id is required to persist agent artifacts.")
+    AgentArtifactsRepository(ctx.session).create(run_id=ctx.run_id, kind=kind, key=key, data_json=data_json)
 
 
 class ContextLoadFunnelArgs(BaseModel):
@@ -441,7 +466,6 @@ class DraftGeneratePageArgs(BaseModel):
     basePuckData: Optional[dict[str, Any]] = None
     productContext: str
     attachmentSummaries: list[dict[str, Any]] = Field(default_factory=list)
-    attachmentBlocks: list[dict[str, Any]] = Field(default_factory=list)
     brandDocuments: list[dict[str, Any]] = Field(default_factory=list)
     copyPack: Optional[str] = None
 
@@ -516,7 +540,32 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             else ""
         )
 
-        attachment_guidance = _build_attachment_guidance(args.attachmentSummaries)
+        # Claude structured outputs: support brand docs and vision attachments (non-stream).
+        #
+        # We intentionally do NOT switch models: if brand docs/vision blocks are present, the caller
+        # must already be using a Claude model. This keeps model selection explicit and avoids hidden
+        # "fallback" behavior.
+        is_claude_model = model_id.lower().startswith("claude")
+        if args.brandDocuments and not is_claude_model:
+            raise ValueError("brandDocuments require a Claude model (model must start with 'claude').")
+        if args.attachmentSummaries and not is_claude_model:
+            raise ValueError(
+                "attachmentSummaries require a Claude vision-capable model (model must start with 'claude')."
+            )
+
+        attachment_summaries = args.attachmentSummaries
+        attachment_blocks: list[dict[str, Any]] = []
+        if args.attachmentSummaries:
+            if not ctx.client_id:
+                raise ValueError("client_id is required to load attachment blocks for Claude generation.")
+            attachment_summaries, attachment_blocks = funnel_ai._build_attachment_blocks(
+                session=ctx.session,
+                org_id=ctx.org_id,
+                client_id=ctx.client_id,
+                attachments=args.attachmentSummaries,
+            )
+
+        attachment_guidance = _build_attachment_guidance(attachment_summaries)
 
         template_guidance = (
             f"Template guidance:\n- Template id: {args.templateId}\n"
@@ -757,29 +806,71 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             response_format=funnel_ai._puck_response_format(),
         )
 
-        # Claude structured outputs: support brand docs and vision attachments (non-stream).
-        #
-        # We intentionally do NOT switch models: if brand docs/vision blocks are present, the caller
-        # must already be using a Claude model. This keeps model selection explicit and avoids hidden
-        # "fallback" behavior.
-        is_claude_model = model_id.lower().startswith("claude")
-        if args.brandDocuments and not is_claude_model:
-            raise ValueError("brandDocuments require a Claude model (model must start with 'claude').")
-        if args.attachmentBlocks and not is_claude_model:
-            raise ValueError("attachmentBlocks require a Claude vision-capable model (model must start with 'claude').")
+        trace_meta = {
+            "runId": ctx.run_id,
+            "toolCallId": ctx.tool_call_id,
+            "toolName": ctx.tool_name,
+            "toolSeq": ctx.tool_seq,
+            "model": model_id,
+            "temperature": args.temperature,
+            "maxTokens": max_tokens,
+            "templateMode": template_mode,
+            "templateKind": template_kind,
+            "templateComponentKind": template_component_kind,
+        }
+
+        def _trace_prompt(*, phase: str, prompt_text: str) -> str:
+            sha256 = _sha256_text(prompt_text)
+            _persist_agent_artifact(
+                ctx=ctx,
+                kind="llm.prompt",
+                key=f"{ctx.tool_call_id}:{phase}",
+                data_json={
+                    **trace_meta,
+                    "phase": phase,
+                    "sha256": sha256,
+                    "chars": len(prompt_text),
+                    "preview": _text_preview(prompt_text),
+                    "text": prompt_text,
+                },
+            )
+            return sha256
+
+        def _trace_output(*, phase: str, output_text: str, duration_ms: int | None) -> str:
+            sha256 = _sha256_text(output_text)
+            payload: dict[str, Any] = {
+                **trace_meta,
+                "phase": phase,
+                "sha256": sha256,
+                "chars": len(output_text),
+                "preview": _text_preview(output_text),
+                "text": output_text,
+            }
+            if duration_ms is not None:
+                payload["durationMs"] = duration_ms
+            _persist_agent_artifact(
+                ctx=ctx,
+                kind="llm.output",
+                key=f"{ctx.tool_call_id}:{phase}",
+                data_json=payload,
+            )
+            return sha256
 
         out = ""
         obj: dict[str, Any] | None = None
         final_model = model_id
+        compiled_prompt_sha256 = _trace_prompt(phase="initial", prompt_text=compiled_prompt)
+        raw_output_sha256: str | None = None
 
-        def _claude_structured(prompt_text: str) -> tuple[dict[str, Any], str]:
+        def _claude_structured(prompt_text: str) -> tuple[dict[str, Any], str, int]:
             # Claude's global default max token budget in funnel_ai is intentionally huge (64k), but
             # page draft generations should not need that much. Large max_tokens budgets can cause
             # very long-running requests. Cap by default unless the caller explicitly overrides.
             default_claude_max = 20_000
             claude_max = args.maxTokens if args.maxTokens is not None else default_claude_max
             claude_max = min(claude_max, funnel_ai._CLAUDE_MAX_OUTPUT_TOKENS)
-            user_content = [{"type": "text", "text": prompt_text}, *args.attachmentBlocks, *args.brandDocuments]
+            user_content = [{"type": "text", "text": prompt_text}, *attachment_blocks, *args.brandDocuments]
+            started = time.monotonic()
             response = call_claude_structured_message(
                 model=model_id,
                 system=None,
@@ -788,14 +879,18 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 max_tokens=claude_max,
                 temperature=args.temperature,
             )
+            duration_ms = int((time.monotonic() - started) * 1000)
             parsed = response.get("parsed") if isinstance(response, dict) else None
             if not isinstance(parsed, dict):
                 raise RuntimeError("Claude structured response returned no parsed JSON.")
-            return parsed, json.dumps(parsed, ensure_ascii=False)
+            out_text = json.dumps(parsed, ensure_ascii=False)
+            return parsed, out_text, duration_ms
 
         if is_claude_model:
-            obj, out = _claude_structured(compiled_prompt)
+            obj, out, duration_ms = _claude_structured(compiled_prompt)
+            raw_output_sha256 = _trace_output(phase="initial", output_text=out, duration_ms=duration_ms)
         else:
+            started = time.monotonic()
             extractor = funnel_ai._AssistantMessageJsonExtractor()
             raw_parts: list[str] = []
             for delta in llm.stream_text(compiled_prompt, params=params):
@@ -806,10 +901,23 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 if assistant_delta:
                     yield {"type": "text", "text": assistant_delta}
             out = "".join(raw_parts)
+            duration_ms = int((time.monotonic() - started) * 1000)
+            raw_output_sha256 = _trace_output(phase="initial", output_text=out, duration_ms=duration_ms)
 
             try:
                 obj = funnel_ai._extract_json_object(out)
             except Exception as exc:  # noqa: BLE001
+                _persist_agent_artifact(
+                    ctx=ctx,
+                    kind="llm.error",
+                    key=f"{ctx.tool_call_id}:repair_invalid_json",
+                    data_json={
+                        **trace_meta,
+                        "phase": "repair_invalid_json",
+                        "error": str(exc),
+                        "outputSha256": raw_output_sha256,
+                    },
+                )
                 yield {"type": "status", "status": "repairing"}
                 repair_lines = [
                     "The previous response was invalid JSON. Regenerate from scratch.",
@@ -821,7 +929,11 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                     repair_lines.append(f"Previous response:\n{out}")
                 repair_lines.append("Return corrected JSON only.")
                 repair_prompt = "\n\n".join(base_prompt_parts + repair_lines)
+                _trace_prompt(phase="repair_invalid_json", prompt_text=repair_prompt)
+                started = time.monotonic()
                 out = llm.generate_text(repair_prompt, params=params)
+                duration_ms = int((time.monotonic() - started) * 1000)
+                raw_output_sha256 = _trace_output(phase="repair_invalid_json", output_text=out, duration_ms=duration_ms)
                 obj = funnel_ai._extract_json_object(out)
 
         if obj is None:
@@ -852,9 +964,23 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 ]
             )
             if is_claude_model:
-                obj, out = _claude_structured(repair_prompt)
+                _trace_prompt(phase="repair_empty_page", prompt_text=repair_prompt)
+                obj, out, duration_ms = _claude_structured(repair_prompt)
+                raw_output_sha256 = _trace_output(
+                    phase="repair_empty_page",
+                    output_text=out,
+                    duration_ms=duration_ms,
+                )
             else:
+                _trace_prompt(phase="repair_empty_page", prompt_text=repair_prompt)
+                started = time.monotonic()
                 out = llm.generate_text(repair_prompt, params=params)
+                duration_ms = int((time.monotonic() - started) * 1000)
+                raw_output_sha256 = _trace_output(
+                    phase="repair_empty_page",
+                    output_text=out,
+                    duration_ms=duration_ms,
+                )
                 obj = funnel_ai._extract_json_object(out)
             assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage") if isinstance(obj, dict) else None)
             puck_data_raw = funnel_ai._coerce_puck_data(obj.get("puckData") if isinstance(obj, dict) else None)
@@ -898,9 +1024,23 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 ]
             )
             if is_claude_model:
-                obj, out = _claude_structured(repair_prompt)
+                _trace_prompt(phase="repair_header_footer", prompt_text=repair_prompt)
+                obj, out, duration_ms = _claude_structured(repair_prompt)
+                raw_output_sha256 = _trace_output(
+                    phase="repair_header_footer",
+                    output_text=out,
+                    duration_ms=duration_ms,
+                )
             else:
+                _trace_prompt(phase="repair_header_footer", prompt_text=repair_prompt)
+                started = time.monotonic()
                 out = llm.generate_text(repair_prompt, params=params)
+                duration_ms = int((time.monotonic() - started) * 1000)
+                raw_output_sha256 = _trace_output(
+                    phase="repair_header_footer",
+                    output_text=out,
+                    duration_ms=duration_ms,
+                )
                 obj = funnel_ai._extract_json_object(out)
             assistant_message = funnel_ai._coerce_assistant_message(obj.get("assistantMessage") if isinstance(obj, dict) else None)
             puck_data_raw = funnel_ai._coerce_puck_data(obj.get("puckData") if isinstance(obj, dict) else None)
@@ -928,6 +1068,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             "assistantMessage": assistant_message,
             "puckData": puck_data,
             "model": final_model,
+            "attachmentSummaries": attachment_summaries,
+            "compiledPromptSha256": compiled_prompt_sha256,
+            "rawOutputSha256": raw_output_sha256,
         }
         llm_output = json.dumps({"assistantMessage": assistant_message, "model": final_model}, ensure_ascii=False)
         return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
