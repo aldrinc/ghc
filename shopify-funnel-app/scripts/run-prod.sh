@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="$(
-  cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1
-  pwd
-)"
+APP_DIR="/opt/apps/shopify-funnel/shopify-funnel-app"
 
 cd "${APP_DIR}"
 
@@ -13,7 +10,8 @@ fail() {
   exit 1
 }
 
-UVICORN_BIN="${SHOPIFY_FUNNEL_UVICORN_BIN:-${APP_DIR}/.venv/bin/uvicorn}"
+UVICORN_BIN="${SHOPIFY_FUNNEL_UVICORN_BIN:
+-${APP_DIR}/.venv/bin/uvicorn}"
 if [[ ! -x "${UVICORN_BIN}" ]]; then
   fail "Uvicorn not found at '${UVICORN_BIN}'. Install dependencies into .venv (or set SHOPIFY_FUNNEL_UVICORN_BIN)."
 fi
