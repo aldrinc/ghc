@@ -8,7 +8,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "0043_creative_service_orchestration"
-down_revision = "0042_client_user_preferences"
+down_revision = "0042b_extend_alembic_version"
 branch_labels = None
 depends_on = None
 
