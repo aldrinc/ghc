@@ -24,7 +24,7 @@ from app.services.funnel_ai import _load_product_context
 from app.services.claude_files import call_claude_structured_message
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
-from app.testimonial_renderer.renderer import TestimonialRenderer
+from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 
 
@@ -2074,7 +2074,7 @@ def generate_funnel_page_testimonials(
 
     generated: list[dict[str, Any]] = []
     try:
-        with TestimonialRenderer() as renderer:
+        with ThreadedTestimonialRenderer() as renderer:
             for idx, group in enumerate(groups):
                 validated = validated_testimonials[idx]
 
