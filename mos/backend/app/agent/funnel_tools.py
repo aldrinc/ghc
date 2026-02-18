@@ -631,6 +631,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             template_config_guidance = (
                 "Pre-sales listicle config requirements:\n"
                 "- PreSalesHero.config MUST be: { hero: { title: string, subtitle: string, media?: { type:'image', alt:string, src?:string, assetPublicId?:string } | { type:'video', srcMp4:string, poster?:string, alt?:string, assetPublicId?:string } }, badges: [] }\n"
+                "- PreSalesHero.config.badges MUST always be an array (use [] when empty; never null).\n"
                 "- PreSalesReasons.config MUST be an array of reasons: [{ number: number, title: string, body: string, image?: { alt:string, src?:string, assetPublicId?:string } }]\n"
                 "- PreSalesMarquee.config MUST be an array of strings.\n"
                 "- PreSalesPitch.config MUST be: { title: string, bullets: string[], image: { alt:string, src?:string, assetPublicId?:string }, cta?: { label: string, linkType?: 'external'|'funnelPage'|'nextPage', href?:string, targetPageId?:string } }\n"
@@ -1345,6 +1346,39 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                         value=cur_modals,
                     )
 
+            def _coerce_pre_sales_hero_badges_to_list(component: dict[str, Any]) -> int:
+                """
+                The frontend expects PreSalesHero.config.badges to be an array.
+                Some LLM outputs omit the key or set it null; coerce to [] deterministically.
+                """
+
+                if args.templateKind != "pre-sales-listicle":
+                    return 0
+                if component.get("type") != "PreSalesHero":
+                    return 0
+                props = component.get("props")
+                if not isinstance(props, dict):
+                    return 0
+                cfg, cfg_source = _load_object_prop(
+                    props,
+                    object_key="config",
+                    json_key="configJson",
+                    label="PreSalesHero",
+                )
+                if not isinstance(cfg, dict):
+                    return 0
+                if isinstance(cfg.get("badges"), list):
+                    return 0
+                cfg["badges"] = []
+                _persist_object_prop(
+                    props,
+                    source=cfg_source,
+                    object_key="config",
+                    json_key="configJson",
+                    value=cfg,
+                )
+                return 1
+
             # Merge the current base page puckData with the latest template structure so new template
             # blocks (e.g. reviews/free gifts) are not lost when regenerating existing pages.
             template = get_funnel_template(args.templateKind)
@@ -1423,6 +1457,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                                     used_ids.add(cid)
 
                                 _restore_sales_pdp_required_fields(candidate, tmpl_child)
+                                _coerce_pre_sales_hero_badges_to_list(candidate)
 
                                 if args.templateKind == "pre-sales-listicle":
                                     restored_testimonial_image_slots += _restore_pre_sales_review_image_slots(
@@ -1510,6 +1545,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                                 used_ids.add(cid)
 
                             _restore_sales_pdp_required_fields(candidate, base_child)
+                            _coerce_pre_sales_hero_badges_to_list(candidate)
 
                             if args.templateKind == "pre-sales-listicle":
                                 restored_testimonial_image_slots += _restore_pre_sales_review_image_slots(
