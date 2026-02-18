@@ -42,6 +42,16 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str | None = None
     OPENAI_WEBHOOK_SECRET: str | None = None
+    LANGFUSE_ENABLED: bool = False
+    LANGFUSE_PUBLIC_KEY: str | None = None
+    LANGFUSE_SECRET_KEY: str | None = None
+    LANGFUSE_HOST: str = "https://cloud.langfuse.com"
+    LANGFUSE_BASE_URL: str | None = None
+    LANGFUSE_ENVIRONMENT: str | None = None
+    LANGFUSE_RELEASE: str | None = None
+    LANGFUSE_SAMPLE_RATE: float = 1.0
+    LANGFUSE_DEBUG: bool = False
+    LANGFUSE_TIMEOUT_SECONDS: int = 20
 
     # Deploy control plane (Terraform apply + SSH deploy) embedded in the MOS backend.
     # Root folder where plan files and Terraform state will be written.

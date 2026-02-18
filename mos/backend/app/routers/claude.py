@@ -14,6 +14,11 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import AuthContext, get_current_user
 from app.db.deps import get_session
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
+from app.observability import (
+    LangfuseTraceContext,
+    bind_langfuse_trace_context,
+    start_langfuse_generation,
+)
 from app.services.claude_files import (
     CLAUDE_API_BASE_URL,
     CLAUDE_DEFAULT_MODEL,
@@ -71,6 +76,23 @@ def _serialize_context_files(records: Sequence[Any]) -> List[Dict[str, Any]]:
             }
         )
     return files
+
+
+def _anthropic_usage_details(usage: Any) -> Dict[str, int] | None:
+    if usage is None:
+        return None
+    input_tokens = getattr(usage, "input_tokens", None)
+    output_tokens = getattr(usage, "output_tokens", None)
+    if isinstance(usage, dict):
+        input_tokens = usage.get("input_tokens", input_tokens)
+        output_tokens = usage.get("output_tokens", output_tokens)
+
+    usage_details: Dict[str, int] = {}
+    if isinstance(input_tokens, int):
+        usage_details["input"] = input_tokens
+    if isinstance(output_tokens, int):
+        usage_details["output"] = output_tokens
+    return usage_details or None
 
 
 @router.get("/context")
@@ -137,40 +159,83 @@ def stream_claude_chat(
         if doc_blocks:
             user_content.extend(doc_blocks)
 
+        trace_context = LangfuseTraceContext(
+            name="assistant.claude_chat",
+            session_id=request.idea_workspace_id,
+            user_id=auth.user_id,
+            metadata={
+                "orgId": auth.org_id,
+                "ideaWorkspaceId": request.idea_workspace_id,
+                "clientId": request.client_id,
+                "productId": request.product_id,
+                "campaignId": request.campaign_id,
+                "docsAttached": len(doc_blocks),
+                "maxTokens": request.max_tokens,
+                "temperature": request.temperature,
+                "model": model,
+            },
+            tags=["assistant", "claude", "stream"],
+        )
         try:
-            client = Anthropic(
-                api_key=api_key,
-                base_url=CLAUDE_API_BASE_URL,
-                default_headers={
-                    "anthropic-version": "2023-06-01",
-                    "anthropic-beta": "files-api-2025-04-14",
-                },
-                timeout=CLAUDE_HTTP_TIMEOUT,
-            )
-            yield _sse({"type": "start", "model": model, "docsAttached": len(doc_blocks)})
-
-            with client.messages.stream(
-                model=model,
-                max_tokens=request.max_tokens,
-                temperature=request.temperature,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_content}],
-            ) as stream:
-                for event in stream:
-                    if event.type == "content_block_delta":
-                        delta = getattr(event, "delta", None)
-                        text = getattr(delta, "text", None) if delta else None
-                        if text:
-                            yield _sse({"type": "text", "text": text})
-                final = stream.get_final_message()
-                stop_reason = getattr(final, "stop_reason", None) if final else None
-                usage = getattr(final, "usage", None)
-                output_tokens = None
-                if usage:
-                    output_tokens = getattr(usage, "output_tokens", None) or (
-                        usage.get("output_tokens") if isinstance(usage, dict) else None
+            with bind_langfuse_trace_context(trace_context):
+                with start_langfuse_generation(
+                    name="llm.anthropic.chat_stream",
+                    model=model,
+                    input=request.prompt,
+                    metadata={
+                        "route": "/claude/chat/stream",
+                        "docsAttached": len(doc_blocks),
+                        "systemPromptChars": len(system_prompt),
+                    },
+                    model_parameters={
+                        "temperature": request.temperature,
+                        "max_tokens": request.max_tokens,
+                    },
+                    tags=["assistant", "claude", "stream"],
+                    trace_name="assistant.claude_chat",
+                ) as generation:
+                    client = Anthropic(
+                        api_key=api_key,
+                        base_url=CLAUDE_API_BASE_URL,
+                        default_headers={
+                            "anthropic-version": "2023-06-01",
+                            "anthropic-beta": "files-api-2025-04-14",
+                        },
+                        timeout=CLAUDE_HTTP_TIMEOUT,
                     )
-                yield _sse({"type": "done", "stop_reason": stop_reason, "output_tokens": output_tokens})
+                    yield _sse({"type": "start", "model": model, "docsAttached": len(doc_blocks)})
+
+                    output_parts: list[str] = []
+                    with client.messages.stream(
+                        model=model,
+                        max_tokens=request.max_tokens,
+                        temperature=request.temperature,
+                        system=system_prompt,
+                        messages=[{"role": "user", "content": user_content}],
+                    ) as stream:
+                        for event in stream:
+                            if event.type == "content_block_delta":
+                                delta = getattr(event, "delta", None)
+                                text = getattr(delta, "text", None) if delta else None
+                                if text:
+                                    output_parts.append(text)
+                                    yield _sse({"type": "text", "text": text})
+                        final = stream.get_final_message()
+                        stop_reason = getattr(final, "stop_reason", None) if final else None
+                        usage = getattr(final, "usage", None)
+                        output_tokens = None
+                        if usage:
+                            output_tokens = getattr(usage, "output_tokens", None) or (
+                                usage.get("output_tokens") if isinstance(usage, dict) else None
+                            )
+                        if generation is not None:
+                            generation.update(
+                                output="".join(output_parts) if output_parts else None,
+                                usage_details=_anthropic_usage_details(usage),
+                            )
+                        yield _sse(
+                            {"type": "done", "stop_reason": stop_reason, "output_tokens": output_tokens}
+                        )
         except Exception as exc:  # noqa: BLE001
             logger.exception(
                 "claude_chat_stream_failed",

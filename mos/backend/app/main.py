@@ -1,3 +1,6 @@
+from contextlib import asynccontextmanager
+from collections.abc import AsyncIterator
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
@@ -6,6 +9,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.db.base import engine
+from app.observability import initialize_langfuse, shutdown_langfuse
 from app.services.media_storage import MediaStorageConfigurationError
 from app.routers import (
     agent_runs,
@@ -34,8 +38,21 @@ from app.routers import (
 )
 
 
+@asynccontextmanager
+async def _app_lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    initialize_langfuse()
+    try:
+        yield
+    finally:
+        shutdown_langfuse()
+
+
 def create_app() -> FastAPI:
-    app = FastAPI(title="mOS Platform API", default_response_class=ORJSONResponse)
+    app = FastAPI(
+        title="mOS Platform API",
+        default_response_class=ORJSONResponse,
+        lifespan=_app_lifespan,
+    )
 
     allow_origins = sorted(
         {

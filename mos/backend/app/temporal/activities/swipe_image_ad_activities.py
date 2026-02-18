@@ -19,6 +19,11 @@ from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.swipes import CompanySwipesRepository
 from app.db.repositories.workflows import WorkflowsRepository
+from app.observability import (
+    LangfuseTraceContext,
+    bind_langfuse_trace_context,
+    start_langfuse_generation,
+)
 from app.schemas.creative_service import CreativeServiceImageAdsCreateIn
 from app.services.creative_service_client import (
     CreativeServiceClient,
@@ -423,6 +428,25 @@ def _extract_gemini_text(result: Any) -> str | None:
     return joined or None
 
 
+def _extract_gemini_usage_details(result: Any) -> Dict[str, int] | None:
+    usage = getattr(result, "usage_metadata", None)
+    if usage is None:
+        return None
+
+    input_tokens = getattr(usage, "prompt_token_count", None)
+    output_tokens = getattr(usage, "candidates_token_count", None)
+    if isinstance(usage, dict):
+        input_tokens = usage.get("prompt_token_count", input_tokens)
+        output_tokens = usage.get("candidates_token_count", output_tokens)
+
+    usage_details: Dict[str, int] = {}
+    if isinstance(input_tokens, int):
+        usage_details["input"] = input_tokens
+    if isinstance(output_tokens, int):
+        usage_details["output"] = output_tokens
+    return usage_details or None
+
+
 @activity.defn(name="swipes.generate_swipe_image_ad")
 def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -614,13 +638,48 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         model_client = genai.GenerativeModel(model_name=model_name, generation_config=generation_config)
         contents: List[Any] = [context_block, prompt_template, {"mime_type": swipe_mime_type, "data": swipe_bytes}]
 
-        try:
-            result = model_client.generate_content(contents, request_options={"timeout": 120})
-            raw_output = _extract_gemini_text(result)
-            if not raw_output:
-                raise RuntimeError("Gemini returned no text for swipe prompt generation")
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Swipe prompt generation failed: {exc}") from exc
+        trace_context = LangfuseTraceContext(
+            name="workflow.swipe_image_ad",
+            session_id=workflow_run_id or asset_brief_id,
+            metadata={
+                "orgId": org_id,
+                "clientId": client_id,
+                "campaignId": campaign_id,
+                "productId": product_id,
+                "assetBriefId": asset_brief_id,
+                "workflowRunId": workflow_run_id,
+                "model": model,
+                "requirementIndex": requirement_index,
+            },
+            tags=["workflow", "swipe_image_ad", "gemini"],
+        )
+        with bind_langfuse_trace_context(trace_context):
+            with start_langfuse_generation(
+                name="llm.gemini.swipe_prompt",
+                model=model,
+                input={"asset_brief_id": asset_brief_id, "prompt_sha256": prompt_sha},
+                metadata={
+                    "channel": channel_id,
+                    "format": fmt,
+                    "companySwipeId": company_swipe_id,
+                    "swipeSourceUrl": swipe_source_url,
+                },
+                model_parameters=generation_config,
+                tags=["workflow", "swipe_image_ad", "gemini"],
+                trace_name="workflow.swipe_image_ad",
+            ) as generation:
+                try:
+                    result = model_client.generate_content(contents, request_options={"timeout": 120})
+                    raw_output = _extract_gemini_text(result)
+                    if not raw_output:
+                        raise RuntimeError("Gemini returned no text for swipe prompt generation")
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(f"Swipe prompt generation failed: {exc}") from exc
+                if generation is not None:
+                    generation.update(
+                        output=raw_output,
+                        usage_details=_extract_gemini_usage_details(result),
+                    )
 
         try:
             image_prompt = extract_new_image_prompt_from_markdown(raw_output)
