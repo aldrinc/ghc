@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class MetaAssetUploadRequest(BaseModel):
@@ -33,8 +33,14 @@ class MetaCampaignCreateRequest(BaseModel):
     name: str
     objective: str
     status: str
-    specialAdCategories: Optional[list[str]] = None
+    # Meta requires this param even when empty.
+    specialAdCategories: list[str] = Field(default_factory=list)
     buyingType: Optional[str] = None
+    dailyBudget: Optional[int] = None
+    lifetimeBudget: Optional[int] = None
+    # Required by Meta when creating ABO campaigns without a campaign-level budget.
+    # For Structure B (CBO), you should set a campaign budget instead.
+    isAdsetBudgetSharingEnabled: Optional[bool] = None
     validateOnly: Optional[bool] = None
 
 
