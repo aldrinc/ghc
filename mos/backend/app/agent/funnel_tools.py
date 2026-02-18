@@ -743,6 +743,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
             '{ \"assistantMessage\": string, \"puckData\": string }\n'
             "puckData must be a JSON-encoded string for this object shape:\n"
             '{ \"root\": { \"props\": object }, \"content\": ComponentData[], \"zones\": object }\n\n'
+            "puckData.content MUST be a non-empty array (include at least one top-level ComponentData item).\n\n"
             "Output the top-level keys in this exact order: assistantMessage, puckData.\n\n"
             "assistantMessage requirements:\n"
             "- Plain text (no markdown)\n"
@@ -1062,7 +1063,19 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         )
 
         if not puck_data.get("content"):
-            raise RuntimeError("AI generation produced an empty page (no content).")
+            run_id = getattr(ctx, "run_id", None)
+            tool_call_id = getattr(ctx, "tool_call_id", None)
+            details = {
+                "runId": run_id,
+                "toolCallId": tool_call_id,
+                "model": final_model,
+                "templateMode": template_mode,
+                "templateKind": template_kind,
+                "templateComponentKind": template_component_kind,
+                "compiledPromptSha256": compiled_prompt_sha256,
+                "rawOutputSha256": raw_output_sha256,
+            }
+            raise RuntimeError(f"AI generation produced an empty page (no content). details={details}")
 
         ui_details = {
             "assistantMessage": assistant_message,
