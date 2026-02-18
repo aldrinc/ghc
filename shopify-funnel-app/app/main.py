@@ -15,10 +15,16 @@ from app.config import settings
 from app.db import get_session, init_db
 from app.models import OAuthState, ProcessedWebhookEvent, ShopInstallation
 from app.schemas import (
+    CatalogProductSummary,
+    CreateCatalogProductRequest,
+    CreateCatalogProductResponse,
+    CreatedCatalogVariant,
     CreateCheckoutRequest,
     CreateCheckoutResponse,
     ForwardOrderPayload,
     InstallationResponse,
+    ListProductsRequest,
+    ListProductsResponse,
     VerifyProductRequest,
     VerifyProductResponse,
     UpdateInstallationRequest,
@@ -314,6 +320,93 @@ async def verify_catalog_product(
         productGid=product["id"],
         handle=product["handle"],
         title=product["title"],
+    )
+
+
+@app.post(
+    "/v1/catalog/products/list",
+    response_model=ListProductsResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def list_catalog_products(
+    payload: ListProductsRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    query = (payload.query or "").strip() or None
+    try:
+        products = await shopify_api.list_products(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            query=query,
+            limit=payload.limit,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return ListProductsResponse(
+        shopDomain=installation.shop_domain,
+        products=[
+            CatalogProductSummary(
+                productGid=item["id"],
+                title=item["title"],
+                handle=item["handle"],
+                status=item["status"],
+            )
+            for item in products
+        ],
+    )
+
+
+@app.post(
+    "/v1/catalog/products/create",
+    response_model=CreateCatalogProductResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def create_catalog_product(
+    payload: CreateCatalogProductRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        created = await shopify_api.create_product(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            title=payload.title,
+            description=payload.description,
+            handle=payload.handle,
+            vendor=payload.vendor,
+            product_type=payload.productType,
+            tags=payload.tags,
+            status=payload.status,
+            variants=[variant.model_dump() for variant in payload.variants],
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return CreateCatalogProductResponse(
+        shopDomain=installation.shop_domain,
+        productGid=created["productGid"],
+        title=created["title"],
+        handle=created["handle"],
+        status=created["status"],
+        variants=[
+            CreatedCatalogVariant(
+                variantGid=item["variantGid"],
+                title=item["title"],
+                priceCents=item["priceCents"],
+                currency=item["currency"],
+            )
+            for item in created["variants"]
+        ],
     )
 
 

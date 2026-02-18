@@ -12,7 +12,8 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
 from app.db.repositories.assets import AssetsRepository
-from app.db.models import Asset, Product, ProductOffer, ProductOfferBonus
+from app.db.models import Asset, Product, ProductOffer, ProductOfferBonus, ProductVariant
+from app.schemas.shopify_connection import ShopifyCreateProductRequest, ShopifyProductCreateResponse
 from app.db.repositories.products import (
     ProductOfferBonusesRepository,
     ProductOffersRepository,
@@ -22,6 +23,7 @@ from app.db.repositories.products import (
 from app.services.assets import create_product_upload_asset
 from app.services.media_storage import MediaStorage
 from app.services.shopify_catalog import verify_shopify_product_exists
+from app.services.shopify_connection import create_client_shopify_product, get_client_shopify_connection_status
 from app.schemas.products import (
     ProductCreateRequest,
     ProductOfferBonusCreateRequest,
@@ -53,6 +55,7 @@ _PRODUCT_ASSET_ALLOWED_SUMMARY = (
 )
 _PRODUCT_ASSET_MAX_BYTES = 200 * 1024 * 1024
 _SHOPIFY_PRODUCT_GID_PREFIX = "gid://shopify/Product/"
+_SHOPIFY_VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/"
 
 
 def _resolve_product_asset_content_type(file: UploadFile) -> str:
@@ -114,6 +117,38 @@ def _normalize_shopify_product_gid(gid: str) -> str:
             detail="shopifyProductGid must be a Shopify product GID.",
         )
     return cleaned
+
+
+def _validate_shopify_variant_gid(external_price_id: str) -> str:
+    cleaned = external_price_id.strip()
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="externalPriceId cannot be empty.",
+        )
+    if not cleaned.startswith(_SHOPIFY_VARIANT_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Shopify externalPriceId must be a Shopify variant GID.",
+        )
+    return cleaned
+
+
+def _validate_variant_provider_mapping(*, provider: str | None, external_price_id: str | None) -> None:
+    if provider == "shopify":
+        if external_price_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail='Shopify provider requires externalPriceId (gid://shopify/ProductVariant/...).',
+            )
+        _validate_shopify_variant_gid(external_price_id)
+        return
+
+    if external_price_id and external_price_id.strip().startswith(_SHOPIFY_VARIANT_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='Shopify variant GIDs require provider="shopify".',
+        )
 
 
 def _serialize_offer_bonus(
@@ -350,6 +385,111 @@ def get_product(
         "offers": serialized_offers,
         "variants": [jsonable_encoder(variant) for variant in variants],
     }
+
+
+@router.post("/{product_id}/shopify/create", response_model=ShopifyProductCreateResponse)
+def create_shopify_product_for_product(
+    product_id: str,
+    payload: ShopifyCreateProductRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    product = session.scalars(
+        select(Product).where(Product.id == product_id, Product.org_id == auth.org_id)
+    ).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    if product.shopify_product_gid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product is already mapped to Shopify. Clear mapping before creating a new Shopify product.",
+        )
+
+    status_payload = get_client_shopify_connection_status(
+        client_id=str(product.client_id),
+        selected_shop_domain=payload.shopDomain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Shopify connection is not ready: {status_payload['message']}",
+        )
+
+    created = create_client_shopify_product(
+        client_id=str(product.client_id),
+        title=payload.title,
+        description=payload.description,
+        handle=payload.handle,
+        vendor=payload.vendor,
+        product_type=payload.productType,
+        tags=payload.tags,
+        status_text=payload.status,
+        variants=[variant.model_dump() for variant in payload.variants],
+        shop_domain=payload.shopDomain,
+    )
+
+    existing_external_ids = {
+        value.strip()
+        for value in session.scalars(
+            select(ProductVariant.external_price_id).where(
+                ProductVariant.product_id == product.id,
+                ProductVariant.external_price_id.is_not(None),
+            )
+        ).all()
+        if isinstance(value, str) and value.strip()
+    }
+    duplicate_external_id = next(
+        (variant["variantGid"] for variant in created["variants"] if variant["variantGid"] in existing_external_ids),
+        None,
+    )
+    if duplicate_external_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Variant mapping already exists for Shopify variant {duplicate_external_id}.",
+        )
+
+    existing_shopify_variant_titles = {
+        value.strip().lower()
+        for value in session.scalars(
+            select(ProductVariant.title).where(
+                ProductVariant.product_id == product.id,
+                ProductVariant.provider == "shopify",
+            )
+        ).all()
+        if isinstance(value, str) and value.strip()
+    }
+    duplicate_variant_title = next(
+        (
+            variant["title"]
+            for variant in created["variants"]
+            if isinstance(variant.get("title"), str)
+            and variant["title"].strip()
+            and variant["title"].strip().lower() in existing_shopify_variant_titles
+        ),
+        None,
+    )
+    if duplicate_variant_title is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f'Shopify variant title "{duplicate_variant_title}" already exists for this product.',
+        )
+
+    product.shopify_product_gid = created["productGid"]
+    session.add(product)
+    for variant in created["variants"]:
+        session.add(
+            ProductVariant(
+                product_id=product.id,
+                title=variant["title"],
+                price=variant["priceCents"],
+                currency=variant["currency"].lower(),
+                provider="shopify",
+                external_price_id=variant["variantGid"],
+            )
+        )
+    session.commit()
+
+    return ShopifyProductCreateResponse(**created)
 
 
 @router.get("/{product_id}/offers")
@@ -709,7 +849,12 @@ def update_product(
         if payload.shopifyProductGid is None:
             fields["shopify_product_gid"] = None
         else:
-            fields["shopify_product_gid"] = _normalize_shopify_product_gid(payload.shopifyProductGid)
+            normalized_gid = _normalize_shopify_product_gid(payload.shopifyProductGid)
+            verify_shopify_product_exists(
+                client_id=str(product.client_id),
+                product_gid=normalized_gid,
+            )
+            fields["shopify_product_gid"] = normalized_gid
     if payload.primaryBenefits is not None:
         fields["primary_benefits"] = payload.primaryBenefits
     if payload.featureBullets is not None:
@@ -777,6 +922,10 @@ def create_variant(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported price provider")
     if payload.externalPriceId and not payload.provider:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="externalPriceId requires provider")
+    _validate_variant_provider_mapping(
+        provider=payload.provider,
+        external_price_id=payload.externalPriceId,
+    )
 
     fields: dict[str, object] = {
         "title": payload.title,
@@ -790,7 +939,7 @@ def create_variant(
     if payload.provider is not None:
         fields["provider"] = payload.provider
     if payload.externalPriceId is not None:
-        fields["external_price_id"] = payload.externalPriceId
+        fields["external_price_id"] = payload.externalPriceId.strip()
     if payload.optionValues is not None:
         fields["option_values"] = payload.optionValues
     if payload.sku is not None:
@@ -859,6 +1008,12 @@ def update_variant(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported price provider")
     if "externalPriceId" in fields_set and payload.externalPriceId and not payload.provider and not variant.provider:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="externalPriceId requires provider")
+    effective_provider = payload.provider if "provider" in fields_set else variant.provider
+    effective_external_price_id = payload.externalPriceId if "externalPriceId" in fields_set else variant.external_price_id
+    _validate_variant_provider_mapping(
+        provider=effective_provider,
+        external_price_id=effective_external_price_id,
+    )
 
     fields: dict[str, object] = {}
     if payload.title is not None:
@@ -872,7 +1027,7 @@ def update_variant(
     if "provider" in fields_set:
         fields["provider"] = payload.provider
     if "externalPriceId" in fields_set:
-        fields["external_price_id"] = payload.externalPriceId
+        fields["external_price_id"] = payload.externalPriceId.strip() if payload.externalPriceId is not None else None
     if "optionValues" in fields_set:
         fields["option_values"] = payload.optionValues
     if "offerId" in fields_set:

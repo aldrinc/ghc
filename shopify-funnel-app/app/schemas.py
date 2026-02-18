@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -61,6 +61,76 @@ class VerifyProductResponse(BaseModel):
     productGid: str
     handle: str
     title: str
+
+
+class ListProductsRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    query: str | None = None
+    limit: int = Field(default=20, ge=1, le=50)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "ListProductsRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        return self
+
+
+class CatalogProductSummary(BaseModel):
+    productGid: str
+    title: str
+    handle: str
+    status: str
+
+
+class ListProductsResponse(BaseModel):
+    shopDomain: str
+    products: list[CatalogProductSummary]
+
+
+class CreateCatalogProductVariantRequest(BaseModel):
+    title: str = Field(min_length=1)
+    priceCents: int = Field(ge=0)
+    currency: str = Field(min_length=3, max_length=3)
+
+
+class CreateCatalogProductRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    title: str = Field(min_length=1)
+    description: str | None = None
+    handle: str | None = None
+    vendor: str | None = None
+    productType: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    status: Literal["ACTIVE", "DRAFT"] = "DRAFT"
+    variants: list[CreateCatalogProductVariantRequest] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "CreateCatalogProductRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        return self
+
+
+class CreatedCatalogVariant(BaseModel):
+    variantGid: str
+    title: str
+    priceCents: int
+    currency: str
+
+
+class CreateCatalogProductResponse(BaseModel):
+    shopDomain: str
+    productGid: str
+    title: str
+    handle: str
+    status: str
+    variants: list[CreatedCatalogVariant]
 
 
 class UpdateInstallationRequest(BaseModel):
