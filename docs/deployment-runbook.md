@@ -14,6 +14,9 @@ This doc captures what is required to ship the current stack (FastAPI + Temporal
 - LLM/research tuning: `LLM_DEFAULT_MODEL`, `LLM_REQUEST_TIMEOUT`, `LLM_REQUEST_RETRIES`, `LLM_POLL_INTERVAL_SECONDS`, `LLM_POLL_TIMEOUT_SECONDS`, `DEEP_RESEARCH_POLL_TIMEOUT_SECONDS`, `O3_DEEP_RESEARCH_MAX_OUTPUT_TOKENS`, `PRECANON_STEP04_MODEL`, `PRECANON_STEP04_MAX_TOKENS`, `PRECANON_STEP04_START_TO_CLOSE_MINUTES`, `PRECANON_STEP04_SCHEDULE_TO_CLOSE_MINUTES`, `PRECANON_STEP0{1,3,6,7,8,9}_MODEL`.
 - Google/Drive: `GOOGLE_APPLICATION_CREDENTIALS` (preferred) or `GOOGLE_CLIENT_EMAIL`/`GOOGLE_PRIVATE_KEY`; optional OAuth `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_REFRESH_TOKEN`; `RESEARCH_DRIVE_PARENT_FOLDER_ID` or `PARENT_FOLDER_ID`.
 - Ads ingestion: `APIFY_API_TOKEN`, optional `APIFY_META_ACTOR_ID`, `APIFY_META_ACTIVE_STATUS`, `APIFY_META_COUNTRY_CODE`, and tuning knobs `ADS_CONTEXT_MAX_MEDIA_ASSETS`, `ADS_CONTEXT_MAX_BREAKDOWN_ADS`, `ADS_CONTEXT_MAX_HIGHLIGHT_ADS`, `ADS_CONTEXT_MAX_ADS_PER_BRAND`, `ADS_CONTEXT_PRIMARY_TEXT_LIMIT`, `ADS_CONTEXT_HEADLINE_LIMIT`.
+- Shopify bridge integration (required for Shopify connection/product mapping/checkout): `SHOPIFY_APP_BASE_URL`, `SHOPIFY_INTERNAL_API_TOKEN`, optional `SHOPIFY_ORDER_WEBHOOK_SECRET`.
+  - `SHOPIFY_APP_BASE_URL` should point to your deployed `shopify-funnel-app` host (for example `https://shopify.moshq.app`).
+  - `SHOPIFY_INTERNAL_API_TOKEN` must match the token configured on `shopify-funnel-app`.
 - LLM providers: `ANTHROPIC_API_KEY`, `ANTHROPIC_API_BASE_URL` (optional), `GEMINI_API_KEY`, `OPENAI_BASE_URL` (optional).
 - Unsplash: `UNSPLASH_ACCESS_KEY` for stock image lookups during funnel image generation.
 - Frontend: set `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (point to deployed backend), and `VITE_CLERK_JWT_TEMPLATE` (defaults to `backend`).

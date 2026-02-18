@@ -20,6 +20,36 @@ This replaces the earlier idea of collecting Shopify connection during onboardin
 - Shopify bridge owns OAuth install and installation records: `shopify-funnel-app/app/main.py:89`.
 - Checkout requires bridge + storefront token and fails if missing: `shopify-funnel-app/app/main.py:272`.
 
+## Production configuration checklist
+
+Required because Product page Shopify actions call `mos/backend`, and `mos/backend` calls `shopify-funnel-app`.
+
+1. Configure `shopify-funnel-app` (the bridge service):
+- `SHOPIFY_APP_BASE_URL=https://<public-bridge-domain>`
+- `SHOPIFY_INTERNAL_API_TOKEN=<shared-secret>`
+
+2. Configure `mos/backend`:
+- `SHOPIFY_APP_BASE_URL=https://<same-bridge-domain>`
+- `SHOPIFY_INTERNAL_API_TOKEN=<same value as bridge token>`
+
+3. Important URL constraint:
+- `SHOPIFY_APP_BASE_URL` is used for both:
+  - server-to-server calls from `mos/backend` to bridge (`/admin/installations`, `/v1/catalog/*`, `/v1/checkouts`)
+  - browser redirect during connect flow (`/auth/install?...`)
+- So this URL must be reachable by both backend runtime and end-user browser.
+
+4. Restart/redeploy requirements:
+- `mos/backend` must be restarted after env changes.
+- `shopify-funnel-app` must be restarted after env changes.
+
+5. Failure mapping:
+- `Shopify checkout bridge is not configured in mos/backend...`:
+  - missing `SHOPIFY_APP_BASE_URL` in `mos/backend`
+- `Shopify checkout bridge auth is not configured in mos/backend...`:
+  - missing `SHOPIFY_INTERNAL_API_TOKEN` in `mos/backend`
+- `Shopify checkout app error: Unauthorized`:
+  - token mismatch between backend `SHOPIFY_INTERNAL_API_TOKEN` and bridge token
+
 ## UX: Product Page State Machine
 
 Show a dedicated `Shopify Connection` card on product detail.

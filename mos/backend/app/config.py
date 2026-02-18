@@ -64,8 +64,8 @@ class Settings(BaseSettings):
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
-    SHOPIFY_CHECKOUT_APP_BASE_URL: str | None = None
-    SHOPIFY_CHECKOUT_APP_API_TOKEN: str | None = None
+    SHOPIFY_APP_BASE_URL: str | None = None
+    SHOPIFY_INTERNAL_API_TOKEN: str | None = None
     SHOPIFY_ORDER_WEBHOOK_SECRET: str | None = None
 
     META_GRAPH_API_VERSION: str | None = None

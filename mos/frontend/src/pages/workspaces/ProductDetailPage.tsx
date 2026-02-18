@@ -57,8 +57,12 @@ export function ProductDetailPage() {
   const { data: productDetail, isLoading: isLoadingDetail } = useProduct(productId);
   const { data: productAssets = [], isLoading: isLoadingAssets } = useProductAssets(productId);
   const productClientId = productDetail?.client_id;
-  const { data: shopifyStatus, isLoading: isLoadingShopifyStatus, refetch: refetchShopifyStatus } =
-    useClientShopifyStatus(productClientId);
+  const {
+    data: shopifyStatus,
+    isLoading: isLoadingShopifyStatus,
+    refetch: refetchShopifyStatus,
+    error: shopifyStatusError,
+  } = useClientShopifyStatus(productClientId);
   const createShopifyInstallUrl = useCreateClientShopifyInstallUrl(productClientId || "");
   const listShopifyProducts = useListClientShopifyProducts(productClientId || "");
   const setDefaultShop = useSetClientShopifyDefaultShop(productClientId || "");
@@ -466,6 +470,11 @@ export function ProductDetailPage() {
     if (shopifyState === "multiple_installations_conflict") return "Store conflict";
     return "Error";
   }, [shopifyState]);
+  const shopifyStatusMessage = useMemo(() => {
+    if (shopifyStatus?.message) return shopifyStatus.message;
+    if (shopifyStatusError instanceof Error && shopifyStatusError.message.trim()) return shopifyStatusError.message;
+    return "Checking Shopify connection status.";
+  }, [shopifyStatus?.message, shopifyStatusError]);
   const isShopifyReady = shopifyState === "ready";
   const hasMappedShopifyProduct = Boolean((productDetail?.shopify_product_gid || "").trim());
 
@@ -545,7 +554,7 @@ export function ProductDetailPage() {
                 <Badge tone={shopifyStatusTone}>{isLoadingShopifyStatus ? "Checking…" : shopifyStatusLabel}</Badge>
               </div>
               <div className="text-xs text-content-muted">
-                {shopifyStatus?.message || "Checking Shopify connection status."}
+                {shopifyStatusMessage}
               </div>
               {shopifyStatus?.missingScopes?.length ? (
                 <div className="text-xs text-danger">Missing scopes: {shopifyStatus.missingScopes.join(", ")}</div>

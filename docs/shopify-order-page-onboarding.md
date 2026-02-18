@@ -40,11 +40,20 @@ uvicorn app.main:app --reload --port 8011
 
 In `mos/backend/.env` set:
 
-- `SHOPIFY_CHECKOUT_APP_BASE_URL=http://localhost:8011`
-- `SHOPIFY_CHECKOUT_APP_API_TOKEN=<same as SHOPIFY_INTERNAL_API_TOKEN>`
+- `SHOPIFY_APP_BASE_URL=http://localhost:8011`
+- `SHOPIFY_INTERNAL_API_TOKEN=<same value configured as SHOPIFY_INTERNAL_API_TOKEN in shopify-funnel-app>`
 - `SHOPIFY_ORDER_WEBHOOK_SECRET=<same as MOS_WEBHOOK_SHARED_SECRET>`
 
 Restart backend after setting these.
+
+### Production notes
+
+- `SHOPIFY_APP_BASE_URL` in `mos/backend` must point to the same bridge host used by `shopify-funnel-app` `SHOPIFY_APP_BASE_URL`.
+- This host must be reachable by both:
+  - end-user browser (for `/auth/install` redirect)
+  - `mos/backend` runtime (for server-to-server bridge calls)
+- `SHOPIFY_INTERNAL_API_TOKEN` in `mos/backend` and `SHOPIFY_INTERNAL_API_TOKEN` in `shopify-funnel-app` must match exactly.
+- After any env change, redeploy/restart both services.
 
 ## 4) Install app into your Shopify store and link to a Marketi client
 
