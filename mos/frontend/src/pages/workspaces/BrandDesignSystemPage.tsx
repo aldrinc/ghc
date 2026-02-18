@@ -1,8 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { useDesignSystems, useCreateDesignSystem, useUpdateDesignSystem, useDeleteDesignSystem } from "@/api/designSystems";
+import {
+  useDesignSystems,
+  useCreateDesignSystem,
+  useUpdateDesignSystem,
+  useDeleteDesignSystem,
+  useUploadDesignSystemLogo,
+} from "@/api/designSystems";
 import { useClient, useUpdateClient } from "@/api/clients";
+import { useAssets } from "@/api/assets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -412,6 +419,31 @@ function normalizeBrand(tokens: unknown): { name?: string; logoAssetPublicId?: s
   return { name, logoAssetPublicId, logoAlt };
 }
 
+function applyLogoPublicIdToTokens(
+  tokens: unknown,
+  logoPublicId: string,
+  defaultLogoAlt?: string
+): { value?: Record<string, unknown>; error?: string } {
+  if (!isRecord(tokens)) {
+    return { error: "Design system tokens must be a JSON object." };
+  }
+  const nextTokens: Record<string, unknown> = { ...tokens };
+  const brand = nextTokens.brand;
+  if (brand !== undefined && !isRecord(brand)) {
+    return { error: "Design system tokens.brand must be a JSON object." };
+  }
+  const nextBrand: Record<string, unknown> = isRecord(brand) ? { ...brand } : {};
+  nextBrand.logoAssetPublicId = logoPublicId;
+  if (
+    defaultLogoAlt &&
+    !(typeof nextBrand.logoAlt === "string" && nextBrand.logoAlt.trim())
+  ) {
+    nextBrand.logoAlt = defaultLogoAlt;
+  }
+  nextTokens.brand = nextBrand;
+  return { value: nextTokens };
+}
+
 function isColorLikeCssValue(raw: string): boolean {
   const value = raw.trim().toLowerCase();
   if (!value) return false;
@@ -459,7 +491,12 @@ export function BrandDesignSystemPage() {
   const updateClient = useUpdateClient();
   const createDesignSystem = useCreateDesignSystem();
   const updateDesignSystem = useUpdateDesignSystem();
+  const uploadDesignSystemLogo = useUploadDesignSystemLogo();
   const deleteDesignSystem = useDeleteDesignSystem();
+  const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
+    { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
+    { enabled: Boolean(workspace?.id) }
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DesignSystem | null>(null);
@@ -470,6 +507,8 @@ export function BrandDesignSystemPage() {
   const [previewDesignSystemId, setPreviewDesignSystemId] = useState("");
   const [varsFilter, setVarsFilter] = useState("");
   const [logoErrored, setLogoErrored] = useState(false);
+  const [selectedLogoPublicId, setSelectedLogoPublicId] = useState("");
+  const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const designSystemOptions = useMemo(
     () => [
@@ -483,6 +522,7 @@ export function BrandDesignSystemPage() {
     setPreviewDesignSystemId("");
     setVarsFilter("");
     setLogoErrored(false);
+    setSelectedLogoPublicId("");
   }, [workspace?.id]);
 
   useEffect(() => {
@@ -520,11 +560,84 @@ export function BrandDesignSystemPage() {
     setLogoErrored(false);
   }, [previewBrand.logoAssetPublicId, previewDesignSystemId]);
 
+  useEffect(() => {
+    setSelectedLogoPublicId(previewBrand.logoAssetPublicId || "");
+  }, [previewBrand.logoAssetPublicId, previewDesignSystemId]);
+
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
   const previewLogoSrc =
     previewBrand.logoAssetPublicId && apiBaseUrl
       ? `${apiBaseUrl.replace(/\/$/, "")}/public/assets/${previewBrand.logoAssetPublicId}`
       : undefined;
+  const logoAssetOptions = useMemo(
+    () =>
+      [...logoAssets]
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .map((asset) => {
+          const createdAt = new Date(asset.created_at);
+          const createdAtLabel = Number.isNaN(createdAt.getTime())
+            ? asset.created_at
+            : createdAt.toLocaleDateString();
+          return {
+            label: `${asset.public_id.slice(0, 8)} · ${createdAtLabel}`,
+            value: asset.public_id,
+          };
+        }),
+    [logoAssets]
+  );
+
+  const applySelectedLogoAsset = () => {
+    if (!workspace?.id) return;
+    if (!previewDesignSystem) {
+      toast.error("Select a design system first.");
+      return;
+    }
+    if (!selectedLogoPublicId) {
+      toast.error("Select a logo asset first.");
+      return;
+    }
+    const patched = applyLogoPublicIdToTokens(
+      previewDesignSystem.tokens,
+      selectedLogoPublicId,
+      previewBrand.logoAlt || previewBrand.name || previewDesignSystem.name
+    );
+    if (!patched.value) {
+      toast.error(patched.error || "Unable to update design system logo.");
+      return;
+    }
+    updateDesignSystem.mutate({
+      designSystemId: previewDesignSystem.id,
+      payload: { tokens: patched.value },
+      clientId: workspace.id,
+    }, {
+      onSuccess: () => setLogoErrored(false),
+    });
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
+    if (!file) return;
+    if (!workspace?.id) {
+      toast.error("Select a workspace first.");
+      return;
+    }
+    if (!previewDesignSystem) {
+      toast.error("Select a design system first.");
+      return;
+    }
+    try {
+      const uploaded = await uploadDesignSystemLogo.mutateAsync({
+        designSystemId: previewDesignSystem.id,
+        clientId: workspace.id,
+        file,
+      });
+      setSelectedLogoPublicId(uploaded.publicId);
+      setLogoErrored(false);
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
+  };
 
   const coreColorKeys = useMemo(
     () => [
@@ -773,6 +886,54 @@ export function BrandDesignSystemPage() {
                                 Unable to load logo from <span className="font-mono">{previewLogoSrc}</span>
                               </div>
                             ) : null}
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            <input
+                              ref={logoUploadInputRef}
+                              className="hidden"
+                              type="file"
+                              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                              onChange={handleLogoUpload}
+                            />
+                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                              <select
+                                className="w-full rounded-md border border-input-border bg-input px-2 py-2 text-xs text-content shadow-sm"
+                                value={selectedLogoPublicId}
+                                onChange={(e) => setSelectedLogoPublicId(e.target.value)}
+                                disabled={isLoadingLogoAssets || !logoAssetOptions.length}
+                              >
+                                <option value="">
+                                  {isLoadingLogoAssets
+                                    ? "Loading image assets…"
+                                    : logoAssetOptions.length
+                                      ? "Select existing image asset"
+                                      : "No image assets available"}
+                                </option>
+                                {logoAssetOptions.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <Button
+                                size="sm"
+                                onClick={applySelectedLogoAsset}
+                                disabled={!selectedLogoPublicId || updateDesignSystem.isPending}
+                              >
+                                {updateDesignSystem.isPending ? "Applying…" : "Set logo"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => logoUploadInputRef.current?.click()}
+                                disabled={uploadDesignSystemLogo.isPending}
+                              >
+                                {uploadDesignSystemLogo.isPending ? "Uploading…" : "Upload logo"}
+                              </Button>
+                            </div>
+                            <div className="text-[11px]" style={{ color: "var(--color-muted)" }}>
+                              Selecting or uploading a logo updates this design system token automatically.
+                            </div>
                           </div>
                         </div>
                       </div>
