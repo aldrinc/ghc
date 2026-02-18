@@ -51,6 +51,18 @@ class CampaignFunnelGenerationWorkflow:
         if not experiment_specs:
             raise RuntimeError("No experiment specs available for funnel generation.")
 
+        # This activity generates N funnels (each with multiple pages, images, and optionally testimonials).
+        # The runtime scales with the number of variants, so size the timeout accordingly.
+        funnel_count = 0
+        for exp in experiment_specs:
+            if not isinstance(exp, dict):
+                continue
+            variants = exp.get("variants") or []
+            if isinstance(variants, list):
+                funnel_count += len(variants)
+        funnel_count = max(1, funnel_count)
+        funnel_batch_timeout = max(timedelta(minutes=45), timedelta(minutes=15) * funnel_count)
+
         funnel_batch = await workflow.execute_activity(
             create_funnels_from_experiments_activity,
             {
@@ -68,7 +80,7 @@ class CampaignFunnelGenerationWorkflow:
                 "temporal_workflow_id": workflow.info().workflow_id,
                 "temporal_run_id": workflow.info().run_id,
             },
-            schedule_to_close_timeout=timedelta(minutes=45),
+            schedule_to_close_timeout=funnel_batch_timeout,
         )
 
         funnel_map: Dict[str, str] = {}
