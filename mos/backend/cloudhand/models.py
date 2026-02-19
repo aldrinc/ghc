@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from enum import Enum
+import re
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -108,6 +110,68 @@ class ApplicationSpec(BaseModel):
     build_config: BuildSpec
     service_config: ServiceSpec
     destination_path: str = "/opt/apps"
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_funnel_artifact_source_ref(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+
+        source_type = str(value.get("source_type") or "").strip().lower()
+        if source_type != ApplicationSourceType.FUNNEL_ARTIFACT.value:
+            return value
+
+        source_ref = value.get("source_ref")
+        if not isinstance(source_ref, dict):
+            return value
+
+        normalized = dict(source_ref)
+
+        legacy_api_base = normalized.get("upstream_api_base_url")
+        if (
+            "upstream_api_base_root" not in normalized
+            and isinstance(legacy_api_base, str)
+            and legacy_api_base.strip()
+        ):
+            normalized["upstream_api_base_root"] = legacy_api_base.strip()
+
+        if "artifact" not in normalized:
+            legacy_meta = normalized.get("meta")
+            legacy_funnels = normalized.get("funnels")
+            if isinstance(legacy_meta, dict) and isinstance(legacy_funnels, dict):
+                normalized["artifact"] = {
+                    "meta": legacy_meta,
+                    "funnels": legacy_funnels,
+                }
+
+        product_id = normalized.get("product_id")
+        if not isinstance(product_id, str) or not product_id.strip():
+            inferred_product_id: Optional[str] = None
+
+            artifact = normalized.get("artifact")
+            if isinstance(artifact, dict):
+                meta = artifact.get("meta")
+                if isinstance(meta, dict):
+                    meta_product_id = meta.get("productId") or meta.get("product_id")
+                    if isinstance(meta_product_id, str) and meta_product_id.strip():
+                        inferred_product_id = meta_product_id.strip()
+
+            if not inferred_product_id:
+                workload_name = str(value.get("name") or "").strip()
+                match = re.match(r"^product-funnels-([0-9a-fA-F-]{36})$", workload_name)
+                if match:
+                    candidate = match.group(1)
+                    try:
+                        inferred_product_id = str(UUID(candidate))
+                    except ValueError:
+                        inferred_product_id = None
+
+            if inferred_product_id:
+                normalized["product_id"] = inferred_product_id
+
+        out = dict(value)
+        out["source_ref"] = normalized
+        return out
 
     @model_validator(mode="after")
     def validate_source(self) -> "ApplicationSpec":
