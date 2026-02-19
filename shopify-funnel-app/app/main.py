@@ -25,6 +25,11 @@ from app.schemas import (
     InstallationResponse,
     ListProductsRequest,
     ListProductsResponse,
+    UpsertedPolicyPage,
+    UpsertPolicyPagesRequest,
+    UpsertPolicyPagesResponse,
+    UpdateCatalogVariantRequest,
+    UpdateCatalogVariantResponse,
     VerifyProductRequest,
     VerifyProductResponse,
     UpdateInstallationRequest,
@@ -406,6 +411,94 @@ async def create_catalog_product(
                 currency=item["currency"],
             )
             for item in created["variants"]
+        ],
+    )
+
+
+@app.patch(
+    "/v1/catalog/variants",
+    response_model=UpdateCatalogVariantResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def update_catalog_variant(
+    payload: UpdateCatalogVariantRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+
+    fields_set = payload.model_fields_set
+    update_fields: dict[str, Any] = {}
+    if "title" in fields_set:
+        update_fields["title"] = payload.title
+    if "priceCents" in fields_set:
+        update_fields["priceCents"] = payload.priceCents
+    if "compareAtPriceCents" in fields_set:
+        update_fields["compareAtPriceCents"] = payload.compareAtPriceCents
+    if "sku" in fields_set:
+        update_fields["sku"] = payload.sku
+    if "barcode" in fields_set:
+        update_fields["barcode"] = payload.barcode
+    if "inventoryPolicy" in fields_set:
+        update_fields["inventoryPolicy"] = payload.inventoryPolicy
+    if "inventoryManagement" in fields_set:
+        update_fields["inventoryManagement"] = payload.inventoryManagement
+
+    try:
+        updated = await shopify_api.update_variant(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            variant_gid=payload.variantGid,
+            fields=update_fields,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return UpdateCatalogVariantResponse(
+        shopDomain=installation.shop_domain,
+        productGid=updated["productGid"],
+        variantGid=updated["variantGid"],
+    )
+
+
+@app.post(
+    "/v1/policies/pages/upsert",
+    response_model=UpsertPolicyPagesResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def upsert_policy_pages(
+    payload: UpsertPolicyPagesRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        synced_pages = await shopify_api.upsert_policy_pages(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            pages=[page.model_dump() for page in payload.pages],
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return UpsertPolicyPagesResponse(
+        shopDomain=installation.shop_domain,
+        pages=[
+            UpsertedPolicyPage(
+                pageKey=item["pageKey"],
+                pageId=item["pageId"],
+                title=item["title"],
+                handle=item["handle"],
+                url=item["url"],
+                operation=item["operation"],
+            )
+            for item in synced_pages
         ],
     )
 

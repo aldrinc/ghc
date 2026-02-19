@@ -133,6 +133,83 @@ class CreateCatalogProductResponse(BaseModel):
     variants: list[CreatedCatalogVariant]
 
 
+class UpdateCatalogVariantRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    variantGid: str = Field(min_length=1)
+    title: str | None = None
+    priceCents: int | None = Field(default=None, ge=0)
+    compareAtPriceCents: int | None = Field(default=None, ge=0)
+    sku: str | None = None
+    barcode: str | None = None
+    inventoryPolicy: str | None = None
+    inventoryManagement: str | None = None
+
+    @model_validator(mode="after")
+    def validate_payload(self) -> "UpdateCatalogVariantRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+
+        fields_set = self.model_fields_set
+        if not any(
+            name in fields_set
+            for name in {
+                "title",
+                "priceCents",
+                "compareAtPriceCents",
+                "sku",
+                "barcode",
+                "inventoryPolicy",
+                "inventoryManagement",
+            }
+        ):
+            raise ValueError("At least one variant update field is required")
+        return self
+
+
+class UpdateCatalogVariantResponse(BaseModel):
+    shopDomain: str
+    productGid: str
+    variantGid: str
+
+
+class UpsertPolicyPageRequest(BaseModel):
+    pageKey: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    handle: str = Field(min_length=1, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    bodyHtml: str = Field(min_length=1)
+
+
+class UpsertPolicyPagesRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    pages: list[UpsertPolicyPageRequest] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "UpsertPolicyPagesRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        return self
+
+
+class UpsertedPolicyPage(BaseModel):
+    pageKey: str
+    pageId: str
+    title: str
+    handle: str
+    url: str
+    operation: Literal["created", "updated"]
+
+
+class UpsertPolicyPagesResponse(BaseModel):
+    shopDomain: str
+    pages: list[UpsertedPolicyPage]
+
+
 class UpdateInstallationRequest(BaseModel):
     clientId: str | None = None
     storefrontAccessToken: str | None = None

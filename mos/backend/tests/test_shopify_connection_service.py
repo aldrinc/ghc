@@ -275,6 +275,94 @@ def test_create_client_shopify_product_parses_response(monkeypatch):
     assert response["variants"][0]["variantGid"] == "gid://shopify/ProductVariant/111"
 
 
+def test_update_client_shopify_variant_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        assert method == "PATCH"
+        assert path == "/v1/catalog/variants"
+        assert json_body["clientId"] == "client_1"
+        assert json_body["variantGid"] == "gid://shopify/ProductVariant/222"
+        assert json_body["priceCents"] == 5999
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/123",
+            "variantGid": "gid://shopify/ProductVariant/222",
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.update_client_shopify_variant(
+        client_id="client_1",
+        variant_gid="gid://shopify/ProductVariant/222",
+        fields={"priceCents": 5999},
+    )
+
+    assert response["shopDomain"] == "example.myshopify.com"
+    assert response["productGid"] == "gid://shopify/Product/123"
+    assert response["variantGid"] == "gid://shopify/ProductVariant/222"
+
+
+def test_update_client_shopify_variant_sends_inventory_related_fields(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        assert method == "PATCH"
+        assert path == "/v1/catalog/variants"
+        assert json_body["clientId"] == "client_1"
+        assert json_body["variantGid"] == "gid://shopify/ProductVariant/222"
+        assert json_body["sku"] == "SKU-001"
+        assert json_body["barcode"] == "BAR-001"
+        assert json_body["inventoryPolicy"] == "continue"
+        assert json_body["inventoryManagement"] == "shopify"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/123",
+            "variantGid": "gid://shopify/ProductVariant/222",
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.update_client_shopify_variant(
+        client_id="client_1",
+        variant_gid="gid://shopify/ProductVariant/222",
+        fields={
+            "sku": "SKU-001",
+            "barcode": "BAR-001",
+            "inventoryPolicy": "continue",
+            "inventoryManagement": "shopify",
+        },
+    )
+
+    assert response["shopDomain"] == "example.myshopify.com"
+    assert response["productGid"] == "gid://shopify/Product/123"
+    assert response["variantGid"] == "gid://shopify/ProductVariant/222"
+
+
+def test_update_client_shopify_variant_rejects_invalid_fields():
+    try:
+        shopify_connection.update_client_shopify_variant(
+            client_id="client_1",
+            variant_gid="gid://shopify/ProductVariant/222",
+            fields={"currency": "USD"},
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "Unsupported Shopify variant update fields" in exc.detail
+    else:
+        raise AssertionError("Expected update_client_shopify_variant to reject unsupported fields")
+
+
+def test_update_client_shopify_variant_rejects_invalid_inventory_management():
+    try:
+        shopify_connection.update_client_shopify_variant(
+            client_id="client_1",
+            variant_gid="gid://shopify/ProductVariant/222",
+            fields={"inventoryManagement": "manual"},
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "inventoryManagement must be null or 'shopify'" in exc.detail
+    else:
+        raise AssertionError("Expected update_client_shopify_variant to reject invalid inventoryManagement")
+
+
 def test_disconnect_client_shopify_store_unlinks_workspace(monkeypatch):
     monkeypatch.setattr(
         shopify_connection,
@@ -337,3 +425,52 @@ def test_disconnect_client_shopify_store_requires_matching_workspace(monkeypatch
         assert exc.detail == "This Shopify store is not connected to this workspace. connectedWorkspaceId=client_other"
     else:
         raise AssertionError("Expected disconnect_client_shopify_store to reject mismatched workspace")
+
+
+def test_upsert_client_shopify_policy_pages_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        assert method == "POST"
+        assert path == "/v1/policies/pages/upsert"
+        assert json_body["clientId"] == "client_1"
+        assert json_body["pages"][0]["pageKey"] == "privacy_policy"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "pages": [
+                {
+                    "pageKey": "privacy_policy",
+                    "pageId": "gid://shopify/Page/101",
+                    "title": "Privacy Policy",
+                    "handle": "privacy-policy",
+                    "url": "https://example.myshopify.com/pages/privacy-policy",
+                    "operation": "created",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.upsert_client_shopify_policy_pages(
+        client_id="client_1",
+        pages=[
+            {
+                "pageKey": "privacy_policy",
+                "title": "Privacy Policy",
+                "handle": "privacy-policy",
+                "bodyHtml": "<h1>Privacy Policy</h1>",
+            }
+        ],
+    )
+
+    assert response["shopDomain"] == "example.myshopify.com"
+    assert response["pages"][0]["pageId"] == "gid://shopify/Page/101"
+    assert response["pages"][0]["operation"] == "created"
+
+
+def test_upsert_client_shopify_policy_pages_rejects_empty_pages():
+    try:
+        shopify_connection.upsert_client_shopify_policy_pages(client_id="client_1", pages=[])
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert exc.detail == "pages must contain at least one policy page."
+    else:
+        raise AssertionError("Expected upsert_client_shopify_policy_pages to reject empty pages")

@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from app.config import settings
 
 _SHOP_DOMAIN_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
+_SHOPIFY_VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/"
 _REQUIRED_SHOPIFY_SCOPES = {
     "read_orders",
     "write_orders",
@@ -130,6 +131,166 @@ def _normalize_currency_code(value: str) -> str:
             detail="Variant currency must be a valid 3-letter ISO code.",
         )
     return cleaned
+
+
+def update_client_shopify_variant(
+    *,
+    client_id: str,
+    variant_gid: str,
+    fields: dict[str, Any],
+    shop_domain: str | None = None,
+) -> dict[str, str]:
+    cleaned_variant_gid = variant_gid.strip()
+    if not cleaned_variant_gid.startswith(_SHOPIFY_VARIANT_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="variantGid must be a Shopify variant GID.",
+        )
+    if not fields:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one variant update field is required.",
+        )
+
+    supported_fields = {
+        "title",
+        "priceCents",
+        "compareAtPriceCents",
+        "sku",
+        "barcode",
+        "inventoryPolicy",
+        "inventoryManagement",
+    }
+    unsupported_fields = sorted(name for name in fields.keys() if name not in supported_fields)
+    if unsupported_fields:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported Shopify variant update fields: {', '.join(unsupported_fields)}.",
+        )
+
+    request_payload: dict[str, Any] = {"variantGid": cleaned_variant_gid}
+    if "title" in fields:
+        raw_title = fields["title"]
+        if not isinstance(raw_title, str) or not raw_title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="title must be a non-empty string.",
+            )
+        request_payload["title"] = raw_title.strip()
+
+    if "priceCents" in fields:
+        raw_price_cents = fields["priceCents"]
+        if not isinstance(raw_price_cents, int) or raw_price_cents < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="priceCents must be a non-negative integer.",
+            )
+        request_payload["priceCents"] = raw_price_cents
+
+    if "compareAtPriceCents" in fields:
+        raw_compare_at_price_cents = fields["compareAtPriceCents"]
+        if raw_compare_at_price_cents is not None and (
+            not isinstance(raw_compare_at_price_cents, int) or raw_compare_at_price_cents < 0
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="compareAtPriceCents must be null or a non-negative integer.",
+            )
+        request_payload["compareAtPriceCents"] = raw_compare_at_price_cents
+
+    if "sku" in fields:
+        raw_sku = fields["sku"]
+        if raw_sku is not None and (not isinstance(raw_sku, str) or not raw_sku.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="sku must be null or a non-empty string.",
+            )
+        request_payload["sku"] = raw_sku.strip() if isinstance(raw_sku, str) else None
+
+    if "barcode" in fields:
+        raw_barcode = fields["barcode"]
+        if raw_barcode is not None and (not isinstance(raw_barcode, str) or not raw_barcode.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="barcode must be null or a non-empty string.",
+            )
+        request_payload["barcode"] = raw_barcode.strip() if isinstance(raw_barcode, str) else None
+
+    if "inventoryPolicy" in fields:
+        raw_inventory_policy = fields["inventoryPolicy"]
+        if not isinstance(raw_inventory_policy, str) or not raw_inventory_policy.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="inventoryPolicy must be one of: deny, continue.",
+            )
+        normalized_inventory_policy = raw_inventory_policy.strip().lower()
+        if normalized_inventory_policy not in {"deny", "continue"}:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="inventoryPolicy must be one of: deny, continue.",
+            )
+        request_payload["inventoryPolicy"] = normalized_inventory_policy
+
+    if "inventoryManagement" in fields:
+        raw_inventory_management = fields["inventoryManagement"]
+        if raw_inventory_management is not None:
+            if not isinstance(raw_inventory_management, str) or not raw_inventory_management.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="inventoryManagement must be null or 'shopify'.",
+                )
+            normalized_inventory_management = raw_inventory_management.strip().lower()
+            if normalized_inventory_management != "shopify":
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="inventoryManagement must be null or 'shopify'.",
+                )
+            request_payload["inventoryManagement"] = normalized_inventory_management
+        else:
+            request_payload["inventoryManagement"] = None
+
+    if shop_domain is not None:
+        request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
+    else:
+        request_payload["clientId"] = client_id
+
+    payload = _bridge_request(
+        method="PATCH",
+        path="/v1/catalog/variants",
+        json_body=request_payload,
+    )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid update-variant payload.",
+        )
+
+    response_shop_domain = payload.get("shopDomain")
+    if not isinstance(response_shop_domain, str) or not response_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid shopDomain for updated variant.",
+        )
+
+    response_product_gid = payload.get("productGid")
+    if not isinstance(response_product_gid, str) or not response_product_gid.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid productGid for updated variant.",
+        )
+
+    response_variant_gid = payload.get("variantGid")
+    if not isinstance(response_variant_gid, str) or not response_variant_gid.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid variantGid for updated variant.",
+        )
+
+    return {
+        "shopDomain": response_shop_domain.strip().lower(),
+        "productGid": response_product_gid.strip(),
+        "variantGid": response_variant_gid.strip(),
+    }
 
 
 def list_shopify_installations() -> list[ShopifyInstallation]:
@@ -557,6 +718,167 @@ def create_client_shopify_product(
         "handle": product_handle.strip(),
         "status": product_status.strip(),
         "variants": response_variants,
+    }
+
+
+def upsert_client_shopify_policy_pages(
+    *,
+    client_id: str,
+    pages: list[dict[str, Any]],
+    shop_domain: str | None = None,
+) -> dict[str, Any]:
+    if not pages:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="pages must contain at least one policy page.",
+        )
+
+    cleaned_pages: list[dict[str, str]] = []
+    seen_page_keys: set[str] = set()
+    for raw_page in pages:
+        if not isinstance(raw_page, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each page must be an object.",
+            )
+
+        raw_page_key = raw_page.get("pageKey")
+        if not isinstance(raw_page_key, str) or not raw_page_key.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each page requires a non-empty pageKey.",
+            )
+        page_key = raw_page_key.strip()
+        if page_key in seen_page_keys:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate pageKey provided: {page_key}",
+            )
+        seen_page_keys.add(page_key)
+
+        raw_title = raw_page.get("title")
+        if not isinstance(raw_title, str) or not raw_title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Policy page '{page_key}' requires a non-empty title.",
+            )
+        title = raw_title.strip()
+
+        raw_handle = raw_page.get("handle")
+        if not isinstance(raw_handle, str) or not raw_handle.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Policy page '{page_key}' requires a non-empty handle.",
+            )
+        handle = raw_handle.strip().lower()
+
+        raw_body_html = raw_page.get("bodyHtml")
+        if not isinstance(raw_body_html, str) or not raw_body_html.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Policy page '{page_key}' requires non-empty bodyHtml.",
+            )
+        body_html = raw_body_html.strip()
+
+        cleaned_pages.append(
+            {
+                "pageKey": page_key,
+                "title": title,
+                "handle": handle,
+                "bodyHtml": body_html,
+            }
+        )
+
+    request_payload: dict[str, Any] = {"pages": cleaned_pages}
+    if shop_domain is not None:
+        request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
+    else:
+        request_payload["clientId"] = client_id
+
+    payload = _bridge_request(
+        method="POST",
+        path="/v1/policies/pages/upsert",
+        json_body=request_payload,
+    )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid policy-page sync payload.",
+        )
+
+    response_shop_domain = payload.get("shopDomain")
+    if not isinstance(response_shop_domain, str) or not response_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid shopDomain for policy-page sync.",
+        )
+
+    raw_pages = payload.get("pages")
+    if not isinstance(raw_pages, list):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid pages list for policy-page sync.",
+        )
+
+    response_pages: list[dict[str, str]] = []
+    for raw_page in raw_pages:
+        if not isinstance(raw_page, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid policy-page object.",
+            )
+        page_key = raw_page.get("pageKey")
+        page_id = raw_page.get("pageId")
+        title = raw_page.get("title")
+        handle = raw_page.get("handle")
+        url = raw_page.get("url")
+        operation = raw_page.get("operation")
+
+        if not isinstance(page_key, str) or not page_key.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid policy pageKey.",
+            )
+        if not isinstance(page_id, str) or not page_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid policy pageId.",
+            )
+        if not isinstance(title, str) or not title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid policy page title.",
+            )
+        if not isinstance(handle, str) or not handle.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid policy page handle.",
+            )
+        if not isinstance(url, str) or not url.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid policy page URL.",
+            )
+        if operation not in {"created", "updated"}:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid policy page operation.",
+            )
+
+        response_pages.append(
+            {
+                "pageKey": page_key.strip(),
+                "pageId": page_id.strip(),
+                "title": title.strip(),
+                "handle": handle.strip(),
+                "url": url.strip(),
+                "operation": operation,
+            }
+        )
+
+    return {
+        "shopDomain": response_shop_domain.strip().lower(),
+        "pages": response_pages,
     }
 
 

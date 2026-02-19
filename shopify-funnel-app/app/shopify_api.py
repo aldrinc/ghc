@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
-from typing import Any
+import re
+from typing import Any, Literal
 
 import httpx
 
@@ -572,6 +573,529 @@ class ShopifyApiClient:
             "status": product_status,
             "variants": variant_rows,
         }
+
+    async def _resolve_variant_product_gid(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        variant_gid: str,
+    ) -> str:
+        query = """
+        query productVariantNode($id: ID!) {
+            node(id: $id) {
+                ... on ProductVariant {
+                    id
+                    product {
+                        id
+                    }
+                }
+            }
+        }
+        """
+        payload = {"query": query, "variables": {"id": variant_gid}}
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload=payload,
+        )
+        node = response.get("node")
+        if not isinstance(node, dict):
+            raise ShopifyApiError(
+                message=f"Product variant not found for GID: {variant_gid}",
+                status_code=404,
+            )
+        product = node.get("product")
+        if not isinstance(product, dict):
+            raise ShopifyApiError(
+                message=f"Product variant is missing parent product for GID: {variant_gid}",
+                status_code=404,
+            )
+        product_gid = product.get("id")
+        if not isinstance(product_gid, str) or not product_gid:
+            raise ShopifyApiError(
+                message=f"Product variant is missing product id for GID: {variant_gid}",
+                status_code=404,
+            )
+        return product_gid
+
+    async def update_variant(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        variant_gid: str,
+        fields: dict[str, Any],
+    ) -> dict[str, str]:
+        cleaned_variant_gid = variant_gid.strip()
+        if not cleaned_variant_gid.startswith("gid://shopify/ProductVariant/"):
+            raise ShopifyApiError(
+                message="variantGid must be a valid Shopify ProductVariant GID.",
+                status_code=400,
+            )
+        if not fields:
+            raise ShopifyApiError(message="At least one variant update field is required.", status_code=400)
+
+        supported_fields = {
+            "title",
+            "priceCents",
+            "compareAtPriceCents",
+            "sku",
+            "barcode",
+            "inventoryPolicy",
+            "inventoryManagement",
+        }
+        unsupported_fields = sorted(name for name in fields.keys() if name not in supported_fields)
+        if unsupported_fields:
+            raise ShopifyApiError(
+                message=f"Unsupported variant update fields: {', '.join(unsupported_fields)}",
+                status_code=400,
+            )
+
+        variant_input: dict[str, Any] = {"id": cleaned_variant_gid}
+        inventory_item_input: dict[str, Any] = {}
+        if "title" in fields:
+            raw_title = fields.get("title")
+            if not isinstance(raw_title, str) or not raw_title.strip():
+                raise ShopifyApiError(message="title must be a non-empty string.", status_code=400)
+            variant_input["optionValues"] = [{"optionName": "Title", "name": raw_title.strip()}]
+
+        if "priceCents" in fields:
+            raw_price_cents = fields.get("priceCents")
+            if not isinstance(raw_price_cents, int) or raw_price_cents < 0:
+                raise ShopifyApiError(
+                    message="priceCents must be a non-negative integer.",
+                    status_code=400,
+                )
+            variant_input["price"] = self._price_cents_to_decimal_string(raw_price_cents)
+
+        if "compareAtPriceCents" in fields:
+            raw_compare_at_price_cents = fields.get("compareAtPriceCents")
+            if raw_compare_at_price_cents is None:
+                variant_input["compareAtPrice"] = None
+            else:
+                if not isinstance(raw_compare_at_price_cents, int) or raw_compare_at_price_cents < 0:
+                    raise ShopifyApiError(
+                        message="compareAtPriceCents must be null or a non-negative integer.",
+                        status_code=400,
+                    )
+                variant_input["compareAtPrice"] = self._price_cents_to_decimal_string(raw_compare_at_price_cents)
+
+        if "sku" in fields:
+            raw_sku = fields.get("sku")
+            if raw_sku is None:
+                inventory_item_input["sku"] = None
+            else:
+                if not isinstance(raw_sku, str) or not raw_sku.strip():
+                    raise ShopifyApiError(
+                        message="sku must be null or a non-empty string.",
+                        status_code=400,
+                    )
+                inventory_item_input["sku"] = raw_sku.strip()
+
+        if "barcode" in fields:
+            raw_barcode = fields.get("barcode")
+            if raw_barcode is None:
+                variant_input["barcode"] = None
+            else:
+                if not isinstance(raw_barcode, str) or not raw_barcode.strip():
+                    raise ShopifyApiError(
+                        message="barcode must be null or a non-empty string.",
+                        status_code=400,
+                    )
+                variant_input["barcode"] = raw_barcode.strip()
+
+        if "inventoryPolicy" in fields:
+            raw_inventory_policy = fields.get("inventoryPolicy")
+            if not isinstance(raw_inventory_policy, str) or not raw_inventory_policy.strip():
+                raise ShopifyApiError(
+                    message="inventoryPolicy must be one of: deny, continue.",
+                    status_code=400,
+                )
+            normalized_inventory_policy = raw_inventory_policy.strip().upper()
+            if normalized_inventory_policy not in {"DENY", "CONTINUE"}:
+                raise ShopifyApiError(
+                    message="inventoryPolicy must be one of: deny, continue.",
+                    status_code=400,
+                )
+            variant_input["inventoryPolicy"] = normalized_inventory_policy
+
+        if "inventoryManagement" in fields:
+            raw_inventory_management = fields.get("inventoryManagement")
+            if raw_inventory_management is None:
+                inventory_item_input["tracked"] = False
+            else:
+                if not isinstance(raw_inventory_management, str) or not raw_inventory_management.strip():
+                    raise ShopifyApiError(
+                        message="inventoryManagement must be null or 'shopify'.",
+                        status_code=400,
+                    )
+                normalized_inventory_management = raw_inventory_management.strip().lower()
+                if normalized_inventory_management != "shopify":
+                    raise ShopifyApiError(
+                        message="inventoryManagement must be null or 'shopify'.",
+                        status_code=400,
+                    )
+                inventory_item_input["tracked"] = True
+
+        if inventory_item_input:
+            variant_input["inventoryItem"] = inventory_item_input
+
+        product_gid = await self._resolve_variant_product_gid(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            variant_gid=cleaned_variant_gid,
+        )
+
+        mutation = """
+        mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+            productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                productVariants {
+                    id
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        payload = {
+            "query": mutation,
+            "variables": {
+                "productId": product_gid,
+                "variants": [variant_input],
+            },
+        }
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload=payload,
+        )
+        update_data = response.get("productVariantsBulkUpdate") or {}
+        user_errors = update_data.get("userErrors") or []
+        if user_errors:
+            messages = "; ".join(str(error.get("message")) for error in user_errors)
+            raise ShopifyApiError(message=f"productVariantsBulkUpdate failed: {messages}", status_code=409)
+
+        updated_variants = update_data.get("productVariants") or []
+        if not isinstance(updated_variants, list) or not updated_variants:
+            raise ShopifyApiError(message="productVariantsBulkUpdate response is missing variants.")
+
+        updated_variant_ids = {
+            item.get("id")
+            for item in updated_variants
+            if isinstance(item, dict) and isinstance(item.get("id"), str)
+        }
+        if cleaned_variant_gid not in updated_variant_ids:
+            raise ShopifyApiError(
+                message="productVariantsBulkUpdate response did not include requested variant.",
+            )
+
+        return {
+            "productGid": product_gid,
+            "variantGid": cleaned_variant_gid,
+        }
+
+    @staticmethod
+    def _normalize_policy_page_handle(handle: str) -> str:
+        cleaned = handle.strip().lower()
+        if not cleaned:
+            raise ShopifyApiError(message="Policy page handle cannot be empty.", status_code=400)
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", cleaned):
+            raise ShopifyApiError(
+                message=(
+                    "Policy page handle must use lowercase letters, numbers, and hyphens "
+                    "(for example: returns-refunds-policy)."
+                ),
+                status_code=400,
+            )
+        return cleaned
+
+    @staticmethod
+    def _coerce_page_node(
+        *,
+        node: Any,
+        mutation_name: str,
+        require_online_store_url: bool,
+    ) -> dict[str, str]:
+        if not isinstance(node, dict):
+            raise ShopifyApiError(message=f"{mutation_name} response is missing page object.")
+
+        page_id = node.get("id")
+        title = node.get("title")
+        handle = node.get("handle")
+        online_store_url = node.get("onlineStoreUrl")
+
+        if not isinstance(page_id, str) or not page_id:
+            raise ShopifyApiError(message=f"{mutation_name} response is missing page.id.")
+        if not isinstance(title, str) or not title:
+            raise ShopifyApiError(message=f"{mutation_name} response is missing page.title.")
+        if not isinstance(handle, str) or not handle:
+            raise ShopifyApiError(message=f"{mutation_name} response is missing page.handle.")
+        if require_online_store_url and (not isinstance(online_store_url, str) or not online_store_url):
+            raise ShopifyApiError(
+                message=(
+                    f"{mutation_name} response is missing page.onlineStoreUrl. "
+                    "Confirm the page is published to Online Store."
+                )
+            )
+
+        return {
+            "id": page_id,
+            "title": title,
+            "handle": handle,
+            "onlineStoreUrl": online_store_url if isinstance(online_store_url, str) else "",
+        }
+
+    async def _find_page_by_handle(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        handle: str,
+    ) -> dict[str, str] | None:
+        normalized_handle = self._normalize_policy_page_handle(handle)
+        query = """
+        query pagesByHandle($query: String!) {
+            pages(first: 10, query: $query, sortKey: UPDATED_AT, reverse: true) {
+                edges {
+                    node {
+                        id
+                        title
+                        handle
+                    }
+                }
+            }
+        }
+        """
+        payload = {"query": query, "variables": {"query": f"handle:{normalized_handle}"}}
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload=payload,
+        )
+        edges = ((response.get("pages") or {}).get("edges")) or []
+        if not isinstance(edges, list):
+            raise ShopifyApiError(message="pages query response is invalid.")
+
+        for edge in edges:
+            if not isinstance(edge, dict):
+                continue
+            node = edge.get("node")
+            parsed = self._coerce_page_node(
+                node=node,
+                mutation_name="pages query",
+                require_online_store_url=False,
+            )
+            if parsed["handle"].strip().lower() == normalized_handle:
+                return parsed
+        return None
+
+    @staticmethod
+    def _assert_no_user_errors(*, user_errors: list[dict[str, Any]], mutation_name: str) -> None:
+        if not user_errors:
+            return
+        messages = "; ".join(str(error.get("message")) for error in user_errors)
+        raise ShopifyApiError(message=f"{mutation_name} failed: {messages}", status_code=409)
+
+    async def _create_policy_page(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        title: str,
+        handle: str,
+        body_html: str,
+    ) -> dict[str, str]:
+        mutation = """
+        mutation pageCreate($page: PageCreateInput!) {
+            pageCreate(page: $page) {
+                page {
+                    id
+                    title
+                    handle
+                    onlineStoreUrl
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        payload = {
+            "query": mutation,
+            "variables": {
+                "page": {
+                    "title": title,
+                    "handle": handle,
+                    "body": body_html,
+                }
+            },
+        }
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload=payload,
+        )
+        create_data = response.get("pageCreate") or {}
+        user_errors = create_data.get("userErrors") or []
+        self._assert_no_user_errors(user_errors=user_errors, mutation_name="pageCreate")
+        return self._coerce_page_node(
+            node=create_data.get("page"),
+            mutation_name="pageCreate",
+            require_online_store_url=True,
+        )
+
+    async def _update_policy_page(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        page_id: str,
+        title: str,
+        handle: str,
+        body_html: str,
+    ) -> dict[str, str]:
+        mutation = """
+        mutation pageUpdate($id: ID!, $page: PageUpdateInput!) {
+            pageUpdate(id: $id, page: $page) {
+                page {
+                    id
+                    title
+                    handle
+                    onlineStoreUrl
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        payload = {
+            "query": mutation,
+            "variables": {
+                "id": page_id,
+                "page": {
+                    "title": title,
+                    "handle": handle,
+                    "body": body_html,
+                },
+            },
+        }
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload=payload,
+        )
+        update_data = response.get("pageUpdate") or {}
+        user_errors = update_data.get("userErrors") or []
+        self._assert_no_user_errors(user_errors=user_errors, mutation_name="pageUpdate")
+        return self._coerce_page_node(
+            node=update_data.get("page"),
+            mutation_name="pageUpdate",
+            require_online_store_url=True,
+        )
+
+    async def upsert_policy_pages(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        pages: list[dict[str, Any]],
+    ) -> list[dict[str, str]]:
+        if not pages:
+            raise ShopifyApiError(message="At least one policy page is required for sync.", status_code=400)
+
+        seen_page_keys: set[str] = set()
+        seen_handles: set[str] = set()
+        normalized_pages: list[dict[str, str]] = []
+        for item in pages:
+            if not isinstance(item, dict):
+                raise ShopifyApiError(message="Each policy page payload must be an object.", status_code=400)
+
+            raw_page_key = item.get("pageKey")
+            if not isinstance(raw_page_key, str) or not raw_page_key.strip():
+                raise ShopifyApiError(message="Each policy page requires pageKey.", status_code=400)
+            page_key = raw_page_key.strip()
+            if page_key in seen_page_keys:
+                raise ShopifyApiError(message=f"Duplicate pageKey in payload: {page_key}", status_code=400)
+            seen_page_keys.add(page_key)
+
+            raw_title = item.get("title")
+            if not isinstance(raw_title, str) or not raw_title.strip():
+                raise ShopifyApiError(message=f"Policy page '{page_key}' requires a non-empty title.", status_code=400)
+            title = raw_title.strip()
+
+            raw_handle = item.get("handle")
+            if not isinstance(raw_handle, str):
+                raise ShopifyApiError(message=f"Policy page '{page_key}' requires handle.", status_code=400)
+            handle = self._normalize_policy_page_handle(raw_handle)
+            if handle in seen_handles:
+                raise ShopifyApiError(
+                    message=f"Duplicate page handle in payload: {handle}",
+                    status_code=400,
+                )
+            seen_handles.add(handle)
+
+            raw_body_html = item.get("bodyHtml")
+            if not isinstance(raw_body_html, str) or not raw_body_html.strip():
+                raise ShopifyApiError(
+                    message=f"Policy page '{page_key}' requires non-empty bodyHtml.",
+                    status_code=400,
+                )
+            body_html = raw_body_html.strip()
+
+            normalized_pages.append(
+                {
+                    "pageKey": page_key,
+                    "title": title,
+                    "handle": handle,
+                    "bodyHtml": body_html,
+                }
+            )
+
+        results: list[dict[str, str]] = []
+        for page in normalized_pages:
+            existing_page = await self._find_page_by_handle(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                handle=page["handle"],
+            )
+            operation: Literal["created", "updated"]
+            if existing_page:
+                synced_page = await self._update_policy_page(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    page_id=existing_page["id"],
+                    title=page["title"],
+                    handle=page["handle"],
+                    body_html=page["bodyHtml"],
+                )
+                operation = "updated"
+            else:
+                synced_page = await self._create_policy_page(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    title=page["title"],
+                    handle=page["handle"],
+                    body_html=page["bodyHtml"],
+                )
+                operation = "created"
+
+            results.append(
+                {
+                    "pageKey": page["pageKey"],
+                    "pageId": synced_page["id"],
+                    "title": synced_page["title"],
+                    "handle": synced_page["handle"],
+                    "url": synced_page["onlineStoreUrl"],
+                    "operation": operation,
+                }
+            )
+        return results
 
     async def _admin_graphql(
         self,

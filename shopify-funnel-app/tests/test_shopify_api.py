@@ -259,3 +259,286 @@ def test_create_product_requires_variants():
                 variants=[],
             )
         )
+
+
+def test_update_variant_updates_price_and_compare_at_price():
+    client = ShopifyApiClient()
+    observed_payloads: list[dict] = []
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        observed_payloads.append(payload)
+        query = payload.get("query", "")
+        if "query productVariantNode" in query:
+            return {
+                "node": {
+                    "id": "gid://shopify/ProductVariant/100",
+                    "product": {"id": "gid://shopify/Product/999"},
+                }
+            }
+        if "mutation productVariantsBulkUpdate" in query:
+            variables = payload.get("variables") or {}
+            assert variables.get("productId") == "gid://shopify/Product/999"
+            variants = variables.get("variants") or []
+            assert len(variants) == 1
+            assert variants[0]["id"] == "gid://shopify/ProductVariant/100"
+            assert variants[0]["price"] == "49.99"
+            assert variants[0]["compareAtPrice"] == "59.99"
+            return {
+                "productVariantsBulkUpdate": {
+                    "productVariants": [{"id": "gid://shopify/ProductVariant/100"}],
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.update_variant(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            variant_gid="gid://shopify/ProductVariant/100",
+            fields={"priceCents": 4999, "compareAtPriceCents": 5999},
+        )
+    )
+
+    assert result["productGid"] == "gid://shopify/Product/999"
+    assert result["variantGid"] == "gid://shopify/ProductVariant/100"
+    assert len(observed_payloads) == 2
+
+
+def test_update_variant_rejects_missing_fields():
+    client = ShopifyApiClient()
+
+    with pytest.raises(ShopifyApiError, match="At least one variant update field is required"):
+        asyncio.run(
+            client.update_variant(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                variant_gid="gid://shopify/ProductVariant/100",
+                fields={},
+            )
+        )
+
+
+def test_update_variant_rejects_invalid_variant_gid():
+    client = ShopifyApiClient()
+
+    with pytest.raises(ShopifyApiError, match="variantGid must be a valid Shopify ProductVariant GID"):
+        asyncio.run(
+            client.update_variant(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                variant_gid="price_123",
+                fields={"priceCents": 4999},
+            )
+        )
+
+
+def test_update_variant_clears_compare_at_price():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query productVariantNode" in query:
+            return {
+                "node": {
+                    "id": "gid://shopify/ProductVariant/100",
+                    "product": {"id": "gid://shopify/Product/999"},
+                }
+            }
+        if "mutation productVariantsBulkUpdate" in query:
+            variants = ((payload.get("variables") or {}).get("variants")) or []
+            assert variants[0]["compareAtPrice"] is None
+            return {
+                "productVariantsBulkUpdate": {
+                    "productVariants": [{"id": "gid://shopify/ProductVariant/100"}],
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.update_variant(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            variant_gid="gid://shopify/ProductVariant/100",
+            fields={"compareAtPriceCents": None},
+        )
+    )
+
+    assert result["variantGid"] == "gid://shopify/ProductVariant/100"
+
+
+def test_update_variant_updates_inventory_related_fields():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query productVariantNode" in query:
+            return {
+                "node": {
+                    "id": "gid://shopify/ProductVariant/100",
+                    "product": {"id": "gid://shopify/Product/999"},
+                }
+            }
+        if "mutation productVariantsBulkUpdate" in query:
+            variants = ((payload.get("variables") or {}).get("variants")) or []
+            assert len(variants) == 1
+            variant = variants[0]
+            assert variant["barcode"] == "BARCODE-001"
+            assert variant["inventoryPolicy"] == "CONTINUE"
+            assert variant["inventoryItem"] == {"sku": "SKU-001", "tracked": True}
+            return {
+                "productVariantsBulkUpdate": {
+                    "productVariants": [{"id": "gid://shopify/ProductVariant/100"}],
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.update_variant(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            variant_gid="gid://shopify/ProductVariant/100",
+            fields={
+                "sku": "SKU-001",
+                "barcode": "BARCODE-001",
+                "inventoryPolicy": "continue",
+                "inventoryManagement": "shopify",
+            },
+        )
+    )
+
+    assert result["variantGid"] == "gid://shopify/ProductVariant/100"
+
+
+def test_update_variant_rejects_invalid_inventory_management():
+    client = ShopifyApiClient()
+
+    with pytest.raises(ShopifyApiError, match="inventoryManagement must be null or 'shopify'"):
+        asyncio.run(
+            client.update_variant(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                variant_gid="gid://shopify/ProductVariant/100",
+                fields={"inventoryManagement": "not-managed"},
+            )
+        )
+
+
+def test_upsert_policy_pages_creates_missing_page():
+    client = ShopifyApiClient()
+    observed_payloads: list[dict] = []
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        observed_payloads.append(payload)
+        query = payload.get("query", "")
+        if "query pagesByHandle" in query:
+            return {"pages": {"edges": []}}
+        if "mutation pageCreate" in query:
+            return {
+                "pageCreate": {
+                    "page": {
+                        "id": "gid://shopify/Page/101",
+                        "title": "Privacy Policy",
+                        "handle": "privacy-policy",
+                        "onlineStoreUrl": "https://example.myshopify.com/pages/privacy-policy",
+                    },
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.upsert_policy_pages(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            pages=[
+                {
+                    "pageKey": "privacy_policy",
+                    "title": "Privacy Policy",
+                    "handle": "privacy-policy",
+                    "bodyHtml": "<h1>Privacy Policy</h1>",
+                }
+            ],
+        )
+    )
+
+    assert len(observed_payloads) == 2
+    assert result == [
+        {
+            "pageKey": "privacy_policy",
+            "pageId": "gid://shopify/Page/101",
+            "title": "Privacy Policy",
+            "handle": "privacy-policy",
+            "url": "https://example.myshopify.com/pages/privacy-policy",
+            "operation": "created",
+        }
+    ]
+
+
+def test_upsert_policy_pages_updates_existing_page():
+    client = ShopifyApiClient()
+    observed_payloads: list[dict] = []
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        observed_payloads.append(payload)
+        query = payload.get("query", "")
+        if "query pagesByHandle" in query:
+            return {
+                "pages": {
+                    "edges": [
+                        {
+                            "node": {
+                                "id": "gid://shopify/Page/101",
+                                "title": "Old Terms",
+                                "handle": "terms-of-service",
+                            }
+                        }
+                    ]
+                }
+            }
+        if "mutation pageUpdate" in query:
+            variables = payload.get("variables") or {}
+            assert variables.get("id") == "gid://shopify/Page/101"
+            return {
+                "pageUpdate": {
+                    "page": {
+                        "id": "gid://shopify/Page/101",
+                        "title": "Terms of Service",
+                        "handle": "terms-of-service",
+                        "onlineStoreUrl": "https://example.myshopify.com/pages/terms-of-service",
+                    },
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.upsert_policy_pages(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            pages=[
+                {
+                    "pageKey": "terms_of_service",
+                    "title": "Terms of Service",
+                    "handle": "terms-of-service",
+                    "bodyHtml": "<h1>Terms of Service</h1>",
+                }
+            ],
+        )
+    )
+
+    assert len(observed_payloads) == 2
+    assert result[0]["operation"] == "updated"
+    assert result[0]["pageId"] == "gid://shopify/Page/101"
