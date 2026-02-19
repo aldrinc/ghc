@@ -24,6 +24,7 @@ from app.schemas.intent import CampaignIntentRequest
 from app.schemas.shopify_connection import (
     ShopifyCreateProductRequest,
     ShopifyDefaultShopRequest,
+    ShopifyInstallationDisconnectRequest,
     ShopifyProductListResponse,
     ShopifyProductCreateResponse,
     ShopifyConnectionStatusResponse,
@@ -34,6 +35,7 @@ from app.schemas.shopify_connection import (
 from app.services.shopify_connection import (
     build_client_shopify_install_url,
     create_client_shopify_product,
+    disconnect_client_shopify_store,
     get_client_shopify_connection_status,
     list_client_shopify_products,
     list_shopify_installations,
@@ -165,6 +167,43 @@ def update_client_shopify_installation(
         shop_domain=payload.shopDomain,
         storefront_access_token=payload.storefrontAccessToken,
     )
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=selected_shop_domain,
+    )
+    return ShopifyConnectionStatusResponse(**status_payload)
+
+
+@router.delete("/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse)
+def disconnect_client_shopify_installation(
+    client_id: str,
+    payload: ShopifyInstallationDisconnectRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    normalized_shop = normalize_shop_domain(payload.shopDomain)
+    disconnect_client_shopify_store(client_id=client_id, shop_domain=normalized_shop)
+
+    prefs_with_selected_shop = session.scalars(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == auth.org_id,
+            ClientUserPreference.client_id == client_id,
+            ClientUserPreference.selected_shop_domain == normalized_shop,
+        )
+    ).all()
+    if prefs_with_selected_shop:
+        for pref in prefs_with_selected_shop:
+            pref.selected_shop_domain = None
+            pref.updated_at = func.now()
+        session.commit()
+
     selected_shop_domain = _get_selected_shop_domain(
         session=session,
         org_id=auth.org_id,

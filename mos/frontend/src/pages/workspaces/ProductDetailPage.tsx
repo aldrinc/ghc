@@ -10,6 +10,7 @@ import { useProductContext } from "@/contexts/ProductContext";
 import {
   useClientShopifyStatus,
   useCreateClientShopifyInstallUrl,
+  useDisconnectClientShopifyInstallation,
   useListClientShopifyProducts,
   useSetClientShopifyDefaultShop,
   useUpdateClientShopifyInstallation,
@@ -67,6 +68,7 @@ export function ProductDetailPage() {
   const listShopifyProducts = useListClientShopifyProducts(productClientId || "");
   const setDefaultShop = useSetClientShopifyDefaultShop(productClientId || "");
   const updateShopifyInstallation = useUpdateClientShopifyInstallation(productClientId || "");
+  const disconnectShopifyInstallation = useDisconnectClientShopifyInstallation(productClientId || "");
   const updateProduct = useUpdateProduct(productId || "");
   const createShopifyProductForProduct = useCreateShopifyProductForProduct(productId || "");
   const createOffer = useCreateProductOffer(productId || "");
@@ -289,6 +291,21 @@ export function ProductDetailPage() {
     await refetchShopifyStatus();
   };
 
+  const handleDisconnectShopify = async () => {
+    if (!productClientId) {
+      toast.error("Select a product before disconnecting Shopify.");
+      return;
+    }
+    const nextDomain = shopifyShopDomainDraft.trim();
+    if (!nextDomain) {
+      toast.error("Shop domain is required.");
+      return;
+    }
+    await disconnectShopifyInstallation.mutateAsync({ shopDomain: nextDomain });
+    setStorefrontAccessTokenDraft("");
+    await refetchShopifyStatus();
+  };
+
   const handleCreateShopifyProduct = async () => {
     if (!isShopifyReady) {
       toast.error("Shopify must be connected and ready before creating products.");
@@ -472,9 +489,18 @@ export function ProductDetailPage() {
   }, [shopifyState]);
   const shopifyStatusMessage = useMemo(() => {
     if (shopifyStatus?.message) return shopifyStatus.message;
-    if (shopifyStatusError instanceof Error && shopifyStatusError.message.trim()) return shopifyStatusError.message;
+    if (shopifyStatusError && typeof shopifyStatusError === "object" && "message" in shopifyStatusError) {
+      const message = (shopifyStatusError as { message?: unknown }).message;
+      if (typeof message === "string" && message.trim()) return message;
+    }
+    if (typeof shopifyStatusError === "string" && shopifyStatusError.trim()) return shopifyStatusError;
     return "Checking Shopify connection status.";
   }, [shopifyStatus?.message, shopifyStatusError]);
+  const isShopifyConnectionMutating =
+    createShopifyInstallUrl.isPending ||
+    updateShopifyInstallation.isPending ||
+    disconnectShopifyInstallation.isPending ||
+    setDefaultShop.isPending;
   const isShopifyReady = shopifyState === "ready";
   const hasMappedShopifyProduct = Boolean((productDetail?.shopify_product_gid || "").trim());
 
@@ -568,7 +594,7 @@ export function ProductDetailPage() {
                     className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
                     value={defaultShopDomainDraft}
                     onChange={(e) => setDefaultShopDomainDraft(e.target.value)}
-                    disabled={setDefaultShop.isPending}
+                    disabled={setDefaultShop.isPending || disconnectShopifyInstallation.isPending}
                   >
                     {shopifyStatus.shopDomains.map((shopDomain) => (
                       <option key={shopDomain} value={shopDomain}>
@@ -580,29 +606,24 @@ export function ProductDetailPage() {
                     size="sm"
                     variant="secondary"
                     onClick={() => void handleSetDefaultShop()}
-                    disabled={!defaultShopDomainDraft.trim() || setDefaultShop.isPending}
+                    disabled={!defaultShopDomainDraft.trim() || setDefaultShop.isPending || disconnectShopifyInstallation.isPending}
                   >
                     {setDefaultShop.isPending ? "Saving…" : "Set default shop"}
                   </Button>
                 </div>
               ) : null}
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
                 <Input
                   placeholder="example-shop.myshopify.com"
                   value={shopifyShopDomainDraft}
                   onChange={(e) => setShopifyShopDomainDraft(e.target.value)}
-                  disabled={createShopifyInstallUrl.isPending || updateShopifyInstallation.isPending || setDefaultShop.isPending}
+                  disabled={isShopifyConnectionMutating}
                 />
                 <Button
                   size="sm"
                   variant="secondary"
                   onClick={() => void refetchShopifyStatus()}
-                  disabled={
-                    isLoadingShopifyStatus ||
-                    createShopifyInstallUrl.isPending ||
-                    updateShopifyInstallation.isPending ||
-                    setDefaultShop.isPending
-                  }
+                  disabled={isLoadingShopifyStatus || isShopifyConnectionMutating}
                 >
                   Refresh
                 </Button>
@@ -612,12 +633,18 @@ export function ProductDetailPage() {
                   disabled={
                     !productClientId ||
                     !shopifyShopDomainDraft.trim() ||
-                    createShopifyInstallUrl.isPending ||
-                    updateShopifyInstallation.isPending ||
-                    setDefaultShop.isPending
+                    isShopifyConnectionMutating
                   }
                 >
                   {createShopifyInstallUrl.isPending ? "Redirecting…" : "Connect Shopify"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => void handleDisconnectShopify()}
+                  disabled={!productClientId || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
+                >
+                  {disconnectShopifyInstallation.isPending ? "Disconnecting…" : "Disconnect Shopify"}
                 </Button>
               </div>
               <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
@@ -626,7 +653,7 @@ export function ProductDetailPage() {
                   placeholder="Storefront access token"
                   value={storefrontAccessTokenDraft}
                   onChange={(e) => setStorefrontAccessTokenDraft(e.target.value)}
-                  disabled={createShopifyInstallUrl.isPending || updateShopifyInstallation.isPending || setDefaultShop.isPending}
+                  disabled={isShopifyConnectionMutating}
                 />
                 <Button
                   size="sm"
@@ -636,9 +663,7 @@ export function ProductDetailPage() {
                     !productClientId ||
                     !shopifyShopDomainDraft.trim() ||
                     !storefrontAccessTokenDraft.trim() ||
-                    createShopifyInstallUrl.isPending ||
-                    updateShopifyInstallation.isPending ||
-                    setDefaultShop.isPending
+                    isShopifyConnectionMutating
                   }
                 >
                   {updateShopifyInstallation.isPending ? "Saving…" : "Set storefront token"}

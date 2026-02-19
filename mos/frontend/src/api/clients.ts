@@ -124,6 +124,29 @@ export function useUpdateClientShopifyInstallation(clientId: string) {
   });
 }
 
+export function useDisconnectClientShopifyInstallation(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { shopDomain: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<ClientShopifyStatus>(`/clients/${clientId}/shopify/installation`, {
+        method: "DELETE",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Shopify store disconnected");
+      queryClient.invalidateQueries({ queryKey: ["clients", "shopify-status", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to disconnect Shopify store";
+      toast.error(message);
+    },
+  });
+}
+
 export function useSetClientShopifyDefaultShop(clientId: string) {
   const { request } = useApiClient();
   const queryClient = useQueryClient();

@@ -606,3 +606,38 @@ def set_client_shopify_storefront_token(
             "storefrontAccessToken": token,
         },
     )
+
+
+def disconnect_client_shopify_store(
+    *,
+    client_id: str,
+    shop_domain: str,
+) -> None:
+    normalized_shop = normalize_shop_domain(shop_domain)
+
+    installations = list_shopify_installations()
+    active_installation = next(
+        (
+            installation
+            for installation in installations
+            if installation.shop_domain == normalized_shop and installation.uninstalled_at is None
+        ),
+        None,
+    )
+    if not active_installation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify installation not found for this store.",
+        )
+
+    if active_installation.client_id != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This Shopify store is not connected to this workspace.",
+        )
+
+    _bridge_request(
+        method="PATCH",
+        path=f"/admin/installations/{normalized_shop}",
+        json_body={"clientId": None},
+    )
