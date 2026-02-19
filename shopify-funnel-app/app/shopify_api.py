@@ -312,6 +312,243 @@ class ShopifyApiClient:
             raise ShopifyApiError(message=f"Shopify returned a negative variant price: {price!r}")
         return cents
 
+    async def get_product(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gid: str,
+    ) -> dict[str, Any]:
+        cleaned_product_gid = product_gid.strip()
+        if not cleaned_product_gid.startswith("gid://shopify/Product/"):
+            raise ShopifyApiError(
+                message="productGid must be a valid Shopify Product GID.",
+                status_code=400,
+            )
+
+        graphql_query = """
+        query productWithVariants($id: ID!, $first: Int!, $after: String) {
+            shop {
+                currencyCode
+            }
+            product(id: $id) {
+                id
+                title
+                handle
+                status
+                variants(first: $first, after: $after) {
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    edges {
+                        node {
+                            id
+                            title
+                            price
+                            compareAtPrice
+                            barcode
+                            taxable
+                            requiresShipping
+                            inventoryPolicy
+                            inventoryQuantity
+                            selectedOptions {
+                                name
+                                value
+                            }
+                            inventoryItem {
+                                sku
+                                tracked
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+
+        cursor: str | None = None
+        currency: str | None = None
+        product_title: str | None = None
+        product_handle: str | None = None
+        product_status: str | None = None
+        variants: list[dict[str, Any]] = []
+
+        while True:
+            payload = {
+                "query": graphql_query,
+                "variables": {
+                    "id": cleaned_product_gid,
+                    "first": 100,
+                    "after": cursor,
+                },
+            }
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload=payload,
+            )
+
+            shop = response.get("shop")
+            if not isinstance(shop, dict):
+                raise ShopifyApiError(message="Product response is missing shop metadata.")
+            raw_currency = shop.get("currencyCode")
+            if not isinstance(raw_currency, str) or len(raw_currency.strip()) != 3:
+                raise ShopifyApiError(message="Product response is missing shop currencyCode.")
+            normalized_currency = raw_currency.strip().upper()
+            if currency is None:
+                currency = normalized_currency
+            elif normalized_currency != currency:
+                raise ShopifyApiError(message="Shop currency changed while paginating product variants.")
+
+            product = response.get("product")
+            if not isinstance(product, dict):
+                raise ShopifyApiError(message=f"Product not found for GID: {cleaned_product_gid}", status_code=404)
+
+            product_id = product.get("id")
+            if not isinstance(product_id, str) or not product_id:
+                raise ShopifyApiError(message="Product response is missing product.id")
+            if product_id != cleaned_product_gid:
+                raise ShopifyApiError(message="Product response returned unexpected product.id")
+
+            raw_title = product.get("title")
+            if not isinstance(raw_title, str) or not raw_title:
+                raise ShopifyApiError(message="Product response is missing product.title")
+            raw_handle = product.get("handle")
+            if not isinstance(raw_handle, str) or not raw_handle:
+                raise ShopifyApiError(message="Product response is missing product.handle")
+            raw_status = product.get("status")
+            if not isinstance(raw_status, str) or not raw_status:
+                raise ShopifyApiError(message="Product response is missing product.status")
+
+            if product_title is None:
+                product_title = raw_title
+                product_handle = raw_handle
+                product_status = raw_status
+            else:
+                if raw_title != product_title or raw_handle != product_handle or raw_status != product_status:
+                    raise ShopifyApiError(message="Product metadata changed while paginating variants.")
+
+            variants_connection = product.get("variants")
+            if not isinstance(variants_connection, dict):
+                raise ShopifyApiError(message="Product response is missing variants connection.")
+            edges = variants_connection.get("edges")
+            if not isinstance(edges, list):
+                raise ShopifyApiError(message="Product variants response is invalid.")
+
+            for edge in edges:
+                if not isinstance(edge, dict):
+                    raise ShopifyApiError(message="Product variants response contains invalid edge.")
+                node = edge.get("node")
+                if not isinstance(node, dict):
+                    raise ShopifyApiError(message="Product variants response contains invalid node.")
+
+                variant_gid = node.get("id")
+                title = node.get("title")
+                price = node.get("price")
+                compare_at_price = node.get("compareAtPrice")
+                barcode = node.get("barcode")
+                taxable = node.get("taxable")
+                requires_shipping = node.get("requiresShipping")
+                inventory_policy = node.get("inventoryPolicy")
+                inventory_quantity = node.get("inventoryQuantity")
+                selected_options = node.get("selectedOptions")
+                inventory_item = node.get("inventoryItem")
+
+                if not isinstance(variant_gid, str) or not variant_gid:
+                    raise ShopifyApiError(message="Product variant response is missing variant.id.")
+                if not isinstance(title, str) or not title:
+                    raise ShopifyApiError(message="Product variant response is missing variant.title.")
+                if not isinstance(price, str) or not price:
+                    raise ShopifyApiError(message="Product variant response is missing variant.price.")
+                if compare_at_price is not None and not isinstance(compare_at_price, str):
+                    raise ShopifyApiError(message="Product variant response has invalid compareAtPrice.")
+                if barcode is not None and not isinstance(barcode, str):
+                    raise ShopifyApiError(message="Product variant response has invalid barcode.")
+                if not isinstance(taxable, bool):
+                    raise ShopifyApiError(message="Product variant response has invalid taxable value.")
+                if not isinstance(requires_shipping, bool):
+                    raise ShopifyApiError(message="Product variant response has invalid requiresShipping value.")
+                if inventory_policy is not None and not isinstance(inventory_policy, str):
+                    raise ShopifyApiError(message="Product variant response has invalid inventoryPolicy value.")
+                if inventory_quantity is not None and not isinstance(inventory_quantity, int):
+                    raise ShopifyApiError(message="Product variant response has invalid inventoryQuantity value.")
+                if not isinstance(selected_options, list):
+                    raise ShopifyApiError(message="Product variant response has invalid selectedOptions value.")
+                if inventory_item is not None and not isinstance(inventory_item, dict):
+                    raise ShopifyApiError(message="Product variant response has invalid inventoryItem value.")
+
+                option_values: dict[str, str] = {}
+                for selected_option in selected_options:
+                    if not isinstance(selected_option, dict):
+                        raise ShopifyApiError(message="Product variant response has invalid selected option.")
+                    option_name = selected_option.get("name")
+                    option_value = selected_option.get("value")
+                    if not isinstance(option_name, str) or not option_name.strip():
+                        raise ShopifyApiError(message="Product variant response has selected option without name.")
+                    if not isinstance(option_value, str):
+                        raise ShopifyApiError(message="Product variant response has selected option without value.")
+                    option_values[option_name.strip()] = option_value
+
+                sku: str | None = None
+                inventory_management: str | None = None
+                if inventory_item is not None:
+                    raw_sku = inventory_item.get("sku")
+                    raw_tracked = inventory_item.get("tracked")
+                    if raw_sku is not None and not isinstance(raw_sku, str):
+                        raise ShopifyApiError(message="Product variant response has invalid inventoryItem.sku.")
+                    if not isinstance(raw_tracked, bool):
+                        raise ShopifyApiError(message="Product variant response has invalid inventoryItem.tracked.")
+                    sku = raw_sku
+                    inventory_management = "shopify" if raw_tracked else None
+
+                variants.append(
+                    {
+                        "variantGid": variant_gid,
+                        "title": title,
+                        "priceCents": self._decimal_price_to_cents(price),
+                        "currency": currency,
+                        "compareAtPriceCents": (
+                            self._decimal_price_to_cents(compare_at_price) if compare_at_price is not None else None
+                        ),
+                        "sku": sku,
+                        "barcode": barcode,
+                        "taxable": taxable,
+                        "requiresShipping": requires_shipping,
+                        "inventoryPolicy": inventory_policy.strip().lower() if inventory_policy else None,
+                        "inventoryManagement": inventory_management,
+                        "inventoryQuantity": inventory_quantity,
+                        "optionValues": option_values,
+                    }
+                )
+
+            page_info = variants_connection.get("pageInfo")
+            if not isinstance(page_info, dict):
+                raise ShopifyApiError(message="Product variants response is missing pageInfo.")
+            has_next_page = page_info.get("hasNextPage")
+            end_cursor = page_info.get("endCursor")
+            if not isinstance(has_next_page, bool):
+                raise ShopifyApiError(message="Product variants response has invalid pageInfo.hasNextPage.")
+            if has_next_page:
+                if not isinstance(end_cursor, str) or not end_cursor:
+                    raise ShopifyApiError(message="Product variants response has invalid pageInfo.endCursor.")
+                cursor = end_cursor
+                continue
+            break
+
+        if currency is None:
+            raise ShopifyApiError(message="Product response is missing currency metadata.")
+        if product_title is None or product_handle is None or product_status is None:
+            raise ShopifyApiError(message="Product response is missing metadata.")
+
+        return {
+            "productGid": cleaned_product_gid,
+            "title": product_title,
+            "handle": product_handle,
+            "status": product_status,
+            "variants": variants,
+        }
+
     async def create_product(
         self,
         *,

@@ -23,6 +23,7 @@ import {
   useProduct,
   useProductAssets,
   useRemoveOfferBonus,
+  useSyncShopifyVariantsForProduct,
   useUpdateProduct,
   useUpdateVariant,
   useUploadProductAssets,
@@ -79,6 +80,7 @@ export function ProductDetailPage() {
   const disconnectShopifyInstallation = useDisconnectClientShopifyInstallation(productClientId || "");
   const updateProduct = useUpdateProduct(productId || "");
   const createShopifyProductForProduct = useCreateShopifyProductForProduct(productId || "");
+  const syncShopifyVariants = useSyncShopifyVariantsForProduct(productId || "");
   const createOffer = useCreateProductOffer(productId || "");
   const addOfferBonus = useAddOfferBonus(productId || "");
   const removeOfferBonus = useRemoveOfferBonus(productId || "");
@@ -443,6 +445,29 @@ export function ProductDetailPage() {
       productGid: createdProductGid || response.productGid,
       variantTitles: importedVariantTitles,
       variantCount: importedVariantTitles.length,
+    });
+  };
+
+  const handleSyncShopifyVariants = async () => {
+    if (!isShopifyReady) {
+      toast.error("Shopify must be connected and ready before syncing variants.");
+      return;
+    }
+    if (!hasMappedShopifyProduct) {
+      toast.error("Save a Shopify product GID before syncing variants.");
+      return;
+    }
+    const response = await syncShopifyVariants.mutateAsync({
+      shopDomain: shopifyStatus?.shopDomain || undefined,
+    });
+    const importedVariantTitles = (response.variants || [])
+      .map((variant) => String(variant.title || "").trim())
+      .filter((title) => Boolean(title));
+    setShopifyImportSummary({
+      shopDomain: response.shopDomain,
+      productGid: response.productGid,
+      variantTitles: importedVariantTitles,
+      variantCount: response.totalFetched,
     });
   };
 
@@ -835,9 +860,19 @@ export function ProductDetailPage() {
                 </div>
               ) : null}
               {isShopifyReady && hasMappedShopifyProduct ? (
-                <div className="text-xs text-content-muted">
-                  Shopify product is already mapped for this product. Clear mapping if you need to create a new Shopify
-                  product.
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <div className="text-xs text-content-muted">
+                    Shopify product is already mapped for this product. Clear mapping if you need to create a new Shopify
+                    product.
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void handleSyncShopifyVariants()}
+                    disabled={syncShopifyVariants.isPending}
+                  >
+                    {syncShopifyVariants.isPending ? "Syncing…" : "Pull variants from Shopify"}
+                  </Button>
                 </div>
               ) : null}
               <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">

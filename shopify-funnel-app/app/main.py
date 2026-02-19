@@ -15,6 +15,7 @@ from app.config import settings
 from app.db import get_session, init_db
 from app.models import OAuthState, ProcessedWebhookEvent, ShopInstallation
 from app.schemas import (
+    CatalogProductVariant,
     CatalogProductSummary,
     CreateCatalogProductRequest,
     CreateCatalogProductResponse,
@@ -22,6 +23,8 @@ from app.schemas import (
     CreateCheckoutRequest,
     CreateCheckoutResponse,
     ForwardOrderPayload,
+    GetProductRequest,
+    GetProductResponse,
     InstallationResponse,
     ListProductsRequest,
     ListProductsResponse,
@@ -363,6 +366,56 @@ async def list_catalog_products(
                 status=item["status"],
             )
             for item in products
+        ],
+    )
+
+
+@app.post(
+    "/v1/catalog/products/get",
+    response_model=GetProductResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def get_catalog_product(
+    payload: GetProductRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        product = await shopify_api.get_product(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            product_gid=payload.productGid,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return GetProductResponse(
+        shopDomain=installation.shop_domain,
+        productGid=product["productGid"],
+        title=product["title"],
+        handle=product["handle"],
+        status=product["status"],
+        variants=[
+            CatalogProductVariant(
+                variantGid=item["variantGid"],
+                title=item["title"],
+                priceCents=item["priceCents"],
+                currency=item["currency"],
+                compareAtPriceCents=item.get("compareAtPriceCents"),
+                sku=item.get("sku"),
+                barcode=item.get("barcode"),
+                taxable=item["taxable"],
+                requiresShipping=item["requiresShipping"],
+                inventoryPolicy=item.get("inventoryPolicy"),
+                inventoryManagement=item.get("inventoryManagement"),
+                inventoryQuantity=item.get("inventoryQuantity"),
+                optionValues=item.get("optionValues") or {},
+            )
+            for item in product["variants"]
         ],
     )
 

@@ -514,6 +514,168 @@ def test_update_shopify_managed_variant_rejects_currency_change(api_client, monk
     assert "currency cannot be changed" in update_resp.json()["detail"]
 
 
+def test_update_shopify_managed_variant_allows_option_values_local_update(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Option Values")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/123456789",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    called = {"value": False}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        called["value"] = True
+        raise AssertionError("Connection status should not be checked for optionValues-only update")
+
+    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+        called["value"] = True
+        raise AssertionError("Shopify variant update should not be called for optionValues-only update")
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "update_client_shopify_variant", fake_update_variant)
+
+    update_resp = api_client.patch(
+        f"/products/variants/{variant_id}",
+        json={"optionValues": {"size": "L", "color": "Blue"}},
+    )
+    assert update_resp.status_code == 200
+    body = update_resp.json()
+    assert body["option_values"] == {"size": "L", "color": "Blue"}
+    assert body["shopify_last_synced_at"] is None
+    assert body["shopify_last_sync_error"] is None
+    assert called["value"] is False
+
+
+def test_sync_shopify_variants_for_product_imports_and_updates_variants(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Pull")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+        shopify_product_gid="gid://shopify/Product/900",
+    )
+
+    existing_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Old Bundle",
+            "price": 7900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/902",
+        },
+    )
+    assert existing_variant_resp.status_code == 201
+    existing_variant_id = existing_variant_resp.json()["id"]
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_get_product(*, client_id: str, product_gid: str, shop_domain: str | None = None):
+        assert client_id
+        assert product_gid == "gid://shopify/Product/900"
+        assert shop_domain == "example.myshopify.com"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/900",
+            "title": "Primary Product",
+            "handle": "primary-product",
+            "status": "ACTIVE",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/901",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": "SKU-STARTER",
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": "continue",
+                    "inventoryManagement": "shopify",
+                    "inventoryQuantity": 10,
+                    "optionValues": {"Title": "Starter"},
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/902",
+                    "title": "Bundle Updated",
+                    "priceCents": 8900,
+                    "currency": "USD",
+                    "compareAtPriceCents": 9900,
+                    "sku": "SKU-BUNDLE",
+                    "barcode": "BAR-BUNDLE",
+                    "taxable": False,
+                    "requiresShipping": True,
+                    "inventoryPolicy": "deny",
+                    "inventoryManagement": None,
+                    "inventoryQuantity": 3,
+                    "optionValues": {"Title": "Bundle"},
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/903",
+                    "title": "Mega",
+                    "priceCents": 11900,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": None,
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": False,
+                    "inventoryPolicy": "continue",
+                    "inventoryManagement": "shopify",
+                    "inventoryQuantity": 1,
+                    "optionValues": {"Title": "Mega"},
+                },
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "get_client_shopify_product", fake_get_product)
+
+    sync_resp = api_client.post(f"/products/{product_id}/shopify/sync-variants", json={})
+    assert sync_resp.status_code == 200
+    payload = sync_resp.json()
+    assert payload["createdCount"] == 2
+    assert payload["updatedCount"] == 1
+    assert payload["totalFetched"] == 3
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    variants = detail_resp.json().get("variants") or []
+    assert len(variants) == 3
+    assert {item["external_price_id"] for item in variants} == {
+        "gid://shopify/ProductVariant/901",
+        "gid://shopify/ProductVariant/902",
+        "gid://shopify/ProductVariant/903",
+    }
+    updated_existing = next(item for item in variants if item["id"] == existing_variant_id)
+    assert updated_existing["title"] == "Bundle Updated"
+    assert updated_existing["price"] == 8900
+    assert updated_existing["compare_at_price"] == 9900
+    assert updated_existing["option_values"] == {"Title": "Bundle"}
+    assert updated_existing["shopify_last_synced_at"] is not None
+    assert updated_existing["shopify_last_sync_error"] is None
+
+
 def test_create_shopify_product_for_product_imports_shopify_variants(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Shopify Product Import")
     product_id = _create_product(api_client, client_id=client_id, title="Primary Product")

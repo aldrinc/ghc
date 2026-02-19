@@ -166,6 +166,101 @@ def test_list_products_returns_summary_rows():
     assert result[0]["status"] == "ACTIVE"
 
 
+def test_get_product_returns_variants_with_inventory_fields():
+    client = ShopifyApiClient()
+    observed_variables: list[dict] = []
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        observed_variables.append(payload.get("variables") or {})
+        variables = payload.get("variables") or {}
+        if variables.get("after") is None:
+            return {
+                "shop": {"currencyCode": "USD"},
+                "product": {
+                    "id": "gid://shopify/Product/100",
+                    "title": "Alpha",
+                    "handle": "alpha",
+                    "status": "ACTIVE",
+                    "variants": {
+                        "pageInfo": {"hasNextPage": True, "endCursor": "cursor-2"},
+                        "edges": [
+                            {
+                                "node": {
+                                    "id": "gid://shopify/ProductVariant/1",
+                                    "title": "Default Title",
+                                    "price": "49.99",
+                                    "compareAtPrice": "59.99",
+                                    "barcode": "BAR-001",
+                                    "taxable": True,
+                                    "requiresShipping": True,
+                                    "inventoryPolicy": "CONTINUE",
+                                    "inventoryQuantity": 12,
+                                    "selectedOptions": [{"name": "Size", "value": "L"}],
+                                    "inventoryItem": {"sku": "SKU-001", "tracked": True},
+                                }
+                            }
+                        ],
+                    },
+                },
+            }
+        return {
+            "shop": {"currencyCode": "USD"},
+            "product": {
+                "id": "gid://shopify/Product/100",
+                "title": "Alpha",
+                "handle": "alpha",
+                "status": "ACTIVE",
+                "variants": {
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    "edges": [
+                        {
+                            "node": {
+                                "id": "gid://shopify/ProductVariant/2",
+                                "title": "Bundle",
+                                "price": "79.00",
+                                "compareAtPrice": None,
+                                "barcode": None,
+                                "taxable": False,
+                                "requiresShipping": False,
+                                "inventoryPolicy": "DENY",
+                                "inventoryQuantity": 0,
+                                "selectedOptions": [{"name": "Pack", "value": "2"}],
+                                "inventoryItem": {"sku": None, "tracked": False},
+                            }
+                        }
+                    ],
+                },
+            },
+        }
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.get_product(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            product_gid="gid://shopify/Product/100",
+        )
+    )
+
+    assert result["productGid"] == "gid://shopify/Product/100"
+    assert result["title"] == "Alpha"
+    assert result["status"] == "ACTIVE"
+    assert len(result["variants"]) == 2
+    first_variant = result["variants"][0]
+    assert first_variant["variantGid"] == "gid://shopify/ProductVariant/1"
+    assert first_variant["priceCents"] == 4999
+    assert first_variant["compareAtPriceCents"] == 5999
+    assert first_variant["inventoryManagement"] == "shopify"
+    assert first_variant["inventoryPolicy"] == "continue"
+    assert first_variant["optionValues"] == {"Size": "L"}
+    second_variant = result["variants"][1]
+    assert second_variant["inventoryManagement"] is None
+    assert second_variant["inventoryPolicy"] == "deny"
+    assert observed_variables[0]["after"] is None
+    assert observed_variables[1]["after"] == "cursor-2"
+
+
 def test_create_product_returns_created_product_and_variants():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []

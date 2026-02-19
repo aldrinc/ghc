@@ -5,6 +5,7 @@ import pytest
 from app.schemas import (
     CreateCatalogProductRequest,
     CreateCheckoutRequest,
+    GetProductRequest,
     ListProductsRequest,
     UpdateCatalogVariantRequest,
     UpsertPolicyPagesRequest,
@@ -73,6 +74,29 @@ def test_list_products_request_accepts_client_target():
     assert payload.shopDomain is None
     assert payload.query == "sleep"
     assert payload.limit == 10
+
+
+def test_get_product_request_requires_exactly_one_target():
+    with pytest.raises(ValueError):
+        GetProductRequest(productGid="gid://shopify/Product/1")
+
+    with pytest.raises(ValueError):
+        GetProductRequest(
+            clientId="client_1",
+            shopDomain="example.myshopify.com",
+            productGid="gid://shopify/Product/1",
+        )
+
+
+def test_get_product_request_accepts_shop_target():
+    payload = GetProductRequest(
+        shopDomain="example.myshopify.com",
+        productGid="gid://shopify/Product/123",
+    )
+
+    assert payload.clientId is None
+    assert payload.shopDomain == "example.myshopify.com"
+    assert payload.productGid == "gid://shopify/Product/123"
 
 
 def test_create_catalog_product_request_requires_exactly_one_target():

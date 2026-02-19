@@ -27,6 +27,31 @@ type ShopifyCreateProductResponse = {
   variants: ShopifyCreatedVariant[];
 };
 
+type ShopifyCatalogVariant = {
+  variantGid: string;
+  title: string;
+  priceCents: number;
+  currency: string;
+  compareAtPriceCents?: number | null;
+  sku?: string | null;
+  barcode?: string | null;
+  taxable: boolean;
+  requiresShipping: boolean;
+  inventoryPolicy?: string | null;
+  inventoryManagement?: string | null;
+  inventoryQuantity?: number | null;
+  optionValues: Record<string, string>;
+};
+
+type ShopifyVariantSyncResponse = {
+  shopDomain: string;
+  productGid: string;
+  createdCount: number;
+  updatedCount: number;
+  totalFetched: number;
+  variants: ShopifyCatalogVariant[];
+};
+
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
@@ -248,6 +273,26 @@ export function useCreateShopifyProductForProduct(productId: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to create Shopify product";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSyncShopifyVariantsForProduct(productId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload?: { shopDomain?: string }) =>
+      post<ShopifyVariantSyncResponse>(`/products/${productId}/shopify/sync-variants`, payload || {}),
+    onSuccess: (response) => {
+      toast.success(
+        `Shopify variants synced (${response.createdCount} created, ${response.updatedCount} updated)`,
+      );
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to sync Shopify variants";
       toast.error(message);
     },
   });

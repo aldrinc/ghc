@@ -13,7 +13,12 @@ from app.config import settings
 from app.db.deps import get_session
 from app.db.repositories.assets import AssetsRepository
 from app.db.models import Asset, ClientUserPreference, Product, ProductOffer, ProductOfferBonus, ProductVariant
-from app.schemas.shopify_connection import ShopifyCreateProductRequest, ShopifyProductCreateResponse
+from app.schemas.shopify_connection import (
+    ShopifyCreateProductRequest,
+    ShopifyProductCreateResponse,
+    ShopifyProductVariantSyncResponse,
+    ShopifySyncProductVariantsRequest,
+)
 from app.db.repositories.products import (
     ProductOfferBonusesRepository,
     ProductOffersRepository,
@@ -25,6 +30,7 @@ from app.services.media_storage import MediaStorage
 from app.services.shopify_catalog import verify_shopify_product_exists
 from app.services.shopify_connection import (
     create_client_shopify_product,
+    get_client_shopify_product,
     get_client_shopify_connection_status,
     update_client_shopify_variant,
 )
@@ -73,7 +79,6 @@ _SHOPIFY_UNSYNCED_VARIANT_FIELDS = {
     "unitPriceMeasurement",
     "quantityRule",
     "quantityPriceBreaks",
-    "optionValues",
 }
 
 
@@ -531,6 +536,153 @@ def create_shopify_product_for_product(
     session.commit()
 
     return ShopifyProductCreateResponse(**created)
+
+
+@router.post("/{product_id}/shopify/sync-variants", response_model=ShopifyProductVariantSyncResponse)
+def sync_shopify_variants_for_product(
+    product_id: str,
+    payload: ShopifySyncProductVariantsRequest | None = None,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    product = session.scalars(
+        select(Product).where(Product.id == product_id, Product.org_id == auth.org_id)
+    ).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    if not product.shopify_product_gid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product is not mapped to Shopify. Save a Shopify product GID first.",
+        )
+
+    selected_shop_domain_pref = _get_client_user_pref(
+        session=session,
+        org_id=auth.org_id,
+        client_id=str(product.client_id),
+        user_external_id=auth.user_id,
+    )
+    selected_shop_domain = (
+        selected_shop_domain_pref.selected_shop_domain.strip().lower()
+        if selected_shop_domain_pref
+        and isinstance(selected_shop_domain_pref.selected_shop_domain, str)
+        and selected_shop_domain_pref.selected_shop_domain.strip()
+        else None
+    )
+    requested_shop_domain = payload.shopDomain if payload is not None else None
+    effective_shop_domain = requested_shop_domain or selected_shop_domain
+    status_payload = get_client_shopify_connection_status(
+        client_id=str(product.client_id),
+        selected_shop_domain=effective_shop_domain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Shopify connection is not ready: {status_payload['message']}",
+        )
+    resolved_shop_domain = status_payload.get("shopDomain")
+    if not isinstance(resolved_shop_domain, str) or not resolved_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shopify connection is ready but no shopDomain was resolved.",
+        )
+
+    shopify_product = get_client_shopify_product(
+        client_id=str(product.client_id),
+        product_gid=product.shopify_product_gid,
+        shop_domain=resolved_shop_domain,
+    )
+    response_product_gid = shopify_product["productGid"]
+    if response_product_gid != product.shopify_product_gid:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify product sync returned a different product GID than the mapped product. "
+                "Confirm mapping before syncing."
+            ),
+        )
+
+    existing_variants = session.scalars(
+        select(ProductVariant).where(ProductVariant.product_id == product.id)
+    ).all()
+    existing_by_external_id: dict[str, ProductVariant] = {}
+    for variant in existing_variants:
+        if not isinstance(variant.external_price_id, str) or not variant.external_price_id.strip():
+            continue
+        normalized_external_id = variant.external_price_id.strip()
+        if normalized_external_id in existing_by_external_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Cannot sync Shopify variants because duplicate externalPriceId mappings exist in MOS for this product: "
+                    f"{normalized_external_id}."
+                ),
+            )
+        existing_by_external_id[normalized_external_id] = variant
+
+    synced_at = datetime.now(timezone.utc)
+    created_count = 0
+    updated_count = 0
+    for shopify_variant in shopify_product["variants"]:
+        variant_gid = shopify_variant["variantGid"]
+        option_values = shopify_variant.get("optionValues") or {}
+        normalized_option_values = (
+            {key: value for key, value in option_values.items()} if option_values else None
+        )
+        if variant_gid in existing_by_external_id:
+            variant = existing_by_external_id[variant_gid]
+            variant.title = shopify_variant["title"]
+            variant.price = shopify_variant["priceCents"]
+            variant.currency = shopify_variant["currency"].lower()
+            variant.provider = "shopify"
+            variant.external_price_id = variant_gid
+            variant.compare_at_price = shopify_variant.get("compareAtPriceCents")
+            variant.sku = shopify_variant.get("sku")
+            variant.barcode = shopify_variant.get("barcode")
+            variant.taxable = shopify_variant["taxable"]
+            variant.requires_shipping = shopify_variant["requiresShipping"]
+            variant.inventory_policy = shopify_variant.get("inventoryPolicy")
+            variant.inventory_management = shopify_variant.get("inventoryManagement")
+            variant.inventory_quantity = shopify_variant.get("inventoryQuantity")
+            variant.option_values = normalized_option_values
+            variant.shopify_last_synced_at = synced_at
+            variant.shopify_last_sync_error = None
+            session.add(variant)
+            updated_count += 1
+            continue
+
+        session.add(
+            ProductVariant(
+                product_id=product.id,
+                title=shopify_variant["title"],
+                price=shopify_variant["priceCents"],
+                currency=shopify_variant["currency"].lower(),
+                provider="shopify",
+                external_price_id=variant_gid,
+                compare_at_price=shopify_variant.get("compareAtPriceCents"),
+                sku=shopify_variant.get("sku"),
+                barcode=shopify_variant.get("barcode"),
+                taxable=shopify_variant["taxable"],
+                requires_shipping=shopify_variant["requiresShipping"],
+                inventory_policy=shopify_variant.get("inventoryPolicy"),
+                inventory_management=shopify_variant.get("inventoryManagement"),
+                inventory_quantity=shopify_variant.get("inventoryQuantity"),
+                option_values=normalized_option_values,
+                shopify_last_synced_at=synced_at,
+                shopify_last_sync_error=None,
+            )
+        )
+        created_count += 1
+
+    session.commit()
+    return ShopifyProductVariantSyncResponse(
+        shopDomain=shopify_product["shopDomain"],
+        productGid=shopify_product["productGid"],
+        createdCount=created_count,
+        updatedCount=updated_count,
+        totalFetched=len(shopify_product["variants"]),
+        variants=shopify_product["variants"],
+    )
 
 
 @router.get("/{product_id}/offers")

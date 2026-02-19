@@ -240,6 +240,64 @@ def test_list_client_shopify_products_rejects_out_of_range_limit():
         raise AssertionError("Expected list_client_shopify_products to reject invalid limit")
 
 
+def test_get_client_shopify_product_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        assert method == "POST"
+        assert path == "/v1/catalog/products/get"
+        assert json_body["clientId"] == "client_1"
+        assert json_body["productGid"] == "gid://shopify/Product/123"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/123",
+            "title": "Sleep Drops",
+            "handle": "sleep-drops",
+            "status": "ACTIVE",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/1",
+                    "title": "Default Title",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                    "compareAtPriceCents": 5999,
+                    "sku": "SKU-001",
+                    "barcode": "BAR-001",
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": "continue",
+                    "inventoryManagement": "shopify",
+                    "inventoryQuantity": 5,
+                    "optionValues": {"Size": "L"},
+                }
+            ],
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.get_client_shopify_product(
+        client_id="client_1",
+        product_gid="gid://shopify/Product/123",
+    )
+
+    assert response["shopDomain"] == "example.myshopify.com"
+    assert response["productGid"] == "gid://shopify/Product/123"
+    assert response["variants"][0]["variantGid"] == "gid://shopify/ProductVariant/1"
+    assert response["variants"][0]["inventoryPolicy"] == "continue"
+    assert response["variants"][0]["optionValues"] == {"Size": "L"}
+
+
+def test_get_client_shopify_product_rejects_invalid_product_gid():
+    try:
+        shopify_connection.get_client_shopify_product(
+            client_id="client_1",
+            product_gid="gid://shopify/ProductVariant/123",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert exc.detail == "productGid must be a Shopify product GID."
+    else:
+        raise AssertionError("Expected get_client_shopify_product to reject invalid product gid")
+
+
 def test_create_client_shopify_product_parses_response(monkeypatch):
     def fake_bridge_request(*, method: str, path: str, json_body=None):
         assert method == "POST"

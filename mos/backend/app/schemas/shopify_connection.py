@@ -110,3 +110,38 @@ class ShopifyProductCreateResponse(BaseModel):
     handle: str
     status: str
     variants: list[ShopifyCreatedVariant] = Field(default_factory=list)
+
+
+class ShopifySyncProductVariantsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str | None = None
+
+
+class ShopifyCatalogVariant(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    variantGid: str
+    title: str
+    priceCents: int
+    currency: str
+    compareAtPriceCents: int | None = None
+    sku: str | None = None
+    barcode: str | None = None
+    taxable: bool
+    requiresShipping: bool
+    inventoryPolicy: str | None = None
+    inventoryManagement: str | None = None
+    inventoryQuantity: int | None = None
+    optionValues: dict[str, str] = Field(default_factory=dict)
+
+
+class ShopifyProductVariantSyncResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str
+    productGid: str
+    createdCount: int = Field(..., ge=0)
+    updatedCount: int = Field(..., ge=0)
+    totalFetched: int = Field(..., ge=0)
+    variants: list[ShopifyCatalogVariant] = Field(default_factory=list)

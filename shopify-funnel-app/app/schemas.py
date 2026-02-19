@@ -90,6 +90,45 @@ class ListProductsResponse(BaseModel):
     products: list[CatalogProductSummary]
 
 
+class GetProductRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    productGid: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "GetProductRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        return self
+
+
+class CatalogProductVariant(BaseModel):
+    variantGid: str
+    title: str
+    priceCents: int
+    currency: str
+    compareAtPriceCents: int | None = None
+    sku: str | None = None
+    barcode: str | None = None
+    taxable: bool
+    requiresShipping: bool
+    inventoryPolicy: str | None = None
+    inventoryManagement: str | None = None
+    inventoryQuantity: int | None = None
+    optionValues: dict[str, str] = Field(default_factory=dict)
+
+
+class GetProductResponse(BaseModel):
+    shopDomain: str
+    productGid: str
+    title: str
+    handle: str
+    status: str
+    variants: list[CatalogProductVariant]
+
+
 class CreateCatalogProductVariantRequest(BaseModel):
     title: str = Field(min_length=1)
     priceCents: int = Field(ge=0)

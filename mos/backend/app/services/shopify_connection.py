@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from app.config import settings
 
 _SHOP_DOMAIN_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
+_SHOPIFY_PRODUCT_GID_PREFIX = "gid://shopify/Product/"
 _SHOPIFY_VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/"
 _REQUIRED_SHOPIFY_SCOPES = {
     "read_orders",
@@ -525,6 +526,204 @@ def list_client_shopify_products(
         )
 
     return {"shopDomain": response_shop_domain.strip().lower(), "products": products}
+
+
+def get_client_shopify_product(
+    *,
+    client_id: str,
+    product_gid: str,
+    shop_domain: str | None = None,
+) -> dict[str, Any]:
+    cleaned_product_gid = product_gid.strip()
+    if not cleaned_product_gid.startswith(_SHOPIFY_PRODUCT_GID_PREFIX):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="productGid must be a Shopify product GID.",
+        )
+
+    request_payload: dict[str, Any] = {"productGid": cleaned_product_gid}
+    if shop_domain is not None:
+        request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
+    else:
+        request_payload["clientId"] = client_id
+
+    payload = _bridge_request(
+        method="POST",
+        path="/v1/catalog/products/get",
+        json_body=request_payload,
+    )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid product payload.",
+        )
+
+    response_shop_domain = payload.get("shopDomain")
+    if not isinstance(response_shop_domain, str) or not response_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid product shopDomain.",
+        )
+
+    response_product_gid = payload.get("productGid")
+    if not isinstance(response_product_gid, str) or not response_product_gid.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid productGid.",
+        )
+
+    response_title = payload.get("title")
+    if not isinstance(response_title, str) or not response_title.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid product title.",
+        )
+
+    response_handle = payload.get("handle")
+    if not isinstance(response_handle, str) or not response_handle.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid product handle.",
+        )
+
+    response_status = payload.get("status")
+    if not isinstance(response_status, str) or not response_status.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid product status.",
+        )
+
+    raw_variants = payload.get("variants")
+    if not isinstance(raw_variants, list):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid product variants list.",
+        )
+
+    parsed_variants: list[dict[str, Any]] = []
+    for raw_variant in raw_variants:
+        if not isinstance(raw_variant, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid product variant object.",
+            )
+
+        variant_gid = raw_variant.get("variantGid")
+        title = raw_variant.get("title")
+        price_cents = raw_variant.get("priceCents")
+        currency = raw_variant.get("currency")
+        compare_at_price_cents = raw_variant.get("compareAtPriceCents")
+        sku = raw_variant.get("sku")
+        barcode = raw_variant.get("barcode")
+        taxable = raw_variant.get("taxable")
+        requires_shipping = raw_variant.get("requiresShipping")
+        inventory_policy = raw_variant.get("inventoryPolicy")
+        inventory_management = raw_variant.get("inventoryManagement")
+        inventory_quantity = raw_variant.get("inventoryQuantity")
+        option_values = raw_variant.get("optionValues")
+
+        if not isinstance(variant_gid, str) or not variant_gid.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid variantGid in product payload.",
+            )
+        if not isinstance(title, str) or not title.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid variant title in product payload.",
+            )
+        if not isinstance(price_cents, int) or price_cents < 0:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid variant priceCents in product payload.",
+            )
+        if not isinstance(currency, str) or not currency.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid variant currency in product payload.",
+            )
+        if compare_at_price_cents is not None and (
+            not isinstance(compare_at_price_cents, int) or compare_at_price_cents < 0
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid compareAtPriceCents in product payload.",
+            )
+        if sku is not None and not isinstance(sku, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid sku in product payload.",
+            )
+        if barcode is not None and not isinstance(barcode, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid barcode in product payload.",
+            )
+        if not isinstance(taxable, bool):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid taxable flag in product payload.",
+            )
+        if not isinstance(requires_shipping, bool):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid requiresShipping flag in product payload.",
+            )
+        if inventory_policy is not None and not isinstance(inventory_policy, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid inventoryPolicy in product payload.",
+            )
+        if inventory_management is not None and not isinstance(inventory_management, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid inventoryManagement in product payload.",
+            )
+        if inventory_quantity is not None and not isinstance(inventory_quantity, int):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid inventoryQuantity in product payload.",
+            )
+        if not isinstance(option_values, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid optionValues in product payload.",
+            )
+        for option_key, option_value in option_values.items():
+            if not isinstance(option_key, str) or not option_key.strip() or not isinstance(option_value, str):
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Shopify checkout app returned non-string optionValues in product payload.",
+                )
+
+        parsed_variants.append(
+            {
+                "variantGid": variant_gid.strip(),
+                "title": title.strip(),
+                "priceCents": price_cents,
+                "currency": _normalize_currency_code(currency),
+                "compareAtPriceCents": compare_at_price_cents,
+                "sku": sku.strip() if isinstance(sku, str) else None,
+                "barcode": barcode.strip() if isinstance(barcode, str) else None,
+                "taxable": taxable,
+                "requiresShipping": requires_shipping,
+                "inventoryPolicy": inventory_policy.strip().lower() if isinstance(inventory_policy, str) else None,
+                "inventoryManagement": (
+                    inventory_management.strip().lower() if isinstance(inventory_management, str) else None
+                ),
+                "inventoryQuantity": inventory_quantity,
+                "optionValues": {key.strip(): value for key, value in option_values.items()},
+            }
+        )
+
+    return {
+        "shopDomain": response_shop_domain.strip().lower(),
+        "productGid": response_product_gid.strip(),
+        "title": response_title.strip(),
+        "handle": response_handle.strip(),
+        "status": response_status.strip(),
+        "variants": parsed_variants,
+    }
 
 
 def create_client_shopify_product(
