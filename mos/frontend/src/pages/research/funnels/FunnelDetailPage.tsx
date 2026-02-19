@@ -483,7 +483,7 @@ export function FunnelDetailPage() {
                   <div className="text-xs text-content-muted">
                     Runtime version:{" "}
                     <span className="font-mono text-content">
-                      {deployJob?.runtimeArtifactVersion !== null
+                      {typeof deployJob?.runtimeArtifactVersion === "number"
                         ? `v${deployJob.runtimeArtifactVersion}`
                         : funnel.active_publication_id || "Unknown"}
                     </span>
