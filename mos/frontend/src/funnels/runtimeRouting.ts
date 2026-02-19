@@ -1,5 +1,4 @@
 type DeployRuntimeConfig = {
-  funnelSlug?: string;
   bundleMode?: boolean;
 };
 
@@ -20,41 +19,49 @@ function getDeployRuntimeConfig(): DeployRuntimeConfig {
   return candidate;
 }
 
+export function normalizeRouteToken(value: string | null | undefined): string {
+  const normalized = (value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized;
+}
+
 export function isStandaloneBundleMode(): boolean {
   return Boolean(getDeployRuntimeConfig().bundleMode);
 }
 
-export function getStandaloneFunnelSlug(): string | null {
-  const funnelSlug = (getDeployRuntimeConfig().funnelSlug || "").trim();
-  return funnelSlug || null;
-}
-
 export function buildPublicFunnelPath(
   {
+    productSlug,
     funnelSlug,
     slug,
     bundleMode,
   }: {
+    productSlug: string;
     funnelSlug: string;
     slug?: string | null;
     bundleMode: boolean;
   },
 ): string {
-  const normalizedFunnelSlug = (funnelSlug || "").trim();
-  if (!normalizedFunnelSlug) {
-    return "/";
+  const normalizedProductSlug = normalizeRouteToken(productSlug);
+  const normalizedFunnelSlug = normalizeRouteToken(funnelSlug);
+  if (!normalizedProductSlug || !normalizedFunnelSlug) {
+    throw new Error("productSlug and funnelSlug are required to build a public funnel path.");
   }
 
-  const normalizedSlug = (slug || "").trim();
+  const normalizedSlug = normalizeRouteToken(slug);
   if (bundleMode) {
     if (!normalizedSlug) {
-      return `/${encodeURIComponent(normalizedFunnelSlug)}`;
+      return `/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}`;
     }
-    return `/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
+    return `/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
   }
 
   if (!normalizedSlug) {
-    return `/f/${encodeURIComponent(normalizedFunnelSlug)}`;
+    return `/f/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}`;
   }
-  return `/f/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
+  return `/f/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
 }

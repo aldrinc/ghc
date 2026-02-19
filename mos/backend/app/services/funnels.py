@@ -35,7 +35,9 @@ from app.db.models import (
     FunnelPublication,
     FunnelPublicationLink,
     FunnelPublicationPage,
+    Product,
 )
+from app.services.public_routing import require_product_route_slug
 from app.services.media_storage import MediaStorage
 
 
@@ -149,6 +151,18 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
         raise ValueError("Funnel not found")
     if funnel.status == FunnelStatusEnum.disabled:
         raise ValueError("Funnel is disabled")
+    if not funnel.product_id:
+        raise ValueError("Funnel product_id is required before publishing.")
+
+    product = session.scalars(
+        select(Product).where(Product.org_id == org_id, Product.id == funnel.product_id)
+    ).first()
+    if not product:
+        raise ValueError("Product not found")
+    try:
+        require_product_route_slug(product=product)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
 
     pages = list(
         session.scalars(

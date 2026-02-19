@@ -10,6 +10,7 @@ import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { normalizeRouteToken } from "@/funnels/runtimeRouting";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -34,6 +35,8 @@ type DeployJobState = {
   status: string;
   accessUrl: string | null;
   publicationId: string | null;
+  runtimeArtifactId: string | null;
+  runtimeArtifactVersion: number | null;
   error: string | null;
 };
 
@@ -43,6 +46,10 @@ type DeployJobStatusResponse = {
   access_urls?: string[];
   result?: {
     publicationId?: string | null;
+    runtimeArtifact?: {
+      id?: string | null;
+      version?: number | null;
+    } | null;
   } | null;
   error?: string | null;
 };
@@ -125,9 +132,10 @@ export function FunnelDetailPage() {
     navigate(`/research/funnels/${funnelId}/pages/${page.id}`);
   };
 
-  const publicBase = funnel?.route_slug ? `/f/${funnel.route_slug}` : null;
+  const productRouteSlug = normalizeRouteToken(funnelProduct?.handle || "");
+  const publicBase = funnel?.route_slug && productRouteSlug ? `/f/${productRouteSlug}/${funnel.route_slug}` : null;
   const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
-  const deployWorkloadName = funnel?.product_id ? `product-funnels-${funnel.product_id}` : undefined;
+  const deployWorkloadName = funnel?.client_id ? `brand-funnels-${funnel.client_id}` : undefined;
   const entryArtifact = useMemo(() => {
     if (!funnel?.entry_page_id || !funnel.pages?.length) return null;
     const entryPage = funnel.pages.find((page) => page.id === funnel.entry_page_id);
@@ -141,7 +149,7 @@ export function FunnelDetailPage() {
   });
 
   const deployedPageUrl = useMemo(() => {
-    if (!funnel?.route_slug || !entryArtifact) return null;
+    if (!productRouteSlug || !funnel?.route_slug || !entryArtifact) return null;
 
     const accessCandidate =
       (deployJob?.accessUrl || "").trim() ||
@@ -154,13 +162,14 @@ export function FunnelDetailPage() {
 
     const baseUrl = accessCandidate || `${window.location.origin}/`;
     const normalizedBase = baseUrl.replace(/\/+$/, "");
-    return `${normalizedBase}/${encodeURIComponent(funnel.route_slug)}/${encodeURIComponent(entryArtifact)}`;
+    return `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnel.route_slug)}/${encodeURIComponent(entryArtifact)}`;
   }, [
     deployDomains.data?.https,
     deployDomains.data?.server_names,
     deployJob?.accessUrl,
     entryArtifact,
     funnel?.route_slug,
+    productRouteSlug,
   ]);
 
   const normalizeDeployDomainList = (values: string[]): string[] => {
@@ -253,8 +262,8 @@ export function FunnelDetailPage() {
     const createIfMissing = !deployDomains.data.workload_found;
     const normalizedApiBaseRoot = (deployUpstreamApiBaseUrl || deployApiBaseUrl).trim().replace(/\/+$/, "");
     if (createIfMissing) {
-      if (!funnel?.product_id) {
-        setDeployDomainsSaveError("Funnel product_id is required to create a deploy workload.");
+      if (!funnel?.client_id) {
+        setDeployDomainsSaveError("Funnel client_id is required to create a deploy workload.");
         return;
       }
       if (!normalizedApiBaseRoot.startsWith("http://") && !normalizedApiBaseRoot.startsWith("https://")) {
@@ -280,13 +289,13 @@ export function FunnelDetailPage() {
       workloadPayload.build_config = {};
       workloadPayload.destination_path = deployDestinationPath || "/opt/apps";
       workloadPayload.source_ref = {
-        product_id: funnel?.product_id,
+        client_id: funnel?.client_id,
         upstream_api_base_root: normalizedApiBaseRoot,
         artifact: {
           meta: {
-            productId: funnel?.product_id,
+            clientId: funnel?.client_id,
           },
-          funnels: {},
+          products: {},
         },
       };
     }
@@ -316,6 +325,7 @@ export function FunnelDetailPage() {
 
   const handlePublish = async (serverNames: string[]) => {
     if (!funnelId || !funnel) return;
+    if (!funnel.client_id) return;
     const payload: {
       deploy: {
         workloadName: string;
@@ -329,7 +339,7 @@ export function FunnelDetailPage() {
       };
     } = {
       deploy: {
-        workloadName: `product-funnels-${funnel.product_id || funnel.id}`,
+        workloadName: `brand-funnels-${funnel.client_id}`,
         createIfMissing: true,
         applyPlan: true,
       },
@@ -355,6 +365,8 @@ export function FunnelDetailPage() {
         status: initialStatus,
         accessUrl: initialAccess,
         publicationId: typeof response.publicationId === "string" ? response.publicationId : null,
+        runtimeArtifactId: null,
+        runtimeArtifactVersion: null,
         error: null,
       });
     }
@@ -371,6 +383,10 @@ export function FunnelDetailPage() {
         if (stopped) return;
         const accessUrl = Array.isArray(job.access_urls) ? job.access_urls[0] || null : null;
         const publicationId = typeof job.result?.publicationId === "string" ? job.result.publicationId : null;
+        const runtimeArtifactId =
+          typeof job.result?.runtimeArtifact?.id === "string" ? job.result.runtimeArtifact.id : null;
+        const runtimeArtifactVersion =
+          typeof job.result?.runtimeArtifact?.version === "number" ? job.result.runtimeArtifact.version : null;
         setDeployJob((current) => {
           if (!current || current.jobId !== job.id) return current;
           return {
@@ -378,6 +394,9 @@ export function FunnelDetailPage() {
             status: job.status,
             accessUrl: accessUrl || current.accessUrl,
             publicationId: publicationId || current.publicationId,
+            runtimeArtifactId: runtimeArtifactId || current.runtimeArtifactId,
+            runtimeArtifactVersion:
+              runtimeArtifactVersion !== null ? runtimeArtifactVersion : current.runtimeArtifactVersion,
             error: job.error || null,
           };
         });
@@ -404,12 +423,18 @@ export function FunnelDetailPage() {
             <Button variant="secondary" size="sm" onClick={() => setIsPageModalOpen(true)} disabled={!funnelId || !funnel}>
               New page
             </Button>
-            {funnel?.status === "published" && deployedPageUrl ? (
-              <Button variant="secondary" size="sm" asChild>
-                <a href={deployedPageUrl} target="_blank" rel="noreferrer">
+            {funnel?.status === "published" ? (
+              deployedPageUrl ? (
+                <Button variant="secondary" size="sm" asChild>
+                  <a href={deployedPageUrl} target="_blank" rel="noreferrer">
+                    Open Deployed Page
+                  </a>
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" disabled>
                   Open Deployed Page
-                </a>
-              </Button>
+                </Button>
+              )
             ) : null}
             {deployJob?.publicationId && mosPreviewUrl ? (
               <Button variant="secondary" size="sm" asChild>
@@ -439,14 +464,31 @@ export function FunnelDetailPage() {
             <div className="ds-card ds-card--md text-xs text-content-muted">
               Deploy job <span className="font-mono">{deployJob.jobId}</span>:{" "}
               <span className="font-semibold text-content">{deployJob.status}</span>
+              {deployJob.runtimeArtifactVersion !== null ? (
+                <span className="ml-2">
+                  Runtime artifact <span className="font-mono">v{deployJob.runtimeArtifactVersion}</span>
+                </span>
+              ) : null}
               {deployJob.error ? <span className="ml-2 text-danger">{deployJob.error}</span> : null}
             </div>
           ) : null}
           <div className="ds-card ds-card--md space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Badge tone={statusTone(funnel.status)}>{funnel.status}</Badge>
-                {funnel.campaign_id ? <Badge tone="neutral">Campaign-linked</Badge> : <Badge tone="neutral">No campaign</Badge>}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge tone={statusTone(funnel.status)}>{funnel.status}</Badge>
+                  {funnel.campaign_id ? <Badge tone="neutral">Campaign-linked</Badge> : <Badge tone="neutral">No campaign</Badge>}
+                </div>
+                {funnel.status === "published" ? (
+                  <div className="text-xs text-content-muted">
+                    Runtime version:{" "}
+                    <span className="font-mono text-content">
+                      {deployJob?.runtimeArtifactVersion !== null
+                        ? `v${deployJob.runtimeArtifactVersion}`
+                        : funnel.active_publication_id || "Unknown"}
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 <Button

@@ -48,10 +48,10 @@ function App() {
     <BrowserRouter>
       <Routes>
         {standaloneBundleMode ? <Route path="/" element={<PublicFunnelPage />} /> : null}
-        {standaloneBundleMode ? <Route path="/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} /> : null}
-        {standaloneBundleMode ? <Route path="/:funnelSlug/:slug" element={<PublicFunnelPage />} /> : null}
-        <Route path="/f/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />
-        <Route path="/f/:funnelSlug/:slug" element={<PublicFunnelPage />} />
+        {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} /> : null}
+        {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} /> : null}
+        <Route path="/f/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />
+        <Route path="/f/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} />
         {standaloneBundleMode ? null : <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />}
         {standaloneBundleMode ? null : (
           <Route

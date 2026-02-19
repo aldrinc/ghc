@@ -39,6 +39,7 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
 
 type FunnelRuntimeContextValue = {
+  productSlug: string;
   funnelSlug: string;
   pageMap: Record<string, string>;
   bundleMode?: boolean;
@@ -74,9 +75,9 @@ export function resolveRuntimePagePath(runtime: FunnelRuntimeContextValue, slug:
     return "#";
   }
   if (runtime.bundleMode) {
-    return `/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
+    return `/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
   }
-  return `/f/${runtime.funnelSlug}/${encodeURIComponent(normalizedSlug)}`;
+  return `/f/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
 }
 
 type PageOption = { label: string; value: string };
@@ -178,6 +179,9 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
   if (linkType === "nextPage") {
     if (!runtime) {
       throw new Error("Funnel runtime is required to resolve next page links.");
+    }
+    if (!runtime.productSlug) {
+      throw new Error("Funnel runtime is missing a product slug.");
     }
     if (!runtime.funnelSlug) {
       throw new Error("Funnel runtime is missing a funnel slug.");

@@ -62,6 +62,7 @@ export type FunnelPageDetail = {
 };
 
 export type PublicFunnelMeta = {
+  productSlug: string;
   funnelSlug: string;
   funnelId: string;
   publicationId: string;
@@ -70,6 +71,7 @@ export type PublicFunnelMeta = {
 };
 
 export type PublicFunnelPage = {
+  productSlug: string;
   funnelId: string;
   publicationId: string;
   pageId: string;

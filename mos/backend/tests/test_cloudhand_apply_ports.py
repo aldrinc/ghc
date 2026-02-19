@@ -76,30 +76,38 @@ def _artifact_app(
         "name": name,
         "source_type": "funnel_artifact",
         "source_ref": {
-            "product_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+            "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
             "upstream_api_base_root": "https://moshq.app/api",
             "runtime_dist_path": "mos/frontend/dist",
             "artifact": {
-                "meta": {"productId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95"},
-                "funnels": {
-                    "example-funnel": {
+                "meta": {"clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95"},
+                "products": {
+                    "example-product": {
                         "meta": {
-                            "funnelSlug": "example-funnel",
-                            "funnelId": "funnel-1",
-                            "publicationId": "pub-1",
-                            "entrySlug": "presales",
-                            "pages": [{"pageId": "page-1", "slug": "presales"}],
+                            "productId": "product-1",
+                            "productSlug": "example-product",
                         },
-                        "pages": {
-                            "presales": {
-                                "funnelId": "funnel-1",
-                                "publicationId": "pub-1",
-                                "pageId": "page-1",
-                                "slug": "presales",
-                                "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
-                                "pageMap": {"page-1": "presales"},
+                        "funnels": {
+                            "example-funnel": {
+                                "meta": {
+                                    "funnelSlug": "example-funnel",
+                                    "funnelId": "funnel-1",
+                                    "publicationId": "pub-1",
+                                    "entrySlug": "presales",
+                                    "pages": [{"pageId": "page-1", "slug": "presales"}],
+                                },
+                                "pages": {
+                                    "presales": {
+                                        "funnelId": "funnel-1",
+                                        "publicationId": "pub-1",
+                                        "pageId": "page-1",
+                                        "slug": "presales",
+                                        "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+                                        "pageMap": {"page-1": "presales"},
+                                    }
+                                },
                             }
-                        },
+                        }
                     }
                 },
             },

@@ -20,7 +20,7 @@ function ensureNoIndex() {
 }
 
 export function PublicFunnelEntryRedirectPage() {
-  const { funnelSlug } = useParams();
+  const { productSlug, funnelSlug } = useParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const bundleMode = isStandaloneBundleMode();
@@ -30,9 +30,9 @@ export function PublicFunnelEntryRedirectPage() {
   }, []);
 
   useEffect(() => {
-    if (!funnelSlug) return;
+    if (!productSlug || !funnelSlug) return;
     setError(null);
-    fetch(`${apiBaseUrl}/public/funnels/${funnelSlug}/meta`)
+    fetch(`${apiBaseUrl}/public/funnels/${encodeURIComponent(productSlug)}/${encodeURIComponent(funnelSlug)}/meta`)
       .then(async (resp) => {
         if (!resp.ok) {
           const text = await resp.text();
@@ -43,6 +43,7 @@ export function PublicFunnelEntryRedirectPage() {
       .then((meta) => {
         navigate(
           buildPublicFunnelPath({
+            productSlug,
             funnelSlug,
             slug: meta.entrySlug,
             bundleMode,
@@ -53,7 +54,7 @@ export function PublicFunnelEntryRedirectPage() {
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Unable to load funnel");
       });
-  }, [bundleMode, funnelSlug, navigate]);
+  }, [bundleMode, funnelSlug, navigate, productSlug]);
 
   return (
     <div className="min-h-screen bg-surface px-6 py-10 text-sm text-content-muted">

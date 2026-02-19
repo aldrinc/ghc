@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { normalizeRouteToken } from "@/funnels/runtimeRouting";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -36,6 +37,7 @@ export function FunnelsPage() {
   }, [isModalOpen, productDetail?.offers]);
 
   const canCreate = Boolean(clientId && product?.id && name.trim());
+  const productRouteSlug = normalizeRouteToken(productDetail?.handle || "");
 
   const statusTone = useMemo(() => {
     return (status: string) => {
@@ -115,7 +117,10 @@ export function FunnelsPage() {
                       </div>
                     </div>
                     <div className="text-xs text-content-muted">
-                      Public: <span className="font-mono">/f/{funnel.route_slug}</span>
+                      Public:{" "}
+                      <span className="font-mono">
+                        {productRouteSlug ? `/f/${productRouteSlug}/${funnel.route_slug}` : "Set product handle to enable route"}
+                      </span>
                     </div>
                   </div>
                 </li>

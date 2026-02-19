@@ -71,32 +71,40 @@ def test_funnel_artifact_source_validates_required_fields():
     payload["service_config"]["command"] = None
     payload["service_config"]["ports"] = []
     payload["source_ref"] = {
-        "product_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         "upstream_api_base_root": "https://moshq.app/api/",
         "runtime_dist_path": "mos/frontend/dist",
         "artifact": {
             "meta": {
-                "productId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+                "clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
             },
-            "funnels": {
-                "example-funnel": {
+            "products": {
+                "example-product": {
                     "meta": {
-                        "funnelSlug": "example-funnel",
-                        "funnelId": "f1",
-                        "publicationId": "pub1",
-                        "entrySlug": "presales",
-                        "pages": [{"pageId": "p1", "slug": "presales"}],
+                        "productId": "p1",
+                        "productSlug": "example-product",
                     },
-                    "pages": {
-                        "presales": {
-                            "funnelId": "f1",
-                            "publicationId": "pub1",
-                            "pageId": "p1",
-                            "slug": "presales",
-                            "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
-                            "pageMap": {"p1": "presales"},
+                    "funnels": {
+                        "example-funnel": {
+                            "meta": {
+                                "funnelSlug": "example-funnel",
+                                "funnelId": "f1",
+                                "publicationId": "pub1",
+                                "entrySlug": "presales",
+                                "pages": [{"pageId": "p1", "slug": "presales"}],
+                            },
+                            "pages": {
+                                "presales": {
+                                    "funnelId": "f1",
+                                    "publicationId": "pub1",
+                                    "pageId": "p1",
+                                    "slug": "presales",
+                                    "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+                                    "pageMap": {"p1": "presales"},
+                                }
+                            },
                         }
-                    },
+                    }
                 }
             },
         },
@@ -104,31 +112,30 @@ def test_funnel_artifact_source_validates_required_fields():
     app = ApplicationSpec.model_validate(payload)
     assert app.source_type == ApplicationSourceType.FUNNEL_ARTIFACT
     assert app.source_ref is not None
+    assert app.source_ref.client_id == "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95"
     assert app.source_ref.upstream_api_base_root == "https://moshq.app/api"
 
 
-def test_funnel_artifact_source_legacy_shape_is_normalized_from_workload_name():
-    product_id = "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95"
+def test_funnel_artifact_source_legacy_shape_is_rejected():
     payload = _base_app_payload()
-    payload["name"] = f"product-funnels-{product_id}"
     payload["source_type"] = "funnel_artifact"
     payload["service_config"]["command"] = None
     payload["service_config"]["ports"] = []
     payload["source_ref"] = {
-        "public_id": "dc6431ec-6f5b-42d2-8f0a-62d7d2f84e6c",
         "upstream_api_base_url": "https://moshq.app/api/",
         "artifact": {
             "meta": {
                 "productId": None,
                 "offers": [],
             },
-            "funnels": {},
+            "funnels": {
+                "legacy-funnel": {
+                    "meta": {},
+                    "pages": {},
+                }
+            },
         },
     }
 
-    app = ApplicationSpec.model_validate(payload)
-
-    assert app.source_type == ApplicationSourceType.FUNNEL_ARTIFACT
-    assert app.source_ref is not None
-    assert app.source_ref.product_id == product_id
-    assert app.source_ref.upstream_api_base_root == "https://moshq.app/api"
+    with pytest.raises(ValidationError):
+        ApplicationSpec.model_validate(payload)

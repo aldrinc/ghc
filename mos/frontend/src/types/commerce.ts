@@ -8,6 +8,7 @@ export type PublicCommerceProduct = Product & {
 };
 
 export type PublicFunnelCommerce = {
+  productSlug: string;
   funnelSlug: string;
   funnelId: string;
   product: PublicCommerceProduct;

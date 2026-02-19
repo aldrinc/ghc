@@ -816,16 +816,10 @@ async def publish_funnel_route(
                 "Set deploy.upstreamApiBaseUrl or DEPLOY_PUBLIC_API_BASE_URL."
             ),
         )
-    if not funnel.product_id:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Funnel product_id is required for deploy.",
-        )
-
     try:
         workload_patch = deploy_service.build_funnel_artifact_workload_patch(
             workload_name=deploy.workloadName,
-            product_id=str(funnel.product_id),
+            client_id=str(funnel.client_id),
             upstream_base_url=upstream_base_url,
             upstream_api_base_url=upstream_api_base_root,
             server_names=server_names,

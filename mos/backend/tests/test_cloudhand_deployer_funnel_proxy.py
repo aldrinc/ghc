@@ -74,32 +74,40 @@ def _artifact_app(
         "name": name,
         "source_type": "funnel_artifact",
         "source_ref": {
-            "product_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+            "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
             "upstream_api_base_root": "https://moshq.app/api",
             "runtime_dist_path": "mos/frontend/dist",
             "artifact": {
                 "meta": {
-                    "productId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+                    "clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
                 },
-                "funnels": {
-                    "example-funnel": {
+                "products": {
+                    "example-product": {
                         "meta": {
-                            "funnelSlug": "example-funnel",
-                            "funnelId": "funnel-1",
-                            "publicationId": "pub-1",
-                            "entrySlug": "presales",
-                            "pages": [{"pageId": "page-1", "slug": "presales"}],
+                            "productId": "product-1",
+                            "productSlug": "example-product",
                         },
-                        "pages": {
-                            "presales": {
-                                "funnelId": "funnel-1",
-                                "publicationId": "pub-1",
-                                "pageId": "page-1",
-                                "slug": "presales",
-                                "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
-                                "pageMap": {"page-1": "presales"},
+                        "funnels": {
+                            "example-funnel": {
+                                "meta": {
+                                    "funnelSlug": "example-funnel",
+                                    "funnelId": "funnel-1",
+                                    "publicationId": "pub-1",
+                                    "entrySlug": "presales",
+                                    "pages": [{"pageId": "page-1", "slug": "presales"}],
+                                },
+                                "pages": {
+                                    "presales": {
+                                        "funnelId": "funnel-1",
+                                        "publicationId": "pub-1",
+                                        "pageId": "page-1",
+                                        "slug": "presales",
+                                        "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+                                        "pageMap": {"page-1": "presales"},
+                                    }
+                                },
                             }
-                        },
+                        }
                     }
                 },
             },
@@ -232,8 +240,8 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
     assert "try_files $uri.json =404;" in conf
     assert "try_files $uri /index.html;" in conf
 
-    meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-funnel/meta.json"
-    page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-funnel/pages/presales.json"
+    meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/meta.json"
+    page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/pages/presales.json"
     assert meta_path in uploaded
     assert page_path in uploaded
 

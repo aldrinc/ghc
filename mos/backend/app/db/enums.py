@@ -91,6 +91,7 @@ class ArtifactTypeEnum(str, Enum):
     qa_report = "qa_report"
     experiment_report = "experiment_report"
     playbook = "playbook"
+    funnel_runtime_bundle = "funnel_runtime_bundle"
 
 
 class WorkflowKindEnum(str, Enum):

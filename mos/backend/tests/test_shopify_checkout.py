@@ -15,7 +15,7 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID, with_selected_offer: bool 
     db_session.commit()
     db_session.refresh(client)
 
-    product = Product(org_id=org_id, client_id=client.id, title="Shopify Product")
+    product = Product(org_id=org_id, client_id=client.id, title="Shopify Product", handle="shopify-product")
     db_session.add(product)
     db_session.commit()
     db_session.refresh(product)
@@ -149,7 +149,7 @@ def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, d
     db_session.add(secondary_variant)
     db_session.commit()
 
-    response = api_client.get(f"/public/funnels/{seeded['funnel'].route_slug}/commerce")
+    response = api_client.get(f"/public/funnels/shopify-product/{seeded['funnel'].route_slug}/commerce")
     assert response.status_code == 200
     payload = response.json()
     assert payload["product"]["variants_count"] == 1
