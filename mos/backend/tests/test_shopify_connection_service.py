@@ -306,6 +306,6 @@ def test_disconnect_client_shopify_store_requires_matching_workspace(monkeypatch
         )
     except HTTPException as exc:
         assert exc.status_code == 409
-        assert exc.detail == "This Shopify store is not connected to this workspace."
+        assert exc.detail == "This Shopify store is not connected to this workspace. connectedWorkspaceId=client_other"
     else:
         raise AssertionError("Expected disconnect_client_shopify_store to reject mismatched workspace")
