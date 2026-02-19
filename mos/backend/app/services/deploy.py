@@ -893,9 +893,9 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
                 continue
             artifact_id = str(source_ref.get("artifact_id") or "").strip()
             if not artifact_id:
-                raise DeployError(
-                    f"Workload '{workload.get('name')}' is missing source_ref.artifact_id while artifact payload is empty."
-                )
+                # Some existing plans may carry placeholder inline artifacts with empty products and
+                # no DB artifact reference yet. Leave those unchanged here.
+                continue
             source_ref["artifact"] = _load_funnel_runtime_artifact_payload_for_apply(artifact_id=artifact_id)
             workload["source_ref"] = source_ref
             has_changes = True
@@ -1244,14 +1244,17 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     artifact_id = str(hydrated_source_ref.get("artifact_id") or "").strip()
                     artifact_version = hydrated_source_ref.get("artifact_version")
                     client_id = str(hydrated_source_ref.get("client_id") or "").strip()
-                    if artifact_id:
-                        runtime_artifact_payload: dict[str, Any] = {
-                            "id": artifact_id,
-                            "clientId": client_id,
-                        }
-                        if isinstance(artifact_version, int):
-                            runtime_artifact_payload["version"] = artifact_version
-                        result_payload["runtimeArtifact"] = runtime_artifact_payload
+                    if not artifact_id:
+                        raise DeployError(
+                            "Hydrated funnel deploy workload is missing source_ref.artifact_id."
+                        )
+                    runtime_artifact_payload: dict[str, Any] = {
+                        "id": artifact_id,
+                        "clientId": client_id,
+                    }
+                    if isinstance(artifact_version, int):
+                        runtime_artifact_payload["version"] = artifact_version
+                    result_payload["runtimeArtifact"] = runtime_artifact_payload
 
                 plan_resolution = ensure_plan_for_funnel_publish_workload(
                     workload_patch=workload_patch,
