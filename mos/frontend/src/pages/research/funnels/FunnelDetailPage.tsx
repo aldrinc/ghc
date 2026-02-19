@@ -131,6 +131,13 @@ export function FunnelDetailPage() {
     const entryPage = funnel.pages.find((page) => page.id === funnel.entry_page_id);
     return artifactForTemplate(entryPage?.template_id);
   }, [funnel?.entry_page_id, funnel?.pages]);
+
+  const deployDomains = useDeployWorkloadDomains({
+    workloadName: deployWorkloadName,
+    planPath: deployPlanPath || undefined,
+    instanceName: deployInstanceName || undefined,
+  });
+
   const deployedPageUrl = useMemo(() => {
     if (!funnel?.route_slug || !entryArtifact) return null;
 
@@ -153,12 +160,6 @@ export function FunnelDetailPage() {
     entryArtifact,
     funnel?.route_slug,
   ]);
-
-  const deployDomains = useDeployWorkloadDomains({
-    workloadName: deployWorkloadName,
-    planPath: deployPlanPath || undefined,
-    instanceName: deployInstanceName || undefined,
-  });
 
   const normalizeDeployDomainList = (values: string[]): string[] => {
     const out: string[] = [];
