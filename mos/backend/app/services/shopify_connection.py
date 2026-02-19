@@ -20,6 +20,11 @@ _REQUIRED_SHOPIFY_SCOPES = {
     "read_discounts",
     "write_discounts",
 }
+_IMPLIED_SHOPIFY_SCOPES: dict[str, set[str]] = {
+    "write_orders": {"read_orders"},
+    "write_products": {"read_products"},
+    "write_discounts": {"read_discounts"},
+}
 
 
 @dataclass(frozen=True)
@@ -29,6 +34,14 @@ class ShopifyInstallation:
     has_storefront_access_token: bool
     scopes: list[str]
     uninstalled_at: str | None
+
+
+def _effective_shopify_scopes(scopes: list[str]) -> set[str]:
+    normalized = {scope.strip().lower() for scope in scopes if scope and scope.strip()}
+    effective = set(normalized)
+    for scope in list(normalized):
+        effective.update(_IMPLIED_SHOPIFY_SCOPES.get(scope, set()))
+    return effective
 
 
 def _require_checkout_service_config() -> tuple[str, str]:
@@ -224,11 +237,15 @@ def get_client_shopify_connection_status(*, client_id: str, selected_shop_domain
         }
 
     installation = selected_installation or active_for_client[0]
-    missing_scopes = sorted(_REQUIRED_SHOPIFY_SCOPES.difference(set(installation.scopes)))
+    effective_scopes = _effective_shopify_scopes(installation.scopes)
+    missing_scopes = sorted(_REQUIRED_SHOPIFY_SCOPES.difference(effective_scopes))
     if missing_scopes:
         return {
             "state": "error",
-            "message": "Shopify app install is missing required Admin API scopes.",
+            "message": (
+                "Shopify app install is missing required Admin API scopes. "
+                "If scopes were recently changed, reconnect/reinstall the app for this store."
+            ),
             "shopDomain": installation.shop_domain,
             "shopDomains": [],
             "selectedShopDomain": normalized_selected_shop,

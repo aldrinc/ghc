@@ -177,6 +177,34 @@ def test_status_ready(monkeypatch):
     assert status["hasStorefrontAccessToken"] is True
 
 
+def test_status_write_scopes_imply_read_scopes(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="example.myshopify.com",
+                client_id="client_1",
+                has_storefront_access_token=True,
+                scopes=sorted(
+                    {
+                        "write_orders",
+                        "write_products",
+                        "write_discounts",
+                        "unauthenticated_read_product_listings",
+                    }
+                ),
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    status = shopify_connection.get_client_shopify_connection_status(client_id="client_1")
+
+    assert status["state"] == "ready"
+    assert status["missingScopes"] == []
+
+
 def test_list_client_shopify_products_parses_response(monkeypatch):
     def fake_bridge_request(*, method: str, path: str, json_body=None):
         assert method == "POST"
