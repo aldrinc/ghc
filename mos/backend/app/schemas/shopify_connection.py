@@ -24,6 +24,12 @@ class ShopifyInstallationUpdateRequest(BaseModel):
     storefrontAccessToken: str = Field(..., min_length=1)
 
 
+class ShopifyInstallationDisconnectRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str = Field(..., min_length=1)
+
+
 class ShopifyDefaultShopRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

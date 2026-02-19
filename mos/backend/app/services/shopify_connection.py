@@ -555,7 +555,10 @@ def build_client_shopify_install_url(*, client_id: str, shop_domain: str) -> str
         if installation.client_id and installation.client_id != client_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="This Shopify store is already connected to a different workspace.",
+                detail=(
+                    "This Shopify store is already connected to a different workspace. "
+                    f"connectedWorkspaceId={installation.client_id}"
+                ),
             )
 
     base_url, _ = _require_checkout_service_config()
@@ -605,4 +608,42 @@ def set_client_shopify_storefront_token(
             "clientId": client_id,
             "storefrontAccessToken": token,
         },
+    )
+
+
+def disconnect_client_shopify_store(
+    *,
+    client_id: str,
+    shop_domain: str,
+) -> None:
+    normalized_shop = normalize_shop_domain(shop_domain)
+
+    installations = list_shopify_installations()
+    active_installation = next(
+        (
+            installation
+            for installation in installations
+            if installation.shop_domain == normalized_shop and installation.uninstalled_at is None
+        ),
+        None,
+    )
+    if not active_installation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify installation not found for this store.",
+        )
+
+    if active_installation.client_id != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This Shopify store is not connected to this workspace. "
+                f"connectedWorkspaceId={active_installation.client_id}"
+            ),
+        )
+
+    _bridge_request(
+        method="PATCH",
+        path=f"/admin/installations/{normalized_shop}",
+        json_body={"clientId": None},
     )

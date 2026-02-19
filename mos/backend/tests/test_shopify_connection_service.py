@@ -245,3 +245,67 @@ def test_create_client_shopify_product_parses_response(monkeypatch):
     assert response["shopDomain"] == "example.myshopify.com"
     assert response["productGid"] == "gid://shopify/Product/123"
     assert response["variants"][0]["variantGid"] == "gid://shopify/ProductVariant/111"
+
+
+def test_disconnect_client_shopify_store_unlinks_workspace(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="example.myshopify.com",
+                client_id="client_1",
+                has_storefront_access_token=True,
+                scopes=[],
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    observed: dict[str, object] = {}
+
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        observed["method"] = method
+        observed["path"] = path
+        observed["json_body"] = json_body
+        return {"ok": True}
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    shopify_connection.disconnect_client_shopify_store(
+        client_id="client_1",
+        shop_domain="example.myshopify.com",
+    )
+
+    assert observed == {
+        "method": "PATCH",
+        "path": "/admin/installations/example.myshopify.com",
+        "json_body": {"clientId": None},
+    }
+
+
+def test_disconnect_client_shopify_store_requires_matching_workspace(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="example.myshopify.com",
+                client_id="client_other",
+                has_storefront_access_token=True,
+                scopes=[],
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    try:
+        shopify_connection.disconnect_client_shopify_store(
+            client_id="client_1",
+            shop_domain="example.myshopify.com",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert exc.detail == "This Shopify store is not connected to this workspace. connectedWorkspaceId=client_other"
+    else:
+        raise AssertionError("Expected disconnect_client_shopify_store to reject mismatched workspace")

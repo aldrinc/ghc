@@ -245,6 +245,7 @@ In `ProductDetailPage`:
 - Status badge + message
 - Actions based on state:
   - `Connect Shopify`
+  - `Disconnect Shopify` (unlinks store from current workspace)
   - `Set storefront token`
   - `Refresh status`
   - `Choose default shop` (when conflict)
