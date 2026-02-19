@@ -19,6 +19,7 @@ from app.routers import (
     assets,
     claude,
     campaigns,
+    compliance,
     brands,
     clients,
     design_systems,
@@ -126,6 +127,7 @@ def create_app() -> FastAPI:
     app.include_router(campaigns.router)
     app.include_router(artifacts.router)
     app.include_router(assets.router)
+    app.include_router(compliance.router)
     app.include_router(agent_runs.router)
     app.include_router(funnels.router)
     app.include_router(public_funnels.router)

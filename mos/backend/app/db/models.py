@@ -1637,6 +1637,50 @@ class ClientUserPreference(Base):
     )
 
 
+class ClientComplianceProfile(Base):
+    __tablename__ = "client_compliance_profiles"
+    __table_args__ = (
+        UniqueConstraint("org_id", "client_id", name="uq_client_compliance_profiles_org_client"),
+        sa.Index("idx_client_compliance_profiles_org_client", "org_id", "client_id"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    ruleset_version: Mapped[str] = mapped_column(Text, nullable=False)
+    business_models: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), server_default=sa.text("'{}'::text[]"), nullable=False
+    )
+
+    legal_business_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    operating_entity_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    company_address_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    business_license_identifier: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    support_email: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    support_phone: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    support_hours_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    response_time_commitment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    privacy_policy_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    terms_of_service_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    returns_refunds_policy_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    shipping_policy_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    contact_support_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    company_information_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    subscription_terms_and_cancellation_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
+        "metadata", JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ResearchRun(Base):
     __tablename__ = "research_runs"
 
