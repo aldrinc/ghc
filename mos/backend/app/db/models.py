@@ -220,6 +220,8 @@ class ProductVariant(Base):
     unit_price_measurement: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     quantity_rule: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     quantity_price_breaks: Mapped[Optional[list[dict[str, Any]]]] = mapped_column(JSONB, nullable=True)
+    shopify_last_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    shopify_last_sync_error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
 class ProductOfferBonus(Base):

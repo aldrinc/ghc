@@ -12,7 +12,7 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
 from app.db.repositories.assets import AssetsRepository
-from app.db.models import Asset, Product, ProductOffer, ProductOfferBonus, ProductVariant
+from app.db.models import Asset, ClientUserPreference, Product, ProductOffer, ProductOfferBonus, ProductVariant
 from app.schemas.shopify_connection import ShopifyCreateProductRequest, ShopifyProductCreateResponse
 from app.db.repositories.products import (
     ProductOfferBonusesRepository,
@@ -23,7 +23,11 @@ from app.db.repositories.products import (
 from app.services.assets import create_product_upload_asset
 from app.services.media_storage import MediaStorage
 from app.services.shopify_catalog import verify_shopify_product_exists
-from app.services.shopify_connection import create_client_shopify_product, get_client_shopify_connection_status
+from app.services.shopify_connection import (
+    create_client_shopify_product,
+    get_client_shopify_connection_status,
+    update_client_shopify_variant,
+)
 from app.schemas.products import (
     ProductCreateRequest,
     ProductOfferBonusCreateRequest,
@@ -56,6 +60,21 @@ _PRODUCT_ASSET_ALLOWED_SUMMARY = (
 _PRODUCT_ASSET_MAX_BYTES = 200 * 1024 * 1024
 _SHOPIFY_PRODUCT_GID_PREFIX = "gid://shopify/Product/"
 _SHOPIFY_VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/"
+_SHOPIFY_UNSYNCED_VARIANT_FIELDS = {
+    "currency",
+    "requiresShipping",
+    "taxable",
+    "weight",
+    "weightUnit",
+    "inventoryQuantity",
+    "incoming",
+    "nextIncomingDate",
+    "unitPrice",
+    "unitPriceMeasurement",
+    "quantityRule",
+    "quantityPriceBreaks",
+    "optionValues",
+}
 
 
 def _resolve_product_asset_content_type(file: UploadFile) -> str:
@@ -178,6 +197,22 @@ def _serialize_offer_with_bonuses(
     payload = jsonable_encoder(offer)
     payload["bonuses"] = bonuses
     return payload
+
+
+def _get_client_user_pref(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    user_external_id: str,
+) -> ClientUserPreference | None:
+    return session.scalar(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == org_id,
+            ClientUserPreference.client_id == client_id,
+            ClientUserPreference.user_external_id == user_external_id,
+        )
+    )
 
 
 def _require_offer_for_org(*, session: Session, offer_id: str, org_id: str) -> ProductOffer:
@@ -479,6 +514,7 @@ def create_shopify_product_for_product(
 
     product.shopify_product_gid = created["productGid"]
     session.add(product)
+    imported_at = datetime.now(timezone.utc)
     for variant in created["variants"]:
         session.add(
             ProductVariant(
@@ -488,6 +524,8 @@ def create_shopify_product_for_product(
                 currency=variant["currency"].lower(),
                 provider="shopify",
                 external_price_id=variant["variantGid"],
+                shopify_last_synced_at=imported_at,
+                shopify_last_sync_error=None,
             )
         )
     session.commit()
@@ -1018,6 +1056,102 @@ def update_variant(
         external_price_id=effective_external_price_id,
     )
 
+    is_shopify_managed = (
+        effective_provider == "shopify"
+        and isinstance(effective_external_price_id, str)
+        and effective_external_price_id.strip().startswith(_SHOPIFY_VARIANT_GID_PREFIX)
+    )
+
+    if is_shopify_managed and "currency" in fields_set and payload.currency is not None:
+        incoming_currency = payload.currency.strip().lower()
+        current_currency = (variant.currency or "").strip().lower()
+        if incoming_currency != current_currency:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Shopify-managed variant currency cannot be changed from MOS. "
+                    "Update currency directly in Shopify product settings."
+                ),
+            )
+
+    shopify_sync_succeeded = False
+    if is_shopify_managed:
+        unsupported_shopify_fields = sorted(name for name in fields_set if name in _SHOPIFY_UNSYNCED_VARIANT_FIELDS)
+        if unsupported_shopify_fields:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Shopify propagation does not support updating these fields from MOS: "
+                    f"{', '.join(unsupported_shopify_fields)}."
+                ),
+            )
+
+        shopify_fields: dict[str, object] = {}
+        if "title" in fields_set:
+            if payload.title is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="title cannot be null.")
+            shopify_fields["title"] = payload.title
+        if "price" in fields_set:
+            if payload.price is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="price cannot be null.")
+            shopify_fields["priceCents"] = payload.price
+        if "compareAtPrice" in fields_set:
+            shopify_fields["compareAtPriceCents"] = payload.compareAtPrice
+        if "sku" in fields_set:
+            shopify_fields["sku"] = payload.sku
+        if "barcode" in fields_set:
+            shopify_fields["barcode"] = payload.barcode
+        if "inventoryPolicy" in fields_set:
+            if payload.inventoryPolicy is None:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="inventoryPolicy cannot be null.")
+            shopify_fields["inventoryPolicy"] = payload.inventoryPolicy
+        if "inventoryManagement" in fields_set:
+            shopify_fields["inventoryManagement"] = payload.inventoryManagement
+
+        if shopify_fields:
+            try:
+                selected_shop_domain = _get_client_user_pref(
+                    session=session,
+                    org_id=auth.org_id,
+                    client_id=str(product.client_id),
+                    user_external_id=auth.user_id,
+                )
+                selected_shop = (
+                    selected_shop_domain.selected_shop_domain.strip().lower()
+                    if selected_shop_domain
+                    and isinstance(selected_shop_domain.selected_shop_domain, str)
+                    and selected_shop_domain.selected_shop_domain.strip()
+                    else None
+                )
+                status_payload = get_client_shopify_connection_status(
+                    client_id=str(product.client_id),
+                    selected_shop_domain=selected_shop,
+                )
+                if status_payload["state"] != "ready":
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Shopify connection is not ready: {status_payload['message']}",
+                    )
+                resolved_shop_domain = status_payload.get("shopDomain")
+                if not isinstance(resolved_shop_domain, str) or not resolved_shop_domain.strip():
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Shopify connection is ready but no shopDomain was resolved.",
+                    )
+                update_client_shopify_variant(
+                    client_id=str(product.client_id),
+                    variant_gid=effective_external_price_id.strip(),
+                    fields=shopify_fields,
+                    shop_domain=resolved_shop_domain,
+                )
+                shopify_sync_succeeded = True
+            except HTTPException as exc:
+                sync_error_detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+                variant.shopify_last_sync_error = sync_error_detail
+                session.add(variant)
+                session.commit()
+                raise
+
     fields: dict[str, object] = {}
     if payload.title is not None:
         fields["title"] = payload.title
@@ -1083,6 +1217,9 @@ def update_variant(
         fields["quantity_rule"] = payload.quantityRule
     if "quantityPriceBreaks" in fields_set:
         fields["quantity_price_breaks"] = payload.quantityPriceBreaks
+    if shopify_sync_succeeded:
+        fields["shopify_last_synced_at"] = datetime.now(timezone.utc)
+        fields["shopify_last_sync_error"] = None
 
     updated = variants_repo.update(variant_id=variant_id, **fields)
     if not updated:

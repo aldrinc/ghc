@@ -251,6 +251,269 @@ def test_update_variant_rejects_shopify_gid_with_non_shopify_provider(api_client
     assert update_resp.json()["detail"] == 'Shopify variant GIDs require provider="shopify".'
 
 
+def test_update_shopify_managed_variant_propagates_to_shopify(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Propagation")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/123456789",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    observed: dict[str, object] = {}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        observed["status_client_id"] = client_id
+        observed["selected_shop_domain"] = selected_shop_domain
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+        observed["update_client_id"] = client_id
+        observed["variant_gid"] = variant_gid
+        observed["fields"] = fields
+        observed["shop_domain"] = shop_domain
+        return {
+            "shopDomain": shop_domain or "example.myshopify.com",
+            "productGid": "gid://shopify/Product/101",
+            "variantGid": variant_gid,
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "update_client_shopify_variant", fake_update_variant)
+
+    update_resp = api_client.patch(
+        f"/products/variants/{variant_id}",
+        json={
+            "title": "Updated Variant",
+            "price": 10900,
+            "compareAtPrice": 12900,
+        },
+    )
+    assert update_resp.status_code == 200
+    body = update_resp.json()
+    assert body["title"] == "Updated Variant"
+    assert body["price"] == 10900
+    assert body["compare_at_price"] == 12900
+
+    assert observed["status_client_id"] == client_id
+    assert observed["variant_gid"] == "gid://shopify/ProductVariant/123456789"
+    assert observed["fields"] == {
+        "title": "Updated Variant",
+        "priceCents": 10900,
+        "compareAtPriceCents": 12900,
+    }
+    assert observed["shop_domain"] == "example.myshopify.com"
+    assert body["shopify_last_synced_at"] is not None
+    assert body["shopify_last_sync_error"] is None
+
+
+def test_update_shopify_managed_variant_propagates_inventory_related_fields(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Inventory Propagation")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/123456789",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    observed: dict[str, object] = {}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+        observed["variant_gid"] = variant_gid
+        observed["fields"] = fields
+        observed["shop_domain"] = shop_domain
+        return {
+            "shopDomain": shop_domain or "example.myshopify.com",
+            "productGid": "gid://shopify/Product/101",
+            "variantGid": variant_gid,
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "update_client_shopify_variant", fake_update_variant)
+
+    update_resp = api_client.patch(
+        f"/products/variants/{variant_id}",
+        json={
+            "sku": "SKU-001",
+            "barcode": "BAR-001",
+            "inventoryPolicy": "continue",
+            "inventoryManagement": "shopify",
+        },
+    )
+    assert update_resp.status_code == 200
+    body = update_resp.json()
+    assert body["sku"] == "SKU-001"
+    assert body["barcode"] == "BAR-001"
+    assert body["inventory_policy"] == "continue"
+    assert body["inventory_management"] == "shopify"
+    assert body["shopify_last_synced_at"] is not None
+    assert body["shopify_last_sync_error"] is None
+
+    assert observed["variant_gid"] == "gid://shopify/ProductVariant/123456789"
+    assert observed["fields"] == {
+        "sku": "SKU-001",
+        "barcode": "BAR-001",
+        "inventoryPolicy": "continue",
+        "inventoryManagement": "shopify",
+    }
+    assert observed["shop_domain"] == "example.myshopify.com"
+
+
+def test_update_shopify_managed_variant_records_sync_error(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Sync Error")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/123456789",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+        raise HTTPException(status_code=502, detail="Shopify checkout app error: upstream timeout")
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "update_client_shopify_variant", fake_update_variant)
+
+    update_resp = api_client.patch(
+        f"/products/variants/{variant_id}",
+        json={"price": 10900},
+    )
+    assert update_resp.status_code == 502
+    assert "upstream timeout" in update_resp.json()["detail"]
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    variants = detail_resp.json().get("variants") or []
+    updated_variant = next(item for item in variants if item["id"] == variant_id)
+    assert updated_variant["shopify_last_synced_at"] is None
+    assert updated_variant["shopify_last_sync_error"] == "Shopify checkout app error: upstream timeout"
+
+
+def test_update_shopify_managed_variant_requires_ready_shopify_connection(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Not Ready")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/123456789",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    called = {"value": False}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "installed_missing_storefront_token",
+            "message": "Shopify is installed but missing storefront access token.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": False,
+            "missingScopes": [],
+        }
+
+    def fake_update_variant(*, client_id: str, variant_gid: str, fields: dict, shop_domain: str | None = None):
+        called["value"] = True
+        return {}
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "update_client_shopify_variant", fake_update_variant)
+
+    update_resp = api_client.patch(
+        f"/products/variants/{variant_id}",
+        json={"price": 10100},
+    )
+    assert update_resp.status_code == 409
+    assert "Shopify connection is not ready" in update_resp.json()["detail"]
+    assert called["value"] is False
+
+
+def test_update_shopify_managed_variant_rejects_currency_change(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Currency Change")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/123456789",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    update_resp = api_client.patch(
+        f"/products/variants/{variant_id}",
+        json={"currency": "eur"},
+    )
+    assert update_resp.status_code == 409
+    assert "currency cannot be changed" in update_resp.json()["detail"]
+
+
 def test_create_shopify_product_for_product_imports_shopify_variants(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Shopify Product Import")
     product_id = _create_product(api_client, client_id=client_id, title="Primary Product")

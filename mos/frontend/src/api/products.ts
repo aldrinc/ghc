@@ -374,6 +374,7 @@ export function useUpdateVariant(variantId: string, productIdForInvalidation?: s
       title?: string;
       price?: number;
       currency?: string;
+      offerId?: string | null;
       compareAtPrice?: number | null;
       provider?: string | null;
       externalPriceId?: string | null;

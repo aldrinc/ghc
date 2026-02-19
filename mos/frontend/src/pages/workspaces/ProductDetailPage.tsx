@@ -24,10 +24,11 @@ import {
   useProductAssets,
   useRemoveOfferBonus,
   useUpdateProduct,
+  useUpdateVariant,
   useUploadProductAssets,
 } from "@/api/products";
 import { toast } from "@/components/ui/toast";
-import type { ProductAsset } from "@/types/products";
+import type { ProductAsset, ProductVariant } from "@/types/products";
 
 function formatBytes(value?: number | null): string | null {
   if (value === null || value === undefined) return null;
@@ -47,6 +48,13 @@ function assetLabel(asset: ProductAsset): string {
   if (typeof filename === "string" && filename.trim()) return filename;
   if (asset.content_type) return asset.content_type;
   return `Asset ${asset.id.slice(0, 8)}`;
+}
+
+function formatTimestamp(value?: string | null): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleString();
 }
 
 export function ProductDetailPage() {
@@ -78,6 +86,9 @@ export function ProductDetailPage() {
   const assetInputRef = useRef<HTMLInputElement | null>(null);
 
   const createVariant = useCreateVariant(productId || "");
+  const [variantFormMode, setVariantFormMode] = useState<"create" | "edit">("create");
+  const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null);
+  const updateVariant = useUpdateVariant(editingVariant?.id || "", productId || "");
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
 
@@ -150,6 +161,26 @@ export function ProductDetailPage() {
     setVariantProvider("stripe");
     setVariantExternalId("");
     setVariantOptionValues("");
+    setEditingVariant(null);
+    setVariantFormMode("create");
+  };
+
+  const openCreateVariantModal = () => {
+    resetVariantForm();
+    setIsVariantModalOpen(true);
+  };
+
+  const openEditVariantModal = (variant: ProductVariant) => {
+    setVariantFormMode("edit");
+    setEditingVariant(variant);
+    setVariantTitle(variant.title || "");
+    setVariantPrice(String(variant.price ?? ""));
+    setVariantCurrency((variant.currency || "").toLowerCase());
+    setVariantOfferId(variant.offer_id || "");
+    setVariantProvider(variant.provider || "");
+    setVariantExternalId(variant.external_price_id || "");
+    setVariantOptionValues(variant.option_values ? JSON.stringify(variant.option_values, null, 2) : "");
+    setIsVariantModalOpen(true);
   };
 
   const resetOfferForm = () => {
@@ -158,19 +189,24 @@ export function ProductDetailPage() {
     setOfferDescription("");
   };
 
-  const handleCreateVariant = async (event: React.FormEvent) => {
+  const handleSaveVariant = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!workspace || !productId) return;
     const price = Number(variantPrice);
-    if (!variantTitle.trim() || Number.isNaN(price) || price <= 0) {
+    const normalizedTitle = variantTitle.trim();
+    if (!normalizedTitle || Number.isNaN(price) || price <= 0) {
       toast.error("Variant title and price are required.");
       return;
     }
-    if (!variantCurrency.trim()) {
+    const normalizedCurrency = variantCurrency.trim().toLowerCase();
+    if (!normalizedCurrency) {
       toast.error("Currency is required.");
       return;
     }
-    if (variantExternalId.trim() && !variantProvider.trim()) {
+    const normalizedProvider = variantProvider.trim() || null;
+    const normalizedExternalPriceId = variantExternalId.trim() || null;
+    const normalizedOfferId = variantOfferId.trim() || null;
+    if (normalizedExternalPriceId && !normalizedProvider) {
       toast.error("Provider is required when external price ID is set.");
       return;
     }
@@ -187,15 +223,60 @@ export function ProductDetailPage() {
         return;
       }
     }
-    await createVariant.mutateAsync({
-      title: variantTitle.trim(),
-      price,
-      currency: variantCurrency.trim(),
-      offerId: variantOfferId.trim() || undefined,
-      provider: variantProvider.trim() || undefined,
-      externalPriceId: variantExternalId.trim() || undefined,
-      optionValues,
-    });
+
+    if (variantFormMode === "create") {
+      await createVariant.mutateAsync({
+        title: normalizedTitle,
+        price,
+        currency: normalizedCurrency,
+        offerId: normalizedOfferId || undefined,
+        provider: normalizedProvider || undefined,
+        externalPriceId: normalizedExternalPriceId || undefined,
+        optionValues,
+      });
+      resetVariantForm();
+      setIsVariantModalOpen(false);
+      return;
+    }
+
+    if (!editingVariant) {
+      toast.error("No variant selected for editing.");
+      return;
+    }
+
+    const patchPayload: {
+      title?: string;
+      price?: number;
+      currency?: string;
+      offerId?: string | null;
+      provider?: string | null;
+      externalPriceId?: string | null;
+      optionValues?: Record<string, unknown> | null;
+    } = {};
+
+    if (normalizedTitle !== editingVariant.title) patchPayload.title = normalizedTitle;
+    if (price !== editingVariant.price) patchPayload.price = price;
+    if (normalizedCurrency !== (editingVariant.currency || "").trim().toLowerCase()) {
+      patchPayload.currency = normalizedCurrency;
+    }
+    if (normalizedOfferId !== (editingVariant.offer_id || null)) patchPayload.offerId = normalizedOfferId;
+    if (normalizedProvider !== (editingVariant.provider || null)) patchPayload.provider = normalizedProvider;
+    if (normalizedExternalPriceId !== (editingVariant.external_price_id || null)) {
+      patchPayload.externalPriceId = normalizedExternalPriceId;
+    }
+
+    const currentOptionValues = editingVariant.option_values || null;
+    const nextOptionValues = optionValues || null;
+    if (JSON.stringify(currentOptionValues) !== JSON.stringify(nextOptionValues)) {
+      patchPayload.optionValues = nextOptionValues;
+    }
+
+    if (!Object.keys(patchPayload).length) {
+      toast.error("No variant changes to save.");
+      return;
+    }
+
+    await updateVariant.mutateAsync(patchPayload);
     resetVariantForm();
     setIsVariantModalOpen(false);
   };
@@ -501,6 +582,7 @@ export function ProductDetailPage() {
     updateShopifyInstallation.isPending ||
     disconnectShopifyInstallation.isPending ||
     setDefaultShop.isPending;
+  const isSavingVariant = createVariant.isPending || updateVariant.isPending;
   const isShopifyReady = shopifyState === "ready";
   const hasMappedShopifyProduct = Boolean((productDetail?.shopify_product_gid || "").trim());
 
@@ -533,7 +615,7 @@ export function ProductDetailPage() {
             <Button size="sm" variant="secondary" onClick={() => setIsOfferModalOpen(true)} disabled={!productDetail}>
               New offer
             </Button>
-            <Button size="sm" onClick={() => setIsVariantModalOpen(true)} disabled={!productDetail}>
+            <Button size="sm" onClick={openCreateVariantModal} disabled={!productDetail}>
               New variant
             </Button>
           </div>
@@ -1029,53 +1111,86 @@ export function ProductDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-xs font-semibold uppercase text-content-muted">Variants</div>
-                  <div className="text-xs text-content-muted">Pricing, provider, and option values.</div>
+                  <div className="text-xs text-content-muted">Pricing, provider, option values, and sync status.</div>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => setIsVariantModalOpen(true)}>
+                <Button size="sm" variant="secondary" onClick={openCreateVariantModal}>
                   New variant
                 </Button>
               </div>
 
               <div className="mt-4 space-y-3">
                 {productDetail.variants.length ? (
-                  productDetail.variants.map((variant) => (
-                    <div key={variant.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-content truncate">{variant.title}</div>
-                          <div className="text-xs text-content-muted">
-                            {variant.price} {variant.currency.toUpperCase()}
-                            {variant.provider ? ` · ${variant.provider}` : ""}
+                  productDetail.variants.map((variant) => {
+                    const isShopifyMapped =
+                      variant.provider === "shopify" &&
+                      typeof variant.external_price_id === "string" &&
+                      variant.external_price_id.startsWith("gid://shopify/ProductVariant/");
+                    const syncTimestamp = formatTimestamp(variant.shopify_last_synced_at);
+                    const syncError = variant.shopify_last_sync_error?.trim() || null;
+                    const syncStatus = !isShopifyMapped
+                      ? "Not Shopify"
+                      : syncError
+                        ? "Error"
+                        : syncTimestamp
+                          ? "Synced"
+                          : "Pending";
+
+                    return (
+                      <div key={variant.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-content truncate">{variant.title}</div>
+                            <div className="text-xs text-content-muted">
+                              {variant.price} {variant.currency.toUpperCase()}
+                              {variant.provider ? ` · ${variant.provider}` : ""}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => openEditVariantModal(variant)}
+                              disabled={isSavingVariant}
+                            >
+                              Edit
+                            </Button>
+                            <div className="text-[10px] text-content-muted">{variant.id.slice(0, 8)}</div>
                           </div>
                         </div>
-                        <div className="text-[10px] text-content-muted">{variant.id.slice(0, 8)}</div>
+                        <div className="grid gap-2 text-xs text-content-muted">
+                          <div>
+                            <span className="font-semibold text-content">Shopify mapping:</span>{" "}
+                            {isShopifyMapped
+                              ? "Ready"
+                              : variant.provider === "shopify"
+                                ? "Missing valid Shopify variant GID"
+                                : "Not Shopify"}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">Sync status:</span> {syncStatus}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">Last synced:</span> {syncTimestamp || "—"}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">Last sync error:</span> {syncError || "—"}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">External price ID:</span>{" "}
+                            {variant.external_price_id || "—"}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">Offer:</span>{" "}
+                            {variant.offer_id ? offerNameById.get(variant.offer_id) || variant.offer_id : "—"}
+                          </div>
+                          <div>
+                            <span className="font-semibold text-content">Option values:</span>{" "}
+                            {variant.option_values ? JSON.stringify(variant.option_values) : "—"}
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid gap-2 text-xs text-content-muted">
-                        <div>
-                          <span className="font-semibold text-content">Shopify mapping:</span>{" "}
-                          {variant.provider === "shopify" &&
-                          typeof variant.external_price_id === "string" &&
-                          variant.external_price_id.startsWith("gid://shopify/ProductVariant/")
-                            ? "Ready"
-                            : variant.provider === "shopify"
-                              ? "Missing valid Shopify variant GID"
-                              : "Not Shopify"}
-                        </div>
-                        <div>
-                          <span className="font-semibold text-content">External price ID:</span>{" "}
-                          {variant.external_price_id || "—"}
-                        </div>
-                        <div>
-                          <span className="font-semibold text-content">Offer:</span>{" "}
-                          {variant.offer_id ? offerNameById.get(variant.offer_id) || variant.offer_id : "—"}
-                        </div>
-                        <div>
-                          <span className="font-semibold text-content">Option values:</span>{" "}
-                          {variant.option_values ? JSON.stringify(variant.option_values) : "—"}
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="text-sm text-content-muted">No variants yet.</div>
                 )}
@@ -1133,11 +1248,19 @@ export function ProductDetailPage() {
         </DialogContent>
       </DialogRoot>
 
-      <DialogRoot open={isVariantModalOpen} onOpenChange={setIsVariantModalOpen}>
+      <DialogRoot
+        open={isVariantModalOpen}
+        onOpenChange={(open) => {
+          setIsVariantModalOpen(open);
+          if (!open) resetVariantForm();
+        }}
+      >
         <DialogContent>
-          <DialogTitle>New variant</DialogTitle>
-          <DialogDescription>Attach pricing and (optionally) a Stripe or Shopify external ID.</DialogDescription>
-          <form className="space-y-3" onSubmit={handleCreateVariant}>
+          <DialogTitle>{variantFormMode === "create" ? "New variant" : "Edit variant"}</DialogTitle>
+          <DialogDescription>
+            Attach pricing and (optionally) a Stripe or Shopify external ID.
+          </DialogDescription>
+          <form className="space-y-3" onSubmit={handleSaveVariant}>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-content">Title</label>
               <Input
@@ -1223,8 +1346,14 @@ export function ProductDetailPage() {
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={!productId || createVariant.isPending}>
-                {createVariant.isPending ? "Creating…" : "Create variant"}
+              <Button type="submit" disabled={!productId || isSavingVariant}>
+                {isSavingVariant
+                  ? variantFormMode === "create"
+                    ? "Creating…"
+                    : "Saving…"
+                  : variantFormMode === "create"
+                    ? "Create variant"
+                    : "Save variant"}
               </Button>
             </div>
           </form>
