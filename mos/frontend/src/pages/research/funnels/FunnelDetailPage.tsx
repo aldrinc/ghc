@@ -132,7 +132,9 @@ export function FunnelDetailPage() {
     navigate(`/research/funnels/${funnelId}/pages/${page.id}`);
   };
 
-  const productRouteSlug = normalizeRouteToken(funnelProduct?.handle || funnelProduct?.id || "");
+  const productRouteSlug = normalizeRouteToken(
+    funnelProduct?.handle || funnelProduct?.id || funnel?.product_id || ""
+  );
   const publicBase = funnel?.route_slug && productRouteSlug ? `/f/${productRouteSlug}/${funnel.route_slug}` : null;
   const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
   const deployWorkloadName = funnel?.client_id ? `brand-funnels-${funnel.client_id}` : undefined;

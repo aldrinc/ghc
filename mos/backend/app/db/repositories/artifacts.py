@@ -1,14 +1,35 @@
 from typing import List, Optional
-from sqlalchemy import select, desc
+from uuid import UUID
+
+from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
 
 from app.db.enums import ArtifactTypeEnum
-from app.db.models import Artifact
+from app.db.models import Artifact, User
 
 
 class ArtifactsRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    def _resolve_created_by_user_id(self, *, org_id: str, created_by_user: Optional[str]) -> Optional[str]:
+        candidate = (created_by_user or "").strip()
+        if not candidate:
+            return None
+
+        try:
+            user_id = str(UUID(candidate))
+            user = self.session.scalars(
+                select(User.id).where(User.org_id == org_id, User.id == user_id)
+            ).first()
+            return str(user) if user else None
+        except ValueError:
+            pass
+
+        user = self.session.scalars(
+            select(User.id).where(User.org_id == org_id, User.clerk_user_id == candidate)
+        ).first()
+        return str(user) if user else None
 
     def list(
         self,
@@ -81,6 +102,10 @@ class ArtifactsRepository:
         created_by_user: Optional[str] = None,
         version: int = 1,
     ) -> Artifact:
+        resolved_created_by_user = self._resolve_created_by_user_id(
+            org_id=org_id,
+            created_by_user=created_by_user,
+        )
         artifact = Artifact(
             org_id=org_id,
             client_id=client_id,
@@ -88,7 +113,7 @@ class ArtifactsRepository:
             campaign_id=campaign_id,
             type=artifact_type,
             data=data,
-            created_by_user=created_by_user,
+            created_by_user=resolved_created_by_user,
             version=version,
         )
         self.session.add(artifact)

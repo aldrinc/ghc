@@ -37,7 +37,7 @@ export function FunnelsPage() {
   }, [isModalOpen, productDetail?.offers]);
 
   const canCreate = Boolean(clientId && product?.id && name.trim());
-  const productRouteSlug = normalizeRouteToken(productDetail?.handle || productDetail?.id || "");
+  const productRouteSlug = normalizeRouteToken(productDetail?.handle || productDetail?.id || product?.id || "");
 
   const statusTone = useMemo(() => {
     return (status: string) => {
