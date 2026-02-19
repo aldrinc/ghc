@@ -1,8 +1,11 @@
 from fastapi.testclient import TestClient
 from sqlalchemy import select
+from sqlalchemy.exc import ProgrammingError
 
+from app.config import settings
 from app.db.enums import FunnelDomainStatusEnum
 from app.db.models import Funnel, FunnelDomain
+from app.db.repositories.funnels import FunnelsRepository
 from app.services import deploy as deploy_service
 
 
@@ -546,3 +549,27 @@ def test_get_funnel_deploy_job_status(api_client: TestClient, monkeypatch):
     assert body["id"] == "job-789"
     assert body["status"] == "succeeded"
     assert body["access_urls"] == ["https://landing.example.com/"]
+
+
+def test_funnels_schema_mismatch_returns_clean_503_with_cors(api_client: TestClient, monkeypatch):
+    origin = settings.BACKEND_CORS_ORIGINS[0]
+
+    class _UndefinedColumnError(Exception):
+        pgcode = "42703"
+
+        def __str__(self) -> str:
+            return 'column "route_slug" does not exist'
+
+    def raise_schema_error(_self, **_kwargs):
+        raise ProgrammingError("SELECT * FROM funnels", {}, _UndefinedColumnError())
+
+    monkeypatch.setattr(FunnelsRepository, "list", raise_schema_error)
+
+    resp = api_client.get(
+        "/funnels?clientId=test-client&productId=test-product",
+        headers={"Origin": origin},
+    )
+
+    assert resp.status_code == 503
+    assert "Database schema is out of date." in resp.json()["detail"]
+    assert resp.headers.get("access-control-allow-origin") == origin

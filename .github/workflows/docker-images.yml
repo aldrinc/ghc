@@ -212,3 +212,5 @@ jobs:
             docker login "$IMAGE_REGISTRY" -u "${{ secrets.GHCR_USERNAME }}" -p "${{ secrets.GHCR_TOKEN }}"
             IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml pull
             IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml up -d
+            IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml exec -T backend alembic upgrade head
+            IMAGE_REGISTRY="$IMAGE_REGISTRY" IMAGE_TAG="$IMAGE_TAG" $DOCKER_COMPOSE -f mos/infra/docker-compose.deploy.yml restart backend worker

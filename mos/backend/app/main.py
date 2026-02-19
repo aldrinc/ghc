@@ -1,8 +1,11 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 
 from sqlalchemy import text
+from sqlalchemy.exc import ProgrammingError
 
 from app.config import settings
 from app.db.base import engine
@@ -33,17 +36,28 @@ from app.routers import (
     deploy,
 )
 
+logger = logging.getLogger(__name__)
+
+
+def _is_schema_mismatch_programming_error(exc: ProgrammingError) -> bool:
+    orig = getattr(exc, "orig", None)
+    if getattr(orig, "pgcode", None) == "42703":
+        return True
+    message = str(orig or exc).lower()
+    return any(
+        marker in message
+        for marker in (
+            "undefined column",
+            "does not exist",
+            "no such column",
+        )
+    )
+
 
 def create_app() -> FastAPI:
     app = FastAPI(title="mOS Platform API", default_response_class=ORJSONResponse)
 
-    allow_origins = sorted(
-        {
-            *settings.BACKEND_CORS_ORIGINS,
-            "http://localhost:5275",
-            "http://127.0.0.1:5275",
-        }
-    )
+    allow_origins = sorted(set(settings.BACKEND_CORS_ORIGINS))
 
     app.add_middleware(
         CORSMiddleware,
@@ -58,6 +72,23 @@ def create_app() -> FastAPI:
         _request: Request, exc: MediaStorageConfigurationError
     ) -> ORJSONResponse:
         return ORJSONResponse(status_code=500, content={"detail": str(exc)})
+
+    @app.exception_handler(ProgrammingError)
+    async def programming_error_handler(_request: Request, exc: ProgrammingError) -> ORJSONResponse:
+        logger.exception("Database programming error", exc_info=exc)
+        if _is_schema_mismatch_programming_error(exc):
+            return ORJSONResponse(
+                status_code=503,
+                content={
+                    "detail": "Database schema is out of date. Run `alembic upgrade head` and redeploy."
+                },
+            )
+        return ORJSONResponse(status_code=500, content={"detail": "Database query failed."})
+
+    @app.exception_handler(Exception)
+    async def unhandled_exception_handler(_request: Request, exc: Exception) -> ORJSONResponse:
+        logger.exception("Unhandled server exception", exc_info=exc)
+        return ORJSONResponse(status_code=500, content={"detail": "Internal server error."})
 
     @app.get("/health")
     async def health() -> dict[str, bool]:
