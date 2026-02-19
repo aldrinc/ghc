@@ -1055,7 +1055,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          publicId: runtime.publicId,
+          funnelSlug: runtime.funnelSlug,
           variantId: variant.id,
           selection,
           quantity: 1,

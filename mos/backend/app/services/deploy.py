@@ -7,8 +7,9 @@ import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Any, Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.config import settings
 
@@ -64,7 +65,15 @@ def _find_latest_plan() -> Optional[Path]:
     ch_dir = _cloudhand_dir()
     if not ch_dir.exists():
         return None
-    plans = sorted(ch_dir.glob("plan-*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    plans = sorted(
+        (
+            path
+            for path in ch_dir.glob("plan-*.json")
+            if not path.name.startswith("plan-apply-")
+        ),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     return plans[0] if plans else None
 
 
@@ -271,7 +280,7 @@ def _deep_merge(dst: Any, patch: Any) -> Any:
 def build_funnel_publication_workload_patch(
     *,
     workload_name: str,
-    funnel_public_id: str,
+    client_id: str,
     upstream_base_url: str,
     upstream_api_base_url: str,
     server_names: list[str],
@@ -283,16 +292,11 @@ def build_funnel_publication_workload_patch(
         raise DeployError("Deploy workloadName must be non-empty.")
     _ = upstream_base_url
 
-    public_id = funnel_public_id.strip()
-    if not public_id:
-        raise DeployError("Funnel public_id must be non-empty.")
+    resolved_client_id = client_id.strip()
+    if not resolved_client_id:
+        raise DeployError("Deploy client_id must be non-empty.")
 
-    api_base_url = upstream_api_base_url.strip().rstrip("/")
-    if not api_base_url.startswith(("http://", "https://")):
-        raise DeployError("Deploy upstreamApiBaseUrl must start with http:// or https://.")
-    suffix = f"/public/funnels/{public_id}"
-    api_base_root = api_base_url[:-len(suffix)] if api_base_url.endswith(suffix) else api_base_url
-    api_base_root = api_base_root.rstrip("/")
+    api_base_root = upstream_api_base_url.strip().rstrip("/")
     if not api_base_root.startswith(("http://", "https://")):
         raise DeployError("Deploy upstreamApiBaseUrl must start with http:// or https://.")
 
@@ -319,16 +323,14 @@ def build_funnel_publication_workload_patch(
         "name": name,
         "source_type": "funnel_artifact",
         "source_ref": {
-            "public_id": public_id,
+            "client_id": resolved_client_id,
             "upstream_api_base_root": api_base_root,
             "runtime_dist_path": settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH,
             "artifact": {
                 "meta": {
-                    "publicId": public_id,
-                    "entrySlug": "",
-                    "pages": [],
+                    "clientId": resolved_client_id,
                 },
-                "pages": {},
+                "products": {},
             },
         },
         "repo_url": None,
@@ -352,7 +354,7 @@ def build_funnel_publication_workload_patch(
 def build_funnel_artifact_workload_patch(
     *,
     workload_name: str,
-    funnel_public_id: str,
+    client_id: str,
     upstream_base_url: str,
     upstream_api_base_url: str,
     server_names: list[str],
@@ -361,7 +363,7 @@ def build_funnel_artifact_workload_patch(
 ) -> dict[str, Any]:
     return build_funnel_publication_workload_patch(
         workload_name=workload_name,
-        funnel_public_id=funnel_public_id,
+        client_id=client_id,
         upstream_base_url=upstream_base_url,
         upstream_api_base_url=upstream_api_base_url,
         server_names=server_names,
@@ -370,101 +372,169 @@ def build_funnel_artifact_workload_patch(
     )
 
 
-def build_funnel_artifact_payload(
+def build_client_funnel_runtime_artifact_payload(
     *,
     session: Any,
     org_id: str,
-    funnel_id: str,
-    publication_id: str,
+    client_id: str,
+    updated_from_funnel_id: str,
+    updated_from_publication_id: str,
 ) -> dict[str, Any]:
     from fastapi.encoders import jsonable_encoder
     from sqlalchemy import select
 
-    from app.db.models import (
-        Funnel,
-        FunnelPage,
-        FunnelPageSlugRedirect,
-        Product,
-        ProductVariant,
-    )
+    from app.db.enums import FunnelStatusEnum
+    from app.db.models import Funnel, FunnelPage, Product, ProductVariant
     from app.db.repositories.funnels import FunnelPublicRepository
     from app.services.design_systems import resolve_design_system_tokens
+    from app.services.public_routing import require_product_route_slug
 
-    funnel = session.scalars(select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)).first()
-    if not funnel:
-        raise DeployError("Funnel not found while creating deploy artifact.")
+    template_to_artifact: dict[str, str] = {
+        "pre-sales-listicle": "presales",
+        "sales-pdp": "sales",
+    }
+
+    client_funnels = list(
+        session.scalars(
+            select(Funnel).where(
+                Funnel.org_id == org_id,
+                Funnel.client_id == client_id,
+                Funnel.active_publication_id.is_not(None),
+                Funnel.status != FunnelStatusEnum.disabled,
+            ).order_by(Funnel.created_at.asc(), Funnel.id.asc())
+        ).all()
+    )
+    if not client_funnels:
+        raise DeployError("No published funnels found for client deploy artifact.")
+
+    product_ids: set[str] = set()
+    for client_funnel in client_funnels:
+        if not client_funnel.product_id:
+            raise DeployError(f"Published funnel '{client_funnel.id}' is missing product_id.")
+        product_ids.add(str(client_funnel.product_id))
+
+    products = list(
+        session.scalars(
+            select(Product).where(
+                Product.org_id == org_id,
+                Product.id.in_(product_ids),
+            )
+        ).all()
+    )
+    products_by_id = {str(product.id): product for product in products}
+    missing_product_ids = sorted(pid for pid in product_ids if pid not in products_by_id)
+    if missing_product_ids:
+        raise DeployError(
+            "Missing products for published funnels in deploy artifact generation: "
+            + ", ".join(missing_product_ids)
+        )
 
     public_repo = FunnelPublicRepository(session)
-    publication = public_repo.get_active_publication(funnel_id=str(funnel.id), publication_id=publication_id)
-    if not publication:
-        raise DeployError("Publication not found while creating deploy artifact.")
+    products_payload: dict[str, dict[str, Any]] = {}
+    product_slug_to_product_id: dict[str, str] = {}
 
-    publication_pages = public_repo.list_publication_pages(publication_id=publication_id)
-    if not publication_pages:
-        raise DeployError("Publication contains no pages.")
+    for client_funnel in client_funnels:
+        route_slug = (client_funnel.route_slug or "").strip()
+        if not route_slug:
+            raise DeployError("Published funnel is missing route_slug.")
 
-    entry_slug = None
-    page_map = {str(item.page_id): item.slug_at_publish for item in publication_pages}
-    pages_payload: dict[str, dict[str, Any]] = {}
+        product_id = str(client_funnel.product_id)
+        product = products_by_id.get(product_id)
+        if not product:
+            raise DeployError(f"Product '{product_id}' not found while creating deploy artifact.")
 
-    for item in publication_pages:
-        if str(item.page_id) == str(publication.entry_page_id):
-            entry_slug = item.slug_at_publish
+        try:
+            product_slug = require_product_route_slug(product=product)
+        except ValueError as exc:
+            raise DeployError(str(exc)) from exc
 
-        version = public_repo.get_page_version(version_id=str(item.page_version_id))
-        if not version:
-            raise DeployError(f"Publication page '{item.page_id}' has no version.")
+        existing_product_id = product_slug_to_product_id.get(product_slug)
+        if existing_product_id and existing_product_id != product_id:
+            raise DeployError(
+                f"Product route slug '{product_slug}' is used by multiple products. "
+                "Ensure product ids have unique 8-character prefixes."
+            )
+        product_slug_to_product_id[product_slug] = product_id
 
-        page = session.scalars(select(FunnelPage).where(FunnelPage.id == item.page_id)).first()
-        tokens = resolve_design_system_tokens(
-            session=session,
-            org_id=str(funnel.org_id),
-            client_id=str(funnel.client_id),
-            funnel=funnel,
-            page=page,
+        active_publication_id = str(client_funnel.active_publication_id or "").strip()
+        if not active_publication_id:
+            raise DeployError(f"Published funnel '{client_funnel.id}' has no active publication.")
+        active_publication = public_repo.get_active_publication(
+            funnel_id=str(client_funnel.id),
+            publication_id=active_publication_id,
         )
-        pages_payload[item.slug_at_publish] = {
-            "funnelId": str(funnel.id),
-            "publicationId": publication_id,
-            "pageId": str(item.page_id),
-            "slug": item.slug_at_publish,
-            "puckData": version.puck_data,
-            "pageMap": page_map,
-            "designSystemTokens": tokens,
-            "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
-        }
+        if not active_publication:
+            raise DeployError(f"Active publication not found for funnel '{client_funnel.id}'.")
+        publication_pages = public_repo.list_publication_pages(publication_id=active_publication_id)
+        if not publication_pages:
+            raise DeployError(f"Publication '{active_publication_id}' contains no pages.")
 
-    if not entry_slug:
-        raise DeployError("Entry page slug not found in publication.")
+        page_details: list[tuple[str, str, Any, FunnelPage | None]] = []
+        entry_slug: str | None = None
+        seen_artifacts: set[str] = set()
 
-    redirects = session.scalars(
-        select(FunnelPageSlugRedirect).where(FunnelPageSlugRedirect.funnel_id == funnel.id)
-    ).all()
-    for redirect in redirects:
-        from_slug = (redirect.from_slug or "").strip()
-        if not from_slug:
-            continue
-        if "/" in from_slug or "\\" in from_slug:
-            continue
-        pages_payload[from_slug] = {"redirectToSlug": redirect.to_slug}
+        for item in publication_pages:
+            version = public_repo.get_page_version(version_id=str(item.page_version_id))
+            if not version:
+                raise DeployError(f"Publication page '{item.page_id}' has no version.")
+            page = session.scalars(select(FunnelPage).where(FunnelPage.id == item.page_id)).first()
+            template_id = (page.template_id if page else None) or ""
+            artifact_slug = template_to_artifact.get(template_id)
+            if not artifact_slug:
+                raise DeployError(
+                    f"Page '{item.page_id}' in funnel '{client_funnel.id}' has unsupported template '{template_id or 'unknown'}'."
+                )
+            if artifact_slug in seen_artifacts:
+                raise DeployError(
+                    f"Funnel '{client_funnel.id}' has multiple pages mapped to artifact '{artifact_slug}'."
+                )
+            seen_artifacts.add(artifact_slug)
+            page_details.append((artifact_slug, str(item.page_id), version, page))
+            if str(item.page_id) == str(active_publication.entry_page_id):
+                entry_slug = artifact_slug
 
-    commerce_payload: dict[str, Any] | None = None
-    if funnel.product_id:
-        product = session.scalars(
-            select(Product).where(Product.id == funnel.product_id, Product.org_id == funnel.org_id)
-        ).first()
-        if product:
-            variants = session.scalars(
-                select(ProductVariant).where(ProductVariant.product_id == product.id)
-            ).all()
-            serialized_variants: list[dict[str, Any]] = []
-            for variant in variants:
-                data = jsonable_encoder(variant)
-                data.pop("external_price_id", None)
-                serialized_variants.append(data)
+        if not entry_slug:
+            raise DeployError(f"Entry page artifact slug not found for funnel '{client_funnel.id}'.")
+
+        page_map = {page_id: artifact_slug for artifact_slug, page_id, _, _ in page_details}
+        pages_payload: dict[str, dict[str, Any]] = {}
+        for artifact_slug, page_id, version, page in page_details:
+            tokens = resolve_design_system_tokens(
+                session=session,
+                org_id=str(client_funnel.org_id),
+                client_id=str(client_funnel.client_id),
+                funnel=client_funnel,
+                page=page,
+            )
+            pages_payload[artifact_slug] = {
+                "productSlug": product_slug,
+                "funnelId": str(client_funnel.id),
+                "funnelSlug": route_slug,
+                "publicationId": active_publication_id,
+                "pageId": page_id,
+                "slug": artifact_slug,
+                "puckData": version.puck_data,
+                "pageMap": page_map,
+                "designSystemTokens": tokens,
+                "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
+            }
+
+        variants_query = select(ProductVariant).where(ProductVariant.product_id == product.id)
+        if client_funnel.selected_offer_id:
+            variants_query = variants_query.where(ProductVariant.offer_id == client_funnel.selected_offer_id)
+        variants = session.scalars(variants_query).all()
+        serialized_variants: list[dict[str, Any]] = []
+        for variant in variants:
+            data = jsonable_encoder(variant)
+            data.pop("external_price_id", None)
+            serialized_variants.append(data)
+
+        commerce_payload: dict[str, Any] | None = None
+        if serialized_variants:
             commerce_payload = {
-                "publicId": str(funnel.public_id),
-                "funnelId": str(funnel.id),
+                "productSlug": product_slug,
+                "funnelSlug": route_slug,
+                "funnelId": str(client_funnel.id),
                 "product": {
                     **jsonable_encoder(product),
                     "variants": serialized_variants,
@@ -472,16 +542,93 @@ def build_funnel_artifact_payload(
                 },
             }
 
+        product_bucket = products_payload.setdefault(
+            product_slug,
+            {
+                "meta": {
+                    "productId": product_id,
+                    "productSlug": product_slug,
+                },
+                "funnels": {},
+            },
+        )
+        funnels_payload = product_bucket.get("funnels")
+        if not isinstance(funnels_payload, dict):
+            raise DeployError(f"Artifact product '{product_slug}' has an invalid funnels payload.")
+        if route_slug in funnels_payload:
+            raise DeployError(
+                f"Duplicate funnel route slug '{route_slug}' within artifact product '{product_slug}'."
+            )
+
+        funnels_payload[route_slug] = {
+            "meta": {
+                "productSlug": product_slug,
+                "funnelSlug": route_slug,
+                "funnelId": str(client_funnel.id),
+                "publicationId": active_publication_id,
+                "entrySlug": entry_slug,
+                "pages": [{"pageId": page_id, "slug": artifact_slug} for artifact_slug, page_id, _, _ in page_details],
+            },
+            "pages": pages_payload,
+            "commerce": commerce_payload,
+        }
+
     return {
         "meta": {
-            "publicId": str(funnel.public_id),
-            "funnelId": str(funnel.id),
-            "publicationId": publication_id,
-            "entrySlug": entry_slug,
-            "pages": [{"pageId": str(item.page_id), "slug": item.slug_at_publish} for item in publication_pages],
+            "clientId": str(client_id),
+            "updatedFromFunnelId": updated_from_funnel_id,
+            "updatedFromPublicationId": updated_from_publication_id,
         },
-        "pages": pages_payload,
-        "commerce": commerce_payload,
+        "products": products_payload,
+    }
+
+
+def persist_client_funnel_runtime_artifact(
+    *,
+    session: Any,
+    org_id: str,
+    funnel_id: str,
+    publication_id: str,
+    created_by_user_id: str | None = None,
+) -> dict[str, Any]:
+    from sqlalchemy import select
+
+    from app.db.enums import ArtifactTypeEnum
+    from app.db.models import Funnel
+    from app.db.repositories.artifacts import ArtifactsRepository
+
+    funnel = session.scalars(select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)).first()
+    if not funnel:
+        raise DeployError("Funnel not found while creating deploy artifact.")
+
+    client_id = str(funnel.client_id)
+    payload = build_client_funnel_runtime_artifact_payload(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        updated_from_funnel_id=str(funnel.id),
+        updated_from_publication_id=publication_id,
+    )
+
+    artifacts_repo = ArtifactsRepository(session)
+    latest = artifacts_repo.get_latest_by_type(
+        org_id=org_id,
+        client_id=client_id,
+        artifact_type=ArtifactTypeEnum.funnel_runtime_bundle,
+    )
+    next_version = int(latest.version) + 1 if latest and latest.version else 1
+    artifact = artifacts_repo.insert(
+        org_id=org_id,
+        client_id=client_id,
+        artifact_type=ArtifactTypeEnum.funnel_runtime_bundle,
+        data=payload,
+        created_by_user=created_by_user_id,
+        version=next_version,
+    )
+    return {
+        "artifact_id": str(artifact.id),
+        "artifact_version": int(artifact.version),
+        "client_id": client_id,
     }
 
 
@@ -492,6 +639,7 @@ def hydrate_funnel_artifact_workload_patch(
     funnel_id: str,
     publication_id: str,
     workload_patch: dict[str, Any],
+    created_by_user_id: str | None = None,
 ) -> dict[str, Any]:
     source_type = str(workload_patch.get("source_type") or "").strip().lower()
     if source_type != "funnel_artifact":
@@ -501,16 +649,24 @@ def hydrate_funnel_artifact_workload_patch(
     if not isinstance(source_ref, dict):
         raise DeployError("funnel_artifact workload patch is missing source_ref.")
 
-    artifact = source_ref.get("artifact")
-    if isinstance(artifact, dict) and artifact.get("pages"):
-        return workload_patch
-
-    source_ref["artifact"] = build_funnel_artifact_payload(
+    artifact_ref = persist_client_funnel_runtime_artifact(
         session=session,
         org_id=org_id,
         funnel_id=funnel_id,
         publication_id=publication_id,
+        created_by_user_id=created_by_user_id,
     )
+    source_ref["client_id"] = str(artifact_ref["client_id"])
+    source_ref["artifact_id"] = str(artifact_ref["artifact_id"])
+    source_ref["artifact_version"] = int(artifact_ref["artifact_version"])
+    source_ref["artifact"] = {
+        "meta": {
+            "clientId": str(artifact_ref["client_id"]),
+            "artifactId": str(artifact_ref["artifact_id"]),
+            "artifactVersion": int(artifact_ref["artifact_version"]),
+        },
+        "products": {},
+    }
     workload_patch["source_ref"] = source_ref
     return workload_patch
 
@@ -678,6 +834,285 @@ def ensure_plan_for_funnel_publish_workload(
     return {"plan_path": saved["path"], "bootstrapped": True}
 
 
+def _load_funnel_runtime_artifact_payload_for_apply(*, artifact_id: str) -> dict[str, Any]:
+    from sqlalchemy import select
+
+    from app.db.base import SessionLocal
+    from app.db.enums import ArtifactTypeEnum
+    from app.db.models import Artifact
+
+    session = SessionLocal()
+    try:
+        artifact = session.scalars(select(Artifact).where(Artifact.id == artifact_id)).first()
+    finally:
+        session.close()
+
+    if not artifact:
+        raise DeployError(f"Funnel runtime artifact '{artifact_id}' was not found.")
+    if artifact.type != ArtifactTypeEnum.funnel_runtime_bundle:
+        raise DeployError(
+            f"Artifact '{artifact_id}' has type '{artifact.type.value}' but expected '{ArtifactTypeEnum.funnel_runtime_bundle.value}'."
+        )
+    data = artifact.data
+    if not isinstance(data, dict):
+        raise DeployError(f"Artifact '{artifact_id}' payload is invalid.")
+    if not isinstance(data.get("meta"), dict):
+        raise DeployError(f"Artifact '{artifact_id}' payload is missing meta.")
+    if not isinstance(data.get("products"), dict):
+        raise DeployError(f"Artifact '{artifact_id}' payload is missing products.")
+    return data
+
+
+def _load_product_route_context_for_apply(*, product_id: str) -> tuple[str, str]:
+    from sqlalchemy import select
+
+    from app.db.base import SessionLocal
+    from app.db.models import Product
+    from app.services.public_routing import require_product_route_slug
+
+    try:
+        normalized_product_id = str(UUID(str(product_id).strip()))
+    except ValueError as exc:
+        raise DeployError(f"Invalid product_id '{product_id}' in funnel artifact source_ref.") from exc
+
+    session = SessionLocal()
+    try:
+        product = session.scalars(select(Product).where(Product.id == normalized_product_id)).first()
+    finally:
+        session.close()
+
+    if not product:
+        raise DeployError(
+            f"Product '{normalized_product_id}' referenced by funnel artifact workload was not found."
+        )
+    return str(product.client_id), require_product_route_slug(product=product)
+
+
+def _normalize_legacy_publication_source_ref_for_apply(*, workload: dict[str, Any]) -> bool:
+    name = str(workload.get("name") or "").strip() or "<unnamed>"
+    source_ref = workload.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError(
+            f"Workload '{name}' source_ref must be an object for source_type='funnel_publication'."
+        )
+
+    changed = False
+    public_id = str(source_ref.get("public_id") or "").strip()
+    if not public_id:
+        raise DeployError(
+            f"Workload '{name}' uses source_type='funnel_publication' but source_ref.public_id is missing."
+        )
+
+    upstream_base_url = str(source_ref.get("upstream_base_url") or "").strip().rstrip("/")
+    if not upstream_base_url:
+        upstream_base_url = str(settings.DEPLOY_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        if not upstream_base_url:
+            legacy_api = str(source_ref.get("upstream_api_base_url") or "").strip().rstrip("/")
+            if legacy_api:
+                parsed = urlsplit(legacy_api)
+                if parsed.scheme and parsed.netloc:
+                    upstream_base_url = f"{parsed.scheme}://{parsed.netloc}"
+        if not upstream_base_url:
+            raise DeployError(
+                f"Workload '{name}' is missing source_ref.upstream_base_url. "
+                "Set DEPLOY_PUBLIC_BASE_URL or update the plan workload."
+            )
+        source_ref["upstream_base_url"] = upstream_base_url
+        changed = True
+
+    upstream_api_base_url = str(source_ref.get("upstream_api_base_url") or "").strip().rstrip("/")
+    if not upstream_api_base_url:
+        upstream_api_base_url = str(settings.DEPLOY_PUBLIC_API_BASE_URL or "").strip().rstrip("/")
+        if not upstream_api_base_url:
+            upstream_api_base_url = f"{upstream_base_url}/api"
+        source_ref["upstream_api_base_url"] = upstream_api_base_url
+        changed = True
+
+    if not upstream_base_url.startswith(("http://", "https://")):
+        raise DeployError(
+            f"Workload '{name}' has invalid source_ref.upstream_base_url '{upstream_base_url}'."
+        )
+    if not upstream_api_base_url.startswith(("http://", "https://")):
+        raise DeployError(
+            f"Workload '{name}' has invalid source_ref.upstream_api_base_url '{upstream_api_base_url}'."
+        )
+
+    if changed:
+        workload["source_ref"] = source_ref
+    return changed
+
+
+def _normalize_legacy_artifact_source_ref_for_apply(*, workload: dict[str, Any]) -> bool:
+    name = str(workload.get("name") or "").strip() or "<unnamed>"
+    source_ref = workload.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError(
+            f"Workload '{name}' source_ref must be an object for source_type='funnel_artifact'."
+        )
+
+    changed = False
+    client_id = str(source_ref.get("client_id") or "").strip()
+    product_id = str(source_ref.get("product_id") or "").strip()
+
+    # Legacy fallback path: source_type was historically set to funnel_artifact while carrying
+    # publication proxy payload (`public_id`) without artifact references.
+    if not client_id and not product_id and str(source_ref.get("public_id") or "").strip():
+        workload["source_type"] = "funnel_publication"
+        changed |= _normalize_legacy_publication_source_ref_for_apply(workload=workload)
+        return True
+
+    if not client_id:
+        if product_id:
+            resolved_client_id, _ = _load_product_route_context_for_apply(product_id=product_id)
+            source_ref["client_id"] = resolved_client_id
+            client_id = resolved_client_id
+            changed = True
+        else:
+            artifact = source_ref.get("artifact")
+            if isinstance(artifact, dict):
+                meta = artifact.get("meta")
+                if isinstance(meta, dict):
+                    meta_client_id = str(meta.get("clientId") or meta.get("client_id") or "").strip()
+                    if meta_client_id:
+                        source_ref["client_id"] = meta_client_id
+                        client_id = meta_client_id
+                        changed = True
+
+    if not client_id:
+        raise DeployError(
+            f"Workload '{name}' uses source_type='funnel_artifact' but source_ref.client_id is missing."
+        )
+
+    upstream_api_base_root = str(source_ref.get("upstream_api_base_root") or "").strip().rstrip("/")
+    if not upstream_api_base_root:
+        legacy_api = str(source_ref.get("upstream_api_base_url") or settings.DEPLOY_PUBLIC_API_BASE_URL or "").strip().rstrip("/")
+        if not legacy_api:
+            raise DeployError(
+                f"Workload '{name}' is missing source_ref.upstream_api_base_root. "
+                "Set DEPLOY_PUBLIC_API_BASE_URL or update the plan workload."
+            )
+        source_ref["upstream_api_base_root"] = legacy_api
+        upstream_api_base_root = legacy_api
+        changed = True
+
+    if not upstream_api_base_root.startswith(("http://", "https://")):
+        raise DeployError(
+            f"Workload '{name}' has invalid source_ref.upstream_api_base_root '{upstream_api_base_root}'."
+        )
+
+    runtime_dist_path = str(source_ref.get("runtime_dist_path") or "").strip()
+    if not runtime_dist_path:
+        source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+        changed = True
+
+    artifact = source_ref.get("artifact")
+    if not isinstance(artifact, dict):
+        raise DeployError(
+            f"Workload '{name}' source_ref.artifact must be an object for source_type='funnel_artifact'."
+        )
+
+    if not isinstance(artifact.get("meta"), dict):
+        artifact["meta"] = {}
+        changed = True
+
+    if not isinstance(artifact.get("products"), dict):
+        legacy_funnels = artifact.get("funnels")
+        if isinstance(legacy_funnels, dict):
+            if not product_id:
+                meta = artifact.get("meta")
+                if isinstance(meta, dict):
+                    product_id = str(meta.get("productId") or meta.get("product_id") or "").strip()
+            if not product_id:
+                raise DeployError(
+                    f"Workload '{name}' has legacy source_ref.artifact.funnels but source_ref.product_id is missing."
+                )
+            _resolved_client_id, product_slug = _load_product_route_context_for_apply(product_id=product_id)
+            artifact["products"] = {
+                product_slug: {
+                    "meta": {
+                        "productId": product_id,
+                        "productSlug": product_slug,
+                    },
+                    "funnels": legacy_funnels,
+                }
+            }
+            changed = True
+        else:
+            artifact["products"] = {}
+            changed = True
+
+    source_ref["artifact"] = artifact
+    workload["source_ref"] = source_ref
+    return changed
+
+
+def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
+    try:
+        plan = json.loads(plan_file.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise DeployError(f"Failed to read plan JSON: {exc}") from exc
+
+    new_spec = plan.get("new_spec")
+    if not isinstance(new_spec, dict):
+        raise DeployError("Plan new_spec must be an object.")
+    instances = new_spec.get("instances")
+    if not isinstance(instances, list):
+        raise DeployError("Plan new_spec.instances must be a list.")
+
+    has_changes = False
+    for inst in instances:
+        if not isinstance(inst, dict):
+            continue
+        workloads = inst.get("workloads")
+        if not isinstance(workloads, list):
+            continue
+        for workload in workloads:
+            if not isinstance(workload, dict):
+                continue
+            source_type = str(workload.get("source_type") or "").strip().lower()
+            if source_type == "funnel_publication":
+                if _normalize_legacy_publication_source_ref_for_apply(workload=workload):
+                    has_changes = True
+                continue
+            if source_type != "funnel_artifact":
+                continue
+            if _normalize_legacy_artifact_source_ref_for_apply(workload=workload):
+                has_changes = True
+            source_ref = workload.get("source_ref")
+            if not isinstance(source_ref, dict):
+                raise DeployError(
+                    f"Workload '{workload.get('name')}' source_ref must be an object for source_type='funnel_artifact'."
+                )
+            artifact = source_ref.get("artifact")
+            if (
+                isinstance(artifact, dict)
+                and isinstance(artifact.get("products"), dict)
+                and bool(artifact.get("products"))
+            ):
+                continue
+            artifact_id = str(source_ref.get("artifact_id") or "").strip()
+            if not artifact_id:
+                # Some existing plans may carry placeholder inline artifacts with empty products and
+                # no DB artifact reference yet. Leave those unchanged here.
+                continue
+            source_ref["artifact"] = _load_funnel_runtime_artifact_payload_for_apply(artifact_id=artifact_id)
+            workload["source_ref"] = source_ref
+            has_changes = True
+
+    if not has_changes:
+        return plan_file
+
+    materialized_path = (
+        _cloudhand_dir()
+        / f"apply-materialized-{datetime.utcnow().strftime('%Y-%m-%dT%H-%M-%SZ')}-{uuid4().hex[:8]}.json"
+    )
+    try:
+        materialized_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
+    except Exception as exc:
+        raise DeployError(f"Failed to write materialized apply plan: {exc}") from exc
+    return materialized_path
+
+
 async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
     """
     Apply a plan using the embedded Cloudhand engine (Terraform + SSH deploy).
@@ -703,6 +1138,9 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
 
     if not plan_file or not plan_file.exists():
         raise DeployError("No plan found.")
+
+    requested_plan_file = plan_file
+    plan_file = _materialize_funnel_artifacts_for_apply(plan_file=plan_file)
 
     # Run Cloudhand apply in a subprocess so we can stream/capture Terraform output.
     env = os.environ.copy()
@@ -773,7 +1211,8 @@ async def apply_plan(*, plan_path: str | None = None) -> dict[str, Any]:
 
     return {
         "returncode": rc,
-        "plan_path": str(plan_file),
+        "plan_path": str(requested_plan_file),
+        "materialized_plan_path": str(plan_file),
         "server_ips": server_ips,
         "live_url": live_url,
         "logs": "".join(logs),
@@ -906,6 +1345,7 @@ def _summarize_apply_result(result: dict[str, Any]) -> tuple[int, dict[str, Any]
     summary: dict[str, Any] = {
         "returncode": rc,
         "plan_path": result.get("plan_path"),
+        "materialized_plan_path": result.get("materialized_plan_path"),
         "server_ips": result.get("server_ips"),
         "live_url": result.get("live_url"),
     }
@@ -998,7 +1438,25 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     funnel_id=funnel_id,
                     publication_id=str(publication.id),
                     workload_patch=workload_patch,
+                    created_by_user_id=user_id,
                 )
+
+                hydrated_source_ref = workload_patch.get("source_ref")
+                if isinstance(hydrated_source_ref, dict):
+                    artifact_id = str(hydrated_source_ref.get("artifact_id") or "").strip()
+                    artifact_version = hydrated_source_ref.get("artifact_version")
+                    client_id = str(hydrated_source_ref.get("client_id") or "").strip()
+                    if not artifact_id:
+                        raise DeployError(
+                            "Hydrated funnel deploy workload is missing source_ref.artifact_id."
+                        )
+                    runtime_artifact_payload: dict[str, Any] = {
+                        "id": artifact_id,
+                        "clientId": client_id,
+                    }
+                    if isinstance(artifact_version, int):
+                        runtime_artifact_payload["version"] = artifact_version
+                    result_payload["runtimeArtifact"] = runtime_artifact_payload
 
                 plan_resolution = ensure_plan_for_funnel_publish_workload(
                     workload_patch=workload_patch,

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import re
+from uuid import UUID, uuid4
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.db.enums import FunnelPageVersionStatusEnum
@@ -21,8 +23,54 @@ from app.db.models import (
 
 
 class FunnelsRepository:
+    _SHORT_ID_LENGTH = 8
+    _MAX_SHORT_ID_GENERATION_ATTEMPTS = 32
+
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    @staticmethod
+    def _slugify(value: str) -> str:
+        text = (value or "").strip().lower()
+        text = re.sub(r"[^a-z0-9]+", "-", text)
+        text = re.sub(r"-{2,}", "-", text).strip("-")
+        return text or "funnel"
+
+    @staticmethod
+    def _short_id_token(value: UUID | str) -> str:
+        normalized = str(value).strip().lower()
+        return normalized.split("-", 1)[0][:FunnelsRepository._SHORT_ID_LENGTH]
+
+    def _short_id_exists(self, *, short_id: str) -> bool:
+        stmt = (
+            select(Funnel.id)
+            .where(func.left(cast(Funnel.id, String), self._SHORT_ID_LENGTH) == short_id)
+            .limit(1)
+        )
+        return self.session.execute(stmt).first() is not None
+
+    def _generate_unique_short_id_funnel_uuid(self) -> UUID:
+        for _ in range(self._MAX_SHORT_ID_GENERATION_ATTEMPTS):
+            candidate = uuid4()
+            if not self._short_id_exists(short_id=self._short_id_token(candidate)):
+                return candidate
+        raise ValueError(
+            "Unable to allocate a unique 8-character funnel id prefix after "
+            f"{self._MAX_SHORT_ID_GENERATION_ATTEMPTS} attempts."
+        )
+
+    def _generate_unique_route_slug(self, *, desired_slug: str, exclude_funnel_id: Optional[str] = None) -> str:
+        base = self._slugify(desired_slug)
+        suffix = 0
+        while True:
+            slug = base if suffix == 0 else f"{base}-{suffix + 1}"
+            stmt = select(Funnel.id).where(Funnel.route_slug == slug)
+            if exclude_funnel_id:
+                stmt = stmt.where(Funnel.id != exclude_funnel_id)
+            exists = self.session.execute(stmt).first()
+            if not exists:
+                return slug
+            suffix += 1
 
     def list(
         self,
@@ -56,8 +104,32 @@ class FunnelsRepository:
         stmt = select(Funnel).where(Funnel.public_id == public_id)
         return self.session.scalars(stmt).first()
 
+    def get_by_route_slug(self, *, route_slug: str) -> Optional[Funnel]:
+        stmt = select(Funnel).where(Funnel.route_slug == route_slug)
+        return self.session.scalars(stmt).first()
+
     def create(self, *, org_id: str, client_id: str, name: str, **fields: Any) -> Funnel:
-        funnel = Funnel(org_id=org_id, client_id=client_id, name=name, **fields)
+        payload = dict(fields)
+        raw_route_slug = payload.pop("route_slug", None)
+        desired_slug = str(raw_route_slug or name or "").strip()
+        payload["route_slug"] = self._generate_unique_route_slug(desired_slug=desired_slug)
+
+        provided_id = payload.get("id")
+        if provided_id is not None:
+            try:
+                normalized_id = UUID(str(provided_id))
+            except ValueError as exc:
+                raise ValueError("Funnel id must be a valid UUID.") from exc
+            short_id = self._short_id_token(normalized_id)
+            if self._short_id_exists(short_id=short_id):
+                raise ValueError(
+                    f"Funnel id prefix '{short_id}' already exists. Use a different id."
+                )
+            payload["id"] = normalized_id
+        else:
+            payload["id"] = self._generate_unique_short_id_funnel_uuid()
+
+        funnel = Funnel(org_id=org_id, client_id=client_id, name=name, **payload)
         self.session.add(funnel)
         self.session.commit()
         self.session.refresh(funnel)

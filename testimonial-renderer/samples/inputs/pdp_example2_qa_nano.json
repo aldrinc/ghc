@@ -1,0 +1,39 @@
+{
+  "template": "pdp_ugc_qa",
+  "output": {
+    "preset": "feed"
+  },
+  "brand": {
+    "logoText": "SampleLogo",
+    "stripBgColor": "#be3b7a",
+    "stripTextColor": "#ffffff"
+  },
+  "rating": {
+    "valueText": "4.9/5",
+    "detailText": "Rated by 10,000+ Women"
+  },
+  "cta": {
+    "text": "BUY ONE, GET ONE FREE TODAY!"
+  },
+  "background": {
+    "promptVars": {
+      "product": "a supplement bottle with a bright pink label that reads HAIR, SKIN AND NAILS GUMMY, white cap, brand name covered by a black rectangle",
+      "subject": "a 50-60 year old blonde woman smiling",
+      "scene": "indoors at home, neutral background, casual smartphone photo",
+      "extra": "She is holding the bottle close to the camera and lightly pointing at it with a finger. Label faces the camera. Realistic skin texture.",
+      "avoid": ["on-image captions", "watermarks", "UI overlays", "extra fingers", "distorted hands"]
+    }
+  },
+  "question": {
+    "handle": "DaphnaJo3",
+    "text": "Is this just a collagen supplement? @tracym",
+    "avatarUrl": "samples/assets/avatar-priya.svg"
+  },
+  "answer": {
+    "handle": "tracym",
+    "text": "absolutely not! this is actually a clinically proven menopause hair thickening formula for women 55+... been a game changer for me",
+    "avatarUrl": "samples/assets/avatar-elaine.svg",
+    "verified": true
+  }
+}
+

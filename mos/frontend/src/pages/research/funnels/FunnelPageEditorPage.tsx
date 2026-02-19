@@ -1,6 +1,7 @@
 import { Puck } from "@measured/puck";
 import type { Data } from "@measured/puck";
 import { useFunnel, useFunnelPage, useSaveFunnelDraft, useUpdateFunnelPage } from "@/api/funnels";
+import { useProduct } from "@/api/products";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonClasses } from "@/components/ui/button";
@@ -13,7 +14,7 @@ import { createFunnelAiPlugin } from "@/funnels/puckAiPlugin";
 import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
 import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
-import { buildPublicFunnelPath } from "@/funnels/runtimeRouting";
+import { buildPublicFunnelPath, shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -23,6 +24,7 @@ export function FunnelPageEditorPage() {
   const { funnelId, pageId } = useParams();
   const { workspace } = useWorkspace();
   const { data: funnel } = useFunnel(funnelId);
+  const { data: funnelProduct } = useProduct(funnel?.product_id || undefined);
   const { data: pageDetail, isLoading } = useFunnelPage(funnelId, pageId);
   const saveDraft = useSaveFunnelDraft();
   const updatePage = useUpdateFunnelPage();
@@ -81,12 +83,13 @@ export function FunnelPageEditorPage() {
     const page = funnel?.pages?.find((p) => p.id === pageId);
     return page ? `${page.name} (${page.slug})` : "Page";
   }, [funnel?.pages, pageId]);
+  const runtimeProductSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
+  const runtimeFunnelSlug = shortUuidRouteToken(funnel?.id || "");
   const publicPageHref = useMemo(() => {
-    const publicId = (funnel?.public_id || "").trim();
     const slug = (metaSlug || pageDetail?.page.slug || "").trim();
-    if (!publicId || !slug) return null;
-    return buildPublicFunnelPath({ publicId, slug, rootMode: false });
-  }, [funnel?.public_id, metaSlug, pageDetail?.page.slug]);
+    if (!runtimeProductSlug || !runtimeFunnelSlug || !slug) return null;
+    return buildPublicFunnelPath({ productSlug: runtimeProductSlug, funnelSlug: runtimeFunnelSlug, slug, bundleMode: false });
+  }, [metaSlug, pageDetail?.page.slug, runtimeFunnelSlug, runtimeProductSlug]);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
   const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
@@ -275,7 +278,8 @@ export function FunnelPageEditorPage() {
           <div className="ds-card ds-card--md p-0 overflow-hidden">
             <FunnelRuntimeProvider
               value={{
-                publicId: funnel?.public_id ?? "",
+                productSlug: runtimeProductSlug,
+                funnelSlug: runtimeFunnelSlug,
                 pageMap: runtimePageMap,
                 pageId: pageDetail.page.id,
                 nextPageId: pageDetail.page.next_page_id ?? null,

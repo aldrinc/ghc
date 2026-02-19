@@ -35,7 +35,9 @@ from app.db.models import (
     FunnelPublication,
     FunnelPublicationLink,
     FunnelPublicationPage,
+    Product,
 )
+from app.services.public_routing import require_product_route_slug
 from app.services.media_storage import MediaStorage
 
 
@@ -127,12 +129,40 @@ def generate_unique_slug(
         suffix += 1
 
 
+def generate_unique_funnel_route_slug(
+    session: Session, *, desired_slug: str, exclude_funnel_id: Optional[str] = None
+) -> str:
+    base = slugify(desired_slug) or "funnel"
+    suffix = 0
+    while True:
+        slug = base if suffix == 0 else f"{base}-{suffix + 1}"
+        stmt = select(Funnel.id).where(Funnel.route_slug == slug)
+        if exclude_funnel_id:
+            stmt = stmt.where(Funnel.id != exclude_funnel_id)
+        exists = session.execute(stmt).first()
+        if not exists:
+            return slug
+        suffix += 1
+
+
 def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: str) -> FunnelPublication:
     funnel = session.scalars(select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)).first()
     if not funnel:
         raise ValueError("Funnel not found")
     if funnel.status == FunnelStatusEnum.disabled:
         raise ValueError("Funnel is disabled")
+    if not funnel.product_id:
+        raise ValueError("Funnel product_id is required before publishing.")
+
+    product = session.scalars(
+        select(Product).where(Product.org_id == org_id, Product.id == funnel.product_id)
+    ).first()
+    if not product:
+        raise ValueError("Product not found")
+    try:
+        require_product_route_slug(product=product)
+    except ValueError as exc:
+        raise ValueError(str(exc)) from exc
 
     pages = list(
         session.scalars(
@@ -289,6 +319,7 @@ def duplicate_funnel(
         name=name or f"{source.name} (Copy)",
         description=source.description,
         status=FunnelStatusEnum.draft,
+        route_slug=generate_unique_funnel_route_slug(session, desired_slug=name or f"{source.name} (Copy)"),
         active_publication_id=None,
     )
     session.add(new_funnel)

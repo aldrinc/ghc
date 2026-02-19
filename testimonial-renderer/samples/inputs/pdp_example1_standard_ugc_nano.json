@@ -1,0 +1,33 @@
+{
+  "template": "pdp_ugc_standard",
+  "output": {
+    "preset": "feed"
+  },
+  "brand": {
+    "logoText": "SampleLogo",
+    "stripBgColor": "#be3b7a",
+    "stripTextColor": "#ffffff"
+  },
+  "rating": {
+    "valueText": "4.9/5",
+    "detailText": "Rated by 10,000+ Women"
+  },
+  "cta": {
+    "text": "BUY ONE, GET ONE FREE TODAY!"
+  },
+  "background": {
+    "promptVars": {
+      "product": "a supplement bottle with a bright pink label that reads HAIR, SKIN AND NAILS GUMMY, white cap, brand name covered by a black rectangle",
+      "subject": "a 55-65 year old woman with gray shoulder-length hair, friendly smile",
+      "scene": "indoors at home, natural daylight, casual smartphone photo",
+      "extra": "Hold the bottle close to the camera in one hand with the label facing the camera. Shallow depth of field. Realistic skin texture.",
+      "avoid": ["on-image captions", "watermarks", "UI overlays", "extra fingers", "distorted hands"]
+    }
+  },
+  "comment": {
+    "handle": "ValleyGirl64",
+    "text": "People ask me all the time if i got extensions, this stuff is the REAL DEAL!!! insane.",
+    "avatarUrl": "samples/assets/avatar-harper.svg"
+  }
+}
+

@@ -294,17 +294,20 @@ def create_funnel(
             )
 
     repo = FunnelsRepository(session)
-    funnel = repo.create(
-        org_id=auth.org_id,
-        client_id=payload.clientId,
-        campaign_id=campaign_id,
-        experiment_spec_id=experiment_id,
-        product_id=product_id,
-        selected_offer_id=selected_offer_id,
-        name=payload.name,
-        description=payload.description,
-        status=FunnelStatusEnum.draft,
-    )
+    try:
+        funnel = repo.create(
+            org_id=auth.org_id,
+            client_id=payload.clientId,
+            campaign_id=campaign_id,
+            experiment_spec_id=experiment_id,
+            product_id=product_id,
+            selected_offer_id=selected_offer_id,
+            name=payload.name,
+            description=payload.description,
+            status=FunnelStatusEnum.draft,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return jsonable_encoder(funnel)
 
 
@@ -816,15 +819,12 @@ async def publish_funnel_route(
                 "Set deploy.upstreamApiBaseUrl or DEPLOY_PUBLIC_API_BASE_URL."
             ),
         )
-
-    upstream_api_base_url = f"{upstream_api_base_root.rstrip('/')}/public/funnels/{funnel.public_id}"
-
     try:
         workload_patch = deploy_service.build_funnel_artifact_workload_patch(
             workload_name=deploy.workloadName,
-            funnel_public_id=str(funnel.public_id),
+            client_id=str(funnel.client_id),
             upstream_base_url=upstream_base_url,
-            upstream_api_base_url=upstream_api_base_url,
+            upstream_api_base_url=upstream_api_base_root,
             server_names=server_names,
             https=deploy.https,
             destination_path=deploy.destinationPath,

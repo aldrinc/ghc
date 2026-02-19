@@ -15,7 +15,7 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID, with_selected_offer: bool 
     db_session.commit()
     db_session.refresh(client)
 
-    product = Product(org_id=org_id, client_id=client.id, title="Shopify Product")
+    product = Product(org_id=org_id, client_id=client.id, title="Shopify Product", handle="shopify-product")
     db_session.add(product)
     db_session.commit()
     db_session.refresh(product)
@@ -53,7 +53,7 @@ def _seed_shopify_funnel(*, db_session, org_id: UUID, with_selected_offer: bool 
         product_id=product.id,
         selected_offer_id=selected_offer.id if selected_offer else None,
         name="Shopify Funnel",
-        public_id=uuid4(),
+        route_slug=f"shopify-funnel-{uuid4().hex[:8]}",
     )
     db_session.add(funnel)
     db_session.commit()
@@ -89,7 +89,7 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     response = api_client.post(
         "/public/checkout",
         json={
-            "publicId": str(seeded["funnel"].public_id),
+            "funnelSlug": seeded["funnel"].route_slug,
             "variantId": str(seeded["variant"].id),
             "selection": {},
             "quantity": 2,
@@ -112,6 +112,7 @@ def test_public_checkout_routes_shopify_provider(api_client, db_session, auth_co
     assert observed["quantity"] == 2
     metadata = observed["metadata"]
     assert isinstance(metadata, dict)
+    assert metadata["funnel_slug"] == seeded["funnel"].route_slug
     assert metadata["funnel_id"] == str(seeded["funnel"].id)
     assert metadata["variant_id"] == str(seeded["variant"].id)
     assert metadata["offer_id"] == str(seeded["offer"].id)
@@ -148,7 +149,8 @@ def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, d
     db_session.add(secondary_variant)
     db_session.commit()
 
-    response = api_client.get(f"/public/funnels/{seeded['funnel'].public_id}/commerce")
+    product_slug = str(seeded["product"].id).split("-", 1)[0]
+    response = api_client.get(f"/public/funnels/{product_slug}/{seeded['funnel'].route_slug}/commerce")
     assert response.status_code == 200
     payload = response.json()
     assert payload["product"]["variants_count"] == 1

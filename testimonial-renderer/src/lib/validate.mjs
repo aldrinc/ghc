@@ -2,7 +2,15 @@ import fs from 'fs';
 import path from 'path';
 import { pathToFileURL } from 'url';
 
-const TEMPLATE_TYPES = new Set(['review_card', 'social_comment', 'testimonial_media']);
+const TEMPLATE_TYPES = new Set([
+  'review_card',
+  'social_comment',
+  'testimonial_media',
+  'pdp_ugc_standard',
+  'pdp_ugc_qa',
+  'pdp_bold_claim',
+  'pdp_personal_highlight',
+]);
 const MAX_NAME_LENGTH = 80;
 const MAX_REVIEW_LENGTH = 800;
 const MAX_COMMENT_LENGTH = 600;
@@ -10,6 +18,15 @@ const MAX_HEADER_TITLE = 40;
 const MAX_META_LABEL = 24;
 const MAX_VIEW_REPLIES = 40;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const PDP_OUTPUT_PRESETS = new Set(['tiktok', 'feed']);
+const PDP_DEFAULT_OUTPUT_PRESET = 'tiktok';
+const PDP_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+const MAX_PDP_HANDLE = 40;
+const MAX_PDP_COMMENT = 220;
+const MAX_PDP_CTA = 60;
+const MAX_PDP_LOGO_TEXT = 24;
+const MAX_PDP_RATING_VALUE = 16;
+const MAX_PDP_RATING_DETAIL = 60;
 
 const isPlainObject = (value) =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -33,6 +50,21 @@ const assertBoolean = (value, field) => {
     throw new Error(`${field} must be a boolean.`);
   }
   return value;
+};
+
+const assertOptionalString = (value, field, maxLength) => {
+  if (value == null) {
+    return undefined;
+  }
+  return assertString(value, field, maxLength);
+};
+
+const assertColor = (value, field) => {
+  const color = assertString(value, field, 24);
+  if (!PDP_COLOR_PATTERN.test(color)) {
+    throw new Error(`${field} must be a hex color like #fff or #ffffff.`);
+  }
+  return color;
 };
 
 const assertRating = (value, field) => {
@@ -66,6 +98,224 @@ const resolveImageUrl = (value, baseDir, field) => {
     throw new Error(`${field} file does not exist: ${resolvedPath}`);
   }
   return pathToFileURL(resolvedPath).href;
+};
+
+const validatePdpOutput = (output) => {
+  if (output == null) {
+    return { preset: PDP_DEFAULT_OUTPUT_PRESET };
+  }
+  if (!isPlainObject(output)) {
+    throw new Error('output must be an object when provided.');
+  }
+  const allowedKeys = new Set(['preset']);
+  for (const key of Object.keys(output)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`output contains unsupported key: ${key}`);
+    }
+  }
+
+  const preset = assertString(output.preset, 'output.preset', 24).toLowerCase();
+  if (!PDP_OUTPUT_PRESETS.has(preset)) {
+    throw new Error(`output.preset must be one of: ${Array.from(PDP_OUTPUT_PRESETS).join(', ')}`);
+  }
+  return { preset };
+};
+
+const validatePdpBrand = (brand, baseDir) => {
+  if (!isPlainObject(brand)) {
+    throw new Error('brand must be an object.');
+  }
+  const allowedKeys = new Set(['logoUrl', 'logoText', 'stripBgColor', 'stripTextColor']);
+  for (const key of Object.keys(brand)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`brand contains unsupported key: ${key}`);
+    }
+  }
+
+  const stripBgColor = assertColor(brand.stripBgColor, 'brand.stripBgColor');
+  const stripTextColor = assertColor(brand.stripTextColor, 'brand.stripTextColor');
+
+  let logoUrl;
+  if (brand.logoUrl != null) {
+    logoUrl = resolveImageUrl(brand.logoUrl, baseDir, 'brand.logoUrl');
+  }
+  const logoText = assertOptionalString(brand.logoText, 'brand.logoText', MAX_PDP_LOGO_TEXT);
+
+  if (!logoUrl && !logoText) {
+    throw new Error('brand.logoUrl or brand.logoText is required.');
+  }
+
+  return { stripBgColor, stripTextColor, logoUrl, logoText };
+};
+
+const validatePdpRating = (rating) => {
+  if (!isPlainObject(rating)) {
+    throw new Error('rating must be an object.');
+  }
+  const allowedKeys = new Set(['valueText', 'detailText']);
+  for (const key of Object.keys(rating)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`rating contains unsupported key: ${key}`);
+    }
+  }
+  const valueText = assertString(rating.valueText, 'rating.valueText', MAX_PDP_RATING_VALUE);
+  const detailText = assertString(rating.detailText, 'rating.detailText', MAX_PDP_RATING_DETAIL);
+  return { valueText, detailText };
+};
+
+const validatePdpCta = (cta) => {
+  if (!isPlainObject(cta)) {
+    throw new Error('cta must be an object.');
+  }
+  const allowedKeys = new Set(['text']);
+  for (const key of Object.keys(cta)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`cta contains unsupported key: ${key}`);
+    }
+  }
+  const text = assertString(cta.text, 'cta.text', MAX_PDP_CTA);
+  return { text };
+};
+
+const validatePdpPromptVars = (vars) => {
+  if (!isPlainObject(vars)) {
+    throw new Error('background.promptVars must be an object.');
+  }
+  const allowedKeys = new Set(['product', 'scene', 'subject', 'extra', 'avoid']);
+  for (const key of Object.keys(vars)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`background.promptVars contains unsupported key: ${key}`);
+    }
+  }
+
+  const product = assertString(vars.product, 'background.promptVars.product', 220);
+  const scene = assertOptionalString(vars.scene, 'background.promptVars.scene', 220);
+  const subject = assertOptionalString(vars.subject, 'background.promptVars.subject', 220);
+  const extra = assertOptionalString(vars.extra, 'background.promptVars.extra', 600);
+
+  let avoid;
+  if (vars.avoid != null) {
+    if (!Array.isArray(vars.avoid) || vars.avoid.length === 0) {
+      throw new Error('background.promptVars.avoid must be a non-empty array when provided.');
+    }
+    avoid = vars.avoid.map((entry, index) =>
+      assertString(entry, `background.promptVars.avoid[${index}]`, 160),
+    );
+  }
+
+  return { product, scene, subject, extra, avoid };
+};
+
+const validatePdpBackground = (background, baseDir) => {
+  if (!isPlainObject(background)) {
+    throw new Error('background must be an object.');
+  }
+  const allowedKeys = new Set([
+    'imageUrl',
+    'alt',
+    'prompt',
+    'promptVars',
+    'referenceImages',
+    'referenceFirst',
+    'imageModel',
+    'imageConfig',
+  ]);
+  for (const key of Object.keys(background)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`background contains unsupported key: ${key}`);
+    }
+  }
+
+  let imageUrl;
+  if (background.imageUrl != null) {
+    imageUrl = resolveImageUrl(background.imageUrl, baseDir, 'background.imageUrl');
+  }
+  const alt = assertOptionalString(background.alt, 'background.alt', 200);
+  const prompt = assertOptionalString(background.prompt, 'background.prompt', 6000);
+
+  let promptVars;
+  if (background.promptVars != null) {
+    promptVars = validatePdpPromptVars(background.promptVars);
+  }
+
+  if (prompt && promptVars) {
+    throw new Error('Provide either background.prompt or background.promptVars, not both.');
+  }
+  if (imageUrl && (prompt || promptVars)) {
+    throw new Error('Provide either background.imageUrl or background.prompt/background.promptVars, not both.');
+  }
+
+  if (!imageUrl && !prompt && !promptVars) {
+    throw new Error('background.imageUrl is required unless background.prompt or background.promptVars is provided.');
+  }
+
+  let referenceImages;
+  if (background.referenceImages != null) {
+    if (!Array.isArray(background.referenceImages) || background.referenceImages.length === 0) {
+      throw new Error('background.referenceImages must be a non-empty array when provided.');
+    }
+    referenceImages = background.referenceImages.map((entry, index) =>
+      assertString(entry, `background.referenceImages[${index}]`, 2000),
+    );
+  }
+
+  let referenceFirst;
+  if (background.referenceFirst != null) {
+    referenceFirst = assertBoolean(background.referenceFirst, 'background.referenceFirst');
+  }
+
+  const imageModel = assertOptionalString(background.imageModel, 'background.imageModel', 120);
+
+  let imageConfig;
+  if (background.imageConfig != null) {
+    if (!isPlainObject(background.imageConfig)) {
+      throw new Error('background.imageConfig must be an object when provided.');
+    }
+    imageConfig = background.imageConfig;
+  }
+
+  if (imageUrl) {
+    if (referenceImages != null || referenceFirst != null || imageModel != null || imageConfig != null) {
+      throw new Error(
+        'background.referenceImages/referenceFirst/imageModel/imageConfig are only allowed when generating a background (omit background.imageUrl).',
+      );
+    }
+  }
+
+  return {
+    imageUrl,
+    alt,
+    prompt,
+    promptVars,
+    referenceImages,
+    referenceFirst,
+    imageModel,
+    imageConfig,
+  };
+};
+
+const validatePdpComment = (comment, options) => {
+  const { baseDir, prefix } = options;
+  if (!isPlainObject(comment)) {
+    throw new Error(`${prefix} must be an object.`);
+  }
+  const allowedKeys = new Set(['handle', 'text', 'avatarUrl', 'verified']);
+  for (const key of Object.keys(comment)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`${prefix} contains unsupported key: ${key}`);
+    }
+  }
+  const handle = assertString(comment.handle, `${prefix}.handle`, MAX_PDP_HANDLE);
+  const text = assertString(comment.text, `${prefix}.text`, MAX_PDP_COMMENT);
+  let avatarUrl;
+  if (comment.avatarUrl != null) {
+    avatarUrl = resolveImageUrl(comment.avatarUrl, baseDir, `${prefix}.avatarUrl`);
+  }
+  let verified;
+  if (comment.verified != null) {
+    verified = assertBoolean(comment.verified, `${prefix}.verified`);
+  }
+  return { handle, text, avatarUrl, verified };
 };
 
 const validateMeta = (meta, options = {}) => {
@@ -291,6 +541,70 @@ export const validatePayload = (payload, options = {}) => {
       template,
       imageUrl,
       alt,
+    };
+  }
+
+  if (
+    template === 'pdp_ugc_standard' ||
+    template === 'pdp_ugc_qa' ||
+    template === 'pdp_bold_claim' ||
+    template === 'pdp_personal_highlight'
+  ) {
+    const allowedKeys = new Set([
+      'template',
+      'output',
+      'brand',
+      'rating',
+      'cta',
+      'background',
+      'comment',
+      'question',
+      'answer',
+      'imageModel',
+    ]);
+    for (const key of Object.keys(payload)) {
+      if (!allowedKeys.has(key)) {
+        throw new Error(`Payload contains unsupported key: ${key}`);
+      }
+    }
+
+    const output = validatePdpOutput(payload.output);
+    const brand = validatePdpBrand(payload.brand, options.baseDir);
+    const rating = validatePdpRating(payload.rating);
+    const cta = validatePdpCta(payload.cta);
+    const background = validatePdpBackground(payload.background, options.baseDir);
+
+    let imageModel;
+    if (payload.imageModel != null) {
+      imageModel = assertString(payload.imageModel, 'imageModel', 120);
+    }
+
+    if (template === 'pdp_ugc_qa') {
+      const question = validatePdpComment(payload.question, { baseDir: options.baseDir, prefix: 'question' });
+      const answer = validatePdpComment(payload.answer, { baseDir: options.baseDir, prefix: 'answer' });
+      return {
+        template,
+        output,
+        brand,
+        rating,
+        cta,
+        background,
+        question,
+        answer,
+        imageModel,
+      };
+    }
+
+    const comment = validatePdpComment(payload.comment, { baseDir: options.baseDir, prefix: 'comment' });
+    return {
+      template,
+      output,
+      brand,
+      rating,
+      cta,
+      background,
+      comment,
+      imageModel,
     };
   }
 

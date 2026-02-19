@@ -269,7 +269,10 @@ def create_product(
         fields["disclaimers"] = payload.disclaimers
 
     repo = ProductsRepository(session)
-    product = repo.create(org_id=auth.org_id, client_id=payload.clientId, **fields)
+    try:
+        product = repo.create(org_id=auth.org_id, client_id=payload.clientId, **fields)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return jsonable_encoder(product)
 
 

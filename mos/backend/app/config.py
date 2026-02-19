@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     TEMPORAL_TASK_QUEUE: str = "growth-agency"
     TEMPORAL_ADDRESS: str = "localhost:7234"
 
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:5275", "http://127.0.0.1:5275"]
+    BACKEND_CORS_ORIGINS: list[str]
 
     OPENAI_API_KEY: str | None = None
     OPENAI_WEBHOOK_SECRET: str | None = None

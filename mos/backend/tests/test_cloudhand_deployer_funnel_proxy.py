@@ -74,25 +74,40 @@ def _artifact_app(
         "name": name,
         "source_type": "funnel_artifact",
         "source_ref": {
-            "public_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+            "client_id": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
             "upstream_api_base_root": "https://moshq.app/api",
             "runtime_dist_path": "mos/frontend/dist",
             "artifact": {
                 "meta": {
-                    "publicId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
-                    "funnelId": "funnel-1",
-                    "publicationId": "pub-1",
-                    "entrySlug": "landing",
-                    "pages": [{"pageId": "page-1", "slug": "landing"}],
+                    "clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
                 },
-                "pages": {
-                    "landing": {
-                        "funnelId": "funnel-1",
-                        "publicationId": "pub-1",
-                        "pageId": "page-1",
-                        "slug": "landing",
-                        "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
-                        "pageMap": {"page-1": "landing"},
+                "products": {
+                    "example-product": {
+                        "meta": {
+                            "productId": "product-1",
+                            "productSlug": "example-product",
+                        },
+                        "funnels": {
+                            "example-funnel": {
+                                "meta": {
+                                    "funnelSlug": "example-funnel",
+                                    "funnelId": "funnel-1",
+                                    "publicationId": "pub-1",
+                                    "entrySlug": "presales",
+                                    "pages": [{"pageId": "page-1", "slug": "presales"}],
+                                },
+                                "pages": {
+                                    "presales": {
+                                        "funnelId": "funnel-1",
+                                        "publicationId": "pub-1",
+                                        "pageId": "page-1",
+                                        "slug": "presales",
+                                        "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+                                        "pageMap": {"page-1": "presales"},
+                                    }
+                                },
+                            }
+                        }
                     }
                 },
             },
@@ -221,17 +236,91 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
     assert "return 302 /f/" not in conf
     assert "location = /api/public/checkout" in conf
     assert "location ^~ /api/public/events" in conf
-    assert "location ^~ /api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95/" in conf
+    assert "location ^~ /api/public/funnels/ {" in conf
     assert "try_files $uri.json =404;" in conf
     assert "try_files $uri /index.html;" in conf
 
-    meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95/meta.json"
-    page_path = "/opt/apps/landing-artifact/site/api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95/pages/landing.json"
+    meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/meta.json"
+    page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/pages/presales.json"
+    id_meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/meta.json"
+    id_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/pages/presales.json"
     assert meta_path in uploaded
     assert page_path in uploaded
+    assert id_meta_path in uploaded
+    assert id_page_path in uploaded
 
     assert "nginx -t" in commands
     assert "systemctl reload nginx" in commands
+
+
+def test_funnel_artifact_site_errors_when_funnel_id_alias_collides_with_existing_slug():
+    app = _artifact_app()
+    product_payload = app.source_ref.artifact["products"]["example-product"]
+    product_payload["funnels"]["funnel-1"] = {
+        "meta": {
+            "funnelSlug": "funnel-1",
+            "funnelId": "funnel-2",
+            "publicationId": "pub-2",
+            "entrySlug": "presales",
+            "pages": [{"pageId": "page-2", "slug": "presales"}],
+        },
+        "pages": {
+            "presales": {
+                "funnelId": "funnel-2",
+                "publicationId": "pub-2",
+                "pageId": "page-2",
+                "slug": "presales",
+                "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+                "pageMap": {"page-2": "presales"},
+            }
+        },
+    }
+
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    with pytest.raises(ValueError, match="duplicates funnel path token"):
+        deployer._configure_funnel_artifact_site(app)
+
+
+def test_funnel_artifact_site_writes_short_funnel_id_alias_for_uuid_funnel_id():
+    app = _artifact_app()
+    uuid_funnel_id = "f85405a4-c7cd-4fdf-a953-6613d712392d"
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["meta"]["funnelId"] = uuid_funnel_id
+    funnel_payload["pages"]["presales"]["funnelId"] = uuid_funnel_id
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    short_meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/f85405a4/meta.json"
+    short_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/f85405a4/pages/presales.json"
+    assert short_meta_path in uploaded
+    assert short_page_path in uploaded
+
+
+def test_funnel_artifact_site_injects_default_route_into_runtime_config():
+    app = _artifact_app()
+    uuid_funnel_id = "f85405a4-c7cd-4fdf-a953-6613d712392d"
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["meta"]["funnelId"] = uuid_funnel_id
+    funnel_payload["pages"]["presales"]["funnelId"] = uuid_funnel_id
+
+    deployer, _uploaded, commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    runtime_inject_cmd = next(
+        (
+            cmd
+            for cmd in commands
+            if cmd.startswith("python3 -c") and "__MOS_DEPLOY_RUNTIME__" in cmd
+        ),
+        "",
+    )
+    assert runtime_inject_cmd
+    assert '"defaultProductSlug":"example-product"' in runtime_inject_cmd
+    assert '"defaultFunnelSlug":"f85405a4"' in runtime_inject_cmd
 
 
 def test_funnel_artifact_site_errors_with_clear_message_when_runtime_dist_missing():

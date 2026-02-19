@@ -10,6 +10,7 @@ import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -17,6 +18,8 @@ const deployPlanPath = (import.meta.env.VITE_DEPLOY_PLAN_PATH || "").trim();
 const deployInstanceName = (import.meta.env.VITE_DEPLOY_INSTANCE_NAME || "").trim();
 const deployUpstreamBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_BASE_URL || "").trim();
 const deployUpstreamApiBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_API_BASE_URL || "").trim();
+const deployApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").trim();
+const deployDestinationPath = (import.meta.env.VITE_DEPLOY_DESTINATION_PATH || "/opt/apps").trim();
 
 type PatchWorkloadResponse = {
   status: string;
@@ -32,6 +35,8 @@ type DeployJobState = {
   status: string;
   accessUrl: string | null;
   publicationId: string | null;
+  runtimeArtifactId: string | null;
+  runtimeArtifactVersion: number | null;
   error: string | null;
 };
 
@@ -41,9 +46,19 @@ type DeployJobStatusResponse = {
   access_urls?: string[];
   result?: {
     publicationId?: string | null;
+    runtimeArtifact?: {
+      id?: string | null;
+      version?: number | null;
+    } | null;
   } | null;
   error?: string | null;
 };
+
+function artifactForTemplate(templateId: string | null | undefined): "presales" | "sales" | null {
+  if (templateId === "pre-sales-listicle") return "presales";
+  if (templateId === "sales-pdp") return "sales";
+  return null;
+}
 
 export function FunnelDetailPage() {
   const navigate = useNavigate();
@@ -117,15 +132,46 @@ export function FunnelDetailPage() {
     navigate(`/research/funnels/${funnelId}/pages/${page.id}`);
   };
 
-  const publicBase = funnel?.public_id ? `/f/${funnel.public_id}` : null;
+  const productRouteSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
+  const funnelRouteSlug = shortUuidRouteToken(funnel?.id || "");
+  const publicBase = funnelRouteSlug && productRouteSlug ? `/f/${productRouteSlug}/${funnelRouteSlug}` : null;
   const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
-  const deployWorkloadName = funnel?.public_id ? `funnel-${funnel.public_id}` : undefined;
+  const deployWorkloadName = funnel?.client_id ? `brand-funnels-${funnel.client_id}` : undefined;
+  const entryArtifact = useMemo(() => {
+    if (!funnel?.entry_page_id || !funnel.pages?.length) return null;
+    const entryPage = funnel.pages.find((page) => page.id === funnel.entry_page_id);
+    return artifactForTemplate(entryPage?.template_id);
+  }, [funnel?.entry_page_id, funnel?.pages]);
 
   const deployDomains = useDeployWorkloadDomains({
     workloadName: deployWorkloadName,
     planPath: deployPlanPath || undefined,
     instanceName: deployInstanceName || undefined,
   });
+
+  const deployedPageUrl = useMemo(() => {
+    if (!productRouteSlug || !funnelRouteSlug || !entryArtifact) return null;
+
+    const accessCandidate =
+      (deployJob?.accessUrl || "").trim() ||
+      (() => {
+        const host = deployDomains.data?.server_names?.[0];
+        if (!host) return "";
+        const scheme = deployDomains.data?.https ? "https" : "http";
+        return `${scheme}://${host}/`;
+      })();
+
+    const baseUrl = accessCandidate || `${window.location.origin}/`;
+    const normalizedBase = baseUrl.replace(/\/+$/, "");
+    return `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnelRouteSlug)}/${encodeURIComponent(entryArtifact)}`;
+  }, [
+    deployDomains.data?.https,
+    deployDomains.data?.server_names,
+    deployJob?.accessUrl,
+    entryArtifact,
+    funnelRouteSlug,
+    productRouteSlug,
+  ]);
 
   const normalizeDeployDomainList = (values: string[]): string[] => {
     const out: string[] = [];
@@ -159,7 +205,7 @@ export function FunnelDetailPage() {
   };
 
   const startEditingDeployDomains = () => {
-    if (!deployDomains.data?.workload_found) return;
+    if (!deployDomains.data) return;
     setDeployDomainsDraft(normalizeDeployDomainList(deployDomains.data.server_names || []));
     setDeployDomainsInput("");
     setDeployDomainsSaveError(null);
@@ -200,14 +246,59 @@ export function FunnelDetailPage() {
 
   const saveDeployDomains = async () => {
     setDeployDomainsSaveError(null);
+    if (!deployDomains.data) {
+      setDeployDomainsSaveError("Deploy domains are not loaded yet.");
+      return;
+    }
     if (!deployWorkloadName) {
       setDeployDomainsSaveError("Deploy workload name is missing for this funnel.");
       return;
     }
-    const planPath = (deployDomains.data?.plan_path || "").trim();
+    const planPath = (deployDomains.data.plan_path || "").trim();
     if (!planPath) {
       setDeployDomainsSaveError("No deploy plan is available to update.");
       return;
+    }
+
+    const createIfMissing = !deployDomains.data.workload_found;
+    const normalizedApiBaseRoot = (deployUpstreamApiBaseUrl || deployApiBaseUrl).trim().replace(/\/+$/, "");
+    if (createIfMissing) {
+      if (!funnel?.client_id) {
+        setDeployDomainsSaveError("Funnel client_id is required to create a deploy workload.");
+        return;
+      }
+      if (!normalizedApiBaseRoot.startsWith("http://") && !normalizedApiBaseRoot.startsWith("https://")) {
+        setDeployDomainsSaveError(
+          "Deploy upstream API base URL must be absolute (http/https). Set VITE_DEPLOY_UPSTREAM_API_BASE_URL or VITE_API_BASE_URL.",
+        );
+        return;
+      }
+    }
+
+    const serverNames = normalizeDeployDomainList(deployDomainsDraft);
+    const serviceConfig = {
+      server_names: serverNames,
+      https: serverNames.length > 0,
+    };
+    const workloadPayload: Record<string, unknown> = {
+      name: deployWorkloadName,
+      service_config: serviceConfig,
+    };
+    if (createIfMissing) {
+      workloadPayload.source_type = "funnel_artifact";
+      workloadPayload.runtime = "static";
+      workloadPayload.build_config = {};
+      workloadPayload.destination_path = deployDestinationPath || "/opt/apps";
+      workloadPayload.source_ref = {
+        client_id: funnel?.client_id,
+        upstream_api_base_root: normalizedApiBaseRoot,
+        artifact: {
+          meta: {
+            clientId: funnel?.client_id,
+          },
+          products: {},
+        },
+      };
     }
 
     setIsSavingDeployDomains(true);
@@ -215,16 +306,10 @@ export function FunnelDetailPage() {
       const params = new URLSearchParams();
       params.set("plan_path", planPath);
       if (deployInstanceName) params.set("instance_name", deployInstanceName);
-      params.set("create_if_missing", "false");
+      params.set("create_if_missing", createIfMissing ? "true" : "false");
       params.set("in_place", "true");
 
-      await post<PatchWorkloadResponse>(`/deploy/plans/workloads?${params.toString()}`, {
-        name: deployWorkloadName,
-        service_config: {
-          server_names: deployDomainsDraft,
-          https: deployDomainsDraft.length > 0,
-        },
-      });
+      await post<PatchWorkloadResponse>(`/deploy/plans/workloads?${params.toString()}`, workloadPayload);
 
       setIsEditingDeployDomains(false);
       void deployDomains.refetch();
@@ -241,6 +326,7 @@ export function FunnelDetailPage() {
 
   const handlePublish = async (serverNames: string[]) => {
     if (!funnelId || !funnel) return;
+    if (!funnel.client_id) return;
     const payload: {
       deploy: {
         workloadName: string;
@@ -254,7 +340,7 @@ export function FunnelDetailPage() {
       };
     } = {
       deploy: {
-        workloadName: `funnel-${funnel.public_id}`,
+        workloadName: `brand-funnels-${funnel.client_id}`,
         createIfMissing: true,
         applyPlan: true,
       },
@@ -280,6 +366,8 @@ export function FunnelDetailPage() {
         status: initialStatus,
         accessUrl: initialAccess,
         publicationId: typeof response.publicationId === "string" ? response.publicationId : null,
+        runtimeArtifactId: null,
+        runtimeArtifactVersion: null,
         error: null,
       });
     }
@@ -296,6 +384,10 @@ export function FunnelDetailPage() {
         if (stopped) return;
         const accessUrl = Array.isArray(job.access_urls) ? job.access_urls[0] || null : null;
         const publicationId = typeof job.result?.publicationId === "string" ? job.result.publicationId : null;
+        const runtimeArtifactId =
+          typeof job.result?.runtimeArtifact?.id === "string" ? job.result.runtimeArtifact.id : null;
+        const runtimeArtifactVersion =
+          typeof job.result?.runtimeArtifact?.version === "number" ? job.result.runtimeArtifact.version : null;
         setDeployJob((current) => {
           if (!current || current.jobId !== job.id) return current;
           return {
@@ -303,6 +395,9 @@ export function FunnelDetailPage() {
             status: job.status,
             accessUrl: accessUrl || current.accessUrl,
             publicationId: publicationId || current.publicationId,
+            runtimeArtifactId: runtimeArtifactId || current.runtimeArtifactId,
+            runtimeArtifactVersion:
+              runtimeArtifactVersion !== null ? runtimeArtifactVersion : current.runtimeArtifactVersion,
             error: job.error || null,
           };
         });
@@ -329,12 +424,18 @@ export function FunnelDetailPage() {
             <Button variant="secondary" size="sm" onClick={() => setIsPageModalOpen(true)} disabled={!funnelId || !funnel}>
               New page
             </Button>
-            {deployJob?.status === "succeeded" && deployJob.accessUrl ? (
-              <Button variant="secondary" size="sm" asChild>
-                <a href={deployJob.accessUrl} target="_blank" rel="noreferrer">
+            {funnel?.status === "published" ? (
+              deployedPageUrl ? (
+                <Button variant="secondary" size="sm" asChild>
+                  <a href={deployedPageUrl} target="_blank" rel="noreferrer">
+                    Open Deployed Page
+                  </a>
+                </Button>
+              ) : (
+                <Button variant="secondary" size="sm" disabled>
                   Open Deployed Page
-                </a>
-              </Button>
+                </Button>
+              )
             ) : null}
             {deployJob?.publicationId && mosPreviewUrl ? (
               <Button variant="secondary" size="sm" asChild>
@@ -364,14 +465,31 @@ export function FunnelDetailPage() {
             <div className="ds-card ds-card--md text-xs text-content-muted">
               Deploy job <span className="font-mono">{deployJob.jobId}</span>:{" "}
               <span className="font-semibold text-content">{deployJob.status}</span>
+              {deployJob.runtimeArtifactVersion !== null ? (
+                <span className="ml-2">
+                  Runtime artifact <span className="font-mono">v{deployJob.runtimeArtifactVersion}</span>
+                </span>
+              ) : null}
               {deployJob.error ? <span className="ml-2 text-danger">{deployJob.error}</span> : null}
             </div>
           ) : null}
           <div className="ds-card ds-card--md space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Badge tone={statusTone(funnel.status)}>{funnel.status}</Badge>
-                {funnel.campaign_id ? <Badge tone="neutral">Campaign-linked</Badge> : <Badge tone="neutral">No campaign</Badge>}
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Badge tone={statusTone(funnel.status)}>{funnel.status}</Badge>
+                  {funnel.campaign_id ? <Badge tone="neutral">Campaign-linked</Badge> : <Badge tone="neutral">No campaign</Badge>}
+                </div>
+                {funnel.status === "published" ? (
+                  <div className="text-xs text-content-muted">
+                    Runtime version:{" "}
+                    <span className="font-mono text-content">
+                      {typeof deployJob?.runtimeArtifactVersion === "number"
+                        ? `v${deployJob.runtimeArtifactVersion}`
+                        : funnel.active_publication_id || "Unknown"}
+                    </span>
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -455,8 +573,13 @@ export function FunnelDetailPage() {
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Deploy domains</div>
                 <div className="rounded-md border border-border bg-surface-2 text-xs text-content">
-                  {deployDomains.data?.workload_found && isEditingDeployDomains ? (
+                  {isEditingDeployDomains ? (
                     <div className="px-3 py-2 space-y-2">
+                      {!deployDomains.data?.workload_found ? (
+                        <div className="text-[11px] text-content-muted">
+                          Workload is not in the plan yet. Saving will create it and apply these domains.
+                        </div>
+                      ) : null}
                       <div className="flex flex-wrap gap-1">
                         {deployDomainsDraft.length ? (
                           deployDomainsDraft.map((hostname) => (
@@ -504,7 +627,11 @@ export function FunnelDetailPage() {
                           Cancel
                         </Button>
                         <Button type="button" size="sm" onClick={() => void saveDeployDomains()} disabled={isSavingDeployDomains}>
-                          {isSavingDeployDomains ? "Saving…" : "Save"}
+                          {isSavingDeployDomains
+                            ? "Saving…"
+                            : deployDomains.data?.workload_found
+                              ? "Save"
+                              : "Create + Save"}
                         </Button>
                       </div>
                     </div>
@@ -546,7 +673,18 @@ export function FunnelDetailPage() {
                           </Button>
                         </>
                       ) : (
-                        <span className="truncate text-content-muted">Not in plan yet</span>
+                        <>
+                          <span className="truncate text-content-muted">Not in plan yet</span>
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="secondary"
+                            onClick={startEditingDeployDomains}
+                            className="shrink-0"
+                          >
+                            Add domains
+                          </Button>
+                        </>
                       )}
                     </div>
                   )}

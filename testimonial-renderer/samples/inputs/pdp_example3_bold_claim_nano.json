@@ -1,0 +1,32 @@
+{
+  "template": "pdp_bold_claim",
+  "output": {
+    "preset": "feed"
+  },
+  "brand": {
+    "logoText": "SampleLogo",
+    "stripBgColor": "#14532d",
+    "stripTextColor": "#ffffff"
+  },
+  "rating": {
+    "valueText": "4.9/5",
+    "detailText": "Rated by 10,000+ Men"
+  },
+  "cta": {
+    "text": "BUY ONE, GET ONE FREE TODAY!"
+  },
+  "background": {
+    "promptVars": {
+      "product": "a white pouch of PURIFIED SHILAJIT GUMMIES standing upright on a clean tabletop, a few dark gummies in front, cucumber and a couple nuts beside it",
+      "scene": "bright minimal background, natural soft light, clean tabletop",
+      "extra": "Keep the pouch in the lower-middle of the frame with clean negative space in the top-right.",
+      "avoid": ["on-image captions", "watermarks", "UI overlays"]
+    }
+  },
+  "comment": {
+    "handle": "PeytonJackson",
+    "text": "the hype is real on these let me be clear... she noticed before i even did. fellas, this is the one.",
+    "avatarUrl": "samples/assets/avatar-omar.svg"
+  }
+}
+

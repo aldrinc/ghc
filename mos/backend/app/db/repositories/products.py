@@ -1,16 +1,43 @@
 from __future__ import annotations
 
+from uuid import UUID, uuid4
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
 
 from app.db.models import Product, ProductOffer, ProductOfferBonus, ProductVariant
+
+_SHORT_ID_LENGTH = 8
+_MAX_SHORT_ID_GENERATION_ATTEMPTS = 32
 
 
 class ProductsRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    @staticmethod
+    def _short_id_token(value: UUID | str) -> str:
+        normalized = str(value).strip().lower()
+        return normalized.split("-", 1)[0][:_SHORT_ID_LENGTH]
+
+    def _short_id_exists(self, *, short_id: str) -> bool:
+        stmt = (
+            select(Product.id)
+            .where(func.left(cast(Product.id, String), _SHORT_ID_LENGTH) == short_id)
+            .limit(1)
+        )
+        return self.session.execute(stmt).first() is not None
+
+    def _generate_unique_short_id_product_uuid(self) -> UUID:
+        for _ in range(_MAX_SHORT_ID_GENERATION_ATTEMPTS):
+            candidate = uuid4()
+            if not self._short_id_exists(short_id=self._short_id_token(candidate)):
+                return candidate
+        raise ValueError(
+            "Unable to allocate a unique 8-character product id prefix after "
+            f"{_MAX_SHORT_ID_GENERATION_ATTEMPTS} attempts."
+        )
 
     def list(self, *, org_id: str, client_id: str) -> list[Product]:
         stmt = select(Product).where(Product.org_id == org_id, Product.client_id == client_id)
@@ -21,7 +48,23 @@ class ProductsRepository:
         return self.session.scalars(stmt).first()
 
     def create(self, *, org_id: str, client_id: str, **fields: Any) -> Product:
-        product = Product(org_id=org_id, client_id=client_id, **fields)
+        payload = dict(fields)
+        provided_id = payload.get("id")
+        if provided_id is not None:
+            try:
+                normalized_id = UUID(str(provided_id))
+            except ValueError as exc:
+                raise ValueError("Product id must be a valid UUID.") from exc
+            short_id = self._short_id_token(normalized_id)
+            if self._short_id_exists(short_id=short_id):
+                raise ValueError(
+                    f"Product id prefix '{short_id}' already exists. Use a different id."
+                )
+            payload["id"] = normalized_id
+        else:
+            payload["id"] = self._generate_unique_short_id_product_uuid()
+
+        product = Product(org_id=org_id, client_id=client_id, **payload)
         self.session.add(product)
         self.session.commit()
         self.session.refresh(product)

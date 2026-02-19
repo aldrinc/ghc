@@ -282,6 +282,7 @@ class Funnel(Base):
     __tablename__ = "funnels"
     __table_args__ = (
         UniqueConstraint("public_id", name="uq_funnels_public_id"),
+        UniqueConstraint("route_slug", name="uq_funnels_route_slug"),
         sa.Index("idx_funnels_org_client", "org_id", "client_id"),
         sa.Index("idx_funnels_client_campaign", "client_id", "campaign_id"),
         sa.Index("idx_funnels_experiment_spec", "experiment_spec_id"),
@@ -310,6 +311,7 @@ class Funnel(Base):
         nullable=False,
         server_default=FunnelStatusEnum.draft.value,
     )
+    route_slug: Mapped[str] = mapped_column(Text, nullable=False)
     public_id: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False, default=uuid4)
     entry_page_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("funnel_pages.id", ondelete="SET NULL"), nullable=True

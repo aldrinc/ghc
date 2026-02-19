@@ -39,9 +39,10 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
 
 type FunnelRuntimeContextValue = {
-  publicId: string;
+  productSlug: string;
+  funnelSlug: string;
   pageMap: Record<string, string>;
-  rootMode?: boolean;
+  bundleMode?: boolean;
   entrySlug?: string | null;
   trackEvent?: (event: { eventType: string; props?: Record<string, unknown> }) => void;
   commerce?: PublicFunnelCommerce | null;
@@ -73,14 +74,10 @@ export function resolveRuntimePagePath(runtime: FunnelRuntimeContextValue, slug:
   if (!normalizedSlug) {
     return "#";
   }
-  if (runtime.rootMode) {
-    const entrySlug = (runtime.entrySlug || "").trim();
-    if (entrySlug && normalizedSlug === entrySlug) {
-      return "/";
-    }
-    return `/${encodeURIComponent(normalizedSlug)}`;
+  if (runtime.bundleMode) {
+    return `/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
   }
-  return `/f/${runtime.publicId}/${encodeURIComponent(normalizedSlug)}`;
+  return `/f/${encodeURIComponent(runtime.productSlug)}/${encodeURIComponent(runtime.funnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
 }
 
 type PageOption = { label: string; value: string };
@@ -183,8 +180,11 @@ function FunnelButton({ label, linkType, href, targetPageId, variant, size, widt
     if (!runtime) {
       throw new Error("Funnel runtime is required to resolve next page links.");
     }
-    if (!runtime.publicId) {
-      throw new Error("Funnel runtime is missing a public id.");
+    if (!runtime.productSlug) {
+      throw new Error("Funnel runtime is missing a product slug.");
+    }
+    if (!runtime.funnelSlug) {
+      throw new Error("Funnel runtime is missing a funnel slug.");
     }
     if (!runtime.nextPageId) {
       throw new Error("Next page is not configured for this page.");

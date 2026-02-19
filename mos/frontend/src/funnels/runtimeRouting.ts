@@ -1,7 +1,11 @@
 type DeployRuntimeConfig = {
-  publicId?: string;
-  rootDomainMode?: boolean;
+  bundleMode?: boolean;
+  defaultProductSlug?: string;
+  defaultFunnelSlug?: string;
 };
+
+const SHORT_ID_LENGTH = 8;
+const SHORT_ID_PATTERN = /^[0-9a-f]{8}$/;
 
 declare global {
   interface Window {
@@ -20,55 +24,69 @@ function getDeployRuntimeConfig(): DeployRuntimeConfig {
   return candidate;
 }
 
-export function getStandalonePublicId(): string | null {
-  const publicId = (getDeployRuntimeConfig().publicId || "").trim();
-  return publicId || null;
+export function normalizeRouteToken(value: string | null | undefined): string {
+  const normalized = (value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return normalized;
 }
 
-export function isStandaloneRootModeForPublicId(publicId: string | null | undefined): boolean {
-  const cfg = getDeployRuntimeConfig();
-  if (!cfg.rootDomainMode) {
-    return false;
+export function shortUuidRouteToken(value: string | null | undefined): string {
+  const normalized = (value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  const prefix = normalized.split("-", 1)[0].slice(0, SHORT_ID_LENGTH);
+  if (!SHORT_ID_PATTERN.test(prefix)) {
+    return "";
   }
-  const runtimePublicId = (cfg.publicId || "").trim();
-  if (!runtimePublicId) {
-    return false;
+  return prefix;
+}
+
+export function isStandaloneBundleMode(): boolean {
+  return Boolean(getDeployRuntimeConfig().bundleMode);
+}
+
+export function getStandaloneDefaultRoute(): { productSlug: string; funnelSlug: string } | null {
+  const config = getDeployRuntimeConfig();
+  const productSlug = normalizeRouteToken(config.defaultProductSlug);
+  const funnelSlug = normalizeRouteToken(config.defaultFunnelSlug);
+  if (!productSlug || !funnelSlug) {
+    return null;
   }
-  if (!publicId) {
-    return true;
-  }
-  return runtimePublicId === publicId;
+  return { productSlug, funnelSlug };
 }
 
 export function buildPublicFunnelPath(
   {
-    publicId,
+    productSlug,
+    funnelSlug,
     slug,
-    entrySlug,
-    rootMode,
+    bundleMode,
   }: {
-    publicId: string;
+    productSlug: string;
+    funnelSlug: string;
     slug?: string | null;
-    entrySlug?: string | null;
-    rootMode: boolean;
+    bundleMode: boolean;
   },
 ): string {
-  const normalizedPublicId = (publicId || "").trim();
-  if (!normalizedPublicId) {
-    return "/";
+  const normalizedProductSlug = normalizeRouteToken(productSlug);
+  const normalizedFunnelSlug = normalizeRouteToken(funnelSlug);
+  if (!normalizedProductSlug || !normalizedFunnelSlug) {
+    throw new Error("productSlug and funnelSlug are required to build a public funnel path.");
   }
 
-  const normalizedSlug = (slug || "").trim();
-  const normalizedEntrySlug = (entrySlug || "").trim();
-  if (rootMode) {
-    if (!normalizedSlug || (normalizedEntrySlug && normalizedSlug === normalizedEntrySlug)) {
-      return "/";
+  const normalizedSlug = normalizeRouteToken(slug);
+  if (bundleMode) {
+    if (!normalizedSlug) {
+      return `/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}`;
     }
-    return `/${encodeURIComponent(normalizedSlug)}`;
+    return `/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
   }
 
   if (!normalizedSlug) {
-    return `/f/${encodeURIComponent(normalizedPublicId)}`;
+    return `/f/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}`;
   }
-  return `/f/${encodeURIComponent(normalizedPublicId)}/${encodeURIComponent(normalizedSlug)}`;
+  return `/f/${encodeURIComponent(normalizedProductSlug)}/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
 }

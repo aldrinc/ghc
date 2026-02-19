@@ -41,8 +41,8 @@ function resolveButtonHref({
   if (!runtime) {
     throw new Error('Funnel runtime is required to resolve internal links.')
   }
-  if (!runtime.publicId) {
-    throw new Error('Funnel runtime is missing a public id.')
+  if (!runtime.funnelSlug) {
+    throw new Error('Funnel runtime is missing a funnel slug.')
   }
 
   const resolvedTargetPageId =

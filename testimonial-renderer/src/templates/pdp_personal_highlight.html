@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDP Personal Highlight</title>
+    <link rel="stylesheet" href="./shared.css" />
+    <link rel="stylesheet" href="./pdp_shared.css" />
+    <style>
+      #bubble-primary {
+        top: 28px;
+        left: 18px;
+        max-width: 58%;
+      }
+
+      #card.is-feed #bubble-primary {
+        top: 20px;
+        left: 14px;
+        max-width: 60%;
+      }
+
+      #bubble-primary .pdp-bubble-text {
+        font-size: 14px;
+        line-height: 1.18;
+      }
+
+      #card.is-feed #bubble-primary .pdp-bubble-text {
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card">
+      <img id="bg" class="pdp-bg" alt="" />
+      <div class="pdp-vignette"></div>
+
+      <div id="bubble-primary" class="pdp-bubble">
+        <div class="pdp-bubble-row">
+          <img id="primary-avatar" class="pdp-avatar" alt="" />
+          <div class="pdp-bubble-copy">
+            <div id="primary-context" class="pdp-bubble-header"></div>
+            <div id="primary-text" class="pdp-bubble-text"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pdp-strip">
+        <div class="pdp-strip-left">
+          <div class="pdp-rating-row">
+            <div class="pdp-stars" aria-hidden="true">
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+            </div>
+            <div class="pdp-rating-text">
+              <span id="rating-value"></span>
+              <span id="rating-detail"></span>
+            </div>
+          </div>
+          <div id="cta" class="pdp-cta"></div>
+        </div>
+
+        <div class="pdp-logo">
+          <img id="logo-img" alt="" />
+          <div id="logo-text" class="pdp-logo-text"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const waitForImage = (img) =>
+        new Promise((resolve, reject) => {
+          if (!img) {
+            reject(new Error('Image element not found.'));
+            return;
+          }
+          if (img.complete && img.naturalWidth > 0) {
+            resolve();
+            return;
+          }
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => reject(new Error('Failed to load image.')), { once: true });
+        });
+
+      const setOutputPreset = (output) => {
+        const preset = output && output.preset;
+        if (preset === 'feed') {
+          document.getElementById('card').classList.add('is-feed');
+          return;
+        }
+        if (preset === 'tiktok') {
+          return;
+        }
+        throw new Error(`Unsupported output.preset: ${preset}`);
+      };
+
+      const setLogo = (brand, waits) => {
+        const img = document.getElementById('logo-img');
+        const text = document.getElementById('logo-text');
+        img.style.display = 'none';
+        text.style.display = 'none';
+
+        if (brand.logoUrl) {
+          img.src = brand.logoUrl;
+          img.alt = 'Brand logo';
+          img.style.display = 'block';
+          waits.push(waitForImage(img));
+          return;
+        }
+
+        text.textContent = brand.logoText;
+        text.style.display = 'block';
+      };
+
+      const setContextLine = (el, handle) => {
+        el.innerHTML = '';
+        const prefix = document.createElement('span');
+        prefix.textContent = 'Reply to ';
+        const handleSpan = document.createElement('span');
+        handleSpan.className = 'pdp-handle';
+        handleSpan.textContent = handle;
+        const suffix = document.createElement('span');
+        suffix.textContent = "'s comment";
+        el.appendChild(prefix);
+        el.appendChild(handleSpan);
+        el.appendChild(suffix);
+      };
+
+      window.setCardData = async (data) => {
+        if (!data || typeof data !== 'object') {
+          throw new Error('Payload must be an object.');
+        }
+
+        setOutputPreset(data.output);
+
+        const card = document.getElementById('card');
+        card.style.setProperty('--strip-bg', data.brand.stripBgColor);
+        card.style.setProperty('--strip-text', data.brand.stripTextColor);
+
+        const waits = [];
+
+        const bg = document.getElementById('bg');
+        bg.src = data.background.imageUrl;
+        bg.alt = data.background.alt || '';
+        waits.push(waitForImage(bg));
+
+        const avatar = document.getElementById('primary-avatar');
+        if (data.comment.avatarUrl) {
+          avatar.src = data.comment.avatarUrl;
+          avatar.alt = '';
+          waits.push(waitForImage(avatar));
+        } else {
+          avatar.style.display = 'none';
+        }
+
+        setContextLine(document.getElementById('primary-context'), data.comment.handle);
+        document.getElementById('primary-text').textContent = data.comment.text;
+
+        document.getElementById('rating-value').textContent = data.rating.valueText;
+        document.getElementById('rating-detail').textContent = ` ${data.rating.detailText}`;
+        document.getElementById('cta').textContent = data.cta.text;
+
+        setLogo(data.brand, waits);
+
+        await Promise.all(waits);
+      };
+    </script>
+  </body>
+</html>
