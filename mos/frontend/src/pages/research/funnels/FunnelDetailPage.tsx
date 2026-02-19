@@ -17,6 +17,8 @@ const deployPlanPath = (import.meta.env.VITE_DEPLOY_PLAN_PATH || "").trim();
 const deployInstanceName = (import.meta.env.VITE_DEPLOY_INSTANCE_NAME || "").trim();
 const deployUpstreamBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_BASE_URL || "").trim();
 const deployUpstreamApiBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_API_BASE_URL || "").trim();
+const deployApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").trim();
+const deployDestinationPath = (import.meta.env.VITE_DEPLOY_DESTINATION_PATH || "/opt/apps").trim();
 
 type PatchWorkloadResponse = {
   status: string;
@@ -193,7 +195,7 @@ export function FunnelDetailPage() {
   };
 
   const startEditingDeployDomains = () => {
-    if (!deployDomains.data?.workload_found) return;
+    if (!deployDomains.data) return;
     setDeployDomainsDraft(normalizeDeployDomainList(deployDomains.data.server_names || []));
     setDeployDomainsInput("");
     setDeployDomainsSaveError(null);
@@ -234,14 +236,59 @@ export function FunnelDetailPage() {
 
   const saveDeployDomains = async () => {
     setDeployDomainsSaveError(null);
+    if (!deployDomains.data) {
+      setDeployDomainsSaveError("Deploy domains are not loaded yet.");
+      return;
+    }
     if (!deployWorkloadName) {
       setDeployDomainsSaveError("Deploy workload name is missing for this funnel.");
       return;
     }
-    const planPath = (deployDomains.data?.plan_path || "").trim();
+    const planPath = (deployDomains.data.plan_path || "").trim();
     if (!planPath) {
       setDeployDomainsSaveError("No deploy plan is available to update.");
       return;
+    }
+
+    const createIfMissing = !deployDomains.data.workload_found;
+    const normalizedApiBaseRoot = (deployUpstreamApiBaseUrl || deployApiBaseUrl).trim().replace(/\/+$/, "");
+    if (createIfMissing) {
+      if (!funnel?.product_id) {
+        setDeployDomainsSaveError("Funnel product_id is required to create a deploy workload.");
+        return;
+      }
+      if (!normalizedApiBaseRoot.startsWith("http://") && !normalizedApiBaseRoot.startsWith("https://")) {
+        setDeployDomainsSaveError(
+          "Deploy upstream API base URL must be absolute (http/https). Set VITE_DEPLOY_UPSTREAM_API_BASE_URL or VITE_API_BASE_URL.",
+        );
+        return;
+      }
+    }
+
+    const serverNames = normalizeDeployDomainList(deployDomainsDraft);
+    const serviceConfig = {
+      server_names: serverNames,
+      https: serverNames.length > 0,
+    };
+    const workloadPayload: Record<string, unknown> = {
+      name: deployWorkloadName,
+      service_config: serviceConfig,
+    };
+    if (createIfMissing) {
+      workloadPayload.source_type = "funnel_artifact";
+      workloadPayload.runtime = "static";
+      workloadPayload.build_config = {};
+      workloadPayload.destination_path = deployDestinationPath || "/opt/apps";
+      workloadPayload.source_ref = {
+        product_id: funnel?.product_id,
+        upstream_api_base_root: normalizedApiBaseRoot,
+        artifact: {
+          meta: {
+            productId: funnel?.product_id,
+          },
+          funnels: {},
+        },
+      };
     }
 
     setIsSavingDeployDomains(true);
@@ -249,16 +296,10 @@ export function FunnelDetailPage() {
       const params = new URLSearchParams();
       params.set("plan_path", planPath);
       if (deployInstanceName) params.set("instance_name", deployInstanceName);
-      params.set("create_if_missing", "false");
+      params.set("create_if_missing", createIfMissing ? "true" : "false");
       params.set("in_place", "true");
 
-      await post<PatchWorkloadResponse>(`/deploy/plans/workloads?${params.toString()}`, {
-        name: deployWorkloadName,
-        service_config: {
-          server_names: deployDomainsDraft,
-          https: deployDomainsDraft.length > 0,
-        },
-      });
+      await post<PatchWorkloadResponse>(`/deploy/plans/workloads?${params.toString()}`, workloadPayload);
 
       setIsEditingDeployDomains(false);
       void deployDomains.refetch();
@@ -489,8 +530,13 @@ export function FunnelDetailPage() {
               <div className="space-y-1">
                 <div className="text-xs font-semibold text-content">Deploy domains</div>
                 <div className="rounded-md border border-border bg-surface-2 text-xs text-content">
-                  {deployDomains.data?.workload_found && isEditingDeployDomains ? (
+                  {isEditingDeployDomains ? (
                     <div className="px-3 py-2 space-y-2">
+                      {!deployDomains.data?.workload_found ? (
+                        <div className="text-[11px] text-content-muted">
+                          Workload is not in the plan yet. Saving will create it and apply these domains.
+                        </div>
+                      ) : null}
                       <div className="flex flex-wrap gap-1">
                         {deployDomainsDraft.length ? (
                           deployDomainsDraft.map((hostname) => (
@@ -538,7 +584,11 @@ export function FunnelDetailPage() {
                           Cancel
                         </Button>
                         <Button type="button" size="sm" onClick={() => void saveDeployDomains()} disabled={isSavingDeployDomains}>
-                          {isSavingDeployDomains ? "Saving…" : "Save"}
+                          {isSavingDeployDomains
+                            ? "Saving…"
+                            : deployDomains.data?.workload_found
+                              ? "Save"
+                              : "Create + Save"}
                         </Button>
                       </div>
                     </div>
@@ -580,7 +630,18 @@ export function FunnelDetailPage() {
                           </Button>
                         </>
                       ) : (
-                        <span className="truncate text-content-muted">Not in plan yet</span>
+                        <>
+                          <span className="truncate text-content-muted">Not in plan yet</span>
+                          <Button
+                            type="button"
+                            size="xs"
+                            variant="secondary"
+                            onClick={startEditingDeployDomains}
+                            className="shrink-0"
+                          >
+                            Add domains
+                          </Button>
+                        </>
                       )}
                     </div>
                   )}
