@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -21,6 +21,25 @@ from app.schemas.common import ClientCreate
 from app.schemas.clients import ClientDeleteRequest, ClientUpdateRequest
 from app.schemas.onboarding import OnboardingStartRequest
 from app.schemas.intent import CampaignIntentRequest
+from app.schemas.shopify_connection import (
+    ShopifyCreateProductRequest,
+    ShopifyDefaultShopRequest,
+    ShopifyProductListResponse,
+    ShopifyProductCreateResponse,
+    ShopifyConnectionStatusResponse,
+    ShopifyInstallationUpdateRequest,
+    ShopifyInstallUrlRequest,
+    ShopifyInstallUrlResponse,
+)
+from app.services.shopify_connection import (
+    build_client_shopify_install_url,
+    create_client_shopify_product,
+    get_client_shopify_connection_status,
+    list_client_shopify_products,
+    list_shopify_installations,
+    normalize_shop_domain,
+    set_client_shopify_storefront_token,
+)
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.client_onboarding import ClientOnboardingInput, ClientOnboardingWorkflow
 from app.temporal.workflows.campaign_intent import CampaignIntentInput, CampaignIntentWorkflow
@@ -68,6 +87,214 @@ def _serialize_active_product(product: Product) -> dict:
         "client_id": str(product.client_id),
         "product_type": product.product_type,
     }
+
+
+def _require_client_exists(*, session: Session, org_id: str, client_id: str) -> None:
+    client = ClientsRepository(session).get(org_id=org_id, client_id=client_id)
+    if not client:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+
+
+def _get_client_user_pref(*, session: Session, org_id: str, client_id: str, user_external_id: str) -> ClientUserPreference | None:
+    return session.scalar(
+        select(ClientUserPreference).where(
+            ClientUserPreference.org_id == org_id,
+            ClientUserPreference.client_id == client_id,
+            ClientUserPreference.user_external_id == user_external_id,
+        )
+    )
+
+
+def _get_selected_shop_domain(*, session: Session, org_id: str, client_id: str, user_external_id: str) -> str | None:
+    pref = _get_client_user_pref(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        user_external_id=user_external_id,
+    )
+    if not pref:
+        return None
+    selected = getattr(pref, "selected_shop_domain", None)
+    if not isinstance(selected, str) or not selected.strip():
+        return None
+    return selected.strip().lower()
+
+
+@router.get("/{client_id}/shopify/status", response_model=ShopifyConnectionStatusResponse)
+def get_client_shopify_status(
+    client_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=selected_shop_domain,
+    )
+    return ShopifyConnectionStatusResponse(**status_payload)
+
+
+@router.post("/{client_id}/shopify/install-url", response_model=ShopifyInstallUrlResponse)
+def create_client_shopify_install_url(
+    client_id: str,
+    payload: ShopifyInstallUrlRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    install_url = build_client_shopify_install_url(client_id=client_id, shop_domain=payload.shopDomain)
+    return ShopifyInstallUrlResponse(installUrl=install_url)
+
+
+@router.patch("/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse)
+def update_client_shopify_installation(
+    client_id: str,
+    payload: ShopifyInstallationUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    set_client_shopify_storefront_token(
+        client_id=client_id,
+        shop_domain=payload.shopDomain,
+        storefront_access_token=payload.storefrontAccessToken,
+    )
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=selected_shop_domain,
+    )
+    return ShopifyConnectionStatusResponse(**status_payload)
+
+
+@router.put("/{client_id}/shopify/default-shop", response_model=ShopifyConnectionStatusResponse)
+def set_client_shopify_default_shop(
+    client_id: str,
+    payload: ShopifyDefaultShopRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    normalized_shop = normalize_shop_domain(payload.shopDomain)
+
+    installations = list_shopify_installations()
+    active_installation = next(
+        (
+            installation
+            for installation in installations
+            if installation.client_id == client_id
+            and installation.uninstalled_at is None
+            and installation.shop_domain == normalized_shop
+        ),
+        None,
+    )
+    if not active_installation:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Selected shopDomain is not an active Shopify installation for this workspace.",
+        )
+
+    pref = _get_client_user_pref(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    if pref:
+        pref.selected_shop_domain = normalized_shop
+        pref.updated_at = func.now()
+    else:
+        session.add(
+            ClientUserPreference(
+                org_id=auth.org_id,
+                client_id=client_id,
+                user_external_id=auth.user_id,
+                selected_shop_domain=normalized_shop,
+            )
+        )
+    session.commit()
+
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=normalized_shop,
+    )
+    return ShopifyConnectionStatusResponse(**status_payload)
+
+
+@router.get("/{client_id}/shopify/products", response_model=ShopifyProductListResponse)
+def list_client_shopify_products_route(
+    client_id: str,
+    query: str | None = Query(default=None),
+    limit: int = Query(default=20),
+    shopDomain: str | None = Query(default=None),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    effective_shop_domain = shopDomain or selected_shop_domain
+    payload = list_client_shopify_products(
+        client_id=client_id,
+        query=query,
+        limit=limit,
+        shop_domain=effective_shop_domain,
+    )
+    return ShopifyProductListResponse(**payload)
+
+
+@router.post("/{client_id}/shopify/products", response_model=ShopifyProductCreateResponse)
+def create_client_shopify_product_route(
+    client_id: str,
+    payload: ShopifyCreateProductRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    effective_shop_domain = payload.shopDomain or selected_shop_domain
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=effective_shop_domain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Shopify connection is not ready: {status_payload['message']}",
+        )
+    created = create_client_shopify_product(
+        client_id=client_id,
+        title=payload.title,
+        description=payload.description,
+        handle=payload.handle,
+        vendor=payload.vendor,
+        product_type=payload.productType,
+        tags=payload.tags,
+        status_text=payload.status,
+        variants=[variant.model_dump() for variant in payload.variants],
+        shop_domain=effective_shop_domain,
+    )
+    return ShopifyProductCreateResponse(**created)
 
 
 @router.get("/{client_id}/active-product")

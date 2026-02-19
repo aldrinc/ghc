@@ -24,6 +24,11 @@ from app.db.repositories.jobs import (
     SUBJECT_TYPE_AD,
 )
 from app.db.repositories.teardowns import TeardownsRepository
+from app.observability import (
+    LangfuseTraceContext,
+    bind_langfuse_trace_context,
+    start_langfuse_generation,
+)
 from app.schemas.teardowns import (
     TeardownAssertionInput,
     TeardownEvidenceInput,
@@ -191,6 +196,25 @@ def _build_media_parts(
     return parts
 
 
+def _extract_gemini_usage_details(result: Any) -> Dict[str, int] | None:
+    usage = getattr(result, "usage_metadata", None)
+    if usage is None:
+        return None
+
+    input_tokens = getattr(usage, "prompt_token_count", None)
+    output_tokens = getattr(usage, "candidates_token_count", None)
+    if isinstance(usage, dict):
+        input_tokens = usage.get("prompt_token_count", input_tokens)
+        output_tokens = usage.get("candidates_token_count", output_tokens)
+
+    usage_details: Dict[str, int] = {}
+    if isinstance(input_tokens, int):
+        usage_details["input"] = input_tokens
+    if isinstance(output_tokens, int):
+        usage_details["output"] = output_tokens
+    return usage_details or None
+
+
 @activity.defn(name="ads.generate_ad_breakdown")
 def generate_ad_breakdown_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -300,52 +324,84 @@ def generate_ad_breakdown_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         contents: List[Any] = [ad_context_block, prompt_template]
         contents.extend(media_parts)
 
-        try:
-            result = model_client.generate_content(contents, request_options={"timeout": 120})
-            raw_output = getattr(result, "text", None)
-            if not raw_output and getattr(result, "candidates", None):
-                first = result.candidates[0]
-                if first and getattr(first, "content", None) and getattr(first.content, "parts", None):
-                    texts: List[str] = []
-                    for part in first.content.parts:
-                        text = getattr(part, "text", None)
-                        if text:
-                            texts.append(text)
-                    raw_output = "\\n".join(texts) if texts else None
-            if not raw_output:
-                raise RuntimeError("Gemini returned no text for ad breakdown")
-
-            structured = segment_ad_breakdown_output(raw_output)
-            output_payload = {
-                "ad_id": str(ad.id),
+        trace_context = LangfuseTraceContext(
+            name="workflow.ad_breakdown",
+            session_id=research_run_id or params.get("workflow_run_id") or str(job.id),
+            metadata={
+                "orgId": org_id,
+                "clientId": client_id,
+                "researchRunId": research_run_id,
+                "jobId": str(job.id),
+                "adId": ad_id,
                 "model": model,
-                "prompt_sha256": prompt_sha,
-                "media_assets": media_summary,
-                "parsed": structured,
-            }
-            jobs_repo.mark_succeeded(str(job.id), output=output_payload, raw_output_text=raw_output)
-            activity.logger.info(
-                "ads_breakdown.completed",
-                extra={"job_id": str(job.id), "ad_id": ad_id},
-            )
-            return {
-                "job_id": str(job.id),
-                "ad_id": ad_id,
-                "status": JOB_STATUS_SUCCEEDED,
-            }
-        except Exception as exc:  # noqa: BLE001
-            error_msg = str(exc)
-            jobs_repo.mark_failed(str(job.id), error=error_msg, output={"error": error_msg})
-            activity.logger.error(
-                "ads_breakdown.error",
-                extra={"job_id": str(job.id), "ad_id": ad_id, "error": error_msg},
-            )
-            return {
-                "job_id": str(job.id),
-                "ad_id": ad_id,
-                "status": JOB_STATUS_FAILED,
-                "error": error_msg,
-            }
+            },
+            tags=["workflow", "ad_breakdown", "gemini"],
+        )
+        with bind_langfuse_trace_context(trace_context):
+            with start_langfuse_generation(
+                name="llm.gemini.ad_breakdown",
+                model=model,
+                input={"ad_id": ad_id, "prompt_sha256": prompt_sha},
+                metadata={"mediaAssetCount": len(media_parts), "jobId": str(job.id)},
+                model_parameters={
+                    "temperature": 0.2,
+                    "max_output_tokens": max_output_tokens,
+                },
+                tags=["workflow", "ad_breakdown", "gemini"],
+                trace_name="workflow.ad_breakdown",
+            ) as generation:
+                try:
+                    result = model_client.generate_content(contents, request_options={"timeout": 120})
+                    raw_output = getattr(result, "text", None)
+                    if not raw_output and getattr(result, "candidates", None):
+                        first = result.candidates[0]
+                        if first and getattr(first, "content", None) and getattr(first.content, "parts", None):
+                            texts: List[str] = []
+                            for part in first.content.parts:
+                                text = getattr(part, "text", None)
+                                if text:
+                                    texts.append(text)
+                            raw_output = "\\n".join(texts) if texts else None
+                    if not raw_output:
+                        raise RuntimeError("Gemini returned no text for ad breakdown")
+
+                    if generation is not None:
+                        generation.update(
+                            output=raw_output,
+                            usage_details=_extract_gemini_usage_details(result),
+                        )
+
+                    structured = segment_ad_breakdown_output(raw_output)
+                    output_payload = {
+                        "ad_id": str(ad.id),
+                        "model": model,
+                        "prompt_sha256": prompt_sha,
+                        "media_assets": media_summary,
+                        "parsed": structured,
+                    }
+                    jobs_repo.mark_succeeded(str(job.id), output=output_payload, raw_output_text=raw_output)
+                    activity.logger.info(
+                        "ads_breakdown.completed",
+                        extra={"job_id": str(job.id), "ad_id": ad_id},
+                    )
+                    return {
+                        "job_id": str(job.id),
+                        "ad_id": ad_id,
+                        "status": JOB_STATUS_SUCCEEDED,
+                    }
+                except Exception as exc:  # noqa: BLE001
+                    error_msg = str(exc)
+                    jobs_repo.mark_failed(str(job.id), error=error_msg, output={"error": error_msg})
+                    activity.logger.error(
+                        "ads_breakdown.error",
+                        extra={"job_id": str(job.id), "ad_id": ad_id, "error": error_msg},
+                    )
+                    return {
+                        "job_id": str(job.id),
+                        "ad_id": ad_id,
+                        "status": JOB_STATUS_FAILED,
+                        "error": error_msg,
+                    }
 
 
 @activity.defn(name="ads.persist_teardown_from_breakdown")

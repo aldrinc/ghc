@@ -11,6 +11,22 @@ import type {
   ProductVariant,
 } from "@/types/products";
 
+type ShopifyCreatedVariant = {
+  variantGid: string;
+  title: string;
+  priceCents: number;
+  currency: string;
+};
+
+type ShopifyCreateProductResponse = {
+  shopDomain: string;
+  productGid: string;
+  title: string;
+  handle: string;
+  status: string;
+  variants: ShopifyCreatedVariant[];
+};
+
 const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
 const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
@@ -204,6 +220,34 @@ export function useCreateVariant(productId: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to create variant";
+      toast.error(message);
+    },
+  });
+}
+
+export function useCreateShopifyProductForProduct(productId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      title: string;
+      description?: string;
+      handle?: string;
+      vendor?: string;
+      productType?: string;
+      tags?: string[];
+      status?: "ACTIVE" | "DRAFT";
+      variants: Array<{ title: string; priceCents: number; currency: string }>;
+      shopDomain?: string;
+    }) =>
+      post<ShopifyCreateProductResponse>(`/products/${productId}/shopify/create`, payload),
+    onSuccess: () => {
+      toast.success("Shopify product created and variants imported");
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", productId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create Shopify product";
       toast.error(message);
     },
   });

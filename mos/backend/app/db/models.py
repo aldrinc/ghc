@@ -1626,6 +1626,7 @@ class ClientUserPreference(Base):
     active_product_id: Mapped[Optional[str]] = mapped_column(
         ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )
+    selected_shop_domain: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

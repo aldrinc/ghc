@@ -28,7 +28,9 @@ class ToolContext:
     org_id: str
     user_id: str
     run_id: str
+    tool_call_id: Optional[str] = None
+    tool_seq: Optional[int] = None
+    tool_name: Optional[str] = None
     client_id: Optional[str] = None
     funnel_id: Optional[str] = None
     page_id: Optional[str] = None
-

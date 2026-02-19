@@ -189,3 +189,271 @@ def test_create_variant_rejects_offer_from_other_product(api_client):
     )
     assert response.status_code == 409
     assert response.json()["detail"] == "offerId must belong to the selected product."
+
+
+def test_create_variant_requires_external_price_id_for_shopify_provider(api_client):
+    client_id = _create_client(api_client, name="Shopify Variant Missing External")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    response = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "shopify",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == 'Shopify provider requires externalPriceId (gid://shopify/ProductVariant/...).'
+
+
+def test_create_variant_rejects_non_gid_external_price_id_for_shopify_provider(api_client):
+    client_id = _create_client(api_client, name="Shopify Variant Invalid External")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    response = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "price_test_123",
+        },
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Shopify externalPriceId must be a Shopify variant GID."
+
+
+def test_update_variant_rejects_shopify_gid_with_non_shopify_provider(api_client):
+    client_id = _create_client(api_client, name="Shopify Variant Update Validation")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Primary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "stripe",
+            "externalPriceId": "price_test_123",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    update_resp = api_client.patch(
+        f"/products/variants/{variant_id}",
+        json={"externalPriceId": "gid://shopify/ProductVariant/123456789"},
+    )
+    assert update_resp.status_code == 400
+    assert update_resp.json()["detail"] == 'Shopify variant GIDs require provider="shopify".'
+
+
+def test_create_shopify_product_for_product_imports_shopify_variants(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Product Import")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_create_client_shopify_product(
+        *,
+        client_id: str,
+        title: str,
+        variants: list[dict],
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        assert client_id
+        assert title == "Sleep Drops"
+        assert variants
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/800",
+            "title": "Sleep Drops",
+            "handle": "sleep-drops",
+            "status": "DRAFT",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/801",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                },
+                {
+                    "variantGid": "gid://shopify/ProductVariant/802",
+                    "title": "Bundle",
+                    "priceCents": 7900,
+                    "currency": "USD",
+                },
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+
+    response = api_client.post(
+        f"/products/{product_id}/shopify/create",
+        json={
+            "title": "Sleep Drops",
+            "status": "DRAFT",
+            "variants": [
+                {"title": "Starter", "priceCents": 4999, "currency": "USD"},
+                {"title": "Bundle", "priceCents": 7900, "currency": "USD"},
+            ],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["productGid"] == "gid://shopify/Product/800"
+
+    product_detail = api_client.get(f"/products/{product_id}")
+    assert product_detail.status_code == 200
+    body = product_detail.json()
+    assert body["shopify_product_gid"] == "gid://shopify/Product/800"
+    variants = body.get("variants") or []
+    assert len(variants) == 2
+    assert {variant["external_price_id"] for variant in variants} == {
+        "gid://shopify/ProductVariant/801",
+        "gid://shopify/ProductVariant/802",
+    }
+    assert all(variant["provider"] == "shopify" for variant in variants)
+
+
+def test_create_shopify_product_for_product_rejects_existing_mapping(api_client):
+    client_id = _create_client(api_client, name="Shopify Product Already Mapped")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+        shopify_product_gid="gid://shopify/Product/123",
+    )
+
+    response = api_client.post(
+        f"/products/{product_id}/shopify/create",
+        json={
+            "title": "Sleep Drops",
+            "status": "DRAFT",
+            "variants": [{"title": "Starter", "priceCents": 4999, "currency": "USD"}],
+        },
+    )
+    assert response.status_code == 409
+    assert "already mapped to Shopify" in response.json()["detail"]
+
+
+def test_create_shopify_product_for_product_requires_ready_connection(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Product Not Ready")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "installed_missing_storefront_token",
+            "message": "Shopify is installed but missing storefront access token.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": False,
+            "missingScopes": [],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+
+    response = api_client.post(
+        f"/products/{product_id}/shopify/create",
+        json={
+            "title": "Sleep Drops",
+            "status": "DRAFT",
+            "variants": [{"title": "Starter", "priceCents": 4999, "currency": "USD"}],
+        },
+    )
+    assert response.status_code == 409
+    assert "Shopify connection is not ready" in response.json()["detail"]
+
+
+def test_create_shopify_product_for_product_rejects_duplicate_shopify_variant_title(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Product Duplicate Title")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    existing_variant_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Starter",
+            "price": 4900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/777",
+        },
+    )
+    assert existing_variant_resp.status_code == 201
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    observed = {"called": False}
+
+    def fake_create_client_shopify_product(
+        *,
+        client_id: str,
+        title: str,
+        variants: list[dict],
+        description: str | None,
+        handle: str | None,
+        vendor: str | None,
+        product_type: str | None,
+        tags: list[str] | None,
+        status_text: str,
+        shop_domain: str | None,
+    ):
+        observed["called"] = True
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/888",
+            "title": "Sleep Drops",
+            "handle": "sleep-drops",
+            "status": "DRAFT",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/889",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "create_client_shopify_product", fake_create_client_shopify_product)
+
+    response = api_client.post(
+        f"/products/{product_id}/shopify/create",
+        json={
+            "title": "Sleep Drops",
+            "status": "DRAFT",
+            "variants": [{"title": "Starter", "priceCents": 4999, "currency": "USD"}],
+        },
+    )
+    assert observed["called"] is True
+    assert response.status_code == 409
+    assert response.json()["detail"] == 'Shopify variant title "Starter" already exists for this product.'

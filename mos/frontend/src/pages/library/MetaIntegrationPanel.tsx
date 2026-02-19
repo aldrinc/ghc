@@ -99,6 +99,8 @@ export function MetaIntegrationPanel() {
     null
   );
   const [configError, setConfigError] = useState<string | null>(null);
+  const metaAdAccountId = config?.adAccountId;
+  const metaConfigLoading = !config && !configError;
 
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [campaignError, setCampaignError] = useState<string | null>(null);
@@ -216,9 +218,18 @@ export function MetaIntegrationPanel() {
 
   useEffect(() => {
     let cancelled = false;
+    if (!metaAdAccountId) {
+      setInventory(null);
+      setInventoryError(null);
+      setInventoryFetchedAt(null);
+      setInventoryLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
     setInventoryLoading(true);
     setInventoryError(null);
-    inventoryFetcher({ fetchAll: true })
+    inventoryFetcher({ fetchAll: true, adAccountId: metaAdAccountId })
       .then((data) => {
         if (cancelled) return;
         setInventory(data);
@@ -236,7 +247,7 @@ export function MetaIntegrationPanel() {
     return () => {
       cancelled = true;
     };
-  }, [inventoryFetcher]);
+  }, [inventoryFetcher, metaAdAccountId]);
 
   const statusOptions = useMemo(
     () => [
@@ -432,11 +443,12 @@ export function MetaIntegrationPanel() {
               variant="secondary"
               size="xs"
               onClick={() => {
+                if (!metaAdAccountId) return;
                 setInventoryFetchedAt(null);
                 setInventory(null);
                 setInventoryError(null);
                 setInventoryLoading(true);
-                inventoryFetcher({ fetchAll: true })
+                inventoryFetcher({ fetchAll: true, adAccountId: metaAdAccountId })
                   .then((data) => {
                     setInventory(data);
                     setInventoryFetchedAt(new Date().toISOString());
@@ -446,7 +458,7 @@ export function MetaIntegrationPanel() {
                   })
                   .finally(() => setInventoryLoading(false));
               }}
-              disabled={inventoryLoading}
+              disabled={inventoryLoading || !metaAdAccountId}
             >
               {inventoryLoading ? "Refreshing…" : "Refresh"}
             </Button>
@@ -474,6 +486,18 @@ export function MetaIntegrationPanel() {
         {inventoryError && (
           <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
             {inventoryError}
+          </div>
+        )}
+
+        {metaConfigLoading && (
+          <div className="rounded-md border border-border bg-surface-2 px-3 py-2 text-xs text-content-muted">
+            Loading Meta config…
+          </div>
+        )}
+
+        {configError && (
+          <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger">
+            {configError}
           </div>
         )}
 

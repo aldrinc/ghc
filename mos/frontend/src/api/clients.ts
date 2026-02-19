@@ -3,6 +3,63 @@ import { useApiClient, type ApiError } from "@/api/client";
 import type { Client } from "@/types/common";
 import { toast } from "@/components/ui/toast";
 
+export type ShopifyConnectionState =
+  | "not_connected"
+  | "installed_missing_storefront_token"
+  | "multiple_installations_conflict"
+  | "ready"
+  | "error";
+
+export type ClientShopifyStatus = {
+  state: ShopifyConnectionState;
+  message: string;
+  shopDomain?: string | null;
+  shopDomains: string[];
+  selectedShopDomain?: string | null;
+  hasStorefrontAccessToken: boolean;
+  missingScopes: string[];
+};
+
+export type ClientShopifyCatalogProduct = {
+  productGid: string;
+  title: string;
+  handle: string;
+  status: string;
+};
+
+export type ClientShopifyProductsResponse = {
+  shopDomain: string;
+  products: ClientShopifyCatalogProduct[];
+};
+
+export type ClientShopifyCreatedVariant = {
+  variantGid: string;
+  title: string;
+  priceCents: number;
+  currency: string;
+};
+
+export type ClientShopifyCreateProductPayload = {
+  title: string;
+  description?: string;
+  handle?: string;
+  vendor?: string;
+  productType?: string;
+  tags?: string[];
+  status?: "ACTIVE" | "DRAFT";
+  variants: Array<{ title: string; priceCents: number; currency: string }>;
+  shopDomain?: string;
+};
+
+export type ClientShopifyCreateProductResponse = {
+  shopDomain: string;
+  productGid: string;
+  title: string;
+  handle: string;
+  status: string;
+  variants: ClientShopifyCreatedVariant[];
+};
+
 export function useClients() {
   const { get } = useApiClient();
   return useQuery<Client[]>({
@@ -17,6 +74,113 @@ export function useClient(clientId?: string) {
     queryKey: ["clients", clientId],
     queryFn: () => get(`/clients/${clientId}`),
     enabled: Boolean(clientId),
+  });
+}
+
+export function useClientShopifyStatus(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<ClientShopifyStatus>({
+    queryKey: ["clients", "shopify-status", clientId],
+    queryFn: () => get(`/clients/${clientId}/shopify/status`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useCreateClientShopifyInstallUrl(clientId: string) {
+  const { post } = useApiClient();
+
+  return useMutation({
+    mutationFn: (payload: { shopDomain: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<{ installUrl: string }>(`/clients/${clientId}/shopify/install-url`, payload);
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create Shopify install URL";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateClientShopifyInstallation(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { shopDomain: string; storefrontAccessToken: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<ClientShopifyStatus>(`/clients/${clientId}/shopify/installation`, {
+        method: "PATCH",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: (_status) => {
+      toast.success("Shopify installation updated");
+      queryClient.invalidateQueries({ queryKey: ["clients", "shopify-status", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to update Shopify installation";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSetClientShopifyDefaultShop(clientId: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { shopDomain: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return request<ClientShopifyStatus>(`/clients/${clientId}/shopify/default-shop`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+    },
+    onSuccess: () => {
+      toast.success("Default Shopify store saved");
+      queryClient.invalidateQueries({ queryKey: ["clients", "shopify-status", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to set default Shopify store";
+      toast.error(message);
+    },
+  });
+}
+
+export function useListClientShopifyProducts(clientId: string) {
+  const { get } = useApiClient();
+
+  return useMutation({
+    mutationFn: async (payload?: { query?: string; shopDomain?: string; limit?: number }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      const params = new URLSearchParams();
+      if (payload?.query?.trim()) params.set("query", payload.query.trim());
+      if (payload?.shopDomain?.trim()) params.set("shopDomain", payload.shopDomain.trim());
+      if (payload?.limit !== undefined) params.set("limit", String(payload.limit));
+      const queryString = params.toString();
+      return get<ClientShopifyProductsResponse>(
+        `/clients/${clientId}/shopify/products${queryString ? `?${queryString}` : ""}`,
+      );
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to load Shopify products";
+      toast.error(message);
+    },
+  });
+}
+
+export function useCreateClientShopifyProduct(clientId: string) {
+  const { post } = useApiClient();
+
+  return useMutation({
+    mutationFn: (payload: ClientShopifyCreateProductPayload) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<ClientShopifyCreateProductResponse>(`/clients/${clientId}/shopify/products`, payload);
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to create Shopify product";
+      toast.error(message);
+    },
   });
 }
 

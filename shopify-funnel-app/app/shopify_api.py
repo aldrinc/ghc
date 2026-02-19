@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from typing import Any
 
 import httpx
@@ -223,6 +224,354 @@ class ShopifyApiClient:
         if not isinstance(handle, str) or not handle:
             raise ShopifyApiError(message="Product verification response is missing product.handle")
         return {"id": found_id, "title": title, "handle": handle}
+
+    async def list_products(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        query: str | None = None,
+        limit: int = 20,
+    ) -> list[dict[str, str]]:
+        search_query = (query or "").strip()
+        graphql_query = """
+        query products($first: Int!, $query: String) {
+            products(first: $first, query: $query, sortKey: UPDATED_AT, reverse: true) {
+                edges {
+                    node {
+                        id
+                        title
+                        handle
+                        status
+                    }
+                }
+            }
+        }
+        """
+        payload = {
+            "query": graphql_query,
+            "variables": {
+                "first": limit,
+                "query": search_query or None,
+            },
+        }
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload=payload,
+        )
+        edges = ((response.get("products") or {}).get("edges")) or []
+        if not isinstance(edges, list):
+            raise ShopifyApiError(message="Product list response is invalid")
+
+        products: list[dict[str, str]] = []
+        for edge in edges:
+            if not isinstance(edge, dict):
+                continue
+            node = edge.get("node")
+            if not isinstance(node, dict):
+                continue
+            product_id = node.get("id")
+            title = node.get("title")
+            handle = node.get("handle")
+            product_status = node.get("status")
+
+            if not isinstance(product_id, str) or not product_id:
+                raise ShopifyApiError(message="Product list response is missing product.id")
+            if not isinstance(title, str) or not title:
+                raise ShopifyApiError(message="Product list response is missing product.title")
+            if not isinstance(handle, str) or not handle:
+                raise ShopifyApiError(message="Product list response is missing product.handle")
+            if not isinstance(product_status, str) or not product_status:
+                raise ShopifyApiError(message="Product list response is missing product.status")
+
+            products.append(
+                {
+                    "id": product_id,
+                    "title": title,
+                    "handle": handle,
+                    "status": product_status,
+                }
+            )
+
+        return products
+
+    @staticmethod
+    def _price_cents_to_decimal_string(price_cents: int) -> str:
+        return str((Decimal(price_cents) / Decimal(100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+    @staticmethod
+    def _decimal_price_to_cents(price: Any) -> int:
+        try:
+            decimal_value = Decimal(str(price).strip())
+        except (InvalidOperation, ValueError, AttributeError) as exc:
+            raise ShopifyApiError(message=f"Invalid variant price from Shopify: {price!r}") from exc
+        cents = int((decimal_value * Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+        if cents < 0:
+            raise ShopifyApiError(message=f"Shopify returned a negative variant price: {price!r}")
+        return cents
+
+    async def create_product(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        title: str,
+        variants: list[dict[str, Any]],
+        description: str | None = None,
+        handle: str | None = None,
+        vendor: str | None = None,
+        product_type: str | None = None,
+        tags: list[str] | None = None,
+        status: str = "DRAFT",
+    ) -> dict[str, Any]:
+        if not variants:
+            raise ShopifyApiError(message="At least one variant is required for product creation.", status_code=400)
+
+        cleaned_variants: list[dict[str, Any]] = []
+        seen_titles: set[str] = set()
+        normalized_currency: str | None = None
+        for raw_variant in variants:
+            if not isinstance(raw_variant, dict):
+                raise ShopifyApiError(message="Each variant must be an object.", status_code=400)
+            raw_title = raw_variant.get("title")
+            if not isinstance(raw_title, str) or not raw_title.strip():
+                raise ShopifyApiError(message="Each variant requires a non-empty title.", status_code=400)
+            variant_title = raw_title.strip()
+            lower_title = variant_title.lower()
+            if lower_title in seen_titles:
+                raise ShopifyApiError(message="Variant titles must be unique.", status_code=400)
+            seen_titles.add(lower_title)
+
+            raw_price_cents = raw_variant.get("priceCents")
+            if not isinstance(raw_price_cents, int) or raw_price_cents < 0:
+                raise ShopifyApiError(message="Each variant requires a non-negative integer priceCents.", status_code=400)
+
+            raw_currency = raw_variant.get("currency")
+            if not isinstance(raw_currency, str) or len(raw_currency.strip()) != 3:
+                raise ShopifyApiError(message="Each variant requires a 3-letter currency code.", status_code=400)
+            currency = raw_currency.strip().upper()
+            if normalized_currency is None:
+                normalized_currency = currency
+            elif currency != normalized_currency:
+                raise ShopifyApiError(
+                    message="All variants must use the same currency for Shopify product creation.",
+                    status_code=400,
+                )
+
+            cleaned_variants.append(
+                {
+                    "title": variant_title,
+                    "priceCents": raw_price_cents,
+                    "price": self._price_cents_to_decimal_string(raw_price_cents),
+                    "currency": currency,
+                }
+            )
+
+        product_input: dict[str, Any] = {
+            "title": title.strip(),
+            "status": status.strip().upper(),
+            "productOptions": [
+                {
+                    "name": "Title",
+                    "values": [{"name": variant["title"]} for variant in cleaned_variants],
+                }
+            ],
+        }
+        if description is not None and description.strip():
+            product_input["descriptionHtml"] = description.strip()
+        if handle is not None and handle.strip():
+            product_input["handle"] = handle.strip()
+        if vendor is not None and vendor.strip():
+            product_input["vendor"] = vendor.strip()
+        if product_type is not None and product_type.strip():
+            product_input["productType"] = product_type.strip()
+        if tags:
+            product_input["tags"] = tags
+
+        create_query = """
+        mutation productCreate($product: ProductCreateInput!) {
+            productCreate(product: $product) {
+                product {
+                    id
+                    title
+                    handle
+                    status
+                    variants(first: 1) {
+                        edges {
+                            node {
+                                id
+                                title
+                                price
+                            }
+                        }
+                    }
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        create_response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={"query": create_query, "variables": {"product": product_input}},
+        )
+        create_data = create_response.get("productCreate") or {}
+        user_errors = create_data.get("userErrors") or []
+        if user_errors:
+            messages = "; ".join(str(error.get("message")) for error in user_errors)
+            raise ShopifyApiError(message=f"productCreate failed: {messages}", status_code=409)
+
+        product = create_data.get("product")
+        if not isinstance(product, dict):
+            raise ShopifyApiError(message="productCreate response is missing product")
+
+        product_gid = product.get("id")
+        product_title = product.get("title")
+        product_handle = product.get("handle")
+        product_status = product.get("status")
+        if not isinstance(product_gid, str) or not product_gid:
+            raise ShopifyApiError(message="productCreate response is missing product.id")
+        if not isinstance(product_title, str) or not product_title:
+            raise ShopifyApiError(message="productCreate response is missing product.title")
+        if not isinstance(product_handle, str) or not product_handle:
+            raise ShopifyApiError(message="productCreate response is missing product.handle")
+        if not isinstance(product_status, str) or not product_status:
+            raise ShopifyApiError(message="productCreate response is missing product.status")
+
+        initial_variant_edges = ((product.get("variants") or {}).get("edges")) or []
+        if not isinstance(initial_variant_edges, list) or not initial_variant_edges:
+            raise ShopifyApiError(message="productCreate response is missing initial product variant.")
+        initial_variant_node = (initial_variant_edges[0] or {}).get("node") if isinstance(initial_variant_edges[0], dict) else None
+        if not isinstance(initial_variant_node, dict):
+            raise ShopifyApiError(message="productCreate response is missing initial variant node.")
+        initial_variant_id = initial_variant_node.get("id")
+        if not isinstance(initial_variant_id, str) or not initial_variant_id:
+            raise ShopifyApiError(message="productCreate response is missing initial variant id.")
+
+        update_query = """
+        mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+            productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                productVariants {
+                    id
+                    title
+                    price
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        first_variant = cleaned_variants[0]
+        update_response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": update_query,
+                "variables": {
+                    "productId": product_gid,
+                    "variants": [{"id": initial_variant_id, "price": first_variant["price"]}],
+                },
+            },
+        )
+        update_data = update_response.get("productVariantsBulkUpdate") or {}
+        update_errors = update_data.get("userErrors") or []
+        if update_errors:
+            messages = "; ".join(str(error.get("message")) for error in update_errors)
+            raise ShopifyApiError(message=f"productVariantsBulkUpdate failed: {messages}", status_code=409)
+        updated_variants = update_data.get("productVariants") or []
+        if not isinstance(updated_variants, list) or not updated_variants:
+            raise ShopifyApiError(message="productVariantsBulkUpdate response is missing variants.")
+        updated_first_variant = updated_variants[0]
+        if not isinstance(updated_first_variant, dict):
+            raise ShopifyApiError(message="productVariantsBulkUpdate response is invalid.")
+
+        created_variants: list[dict[str, Any]] = []
+        if len(cleaned_variants) > 1:
+            create_variants_query = """
+            mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+                productVariantsBulkCreate(productId: $productId, variants: $variants) {
+                    productVariants {
+                        id
+                        title
+                        price
+                    }
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+            """
+            bulk_create_response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={
+                    "query": create_variants_query,
+                    "variables": {
+                        "productId": product_gid,
+                        "variants": [
+                            {
+                                "price": variant["price"],
+                                "optionValues": [{"optionName": "Title", "name": variant["title"]}],
+                            }
+                            for variant in cleaned_variants[1:]
+                        ],
+                    },
+                },
+            )
+            bulk_create_data = bulk_create_response.get("productVariantsBulkCreate") or {}
+            bulk_create_errors = bulk_create_data.get("userErrors") or []
+            if bulk_create_errors:
+                messages = "; ".join(str(error.get("message")) for error in bulk_create_errors)
+                raise ShopifyApiError(message=f"productVariantsBulkCreate failed: {messages}", status_code=409)
+            raw_created_variants = bulk_create_data.get("productVariants") or []
+            if not isinstance(raw_created_variants, list):
+                raise ShopifyApiError(message="productVariantsBulkCreate response is invalid.")
+            for raw_variant in raw_created_variants:
+                if not isinstance(raw_variant, dict):
+                    continue
+                created_variants.append(raw_variant)
+
+        currency = normalized_currency or "USD"
+        variant_rows: list[dict[str, Any]] = []
+        for variant_node in [updated_first_variant, *created_variants]:
+            variant_gid = variant_node.get("id")
+            variant_title = variant_node.get("title")
+            variant_price = variant_node.get("price")
+            if not isinstance(variant_gid, str) or not variant_gid:
+                raise ShopifyApiError(message="Variant creation response is missing variant id.")
+            if not isinstance(variant_title, str) or not variant_title:
+                raise ShopifyApiError(message="Variant creation response is missing variant title.")
+            variant_rows.append(
+                {
+                    "variantGid": variant_gid,
+                    "title": variant_title,
+                    "priceCents": self._decimal_price_to_cents(variant_price),
+                    "currency": currency,
+                }
+            )
+
+        if len(variant_rows) != len(cleaned_variants):
+            raise ShopifyApiError(
+                message=(
+                    "Shopify variant creation returned an unexpected number of variants. "
+                    f"Expected {len(cleaned_variants)}, got {len(variant_rows)}."
+                ),
+            )
+
+        return {
+            "productGid": product_gid,
+            "title": product_title,
+            "handle": product_handle,
+            "status": product_status,
+            "variants": variant_rows,
+        }
 
     async def _admin_graphql(
         self,

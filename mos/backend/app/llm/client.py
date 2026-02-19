@@ -11,7 +11,12 @@ from typing import Any, Optional
 from anthropic import Anthropic
 from dotenv import load_dotenv
 import google.generativeai as genai
-from openai import OpenAI
+
+from app.observability import (
+    get_openai_client_class,
+    start_langfuse_generation,
+    start_langfuse_span,
+)
 
 # Ensure API keys in .env are loaded even if app.config hasn't been imported yet.
 _backend_root = Path(__file__).resolve().parents[2]
@@ -66,29 +71,136 @@ class LLMClient:
         self.default_model = default_model or _DEFAULT_MODEL
         self._gemini_configured = False
         self._anthropic_client: Optional[Anthropic] = None
-        self._openai_client: Optional[OpenAI] = None
+        self._openai_client: Optional[Any] = None
+        self._openai_client_class = get_openai_client_class()
+
+    def _ensure_openai_client(self) -> None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise LLMClientConfigError("OPENAI_API_KEY not configured")
+
+        if self._openai_client:
+            return
+
+        client_kwargs = {
+            "api_key": api_key,
+            "timeout": float(_DEFAULT_TIMEOUT),
+            "max_retries": _MAX_RETRIES,
+        }
+        base_url = os.getenv("OPENAI_BASE_URL")
+        if base_url:
+            client_kwargs["base_url"] = base_url
+        self._openai_client = self._openai_client_class(**client_kwargs)
+
+    def _langfuse_metadata(
+        self,
+        *,
+        operation: str,
+        model: str,
+        params: Optional[LLMGenerationParams],
+        provider: str,
+    ) -> dict[str, Any]:
+        metadata: dict[str, Any] = {
+            "provider": provider,
+            "model": model,
+            "operation": operation,
+        }
+        if params:
+            metadata["temperature"] = params.temperature
+            metadata["maxTokens"] = params.max_tokens
+            metadata["useReasoning"] = bool(params.use_reasoning)
+            metadata["useWebSearch"] = bool(params.use_web_search)
+            if params.response_format is not None:
+                metadata["hasResponseFormat"] = True
+        return metadata
+
+    @staticmethod
+    def _extract_anthropic_usage(response: Any) -> dict[str, int] | None:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return None
+
+        input_tokens = getattr(usage, "input_tokens", None)
+        output_tokens = getattr(usage, "output_tokens", None)
+        if isinstance(usage, dict):
+            input_tokens = usage.get("input_tokens", input_tokens)
+            output_tokens = usage.get("output_tokens", output_tokens)
+
+        usage_details: dict[str, int] = {}
+        if isinstance(input_tokens, int):
+            usage_details["input"] = input_tokens
+        if isinstance(output_tokens, int):
+            usage_details["output"] = output_tokens
+        return usage_details or None
+
+    @staticmethod
+    def _extract_gemini_usage(result: Any) -> dict[str, int] | None:
+        usage = getattr(result, "usage_metadata", None)
+        if usage is None:
+            return None
+
+        input_tokens = getattr(usage, "prompt_token_count", None)
+        output_tokens = getattr(usage, "candidates_token_count", None)
+        if isinstance(usage, dict):
+            input_tokens = usage.get("prompt_token_count", input_tokens)
+            output_tokens = usage.get("candidates_token_count", output_tokens)
+
+        usage_details: dict[str, int] = {}
+        if isinstance(input_tokens, int):
+            usage_details["input"] = input_tokens
+        if isinstance(output_tokens, int):
+            usage_details["output"] = output_tokens
+        return usage_details or None
 
     def generate_text(self, prompt: str, params: Optional[LLMGenerationParams] = None) -> str:
         model = params.model if params and params.model else self.default_model
         model = model or _DEFAULT_MODEL
-        if self._is_openai_model(model):
-            return self._generate_with_openai(prompt, model, params)
-        if model.startswith("claude"):
-            return self._generate_with_anthropic(prompt, model, params)
-        return self._generate_with_gemini(prompt, model, params)
+        provider = "openai" if self._is_openai_model(model) else "anthropic" if model.startswith("claude") else "gemini"
+        metadata = self._langfuse_metadata(
+            operation="generate_text",
+            model=model,
+            params=params,
+            provider=provider,
+        )
+        with start_langfuse_span(
+            name="llm.generate_text",
+            input={"prompt_chars": len(prompt)},
+            metadata=metadata,
+            tags=["llm", provider],
+            trace_name="llm.workflow",
+        ):
+            if provider == "openai":
+                return self._generate_with_openai(prompt, model, params)
+            if provider == "anthropic":
+                return self._generate_with_anthropic(prompt, model, params)
+            return self._generate_with_gemini(prompt, model, params)
 
     def stream_text(self, prompt: str, params: Optional[LLMGenerationParams] = None) -> Iterator[str]:
         model = params.model if params and params.model else self.default_model
         model = model or _DEFAULT_MODEL
-        if self._is_openai_model(model):
-            yield from self._stream_with_openai(prompt, model, params)
-            return
-        if model.startswith("claude"):
-            yield from self._stream_with_anthropic(prompt, model, params)
-            return
+        provider = "openai" if self._is_openai_model(model) else "anthropic" if model.startswith("claude") else "gemini"
+        metadata = self._langfuse_metadata(
+            operation="stream_text",
+            model=model,
+            params=params,
+            provider=provider,
+        )
+        with start_langfuse_span(
+            name="llm.stream_text",
+            input={"prompt_chars": len(prompt)},
+            metadata=metadata,
+            tags=["llm", provider, "stream"],
+            trace_name="llm.workflow",
+        ):
+            if provider == "openai":
+                yield from self._stream_with_openai(prompt, model, params)
+                return
+            if provider == "anthropic":
+                yield from self._stream_with_anthropic(prompt, model, params)
+                return
 
-        # Other providers: fallback to a single non-streamed chunk for now.
-        yield self.generate_text(prompt, params)
+            # Other providers: fallback to a single non-streamed chunk for now.
+            yield self.generate_text(prompt, params)
 
     def _is_openai_model(self, model: str) -> bool:
         lower = model.lower()
@@ -231,20 +343,7 @@ class LLMClient:
         include: Optional[list[str]] = None,
         poll_timeout_seconds: Optional[int] = None,
     ) -> str:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise LLMClientConfigError("OPENAI_API_KEY not configured")
-
-        if not self._openai_client:
-            client_kwargs = {
-                "api_key": api_key,
-                "timeout": float(_DEFAULT_TIMEOUT),
-                "max_retries": _MAX_RETRIES,
-            }
-            base_url = os.getenv("OPENAI_BASE_URL")
-            if base_url:
-                client_kwargs["base_url"] = base_url
-            self._openai_client = OpenAI(**client_kwargs)
+        self._ensure_openai_client()
 
         return self._poll_openai_response(
             response_id,
@@ -253,20 +352,7 @@ class LLMClient:
         )
 
     def _generate_with_openai(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> str:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise LLMClientConfigError("OPENAI_API_KEY not configured")
-
-        if not self._openai_client:
-            client_kwargs = {
-                "api_key": api_key,
-                "timeout": float(_DEFAULT_TIMEOUT),
-                "max_retries": _MAX_RETRIES,
-            }
-            base_url = os.getenv("OPENAI_BASE_URL")
-            if base_url:
-                client_kwargs["base_url"] = base_url
-            self._openai_client = OpenAI(**client_kwargs)
+        self._ensure_openai_client()
 
         # Deep research needs background mode + polling for reliability and a higher token budget.
         if model.lower().startswith("o3-deep-research"):
@@ -364,20 +450,7 @@ class LLMClient:
         raise RuntimeError(f"OpenAI chat completion returned no content for model {model}")
 
     def _stream_with_openai(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> Iterator[str]:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise LLMClientConfigError("OPENAI_API_KEY not configured")
-
-        if not self._openai_client:
-            client_kwargs = {
-                "api_key": api_key,
-                "timeout": float(_DEFAULT_TIMEOUT),
-                "max_retries": _MAX_RETRIES,
-            }
-            base_url = os.getenv("OPENAI_BASE_URL")
-            if base_url:
-                client_kwargs["base_url"] = base_url
-            self._openai_client = OpenAI(**client_kwargs)
+        self._ensure_openai_client()
 
         if model.lower().startswith("o3-deep-research"):
             # Deep research is long-running; keep the more reliable polling flow.
@@ -534,20 +607,40 @@ class LLMClient:
 
         model_name = model if model.startswith("models/") else f"models/{model}"
         model_client = genai.GenerativeModel(model_name=model_name, generation_config=generation_config)
-        try:
-            result = model_client.generate_content(prompt, request_options={"timeout": 120})
-            text = None
-            if result and getattr(result, "candidates", None):
-                first = result.candidates[0]
-                if first and first.content and getattr(first.content, "parts", None):
-                    parts = first.content.parts
-                    if parts and getattr(parts[0], "text", None):
-                        text = parts[0].text
-            if not text and hasattr(result, "text"):
-                text = result.text
-        except Exception as exc:
-            logger.exception("Gemini generation failed", extra={"model": model})
-            raise
+        with start_langfuse_generation(
+            name="llm.gemini.generate",
+            model=model,
+            input=prompt,
+            metadata=self._langfuse_metadata(
+                operation="generate_text",
+                model=model,
+                params=params,
+                provider="gemini",
+            ),
+            model_parameters=generation_config,
+            tags=["llm", "gemini"],
+            trace_name="llm.workflow",
+        ) as generation:
+            try:
+                result = model_client.generate_content(prompt, request_options={"timeout": 120})
+                text = None
+                if result and getattr(result, "candidates", None):
+                    first = result.candidates[0]
+                    if first and first.content and getattr(first.content, "parts", None):
+                        parts = first.content.parts
+                        if parts and getattr(parts[0], "text", None):
+                            text = parts[0].text
+                if not text and hasattr(result, "text"):
+                    text = result.text
+            except Exception:
+                logger.exception("Gemini generation failed", extra={"model": model})
+                raise
+
+            if generation is not None:
+                generation.update(
+                    output=text,
+                    usage_details=self._extract_gemini_usage(result),
+                )
 
         if text:
             return text
@@ -567,22 +660,41 @@ class LLMClient:
         timeout = _DEFAULT_TIMEOUT
 
         text = None
-        for _ in range(max(1, _MAX_RETRIES)):
-            try:
-                response = self._anthropic_client.messages.create(
-                    model=model,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    messages=[{"role": "user", "content": prompt}],
-                    timeout=timeout,
-                )
-                text_parts = [content.text for content in response.content if getattr(content, "text", None)]
-                text = "".join(text_parts) if text_parts else None
-                if text:
-                    break
-            except Exception as exc:
-                logger.exception("Anthropic generation attempt failed", extra={"model": model})
-                text = None
+        with start_langfuse_generation(
+            name="llm.anthropic.generate",
+            model=model,
+            input=prompt,
+            metadata=self._langfuse_metadata(
+                operation="generate_text",
+                model=model,
+                params=params,
+                provider="anthropic",
+            ),
+            model_parameters={"max_tokens": max_tokens, "temperature": temperature},
+            tags=["llm", "anthropic"],
+            trace_name="llm.workflow",
+        ) as generation:
+            for _ in range(max(1, _MAX_RETRIES)):
+                try:
+                    response = self._anthropic_client.messages.create(
+                        model=model,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        messages=[{"role": "user", "content": prompt}],
+                        timeout=timeout,
+                    )
+                    text_parts = [content.text for content in response.content if getattr(content, "text", None)]
+                    text = "".join(text_parts) if text_parts else None
+                    if text:
+                        if generation is not None:
+                            generation.update(
+                                output=text,
+                                usage_details=self._extract_anthropic_usage(response),
+                            )
+                        break
+                except Exception:
+                    logger.exception("Anthropic generation attempt failed", extra={"model": model})
+                    text = None
 
         if text:
             return text
@@ -601,19 +713,43 @@ class LLMClient:
         temperature = params.temperature if params else 0.2
         timeout = _DEFAULT_TIMEOUT
 
-        try:
-            with self._anthropic_client.messages.stream(
+        with start_langfuse_generation(
+            name="llm.anthropic.stream",
+            model=model,
+            input=prompt,
+            metadata=self._langfuse_metadata(
+                operation="stream_text",
                 model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=[{"role": "user", "content": prompt}],
-                timeout=timeout,
-            ) as stream:
-                for text in stream.text_stream:
-                    if text:
-                        yield text
-        except Exception:
-            logger.exception("Anthropic streaming failed; falling back to non-stream", extra={"model": model})
-            text = self._generate_with_anthropic(prompt, model, params)
-            if text:
-                yield text
+                params=params,
+                provider="anthropic",
+            ),
+            model_parameters={"max_tokens": max_tokens, "temperature": temperature},
+            tags=["llm", "anthropic", "stream"],
+            trace_name="llm.workflow",
+        ) as generation:
+            streamed_parts: list[str] = []
+            try:
+                with self._anthropic_client.messages.stream(
+                    model=model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    messages=[{"role": "user", "content": prompt}],
+                    timeout=timeout,
+                ) as stream:
+                    for text in stream.text_stream:
+                        if text:
+                            streamed_parts.append(text)
+                            yield text
+                    final = stream.get_final_message()
+                    if generation is not None:
+                        generation.update(
+                            output="".join(streamed_parts) if streamed_parts else None,
+                            usage_details=self._extract_anthropic_usage(final),
+                        )
+            except Exception:
+                logger.exception("Anthropic streaming failed; falling back to non-stream", extra={"model": model})
+                text = self._generate_with_anthropic(prompt, model, params)
+                if generation is not None:
+                    generation.update(output=text)
+                if text:
+                    yield text

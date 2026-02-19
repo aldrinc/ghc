@@ -34,6 +34,7 @@ from app.services.creative_service_client import (
     CreativeServiceConfigError,
     CreativeServiceRequestError,
 )
+from app.services.design_systems import resolve_design_system_tokens
 from app.services.media_storage import IMMUTABLE_CACHE_CONTROL, MediaStorage
 from app.services.video_ads_orchestrator import (
     VideoAdsOrchestrator,
@@ -367,6 +368,61 @@ def _extract_remote_reference_asset_id(*, ai_metadata: dict[str, Any] | None) ->
         return None
     cleaned = remote_id.strip()
     return cleaned or None
+
+
+def _extract_brand_logo_public_id(*, design_tokens: dict[str, Any] | None) -> str | None:
+    if not isinstance(design_tokens, dict) or not design_tokens:
+        return None
+    brand = design_tokens.get("brand")
+    if not isinstance(brand, dict):
+        return None
+    logo_public_id = brand.get("logoAssetPublicId")
+    if not isinstance(logo_public_id, str) or not logo_public_id.strip():
+        return None
+    cleaned = logo_public_id.strip()
+    # Treat token placeholders as absent.
+    if cleaned.startswith("__"):
+        return None
+    return cleaned
+
+
+def _resolve_brand_logo_reference_asset(
+    *,
+    session,
+    org_id: str,
+    logo_public_id: str,
+) -> _ProductReferenceAsset:
+    assets_repo = _repo(session)
+    asset = assets_repo.get_by_public_id(org_id=org_id, public_id=logo_public_id)
+    if not asset:
+        raise ValueError(f"Brand logo asset not found for public_id={logo_public_id}")
+    if asset.asset_kind != "image":
+        raise ValueError(
+            f"Brand logo asset must be an image (public_id={logo_public_id}, asset_kind={asset.asset_kind})"
+        )
+    if not asset.storage_key:
+        raise ValueError(f"Brand logo asset is missing storage_key (public_id={logo_public_id})")
+    if asset.file_status and asset.file_status != "ready":
+        raise ValueError(
+            f"Brand logo asset is not ready (public_id={logo_public_id}, file_status={asset.file_status})"
+        )
+    now = datetime.now(timezone.utc)
+    if asset.expires_at and asset.expires_at <= now:
+        raise ValueError(f"Brand logo asset is expired (public_id={logo_public_id}, expires_at={asset.expires_at})")
+
+    title = None
+    if isinstance(asset.ai_metadata, dict):
+        name = asset.ai_metadata.get("filename")
+        if isinstance(name, str) and name.strip():
+            title = name.strip()
+
+    storage = MediaStorage()
+    return _ProductReferenceAsset(
+        local_asset_id=str(asset.id),
+        primary_url=storage.presign_get(bucket=storage.bucket, key=asset.storage_key),
+        title=title or "Brand logo",
+        remote_asset_id=_extract_remote_reference_asset_id(ai_metadata=asset.ai_metadata),
+    )
 
 
 def _select_product_reference_assets(*, session, org_id: str, product_id: str) -> list[_ProductReferenceAsset]:
@@ -742,13 +798,40 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
             org_id=org_id,
             product_id=product_id,
         )
-        image_reference_asset_ids = _ensure_remote_reference_asset_ids(
+        design_tokens = resolve_design_system_tokens(session=session, org_id=org_id, client_id=client_id) or {}
+        logo_public_id = _extract_brand_logo_public_id(design_tokens=design_tokens)
+        logo_reference_asset: _ProductReferenceAsset | None = None
+        logo_remote_asset_id: str | None = None
+        if logo_public_id:
+            logo_reference_asset = _resolve_brand_logo_reference_asset(
+                session=session,
+                org_id=org_id,
+                logo_public_id=logo_public_id,
+            )
+            # Upload logo as a separate reference so the creative model can use it if desired.
+            logo_remote_asset_id = _ensure_remote_reference_asset_ids(
+                session=session,
+                org_id=org_id,
+                creative_client=creative_client,
+                references=[logo_reference_asset],
+            )[0]
+        product_reference_remote_ids = _ensure_remote_reference_asset_ids(
             session=session,
             org_id=org_id,
             creative_client=creative_client,
             references=product_reference_assets,
         )
+        image_reference_asset_ids = list(product_reference_remote_ids)
+        if logo_remote_asset_id:
+            image_reference_asset_ids.append(logo_remote_asset_id)
         image_reference_text = _build_image_reference_text(product_reference_assets)
+        if logo_reference_asset:
+            image_reference_text = "\n\n".join(
+                [
+                    image_reference_text,
+                    f"Brand logo reference (optional, use if adding a logo): {logo_reference_asset.primary_url}",
+                ]
+            ).strip()
         product_asset_urls = [item.primary_url for item in product_reference_assets]
         video_reference_attachments = [
             CreativeServiceVideoAttachmentIn(
@@ -756,9 +839,17 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 title=product_reference_assets[idx].title if idx < len(product_reference_assets) else None,
                 role="product_reference",
             )
-            for idx, remote_asset_id in enumerate(image_reference_asset_ids)
+            for idx, remote_asset_id in enumerate(product_reference_remote_ids)
         ]
-        reference_signature = _stable_idempotency_key("image_reference_assets_v2", *image_reference_asset_ids)
+        if logo_remote_asset_id and logo_reference_asset:
+            video_reference_attachments.append(
+                CreativeServiceVideoAttachmentIn(
+                    asset_id=logo_remote_asset_id,
+                    title=logo_reference_asset.title,
+                    role="brand_logo",
+                )
+            )
+        reference_signature = _stable_idempotency_key("image_reference_assets_v3", *image_reference_asset_ids)
 
         retention_expires_at = _retention_expires_at()
         created_asset_ids: list[str] = []

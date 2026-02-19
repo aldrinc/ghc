@@ -454,7 +454,7 @@ function Gallery({
           onClick={() => setIndex((v) => clampIndex(v - 1, slides.length))}
           aria-label="Previous image"
         >
-          <IconArrow dir="left" size={18} />
+          <IconArrow dir="left" size={14} />
         </button>
         <span className={styles.galleryCounter}>
           {index + 1} / {slides.length}
@@ -465,7 +465,7 @@ function Gallery({
           onClick={() => setIndex((v) => clampIndex(v + 1, slides.length))}
           aria-label="Next image"
         >
-          <IconArrow dir="right" size={18} />
+          <IconArrow dir="right" size={14} />
         </button>
       </div>
 
@@ -824,6 +824,13 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
   const [openPillIndex, setOpenPillIndex] = useState<number | null>(null)
   const [isPillDragging, setIsPillDragging] = useState(false)
   const pillViewportRef = useRef<HTMLDivElement | null>(null)
+  const ctaButtonRef = useRef<HTMLButtonElement | null>(null)
+  const ctaHighlightTimeoutRef = useRef<number | null>(null)
+  const ctaObserverRef = useRef<IntersectionObserver | null>(null)
+  const [pillHintMounted, setPillHintMounted] = useState(false);
+  const [pillHintVisible, setPillHintVisible] = useState(false);
+  const pillHintHasShownRef = useRef(false);
+  const pillHintTimeoutIdsRef = useRef<number[]>([]);
   const pillDragState = useRef({
     pointerDown: false,
     dragging: false,
@@ -833,11 +840,87 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
     wasDragged: false,
   })
 
+  const clearPillHintTimeouts = () => {
+    pillHintTimeoutIdsRef.current.forEach((id) => window.clearTimeout(id));
+    pillHintTimeoutIdsRef.current = [];
+  };
+
+  const dismissPillHint = (immediate = false) => {
+    pillHintHasShownRef.current = true;
+    clearPillHintTimeouts();
+    setPillHintVisible(false);
+    if (immediate || !pillHintMounted) {
+      setPillHintMounted(false);
+      return;
+    }
+    pillHintTimeoutIdsRef.current = [
+      window.setTimeout(() => {
+        setPillHintMounted(false);
+      }, 260),
+    ];
+  };
+
+  const flashCtaButton = () => {
+    const el = ctaButtonRef.current;
+    if (!el) {
+      console.error("SalesPdpHero: cannot highlight CTA because ctaButtonRef is null.");
+      return;
+    }
+
+    const cls = styles.ctaButtonHighlight;
+    el.classList.remove(cls);
+    // Force a reflow so repeated selections restart the CSS animation.
+    el.getBoundingClientRect();
+    el.classList.add(cls);
+
+    if (ctaHighlightTimeoutRef.current) window.clearTimeout(ctaHighlightTimeoutRef.current);
+    ctaHighlightTimeoutRef.current = window.setTimeout(() => {
+      el.classList.remove(cls);
+      ctaHighlightTimeoutRef.current = null;
+    }, 1300);
+  };
+
+  const scrollToCtaAndHighlight = () => {
+    const el = ctaButtonRef.current;
+    if (!el) {
+      console.error("SalesPdpHero: cannot scroll to CTA because ctaButtonRef is null.");
+      return;
+    }
+
+    ctaObserverRef.current?.disconnect();
+    ctaObserverRef.current = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting) return;
+        flashCtaButton();
+        ctaObserverRef.current?.disconnect();
+        ctaObserverRef.current = null;
+      },
+      { threshold: 0.6 }
+    );
+    ctaObserverRef.current.observe(el);
+
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "center" });
+  };
+
+  const handleOfferSelect = (offerId: OfferOption["id"]) => {
+    setSelectedOffer(offerId);
+    scrollToCtaAndHighlight();
+  };
+
   const [openSizeChart, setOpenSizeChart] = useState(false)
   const [openWhyBundle, setOpenWhyBundle] = useState(false)
   const [openFreeGifts, setOpenFreeGifts] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+
+  useEffect(() => {
+    return () => {
+      if (ctaHighlightTimeoutRef.current) window.clearTimeout(ctaHighlightTimeoutRef.current);
+      ctaObserverRef.current?.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (!sizeOptions.length) return
@@ -859,6 +942,40 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       setSelectedOffer(offerOptions[0].id)
     }
   }, [offerOptions, selectedOffer])
+
+  useEffect(() => {
+    if (pillHintHasShownRef.current) return;
+    if (!resolvedHero.purchase.faqPills.length) return;
+
+    const ENTER_DELAY_MS = 200;
+    const VISIBLE_MS = 3500;
+    const EXIT_MS = 260;
+
+    setPillHintMounted(true);
+    const timeoutIds: number[] = [];
+    timeoutIds.push(
+      window.setTimeout(() => {
+        pillHintHasShownRef.current = true;
+        setPillHintVisible(true);
+      }, ENTER_DELAY_MS)
+    );
+    timeoutIds.push(
+      window.setTimeout(() => {
+        setPillHintVisible(false);
+      }, ENTER_DELAY_MS + VISIBLE_MS)
+    );
+    timeoutIds.push(
+      window.setTimeout(() => {
+        setPillHintMounted(false);
+      }, ENTER_DELAY_MS + VISIBLE_MS + EXIT_MS)
+    );
+    pillHintTimeoutIdsRef.current = timeoutIds;
+
+    return () => {
+      timeoutIds.forEach((id) => window.clearTimeout(id));
+      pillHintTimeoutIdsRef.current = [];
+    };
+  }, [resolvedHero.purchase.faqPills.length]);
 
   const selectedSizeObj = useMemo(
     () => sizeOptions.find((o) => o.id === selectedSize) ?? sizeOptions[0],
@@ -968,6 +1085,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
   const handlePillPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return
+    dismissPillHint()
     const viewport = pillViewportRef.current
     if (!viewport) return
     pillDragState.current.pointerDown = true
@@ -1014,6 +1132,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
   const handlePillClick = (idx: number) => {
     if (pillDragState.current.wasDragged) return
+    dismissPillHint()
     setOpenPillIndex(idx)
   }
 
@@ -1038,61 +1157,73 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                 - Pauses on hover/focus and when an answer is open.
                 - Clicking a pill always opens the answer panel.
               */}
-              <div
-                className={`${styles.pillMarquee} ${openPillIndex !== null ? styles.pillMarqueePaused : ''} ${
-                  isPillDragging ? styles.pillMarqueeDragging : ''
-                }`}
-                aria-label="Quick questions"
-              >
+              <div className={styles.pillMarqueeWrap}>
                 <div
-                  className={styles.pillMarqueeViewport}
-                  ref={pillViewportRef}
-                  onPointerDown={handlePillPointerDown}
-                  onPointerMove={handlePillPointerMove}
-                  onPointerUp={handlePillPointerUp}
-                  onPointerCancel={handlePillPointerUp}
+                  className={`${styles.pillMarquee} ${openPillIndex !== null ? styles.pillMarqueePaused : ''} ${
+                    isPillDragging ? styles.pillMarqueeDragging : ''
+                  }`}
+                  aria-label="Quick questions"
                 >
-                  <div className={styles.pillMarqueeTrack}>
-                    {/* Primary group */}
-                    <div className={styles.pillGroup}>
-                      {resolvedHero.purchase.faqPills.map((p, idx) => {
-                        const active = openPillIndex === idx
-                        return (
-                          <button
-                            key={`pill-a-${p.label}-${idx}`}
-                            type="button"
-                            className={`${styles.pill} ${active ? styles.pillActive : ''}`}
-                            onClick={() => handlePillClick(idx)}
-                            aria-pressed={active}
-                          >
-                            <IconDiamondStar size={14} />
-                            {p.label}
-                          </button>
-                        )
-                      })}
-                    </div>
+                  <div
+                    className={styles.pillMarqueeViewport}
+                    ref={pillViewportRef}
+                    onPointerDown={handlePillPointerDown}
+                    onPointerMove={handlePillPointerMove}
+                    onPointerUp={handlePillPointerUp}
+                    onPointerCancel={handlePillPointerUp}
+                  >
+                    <div className={styles.pillMarqueeTrack}>
+                      {/* Primary group */}
+                      <div className={styles.pillGroup}>
+                        {resolvedHero.purchase.faqPills.map((p, idx) => {
+                          const active = openPillIndex === idx
+                          return (
+                            <button
+                              key={`pill-a-${p.label}-${idx}`}
+                              type="button"
+                              className={`${styles.pill} ${active ? styles.pillActive : ''}`}
+                              onClick={() => handlePillClick(idx)}
+                              aria-pressed={active}
+                            >
+                              <IconDiamondStar size={14} />
+                              {p.label}
+                            </button>
+                          )
+                        })}
+                      </div>
 
-                    {/* Duplicate group for seamless looping */}
-                    <div className={styles.pillGroup} aria-hidden="true">
-                      {resolvedHero.purchase.faqPills.map((p, idx) => {
-                        const active = openPillIndex === idx
-                        return (
-                          <button
-                            key={`pill-b-${p.label}-${idx}`}
-                            type="button"
-                            className={`${styles.pill} ${active ? styles.pillActive : ''}`}
-                            onClick={() => handlePillClick(idx)}
-                            aria-pressed={active}
-                            tabIndex={-1}
-                          >
-                            <IconDiamondStar size={14} />
-                            {p.label}
-                          </button>
-                        )
-                      })}
+                      {/* Duplicate group for seamless looping */}
+                      <div className={styles.pillGroup} aria-hidden="true">
+                        {resolvedHero.purchase.faqPills.map((p, idx) => {
+                          const active = openPillIndex === idx
+                          return (
+                            <button
+                              key={`pill-b-${p.label}-${idx}`}
+                              type="button"
+                              className={`${styles.pill} ${active ? styles.pillActive : ''}`}
+                              onClick={() => handlePillClick(idx)}
+                              aria-pressed={active}
+                              tabIndex={-1}
+                            >
+                              <IconDiamondStar size={14} />
+                              {p.label}
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
                   </div>
                 </div>
+
+                {pillHintMounted ? (
+                  <div
+                    className={`${styles.pillHint} ${pillHintVisible ? styles.pillHintVisible : ''}`}
+                    aria-hidden="true"
+                  >
+                    <span className={styles.pillHintPointer}>👆</span>
+                    <span className={styles.pillHintText}>Click any question</span>
+                  </div>
+                ) : null}
               </div>
 
               {openPillIndex !== null ? (
@@ -1205,12 +1336,18 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 	                      key={o.id}
 	                      option={o}
 	                      selected={o.id === selectedOffer}
-                      onClick={() => setSelectedOffer(o.id)}
+                      onClick={() => handleOfferSelect(o.id)}
                     />
                   ))}
                 </div>
 
-	                <button type="button" className={styles.ctaButton} onClick={handleCheckout} disabled={isCheckingOut}>
+	                <button
+                    type="button"
+                    className={styles.ctaButton}
+                    onClick={handleCheckout}
+                    disabled={isCheckingOut}
+                    ref={ctaButtonRef}
+                  >
 	                  {isCheckingOut ? "Starting checkout…" : ctaLabel}
 	                  <span className={styles.ctaIconCircle} aria-hidden="true">
 	                    <IconArrow dir="right" size={24} />

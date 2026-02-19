@@ -6,7 +6,6 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Optional, Tuple
 
-from openai import OpenAI
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_
 
@@ -15,6 +14,12 @@ from app.db.base import SessionLocal
 from app.db.enums import ResearchJobStatusEnum
 from app.db.models import DeepResearchJob, WorkflowRun
 from app.db.repositories.deep_research_jobs import DeepResearchJobsRepository
+from app.observability import (
+    LangfuseTraceContext,
+    bind_langfuse_trace_context,
+    get_openai_client_class,
+    start_langfuse_span,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +36,7 @@ _TERMINAL_STATUSES = {
 }
 
 
-def build_openai_client(require_api_key: bool = True) -> Optional[OpenAI]:
+def build_openai_client(require_api_key: bool = True) -> Optional[Any]:
     api_key = settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
     if not api_key and require_api_key:
         return None
@@ -41,7 +46,8 @@ def build_openai_client(require_api_key: bool = True) -> Optional[OpenAI]:
     base_url = os.getenv("OPENAI_BASE_URL")
     if base_url:
         client_kwargs["base_url"] = base_url
-    return OpenAI(**client_kwargs)
+    openai_client_class = get_openai_client_class()
+    return openai_client_class(**client_kwargs)
 
 
 def extract_output_text(response: Any) -> Optional[str]:
@@ -67,7 +73,7 @@ def extract_output_text(response: Any) -> Optional[str]:
 
 
 class DeepResearchJobService:
-    def __init__(self, session: Session | None = None, openai_client: OpenAI | None = None) -> None:
+    def __init__(self, session: Session | None = None, openai_client: Any | None = None) -> None:
         self.session = session or SessionLocal()
         self.repo = DeepResearchJobsRepository(self.session)
         self.client = openai_client or build_openai_client(require_api_key=False)
@@ -133,6 +139,30 @@ class DeepResearchJobService:
             return None
         return str(run.id)
 
+    @staticmethod
+    def _build_trace_context(
+        *,
+        org_id: str,
+        client_id: str,
+        workflow_run_id: str | None,
+        temporal_workflow_id: str | None,
+        step_key: str,
+    ) -> LangfuseTraceContext:
+        session_id = workflow_run_id or temporal_workflow_id or f"deep-research:{client_id}:{step_key}"
+        metadata: dict[str, Any] = {
+            "orgId": org_id,
+            "clientId": client_id,
+            "workflowRunId": workflow_run_id,
+            "temporalWorkflowId": temporal_workflow_id,
+            "stepKey": step_key,
+        }
+        return LangfuseTraceContext(
+            name="workflow.deep_research",
+            session_id=session_id,
+            metadata=metadata,
+            tags=["workflow", "deep_research"],
+        )
+
     def run_deep_research(
         self,
         *,
@@ -151,13 +181,6 @@ class DeepResearchJobService:
         parent_run_id: str | None = None,
         metadata: Optional[dict[str, Any]] = None,
     ) -> Tuple[str, Optional[DeepResearchJob]]:
-        existing = self._get_existing_job(
-            org_id=org_id,
-            client_id=client_id,
-            temporal_workflow_id=temporal_workflow_id,
-            step_key=step_key,
-        )
-
         resolved_workflow_run_id = self._resolve_workflow_run_id(
             org_id=org_id,
             workflow_run_id=workflow_run_id,
@@ -165,99 +188,133 @@ class DeepResearchJobService:
             parent_run_id=parent_run_id,
             parent_workflow_id=parent_workflow_id,
         )
-
-        if existing and existing.response_id:
-            include_existing = _INCLUDE_SOURCES if existing.use_web_search else None
-            resumed = self._poll_until_terminal(
-                job_id=str(existing.id),
-                response_id=existing.response_id,
-                include=include_existing,
-            )
-            if resumed and getattr(resumed, "output_text", None):
-                return resumed.output_text, resumed
-
-        job = self.repo.create_job(
+        trace_context = self._build_trace_context(
             org_id=org_id,
             client_id=client_id,
             workflow_run_id=resolved_workflow_run_id,
-            onboarding_payload_id=onboarding_payload_id,
             temporal_workflow_id=temporal_workflow_id,
             step_key=step_key,
-            model=model,
-            prompt=prompt,
-            prompt_sha256=prompt_sha256,
-            use_web_search=use_web_search,
-            max_output_tokens=max_output_tokens,
-            metadata=metadata,
         )
+        trace_metadata: dict[str, Any] = {
+            "orgId": org_id,
+            "clientId": client_id,
+            "model": model,
+            "stepKey": step_key,
+            "workflowRunId": resolved_workflow_run_id,
+            "temporalWorkflowId": temporal_workflow_id,
+            "useWebSearch": use_web_search,
+            "maxOutputTokens": max_output_tokens,
+            "promptSha256": prompt_sha256,
+        }
+        with bind_langfuse_trace_context(trace_context):
+            with start_langfuse_span(
+                name="deep_research.run",
+                input={"prompt_chars": len(prompt)},
+                metadata=trace_metadata,
+                tags=["workflow", "deep_research"],
+                trace_name="workflow.deep_research",
+            ):
+                existing = self._get_existing_job(
+                    org_id=org_id,
+                    client_id=client_id,
+                    temporal_workflow_id=temporal_workflow_id,
+                    step_key=step_key,
+                )
+                if existing and existing.response_id:
+                    include_existing = _INCLUDE_SOURCES if existing.use_web_search else None
+                    resumed = self._poll_until_terminal(
+                        job_id=str(existing.id),
+                        response_id=existing.response_id,
+                        include=include_existing,
+                    )
+                    if resumed and getattr(resumed, "output_text", None):
+                        return resumed.output_text, resumed
 
-        if not self.client:
-            logger.error("OPENAI_API_KEY not configured; cannot start deep research.")
-            now = datetime.now(timezone.utc)
-            job = self.repo.update_job(
-                job_id=str(job.id),
-                status=ResearchJobStatusEnum.errored,
-                error="OPENAI_API_KEY not configured",
-                finished_at=now,
-            )
-            raise RuntimeError("OPENAI_API_KEY not configured; deep research cannot run.")
+                job = self.repo.create_job(
+                    org_id=org_id,
+                    client_id=client_id,
+                    workflow_run_id=resolved_workflow_run_id,
+                    onboarding_payload_id=onboarding_payload_id,
+                    temporal_workflow_id=temporal_workflow_id,
+                    step_key=step_key,
+                    model=model,
+                    prompt=prompt,
+                    prompt_sha256=prompt_sha256,
+                    use_web_search=use_web_search,
+                    max_output_tokens=max_output_tokens,
+                    metadata=metadata,
+                )
 
-        include = _INCLUDE_SOURCES if use_web_search else None
-        try:
-            response = self.client.responses.create(
-                model=model,
-                input=prompt,
-                background=True,
-                max_output_tokens=max_output_tokens or _DEFAULT_MAX_OUTPUT_TOKENS,
-                reasoning={"summary": "auto", "effort": "medium"},
-                tools=[{"type": "web_search"}] if use_web_search else None,
-                include=include,
-                metadata={
-                    "deep_research_job_id": str(job.id),
-                    "org_id": org_id,
-                    "client_id": client_id,
-                    "step_key": step_key,
-                    "temporal_workflow_id": temporal_workflow_id,
-                },
-            )
-        except Exception as exc:
-            logger.exception("Failed to start deep research response", extra={"org_id": org_id, "client_id": client_id})
-            now = datetime.now(timezone.utc)
-            job = self.repo.update_job(
-                job_id=str(job.id),
-                status=ResearchJobStatusEnum.errored,
-                error=str(exc),
-                finished_at=now,
-            )
-            raise
+                if not self.client:
+                    logger.error("OPENAI_API_KEY not configured; cannot start deep research.")
+                    now = datetime.now(timezone.utc)
+                    job = self.repo.update_job(
+                        job_id=str(job.id),
+                        status=ResearchJobStatusEnum.errored,
+                        error="OPENAI_API_KEY not configured",
+                        finished_at=now,
+                    )
+                    raise RuntimeError("OPENAI_API_KEY not configured; deep research cannot run.")
 
-        job = self.repo.mark_response(
-            job_id=str(job.id),
-            response_id=getattr(response, "id", ""),
-            status=self._status_from_response_status(getattr(response, "status", None)),
-        )
+                include = _INCLUDE_SOURCES if use_web_search else None
+                try:
+                    response = self.client.responses.create(
+                        model=model,
+                        input=prompt,
+                        background=True,
+                        max_output_tokens=max_output_tokens or _DEFAULT_MAX_OUTPUT_TOKENS,
+                        reasoning={"summary": "auto", "effort": "medium"},
+                        tools=[{"type": "web_search"}] if use_web_search else None,
+                        include=include,
+                        metadata={
+                            "deep_research_job_id": str(job.id),
+                            "org_id": org_id,
+                            "client_id": client_id,
+                            "step_key": step_key,
+                            "temporal_workflow_id": temporal_workflow_id,
+                        },
+                    )
+                except Exception as exc:
+                    logger.exception(
+                        "Failed to start deep research response",
+                        extra={"org_id": org_id, "client_id": client_id},
+                    )
+                    now = datetime.now(timezone.utc)
+                    job = self.repo.update_job(
+                        job_id=str(job.id),
+                        status=ResearchJobStatusEnum.errored,
+                        error=str(exc),
+                        finished_at=now,
+                    )
+                    raise
 
-        job = self._poll_until_terminal(
-            job_id=str(job.id),
-            response_id=getattr(response, "id", ""),
-            include=include,
-        )
+                job = self.repo.mark_response(
+                    job_id=str(job.id),
+                    response_id=getattr(response, "id", ""),
+                    status=self._status_from_response_status(getattr(response, "status", None)),
+                )
 
-        if not job:
-            raise RuntimeError("Deep research job not found after polling for completion.")
+                job = self._poll_until_terminal(
+                    job_id=str(job.id),
+                    response_id=getattr(response, "id", ""),
+                    include=include,
+                )
 
-        if not getattr(job, "output_text", None):
-            error_message = getattr(job, "error", None) or "Deep research returned no output text."
-            self.repo.update_job(job_id=str(job.id), error=error_message)
-            raise RuntimeError(error_message)
+                if not job:
+                    raise RuntimeError("Deep research job not found after polling for completion.")
 
-        if job.status not in _TERMINAL_STATUSES:
-            logger.warning(
-                "Deep research job ended without terminal status but returned output",
-                extra={"job_id": str(job.id), "status": getattr(job, "status", None)},
-            )
+                if not getattr(job, "output_text", None):
+                    error_message = getattr(job, "error", None) or "Deep research returned no output text."
+                    self.repo.update_job(job_id=str(job.id), error=error_message)
+                    raise RuntimeError(error_message)
 
-        return job.output_text, job
+                if job.status not in _TERMINAL_STATUSES:
+                    logger.warning(
+                        "Deep research job ended without terminal status but returned output",
+                        extra={"job_id": str(job.id), "status": getattr(job, "status", None)},
+                    )
+
+                return job.output_text, job
 
     def refresh_from_openai(self, *, job_id: str) -> Optional[DeepResearchJob]:
         job = self.repo.get(job_id=job_id)

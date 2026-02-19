@@ -1,5 +1,7 @@
 .section {
   padding: var(--reviews-pad-y) 0;
+  /* Ensure the carousel never visually crowds/overlaps the full-width marquee band below. */
+  padding-bottom: calc(var(--reviews-pad-y) + var(--space-6));
 }
 
 .carousel {

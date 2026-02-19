@@ -37,20 +37,6 @@
 
   <body class="bg-fbBg font-fb text-fbText antialiased">
     <div id="card" class="mx-auto w-full max-w-[430px] bg-white">
-      <div class="flex items-center gap-2 px-4 py-3">
-        <span id="header-title" class="text-[16px] font-semibold"></span>
-        <svg
-          id="header-icon"
-          viewBox="0 0 20 20"
-          class="h-4 w-4 text-fbMuted"
-          fill="currentColor"
-        >
-          <path
-            d="M5.3 7.3a1 1 0 0 1 1.4 0L10 10.6l3.3-3.3a1 1 0 1 1 1.4 1.4l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 0 1 0-1.4Z"
-          />
-        </svg>
-      </div>
-      <div class="h-px bg-fbLine"></div>
       <div id="comment-section" class="pb-6"></div>
     </div>
 
@@ -66,7 +52,22 @@
             return;
           }
           img.addEventListener('load', () => resolve(), { once: true });
-          img.addEventListener('error', () => reject(new Error('Failed to load image.')), { once: true });
+          img.addEventListener(
+            'error',
+            () => {
+              const src = String(img.currentSrc || img.src || '');
+              let summary = src;
+              if (src.startsWith('data:')) {
+                const comma = src.indexOf(',');
+                const header = comma >= 0 ? src.slice(0, comma) : src.slice(0, 80);
+                summary = `${header},... (len=${src.length})`;
+              } else if (src.length > 200) {
+                summary = `${src.slice(0, 200)}...`;
+              }
+              reject(new Error('Failed to load image (src=' + summary + ').'));
+            },
+            { once: true }
+          );
         });
 
       const createIconButton = (svg, label) => {
@@ -277,11 +278,6 @@
         if (!header || typeof header !== 'object') {
           throw new Error('header is required.');
         }
-
-        const headerTitle = document.getElementById('header-title');
-        const headerIcon = document.getElementById('header-icon');
-        headerTitle.textContent = header.title;
-        headerIcon.style.display = header.showSortIcon ? 'block' : 'none';
 
         const section = document.getElementById('comment-section');
         section.innerHTML = '';

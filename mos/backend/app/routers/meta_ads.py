@@ -3,11 +3,14 @@ from __future__ import annotations
 import mimetypes
 from collections import defaultdict
 from typing import Any, Optional
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
@@ -40,8 +43,35 @@ from app.schemas.meta_ads import (
 )
 from app.services.media_storage import MediaStorage
 from app.services.meta_ads import MetaAdsClient, MetaAdsConfigError, MetaAdsError
+from app.services.meta_media_buying import (
+    MetaCutRuleConfig,
+    MetaEventMappings,
+    MetaInsightsConfig,
+    build_management_plan,
+)
 
 router = APIRouter(prefix="/meta", tags=["meta"])
+
+
+class _MetaEventMappingsRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contentViewActionType: str = "offsite_conversion.fb_pixel_view_content"
+    addToCartActionType: str = "offsite_conversion.fb_pixel_add_to_cart"
+    purchaseActionType: str = "offsite_conversion.fb_pixel_purchase"
+    purchaseValueActionType: str = "offsite_conversion.fb_pixel_purchase"
+
+
+class MetaManagementPlanRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metaCampaignId: str
+    adAccountId: str | None = None
+    mode: Literal["plan_only", "apply"] = "plan_only"
+    datePreset: str = "last_3d"
+    includeRaw: bool = False
+    cutRules: MetaCutRuleConfig | None = None
+    eventMappings: _MetaEventMappingsRequest | None = None
 
 
 def _resolve_ad_account_id(ad_account_id: Optional[str]) -> str:
@@ -394,10 +424,31 @@ def create_meta_campaign(
         "objective": payload.objective,
         "status": payload.status,
     }
-    if payload.specialAdCategories:
-        request_payload["special_ad_categories"] = payload.specialAdCategories
+    # Meta requires passing this param even when empty.
+    request_payload["special_ad_categories"] = payload.specialAdCategories
     if payload.buyingType:
         request_payload["buying_type"] = payload.buyingType
+
+    if payload.dailyBudget is not None and payload.lifetimeBudget is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Provide at most one of dailyBudget or lifetimeBudget.",
+        )
+    if payload.dailyBudget is None and payload.lifetimeBudget is None:
+        if payload.isAdsetBudgetSharingEnabled is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Provide dailyBudget/lifetimeBudget for CBO campaigns, or isAdsetBudgetSharingEnabled for ABO campaigns without a campaign budget.",
+            )
+        request_payload["is_adset_budget_sharing_enabled"] = payload.isAdsetBudgetSharingEnabled
+    else:
+        if payload.dailyBudget is not None:
+            request_payload["daily_budget"] = payload.dailyBudget
+        if payload.lifetimeBudget is not None:
+            request_payload["lifetime_budget"] = payload.lifetimeBudget
+        if payload.isAdsetBudgetSharingEnabled is not None:
+            request_payload["is_adset_budget_sharing_enabled"] = payload.isAdsetBudgetSharingEnabled
+
     if payload.validateOnly:
         request_payload["execution_options"] = ["validate_only"]
 
@@ -446,12 +497,10 @@ def create_meta_adset(
     if existing:
         return jsonable_encoder(existing)
 
-    if (payload.dailyBudget is None and payload.lifetimeBudget is None) or (
-        payload.dailyBudget is not None and payload.lifetimeBudget is not None
-    ):
+    if payload.dailyBudget is not None and payload.lifetimeBudget is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Provide exactly one of dailyBudget or lifetimeBudget.",
+            detail="Provide at most one of dailyBudget or lifetimeBudget.",
         )
 
     request_payload: dict[str, Any] = {
@@ -611,6 +660,39 @@ def get_meta_config(auth: AuthContext = Depends(get_current_user)) -> dict:
         "graphApiVersion": settings.META_GRAPH_API_VERSION,
         "graphApiBaseUrl": settings.META_GRAPH_API_BASE_URL,
     }
+
+
+@router.post("/management/plan")
+def plan_meta_management(
+    payload: MetaManagementPlanRequest,
+    auth: AuthContext = Depends(get_current_user),
+):
+    """
+    Plan-only media buying evaluation for a Meta campaign.
+
+    This endpoint does not mutate Meta objects; it only returns the computed dashboard
+    metrics and the actions that would be taken under the current ruleset.
+    """
+    _ = auth
+    ad_account_id = _resolve_ad_account_id(payload.adAccountId)
+    cut_rules = payload.cutRules or MetaCutRuleConfig()
+    mappings_req = payload.eventMappings or _MetaEventMappingsRequest()
+    event_mappings = MetaEventMappings(
+        content_view_action_type=mappings_req.contentViewActionType,
+        add_to_cart_action_type=mappings_req.addToCartActionType,
+        purchase_action_type=mappings_req.purchaseActionType,
+        purchase_value_action_type=mappings_req.purchaseValueActionType,
+    )
+    plan = build_management_plan(
+        ad_account_id=ad_account_id,
+        campaign_id=payload.metaCampaignId,
+        mode=payload.mode,
+        insights=MetaInsightsConfig(datePreset=payload.datePreset),
+        cut_rules=cut_rules,
+        event_mappings=event_mappings,
+        include_raw=payload.includeRaw,
+    )
+    return jsonable_encoder(plan)
 
 
 @router.post("/specs/creatives", status_code=status.HTTP_201_CREATED)

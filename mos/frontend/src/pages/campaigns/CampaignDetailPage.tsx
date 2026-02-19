@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -52,6 +52,131 @@ function assetLabel(asset: ProductAsset): string {
   if (typeof filename === "string" && filename.trim()) return filename;
   if (asset.content_type) return asset.content_type;
   return `Asset ${asset.id.slice(0, 8)}`;
+}
+
+function GeneratedAssetCarousel({
+  assets,
+  selectedAssetId,
+  onSelect,
+}: {
+  assets: ProductAsset[];
+  selectedAssetId: string;
+  onSelect: (assetId: string) => void;
+}) {
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const updateScrollState = useCallback(() => {
+    const el = stripRef.current;
+    if (!el) return;
+    const maxScrollLeft = el.scrollWidth - el.clientWidth;
+    setCanScrollLeft(el.scrollLeft > 0);
+    setCanScrollRight(el.scrollLeft < maxScrollLeft - 1);
+  }, []);
+
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el) return;
+
+    updateScrollState();
+
+    const onScroll = () => updateScrollState();
+    el.addEventListener("scroll", onScroll, { passive: true });
+
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => updateScrollState()) : null;
+    observer?.observe(el);
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+      observer?.disconnect();
+    };
+  }, [updateScrollState, assets.length]);
+
+  const scrollByPage = (direction: "left" | "right") => {
+    const el = stripRef.current;
+    if (!el) return;
+    const delta = Math.round(el.clientWidth * 0.85) * (direction === "left" ? -1 : 1);
+    el.scrollBy({ left: delta, behavior: "smooth" });
+  };
+
+  if (!assets.length) return null;
+
+  return (
+    <div className="relative">
+      {canScrollLeft ? (
+        <button
+          type="button"
+          aria-label="Scroll left"
+          onClick={() => scrollByPage("left")}
+          className={cn(
+            "absolute left-1 top-1/2 z-10 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center",
+            "rounded-full border border-border bg-surface/90 text-content shadow-sm backdrop-blur",
+            "transition hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+          )}
+        >
+          {"<"}
+        </button>
+      ) : null}
+      {canScrollRight ? (
+        <button
+          type="button"
+          aria-label="Scroll right"
+          onClick={() => scrollByPage("right")}
+          className={cn(
+            "absolute right-1 top-1/2 z-10 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center",
+            "rounded-full border border-border bg-surface/90 text-content shadow-sm backdrop-blur",
+            "transition hover:bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+          )}
+        >
+          {">"}
+        </button>
+      ) : null}
+
+      <div
+        ref={stripRef}
+        className={cn(
+          "flex gap-2 overflow-x-auto overscroll-x-contain pb-1",
+          "[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        )}
+      >
+        {assets.map((asset) => {
+          const thumbUrl = asset.download_url || undefined;
+          const thumbIsImage = asset.asset_kind === "image";
+          const thumbSelected = selectedAssetId === asset.id;
+          return (
+            <button
+              key={asset.id}
+              type="button"
+              onClick={(e) => {
+                onSelect(asset.id);
+                e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+              }}
+              className={cn(
+                "flex-none overflow-hidden rounded-md border bg-surface-2 text-left transition",
+                "h-20 w-20",
+                thumbSelected ? "border-accent ring-2 ring-accent/20" : "border-border hover:border-accent/50"
+              )}
+              title={assetLabel(asset)}
+            >
+              {thumbIsImage && thumbUrl ? (
+                <img
+                  src={thumbUrl}
+                  alt={asset.alt || assetLabel(asset)}
+                  className="h-full w-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase text-content-muted">
+                  {asset.asset_kind}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function normalizeListText(value: string) {
@@ -245,16 +370,22 @@ export function CampaignDetailPage() {
     return Array.from(map.values());
   }, [assetBriefArtifacts]);
   const generatedAssetsByBriefId = useMemo(() => {
-    const groups = campaignProductDetail?.creative_brief_assets || [];
+    const assets = campaignProductDetail?.assets || [];
     const validBriefIds = new Set(assetBriefs.map((brief) => brief.id));
     const mapped = new Map<string, ProductAsset[]>();
-    groups.forEach((group) => {
-      if (!group?.assetBriefId) return;
-      if (!validBriefIds.has(group.assetBriefId)) return;
-      mapped.set(group.assetBriefId, group.assets || []);
+    assets.forEach((asset) => {
+      const metadata = asset.ai_metadata || {};
+      const briefId = typeof metadata.assetBriefId === "string" ? metadata.assetBriefId : null;
+      if (!briefId || !validBriefIds.has(briefId)) return;
+      const group = mapped.get(briefId);
+      if (group) {
+        group.push(asset);
+      } else {
+        mapped.set(briefId, [asset]);
+      }
     });
     return mapped;
-  }, [campaignProductDetail?.creative_brief_assets, assetBriefs]);
+  }, [campaignProductDetail?.assets, assetBriefs]);
   const generatedAssetTotal = useMemo(
     () =>
       Array.from(generatedAssetsByBriefId.values()).reduce((sum, assets) => {
@@ -1271,44 +1402,13 @@ export function CampaignDetailPage() {
                                     </a>
                                   ) : null}
                                 </div>
-                                <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
-                                  {generatedAssets.map((asset) => {
-                                    const thumbUrl = asset.download_url || undefined;
-                                    const thumbIsImage = asset.asset_kind === "image";
-                                    const thumbSelected = featuredAsset.id === asset.id;
-                                    return (
-                                      <button
-                                        key={asset.id}
-                                        type="button"
-                                        onClick={() =>
-                                          setSelectedPreviewAssetByBrief((prev) => ({ ...prev, [brief.id]: asset.id }))
-                                        }
-                                        className={cn(
-                                          "overflow-hidden rounded-md border bg-surface-2 text-left transition",
-                                          thumbSelected
-                                            ? "border-accent ring-2 ring-accent/20"
-                                            : "border-border hover:border-accent/50"
-                                        )}
-                                        title={assetLabel(asset)}
-                                      >
-                                        <div className="h-20 w-full">
-                                          {thumbIsImage && thumbUrl ? (
-                                            <img
-                                              src={thumbUrl}
-                                              alt={asset.alt || assetLabel(asset)}
-                                              className="h-full w-full object-cover"
-                                              loading="lazy"
-                                            />
-                                          ) : (
-                                            <div className="flex h-full w-full items-center justify-center text-[10px] font-semibold uppercase text-content-muted">
-                                              {asset.asset_kind}
-                                            </div>
-                                          )}
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
+                                <GeneratedAssetCarousel
+                                  assets={generatedAssets}
+                                  selectedAssetId={featuredAsset.id}
+                                  onSelect={(assetId) =>
+                                    setSelectedPreviewAssetByBrief((prev) => ({ ...prev, [brief.id]: assetId }))
+                                  }
+                                />
                               </div>
                             ) : (
                               <div className="text-xs text-content-muted">No generated assets for this brief yet.</div>

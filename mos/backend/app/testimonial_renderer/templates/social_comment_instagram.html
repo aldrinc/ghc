@@ -8,22 +8,8 @@
   </head>
   <body class="bg-[#eef6ff] antialiased">
     <div id="card" class="mx-auto w-full max-w-[430px] overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
-      <div id="post-header" class="border-b border-neutral-100 px-4 pb-2 pt-4"></div>
-      <div class="px-4 pb-3 pt-2">
+      <div class="px-4 pb-6 pt-4">
         <div id="comments" class="space-y-4"></div>
-        <div id="post-actions" class="mt-4"></div>
-      </div>
-      <div class="flex items-center gap-3 border-t border-neutral-200 px-4 py-3">
-        <button type="button" class="h-7 w-7 rounded-full text-neutral-500 hover:bg-neutral-100" aria-label="Add emoji">
-          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="9" />
-            <path d="M8.5 10.5h.01" />
-            <path d="M15.5 10.5h.01" />
-            <path d="M8 15c1.2 1.6 2.7 2.4 4 2.4S14.8 16.6 16 15" />
-          </svg>
-        </button>
-        <div class="flex-1 text-sm text-neutral-400">Add a comment...</div>
-        <button type="button" class="text-sm font-semibold text-sky-400" disabled>Post</button>
       </div>
     </div>
 
@@ -39,7 +25,22 @@
             return;
           }
           img.addEventListener('load', () => resolve(), { once: true });
-          img.addEventListener('error', () => reject(new Error('Failed to load image.')), { once: true });
+          img.addEventListener(
+            'error',
+            () => {
+              const src = String(img.currentSrc || img.src || '');
+              let summary = src;
+              if (src.startsWith('data:')) {
+                const comma = src.indexOf(',');
+                const header = comma >= 0 ? src.slice(0, comma) : src.slice(0, 80);
+                summary = `${header},... (len=${src.length})`;
+              } else if (src.length > 200) {
+                summary = `${src.slice(0, 200)}...`;
+              }
+              reject(new Error('Failed to load image (src=' + summary + ').'));
+            },
+            { once: true }
+          );
         });
 
       const initials = (value) => {
@@ -261,19 +262,11 @@
 
         const imageList = [];
 
-        const postHeader = document.getElementById('post-header');
-        postHeader.innerHTML = '';
-        postHeader.appendChild(buildPostHeader({ post: data.post, imageList }));
-
         const comments = document.getElementById('comments');
         comments.innerHTML = '';
         data.comments.forEach((comment) => {
           comments.appendChild(buildCommentRow({ comment, depth: 0, imageList }));
         });
-
-        const postActions = document.getElementById('post-actions');
-        postActions.innerHTML = '';
-        postActions.appendChild(buildPostActions({ likeCount: data.post.likeCount, dateLabel: data.post.dateLabel }));
 
         await Promise.all(imageList.map(waitForImage));
       };

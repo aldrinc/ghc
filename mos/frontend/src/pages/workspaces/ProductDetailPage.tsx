@@ -2,13 +2,22 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import {
+  useClientShopifyStatus,
+  useCreateClientShopifyInstallUrl,
+  useListClientShopifyProducts,
+  useSetClientShopifyDefaultShop,
+  useUpdateClientShopifyInstallation,
+} from "@/api/clients";
+import {
   useAddOfferBonus,
   useCreateProductOffer,
+  useCreateShopifyProductForProduct,
   useCreateVariant,
   useProduct,
   useProductAssets,
@@ -47,7 +56,19 @@ export function ProductDetailPage() {
 
   const { data: productDetail, isLoading: isLoadingDetail } = useProduct(productId);
   const { data: productAssets = [], isLoading: isLoadingAssets } = useProductAssets(productId);
+  const productClientId = productDetail?.client_id;
+  const {
+    data: shopifyStatus,
+    isLoading: isLoadingShopifyStatus,
+    refetch: refetchShopifyStatus,
+    error: shopifyStatusError,
+  } = useClientShopifyStatus(productClientId);
+  const createShopifyInstallUrl = useCreateClientShopifyInstallUrl(productClientId || "");
+  const listShopifyProducts = useListClientShopifyProducts(productClientId || "");
+  const setDefaultShop = useSetClientShopifyDefaultShop(productClientId || "");
+  const updateShopifyInstallation = useUpdateClientShopifyInstallation(productClientId || "");
   const updateProduct = useUpdateProduct(productId || "");
+  const createShopifyProductForProduct = useCreateShopifyProductForProduct(productId || "");
   const createOffer = useCreateProductOffer(productId || "");
   const addOfferBonus = useAddOfferBonus(productId || "");
   const removeOfferBonus = useRemoveOfferBonus(productId || "");
@@ -66,6 +87,21 @@ export function ProductDetailPage() {
   const [variantExternalId, setVariantExternalId] = useState("");
   const [variantOptionValues, setVariantOptionValues] = useState("");
   const [shopifyProductGidDraft, setShopifyProductGidDraft] = useState("");
+  const [shopifyShopDomainDraft, setShopifyShopDomainDraft] = useState("");
+  const [defaultShopDomainDraft, setDefaultShopDomainDraft] = useState("");
+  const [storefrontAccessTokenDraft, setStorefrontAccessTokenDraft] = useState("");
+  const [shopifyProductSearchQuery, setShopifyProductSearchQuery] = useState("");
+  const [selectedShopifyProductGid, setSelectedShopifyProductGid] = useState("");
+  const [createShopifyTitleDraft, setCreateShopifyTitleDraft] = useState("");
+  const [createShopifyVariantTitleDraft, setCreateShopifyVariantTitleDraft] = useState("Default");
+  const [createShopifyVariantPriceDraft, setCreateShopifyVariantPriceDraft] = useState("");
+  const [createShopifyCurrencyDraft, setCreateShopifyCurrencyDraft] = useState("USD");
+  const [shopifyImportSummary, setShopifyImportSummary] = useState<{
+    shopDomain: string;
+    productGid: string;
+    variantTitles: string[];
+    variantCount: number;
+  } | null>(null);
   const [offerName, setOfferName] = useState("");
   const [offerBusinessModel, setOfferBusinessModel] = useState("one_time");
   const [offerDescription, setOfferDescription] = useState("");
@@ -80,6 +116,29 @@ export function ProductDetailPage() {
     });
     setShopifyProductGidDraft(productDetail.shopify_product_gid || "");
   }, [productDetail, selectProduct]);
+
+  useEffect(() => {
+    if (!shopifyStatus?.shopDomain) return;
+    setShopifyShopDomainDraft((current) => (current.trim() ? current : shopifyStatus.shopDomain || ""));
+  }, [shopifyStatus?.shopDomain]);
+
+  useEffect(() => {
+    if (!shopifyStatus?.shopDomains?.length) return;
+    setDefaultShopDomainDraft((current) => {
+      if (current.trim()) return current;
+      if (shopifyStatus.selectedShopDomain) return shopifyStatus.selectedShopDomain;
+      return shopifyStatus.shopDomains[0] || "";
+    });
+  }, [shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomains]);
+
+  useEffect(() => {
+    if (!productDetail) return;
+    setCreateShopifyTitleDraft((current) => (current.trim() ? current : productDetail.title || ""));
+  }, [productDetail]);
+
+  useEffect(() => {
+    setShopifyImportSummary(null);
+  }, [productId]);
 
   const resetVariantForm = () => {
     setVariantTitle("");
@@ -168,8 +227,160 @@ export function ProductDetailPage() {
 
   const handleSaveShopifyProductGid = () => {
     if (!productDetail) return;
+    if (shopifyStatus?.state !== "ready") {
+      toast.error("Shopify must be connected and ready before mapping products.");
+      return;
+    }
     const next = shopifyProductGidDraft.trim();
     updateProduct.mutate({ shopifyProductGid: next || null });
+  };
+
+  const handleConnectShopify = async () => {
+    if (!productClientId) {
+      toast.error("Select a product before connecting Shopify.");
+      return;
+    }
+    const nextDomain = shopifyShopDomainDraft.trim();
+    if (!nextDomain) {
+      toast.error("Shop domain is required.");
+      return;
+    }
+    const response = await createShopifyInstallUrl.mutateAsync({ shopDomain: nextDomain });
+    if (!response.installUrl) {
+      throw new Error("Install URL is missing from response.");
+    }
+    window.location.assign(response.installUrl);
+  };
+
+  const handleSetStorefrontToken = async () => {
+    if (!productClientId) {
+      toast.error("Select a product before updating Shopify installation.");
+      return;
+    }
+    const nextDomain = shopifyShopDomainDraft.trim();
+    if (!nextDomain) {
+      toast.error("Shop domain is required.");
+      return;
+    }
+    const nextToken = storefrontAccessTokenDraft.trim();
+    if (!nextToken) {
+      toast.error("Storefront access token is required.");
+      return;
+    }
+    await updateShopifyInstallation.mutateAsync({
+      shopDomain: nextDomain,
+      storefrontAccessToken: nextToken,
+    });
+    setStorefrontAccessTokenDraft("");
+    await refetchShopifyStatus();
+  };
+
+  const handleSetDefaultShop = async () => {
+    if (!productClientId) {
+      toast.error("Select a product before setting default Shopify store.");
+      return;
+    }
+    const nextDomain = defaultShopDomainDraft.trim();
+    if (!nextDomain) {
+      toast.error("Select a Shopify shop domain.");
+      return;
+    }
+    await setDefaultShop.mutateAsync({ shopDomain: nextDomain });
+    await refetchShopifyStatus();
+  };
+
+  const handleCreateShopifyProduct = async () => {
+    if (!isShopifyReady) {
+      toast.error("Shopify must be connected and ready before creating products.");
+      return;
+    }
+    if (!productDetail) return;
+    const nextTitle = createShopifyTitleDraft.trim();
+    if (!nextTitle) {
+      toast.error("Shopify product title is required.");
+      return;
+    }
+    const nextVariantTitle = createShopifyVariantTitleDraft.trim();
+    if (!nextVariantTitle) {
+      toast.error("Shopify variant title is required.");
+      return;
+    }
+    const nextVariantPrice = Number(createShopifyVariantPriceDraft);
+    if (Number.isNaN(nextVariantPrice) || nextVariantPrice <= 0) {
+      toast.error("Shopify variant price must be greater than 0.");
+      return;
+    }
+    const nextCurrency = createShopifyCurrencyDraft.trim().toUpperCase();
+    if (nextCurrency.length !== 3) {
+      toast.error("Currency must be a 3-letter code.");
+      return;
+    }
+
+    const response = await createShopifyProductForProduct.mutateAsync({
+      title: nextTitle,
+      description: productDetail.description || undefined,
+      handle: productDetail.handle || undefined,
+      vendor: productDetail.vendor || undefined,
+      productType: productDetail.product_type || undefined,
+      tags: productDetail.tags || [],
+      status: "DRAFT",
+      variants: [
+        {
+          title: nextVariantTitle,
+          priceCents: Math.round(nextVariantPrice * 100),
+          currency: nextCurrency,
+        },
+      ],
+      shopDomain: shopifyStatus?.shopDomain || undefined,
+    });
+    const createdProductGid = String(response.productGid || "").trim();
+    if (createdProductGid) {
+      setShopifyProductGidDraft(createdProductGid);
+    }
+    const importedVariantTitles = (response.variants || [])
+      .map((variant) => String(variant.title || "").trim())
+      .filter((title) => Boolean(title));
+    setShopifyImportSummary({
+      shopDomain: response.shopDomain,
+      productGid: createdProductGid || response.productGid,
+      variantTitles: importedVariantTitles,
+      variantCount: importedVariantTitles.length,
+    });
+  };
+
+  const handleSearchShopifyProducts = async () => {
+    if (!productClientId) {
+      toast.error("Select a product before searching Shopify products.");
+      return;
+    }
+    if (!isShopifyReady) {
+      toast.error("Shopify must be connected and ready before searching products.");
+      return;
+    }
+    const response = await listShopifyProducts.mutateAsync({
+      query: shopifyProductSearchQuery.trim() || undefined,
+      shopDomain: shopifyStatus?.shopDomain || undefined,
+      limit: 25,
+    });
+    if (!response.products.length) {
+      toast.error("No Shopify products matched your search.");
+      setSelectedShopifyProductGid("");
+      return;
+    }
+    setSelectedShopifyProductGid((current) => {
+      if (current && response.products.some((product) => product.productGid === current)) {
+        return current;
+      }
+      return response.products[0]?.productGid || "";
+    });
+  };
+
+  const handleUseSelectedShopifyProduct = () => {
+    if (!selectedShopifyProductGid) {
+      toast.error("Select a Shopify product first.");
+      return;
+    }
+    setShopifyProductGidDraft(selectedShopifyProductGid);
   };
 
   const handleCreateOffer = async (event: React.FormEvent) => {
@@ -233,6 +444,39 @@ export function ProductDetailPage() {
     const rest = filteredAssets.filter((asset) => asset.id !== primaryAssetId);
     return primary ? [primary, ...rest] : filteredAssets;
   }, [filteredAssets, primaryAssetId]);
+  const shopifyCatalogProducts = listShopifyProducts.data?.products || [];
+  const hasShopifyCheckoutVariant = useMemo(
+    () =>
+      Boolean(
+        productDetail?.variants.some(
+          (variant) =>
+            variant.provider === "shopify" &&
+            typeof variant.external_price_id === "string" &&
+            variant.external_price_id.startsWith("gid://shopify/ProductVariant/"),
+        ),
+      ),
+    [productDetail?.variants],
+  );
+  const shopifyState = shopifyStatus?.state || "error";
+  const shopifyStatusTone = useMemo(() => {
+    if (shopifyState === "ready") return "success" as const;
+    if (shopifyState === "not_connected" || shopifyState === "installed_missing_storefront_token") return "neutral" as const;
+    return "danger" as const;
+  }, [shopifyState]);
+  const shopifyStatusLabel = useMemo(() => {
+    if (shopifyState === "ready") return "Ready";
+    if (shopifyState === "not_connected") return "Not connected";
+    if (shopifyState === "installed_missing_storefront_token") return "Missing token";
+    if (shopifyState === "multiple_installations_conflict") return "Store conflict";
+    return "Error";
+  }, [shopifyState]);
+  const shopifyStatusMessage = useMemo(() => {
+    if (shopifyStatus?.message) return shopifyStatus.message;
+    if (shopifyStatusError instanceof Error && shopifyStatusError.message.trim()) return shopifyStatusError.message;
+    return "Checking Shopify connection status.";
+  }, [shopifyStatus?.message, shopifyStatusError]);
+  const isShopifyReady = shopifyState === "ready";
+  const hasMappedShopifyProduct = Boolean((productDetail?.shopify_product_gid || "").trim());
 
   if (!workspace) {
     return (
@@ -300,25 +544,253 @@ export function ProductDetailPage() {
             </div>
 
             <div className="rounded-md border border-border bg-surface-2 p-4 space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase text-content-muted">Shopify Connection</div>
+                  <div className="text-xs text-content-muted">
+                    Connect the store and verify setup before mapping products.
+                  </div>
+                </div>
+                <Badge tone={shopifyStatusTone}>{isLoadingShopifyStatus ? "Checking…" : shopifyStatusLabel}</Badge>
+              </div>
+              <div className="text-xs text-content-muted">
+                {shopifyStatusMessage}
+              </div>
+              {shopifyStatus?.missingScopes?.length ? (
+                <div className="text-xs text-danger">Missing scopes: {shopifyStatus.missingScopes.join(", ")}</div>
+              ) : null}
+              {shopifyStatus?.shopDomains?.length ? (
+                <div className="text-xs text-content-muted">Connected stores: {shopifyStatus.shopDomains.join(", ")}</div>
+              ) : null}
+              {shopifyState === "multiple_installations_conflict" && shopifyStatus?.shopDomains?.length ? (
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <select
+                    className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
+                    value={defaultShopDomainDraft}
+                    onChange={(e) => setDefaultShopDomainDraft(e.target.value)}
+                    disabled={setDefaultShop.isPending}
+                  >
+                    {shopifyStatus.shopDomains.map((shopDomain) => (
+                      <option key={shopDomain} value={shopDomain}>
+                        {shopDomain}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void handleSetDefaultShop()}
+                    disabled={!defaultShopDomainDraft.trim() || setDefaultShop.isPending}
+                  >
+                    {setDefaultShop.isPending ? "Saving…" : "Set default shop"}
+                  </Button>
+                </div>
+              ) : null}
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+                <Input
+                  placeholder="example-shop.myshopify.com"
+                  value={shopifyShopDomainDraft}
+                  onChange={(e) => setShopifyShopDomainDraft(e.target.value)}
+                  disabled={createShopifyInstallUrl.isPending || updateShopifyInstallation.isPending || setDefaultShop.isPending}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void refetchShopifyStatus()}
+                  disabled={
+                    isLoadingShopifyStatus ||
+                    createShopifyInstallUrl.isPending ||
+                    updateShopifyInstallation.isPending ||
+                    setDefaultShop.isPending
+                  }
+                >
+                  Refresh
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => void handleConnectShopify()}
+                  disabled={
+                    !productClientId ||
+                    !shopifyShopDomainDraft.trim() ||
+                    createShopifyInstallUrl.isPending ||
+                    updateShopifyInstallation.isPending ||
+                    setDefaultShop.isPending
+                  }
+                >
+                  {createShopifyInstallUrl.isPending ? "Redirecting…" : "Connect Shopify"}
+                </Button>
+              </div>
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                <Input
+                  type="password"
+                  placeholder="Storefront access token"
+                  value={storefrontAccessTokenDraft}
+                  onChange={(e) => setStorefrontAccessTokenDraft(e.target.value)}
+                  disabled={createShopifyInstallUrl.isPending || updateShopifyInstallation.isPending || setDefaultShop.isPending}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleSetStorefrontToken()}
+                  disabled={
+                    !productClientId ||
+                    !shopifyShopDomainDraft.trim() ||
+                    !storefrontAccessTokenDraft.trim() ||
+                    createShopifyInstallUrl.isPending ||
+                    updateShopifyInstallation.isPending ||
+                    setDefaultShop.isPending
+                  }
+                >
+                  {updateShopifyInstallation.isPending ? "Saving…" : "Set storefront token"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-md border border-border bg-surface-2 p-4 space-y-3">
               <div>
-                <div className="text-xs font-semibold uppercase text-content-muted">Shopify Mapping</div>
+                <div className="text-xs font-semibold uppercase text-content-muted">Shopify Product Mapping</div>
                 <div className="text-xs text-content-muted">
                   Required for bonus products and Shopify offer verification.
                 </div>
               </div>
+              {!isShopifyReady ? (
+                <div className="text-xs text-danger">
+                  Shopify mapping is blocked until connection state is Ready.
+                </div>
+              ) : null}
+              {isShopifyReady && !hasShopifyCheckoutVariant ? (
+                <div className="text-xs text-danger">
+                  Checkout readiness is blocked: add at least one variant with provider `shopify` and external price ID
+                  `gid://shopify/ProductVariant/...`.
+                </div>
+              ) : null}
+              {isShopifyReady && !hasMappedShopifyProduct ? (
+                <div className="rounded-md border border-border bg-surface p-3 space-y-2">
+                  <div className="text-xs font-semibold uppercase text-content-muted">Create In Shopify</div>
+                  <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_180px]">
+                    <Input
+                      placeholder="Shopify product title"
+                      value={createShopifyTitleDraft}
+                      onChange={(e) => setCreateShopifyTitleDraft(e.target.value)}
+                      disabled={createShopifyProductForProduct.isPending}
+                    />
+                    <Input
+                      placeholder="Variant title"
+                      value={createShopifyVariantTitleDraft}
+                      onChange={(e) => setCreateShopifyVariantTitleDraft(e.target.value)}
+                      disabled={createShopifyProductForProduct.isPending}
+                    />
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-[180px_120px_auto]">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Price"
+                      value={createShopifyVariantPriceDraft}
+                      onChange={(e) => setCreateShopifyVariantPriceDraft(e.target.value)}
+                      disabled={createShopifyProductForProduct.isPending}
+                    />
+                    <Input
+                      placeholder="USD"
+                      value={createShopifyCurrencyDraft}
+                      onChange={(e) => setCreateShopifyCurrencyDraft(e.target.value)}
+                      disabled={createShopifyProductForProduct.isPending}
+                    />
+                    <Button
+                      size="sm"
+                      onClick={() => void handleCreateShopifyProduct()}
+                      disabled={
+                        createShopifyProductForProduct.isPending ||
+                        !createShopifyTitleDraft.trim() ||
+                        !createShopifyVariantTitleDraft.trim() ||
+                        !createShopifyVariantPriceDraft.trim()
+                      }
+                    >
+                      {createShopifyProductForProduct.isPending ? "Creating…" : "Create product in Shopify"}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {shopifyImportSummary ? (
+                <div className="rounded-md border border-border bg-surface p-3 space-y-1">
+                  <div className="text-xs font-semibold uppercase text-content-muted">Latest Shopify Import</div>
+                  <div className="text-xs text-content-muted">
+                    Store: {shopifyImportSummary.shopDomain} · Product: {shopifyImportSummary.productGid}
+                  </div>
+                  <div className="text-xs text-content-muted">
+                    Imported {shopifyImportSummary.variantCount} variant
+                    {shopifyImportSummary.variantCount === 1 ? "" : "s"}
+                    {shopifyImportSummary.variantTitles.length
+                      ? `: ${shopifyImportSummary.variantTitles.join(", ")}`
+                      : "."}
+                  </div>
+                </div>
+              ) : null}
+              {isShopifyReady && hasMappedShopifyProduct ? (
+                <div className="text-xs text-content-muted">
+                  Shopify product is already mapped for this product. Clear mapping if you need to create a new Shopify
+                  product.
+                </div>
+              ) : null}
+              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                <Input
+                  placeholder="Search Shopify products by title or handle"
+                  value={shopifyProductSearchQuery}
+                  onChange={(e) => setShopifyProductSearchQuery(e.target.value)}
+                  disabled={!isShopifyReady || listShopifyProducts.isPending}
+                />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleSearchShopifyProducts()}
+                  disabled={!isShopifyReady || listShopifyProducts.isPending}
+                >
+                  {listShopifyProducts.isPending ? "Searching…" : "Search Shopify"}
+                </Button>
+              </div>
+              {shopifyCatalogProducts.length ? (
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <select
+                    className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
+                    value={selectedShopifyProductGid}
+                    onChange={(e) => setSelectedShopifyProductGid(e.target.value)}
+                    disabled={!isShopifyReady}
+                  >
+                    {shopifyCatalogProducts.map((product) => (
+                      <option key={product.productGid} value={product.productGid}>
+                        {product.title} ({product.handle}) · {product.status}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleUseSelectedShopifyProduct}
+                    disabled={!isShopifyReady || !selectedShopifyProductGid}
+                  >
+                    Use selected product
+                  </Button>
+                </div>
+              ) : null}
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-content">Shopify product GID</label>
                 <Input
                   placeholder="gid://shopify/Product/1234567890"
                   value={shopifyProductGidDraft}
                   onChange={(e) => setShopifyProductGidDraft(e.target.value)}
+                  disabled={!isShopifyReady || updateProduct.isPending}
                 />
               </div>
               <div className="flex justify-end">
                 <Button
                   size="sm"
                   onClick={handleSaveShopifyProductGid}
-                  disabled={updateProduct.isPending || shopifyProductGidDraft === (productDetail.shopify_product_gid || "")}
+                  disabled={
+                    !isShopifyReady ||
+                    updateProduct.isPending ||
+                    shopifyProductGidDraft === (productDetail.shopify_product_gid || "")
+                  }
                 >
                   {updateProduct.isPending ? "Saving…" : "Save Shopify mapping"}
                 </Button>
@@ -554,6 +1026,16 @@ export function ProductDetailPage() {
                         <div className="text-[10px] text-content-muted">{variant.id.slice(0, 8)}</div>
                       </div>
                       <div className="grid gap-2 text-xs text-content-muted">
+                        <div>
+                          <span className="font-semibold text-content">Shopify mapping:</span>{" "}
+                          {variant.provider === "shopify" &&
+                          typeof variant.external_price_id === "string" &&
+                          variant.external_price_id.startsWith("gid://shopify/ProductVariant/")
+                            ? "Ready"
+                            : variant.provider === "shopify"
+                              ? "Missing valid Shopify variant GID"
+                              : "Not Shopify"}
+                        </div>
                         <div>
                           <span className="font-semibold text-content">External price ID:</span>{" "}
                           {variant.external_price_id || "—"}

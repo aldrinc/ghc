@@ -144,9 +144,10 @@ def run_generate_page_draft_stream(
         )
         docs_ctx = docs_res.ui_details
 
-        # Normalize attachments + build vision blocks (used only for Claude structured calls).
-        normalized_attachments = funnel_ai._normalize_attachment_list(attachments)
-        if normalized_attachments and not model_id.lower().startswith("claude"):
+        # Normalize attachments. Vision blocks are built inside DraftGeneratePageTool (Claude-only) to
+        # avoid persisting base64 image payloads in agent tool call traces.
+        attachment_summaries = funnel_ai._normalize_attachment_list(attachments)
+        if attachment_summaries and not model_id.lower().startswith("claude"):
             raise funnel_ai.AiAttachmentError(
                 "Image attachments require a Claude model with vision support. "
                 "Set model to a Claude model."
@@ -155,12 +156,6 @@ def run_generate_page_draft_stream(
         # Brand docs are stored as Claude file blocks; do not silently switch models.
         if (docs_ctx.get("documentBlocks") or []) and not model_id.lower().startswith("claude"):
             raise ValueError("Brand documents require a Claude model (model must start with 'claude').")
-        attachment_summaries, attachment_blocks = funnel_ai._build_attachment_blocks(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-            attachments=normalized_attachments,
-        )
 
         # 5) Generate candidate draft (LLM)
         draft_res = yield from runtime.invoke_tool_stream(
@@ -183,7 +178,6 @@ def run_generate_page_draft_stream(
                 "basePuckData": funnel_ctx.get("basePuckData"),
                 "productContext": str(product_ctx.get("productContext") or ""),
                 "attachmentSummaries": attachment_summaries,
-                "attachmentBlocks": attachment_blocks,
                 "brandDocuments": docs_ctx.get("documentBlocks") or [],
                 "copyPack": copy_pack,
             },
@@ -192,6 +186,8 @@ def run_generate_page_draft_stream(
             page_id=page_id,
         )
         draft_ctx = draft_res.ui_details
+        if isinstance(draft_ctx.get("attachmentSummaries"), list):
+            attachment_summaries = draft_ctx["attachmentSummaries"]
         puck_data = draft_ctx["puckData"]
         assistant_message = str(draft_ctx.get("assistantMessage") or "")
         final_model = str(draft_ctx.get("model") or model_id)

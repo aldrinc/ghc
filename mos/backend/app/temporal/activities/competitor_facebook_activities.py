@@ -10,6 +10,7 @@ from temporalio import activity
 
 from app.ads.normalization import normalize_facebook_page_url
 from app.llm import LLMClient, LLMGenerationParams
+from app.observability import LangfuseTraceContext, bind_langfuse_trace_context
 from app.schemas.competitors import CompetitorRow, ResolveFacebookRequest, ResolveFacebookResult
 
 
@@ -293,7 +294,22 @@ def resolve_competitor_facebook_pages_activity(request: ResolveFacebookRequest) 
         if context_str:
             prompt += "\n\nAdditional context:\n" + context_str
 
-        raw_response = llm.generate_text(prompt, params)
+        info = activity.info()
+        trace_context = LangfuseTraceContext(
+            name="workflow.competitor_facebook_resolution",
+            session_id=f"{info.workflow_id}:{info.run_id}",
+            metadata={
+                "orgId": request.org_id,
+                "clientId": request.client_id,
+                "workflowId": info.workflow_id,
+                "workflowRunId": info.run_id,
+                "resolvedCount": deterministic_debug["resolved"],
+                "unresolvedCount": deterministic_debug["unresolved"],
+            },
+            tags=["workflow", "activity", "competitor_resolution"],
+        )
+        with bind_langfuse_trace_context(trace_context):
+            raw_response = llm.generate_text(prompt, params)
 
         parsed_json: Any = None
         try:

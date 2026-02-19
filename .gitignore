@@ -43,6 +43,11 @@ coverage/
 clerk-clerk-js-*.tgz
 mos/backend/reports/
 
+# Local temp/output
+.tmp/
+mos/backend/.tmp/
+swipe/
+
 # Taskmaster
 .taskmaster/
 

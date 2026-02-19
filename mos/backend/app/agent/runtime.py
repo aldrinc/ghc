@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.agent.types import ToolContext, ToolResult
 from app.db.enums import AgentRunStatusEnum, AgentToolCallStatusEnum
 from app.db.repositories.agent_runs import AgentRunsRepository, AgentToolCallsRepository
+from app.observability import LangfuseTraceContext, bind_langfuse_trace_context
 
 
 ArgsT = TypeVar("ArgsT", bound=BaseModel)
@@ -159,14 +160,34 @@ class AgentRuntime:
             org_id=self.org_id,
             user_id=self.user_id,
             run_id=handle.run_id,
+            tool_call_id=str(call.id),
+            tool_seq=handle.seq,
+            tool_name=tool.name,
             client_id=client_id,
             funnel_id=funnel_id,
             page_id=page_id,
         )
+        trace_context = LangfuseTraceContext(
+            name=f"agent.{tool.name}",
+            session_id=handle.run_id,
+            user_id=self.user_id,
+            metadata={
+                "orgId": self.org_id,
+                "agentRunId": handle.run_id,
+                "toolCallId": str(call.id),
+                "toolName": tool.name,
+                "toolSeq": handle.seq,
+                "clientId": client_id,
+                "funnelId": funnel_id,
+                "pageId": page_id,
+            },
+            tags=["agent", "tool_call", tool.name],
+        )
 
         started = time.monotonic()
         try:
-            result = yield from tool.run_stream(ctx=ctx, args=args)
+            with bind_langfuse_trace_context(trace_context):
+                result = yield from tool.run_stream(ctx=ctx, args=args)
         except Exception as exc:  # noqa: BLE001
             duration_ms = int((time.monotonic() - started) * 1000)
             self._calls_repo.finish_call(

@@ -278,6 +278,86 @@ def _is_output_format_unsupported(exc: httpx.HTTPStatusError) -> bool:
         return False
 
 
+def _extract_first_json_object(text: str) -> Dict[str, Any]:
+    """
+    Extract and parse the first top-level JSON object from an arbitrary text blob.
+
+    Claude sometimes returns JSON with minor preambles/suffixes even when structured
+    outputs are requested. This helper avoids failing the entire generation run when
+    the content still includes a valid JSON object.
+    """
+
+    if not isinstance(text, str):
+        raise ValueError("Input text must be a string")
+    raw = text.strip()
+    if not raw:
+        raise ValueError("Input text is empty")
+
+    start: int | None = None
+    depth = 0
+    in_string = False
+    escape = False
+
+    for i, ch in enumerate(raw):
+        if start is None:
+            if ch == "{":
+                start = i
+                depth = 1
+                in_string = False
+                escape = False
+            continue
+
+        if in_string:
+            if escape:
+                escape = False
+                continue
+            if ch == "\\":
+                escape = True
+                continue
+            if ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+            continue
+        if ch == "{":
+            depth += 1
+            continue
+        if ch == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = raw[start : i + 1].strip()
+                parsed = json.loads(candidate)
+                if not isinstance(parsed, dict):
+                    raise ValueError("Extracted JSON was not an object")
+                return parsed
+
+    raise ValueError("Unable to locate a complete JSON object in response text")
+
+
+def _summarize_claude_structured_payload(payload: Any) -> str:
+    if not isinstance(payload, dict):
+        return f"type={type(payload).__name__}"
+
+    model = payload.get("model")
+    stop_reason = payload.get("stop_reason")
+    content = payload.get("content")
+    block_types: list[str] = []
+    text_len = 0
+    if isinstance(content, list):
+        for block in content[:12]:
+            if isinstance(block, dict):
+                block_type = block.get("type")
+                block_types.append(str(block_type) if block_type is not None else "unknown")
+                if block_type == "text":
+                    text_len += len(block.get("text") or "")
+            else:
+                block_types.append(type(block).__name__)
+
+    return f"model={model!r} stop_reason={stop_reason!r} content_types={block_types} text_len={text_len}"
+
+
 def call_claude_structured_message(
     *,
     model: str,
@@ -339,6 +419,7 @@ def call_claude_structured_message(
         parsed = output_block.get("parsed") or output_block.get("data") or output_block.get("content")
 
     text_content = ""
+    stop_reason = payload.get("stop_reason") if isinstance(payload, dict) else None
     if parsed is None:
         content_blocks = payload.get("content") or []
         text_parts: List[str] = []
@@ -350,9 +431,24 @@ def call_claude_structured_message(
             try:
                 parsed = json.loads(text_content)
             except Exception:
-                parsed = None
+                try:
+                    parsed = _extract_first_json_object(text_content)
+                except Exception:
+                    parsed = None
 
     if parsed is None:
-        raise RuntimeError("Claude structured message returned no parsable output")
+        summary = _summarize_claude_structured_payload(payload)
+        if stop_reason == "max_tokens":
+            # This is very often truncated JSON. Surface a clear error so callers can increase max_tokens.
+            raise RuntimeError(
+                "Claude structured message returned non-JSON output (stop_reason=max_tokens). "
+                f"Increase max_tokens. {summary}"
+            )
+
+        head = text_content[:400].replace("\n", "\\n") if text_content else ""
+        raise RuntimeError(
+            "Claude structured message returned no parsable output. "
+            f"{summary} text_head={head!r}"
+        )
 
     return {"parsed": parsed, "raw": payload, "text": text_content}

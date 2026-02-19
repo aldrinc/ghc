@@ -5,6 +5,8 @@ import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
+import queue
+import threading
 from typing import Any, Optional
 
 import httpx
@@ -278,3 +280,82 @@ class TestimonialRenderer:
             return buffer
         finally:
             page.close()
+
+
+@dataclass
+class _RenderRequest:
+    payload: dict[str, Any]
+    response: "queue.Queue[tuple[bool, Any]]"
+
+
+class ThreadedTestimonialRenderer:
+    """
+    Run the synchronous Playwright renderer inside a dedicated thread.
+
+    Playwright's sync API raises if used inside an active asyncio event loop. Temporal workers and
+    other async runtimes can end up invoking this renderer in such a context. By isolating the
+    Playwright sync API to a background thread, we avoid that constraint while keeping the public
+    API synchronous.
+    """
+
+    def __init__(self, *, config: Optional[RenderConfig] = None):
+        self._config = config or RenderConfig()
+        self._requests: "queue.Queue[_RenderRequest | None]" = queue.Queue()
+        self._thread: threading.Thread | None = None
+        self._started = threading.Event()
+        self._start_error: Exception | None = None
+
+    def __enter__(self) -> "ThreadedTestimonialRenderer":
+        def worker() -> None:
+            try:
+                with TestimonialRenderer(config=self._config) as renderer:
+                    self._started.set()
+                    while True:
+                        item = self._requests.get()
+                        if item is None:
+                            return
+                        try:
+                            result = renderer.render_png(item.payload)
+                        except Exception as exc:  # noqa: BLE001
+                            item.response.put((False, exc))
+                        else:
+                            item.response.put((True, result))
+            except Exception as exc:  # noqa: BLE001
+                self._start_error = exc
+                self._started.set()
+                # Best-effort: unblock any callers waiting for a render result.
+                while True:
+                    try:
+                        item = self._requests.get_nowait()
+                    except queue.Empty:
+                        break
+                    if item is None:
+                        continue
+                    item.response.put((False, exc))
+
+        self._thread = threading.Thread(target=worker, name="testimonial-renderer", daemon=True)
+        self._thread.start()
+        self._started.wait()
+        if self._start_error is not None:
+            raise self._start_error
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # noqa: ANN001
+        if self._thread is None:
+            return
+        self._requests.put(None)
+        self._thread.join()
+        self._thread = None
+
+    def render_png(self, payload: dict[str, Any]) -> bytes:
+        if self._thread is None:
+            raise TestimonialRenderError(
+                "ThreadedTestimonialRenderer is not started. Use it as a context manager."
+            )
+
+        response: "queue.Queue[tuple[bool, Any]]" = queue.Queue(maxsize=1)
+        self._requests.put(_RenderRequest(payload=payload, response=response))
+        ok, value = response.get()
+        if ok:
+            return value
+        raise value

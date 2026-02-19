@@ -1,14 +1,9 @@
-"""Compatibility revision for legacy client Shopify default shop migration.
-
-Revision ID: 0046_client_shopify_default_shop
-Revises: 0045_offer_bonuses_and_shopify_product_gid
-Create Date: 2026-02-19 00:00:00.000000
-
-This revision existed in a previous deployment lineage. It is kept as a
-no-op so databases stamped/applied at this revision can continue upgrading.
-"""
+"""Persist explicit default Shopify shop selection per client/user."""
 
 from __future__ import annotations
+
+from alembic import op
+import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "0046_client_shopify_default_shop"
@@ -18,8 +13,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    pass
+    op.add_column("client_user_preferences", sa.Column("selected_shop_domain", sa.Text(), nullable=True))
 
 
 def downgrade() -> None:
-    pass
+    op.drop_column("client_user_preferences", "selected_shop_domain")

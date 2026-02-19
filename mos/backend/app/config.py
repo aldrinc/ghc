@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _backend_root = Path(__file__).resolve().parents[1]
 _project_root = _backend_root.parent.parent
 load_dotenv(_project_root / ".env", override=False)
+# Optional consolidated env (gitignored) used in local dev to store secrets outside repo-tracked env examples.
+load_dotenv(_project_root / ".env.local.consolidated", override=False)
 load_dotenv(_backend_root / ".env", override=True)
 
 
@@ -40,6 +42,16 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str | None = None
     OPENAI_WEBHOOK_SECRET: str | None = None
+    LANGFUSE_ENABLED: bool = False
+    LANGFUSE_PUBLIC_KEY: str | None = None
+    LANGFUSE_SECRET_KEY: str | None = None
+    LANGFUSE_HOST: str = "https://cloud.langfuse.com"
+    LANGFUSE_BASE_URL: str | None = None
+    LANGFUSE_ENVIRONMENT: str | None = None
+    LANGFUSE_RELEASE: str | None = None
+    LANGFUSE_SAMPLE_RATE: float = 1.0
+    LANGFUSE_DEBUG: bool = False
+    LANGFUSE_TIMEOUT_SECONDS: int = 20
 
     # Deploy control plane (Terraform apply + SSH deploy) embedded in the MOS backend.
     # Root folder where plan files and Terraform state will be written.
@@ -52,8 +64,8 @@ class Settings(BaseSettings):
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
-    SHOPIFY_CHECKOUT_APP_BASE_URL: str | None = None
-    SHOPIFY_CHECKOUT_APP_API_TOKEN: str | None = None
+    SHOPIFY_APP_BASE_URL: str | None = None
+    SHOPIFY_INTERNAL_API_TOKEN: str | None = None
     SHOPIFY_ORDER_WEBHOOK_SECRET: str | None = None
 
     META_GRAPH_API_VERSION: str | None = None
