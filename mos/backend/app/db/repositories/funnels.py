@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Optional
 
 from sqlalchemy import select
@@ -23,6 +24,26 @@ from app.db.models import (
 class FunnelsRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
+
+    @staticmethod
+    def _slugify(value: str) -> str:
+        text = (value or "").strip().lower()
+        text = re.sub(r"[^a-z0-9]+", "-", text)
+        text = re.sub(r"-{2,}", "-", text).strip("-")
+        return text or "funnel"
+
+    def _generate_unique_route_slug(self, *, desired_slug: str, exclude_funnel_id: Optional[str] = None) -> str:
+        base = self._slugify(desired_slug)
+        suffix = 0
+        while True:
+            slug = base if suffix == 0 else f"{base}-{suffix + 1}"
+            stmt = select(Funnel.id).where(Funnel.route_slug == slug)
+            if exclude_funnel_id:
+                stmt = stmt.where(Funnel.id != exclude_funnel_id)
+            exists = self.session.execute(stmt).first()
+            if not exists:
+                return slug
+            suffix += 1
 
     def list(
         self,
@@ -56,7 +77,14 @@ class FunnelsRepository:
         stmt = select(Funnel).where(Funnel.public_id == public_id)
         return self.session.scalars(stmt).first()
 
+    def get_by_route_slug(self, *, route_slug: str) -> Optional[Funnel]:
+        stmt = select(Funnel).where(Funnel.route_slug == route_slug)
+        return self.session.scalars(stmt).first()
+
     def create(self, *, org_id: str, client_id: str, name: str, **fields: Any) -> Funnel:
+        raw_route_slug = fields.pop("route_slug", None)
+        desired_slug = str(raw_route_slug or name or "").strip()
+        fields["route_slug"] = self._generate_unique_route_slug(desired_slug=desired_slug)
         funnel = Funnel(org_id=org_id, client_id=client_id, name=name, **fields)
         self.session.add(funnel)
         self.session.commit()

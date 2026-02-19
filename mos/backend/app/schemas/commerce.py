@@ -6,7 +6,7 @@ from pydantic import AnyUrl, BaseModel
 
 
 class PublicCheckoutRequest(BaseModel):
-    publicId: str
+    funnelSlug: str
     variantId: Optional[str] = None
     selection: dict[str, Any]
     quantity: int

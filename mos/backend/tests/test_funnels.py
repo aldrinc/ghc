@@ -6,7 +6,7 @@ from app.db.models import Funnel, FunnelDomain
 from app.services import deploy as deploy_service
 
 
-def _create_publish_ready_funnel(api_client: TestClient, *, funnel_name: str) -> tuple[str, str]:
+def _create_publish_ready_funnel(api_client: TestClient, *, funnel_name: str) -> tuple[str, str, str]:
     client_resp = api_client.post("/clients", json={"name": f"{funnel_name} Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
@@ -21,7 +21,7 @@ def _create_publish_ready_funnel(api_client: TestClient, *, funnel_name: str) ->
     assert funnel_resp.status_code == 201
     funnel = funnel_resp.json()
     funnel_id = funnel["id"]
-    public_id = funnel["public_id"]
+    route_slug = funnel["route_slug"]
 
     page_resp = api_client.post(f"/funnels/{funnel_id}/pages", json={"name": "Landing"})
     assert page_resp.status_code == 201
@@ -43,7 +43,7 @@ def _create_publish_ready_funnel(api_client: TestClient, *, funnel_name: str) ->
     )
     assert save_draft.status_code == 200
 
-    return funnel_id, public_id
+    return funnel_id, route_slug, product_id
 
 from app.db.models import AgentRun, AgentToolCall
 
@@ -63,7 +63,7 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     assert funnel_resp.status_code == 201
     funnel = funnel_resp.json()
     funnel_id = funnel["id"]
-    public_id = funnel["public_id"]
+    route_slug = funnel["route_slug"]
 
     page1_resp = api_client.post(f"/funnels/{funnel_id}/pages", json={"name": "Landing"})
     assert page1_resp.status_code == 201
@@ -106,12 +106,13 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     tool_names = sorted({c.tool_name for c in tool_calls})
     assert tool_names == ["publish.execute", "publish.validate_ready"]
 
-    meta = api_client.get(f"/public/funnels/{public_id}/meta")
+    meta = api_client.get(f"/public/funnels/{route_slug}/meta")
     assert meta.status_code == 200
     assert meta.json()["publicationId"] == publication_id
+    assert meta.json()["funnelSlug"] == route_slug
     assert meta.json()["entrySlug"] == page1["slug"]
 
-    public_page = api_client.get(f"/public/funnels/{public_id}/pages/{page1['slug']}")
+    public_page = api_client.get(f"/public/funnels/{route_slug}/pages/{page1['slug']}")
     assert public_page.status_code == 200
     assert public_page.json()["slug"] == page1["slug"]
     assert public_page.json()["puckData"]["content"][0]["props"]["text"] == "Published"
@@ -128,7 +129,7 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
         },
     )
     assert save_new_draft.status_code == 200
-    public_page_after = api_client.get(f"/public/funnels/{public_id}/pages/{page1['slug']}")
+    public_page_after = api_client.get(f"/public/funnels/{route_slug}/pages/{page1['slug']}")
     assert public_page_after.status_code == 200
     assert public_page_after.json()["puckData"]["content"][0]["props"]["text"] == "Published"
 
@@ -145,17 +146,17 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     publication_id_2 = publish2.json()["publicationId"]
     assert publication_id_2 != publication_id
 
-    redirect = api_client.get(f"/public/funnels/{public_id}/pages/{page1['slug']}")
+    redirect = api_client.get(f"/public/funnels/{route_slug}/pages/{page1['slug']}")
     assert redirect.status_code == 200
     assert redirect.json()["redirectToSlug"] == new_slug
 
-    meta2 = api_client.get(f"/public/funnels/{public_id}/meta").json()
+    meta2 = api_client.get(f"/public/funnels/{route_slug}/meta").json()
     assert meta2["publicationId"] == publication_id_2
     assert meta2["entrySlug"] == new_slug
 
     disable = api_client.post(f"/funnels/{funnel_id}/disable")
     assert disable.status_code == 200
-    disabled_meta = api_client.get(f"/public/funnels/{public_id}/meta")
+    disabled_meta = api_client.get(f"/public/funnels/{route_slug}/meta")
     assert disabled_meta.status_code == 410
 
 
@@ -174,7 +175,7 @@ def test_funnel_public_preview_allows_approved_pages_before_publish(api_client: 
     assert funnel_resp.status_code == 201
     funnel = funnel_resp.json()
     funnel_id = funnel["id"]
-    public_id = funnel["public_id"]
+    route_slug = funnel["route_slug"]
 
     page1_resp = api_client.post(f"/funnels/{funnel_id}/pages", json={"name": "Landing"})
     assert page1_resp.status_code == 201
@@ -202,21 +203,21 @@ def test_funnel_public_preview_allows_approved_pages_before_publish(api_client: 
     )
     assert save_draft.status_code == 200
 
-    meta = api_client.get(f"/public/funnels/{public_id}/meta")
+    meta = api_client.get(f"/public/funnels/{route_slug}/meta")
     assert meta.status_code == 200
     assert meta.json()["publicationId"] == funnel_id
     assert meta.json()["entrySlug"] == page1["slug"]
     assert {"pageId": page1_id, "slug": page1["slug"]} in meta.json()["pages"]
     assert {"pageId": page2_id, "slug": page2["slug"]} in meta.json()["pages"]
 
-    public_page = api_client.get(f"/public/funnels/{public_id}/pages/{page1['slug']}")
+    public_page = api_client.get(f"/public/funnels/{route_slug}/pages/{page1['slug']}")
     assert public_page.status_code == 200
     assert public_page.json()["publicationId"] == funnel_id
     assert public_page.json()["slug"] == page1["slug"]
     assert public_page.json()["puckData"]["content"][0]["props"]["text"] == "Preview"
 
     # Preview mode: pages with drafts are available on the internal preview URL even before publish.
-    page2_preview = api_client.get(f"/public/funnels/{public_id}/pages/{page2['slug']}")
+    page2_preview = api_client.get(f"/public/funnels/{route_slug}/pages/{page2['slug']}")
     assert page2_preview.status_code == 200
 
 
@@ -234,9 +235,9 @@ def test_public_funnel_commerce_requires_offers(api_client: TestClient):
         json={"clientId": client_id, "productId": product_id, "name": "Commerce Funnel"},
     )
     assert funnel_resp.status_code == 201
-    public_id = funnel_resp.json()["public_id"]
+    route_slug = funnel_resp.json()["route_slug"]
 
-    commerce_resp = api_client.get(f"/public/funnels/{public_id}/commerce")
+    commerce_resp = api_client.get(f"/public/funnels/{route_slug}/commerce")
     assert commerce_resp.status_code == 409
     assert commerce_resp.json()["detail"] == "Product variants are not configured for this funnel product."
 
@@ -267,9 +268,9 @@ def test_public_funnel_commerce_requires_price_points(api_client: TestClient):
         json={"clientId": client_id, "productId": product_id, "name": "Commerce Funnel"},
     )
     assert funnel_resp.status_code == 201
-    public_id = funnel_resp.json()["public_id"]
+    route_slug = funnel_resp.json()["route_slug"]
 
-    commerce_resp = api_client.get(f"/public/funnels/{public_id}/commerce")
+    commerce_resp = api_client.get(f"/public/funnels/{route_slug}/commerce")
     assert commerce_resp.status_code == 200
     payload = commerce_resp.json()
     assert payload["product"]["variants_count"] == 1
@@ -303,9 +304,9 @@ def test_public_funnel_commerce_returns_offers_and_price_points(api_client: Test
         json={"clientId": client_id, "productId": product_id, "name": "Commerce Funnel"},
     )
     assert funnel_resp.status_code == 201
-    public_id = funnel_resp.json()["public_id"]
+    route_slug = funnel_resp.json()["route_slug"]
 
-    commerce_resp = api_client.get(f"/public/funnels/{public_id}/commerce")
+    commerce_resp = api_client.get(f"/public/funnels/{route_slug}/commerce")
     assert commerce_resp.status_code == 200
     payload = commerce_resp.json()
     assert payload["product"]["variants_count"] == 1
@@ -314,7 +315,7 @@ def test_public_funnel_commerce_returns_offers_and_price_points(api_client: Test
 
 
 def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client: TestClient, monkeypatch):
-    funnel_id, public_id = _create_publish_ready_funnel(api_client, funnel_name="Deploy Funnel")
+    funnel_id, _route_slug, product_id = _create_publish_ready_funnel(api_client, funnel_name="Deploy Funnel")
 
     captured: dict[str, object] = {}
 
@@ -368,11 +369,11 @@ def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client:
     deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
     assert workload_patch["source_type"] == "funnel_artifact"
-    assert workload_patch["source_ref"]["public_id"] == public_id
+    assert workload_patch["source_ref"]["product_id"] == product_id
     assert workload_patch["source_ref"]["upstream_api_base_root"] == "https://moshq.app/api"
     assert workload_patch["source_ref"]["runtime_dist_path"] == "mos/frontend/dist"
-    assert workload_patch["source_ref"]["artifact"]["meta"]["publicId"] == public_id
-    assert workload_patch["source_ref"]["artifact"]["pages"] == {}
+    assert workload_patch["source_ref"]["artifact"]["meta"]["productId"] == product_id
+    assert workload_patch["source_ref"]["artifact"]["funnels"] == {}
     assert workload_patch["service_config"]["server_names"] == ["landing.example.com"]
     assert deploy_request["plan_path"] is None
     assert deploy_request["instance_name"] == "mos-ghc-1"
@@ -387,7 +388,7 @@ def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitte
     db_session,
     monkeypatch,
 ):
-    funnel_id, public_id = _create_publish_ready_funnel(api_client, funnel_name="Domain Deploy Funnel")
+    funnel_id, _route_slug, product_id = _create_publish_ready_funnel(api_client, funnel_name="Domain Deploy Funnel")
 
     funnel = db_session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
     assert funnel is not None
@@ -440,14 +441,14 @@ def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitte
 
     deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
-    assert workload_patch["source_ref"]["public_id"] == public_id
+    assert workload_patch["source_ref"]["product_id"] == product_id
     assert workload_patch["service_config"]["server_names"] == ["offers.example.com"]
     assert deploy_request["apply_plan"] is False
     assert captured["access_urls"] == ["https://offers.example.com/"]
 
 
 def test_publish_with_deploy_allows_no_server_names(api_client: TestClient, monkeypatch):
-    funnel_id, _ = _create_publish_ready_funnel(api_client, funnel_name="Missing Domain Deploy Funnel")
+    funnel_id, _, _ = _create_publish_ready_funnel(api_client, funnel_name="Missing Domain Deploy Funnel")
 
     captured: dict[str, object] = {}
 
@@ -495,7 +496,7 @@ def test_publish_with_deploy_allows_no_server_names(api_client: TestClient, monk
 
 
 def test_get_funnel_publish_job_status(api_client: TestClient, monkeypatch):
-    funnel_id, _ = _create_publish_ready_funnel(api_client, funnel_name="Publish Job Status Funnel")
+    funnel_id, _, _ = _create_publish_ready_funnel(api_client, funnel_name="Publish Job Status Funnel")
 
     def fake_get_funnel_publish_job(*, job_id=None, org_id=None, funnel_id=None):
         assert job_id == "publish-job-789"
@@ -521,7 +522,7 @@ def test_get_funnel_publish_job_status(api_client: TestClient, monkeypatch):
 
 
 def test_get_funnel_deploy_job_status(api_client: TestClient, monkeypatch):
-    funnel_id, _ = _create_publish_ready_funnel(api_client, funnel_name="Deploy Job Status Funnel")
+    funnel_id, _, _ = _create_publish_ready_funnel(api_client, funnel_name="Deploy Job Status Funnel")
 
     def fake_get_apply_plan_job(*, job_id=None):
         assert job_id == "job-789"

@@ -14,6 +14,7 @@ export type Funnel = {
   name: string;
   description: string | null;
   status: FunnelStatus;
+  route_slug: string;
   public_id: string;
   entry_page_id: string | null;
   active_publication_id: string | null;
@@ -61,7 +62,7 @@ export type FunnelPageDetail = {
 };
 
 export type PublicFunnelMeta = {
-  publicId: string;
+  funnelSlug: string;
   funnelId: string;
   publicationId: string;
   entrySlug: string;

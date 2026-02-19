@@ -73,7 +73,7 @@ class FunnelPageSaveDraftRequest(BaseModel):
 
 
 class PublicFunnelMetaResponse(BaseModel):
-    publicId: str
+    funnelSlug: str
     funnelId: str
     publicationId: str
     entrySlug: str

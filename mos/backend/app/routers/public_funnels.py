@@ -39,9 +39,9 @@ from app.services.shopify_checkout import create_shopify_checkout
 router = APIRouter(prefix="/public", tags=["public"])
 
 
-def _get_funnel_or_404(*, session: Session, public_id: str) -> Funnel:
+def _get_funnel_or_404(*, session: Session, funnel_slug: str) -> Funnel:
     funnels_repo = FunnelsRepository(session)
-    funnel = funnels_repo.get_by_public_id(public_id=public_id)
+    funnel = funnels_repo.get_by_route_slug(route_slug=funnel_slug)
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
     if funnel.status == FunnelStatusEnum.disabled:
@@ -130,14 +130,14 @@ def _preview_page_map(*, session: Session, funnel_id: str) -> dict[str, str]:
     return {str(page.id): page.slug for page in pages if str(page.id) in preview_page_ids}
 
 
-@router.get("/funnels/{public_id}/meta")
+@router.get("/funnels/{funnel_slug}/meta")
 def public_funnel_meta(
-    public_id: str,
+    funnel_slug: str,
     response: Response,
     session: Session = Depends(get_session),
 ):
     public_repo = FunnelPublicRepository(session)
-    funnel = _get_funnel_or_404(session=session, public_id=public_id)
+    funnel = _get_funnel_or_404(session=session, funnel_slug=funnel_slug)
 
     publication_id = _publication_id_for_public_response(funnel)
     if funnel.active_publication_id:
@@ -157,7 +157,7 @@ def public_funnel_meta(
 
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         return {
-            "publicId": str(funnel.public_id),
+            "funnelSlug": str(funnel.route_slug),
             "funnelId": str(funnel.id),
             "publicationId": publication_id,
             "entrySlug": entry_slug,
@@ -174,7 +174,7 @@ def public_funnel_meta(
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
-        "publicId": str(funnel.public_id),
+        "funnelSlug": str(funnel.route_slug),
         "funnelId": str(funnel.id),
         "publicationId": publication_id,
         "entrySlug": entry_slug,
@@ -182,15 +182,15 @@ def public_funnel_meta(
     }
 
 
-@router.get("/funnels/{public_id}/pages/{slug}")
+@router.get("/funnels/{funnel_slug}/pages/{slug}")
 def public_funnel_page(
-    public_id: str,
+    funnel_slug: str,
     slug: str,
     response: Response,
     session: Session = Depends(get_session),
 ):
     public_repo = FunnelPublicRepository(session)
-    funnel = _get_funnel_or_404(session=session, public_id=public_id)
+    funnel = _get_funnel_or_404(session=session, funnel_slug=funnel_slug)
 
     publication_id = _publication_id_for_public_response(funnel)
     if funnel.active_publication_id:
@@ -269,13 +269,13 @@ def public_funnel_page(
     }
 
 
-@router.get("/funnels/{public_id}/graph")
+@router.get("/funnels/{funnel_slug}/graph")
 def public_funnel_graph(
-    public_id: str,
+    funnel_slug: str,
     response: Response,
     session: Session = Depends(get_session),
 ):
-    funnel = _get_funnel_or_404(session=session, public_id=public_id)
+    funnel = _get_funnel_or_404(session=session, funnel_slug=funnel_slug)
     public_repo = FunnelPublicRepository(session)
     publication_id = _publication_id_for_public_response(funnel)
     if funnel.active_publication_id:
@@ -288,7 +288,7 @@ def public_funnel_graph(
         links = public_repo.list_publication_links(publication_id=str(funnel.active_publication_id))
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         return {
-            "publicId": str(funnel.public_id),
+            "funnelSlug": str(funnel.route_slug),
             "funnelId": str(funnel.id),
             "publicationId": publication_id,
             "entryPageId": str(publication.entry_page_id),
@@ -305,7 +305,7 @@ def public_funnel_graph(
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
-        "publicId": str(funnel.public_id),
+        "funnelSlug": str(funnel.route_slug),
         "funnelId": str(funnel.id),
         "publicationId": publication_id,
         "entryPageId": str(funnel.entry_page_id),
@@ -314,13 +314,13 @@ def public_funnel_graph(
     }
 
 
-@router.get("/funnels/{public_id}/commerce")
+@router.get("/funnels/{funnel_slug}/commerce")
 def public_funnel_commerce(
-    public_id: str,
+    funnel_slug: str,
     response: Response,
     session: Session = Depends(get_session),
 ):
-    funnel = _get_funnel_or_404(session=session, public_id=public_id)
+    funnel = _get_funnel_or_404(session=session, funnel_slug=funnel_slug)
     if not funnel.product_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -350,7 +350,7 @@ def public_funnel_commerce(
 
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
-        "publicId": str(funnel.public_id),
+        "funnelSlug": str(funnel.route_slug),
         "funnelId": str(funnel.id),
         "product": {
             **jsonable_encoder(product),
@@ -369,7 +369,7 @@ def public_checkout(
     if payload.quantity < 1:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="quantity must be >= 1")
 
-    funnel = _get_funnel_or_404(session=session, public_id=payload.publicId)
+    funnel = _get_funnel_or_404(session=session, funnel_slug=payload.funnelSlug)
     if not funnel.product_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -424,7 +424,7 @@ def public_checkout(
             detail="Variant provider is required for checkout.",
         )
     metadata = {
-        "public_id": _metadata_value(payload.publicId, "publicId"),
+        "funnel_slug": _metadata_value(payload.funnelSlug, "funnelSlug"),
         "funnel_id": _metadata_value(str(funnel.id), "funnelId"),
         "offer_id": _metadata_value(str(funnel.selected_offer_id), "offerId") if funnel.selected_offer_id else None,
         "variant_id": _metadata_value(str(variant.id), "variantId"),

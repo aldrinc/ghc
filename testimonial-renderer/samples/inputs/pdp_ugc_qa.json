@@ -1,0 +1,32 @@
+{
+  "template": "pdp_ugc_qa",
+  "output": {
+    "preset": "tiktok"
+  },
+  "brand": {
+    "logoText": "SampleLogo",
+    "stripBgColor": "#7c2d12",
+    "stripTextColor": "#ffffff"
+  },
+  "rating": {
+    "valueText": "4.8/5",
+    "detailText": "Rated by 5,000+ Customers"
+  },
+  "cta": {
+    "text": "LIMITED TIME OFFER!"
+  },
+  "background": {
+    "imageUrl": "../assets/hero-pads.svg",
+    "alt": "Sample background"
+  },
+  "question": {
+    "handle": "question_handle",
+    "text": "YOUR QUESTION HERE"
+  },
+  "answer": {
+    "handle": "brand_handle",
+    "text": "YOUR ANSWER HERE",
+    "verified": true
+  }
+}
+

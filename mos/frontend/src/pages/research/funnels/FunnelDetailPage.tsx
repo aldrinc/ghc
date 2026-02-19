@@ -45,6 +45,12 @@ type DeployJobStatusResponse = {
   error?: string | null;
 };
 
+function artifactForTemplate(templateId: string | null | undefined): "presales" | "sales" | null {
+  if (templateId === "pre-sales-listicle") return "presales";
+  if (templateId === "sales-pdp") return "sales";
+  return null;
+}
+
 export function FunnelDetailPage() {
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
@@ -117,9 +123,36 @@ export function FunnelDetailPage() {
     navigate(`/research/funnels/${funnelId}/pages/${page.id}`);
   };
 
-  const publicBase = funnel?.public_id ? `/f/${funnel.public_id}` : null;
+  const publicBase = funnel?.route_slug ? `/f/${funnel.route_slug}` : null;
   const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
-  const deployWorkloadName = funnel?.public_id ? `funnel-${funnel.public_id}` : undefined;
+  const deployWorkloadName = funnel?.product_id ? `product-funnels-${funnel.product_id}` : undefined;
+  const entryArtifact = useMemo(() => {
+    if (!funnel?.entry_page_id || !funnel.pages?.length) return null;
+    const entryPage = funnel.pages.find((page) => page.id === funnel.entry_page_id);
+    return artifactForTemplate(entryPage?.template_id);
+  }, [funnel?.entry_page_id, funnel?.pages]);
+  const deployedPageUrl = useMemo(() => {
+    if (!funnel?.route_slug || !entryArtifact) return null;
+
+    const accessCandidate =
+      (deployJob?.accessUrl || "").trim() ||
+      (() => {
+        const host = deployDomains.data?.server_names?.[0];
+        if (!host) return "";
+        const scheme = deployDomains.data?.https ? "https" : "http";
+        return `${scheme}://${host}/`;
+      })();
+
+    const baseUrl = accessCandidate || `${window.location.origin}/`;
+    const normalizedBase = baseUrl.replace(/\/+$/, "");
+    return `${normalizedBase}/${encodeURIComponent(funnel.route_slug)}/${encodeURIComponent(entryArtifact)}`;
+  }, [
+    deployDomains.data?.https,
+    deployDomains.data?.server_names,
+    deployJob?.accessUrl,
+    entryArtifact,
+    funnel?.route_slug,
+  ]);
 
   const deployDomains = useDeployWorkloadDomains({
     workloadName: deployWorkloadName,
@@ -254,7 +287,7 @@ export function FunnelDetailPage() {
       };
     } = {
       deploy: {
-        workloadName: `funnel-${funnel.public_id}`,
+        workloadName: `product-funnels-${funnel.product_id || funnel.id}`,
         createIfMissing: true,
         applyPlan: true,
       },
@@ -329,9 +362,9 @@ export function FunnelDetailPage() {
             <Button variant="secondary" size="sm" onClick={() => setIsPageModalOpen(true)} disabled={!funnelId || !funnel}>
               New page
             </Button>
-            {deployJob?.status === "succeeded" && deployJob.accessUrl ? (
+            {funnel?.status === "published" && deployedPageUrl ? (
               <Button variant="secondary" size="sm" asChild>
-                <a href={deployJob.accessUrl} target="_blank" rel="noreferrer">
+                <a href={deployedPageUrl} target="_blank" rel="noreferrer">
                   Open Deployed Page
                 </a>
               </Button>

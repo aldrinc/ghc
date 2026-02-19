@@ -558,10 +558,8 @@ WantedBy=multi-user.target
         )
         self.run(f"python3 -c {shlex.quote(script)}")
 
-    def _inject_funnel_runtime_config(self, *, site_dir: str, public_id: str) -> None:
-        if not public_id:
-            raise ValueError("public_id is required for runtime config injection.")
-        config_json = json.dumps({"publicId": public_id, "rootDomainMode": True}, separators=(",", ":"))
+    def _inject_funnel_runtime_config(self, *, site_dir: str) -> None:
+        config_json = json.dumps({"bundleMode": True}, separators=(",", ":"))
         block = (
             "<!-- MOS_DEPLOY_RUNTIME_START -->"
             f"<script>window.__MOS_DEPLOY_RUNTIME__={config_json};</script>"
@@ -591,37 +589,54 @@ WantedBy=multi-user.target
     def _write_funnel_artifact_payload(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
         artifact = source.artifact or {}
         meta = artifact.get("meta")
-        pages = artifact.get("pages")
-        commerce = artifact.get("commerce")
+        funnels = artifact.get("funnels")
         if not isinstance(meta, dict):
             raise ValueError("source_ref.artifact.meta must be an object.")
-        if not isinstance(pages, dict):
-            raise ValueError("source_ref.artifact.pages must be an object.")
+        if not isinstance(funnels, dict):
+            raise ValueError("source_ref.artifact.funnels must be an object.")
 
-        public_id = source.public_id.strip()
-        if not public_id:
-            raise ValueError("source_ref.public_id must be non-empty.")
+        base_root = f"{site_dir}/api/public/funnels"
+        self.run(f"mkdir -p {shlex.quote(base_root)}")
 
-        base_dir = f"{site_dir}/api/public/funnels/{public_id}"
-        pages_dir = f"{base_dir}/pages"
-        self.run(f"mkdir -p {shlex.quote(pages_dir)}")
-        self.upload_file(json.dumps(meta, ensure_ascii=False), f"{base_dir}/meta.json")
-
-        if isinstance(commerce, dict):
-            self.upload_file(json.dumps(commerce, ensure_ascii=False), f"{base_dir}/commerce.json")
-
-        for raw_slug, page_payload in pages.items():
-            slug = str(raw_slug or "").strip()
-            if not slug:
+        for raw_funnel_slug, funnel_payload in funnels.items():
+            funnel_slug = str(raw_funnel_slug or "").strip()
+            if not funnel_slug:
                 continue
-            if "/" in slug or "\\" in slug:
-                raise ValueError(f"Invalid artifact page slug '{slug}'.")
-            if not isinstance(page_payload, dict):
-                raise ValueError(f"Artifact page payload for slug '{slug}' must be an object.")
-            self.upload_file(
-                json.dumps(page_payload, ensure_ascii=False),
-                f"{pages_dir}/{slug}.json",
-            )
+            if "/" in funnel_slug or "\\" in funnel_slug:
+                raise ValueError(f"Invalid artifact funnel slug '{funnel_slug}'.")
+            if not isinstance(funnel_payload, dict):
+                raise ValueError(f"Artifact funnel payload for '{funnel_slug}' must be an object.")
+
+            funnel_meta = funnel_payload.get("meta")
+            pages = funnel_payload.get("pages")
+            commerce = funnel_payload.get("commerce")
+            if not isinstance(funnel_meta, dict):
+                raise ValueError(f"Artifact funnel '{funnel_slug}' is missing a meta object.")
+            if not isinstance(pages, dict):
+                raise ValueError(f"Artifact funnel '{funnel_slug}' is missing a pages object.")
+
+            base_dir = f"{base_root}/{funnel_slug}"
+            pages_dir = f"{base_dir}/pages"
+            self.run(f"mkdir -p {shlex.quote(pages_dir)}")
+            self.upload_file(json.dumps(funnel_meta, ensure_ascii=False), f"{base_dir}/meta.json")
+
+            if isinstance(commerce, dict):
+                self.upload_file(json.dumps(commerce, ensure_ascii=False), f"{base_dir}/commerce.json")
+
+            for raw_page_slug, page_payload in pages.items():
+                page_slug = str(raw_page_slug or "").strip()
+                if not page_slug:
+                    continue
+                if "/" in page_slug or "\\" in page_slug:
+                    raise ValueError(f"Invalid artifact page slug '{page_slug}' for funnel '{funnel_slug}'.")
+                if not isinstance(page_payload, dict):
+                    raise ValueError(
+                        f"Artifact page payload for '{funnel_slug}/{page_slug}' must be an object."
+                    )
+                self.upload_file(
+                    json.dumps(page_payload, ensure_ascii=False),
+                    f"{pages_dir}/{page_slug}.json",
+                )
 
     def _configure_funnel_artifact_site(self, app: ApplicationSpec):
         source = app.source_ref
@@ -661,7 +676,7 @@ WantedBy=multi-user.target
                 self._upload_local_directory(local_dir=local_dist, remote_dir=cached_runtime_dir)
             cached_runtime_q = shlex.quote(cached_runtime_dir)
             self.run(f"cp -R {cached_runtime_q}/. {site_dir_q}/")
-        self._inject_funnel_runtime_config(site_dir=site_dir, public_id=source.public_id)
+        self._inject_funnel_runtime_config(site_dir=site_dir)
         self._replace_api_base_tokens(site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root)
         self._write_funnel_artifact_payload(site_dir=site_dir, source=source)
 
@@ -678,7 +693,6 @@ WantedBy=multi-user.target
                 )
             listen_port = int(ports[0])
 
-        public_id = source.public_id
         conf = f"""server {{
     listen {listen_port};
     server_name {server_name_line};
@@ -698,7 +712,7 @@ WantedBy=multi-user.target
         return 204;
     }}
 
-    location ^~ /api/public/funnels/{public_id}/ {{
+    location ^~ /api/public/funnels/ {{
         default_type application/json;
         try_files $uri.json =404;
     }}

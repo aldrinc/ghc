@@ -24,7 +24,7 @@ import { ProductProvider } from "@/contexts/ProductContext";
 import { ClaudeChatPage } from "@/pages/claude/ClaudeChatPage";
 import { PublicFunnelEntryRedirectPage } from "@/pages/public/PublicFunnelEntryRedirectPage";
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
-import { getStandalonePublicId } from "@/funnels/runtimeRouting";
+import { isStandaloneBundleMode } from "@/funnels/runtimeRouting";
 
 function RequireAuth({ children }: { children: ReactNode }) {
   return (
@@ -42,17 +42,18 @@ function RequireAuth({ children }: { children: ReactNode }) {
 }
 
 function App() {
-  const standalonePublicId = getStandalonePublicId();
+  const standaloneBundleMode = isStandaloneBundleMode();
 
   return (
     <BrowserRouter>
       <Routes>
-        {standalonePublicId ? <Route path="/" element={<PublicFunnelPage />} /> : null}
-        {standalonePublicId ? <Route path="/:slug" element={<PublicFunnelPage />} /> : null}
-        <Route path="/f/:publicId" element={<PublicFunnelEntryRedirectPage />} />
-        <Route path="/f/:publicId/:slug" element={<PublicFunnelPage />} />
-        {standalonePublicId ? null : <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />}
-        {standalonePublicId ? null : (
+        {standaloneBundleMode ? <Route path="/" element={<PublicFunnelPage />} /> : null}
+        {standaloneBundleMode ? <Route path="/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} /> : null}
+        {standaloneBundleMode ? <Route path="/:funnelSlug/:slug" element={<PublicFunnelPage />} /> : null}
+        <Route path="/f/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />
+        <Route path="/f/:funnelSlug/:slug" element={<PublicFunnelPage />} />
+        {standaloneBundleMode ? null : <Route path="/sign-in/*" element={<SignIn routing="path" path="/sign-in" />} />}
+        {standaloneBundleMode ? null : (
           <Route
             path="/workspaces"
             element={
@@ -62,7 +63,7 @@ function App() {
             }
           />
         )}
-        {standalonePublicId ? null : (
+        {standaloneBundleMode ? null : (
           <Route
             path="/workspaces/new"
             element={
@@ -72,7 +73,7 @@ function App() {
             }
           />
         )}
-        {standalonePublicId ? null : (
+        {standaloneBundleMode ? null : (
           <Route
             path="/"
             element={
@@ -104,7 +105,7 @@ function App() {
             <Route path="campaigns/:campaignId" element={<CampaignDetailPage />} />
           </Route>
         )}
-        <Route path="*" element={<Navigate to={standalonePublicId ? "/" : "/workspaces"} replace />} />
+        <Route path="*" element={<Navigate to={standaloneBundleMode ? "/" : "/workspaces"} replace />} />
       </Routes>
     </BrowserRouter>
   );

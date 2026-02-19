@@ -82,11 +82,11 @@ export function FunnelPageEditorPage() {
     return page ? `${page.name} (${page.slug})` : "Page";
   }, [funnel?.pages, pageId]);
   const publicPageHref = useMemo(() => {
-    const publicId = (funnel?.public_id || "").trim();
+    const funnelSlug = (funnel?.route_slug || "").trim();
     const slug = (metaSlug || pageDetail?.page.slug || "").trim();
-    if (!publicId || !slug) return null;
-    return buildPublicFunnelPath({ publicId, slug, rootMode: false });
-  }, [funnel?.public_id, metaSlug, pageDetail?.page.slug]);
+    if (!funnelSlug || !slug) return null;
+    return buildPublicFunnelPath({ funnelSlug, slug, bundleMode: false });
+  }, [funnel?.route_slug, metaSlug, pageDetail?.page.slug]);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
   const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
@@ -275,7 +275,7 @@ export function FunnelPageEditorPage() {
           <div className="ds-card ds-card--md p-0 overflow-hidden">
             <FunnelRuntimeProvider
               value={{
-                publicId: funnel?.public_id ?? "",
+                funnelSlug: funnel?.route_slug ?? "",
                 pageMap: runtimePageMap,
                 pageId: pageDetail.page.id,
                 nextPageId: pageDetail.page.next_page_id ?? null,

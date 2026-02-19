@@ -115,7 +115,7 @@ export function FunnelsPage() {
                       </div>
                     </div>
                     <div className="text-xs text-content-muted">
-                      Public: <span className="font-mono">/f/{funnel.public_id}</span>
+                      Public: <span className="font-mono">/f/{funnel.route_slug}</span>
                     </div>
                   </div>
                 </li>

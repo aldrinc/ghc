@@ -1,6 +1,6 @@
 type DeployRuntimeConfig = {
-  publicId?: string;
-  rootDomainMode?: boolean;
+  funnelSlug?: string;
+  bundleMode?: boolean;
 };
 
 declare global {
@@ -20,55 +20,41 @@ function getDeployRuntimeConfig(): DeployRuntimeConfig {
   return candidate;
 }
 
-export function getStandalonePublicId(): string | null {
-  const publicId = (getDeployRuntimeConfig().publicId || "").trim();
-  return publicId || null;
+export function isStandaloneBundleMode(): boolean {
+  return Boolean(getDeployRuntimeConfig().bundleMode);
 }
 
-export function isStandaloneRootModeForPublicId(publicId: string | null | undefined): boolean {
-  const cfg = getDeployRuntimeConfig();
-  if (!cfg.rootDomainMode) {
-    return false;
-  }
-  const runtimePublicId = (cfg.publicId || "").trim();
-  if (!runtimePublicId) {
-    return false;
-  }
-  if (!publicId) {
-    return true;
-  }
-  return runtimePublicId === publicId;
+export function getStandaloneFunnelSlug(): string | null {
+  const funnelSlug = (getDeployRuntimeConfig().funnelSlug || "").trim();
+  return funnelSlug || null;
 }
 
 export function buildPublicFunnelPath(
   {
-    publicId,
+    funnelSlug,
     slug,
-    entrySlug,
-    rootMode,
+    bundleMode,
   }: {
-    publicId: string;
+    funnelSlug: string;
     slug?: string | null;
-    entrySlug?: string | null;
-    rootMode: boolean;
+    bundleMode: boolean;
   },
 ): string {
-  const normalizedPublicId = (publicId || "").trim();
-  if (!normalizedPublicId) {
+  const normalizedFunnelSlug = (funnelSlug || "").trim();
+  if (!normalizedFunnelSlug) {
     return "/";
   }
 
   const normalizedSlug = (slug || "").trim();
-  const normalizedEntrySlug = (entrySlug || "").trim();
-  if (rootMode) {
-    if (!normalizedSlug || (normalizedEntrySlug && normalizedSlug === normalizedEntrySlug)) {
-      return "/";
+  if (bundleMode) {
+    if (!normalizedSlug) {
+      return `/${encodeURIComponent(normalizedFunnelSlug)}`;
     }
-    return `/${encodeURIComponent(normalizedSlug)}`;
+    return `/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
   }
 
   if (!normalizedSlug) {
-    return `/f/${encodeURIComponent(normalizedPublicId)}`;
+    return `/f/${encodeURIComponent(normalizedFunnelSlug)}`;
   }
-  return `/f/${encodeURIComponent(normalizedPublicId)}/${encodeURIComponent(normalizedSlug)}`;
+  return `/f/${encodeURIComponent(normalizedFunnelSlug)}/${encodeURIComponent(normalizedSlug)}`;
 }

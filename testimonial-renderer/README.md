@@ -66,6 +66,34 @@ npx playwright install chromium
 }
 ```
 
+```json
+{
+  "template": "pdp_ugc_standard",
+  "output": {
+    "preset": "tiktok"
+  },
+  "brand": {
+    "logoText": "SampleLogo",
+    "stripBgColor": "#be3b7a",
+    "stripTextColor": "#ffffff"
+  },
+  "rating": {
+    "valueText": "4.9/5",
+    "detailText": "Rated by 10,000+ Customers"
+  },
+  "cta": {
+    "text": "BUY ONE, GET ONE FREE TODAY!"
+  },
+  "background": {
+    "imageUrl": "./samples/assets/hero-puppies.svg"
+  },
+  "comment": {
+    "handle": "your_handle",
+    "text": "YOUR COMMENT TEXT HERE"
+  }
+}
+```
+
 ### Template requirements
 
 - `review_card`
@@ -77,6 +105,27 @@ npx playwright install chromium
   - Each comment requires: `name`, `text`, `avatarUrl`, `meta`
   - `meta` requires: `time`; optional: `followLabel`, `authorLabel`
   - Optional per comment: `reactionCount`, `attachmentUrl`, `viewRepliesText`, `replies[]`
+- PDP templates
+  - `pdp_ugc_standard`, `pdp_bold_claim`, `pdp_personal_highlight`
+    - Required: `brand`, `rating`, `cta`, `background`, `comment`
+    - Optional: `output` (defaults to TikTok preset)
+  - `pdp_ugc_qa`
+    - Required: `brand`, `rating`, `cta`, `background`, `question`, `answer`
+    - Optional: `output` (defaults to TikTok preset)
+
+### PDP output presets
+
+- `output.preset: "tiktok"` (default): 1080x1920 (9:16)
+- `output.preset: "feed"`: 1080x1350 (4:5)
+
+### PDP background generation (Nano Banana)
+
+If you omit `background.imageUrl`, the service will generate the background image via Nano Banana when you provide **either**:
+
+- `background.prompt` (string), or
+- `background.promptVars` (object: `product` required; optional `scene`, `subject`, `extra`, `avoid[]`)
+
+This requires `GEMINI_API_KEY` and a configured model (`NANO_BANANA_MODEL` or `background.imageModel` / `imageModel`).
 
 ### Validation rules
 
@@ -89,6 +138,8 @@ npx playwright install chromium
 - `reactionCount` must be a non-negative integer when provided.
 - `followLabel`/`authorLabel` max length: 24 characters.
 - Image paths must resolve to an existing file (or a valid HTTP/HTTPS URL).
+- PDP templates require `brand.logoUrl` or `brand.logoText`.
+- PDP `brand.stripBgColor` / `brand.stripTextColor` must be hex colors like `#fff` or `#ffffff`.
 
 ## Render a single image
 
@@ -126,6 +177,10 @@ See `samples/inputs/nano_banana_flow.json` for the full schema.
 
 - `src/templates/review_card.html`
 - `src/templates/social_comment.html`
+- `src/templates/pdp_ugc_standard.html`
+- `src/templates/pdp_ugc_qa.html`
+- `src/templates/pdp_bold_claim.html`
+- `src/templates/pdp_personal_highlight.html`
 
 ## Samples
 

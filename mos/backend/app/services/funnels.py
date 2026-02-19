@@ -127,6 +127,22 @@ def generate_unique_slug(
         suffix += 1
 
 
+def generate_unique_funnel_route_slug(
+    session: Session, *, desired_slug: str, exclude_funnel_id: Optional[str] = None
+) -> str:
+    base = slugify(desired_slug) or "funnel"
+    suffix = 0
+    while True:
+        slug = base if suffix == 0 else f"{base}-{suffix + 1}"
+        stmt = select(Funnel.id).where(Funnel.route_slug == slug)
+        if exclude_funnel_id:
+            stmt = stmt.where(Funnel.id != exclude_funnel_id)
+        exists = session.execute(stmt).first()
+        if not exists:
+            return slug
+        suffix += 1
+
+
 def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: str) -> FunnelPublication:
     funnel = session.scalars(select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)).first()
     if not funnel:
@@ -289,6 +305,7 @@ def duplicate_funnel(
         name=name or f"{source.name} (Copy)",
         description=source.description,
         status=FunnelStatusEnum.draft,
+        route_slug=generate_unique_funnel_route_slug(session, desired_slug=name or f"{source.name} (Copy)"),
         active_publication_id=None,
     )
     session.add(new_funnel)

@@ -72,7 +72,7 @@ class FunnelPublicationSourceSpec(BaseModel):
 
 
 class FunnelArtifactSourceSpec(BaseModel):
-    public_id: str
+    product_id: str
     upstream_api_base_root: str
     runtime_dist_path: str = "mos/frontend/dist"
     artifact: Dict[str, Any]
@@ -149,11 +149,11 @@ class ApplicationSpec(BaseModel):
                 raise ValueError("source_ref is required when source_type='funnel_artifact'.")
             if not isinstance(self.source_ref, FunnelArtifactSourceSpec):
                 raise ValueError("source_ref must be FunnelArtifactSourceSpec when source_type='funnel_artifact'.")
-            self.source_ref.public_id = self.source_ref.public_id.strip()
+            self.source_ref.product_id = self.source_ref.product_id.strip()
             self.source_ref.upstream_api_base_root = self.source_ref.upstream_api_base_root.strip().rstrip("/")
             self.source_ref.runtime_dist_path = self.source_ref.runtime_dist_path.strip()
-            if not self.source_ref.public_id:
-                raise ValueError("source_ref.public_id must be non-empty for source_type='funnel_artifact'.")
+            if not self.source_ref.product_id:
+                raise ValueError("source_ref.product_id must be non-empty for source_type='funnel_artifact'.")
             if not self.source_ref.upstream_api_base_root.startswith(("http://", "https://")):
                 raise ValueError("source_ref.upstream_api_base_root must start with http:// or https://.")
             if not self.source_ref.runtime_dist_path:
@@ -162,8 +162,8 @@ class ApplicationSpec(BaseModel):
                 raise ValueError("source_ref.artifact must be an object for source_type='funnel_artifact'.")
             if not isinstance(self.source_ref.artifact.get("meta"), dict):
                 raise ValueError("source_ref.artifact.meta must be an object for source_type='funnel_artifact'.")
-            if not isinstance(self.source_ref.artifact.get("pages"), dict):
-                raise ValueError("source_ref.artifact.pages must be an object for source_type='funnel_artifact'.")
+            if not isinstance(self.source_ref.artifact.get("funnels"), dict):
+                raise ValueError("source_ref.artifact.funnels must be an object for source_type='funnel_artifact'.")
             return self
 
         raise ValueError(f"Unsupported source_type: {self.source_type}")

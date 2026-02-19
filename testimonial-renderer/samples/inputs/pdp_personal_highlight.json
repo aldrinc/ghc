@@ -1,0 +1,27 @@
+{
+  "template": "pdp_personal_highlight",
+  "output": {
+    "preset": "tiktok"
+  },
+  "brand": {
+    "logoText": "SampleLogo",
+    "stripBgColor": "#111827",
+    "stripTextColor": "#ffffff"
+  },
+  "rating": {
+    "valueText": "4.7/5",
+    "detailText": "Rated by 2,000+ Customers"
+  },
+  "cta": {
+    "text": "TRY IT RISK-FREE TODAY!"
+  },
+  "background": {
+    "imageUrl": "../assets/hero-pads.svg",
+    "alt": "Sample background"
+  },
+  "comment": {
+    "handle": "personal_story_handle",
+    "text": "YOUR PERSONAL HIGHLIGHT TEXT HERE"
+  }
+}
+

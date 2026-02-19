@@ -43,9 +43,9 @@ def test_ensure_plan_for_funnel_publish_workload_bootstraps_when_missing(tmp_pat
 
     workload_patch = deploy_service.build_funnel_publication_workload_patch(
         workload_name="landing-page",
-        funnel_public_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        product_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        upstream_api_base_url="https://moshq.app/api",
         server_names=[],
         https=False,
         destination_path="/opt/apps",
@@ -74,9 +74,9 @@ def test_ensure_plan_for_funnel_publish_workload_uses_instance_override(tmp_path
 
     workload_patch = deploy_service.build_funnel_publication_workload_patch(
         workload_name="landing-page",
-        funnel_public_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        product_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
         upstream_base_url="https://moshq.app",
-        upstream_api_base_url="https://moshq.app/api/public/funnels/f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        upstream_api_base_url="https://moshq.app/api",
         server_names=[],
         https=False,
         destination_path="/opt/apps",

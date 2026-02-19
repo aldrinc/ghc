@@ -1,0 +1,33 @@
+{
+  "template": "pdp_personal_highlight",
+  "output": {
+    "preset": "feed"
+  },
+  "brand": {
+    "logoText": "SampleLogo",
+    "stripBgColor": "#111827",
+    "stripTextColor": "#ffffff"
+  },
+  "rating": {
+    "valueText": "4.9/5",
+    "detailText": "Rated by 10,000+ Men"
+  },
+  "cta": {
+    "text": "BUY ONE, GET ONE FREE TODAY!"
+  },
+  "background": {
+    "promptVars": {
+      "product": "a black jar of PURE SHILAJIT GUMMIES held in one hand with the label facing the camera",
+      "subject": "a 60-65 year old man in good shape, smiling, flexing his bicep",
+      "scene": "gym setting with equipment softly blurred in the background",
+      "extra": "Shot from chest up. Natural gym lighting. Realistic skin texture. Leave clean negative space in the top-left for an overlay.",
+      "avoid": ["on-image captions", "watermarks", "UI overlays", "extra hands", "distorted arms"]
+    }
+  },
+  "comment": {
+    "handle": "jaimondavis63",
+    "text": "as a 61 year old man this stuff right here is like youth in a bottle... i will be a customer for the rest of my life!",
+    "avatarUrl": "samples/assets/avatar-omar.svg"
+  }
+}
+
