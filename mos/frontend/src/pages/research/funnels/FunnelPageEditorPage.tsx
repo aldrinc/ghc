@@ -14,7 +14,7 @@ import { createFunnelAiPlugin } from "@/funnels/puckAiPlugin";
 import { createDesignSystemPlugin } from "@/funnels/puckDesignSystemPlugin";
 import { createFunnelPuckConfig, defaultFunnelPuckData, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
-import { buildPublicFunnelPath, normalizeRouteToken } from "@/funnels/runtimeRouting";
+import { buildPublicFunnelPath, shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -83,9 +83,7 @@ export function FunnelPageEditorPage() {
     const page = funnel?.pages?.find((p) => p.id === pageId);
     return page ? `${page.name} (${page.slug})` : "Page";
   }, [funnel?.pages, pageId]);
-  const runtimeProductSlug = normalizeRouteToken(
-    funnelProduct?.handle || funnelProduct?.id || funnel?.product_id || ""
-  );
+  const runtimeProductSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
   const publicPageHref = useMemo(() => {
     const funnelSlug = (funnel?.route_slug || "").trim();
     const slug = (metaSlug || pageDetail?.page.slug || "").trim();

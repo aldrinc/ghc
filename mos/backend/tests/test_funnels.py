@@ -18,6 +18,10 @@ def _slugify(value: str) -> str:
     return text or "product"
 
 
+def _short_uuid_slug(value: str) -> str:
+    return str(value).strip().lower().split("-", 1)[0][:8]
+
+
 def _create_publish_ready_funnel(
     api_client: TestClient,
     *,
@@ -27,18 +31,17 @@ def _create_publish_ready_funnel(
     client_resp = api_client.post("/clients", json={"name": f"{funnel_name} Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
-    product_slug = _slugify(f"{funnel_name}-product")
+    product_handle = _slugify(f"{funnel_name}-product")
     product_payload = {"clientId": client_id, "title": f"{funnel_name} Product"}
     if use_product_handle:
-        product_payload["handle"] = product_slug
+        product_payload["handle"] = product_handle
     product_resp = api_client.post(
         "/products",
         json=product_payload,
     )
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
-    if not use_product_handle:
-        product_slug = _slugify(product_id)
+    product_slug = _short_uuid_slug(product_id)
 
     funnel_resp = api_client.post(
         "/funnels",
@@ -76,13 +79,14 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     client_resp = api_client.post("/clients", json={"name": "Funnels Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
-    product_slug = _slugify("funnels-product")
+    product_handle = _slugify("funnels-product")
     product_resp = api_client.post(
         "/products",
-        json={"clientId": client_id, "title": "Funnels Product", "handle": product_slug},
+        json={"clientId": client_id, "title": "Funnels Product", "handle": product_handle},
     )
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
+    product_slug = _short_uuid_slug(product_id)
 
     funnel_resp = api_client.post(
         "/funnels",
@@ -147,6 +151,12 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     assert meta_by_id.json()["funnelId"] == funnel_id
     assert meta_by_id.json()["funnelSlug"] == route_slug
 
+    short_funnel_id = funnel_id.split("-", 1)[0]
+    meta_by_short_id = api_client.get(f"/public/funnels/{product_slug}/{short_funnel_id}/meta")
+    assert meta_by_short_id.status_code == 200
+    assert meta_by_short_id.json()["funnelId"] == funnel_id
+    assert meta_by_short_id.json()["funnelSlug"] == route_slug
+
     public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{page1['slug']}")
     assert public_page.status_code == 200
     assert public_page.json()["slug"] == page1["slug"]
@@ -155,6 +165,12 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     public_page_by_id = api_client.get(f"/public/funnels/{product_slug}/{funnel_id}/pages/{page1['slug']}")
     assert public_page_by_id.status_code == 200
     assert public_page_by_id.json()["slug"] == page1["slug"]
+
+    public_page_by_short_id = api_client.get(
+        f"/public/funnels/{product_slug}/{short_funnel_id}/pages/{page1['slug']}"
+    )
+    assert public_page_by_short_id.status_code == 200
+    assert public_page_by_short_id.json()["slug"] == page1["slug"]
 
     # Draft leakage guard: save a new draft but do not approve; public stays the same.
     save_new_draft = api_client.put(
@@ -199,13 +215,13 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     assert disabled_meta.status_code == 410
 
 
-def test_funnel_publish_uses_product_id_slug_when_handle_missing(api_client: TestClient):
+def test_funnel_publish_uses_short_product_id_slug_when_handle_missing(api_client: TestClient):
     funnel_id, route_slug, product_id, product_slug = _create_publish_ready_funnel(
         api_client,
         funnel_name="Id Slug Funnel",
         use_product_handle=False,
     )
-    assert product_slug == _slugify(product_id)
+    assert product_slug == _short_uuid_slug(product_id)
 
     publish = api_client.post(f"/funnels/{funnel_id}/publish")
     assert publish.status_code == 201
@@ -285,13 +301,14 @@ def test_funnel_public_preview_allows_approved_pages_before_publish(api_client: 
     client_resp = api_client.post("/clients", json={"name": "Preview Funnel Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
-    product_slug = _slugify("preview-product")
+    product_handle = _slugify("preview-product")
     product_resp = api_client.post(
         "/products",
-        json={"clientId": client_id, "title": "Preview Product", "handle": product_slug},
+        json={"clientId": client_id, "title": "Preview Product", "handle": product_handle},
     )
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
+    product_slug = _short_uuid_slug(product_id)
 
     funnel_resp = api_client.post(
         "/funnels",
@@ -352,13 +369,14 @@ def test_public_funnel_commerce_requires_offers(api_client: TestClient):
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
-    product_slug = _slugify("commerce-product")
+    product_handle = _slugify("commerce-product")
     product_resp = api_client.post(
         "/products",
-        json={"clientId": client_id, "title": "Commerce Product", "handle": product_slug},
+        json={"clientId": client_id, "title": "Commerce Product", "handle": product_handle},
     )
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
+    product_slug = _short_uuid_slug(product_id)
 
     funnel_resp = api_client.post(
         "/funnels",
@@ -377,13 +395,14 @@ def test_public_funnel_commerce_requires_price_points(api_client: TestClient):
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
-    product_slug = _slugify("commerce-product")
+    product_handle = _slugify("commerce-product")
     product_resp = api_client.post(
         "/products",
-        json={"clientId": client_id, "title": "Commerce Product", "handle": product_slug},
+        json={"clientId": client_id, "title": "Commerce Product", "handle": product_handle},
     )
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
+    product_slug = _short_uuid_slug(product_id)
 
     variant_resp = api_client.post(
         f"/products/{product_id}/variants",
@@ -416,13 +435,14 @@ def test_public_funnel_commerce_returns_offers_and_price_points(api_client: Test
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
-    product_slug = _slugify("commerce-product")
+    product_handle = _slugify("commerce-product")
     product_resp = api_client.post(
         "/products",
-        json={"clientId": client_id, "title": "Commerce Product", "handle": product_slug},
+        json={"clientId": client_id, "title": "Commerce Product", "handle": product_handle},
     )
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
+    product_slug = _short_uuid_slug(product_id)
 
     variant_resp = api_client.post(
         f"/products/{product_id}/variants",

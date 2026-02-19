@@ -2,6 +2,9 @@ type DeployRuntimeConfig = {
   bundleMode?: boolean;
 };
 
+const SHORT_ID_LENGTH = 8;
+const SHORT_ID_PATTERN = /^[0-9a-f]{8}$/;
+
 declare global {
   interface Window {
     __MOS_DEPLOY_RUNTIME__?: DeployRuntimeConfig;
@@ -27,6 +30,16 @@ export function normalizeRouteToken(value: string | null | undefined): string {
     .replace(/-{2,}/g, "-")
     .replace(/^-+|-+$/g, "");
   return normalized;
+}
+
+export function shortUuidRouteToken(value: string | null | undefined): string {
+  const normalized = (value || "").trim().toLowerCase();
+  if (!normalized) return "";
+  const prefix = normalized.split("-", 1)[0].slice(0, SHORT_ID_LENGTH);
+  if (!SHORT_ID_PATTERN.test(prefix)) {
+    return "";
+  }
+  return prefix;
 }
 
 export function isStandaloneBundleMode(): boolean {

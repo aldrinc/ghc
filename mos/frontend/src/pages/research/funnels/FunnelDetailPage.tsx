@@ -10,7 +10,7 @@ import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle 
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
-import { normalizeRouteToken } from "@/funnels/runtimeRouting";
+import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
@@ -132,9 +132,7 @@ export function FunnelDetailPage() {
     navigate(`/research/funnels/${funnelId}/pages/${page.id}`);
   };
 
-  const productRouteSlug = normalizeRouteToken(
-    funnelProduct?.handle || funnelProduct?.id || funnel?.product_id || ""
-  );
+  const productRouteSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
   const publicBase = funnel?.route_slug && productRouteSlug ? `/f/${productRouteSlug}/${funnel.route_slug}` : null;
   const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
   const deployWorkloadName = funnel?.client_id ? `brand-funnels-${funnel.client_id}` : undefined;

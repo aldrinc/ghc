@@ -8,7 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import Response as BinaryResponse
-from sqlalchemy import select
+from sqlalchemy import String, cast, func, select
 from sqlalchemy.orm import Session
 
 import stripe
@@ -53,6 +53,20 @@ def _resolve_funnel_by_route_token(*, session: Session, funnel_token: str) -> Fu
     try:
         parsed_funnel_id = str(UUID(token))
     except ValueError:
+        # Support short id aliases like "638d19db" by matching UUID prefix.
+        short_token = token.lower()
+        if len(short_token) != 8 or any(ch not in "0123456789abcdef" for ch in short_token):
+            return None
+        matches = list(
+            session.scalars(
+                select(Funnel)
+                .where(func.left(cast(Funnel.id, String), 8) == short_token)
+                .order_by(Funnel.created_at.asc(), Funnel.id.asc())
+                .limit(2)
+            ).all()
+        )
+        if len(matches) == 1:
+            return matches[0]
         return None
     return session.scalars(select(Funnel).where(Funnel.id == parsed_funnel_id)).first()
 

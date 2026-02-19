@@ -6,6 +6,7 @@ import tarfile
 import time
 import shlex
 import hashlib
+from uuid import UUID
 from pathlib import Path
 import paramiko
 from typing import Dict, List, Optional  # noqa: F401
@@ -653,6 +654,12 @@ WantedBy=multi-user.target
                         )
                     if funnel_id_token != funnel_slug:
                         funnel_path_tokens.append(funnel_id_token)
+                    try:
+                        short_funnel_id_token = str(UUID(funnel_id_token)).split("-", 1)[0]
+                    except ValueError:
+                        short_funnel_id_token = ""
+                    if short_funnel_id_token and short_funnel_id_token not in funnel_path_tokens:
+                        funnel_path_tokens.append(short_funnel_id_token)
 
                 for funnel_path_token in funnel_path_tokens:
                     if funnel_path_token in seen_funnel_path_tokens:

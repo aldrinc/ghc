@@ -282,6 +282,23 @@ def test_funnel_artifact_site_errors_when_funnel_id_alias_collides_with_existing
         deployer._configure_funnel_artifact_site(app)
 
 
+def test_funnel_artifact_site_writes_short_funnel_id_alias_for_uuid_funnel_id():
+    app = _artifact_app()
+    uuid_funnel_id = "f85405a4-c7cd-4fdf-a953-6613d712392d"
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["meta"]["funnelId"] = uuid_funnel_id
+    funnel_payload["pages"]["presales"]["funnelId"] = uuid_funnel_id
+
+    deployer, uploaded, _commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    short_meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/f85405a4/meta.json"
+    short_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/f85405a4/pages/presales.json"
+    assert short_meta_path in uploaded
+    assert short_page_path in uploaded
+
+
 def test_funnel_artifact_site_errors_with_clear_message_when_runtime_dist_missing():
     app = _artifact_app()
     deployer, _uploaded, _commands = _stub_deployer()

@@ -451,7 +451,8 @@ def build_client_funnel_runtime_artifact_payload(
         existing_product_id = product_slug_to_product_id.get(product_slug)
         if existing_product_id and existing_product_id != product_id:
             raise DeployError(
-                f"Product route slug '{product_slug}' is used by multiple products. Set unique product handles."
+                f"Product route slug '{product_slug}' is used by multiple products. "
+                "Ensure product ids have unique 8-character prefixes."
             )
         product_slug_to_product_id[product_slug] = product_id
 

@@ -149,7 +149,8 @@ def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, d
     db_session.add(secondary_variant)
     db_session.commit()
 
-    response = api_client.get(f"/public/funnels/shopify-product/{seeded['funnel'].route_slug}/commerce")
+    product_slug = str(seeded["product"].id).split("-", 1)[0]
+    response = api_client.get(f"/public/funnels/{product_slug}/{seeded['funnel'].route_slug}/commerce")
     assert response.status_code == 200
     payload = response.json()
     assert payload["product"]["variants_count"] == 1
