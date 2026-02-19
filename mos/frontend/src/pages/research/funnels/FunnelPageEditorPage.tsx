@@ -84,12 +84,12 @@ export function FunnelPageEditorPage() {
     return page ? `${page.name} (${page.slug})` : "Page";
   }, [funnel?.pages, pageId]);
   const publicPageHref = useMemo(() => {
-    const productSlug = normalizeRouteToken(funnelProduct?.handle || "");
+    const productSlug = normalizeRouteToken(funnelProduct?.handle || funnelProduct?.id || "");
     const funnelSlug = (funnel?.route_slug || "").trim();
     const slug = (metaSlug || pageDetail?.page.slug || "").trim();
     if (!productSlug || !funnelSlug || !slug) return null;
     return buildPublicFunnelPath({ productSlug, funnelSlug, slug, bundleMode: false });
-  }, [funnel?.route_slug, funnelProduct?.handle, metaSlug, pageDetail?.page.slug]);
+  }, [funnel?.route_slug, funnelProduct?.handle, funnelProduct?.id, metaSlug, pageDetail?.page.slug]);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
   const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
@@ -278,7 +278,7 @@ export function FunnelPageEditorPage() {
           <div className="ds-card ds-card--md p-0 overflow-hidden">
             <FunnelRuntimeProvider
               value={{
-                productSlug: normalizeRouteToken(funnelProduct?.handle || ""),
+                productSlug: normalizeRouteToken(funnelProduct?.handle || funnelProduct?.id || ""),
                 funnelSlug: funnel?.route_slug ?? "",
                 pageMap: runtimePageMap,
                 pageId: pageDetail.page.id,

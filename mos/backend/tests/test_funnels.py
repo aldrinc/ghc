@@ -17,17 +17,27 @@ def _slugify(value: str) -> str:
     return text or "product"
 
 
-def _create_publish_ready_funnel(api_client: TestClient, *, funnel_name: str) -> tuple[str, str, str, str]:
+def _create_publish_ready_funnel(
+    api_client: TestClient,
+    *,
+    funnel_name: str,
+    use_product_handle: bool = True,
+) -> tuple[str, str, str, str]:
     client_resp = api_client.post("/clients", json={"name": f"{funnel_name} Client", "industry": "SaaS"})
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
     product_slug = _slugify(f"{funnel_name}-product")
+    product_payload = {"clientId": client_id, "title": f"{funnel_name} Product"}
+    if use_product_handle:
+        product_payload["handle"] = product_slug
     product_resp = api_client.post(
         "/products",
-        json={"clientId": client_id, "title": f"{funnel_name} Product", "handle": product_slug},
+        json=product_payload,
     )
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
+    if not use_product_handle:
+        product_slug = _slugify(product_id)
 
     funnel_resp = api_client.post(
         "/funnels",
@@ -176,6 +186,23 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     assert disable.status_code == 200
     disabled_meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
     assert disabled_meta.status_code == 410
+
+
+def test_funnel_publish_uses_product_id_slug_when_handle_missing(api_client: TestClient):
+    funnel_id, route_slug, product_id, product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Id Slug Funnel",
+        use_product_handle=False,
+    )
+    assert product_slug == _slugify(product_id)
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+
+    meta = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta.status_code == 200
+    assert meta.json()["productSlug"] == product_slug
+    assert meta.json()["funnelSlug"] == route_slug
 
 
 def test_funnel_public_preview_allows_approved_pages_before_publish(api_client: TestClient):

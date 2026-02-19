@@ -16,14 +16,21 @@ def normalize_route_token(value: str) -> str:
 
 
 def require_product_route_slug(*, product: Product) -> str:
-    raw = (product.handle or "").strip()
-    if not raw:
+    handle = (product.handle or "").strip()
+    if handle:
+        handle_slug = normalize_route_token(handle)
+        if handle_slug:
+            return handle_slug
+
+    product_id = str(product.id).strip() if product.id is not None else ""
+    id_slug = normalize_route_token(product_id)
+    if id_slug:
+        return id_slug
+
+    if handle:
         raise ValueError(
-            f"Product '{product.id}' is missing handle. Set product.handle before publishing funnels."
+            f"Product '{product.id}' handle '{handle}' is invalid for routing and product id is unavailable."
         )
-    slug = normalize_route_token(raw)
-    if not slug:
-        raise ValueError(
-            f"Product '{product.id}' handle '{raw}' is invalid for routing. Use lowercase letters, numbers, and dashes."
-        )
-    return slug
+    raise ValueError(
+        "Product route slug cannot be resolved because both product.handle and product.id are unavailable."
+    )

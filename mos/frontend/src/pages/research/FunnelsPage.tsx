@@ -37,7 +37,7 @@ export function FunnelsPage() {
   }, [isModalOpen, productDetail?.offers]);
 
   const canCreate = Boolean(clientId && product?.id && name.trim());
-  const productRouteSlug = normalizeRouteToken(productDetail?.handle || "");
+  const productRouteSlug = normalizeRouteToken(productDetail?.handle || productDetail?.id || "");
 
   const statusTone = useMemo(() => {
     return (status: string) => {
@@ -119,7 +119,7 @@ export function FunnelsPage() {
                     <div className="text-xs text-content-muted">
                       Public:{" "}
                       <span className="font-mono">
-                        {productRouteSlug ? `/f/${productRouteSlug}/${funnel.route_slug}` : "Set product handle to enable route"}
+                        {productRouteSlug ? `/f/${productRouteSlug}/${funnel.route_slug}` : "Route unavailable"}
                       </span>
                     </div>
                   </div>
