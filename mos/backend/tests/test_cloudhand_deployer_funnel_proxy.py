@@ -299,6 +299,30 @@ def test_funnel_artifact_site_writes_short_funnel_id_alias_for_uuid_funnel_id():
     assert short_page_path in uploaded
 
 
+def test_funnel_artifact_site_injects_default_route_into_runtime_config():
+    app = _artifact_app()
+    uuid_funnel_id = "f85405a4-c7cd-4fdf-a953-6613d712392d"
+    funnel_payload = app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]
+    funnel_payload["meta"]["funnelId"] = uuid_funnel_id
+    funnel_payload["pages"]["presales"]["funnelId"] = uuid_funnel_id
+
+    deployer, _uploaded, commands = _stub_deployer()
+
+    deployer._configure_funnel_artifact_site(app)
+
+    runtime_inject_cmd = next(
+        (
+            cmd
+            for cmd in commands
+            if cmd.startswith("python3 -c") and "__MOS_DEPLOY_RUNTIME__" in cmd
+        ),
+        "",
+    )
+    assert runtime_inject_cmd
+    assert '"defaultProductSlug":"example-product"' in runtime_inject_cmd
+    assert '"defaultFunnelSlug":"f85405a4"' in runtime_inject_cmd
+
+
 def test_funnel_artifact_site_errors_with_clear_message_when_runtime_dist_missing():
     app = _artifact_app()
     deployer, _uploaded, _commands = _stub_deployer()

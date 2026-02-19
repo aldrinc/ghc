@@ -84,12 +84,12 @@ export function FunnelPageEditorPage() {
     return page ? `${page.name} (${page.slug})` : "Page";
   }, [funnel?.pages, pageId]);
   const runtimeProductSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
+  const runtimeFunnelSlug = shortUuidRouteToken(funnel?.id || "");
   const publicPageHref = useMemo(() => {
-    const funnelSlug = (funnel?.route_slug || "").trim();
     const slug = (metaSlug || pageDetail?.page.slug || "").trim();
-    if (!runtimeProductSlug || !funnelSlug || !slug) return null;
-    return buildPublicFunnelPath({ productSlug: runtimeProductSlug, funnelSlug, slug, bundleMode: false });
-  }, [funnel?.route_slug, metaSlug, pageDetail?.page.slug, runtimeProductSlug]);
+    if (!runtimeProductSlug || !runtimeFunnelSlug || !slug) return null;
+    return buildPublicFunnelPath({ productSlug: runtimeProductSlug, funnelSlug: runtimeFunnelSlug, slug, bundleMode: false });
+  }, [metaSlug, pageDetail?.page.slug, runtimeFunnelSlug, runtimeProductSlug]);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
   const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
@@ -279,7 +279,7 @@ export function FunnelPageEditorPage() {
             <FunnelRuntimeProvider
               value={{
                 productSlug: runtimeProductSlug,
-                funnelSlug: funnel?.route_slug ?? "",
+                funnelSlug: runtimeFunnelSlug,
                 pageMap: runtimePageMap,
                 pageId: pageDetail.page.id,
                 nextPageId: pageDetail.page.next_page_id ?? null,

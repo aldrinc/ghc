@@ -133,7 +133,8 @@ export function FunnelDetailPage() {
   };
 
   const productRouteSlug = shortUuidRouteToken(funnelProduct?.id || funnel?.product_id || "");
-  const publicBase = funnel?.route_slug && productRouteSlug ? `/f/${productRouteSlug}/${funnel.route_slug}` : null;
+  const funnelRouteSlug = shortUuidRouteToken(funnel?.id || "");
+  const publicBase = funnelRouteSlug && productRouteSlug ? `/f/${productRouteSlug}/${funnelRouteSlug}` : null;
   const mosPreviewUrl = publicBase ? `${window.location.origin}${publicBase}` : null;
   const deployWorkloadName = funnel?.client_id ? `brand-funnels-${funnel.client_id}` : undefined;
   const entryArtifact = useMemo(() => {
@@ -149,7 +150,7 @@ export function FunnelDetailPage() {
   });
 
   const deployedPageUrl = useMemo(() => {
-    if (!productRouteSlug || !funnel?.route_slug || !entryArtifact) return null;
+    if (!productRouteSlug || !funnelRouteSlug || !entryArtifact) return null;
 
     const accessCandidate =
       (deployJob?.accessUrl || "").trim() ||
@@ -162,13 +163,13 @@ export function FunnelDetailPage() {
 
     const baseUrl = accessCandidate || `${window.location.origin}/`;
     const normalizedBase = baseUrl.replace(/\/+$/, "");
-    return `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnel.route_slug)}/${encodeURIComponent(entryArtifact)}`;
+    return `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnelRouteSlug)}/${encodeURIComponent(entryArtifact)}`;
   }, [
     deployDomains.data?.https,
     deployDomains.data?.server_names,
     deployJob?.accessUrl,
     entryArtifact,
-    funnel?.route_slug,
+    funnelRouteSlug,
     productRouteSlug,
   ]);
 

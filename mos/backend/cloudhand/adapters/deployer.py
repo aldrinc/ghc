@@ -6,6 +6,7 @@ import tarfile
 import time
 import shlex
 import hashlib
+import re
 from uuid import UUID
 from pathlib import Path
 import paramiko
@@ -24,6 +25,7 @@ _NGINX_PROXY_CONNECT_TIMEOUT = "60s"
 _NGINX_PROXY_SEND_TIMEOUT = "3600s"
 _NGINX_PROXY_READ_TIMEOUT = "3600s"
 _RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
+_SHORT_UUID_TOKEN_PATTERN = re.compile(r"^[0-9a-f]{8}$")
 
 
 class ServerDeployer:
@@ -559,8 +561,58 @@ WantedBy=multi-user.target
         )
         self.run(f"python3 -c {shlex.quote(script)}")
 
-    def _inject_funnel_runtime_config(self, *, site_dir: str) -> None:
-        config_json = json.dumps({"bundleMode": True}, separators=(",", ":"))
+    def _resolve_funnel_artifact_default_route(
+        self, *, source: FunnelArtifactSourceSpec
+    ) -> Optional[tuple[str, str]]:
+        artifact = source.artifact or {}
+        products = artifact.get("products")
+        if not isinstance(products, dict):
+            return None
+
+        for raw_product_slug, product_payload in products.items():
+            product_slug = str(raw_product_slug or "").strip()
+            if not product_slug:
+                continue
+            if not isinstance(product_payload, dict):
+                continue
+            funnels = product_payload.get("funnels")
+            if not isinstance(funnels, dict):
+                continue
+
+            for raw_funnel_slug, funnel_payload in funnels.items():
+                funnel_slug = str(raw_funnel_slug or "").strip()
+                if not funnel_slug:
+                    continue
+                if not isinstance(funnel_payload, dict):
+                    continue
+
+                resolved_funnel_token = funnel_slug
+                funnel_meta = funnel_payload.get("meta")
+                if isinstance(funnel_meta, dict):
+                    funnel_id_token = str(funnel_meta.get("funnelId") or "").strip().lower()
+                    if funnel_id_token:
+                        try:
+                            short_funnel_id_token = str(UUID(funnel_id_token)).split("-", 1)[0]
+                        except ValueError:
+                            short_funnel_id_token = ""
+                        if short_funnel_id_token and _SHORT_UUID_TOKEN_PATTERN.fullmatch(short_funnel_id_token):
+                            resolved_funnel_token = short_funnel_id_token
+                        else:
+                            resolved_funnel_token = funnel_id_token
+
+                return product_slug, resolved_funnel_token
+
+        return None
+
+    def _inject_funnel_runtime_config(self, *, site_dir: str, source: FunnelArtifactSourceSpec) -> None:
+        runtime_config: Dict[str, object] = {"bundleMode": True}
+        default_route = self._resolve_funnel_artifact_default_route(source=source)
+        if default_route:
+            product_slug, funnel_slug = default_route
+            runtime_config["defaultProductSlug"] = product_slug
+            runtime_config["defaultFunnelSlug"] = funnel_slug
+
+        config_json = json.dumps(runtime_config, separators=(",", ":"))
         block = (
             "<!-- MOS_DEPLOY_RUNTIME_START -->"
             f"<script>window.__MOS_DEPLOY_RUNTIME__={config_json};</script>"
@@ -731,7 +783,7 @@ WantedBy=multi-user.target
                 self._upload_local_directory(local_dir=local_dist, remote_dir=cached_runtime_dir)
             cached_runtime_q = shlex.quote(cached_runtime_dir)
             self.run(f"cp -R {cached_runtime_q}/. {site_dir_q}/")
-        self._inject_funnel_runtime_config(site_dir=site_dir)
+        self._inject_funnel_runtime_config(site_dir=site_dir, source=source)
         self._replace_api_base_tokens(site_dir=site_dir, upstream_api_base_root=source.upstream_api_base_root)
         self._write_funnel_artifact_payload(site_dir=site_dir, source=source)
 

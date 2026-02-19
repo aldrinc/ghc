@@ -1,5 +1,7 @@
 type DeployRuntimeConfig = {
   bundleMode?: boolean;
+  defaultProductSlug?: string;
+  defaultFunnelSlug?: string;
 };
 
 const SHORT_ID_LENGTH = 8;
@@ -44,6 +46,16 @@ export function shortUuidRouteToken(value: string | null | undefined): string {
 
 export function isStandaloneBundleMode(): boolean {
   return Boolean(getDeployRuntimeConfig().bundleMode);
+}
+
+export function getStandaloneDefaultRoute(): { productSlug: string; funnelSlug: string } | null {
+  const config = getDeployRuntimeConfig();
+  const productSlug = normalizeRouteToken(config.defaultProductSlug);
+  const funnelSlug = normalizeRouteToken(config.defaultFunnelSlug);
+  if (!productSlug || !funnelSlug) {
+    return null;
+  }
+  return { productSlug, funnelSlug };
 }
 
 export function buildPublicFunnelPath(

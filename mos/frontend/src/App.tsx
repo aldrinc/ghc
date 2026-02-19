@@ -24,6 +24,7 @@ import { ProductProvider } from "@/contexts/ProductContext";
 import { ClaudeChatPage } from "@/pages/claude/ClaudeChatPage";
 import { PublicFunnelEntryRedirectPage } from "@/pages/public/PublicFunnelEntryRedirectPage";
 import { PublicFunnelPage } from "@/pages/public/PublicFunnelPage";
+import { PublicFunnelRootRedirectPage } from "@/pages/public/PublicFunnelRootRedirectPage";
 import { isStandaloneBundleMode } from "@/funnels/runtimeRouting";
 
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -47,7 +48,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {standaloneBundleMode ? <Route path="/" element={<PublicFunnelPage />} /> : null}
+        {standaloneBundleMode ? <Route path="/" element={<PublicFunnelRootRedirectPage />} /> : null}
         {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} /> : null}
         {standaloneBundleMode ? <Route path="/:productSlug/:funnelSlug/:slug" element={<PublicFunnelPage />} /> : null}
         <Route path="/f/:productSlug/:funnelSlug" element={<PublicFunnelEntryRedirectPage />} />

@@ -119,7 +119,7 @@ export function FunnelsPage() {
                     <div className="text-xs text-content-muted">
                       Public:{" "}
                       <span className="font-mono">
-                        {productRouteSlug ? `/f/${productRouteSlug}/${funnel.route_slug}` : "Route unavailable"}
+                        {productRouteSlug ? `/f/${productRouteSlug}/${shortUuidRouteToken(funnel.id)}` : "Route unavailable"}
                       </span>
                     </div>
                   </div>
