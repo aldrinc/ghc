@@ -42,7 +42,7 @@ type AiAttachment = {
 };
 
 const makeAttachmentId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
   return `att-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 };
 

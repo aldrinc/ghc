@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -152,6 +153,34 @@ def test_infer_external_access_urls_errors_when_server_ips_missing(tmp_path, mon
             workload_name="landing-page",
             instance_name="ubuntu-4gb-nbg1-2",
         )
+
+
+def test_find_latest_plan_ignores_materialized_apply_plans(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+
+    canonical_older = tmp_path / "plan-2026-02-19T12-00-00Z.json"
+    canonical_newer = tmp_path / "plan-2026-02-19T12-05-00Z.json"
+    materialized = tmp_path / "plan-apply-2026-02-19T12-06-00Z-abcd1234.json"
+
+    canonical_older.write_text("{}", encoding="utf-8")
+    canonical_newer.write_text("{}", encoding="utf-8")
+    materialized.write_text("{}", encoding="utf-8")
+
+    os.utime(canonical_older, (100.0, 100.0))
+    os.utime(canonical_newer, (200.0, 200.0))
+    os.utime(materialized, (300.0, 300.0))
+
+    latest = deploy_service._find_latest_plan()
+    assert latest == canonical_newer
+
+
+def test_find_latest_plan_returns_none_when_only_materialized_apply_plan_exists(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+
+    materialized = tmp_path / "plan-apply-2026-02-19T12-06-00Z-abcd1234.json"
+    materialized.write_text("{}", encoding="utf-8")
+
+    assert deploy_service._find_latest_plan() is None
 
 
 def test_materialize_funnel_artifacts_for_apply_skips_empty_inline_artifacts_without_artifact_id(

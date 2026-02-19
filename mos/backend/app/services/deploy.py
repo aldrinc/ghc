@@ -65,7 +65,15 @@ def _find_latest_plan() -> Optional[Path]:
     ch_dir = _cloudhand_dir()
     if not ch_dir.exists():
         return None
-    plans = sorted(ch_dir.glob("plan-*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    plans = sorted(
+        (
+            path
+            for path in ch_dir.glob("plan-*.json")
+            if not path.name.startswith("plan-apply-")
+        ),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     return plans[0] if plans else None
 
 
@@ -1093,7 +1101,10 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
     if not has_changes:
         return plan_file
 
-    materialized_path = _cloudhand_dir() / f"plan-apply-{datetime.utcnow().strftime('%Y-%m-%dT%H-%M-%SZ')}-{uuid4().hex[:8]}.json"
+    materialized_path = (
+        _cloudhand_dir()
+        / f"apply-materialized-{datetime.utcnow().strftime('%Y-%m-%dT%H-%M-%SZ')}-{uuid4().hex[:8]}.json"
+    )
     try:
         materialized_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
     except Exception as exc:

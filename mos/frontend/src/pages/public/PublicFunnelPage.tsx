@@ -47,7 +47,10 @@ function setPageMetadata(title?: string, description?: string) {
 function getOrCreateId(storage: Storage, key: string) {
   const existing = storage.getItem(key);
   if (existing) return existing;
-  const id = crypto.randomUUID();
+  const id =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `funnel-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   storage.setItem(key, id);
   return id;
 }
