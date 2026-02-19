@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } fro
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import { useCreateProduct, useProducts } from "@/api/products";
+import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 
 function parseList(value: string) {
   return value
@@ -67,7 +68,8 @@ export function ProductsPage() {
         client_id: created.client_id,
         product_type: created.product_type ?? null,
       });
-      navigate(`/workspaces/products/${created.id}`);
+      const productRouteToken = shortUuidRouteToken(created.id);
+      navigate(`/workspaces/products/${productRouteToken || created.id}`);
     }
     resetForm();
     setIsModalOpen(false);
@@ -116,7 +118,8 @@ export function ProductsPage() {
                         client_id: product.client_id,
                         product_type: product.product_type ?? null,
                       });
-                      navigate(`/workspaces/products/${product.id}`);
+                      const productRouteToken = shortUuidRouteToken(product.id);
+                      navigate(`/workspaces/products/${productRouteToken || product.id}`);
                     }}
                   >
                     <TableCell>

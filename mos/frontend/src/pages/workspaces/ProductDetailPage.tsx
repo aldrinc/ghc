@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
+import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import {
   useClientShopifyStatus,
   useCreateClientShopifyInstallUrl,
@@ -118,6 +119,13 @@ export function ProductDetailPage() {
     });
     setShopifyProductGidDraft(productDetail.shopify_product_gid || "");
   }, [productDetail, selectProduct]);
+
+  useEffect(() => {
+    if (!productId || !productDetail?.id) return;
+    const canonicalRouteToken = shortUuidRouteToken(productDetail.id);
+    if (!canonicalRouteToken || productId === canonicalRouteToken) return;
+    navigate(`/workspaces/products/${canonicalRouteToken}`, { replace: true });
+  }, [navigate, productDetail?.id, productId]);
 
   useEffect(() => {
     if (!shopifyStatus?.shopDomain) return;
@@ -402,7 +410,7 @@ export function ProductDetailPage() {
 
   const handleCreateOffer = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!productId) return;
+    if (!productDetail?.id) return;
     if (!offerName.trim()) {
       toast.error("Offer name is required.");
       return;
@@ -412,7 +420,7 @@ export function ProductDetailPage() {
       return;
     }
     await createOffer.mutateAsync({
-      productId,
+      productId: productDetail.id,
       name: offerName.trim(),
       businessModel: offerBusinessModel.trim(),
       description: offerDescription.trim() || undefined,
@@ -447,9 +455,9 @@ export function ProductDetailPage() {
       }));
   }, [productDetail, products]);
   const filteredAssets = useMemo(() => {
-    if (!productId) return [] as ProductAsset[];
-    return productAssets.filter((asset) => asset.product_id === productId);
-  }, [productAssets, productId]);
+    if (!productDetail?.id) return [] as ProductAsset[];
+    return productAssets.filter((asset) => asset.product_id === productDetail.id);
+  }, [productAssets, productDetail?.id]);
   const offerNameById = useMemo(() => {
     const mapping = new Map<string, string>();
     (productDetail?.offers || []).forEach((offer) => mapping.set(offer.id, offer.name));

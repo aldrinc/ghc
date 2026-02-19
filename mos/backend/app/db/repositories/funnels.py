@@ -145,6 +145,14 @@ class FunnelsRepository:
         self.session.refresh(funnel)
         return funnel
 
+    def delete(self, *, org_id: str, funnel_id: str) -> bool:
+        funnel = self.get(org_id=org_id, funnel_id=funnel_id)
+        if not funnel:
+            return False
+        self.session.delete(funnel)
+        self.session.commit()
+        return True
+
 
 class FunnelPagesRepository:
     def __init__(self, session: Session) -> None:

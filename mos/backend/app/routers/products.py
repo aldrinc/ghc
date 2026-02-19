@@ -397,9 +397,8 @@ def create_shopify_product_for_product(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    product = session.scalars(
-        select(Product).where(Product.id == product_id, Product.org_id == auth.org_id)
-    ).first()
+    products_repo = ProductsRepository(session)
+    product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     if product.shopify_product_gid:
@@ -501,9 +500,8 @@ def list_product_offers(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    product = session.scalars(
-        select(Product).where(Product.id == product_id, Product.org_id == auth.org_id)
-    ).first()
+    products_repo = ProductsRepository(session)
+    product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
@@ -547,16 +545,17 @@ def create_product_offer(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    if str(payload.productId) != str(product_id):
+    products_repo = ProductsRepository(session)
+    product = products_repo.get(org_id=auth.org_id, product_id=product_id)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    payload_product = products_repo.get(org_id=auth.org_id, product_id=payload.productId)
+    if not payload_product or str(payload_product.id) != str(product.id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Offer productId must match URL product_id.",
         )
-    product = session.scalars(
-        select(Product).where(Product.id == product_id, Product.org_id == auth.org_id)
-    ).first()
-    if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     fields: dict[str, object] = {
         "name": payload.name,
@@ -754,7 +753,11 @@ def list_product_assets(
 
     assets_repo = AssetsRepository(session)
     now = datetime.now(timezone.utc)
-    assets = [asset for asset in assets_repo.list(org_id=auth.org_id, product_id=product_id) if _is_asset_active(asset, now=now)]
+    assets = [
+        asset
+        for asset in assets_repo.list(org_id=auth.org_id, product_id=str(product.id))
+        if _is_asset_active(asset, now=now)
+    ]
     primary_asset_id = str(product.primary_asset_id) if product.primary_asset_id else None
     if not assets:
         return []
