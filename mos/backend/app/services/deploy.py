@@ -7,8 +7,9 @@ import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 from typing import Any, Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from app.config import settings
 
@@ -853,6 +854,189 @@ def _load_funnel_runtime_artifact_payload_for_apply(*, artifact_id: str) -> dict
     return data
 
 
+def _load_product_route_context_for_apply(*, product_id: str) -> tuple[str, str]:
+    from sqlalchemy import select
+
+    from app.db.base import SessionLocal
+    from app.db.models import Product
+    from app.services.public_routing import require_product_route_slug
+
+    try:
+        normalized_product_id = str(UUID(str(product_id).strip()))
+    except ValueError as exc:
+        raise DeployError(f"Invalid product_id '{product_id}' in funnel artifact source_ref.") from exc
+
+    session = SessionLocal()
+    try:
+        product = session.scalars(select(Product).where(Product.id == normalized_product_id)).first()
+    finally:
+        session.close()
+
+    if not product:
+        raise DeployError(
+            f"Product '{normalized_product_id}' referenced by funnel artifact workload was not found."
+        )
+    return str(product.client_id), require_product_route_slug(product=product)
+
+
+def _normalize_legacy_publication_source_ref_for_apply(*, workload: dict[str, Any]) -> bool:
+    name = str(workload.get("name") or "").strip() or "<unnamed>"
+    source_ref = workload.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError(
+            f"Workload '{name}' source_ref must be an object for source_type='funnel_publication'."
+        )
+
+    changed = False
+    public_id = str(source_ref.get("public_id") or "").strip()
+    if not public_id:
+        raise DeployError(
+            f"Workload '{name}' uses source_type='funnel_publication' but source_ref.public_id is missing."
+        )
+
+    upstream_base_url = str(source_ref.get("upstream_base_url") or "").strip().rstrip("/")
+    if not upstream_base_url:
+        upstream_base_url = str(settings.DEPLOY_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        if not upstream_base_url:
+            legacy_api = str(source_ref.get("upstream_api_base_url") or "").strip().rstrip("/")
+            if legacy_api:
+                parsed = urlsplit(legacy_api)
+                if parsed.scheme and parsed.netloc:
+                    upstream_base_url = f"{parsed.scheme}://{parsed.netloc}"
+        if not upstream_base_url:
+            raise DeployError(
+                f"Workload '{name}' is missing source_ref.upstream_base_url. "
+                "Set DEPLOY_PUBLIC_BASE_URL or update the plan workload."
+            )
+        source_ref["upstream_base_url"] = upstream_base_url
+        changed = True
+
+    upstream_api_base_url = str(source_ref.get("upstream_api_base_url") or "").strip().rstrip("/")
+    if not upstream_api_base_url:
+        upstream_api_base_url = str(settings.DEPLOY_PUBLIC_API_BASE_URL or "").strip().rstrip("/")
+        if not upstream_api_base_url:
+            upstream_api_base_url = f"{upstream_base_url}/api"
+        source_ref["upstream_api_base_url"] = upstream_api_base_url
+        changed = True
+
+    if not upstream_base_url.startswith(("http://", "https://")):
+        raise DeployError(
+            f"Workload '{name}' has invalid source_ref.upstream_base_url '{upstream_base_url}'."
+        )
+    if not upstream_api_base_url.startswith(("http://", "https://")):
+        raise DeployError(
+            f"Workload '{name}' has invalid source_ref.upstream_api_base_url '{upstream_api_base_url}'."
+        )
+
+    if changed:
+        workload["source_ref"] = source_ref
+    return changed
+
+
+def _normalize_legacy_artifact_source_ref_for_apply(*, workload: dict[str, Any]) -> bool:
+    name = str(workload.get("name") or "").strip() or "<unnamed>"
+    source_ref = workload.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError(
+            f"Workload '{name}' source_ref must be an object for source_type='funnel_artifact'."
+        )
+
+    changed = False
+    client_id = str(source_ref.get("client_id") or "").strip()
+    product_id = str(source_ref.get("product_id") or "").strip()
+
+    # Legacy fallback path: source_type was historically set to funnel_artifact while carrying
+    # publication proxy payload (`public_id`) without artifact references.
+    if not client_id and not product_id and str(source_ref.get("public_id") or "").strip():
+        workload["source_type"] = "funnel_publication"
+        changed |= _normalize_legacy_publication_source_ref_for_apply(workload=workload)
+        return True
+
+    if not client_id:
+        if product_id:
+            resolved_client_id, _ = _load_product_route_context_for_apply(product_id=product_id)
+            source_ref["client_id"] = resolved_client_id
+            client_id = resolved_client_id
+            changed = True
+        else:
+            artifact = source_ref.get("artifact")
+            if isinstance(artifact, dict):
+                meta = artifact.get("meta")
+                if isinstance(meta, dict):
+                    meta_client_id = str(meta.get("clientId") or meta.get("client_id") or "").strip()
+                    if meta_client_id:
+                        source_ref["client_id"] = meta_client_id
+                        client_id = meta_client_id
+                        changed = True
+
+    if not client_id:
+        raise DeployError(
+            f"Workload '{name}' uses source_type='funnel_artifact' but source_ref.client_id is missing."
+        )
+
+    upstream_api_base_root = str(source_ref.get("upstream_api_base_root") or "").strip().rstrip("/")
+    if not upstream_api_base_root:
+        legacy_api = str(source_ref.get("upstream_api_base_url") or settings.DEPLOY_PUBLIC_API_BASE_URL or "").strip().rstrip("/")
+        if not legacy_api:
+            raise DeployError(
+                f"Workload '{name}' is missing source_ref.upstream_api_base_root. "
+                "Set DEPLOY_PUBLIC_API_BASE_URL or update the plan workload."
+            )
+        source_ref["upstream_api_base_root"] = legacy_api
+        upstream_api_base_root = legacy_api
+        changed = True
+
+    if not upstream_api_base_root.startswith(("http://", "https://")):
+        raise DeployError(
+            f"Workload '{name}' has invalid source_ref.upstream_api_base_root '{upstream_api_base_root}'."
+        )
+
+    runtime_dist_path = str(source_ref.get("runtime_dist_path") or "").strip()
+    if not runtime_dist_path:
+        source_ref["runtime_dist_path"] = settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+        changed = True
+
+    artifact = source_ref.get("artifact")
+    if not isinstance(artifact, dict):
+        raise DeployError(
+            f"Workload '{name}' source_ref.artifact must be an object for source_type='funnel_artifact'."
+        )
+
+    if not isinstance(artifact.get("meta"), dict):
+        artifact["meta"] = {}
+        changed = True
+
+    if not isinstance(artifact.get("products"), dict):
+        legacy_funnels = artifact.get("funnels")
+        if isinstance(legacy_funnels, dict):
+            if not product_id:
+                meta = artifact.get("meta")
+                if isinstance(meta, dict):
+                    product_id = str(meta.get("productId") or meta.get("product_id") or "").strip()
+            if not product_id:
+                raise DeployError(
+                    f"Workload '{name}' has legacy source_ref.artifact.funnels but source_ref.product_id is missing."
+                )
+            _resolved_client_id, product_slug = _load_product_route_context_for_apply(product_id=product_id)
+            artifact["products"] = {
+                product_slug: {
+                    "meta": {
+                        "productId": product_id,
+                        "productSlug": product_slug,
+                    },
+                    "funnels": legacy_funnels,
+                }
+            }
+            changed = True
+        else:
+            artifact["products"] = {}
+            changed = True
+
+    source_ref["artifact"] = artifact
+    workload["source_ref"] = source_ref
+    return changed
+
+
 def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
     try:
         plan = json.loads(plan_file.read_text(encoding="utf-8"))
@@ -877,8 +1061,14 @@ def _materialize_funnel_artifacts_for_apply(*, plan_file: Path) -> Path:
             if not isinstance(workload, dict):
                 continue
             source_type = str(workload.get("source_type") or "").strip().lower()
+            if source_type == "funnel_publication":
+                if _normalize_legacy_publication_source_ref_for_apply(workload=workload):
+                    has_changes = True
+                continue
             if source_type != "funnel_artifact":
                 continue
+            if _normalize_legacy_artifact_source_ref_for_apply(workload=workload):
+                has_changes = True
             source_ref = workload.get("source_ref")
             if not isinstance(source_ref, dict):
                 raise DeployError(

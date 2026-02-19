@@ -242,3 +242,146 @@ def test_materialize_funnel_artifacts_for_apply_hydrates_from_artifact_id(tmp_pa
     source_ref = payload["new_spec"]["instances"][0]["workloads"][0]["source_ref"]
     assert source_ref["artifact"]["meta"]["artifactId"] == "artifact-123"
     assert "sample-product" in source_ref["artifact"]["products"]
+
+
+def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_publication_source_ref(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "legacy-publication-workload",
+                                    "source_type": "funnel_publication",
+                                    "source_ref": {
+                                        "public_id": "dc6431ec-6f65-4fac-9492-6581a93690b0",
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materialized = deploy_service._materialize_funnel_artifacts_for_apply(plan_file=plan_file)
+    assert materialized != plan_file
+    payload = json.loads(materialized.read_text(encoding="utf-8"))
+    source_ref = payload["new_spec"]["instances"][0]["workloads"][0]["source_ref"]
+    assert source_ref["public_id"] == "dc6431ec-6f65-4fac-9492-6581a93690b0"
+    assert source_ref["upstream_base_url"] == "https://moshq.app"
+    assert source_ref["upstream_api_base_url"] == "https://moshq.app/api"
+
+
+def test_materialize_funnel_artifacts_for_apply_normalizes_legacy_artifact_source_ref(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+    client_id = "f51f25df-e761-4ead-850b-a35a20b35fde"
+    product_id = "638d19db-9480-4bbd-91c6-052b07b6537d"
+
+    def _fake_product_context(*, product_id: str):
+        assert product_id == "638d19db-9480-4bbd-91c6-052b07b6537d"
+        return (
+            "f51f25df-e761-4ead-850b-a35a20b35fde",
+            "legacy-product",
+        )
+
+    monkeypatch.setattr(deploy_service, "_load_product_route_context_for_apply", _fake_product_context)
+
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "legacy-artifact-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "product_id": product_id,
+                                        "upstream_api_base_url": "https://moshq.app/api",
+                                        "artifact": {
+                                            "meta": {"productId": product_id},
+                                            "funnels": {},
+                                        },
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materialized = deploy_service._materialize_funnel_artifacts_for_apply(plan_file=plan_file)
+    assert materialized != plan_file
+    payload = json.loads(materialized.read_text(encoding="utf-8"))
+    workload = payload["new_spec"]["instances"][0]["workloads"][0]
+    source_ref = workload["source_ref"]
+    assert source_ref["client_id"] == client_id
+    assert source_ref["upstream_api_base_root"] == "https://moshq.app/api"
+    assert source_ref["runtime_dist_path"] == deploy_service.settings.DEPLOY_ARTIFACT_RUNTIME_DIST_PATH
+    assert "legacy-product" in source_ref["artifact"]["products"]
+
+
+def test_materialize_funnel_artifacts_for_apply_converts_legacy_artifact_public_id_to_publication(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_BASE_URL", "https://moshq.app")
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_PUBLIC_API_BASE_URL", "https://moshq.app/api")
+
+    plan_file = tmp_path / "plan-input.json"
+    plan_file.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "legacy-artifact-public-id-workload",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {
+                                        "public_id": "dc6431ec-6f65-4fac-9492-6581a93690b0",
+                                        "artifact": {"meta": {"offers": []}},
+                                    },
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    materialized = deploy_service._materialize_funnel_artifacts_for_apply(plan_file=plan_file)
+    assert materialized != plan_file
+    payload = json.loads(materialized.read_text(encoding="utf-8"))
+    workload = payload["new_spec"]["instances"][0]["workloads"][0]
+    source_ref = workload["source_ref"]
+    assert workload["source_type"] == "funnel_publication"
+    assert source_ref["public_id"] == "dc6431ec-6f65-4fac-9492-6581a93690b0"
+    assert source_ref["upstream_base_url"] == "https://moshq.app"
+    assert source_ref["upstream_api_base_url"] == "https://moshq.app/api"
