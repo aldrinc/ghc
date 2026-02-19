@@ -294,17 +294,20 @@ def create_funnel(
             )
 
     repo = FunnelsRepository(session)
-    funnel = repo.create(
-        org_id=auth.org_id,
-        client_id=payload.clientId,
-        campaign_id=campaign_id,
-        experiment_spec_id=experiment_id,
-        product_id=product_id,
-        selected_offer_id=selected_offer_id,
-        name=payload.name,
-        description=payload.description,
-        status=FunnelStatusEnum.draft,
-    )
+    try:
+        funnel = repo.create(
+            org_id=auth.org_id,
+            client_id=payload.clientId,
+            campaign_id=campaign_id,
+            experiment_spec_id=experiment_id,
+            product_id=product_id,
+            selected_offer_id=selected_offer_id,
+            name=payload.name,
+            description=payload.description,
+            status=FunnelStatusEnum.draft,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return jsonable_encoder(funnel)
 
 

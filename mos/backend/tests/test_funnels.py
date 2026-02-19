@@ -1,4 +1,5 @@
 import re
+from uuid import UUID
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -140,10 +141,20 @@ def test_funnel_authoring_publish_and_public_runtime(api_client: TestClient, db_
     assert meta.json()["funnelSlug"] == route_slug
     assert meta.json()["entrySlug"] == page1["slug"]
 
+    # Support route token by funnel id as well as route slug.
+    meta_by_id = api_client.get(f"/public/funnels/{product_slug}/{funnel_id}/meta")
+    assert meta_by_id.status_code == 200
+    assert meta_by_id.json()["funnelId"] == funnel_id
+    assert meta_by_id.json()["funnelSlug"] == route_slug
+
     public_page = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/pages/{page1['slug']}")
     assert public_page.status_code == 200
     assert public_page.json()["slug"] == page1["slug"]
     assert public_page.json()["puckData"]["content"][0]["props"]["text"] == "Published"
+
+    public_page_by_id = api_client.get(f"/public/funnels/{product_slug}/{funnel_id}/pages/{page1['slug']}")
+    assert public_page_by_id.status_code == 200
+    assert public_page_by_id.json()["slug"] == page1["slug"]
 
     # Draft leakage guard: save a new draft but do not approve; public stays the same.
     save_new_draft = api_client.put(
@@ -203,6 +214,71 @@ def test_funnel_publish_uses_product_id_slug_when_handle_missing(api_client: Tes
     assert meta.status_code == 200
     assert meta.json()["productSlug"] == product_slug
     assert meta.json()["funnelSlug"] == route_slug
+
+
+def test_create_product_retries_on_8_char_id_prefix_collision(api_client: TestClient, monkeypatch):
+    client_resp = api_client.post("/clients", json={"name": "Short Id Product Client", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    first_product = api_client.post("/products", json={"clientId": client_id, "title": "Product One"})
+    assert first_product.status_code == 201
+    first_product_id = first_product.json()["id"]
+    first_prefix = first_product_id.split("-", 1)[0]
+
+    colliding_uuid = UUID(f"{first_prefix}-0000-0000-0000-000000000001")
+    if str(colliding_uuid) == first_product_id:
+        colliding_uuid = UUID(f"{first_prefix}-0000-0000-0000-000000000002")
+    unique_prefix = ("f" if first_prefix[0] != "f" else "e") + first_prefix[1:]
+    unique_uuid = UUID(f"{unique_prefix}-1111-1111-1111-111111111111")
+
+    generated = iter([colliding_uuid, unique_uuid])
+
+    def fake_uuid4():
+        return next(generated)
+
+    monkeypatch.setattr("app.db.repositories.products.uuid4", fake_uuid4)
+
+    second_product = api_client.post("/products", json={"clientId": client_id, "title": "Product Two"})
+    assert second_product.status_code == 201
+    assert second_product.json()["id"].split("-", 1)[0] == unique_prefix
+
+
+def test_create_funnel_retries_on_8_char_id_prefix_collision(api_client: TestClient, monkeypatch):
+    client_resp = api_client.post("/clients", json={"name": "Short Id Funnel Client", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+    product_resp = api_client.post("/products", json={"clientId": client_id, "title": "Short Id Product"})
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    first_funnel = api_client.post(
+        "/funnels",
+        json={"clientId": client_id, "productId": product_id, "name": "Short Id Funnel One", "description": "Demo"},
+    )
+    assert first_funnel.status_code == 201
+    first_funnel_id = first_funnel.json()["id"]
+    first_prefix = first_funnel_id.split("-", 1)[0]
+
+    colliding_uuid = UUID(f"{first_prefix}-0000-0000-0000-000000000001")
+    if str(colliding_uuid) == first_funnel_id:
+        colliding_uuid = UUID(f"{first_prefix}-0000-0000-0000-000000000002")
+    unique_prefix = ("f" if first_prefix[0] != "f" else "e") + first_prefix[1:]
+    unique_uuid = UUID(f"{unique_prefix}-2222-2222-2222-222222222222")
+
+    generated = iter([colliding_uuid, unique_uuid])
+
+    def fake_uuid4():
+        return next(generated)
+
+    monkeypatch.setattr("app.db.repositories.funnels.uuid4", fake_uuid4)
+
+    second_funnel = api_client.post(
+        "/funnels",
+        json={"clientId": client_id, "productId": product_id, "name": "Short Id Funnel Two", "description": "Demo"},
+    )
+    assert second_funnel.status_code == 201
+    assert second_funnel.json()["id"].split("-", 1)[0] == unique_prefix
 
 
 def test_funnel_public_preview_allows_approved_pages_before_publish(api_client: TestClient):

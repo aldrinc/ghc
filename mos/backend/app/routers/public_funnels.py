@@ -40,9 +40,25 @@ from app.services.shopify_checkout import create_shopify_checkout
 router = APIRouter(prefix="/public", tags=["public"])
 
 
-def _get_funnel_or_404(*, session: Session, product_slug: str, funnel_slug: str) -> tuple[Funnel, Product, str]:
+def _resolve_funnel_by_route_token(*, session: Session, funnel_token: str) -> Funnel | None:
+    token = str(funnel_token or "").strip()
+    if not token:
+        return None
+
     funnels_repo = FunnelsRepository(session)
-    funnel = funnels_repo.get_by_route_slug(route_slug=funnel_slug)
+    funnel = funnels_repo.get_by_route_slug(route_slug=token)
+    if funnel:
+        return funnel
+
+    try:
+        parsed_funnel_id = str(UUID(token))
+    except ValueError:
+        return None
+    return session.scalars(select(Funnel).where(Funnel.id == parsed_funnel_id)).first()
+
+
+def _get_funnel_or_404(*, session: Session, product_slug: str, funnel_slug: str) -> tuple[Funnel, Product, str]:
+    funnel = _resolve_funnel_by_route_token(session=session, funnel_token=funnel_slug)
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
     if funnel.status == FunnelStatusEnum.disabled:
@@ -68,8 +84,7 @@ def _get_funnel_or_404(*, session: Session, product_slug: str, funnel_slug: str)
 
 
 def _get_funnel_by_slug_or_404(*, session: Session, funnel_slug: str) -> Funnel:
-    funnels_repo = FunnelsRepository(session)
-    funnel = funnels_repo.get_by_route_slug(route_slug=funnel_slug)
+    funnel = _resolve_funnel_by_route_token(session=session, funnel_token=funnel_slug)
     if not funnel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
     if funnel.status == FunnelStatusEnum.disabled:

@@ -617,6 +617,7 @@ WantedBy=multi-user.target
             product_dir = f"{base_root}/{product_slug}"
             self.run(f"mkdir -p {shlex.quote(product_dir)}")
             self.upload_file(json.dumps(product_meta, ensure_ascii=False), f"{product_dir}/meta.json")
+            seen_funnel_path_tokens: set[str] = set()
 
             for raw_funnel_slug, funnel_payload in funnels.items():
                 funnel_slug = str(raw_funnel_slug or "").strip()
@@ -643,30 +644,47 @@ WantedBy=multi-user.target
                         f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a pages object."
                     )
 
-                funnel_dir = f"{product_dir}/{funnel_slug}"
-                pages_dir = f"{funnel_dir}/pages"
-                self.run(f"mkdir -p {shlex.quote(pages_dir)}")
-                self.upload_file(json.dumps(funnel_meta, ensure_ascii=False), f"{funnel_dir}/meta.json")
-
-                if isinstance(commerce, dict):
-                    self.upload_file(json.dumps(commerce, ensure_ascii=False), f"{funnel_dir}/commerce.json")
-
-                for raw_page_slug, page_payload in pages.items():
-                    page_slug = str(raw_page_slug or "").strip()
-                    if not page_slug:
-                        continue
-                    if "/" in page_slug or "\\" in page_slug:
+                funnel_path_tokens = [funnel_slug]
+                funnel_id_token = str(funnel_meta.get("funnelId") or "").strip()
+                if funnel_id_token:
+                    if "/" in funnel_id_token or "\\" in funnel_id_token:
                         raise ValueError(
-                            f"Invalid artifact page slug '{page_slug}' for funnel '{product_slug}/{funnel_slug}'."
+                            f"Invalid artifact funnelId '{funnel_id_token}' for '{product_slug}/{funnel_slug}'."
                         )
-                    if not isinstance(page_payload, dict):
+                    if funnel_id_token != funnel_slug:
+                        funnel_path_tokens.append(funnel_id_token)
+
+                for funnel_path_token in funnel_path_tokens:
+                    if funnel_path_token in seen_funnel_path_tokens:
                         raise ValueError(
-                            f"Artifact page payload for '{product_slug}/{funnel_slug}/{page_slug}' must be an object."
+                            f"Artifact product '{product_slug}' duplicates funnel path token '{funnel_path_token}'."
                         )
-                    self.upload_file(
-                        json.dumps(page_payload, ensure_ascii=False),
-                        f"{pages_dir}/{page_slug}.json",
-                    )
+                    seen_funnel_path_tokens.add(funnel_path_token)
+
+                    funnel_dir = f"{product_dir}/{funnel_path_token}"
+                    pages_dir = f"{funnel_dir}/pages"
+                    self.run(f"mkdir -p {shlex.quote(pages_dir)}")
+                    self.upload_file(json.dumps(funnel_meta, ensure_ascii=False), f"{funnel_dir}/meta.json")
+
+                    if isinstance(commerce, dict):
+                        self.upload_file(json.dumps(commerce, ensure_ascii=False), f"{funnel_dir}/commerce.json")
+
+                    for raw_page_slug, page_payload in pages.items():
+                        page_slug = str(raw_page_slug or "").strip()
+                        if not page_slug:
+                            continue
+                        if "/" in page_slug or "\\" in page_slug:
+                            raise ValueError(
+                                f"Invalid artifact page slug '{page_slug}' for funnel '{product_slug}/{funnel_slug}'."
+                            )
+                        if not isinstance(page_payload, dict):
+                            raise ValueError(
+                                f"Artifact page payload for '{product_slug}/{funnel_slug}/{page_slug}' must be an object."
+                            )
+                        self.upload_file(
+                            json.dumps(page_payload, ensure_ascii=False),
+                            f"{pages_dir}/{page_slug}.json",
+                        )
 
     def _configure_funnel_artifact_site(self, app: ApplicationSpec):
         source = app.source_ref

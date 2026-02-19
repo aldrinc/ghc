@@ -242,11 +242,44 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
 
     meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/meta.json"
     page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/pages/presales.json"
+    id_meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/meta.json"
+    id_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/pages/presales.json"
     assert meta_path in uploaded
     assert page_path in uploaded
+    assert id_meta_path in uploaded
+    assert id_page_path in uploaded
 
     assert "nginx -t" in commands
     assert "systemctl reload nginx" in commands
+
+
+def test_funnel_artifact_site_errors_when_funnel_id_alias_collides_with_existing_slug():
+    app = _artifact_app()
+    product_payload = app.source_ref.artifact["products"]["example-product"]
+    product_payload["funnels"]["funnel-1"] = {
+        "meta": {
+            "funnelSlug": "funnel-1",
+            "funnelId": "funnel-2",
+            "publicationId": "pub-2",
+            "entrySlug": "presales",
+            "pages": [{"pageId": "page-2", "slug": "presales"}],
+        },
+        "pages": {
+            "presales": {
+                "funnelId": "funnel-2",
+                "publicationId": "pub-2",
+                "pageId": "page-2",
+                "slug": "presales",
+                "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+                "pageMap": {"page-2": "presales"},
+            }
+        },
+    }
+
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    with pytest.raises(ValueError, match="duplicates funnel path token"):
+        deployer._configure_funnel_artifact_site(app)
 
 
 def test_funnel_artifact_site_errors_with_clear_message_when_runtime_dist_missing():
