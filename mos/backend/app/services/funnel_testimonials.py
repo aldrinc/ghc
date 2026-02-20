@@ -927,21 +927,22 @@ def _resolve_product_primary_image(
 
 
 def _parse_config_context(props: dict[str, Any]) -> tuple[dict[str, Any] | None, _ConfigContext | None]:
+    raw = props.get("configJson")
+    if raw is not None:
+        if not isinstance(raw, str) or not raw.strip():
+            raise TestimonialGenerationError("configJson must be a non-empty JSON string.")
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise TestimonialGenerationError(f"configJson must be valid JSON: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise TestimonialGenerationError("configJson must decode to a JSON object.")
+        return parsed, _ConfigContext(props=props, key="configJson", parsed=parsed)
+
     config = props.get("config")
     if isinstance(config, dict):
         return config, None
-    raw = props.get("configJson")
-    if raw is None:
-        return None, None
-    if not isinstance(raw, str) or not raw.strip():
-        raise TestimonialGenerationError("configJson must be a non-empty JSON string.")
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise TestimonialGenerationError(f"configJson must be valid JSON: {exc}") from exc
-    if not isinstance(parsed, dict):
-        raise TestimonialGenerationError("configJson must decode to a JSON object.")
-    return parsed, _ConfigContext(props=props, key="configJson", parsed=parsed)
+    return None, None
 
 
 def _collect_sales_pdp_targets(
