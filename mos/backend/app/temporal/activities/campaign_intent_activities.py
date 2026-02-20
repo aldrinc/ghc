@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from temporalio import activity
 from sqlalchemy import select
@@ -20,6 +20,39 @@ from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.design_systems import DesignSystemsRepository
 from app.services.design_systems import resolve_design_system_tokens
 
+
+_DEFAULT_AI_DRAFT_EMPTY_PAGE_MAX_ATTEMPTS = 3
+_EMPTY_PAGE_ERROR_MARKERS = (
+    "ai generation produced an empty page",
+    "empty page (no content)",
+)
+
+
+def _is_empty_page_generation_error(exc: Exception) -> bool:
+    message = str(exc).strip().lower()
+    return any(marker in message for marker in _EMPTY_PAGE_ERROR_MARKERS)
+
+
+def _run_generate_page_draft_with_retries(
+    *,
+    run_generation: Callable[[], Dict[str, Any]],
+    max_attempts: int,
+    on_retry: Callable[[int, Exception], None] | None = None,
+) -> Dict[str, Any]:
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be >= 1.")
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return run_generation()
+        except Exception as exc:  # noqa: BLE001
+            should_retry = _is_empty_page_generation_error(exc) and attempt < max_attempts
+            if not should_retry:
+                raise
+            if on_retry is not None:
+                on_retry(attempt, exc)
+
+    raise RuntimeError("AI draft generation failed after retries without returning a result.")
 
 
 @activity.defn
@@ -89,6 +122,16 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     generate_ai_drafts = bool(params.get("generate_ai_drafts", False))
     generate_testimonials = bool(params.get("generate_testimonials", False))
     workflow_run_id = params.get("workflow_run_id")
+    raw_ai_draft_max_attempts = params.get("ai_draft_max_attempts")
+    if raw_ai_draft_max_attempts is None:
+        ai_draft_max_attempts = _DEFAULT_AI_DRAFT_EMPTY_PAGE_MAX_ATTEMPTS
+    else:
+        try:
+            ai_draft_max_attempts = int(raw_ai_draft_max_attempts)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("ai_draft_max_attempts must be an integer >= 1 when provided.") from exc
+        if ai_draft_max_attempts < 1:
+            raise ValueError("ai_draft_max_attempts must be >= 1.")
 
     def log_activity(step: str, status: str, *, payload_in=None, payload_out=None, error: str | None = None) -> None:
         if not workflow_run_id:
@@ -252,17 +295,33 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
                     )
                 try:
-                    result = run_generate_page_draft(
-                        session=session,
-                        org_id=org_id,
-                        user_id=str(actor_user_id),
-                        funnel_id=str(funnel.id),
-                        page_id=str(page.id),
-                        prompt=prompt,
-                        current_puck_data=puck_data,
-                        template_id=template_id,
-                        idea_workspace_id=idea_workspace_id,
-                        generate_testimonials=generate_testimonials,
+                    result = _run_generate_page_draft_with_retries(
+                        run_generation=lambda: run_generate_page_draft(
+                            session=session,
+                            org_id=org_id,
+                            user_id=str(actor_user_id),
+                            funnel_id=str(funnel.id),
+                            page_id=str(page.id),
+                            prompt=prompt,
+                            current_puck_data=puck_data,
+                            template_id=template_id,
+                            idea_workspace_id=idea_workspace_id,
+                            generate_testimonials=generate_testimonials,
+                        ),
+                        max_attempts=ai_draft_max_attempts,
+                        on_retry=lambda attempt, exc: log_activity(
+                            "funnel_page_draft",
+                            "retrying",
+                            payload_in={
+                                "page_id": str(page.id),
+                                "template_id": template_id,
+                                "funnel_id": str(funnel.id),
+                                "attempt": attempt,
+                                "max_attempts": ai_draft_max_attempts,
+                                "reason": "empty_page_generation",
+                                "error": str(exc),
+                            },
+                        ),
                     )
                     draft_version_id = result.get("draftVersionId") or ""
                     generated_images = result.get("generatedImages") or []
@@ -538,6 +597,7 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
                         "actor_user_id": actor_user_id,
                         "generate_ai_drafts": generate_ai_drafts,
                         "generate_testimonials": generate_testimonials,
+                        "ai_draft_max_attempts": params.get("ai_draft_max_attempts"),
                         "workflow_run_id": workflow_run_id,
                     }
                 )
