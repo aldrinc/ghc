@@ -597,7 +597,8 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
                 "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
                 "- Do not set referenceAssetPublicId unless you are using one of the attached images listed above.\n"
-                "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n\n"
+                "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n"
+                "- If referenceAssetPublicId is set, imageSource must be 'ai' (never 'unsplash').\n\n"
             )
             if template_kind == "sales-pdp":
                 template_image_guidance += (
@@ -720,7 +721,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "   - imageSource: 'ai' (default) | 'unsplash'\n"
                 "   - radius: 'none' | 'md' | 'lg'\n"
                 "   - If imageSource='unsplash': include prompt and leave assetPublicId empty (no referenceAssetPublicId)\n"
-                "   - If referenceAssetPublicId is set: include prompt and leave assetPublicId empty\n"
+                "   - If referenceAssetPublicId is set: include prompt, leave assetPublicId empty, and set imageSource='ai'\n"
                 "7) Button: props { id, label, variant?, size?, width?, align?, linkType?, targetPageId?, href? }\n"
                 "   - variant: 'primary' | 'secondary'\n"
                 "   - size: 'sm' | 'md' | 'lg'\n"

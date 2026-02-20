@@ -1,3 +1,4 @@
+import ast
 import json
 from types import SimpleNamespace
 
@@ -93,6 +94,34 @@ def test_routes_overly_specific_stock_scene_to_ai():
     assert planned[0]["routingSuggestedImageSource"] == "ai"
     assert "too specific for reliable stock search" in planned[0]["routingReason"]
     assert "imageSource" not in puck_data["content"][0]["props"]
+
+
+def test_collect_image_plans_unsplash_reference_error_includes_details():
+    puck_data = _puck_with_images(
+        [
+            {
+                "id": "hero-image",
+                "alt": "Lifestyle scene",
+                "prompt": "Candid lifestyle portrait in a bright kitchen with natural light.",
+                "imageSource": "unsplash",
+                "referenceAssetPublicId": "reference-public-id",
+            }
+        ]
+    )
+
+    with pytest.raises(funnel_ai.AiAttachmentError) as exc_info:
+        funnel_ai._collect_image_plans(puck_data=puck_data, config_contexts=[])
+
+    message = str(exc_info.value)
+    assert "Unsplash images do not support referenceAssetPublicId." in message
+    assert "details=" in message
+
+    details = ast.literal_eval(message.split("details=", maxsplit=1)[1])
+    assert details["path"] == "puckData.content[0].props"
+    assert details["assetKey"] == "assetPublicId"
+    assert details["imageSource"] == "unsplash"
+    assert details["referenceAssetPublicId"] == "reference-public-id"
+    assert details["hasPrompt"] is True
 
 
 def test_pre_sales_badge_icons_are_repaired_from_fallback_template():
