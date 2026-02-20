@@ -172,6 +172,98 @@ def test_create_variant_with_offer_id(api_client):
     assert payload["offer_id"] == offer_id
 
 
+def test_delete_variant_removes_variant_from_product(api_client):
+    client_id = _create_client(api_client, name="Variant Delete")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Temporary Variant",
+            "price": 9900,
+            "currency": "usd",
+            "provider": "stripe",
+            "externalPriceId": "price_test_delete",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    delete_resp = api_client.delete(f"/products/variants/{variant_id}")
+    assert delete_resp.status_code == 200
+    assert delete_resp.json() == {"ok": True}
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    variants = detail_resp.json().get("variants") or []
+    assert variants == []
+
+
+def test_delete_variant_returns_not_found_when_missing(api_client):
+    missing_variant_id = "00000000-0000-0000-0000-000000000123"
+
+    delete_resp = api_client.delete(f"/products/variants/{missing_variant_id}")
+    assert delete_resp.status_code == 404
+    assert delete_resp.json()["detail"] == "Variant not found"
+
+
+def test_delete_shopify_mapped_variant_requires_force(api_client):
+    client_id = _create_client(api_client, name="Variant Delete Shopify Guard")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Shopify Variant",
+            "price": 12900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/123456789",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    delete_resp = api_client.delete(f"/products/variants/{variant_id}")
+    assert delete_resp.status_code == 409
+    assert delete_resp.json()["detail"] == (
+        "Shopify-mapped variants require explicit force delete. "
+        "Retry with ?force=true to delete only the MOS record."
+    )
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    variants = detail_resp.json().get("variants") or []
+    assert any(item["id"] == variant_id for item in variants)
+
+
+def test_delete_shopify_mapped_variant_allows_force(api_client):
+    client_id = _create_client(api_client, name="Variant Delete Shopify Forced")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+
+    create_resp = api_client.post(
+        f"/products/{product_id}/variants",
+        json={
+            "title": "Shopify Variant",
+            "price": 12900,
+            "currency": "usd",
+            "provider": "shopify",
+            "externalPriceId": "gid://shopify/ProductVariant/987654321",
+        },
+    )
+    assert create_resp.status_code == 201
+    variant_id = create_resp.json()["id"]
+
+    delete_resp = api_client.delete(f"/products/variants/{variant_id}?force=true")
+    assert delete_resp.status_code == 200
+    assert delete_resp.json() == {"ok": True}
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    variants = detail_resp.json().get("variants") or []
+    assert all(item["id"] != variant_id for item in variants)
+
+
 def test_create_variant_rejects_offer_from_other_product(api_client):
     client_id = _create_client(api_client, name="Offer Variant Scope")
     primary_product_id = _create_product(api_client, client_id=client_id, title="Primary Product")

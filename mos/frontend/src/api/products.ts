@@ -456,3 +456,25 @@ export function useUpdateVariant(variantId: string, productIdForInvalidation?: s
     },
   });
 }
+
+export function useDeleteVariant(productIdForInvalidation?: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ variantId, force }: { variantId: string; force?: boolean }) =>
+      request<{ ok: boolean }>(`/products/variants/${variantId}${force ? "?force=true" : ""}`, {
+        method: "DELETE",
+      }),
+    onSuccess: () => {
+      toast.success("Variant deleted");
+      if (productIdForInvalidation) {
+        queryClient.invalidateQueries({ queryKey: ["products", "detail", productIdForInvalidation] });
+      }
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to delete variant";
+      toast.error(message);
+    },
+  });
+}

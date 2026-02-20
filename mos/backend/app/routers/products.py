@@ -175,6 +175,14 @@ def _validate_variant_provider_mapping(*, provider: str | None, external_price_i
         )
 
 
+def _is_shopify_managed_variant(variant: ProductVariant) -> bool:
+    return (
+        variant.provider == "shopify"
+        and isinstance(variant.external_price_id, str)
+        and variant.external_price_id.strip().startswith(_SHOPIFY_VARIANT_GID_PREFIX)
+    )
+
+
 def _serialize_offer_bonus(
     *,
     bonus: ProductOfferBonus,
@@ -1377,3 +1385,42 @@ def update_variant(
     if not updated:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
     return jsonable_encoder(updated)
+
+
+@router.delete("/variants/{variant_id}")
+def delete_variant(
+    variant_id: str,
+    force: bool = False,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    variants_repo = ProductVariantsRepository(session)
+    variant = variants_repo.get(variant_id=variant_id)
+    if not variant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+
+    if not variant.product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Variant is not linked to a product.",
+        )
+
+    product = session.scalars(
+        select(Product).where(Product.id == variant.product_id, Product.org_id == auth.org_id)
+    ).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+
+    if _is_shopify_managed_variant(variant) and not force:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify-mapped variants require explicit force delete. "
+                "Retry with ?force=true to delete only the MOS record."
+            ),
+        )
+
+    deleted = variants_repo.delete(variant_id=variant_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Variant not found")
+    return {"ok": True}

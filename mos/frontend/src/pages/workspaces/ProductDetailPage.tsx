@@ -20,6 +20,7 @@ import {
   useCreateProductOffer,
   useCreateShopifyProductForProduct,
   useCreateVariant,
+  useDeleteVariant,
   useProduct,
   useProductAssets,
   useRemoveOfferBonus,
@@ -91,8 +92,10 @@ export function ProductDetailPage() {
   const [variantFormMode, setVariantFormMode] = useState<"create" | "edit">("create");
   const [editingVariant, setEditingVariant] = useState<ProductVariant | null>(null);
   const updateVariant = useUpdateVariant(editingVariant?.id || "", productId || "");
+  const deleteVariant = useDeleteVariant(productId || "");
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [deletingVariantId, setDeletingVariantId] = useState<string | null>(null);
 
   const [variantTitle, setVariantTitle] = useState("");
   const [variantPrice, setVariantPrice] = useState("");
@@ -281,6 +284,31 @@ export function ProductDetailPage() {
     await updateVariant.mutateAsync(patchPayload);
     resetVariantForm();
     setIsVariantModalOpen(false);
+  };
+
+  const handleDeleteVariant = async (variant: ProductVariant) => {
+    const isShopifyMapped =
+      variant.provider === "shopify" &&
+      typeof variant.external_price_id === "string" &&
+      variant.external_price_id.startsWith("gid://shopify/ProductVariant/");
+
+    const confirmed = window.confirm(
+      isShopifyMapped
+        ? `Delete variant "${variant.title}" from MOS? This will not delete it in Shopify.`
+        : `Delete variant "${variant.title}"?`,
+    );
+    if (!confirmed) return;
+
+    setDeletingVariantId(variant.id);
+    try {
+      await deleteVariant.mutateAsync({ variantId: variant.id, force: isShopifyMapped });
+      if (editingVariant?.id === variant.id) {
+        setIsVariantModalOpen(false);
+        resetVariantForm();
+      }
+    } finally {
+      setDeletingVariantId((current) => (current === variant.id ? null : current));
+    }
   };
 
   const handleAssetUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -608,6 +636,7 @@ export function ProductDetailPage() {
     disconnectShopifyInstallation.isPending ||
     setDefaultShop.isPending;
   const isSavingVariant = createVariant.isPending || updateVariant.isPending;
+  const isDeletingVariant = deleteVariant.isPending;
   const isShopifyReady = shopifyState === "ready";
   const hasMappedShopifyProduct = Boolean((productDetail?.shopify_product_gid || "").trim());
 
@@ -1185,9 +1214,17 @@ export function ProductDetailPage() {
                               size="sm"
                               variant="secondary"
                               onClick={() => openEditVariantModal(variant)}
-                              disabled={isSavingVariant}
+                              disabled={isSavingVariant || isDeletingVariant}
                             >
                               Edit
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => void handleDeleteVariant(variant)}
+                              disabled={isSavingVariant || isDeletingVariant}
+                            >
+                              {isDeletingVariant && deletingVariantId === variant.id ? "Deleting…" : "Delete"}
                             </Button>
                             <div className="text-[10px] text-content-muted">{variant.id.slice(0, 8)}</div>
                           </div>
