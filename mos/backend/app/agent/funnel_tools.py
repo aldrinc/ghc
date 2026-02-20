@@ -1066,6 +1066,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         if not puck_data.get("content"):
             run_id = getattr(ctx, "run_id", None)
             tool_call_id = getattr(ctx, "tool_call_id", None)
+            raw_puck_content = puck_data_raw.get("content") if isinstance(puck_data_raw, dict) else None
+            raw_puck_content_count = len(raw_puck_content) if isinstance(raw_puck_content, list) else None
+            sanitized_puck_content = puck_data.get("content")
             details = {
                 "runId": run_id,
                 "toolCallId": tool_call_id,
@@ -1075,6 +1078,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "templateComponentKind": template_component_kind,
                 "compiledPromptSha256": compiled_prompt_sha256,
                 "rawOutputSha256": raw_output_sha256,
+                "rawPuckContentCount": raw_puck_content_count,
+                "sanitizedPuckContentCount": len(sanitized_puck_content) if isinstance(sanitized_puck_content, list) else None,
+                "allowedTypesCount": len(allowed_types),
             }
             raise RuntimeError(f"AI generation produced an empty page (no content). details={details}")
 
