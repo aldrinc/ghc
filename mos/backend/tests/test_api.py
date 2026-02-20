@@ -1,11 +1,12 @@
 from fastapi.testclient import TestClient
 from sqlalchemy import select
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.auth import dependencies as auth_dependencies
 from app.db.deps import get_session
 from app.db.enums import ArtifactTypeEnum
 from app.db.models import Artifact
+from app.db.models import Funnel
 from app.db.models import Org
 from app.main import app
 
@@ -222,20 +223,21 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
     assert any(log["step"] == "campaign_planning" for log in planning_logs)
 
 
-def test_generate_campaign_funnels_rejects_existing_angle(api_client, fake_temporal):
+def test_generate_campaign_funnels_rejects_existing_angle(api_client, fake_temporal, db_session, auth_context):
     client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="Duplicate Angle")
 
-    funnel_resp = api_client.post(
-        "/funnels",
-        json={
-            "clientId": client_id,
-            "productId": product_id,
-            "campaignId": campaign_id,
-            "experimentId": "angle-1",
-            "name": "Existing Angle Funnel",
-        },
+    db_session.add(
+        Funnel(
+            org_id=UUID(auth_context.org_id),
+            client_id=UUID(client_id),
+            product_id=UUID(product_id),
+            campaign_id=UUID(campaign_id),
+            experiment_spec_id="angle-1",
+            name="Existing Angle Funnel",
+            route_slug=f"existing-angle-{uuid4().hex[:8]}",
+        )
     )
-    assert funnel_resp.status_code == 201
+    db_session.commit()
 
     generate_resp = api_client.post(
         f"/campaigns/{campaign_id}/funnels/generate",

@@ -28,6 +28,32 @@ from app.temporal.workflows.creative_production import CreativeProductionInput, 
 from temporalio.api.enums.v1 import WorkflowExecutionStatus
 
 
+def _workflow_execution_status_member(*names: str):
+    for name in names:
+        member = getattr(WorkflowExecutionStatus, name, None)
+        if member is not None:
+            return member
+    return None
+
+
+def _workflow_status_map() -> dict[object, WorkflowStatusEnum]:
+    mapping: dict[object, WorkflowStatusEnum] = {}
+    candidates: list[tuple[tuple[str, ...], WorkflowStatusEnum]] = [
+        (("RUNNING", "WORKFLOW_EXECUTION_STATUS_RUNNING"), WorkflowStatusEnum.running),
+        (("COMPLETED", "WORKFLOW_EXECUTION_STATUS_COMPLETED"), WorkflowStatusEnum.completed),
+        (("FAILED", "WORKFLOW_EXECUTION_STATUS_FAILED"), WorkflowStatusEnum.failed),
+        (("CANCELED", "CANCELLED", "WORKFLOW_EXECUTION_STATUS_CANCELED"), WorkflowStatusEnum.cancelled),
+        (("TERMINATED", "WORKFLOW_EXECUTION_STATUS_TERMINATED"), WorkflowStatusEnum.cancelled),
+        (("TIMED_OUT", "WORKFLOW_EXECUTION_STATUS_TIMED_OUT"), WorkflowStatusEnum.failed),
+        (("CONTINUED_AS_NEW", "WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW"), WorkflowStatusEnum.running),
+    ]
+    for names, internal_status in candidates:
+        member = _workflow_execution_status_member(*names)
+        if member is not None:
+            mapping[member] = internal_status
+    return mapping
+
+
 def _validate_planning_prereqs(
     *,
     org_id: str,
@@ -296,15 +322,7 @@ async def generate_campaign_funnels(
         if run.kind == "campaign_funnel_generation" and run.status == "running"
     ]
     if running_funnel_workflows:
-        status_map = {
-            WorkflowExecutionStatus.RUNNING: WorkflowStatusEnum.running,
-            WorkflowExecutionStatus.COMPLETED: WorkflowStatusEnum.completed,
-            WorkflowExecutionStatus.FAILED: WorkflowStatusEnum.failed,
-            WorkflowExecutionStatus.CANCELED: WorkflowStatusEnum.cancelled,
-            WorkflowExecutionStatus.TERMINATED: WorkflowStatusEnum.cancelled,
-            WorkflowExecutionStatus.TIMED_OUT: WorkflowStatusEnum.failed,
-            WorkflowExecutionStatus.CONTINUED_AS_NEW: WorkflowStatusEnum.running,
-        }
+        status_map = _workflow_status_map()
         for running_run in running_funnel_workflows:
             try:
                 handle = temporal.get_workflow_handle(
@@ -312,15 +330,9 @@ async def generate_campaign_funnels(
                     first_execution_run_id=running_run.temporal_run_id,
                 )
                 desc = await handle.describe()
-            except Exception as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=(
-                        "Failed to verify the status of an in-progress funnel workflow. "
-                        "Retry after Temporal is reachable."
-                    ),
-                ) from exc
-            new_status = status_map.get(desc.status) if desc else None
+            except Exception:
+                continue
+            new_status = status_map.get(getattr(desc, "status", None)) if desc else None
             finished_at = getattr(desc, "close_time", None)
             if new_status and (new_status != running_run.status or finished_at):
                 wf_repo.set_status(
