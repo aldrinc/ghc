@@ -22,6 +22,16 @@ from app.schemas.meta_ads import (
     MetaAdCreateRequest,
     MetaCreativePreviewRequest,
 )
+from app.schemas.compliance import (
+    ClientComplianceProfileResponse,
+    ClientComplianceProfileUpsertRequest,
+    ClientComplianceRequirementsResponse,
+    ComplianceShopifyPolicySyncRequest,
+    ComplianceShopifyPolicySyncResponse,
+    CompliancePolicyTemplateResponse,
+    ComplianceRulesetResponse,
+    ComplianceRulesetSummaryResponse,
+)
 
 __all__ = [
     "ClientCanon",
@@ -47,4 +57,12 @@ __all__ = [
     "MetaAdSetCreateRequest",
     "MetaAdCreateRequest",
     "MetaCreativePreviewRequest",
+    "ClientComplianceProfileUpsertRequest",
+    "ClientComplianceProfileResponse",
+    "ClientComplianceRequirementsResponse",
+    "ComplianceShopifyPolicySyncRequest",
+    "ComplianceShopifyPolicySyncResponse",
+    "CompliancePolicyTemplateResponse",
+    "ComplianceRulesetSummaryResponse",
+    "ComplianceRulesetResponse",
 ]

@@ -46,6 +46,8 @@ export interface ProductVariant {
   unit_price_measurement?: Record<string, unknown> | null;
   quantity_rule?: Record<string, unknown> | null;
   quantity_price_breaks?: Record<string, unknown>[] | null;
+  shopify_last_synced_at?: string | null;
+  shopify_last_sync_error?: string | null;
 }
 
 export interface ProductAsset {

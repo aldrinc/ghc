@@ -10,6 +10,7 @@ from app.db.repositories.deep_research_jobs import DeepResearchJobsRepository
 from app.db.repositories.jobs import JobsRepository
 from app.db.repositories.teardowns import TeardownsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
+from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 
@@ -26,6 +27,7 @@ __all__ = [
     "DeepResearchJobsRepository",
     "TeardownsRepository",
     "ClaudeContextFilesRepository",
+    "ClientComplianceProfilesRepository",
     "MetaAdsRepository",
     "ResearchArtifactsRepository",
 ]

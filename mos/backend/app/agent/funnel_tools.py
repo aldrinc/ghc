@@ -16,7 +16,7 @@ from app.agent.runtime import BaseTool
 from app.agent.types import ToolContext, ToolResult
 from app.config import settings
 from app.db.enums import FunnelPageReviewStatusEnum, FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
-from app.db.models import Funnel, FunnelPage, FunnelPageVersion, Product, ProductVariant
+from app.db.models import Funnel, FunnelPage, FunnelPageVersion, Product, ProductOffer, ProductVariant
 from app.db.repositories.agent_artifacts import AgentArtifactsRepository
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
 from app.llm.client import LLMClient, LLMGenerationParams
@@ -597,7 +597,8 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- For icon prompts, set iconAlt/alt/label clearly so the backend can derive <subject> deterministically.\n"
                 "- Brand color palette from design_system_tokens.cssVars is injected automatically before image generation.\n"
                 "- Do not set referenceAssetPublicId unless you are using one of the attached images listed above.\n"
-                "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n\n"
+                "- If you want to base it on an attached image, set referenceAssetPublicId on that image object and include the prompt.\n"
+                "- If referenceAssetPublicId is set, imageSource must be 'ai' (never 'unsplash').\n\n"
             )
             if template_kind == "sales-pdp":
                 template_image_guidance += (
@@ -619,7 +620,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- SalesPdpHeader.config MUST be: { logo: { alt:string, src?:string, assetPublicId?:string, href?:string }, nav: [{ label:string, href:string }], cta: { label:string, href:string } }\n"
                 "- SalesPdpHero.config MUST be: { header: { ...same as SalesPdpHeader.config }, gallery: { watchInAction: { label:string }, slides: [{ alt:string, src?:string, assetPublicId?:string, thumbSrc?:string, thumbAssetPublicId?:string }], freeGifts: { icon:{ alt:string, src?:string, assetPublicId?:string }, title:string, body:string, ctaLabel:string } }, purchase: { faqPills: [{ label:string, answer:string }], title:string, benefits:[{ text:string }], size:{ title:string, helpLinkLabel:string, options:[{ id:string, label:string, sizeIn:string, sizeCm:string }], shippingDelayLabel:string }, color:{ title:string, options:[{ id:string, label:string, swatch?:string, swatchImageSrc?:string, swatchAssetPublicId?:string }], outOfStockTitle:string, outOfStockBody:string }, offer:{ title:string, helperText:string, seeWhyLabel:string, options:[{ id:string, title:string, image:{ alt:string, src?:string, assetPublicId?:string }, price:number, compareAt?:number, saveLabel?:string, productOfferId?:string } ] }, cta:{ labelTemplate:string, subBullets:string[], urgency:{ message:string, rows:[{ label:string, value:string, tone?:'muted'|'highlight' }] } }, outOfStock?:[{ sizeId:string, colorId:string }], shippingDelay?:[{ sizeId:string, colorId:string }] } }\n"
                 "- SalesPdpHero.modals MUST be: { sizeChart: { title:string, sizes:[{ label:string, size:string, idealFor:string, weight:string }], note:string }, whyBundle: { title:string, body:string, quotes:[{ text:string, author:string }] }, freeGifts: { title:string, body:string } }\n"
-                "- Checkout requirement: purchase size/color/offer option ids MUST match productContext.selected_offer.price_points[].option_values keys (sizeId/colorId/offerId). Do NOT invent ids.\n"
+                "- Checkout requirement: purchase selector ids MUST match productContext.selected_offer.price_points[].option_values using normalized checkout keys (sizeId/colorId/offerId). Do NOT invent ids.\n"
                 "- SalesPdpMarquee.config MUST be: { items: string[], repeat?: number }\n"
                 "- SalesPdpFaq.config MUST be: { title: string, items: [{ question: string, answer: string }] }\n"
                 "- SalesPdpReviews.config MUST be: { id: string, data: object }\n"
@@ -720,7 +721,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "   - imageSource: 'ai' (default) | 'unsplash'\n"
                 "   - radius: 'none' | 'md' | 'lg'\n"
                 "   - If imageSource='unsplash': include prompt and leave assetPublicId empty (no referenceAssetPublicId)\n"
-                "   - If referenceAssetPublicId is set: include prompt and leave assetPublicId empty\n"
+                "   - If referenceAssetPublicId is set: include prompt, leave assetPublicId empty, and set imageSource='ai'\n"
                 "7) Button: props { id, label, variant?, size?, width?, align?, linkType?, targetPageId?, href? }\n"
                 "   - variant: 'primary' | 'secondary'\n"
                 "   - size: 'sm' | 'md' | 'lg'\n"
@@ -1066,6 +1067,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
         if not puck_data.get("content"):
             run_id = getattr(ctx, "run_id", None)
             tool_call_id = getattr(ctx, "tool_call_id", None)
+            raw_puck_content = puck_data_raw.get("content") if isinstance(puck_data_raw, dict) else None
+            raw_puck_content_count = len(raw_puck_content) if isinstance(raw_puck_content, list) else None
+            sanitized_puck_content = puck_data.get("content")
             details = {
                 "runId": run_id,
                 "toolCallId": tool_call_id,
@@ -1075,6 +1079,9 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "templateComponentKind": template_component_kind,
                 "compiledPromptSha256": compiled_prompt_sha256,
                 "rawOutputSha256": raw_output_sha256,
+                "rawPuckContentCount": raw_puck_content_count,
+                "sanitizedPuckContentCount": len(sanitized_puck_content) if isinstance(sanitized_puck_content, list) else None,
+                "allowedTypesCount": len(allowed_types),
             }
             raise RuntimeError(f"AI generation produced an empty page (no content). details={details}")
 
@@ -1715,6 +1722,21 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             if not funnel:
                 raise ValueError("Funnel not found")
 
+            selected_offer_options_schema: dict[str, Any] | None = None
+            if funnel.selected_offer_id:
+                selected_offer = ctx.session.scalars(
+                    select(ProductOffer).where(
+                        ProductOffer.id == funnel.selected_offer_id,
+                        ProductOffer.product_id == product.id,
+                    )
+                ).first()
+                if not selected_offer:
+                    raise ValueError("Selected offer does not belong to the funnel product.")
+                if selected_offer.options_schema is not None:
+                    if not isinstance(selected_offer.options_schema, dict):
+                        raise ValueError("Selected offer options_schema must be a JSON object.")
+                    selected_offer_options_schema = selected_offer.options_schema
+
             variants_query = select(ProductVariant).where(ProductVariant.product_id == product.id)
             if funnel.selected_offer_id:
                 variants_query = variants_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
@@ -1760,14 +1782,22 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             for variant in variants:
                 variant_inputs.append(
                     {
+                        "id": str(variant.id),
                         "title": variant.title,
                         "amount_cents": variant.price,
                         "option_values": variant.option_values,
                     }
                 )
+            normalized_variant_options, variant_schema = funnel_ai._normalize_sales_pdp_variant_option_values(
+                variants=variant_inputs,
+                options_schema=selected_offer_options_schema,
+            )
             if funnel_ai._align_sales_pdp_purchase_options_to_variants(
                 purchase=purchase,
                 variants=variant_inputs,
+                options_schema=selected_offer_options_schema,
+                normalized_variants=normalized_variant_options,
+                variant_schema=variant_schema,
             ):
                 checkout_purchase_ids_aligned += 1
                 if hero_cfg_source == "configJson":
@@ -1799,29 +1829,20 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
             valid_colors: set[str] = set()
             valid_offers: set[str] = set()
             valid_selections: dict[tuple[str, str, str], str] = {}
-            for variant in variants:
-                option_values = variant.option_values
-                if not isinstance(option_values, dict):
-                    raise ValueError(
-                        "Checkout is not configured for this funnel product. "
-                        "Every product variant must include option_values (sizeId/colorId/offerId)."
-                    )
-                size_id = option_values.get("sizeId")
-                color_id = option_values.get("colorId")
-                offer_id = option_values.get("offerId")
-                if not all(isinstance(v, str) and v.strip() for v in (size_id, color_id, offer_id)):
-                    raise ValueError(
-                        "Checkout is not configured for this funnel product. "
-                        "Every product variant option_values must include non-empty sizeId/colorId/offerId strings."
-                    )
-                key = (size_id.strip(), color_id.strip(), offer_id.strip())
+            for normalized_variant in normalized_variant_options:
+                size_id = normalized_variant["sizeId"]
+                color_id = normalized_variant["colorId"]
+                offer_id = normalized_variant["offerId"]
+                key = (size_id, color_id, offer_id)
+                variant_id = normalized_variant.get("variantId")
+                variant_ref = str(variant_id) if isinstance(variant_id, str) and variant_id.strip() else "unknown"
                 if key in valid_selections:
                     raise ValueError(
                         "Checkout is not configured for this funnel product. "
                         "Duplicate variant option_values detected for selection="
                         + json.dumps({"sizeId": key[0], "colorId": key[1], "offerId": key[2]}, separators=(",", ":"))
                     )
-                valid_selections[key] = str(variant.id)
+                valid_selections[key] = variant_ref
                 valid_sizes.add(key[0])
                 valid_colors.add(key[1])
                 valid_offers.add(key[2])

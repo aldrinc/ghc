@@ -6,7 +6,9 @@ from pathlib import Path
 import re
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from app.config import settings
 from app.db.models import Ad, MediaAsset
+from app.llm_ops import fetch_prompt_text
 
 _PROMPT_CACHE: Dict[str, Tuple[str, str]] = {}
 
@@ -18,6 +20,12 @@ def load_ad_breakdown_prompt() -> Tuple[str, str]:
     cache_key = "ad_breakdown"
     if cache_key in _PROMPT_CACHE:
         return _PROMPT_CACHE[cache_key]
+
+    prompt_key = "prompts/creative_analysis/ad_breakdown.md"
+    if settings.AGENTA_ENABLED:
+        text, sha = fetch_prompt_text(prompt_key)
+        _PROMPT_CACHE[cache_key] = (text, sha)
+        return text, sha
 
     # ad_breakdown.py lives at app/services/, and prompts are under app/prompts/
     backend_app_root = Path(__file__).resolve().parents[1]

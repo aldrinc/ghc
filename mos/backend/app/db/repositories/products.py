@@ -213,3 +213,11 @@ class ProductVariantsRepository:
         self.session.commit()
         self.session.refresh(variant)
         return variant
+
+    def delete(self, *, variant_id: str) -> bool:
+        variant = self.get(variant_id=variant_id)
+        if not variant:
+            return False
+        self.session.delete(variant)
+        self.session.commit()
+        return True

@@ -816,6 +816,13 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
   const sizeOptions = resolvedHero.purchase.size.options
   const colorOptions = resolvedHero.purchase.color.options
   const offerOptions = resolvedHero.purchase.offer.options
+  const variantSchemaDimensions = resolvedHero.purchase.variantSchema?.dimensions
+  const hasExplicitVariantSchema = Array.isArray(variantSchemaDimensions) && variantSchemaDimensions.length > 0
+  const hasSchemaDimensionType = (type: string) =>
+    hasExplicitVariantSchema && variantSchemaDimensions.some((item) => item?.type === type)
+  const showSizeSelector = !hasExplicitVariantSchema || hasSchemaDimensionType("size")
+  const showColorSelector = !hasExplicitVariantSchema || hasSchemaDimensionType("color")
+  const showOfferSelector = true
 
   const [selectedSize, setSelectedSize] = useState(sizeOptions[0]?.id)
   const [selectedColor, setSelectedColor] = useState(colorOptions[0]?.id)
@@ -1262,150 +1269,156 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
               <div className={styles.divider} />
 
-	              {/* Size */}
-	              <div>
-	                <div className={styles.sectionTitleRow}>
-	                  <div className={styles.stepTitle}>{resolvedHero.purchase.size.title}</div>
-	                  <button type="button" className={styles.helpLink} onClick={() => setOpenSizeChart(true)}>
-	                    {resolvedHero.purchase.size.helpLinkLabel}
-	                  </button>
-	                </div>
-
-                <div className={styles.optionGrid3}>
-                  {sizeOptions.map((o) => (
-                    <SizeCard
-                      key={o.id}
-                      option={o}
-                      selected={o.id === selectedSize}
-                      onClick={() => setSelectedSize(o.id)}
-                    />
-                  ))}
-                </div>
-
-                {showShippingDelay ? (
-                  <div className={styles.delayBar}>
-                    <span aria-hidden="true">⚠️</span>
-                    <span className={styles.delayText}>{resolvedHero.purchase.size.shippingDelayLabel}</span>
+              {showSizeSelector ? (
+                <div>
+                  <div className={styles.sectionTitleRow}>
+                    <div className={styles.stepTitle}>{resolvedHero.purchase.size.title}</div>
+                    <button type="button" className={styles.helpLink} onClick={() => setOpenSizeChart(true)}>
+                      {resolvedHero.purchase.size.helpLinkLabel}
+                    </button>
                   </div>
-                ) : null}
-              </div>
 
-              <div className={styles.divider} />
-
-	              {/* Color */}
-	              <div>
-	                <div className={styles.sectionTitleRow}>
-	                  <div className={styles.stepTitle}>{resolvedHero.purchase.color.title}</div>
-	                </div>
-	                <div className={styles.colorRow}>
-	                  {colorOptions.map((c) => (
-	                    <ColorSwatch
-                      key={c.id}
-                      option={c}
-                      selected={c.id === selectedColor}
-                      onClick={() => setSelectedColor(c.id)}
-                    />
-                  ))}
-                </div>
-
-                {showOutOfStock ? (
-                  <div className={styles.stockNotice}>
-                    <div style={{ fontWeight: 900, marginBottom: 6 }}>{resolvedHero.purchase.color.outOfStockTitle}</div>
-                    <div style={{ color: 'var(--color-muted)' }}>{resolvedHero.purchase.color.outOfStockBody}</div>
+                  <div className={styles.optionGrid3}>
+                    {sizeOptions.map((o) => (
+                      <SizeCard
+                        key={o.id}
+                        option={o}
+                        selected={o.id === selectedSize}
+                        onClick={() => setSelectedSize(o.id)}
+                      />
+                    ))}
                   </div>
-                ) : null}
-              </div>
 
-              <div className={styles.divider} />
-
-	              {/* Offer */}
-	              <div>
-	                <div className={styles.sectionTitleRow}>
-	                  <div className={styles.stepTitle}>{resolvedHero.purchase.offer.title}</div>
-	                </div>
-	                <div className={styles.offerHelper}>
-	                  {resolvedHero.purchase.offer.helperText}{' '}
-	                  <button type="button" className={styles.seeWhy} onClick={() => setOpenWhyBundle(true)}>
-	                    {resolvedHero.purchase.offer.seeWhyLabel}
-                  </button>
+                  {showShippingDelay ? (
+                    <div className={styles.delayBar}>
+                      <span aria-hidden="true">⚠️</span>
+                      <span className={styles.delayText}>{resolvedHero.purchase.size.shippingDelayLabel}</span>
+                    </div>
+                  ) : null}
                 </div>
+              ) : null}
 
-	                <div className={styles.offerGrid}>
-	                  {offerOptions.map((o) => (
-	                    <OfferCard
-	                      key={o.id}
-	                      option={o}
-	                      selected={o.id === selectedOffer}
-                      onClick={() => handleOfferSelect(o.id)}
-                    />
-                  ))}
+              {showSizeSelector && (showColorSelector || showOfferSelector) ? (
+                <div className={styles.divider} />
+              ) : null}
+
+              {showColorSelector ? (
+                <div>
+                  <div className={styles.sectionTitleRow}>
+                    <div className={styles.stepTitle}>{resolvedHero.purchase.color.title}</div>
+                  </div>
+                  <div className={styles.colorRow}>
+                    {colorOptions.map((c) => (
+                      <ColorSwatch
+                        key={c.id}
+                        option={c}
+                        selected={c.id === selectedColor}
+                        onClick={() => setSelectedColor(c.id)}
+                      />
+                    ))}
+                  </div>
+
+                  {showOutOfStock ? (
+                    <div className={styles.stockNotice}>
+                      <div style={{ fontWeight: 900, marginBottom: 6 }}>{resolvedHero.purchase.color.outOfStockTitle}</div>
+                      <div style={{ color: 'var(--color-muted)' }}>{resolvedHero.purchase.color.outOfStockBody}</div>
+                    </div>
+                  ) : null}
                 </div>
+              ) : null}
 
-	                <button
+              {showColorSelector && showOfferSelector ? <div className={styles.divider} /> : null}
+
+              {/* Offer */}
+              {showOfferSelector ? (
+                <div>
+                  <div className={styles.sectionTitleRow}>
+                    <div className={styles.stepTitle}>{resolvedHero.purchase.offer.title}</div>
+                  </div>
+                  <div className={styles.offerHelper}>
+                    {resolvedHero.purchase.offer.helperText}{" "}
+                    <button type="button" className={styles.seeWhy} onClick={() => setOpenWhyBundle(true)}>
+                      {resolvedHero.purchase.offer.seeWhyLabel}
+                    </button>
+                  </div>
+
+                  <div className={styles.offerGrid}>
+                    {offerOptions.map((o) => (
+                      <OfferCard
+                        key={o.id}
+                        option={o}
+                        selected={o.id === selectedOffer}
+                        onClick={() => handleOfferSelect(o.id)}
+                      />
+                    ))}
+                  </div>
+
+                  <button
                     type="button"
                     className={styles.ctaButton}
                     onClick={handleCheckout}
                     disabled={isCheckingOut}
                     ref={ctaButtonRef}
                   >
-	                  {isCheckingOut ? "Starting checkout…" : ctaLabel}
-	                  <span className={styles.ctaIconCircle} aria-hidden="true">
-	                    <IconArrow dir="right" size={24} />
-	                  </span>
-	                </button>
-                {checkoutError ? (
-                  <div className={styles.stockNotice} role="alert">
-                    {checkoutError}
-                  </div>
-                ) : null}
-
-	                <div className={styles.ctaSubBullets}>
-	                  {resolvedHero.purchase.cta.subBullets.map((t) => (
-	                    <span key={t}>
-	                      <span className={styles.checkCircle} aria-hidden="true">
-	                        <IconCheck size={18} />
-	                      </span>
-	                      {t}
-	                    </span>
-	                  ))}
-	                </div>
-
-                <div className={styles.urgency}>
-                  <div className={styles.urgencyTop}>
-                    <span className={styles.urgencyIcon} aria-hidden="true">
-                      <IconWarning size={28} />
+                    {isCheckingOut ? "Starting checkout…" : ctaLabel}
+                    <span className={styles.ctaIconCircle} aria-hidden="true">
+                      <IconArrow dir="right" size={24} />
                     </span>
-                    <div className={styles.urgencyMessage}>
-                      {urgencyHighlightIndex >= 0 ? (
-                        <>
-                          {urgencyLead}
-                          <strong>{urgencyHighlight}</strong>
-                          {urgencyTail}
-                        </>
-                      ) : (
-                        urgencyMessage
-                      )}
+                  </button>
+                  {checkoutError ? (
+                    <div className={styles.stockNotice} role="alert">
+                      {checkoutError}
                     </div>
-                  </div>
-                  <div className={styles.urgencyRows}>
-                    {urgencyRows.map((r, index) => (
-                      <div
-                        key={`${r.label}-${index}`}
-                        className={`${styles.urgencyRow} ${
-                          r.tone === 'highlight'
-                            ? styles.urgencyRowHighlight
-                            : r.tone === 'muted'
-                              ? styles.urgencyRowMuted
-                              : ''
-                        }`}
-                      >
-                        <span>{r.label}</span>
-                        <span>{r.value}</span>
-                      </div>
+                  ) : null}
+
+                  <div className={styles.ctaSubBullets}>
+                    {resolvedHero.purchase.cta.subBullets.map((t) => (
+                      <span key={t}>
+                        <span className={styles.checkCircle} aria-hidden="true">
+                          <IconCheck size={18} />
+                        </span>
+                        {t}
+                      </span>
                     ))}
                   </div>
+
+                  <div className={styles.urgency}>
+                    <div className={styles.urgencyTop}>
+                      <span className={styles.urgencyIcon} aria-hidden="true">
+                        <IconWarning size={28} />
+                      </span>
+                      <div className={styles.urgencyMessage}>
+                        {urgencyHighlightIndex >= 0 ? (
+                          <>
+                            {urgencyLead}
+                            <strong>{urgencyHighlight}</strong>
+                            {urgencyTail}
+                          </>
+                        ) : (
+                          urgencyMessage
+                        )}
+                      </div>
+                    </div>
+                    <div className={styles.urgencyRows}>
+                      {urgencyRows.map((r, index) => (
+                        <div
+                          key={`${r.label}-${index}`}
+                          className={`${styles.urgencyRow} ${
+                            r.tone === "highlight"
+                              ? styles.urgencyRowHighlight
+                              : r.tone === "muted"
+                                ? styles.urgencyRowMuted
+                                : ""
+                          }`}
+                        >
+                          <span>{r.label}</span>
+                          <span>{r.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : null}
             </div>
           </div>
         </Container>

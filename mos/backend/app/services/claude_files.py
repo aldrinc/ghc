@@ -13,6 +13,7 @@ import httpx
 from app.db.base import session_scope
 from app.db.enums import ClaudeContextFileStatusEnum
 from app.db.repositories.claude_context_files import ClaudeContextFilesRepository
+from app.observability import start_langfuse_generation
 
 
 logger = logging.getLogger(__name__)
@@ -358,6 +359,81 @@ def _summarize_claude_structured_payload(payload: Any) -> str:
     return f"model={model!r} stop_reason={stop_reason!r} content_types={block_types} text_len={text_len}"
 
 
+def _extract_anthropic_usage_from_payload(payload: Any) -> Dict[str, int] | None:
+    if not isinstance(payload, dict):
+        return None
+    usage = payload.get("usage")
+    if not isinstance(usage, dict):
+        return None
+
+    usage_details: Dict[str, int] = {}
+    input_tokens = usage.get("input_tokens")
+    output_tokens = usage.get("output_tokens")
+    if isinstance(input_tokens, int):
+        usage_details["input"] = input_tokens
+    if isinstance(output_tokens, int):
+        usage_details["output"] = output_tokens
+    return usage_details or None
+
+
+def _extract_puck_content_count(parsed: Any) -> int | None:
+    if not isinstance(parsed, dict):
+        return None
+    puck_data_raw = parsed.get("puckData")
+    puck_data: Any = None
+    if isinstance(puck_data_raw, dict):
+        puck_data = puck_data_raw
+    elif isinstance(puck_data_raw, str) and puck_data_raw.strip():
+        try:
+            puck_data = json.loads(puck_data_raw)
+        except json.JSONDecodeError:
+            try:
+                puck_data = _extract_first_json_object(puck_data_raw)
+            except Exception:  # noqa: BLE001
+                puck_data = None
+
+    if not isinstance(puck_data, dict):
+        return None
+    content = puck_data.get("content")
+    if isinstance(content, list):
+        return len(content)
+    return None
+
+
+def _user_content_summary(user_content: List[Dict[str, Any]]) -> Dict[str, Any]:
+    block_types: list[str] = []
+    text_chars = 0
+    for block in user_content:
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        block_types.append(str(block_type) if block_type is not None else "unknown")
+        if block_type == "text":
+            text_value = block.get("text")
+            if isinstance(text_value, str):
+                text_chars += len(text_value)
+
+    return {
+        "blockCount": len(user_content),
+        "blockTypes": block_types[:20],
+        "textChars": text_chars,
+    }
+
+
+def _structured_output_summary(*, payload: Dict[str, Any], parsed: Any, text_content: str) -> Dict[str, Any]:
+    summary: Dict[str, Any] = {
+        "stopReason": payload.get("stop_reason"),
+        "hasParsed": parsed is not None,
+        "textChars": len(text_content),
+    }
+    if isinstance(parsed, dict):
+        summary["parsedKeys"] = list(parsed.keys())[:20]
+        puck_content_count = _extract_puck_content_count(parsed)
+        if puck_content_count is not None:
+            summary["puckContentCount"] = puck_content_count
+    return summary
+
+
 def call_claude_structured_message(
     *,
     model: str,
@@ -394,61 +470,86 @@ def call_claude_structured_message(
     if system:
         body["system"] = system
 
+    schema_json = json.dumps(safe_schema, ensure_ascii=False, sort_keys=True)
+    schema_sha256 = hashlib.sha256(schema_json.encode("utf-8")).hexdigest()
+    user_content_summary = _user_content_summary(user_content)
+
     url = f"{CLAUDE_API_BASE_URL.rstrip('/')}/v1/messages"
-    try:
-        with httpx.Client(timeout=CLAUDE_HTTP_TIMEOUT) as client:
-            response = client.post(url, headers=headers, json=body)
-            response.raise_for_status()
-            payload = response.json()
-    except httpx.HTTPStatusError as exc:
-        if _is_model_not_found(exc):
-            raise RuntimeError(f"Claude model not found: {candidate_model}") from exc
-        if _is_output_format_unsupported(exc):
-            raise RuntimeError(
-                f"Claude model does not support structured outputs (output_format=json_schema): {candidate_model}"
-            ) from exc
-        body_text = exc.response.text if exc.response else ""
-        status = exc.response.status_code if exc.response else "unknown"
-        raise RuntimeError(f"Claude structured message failed (status={status}): {body_text}") from exc
-    except Exception as exc:  # noqa: BLE001
-        raise RuntimeError(f"Claude structured message failed: {exc}") from exc
+    with start_langfuse_generation(
+        name="llm.anthropic.structured",
+        model=candidate_model,
+        input={"systemChars": len(system or ""), "userContent": user_content_summary},
+        metadata={
+            "operation": "claude_structured_message",
+            "provider": "anthropic",
+            "outputSchemaSha256": schema_sha256,
+            "outputSchemaChars": len(schema_json),
+            "structuredOutput": True,
+        },
+        model_parameters={"max_tokens": max_tokens, "temperature": temperature},
+        tags=["llm", "anthropic", "structured"],
+        trace_name="llm.workflow",
+    ) as generation:
+        try:
+            with httpx.Client(timeout=CLAUDE_HTTP_TIMEOUT) as client:
+                response = client.post(url, headers=headers, json=body)
+                response.raise_for_status()
+                payload = response.json()
+        except httpx.HTTPStatusError as exc:
+            if _is_model_not_found(exc):
+                raise RuntimeError(f"Claude model not found: {candidate_model}") from exc
+            if _is_output_format_unsupported(exc):
+                raise RuntimeError(
+                    f"Claude model does not support structured outputs (output_format=json_schema): {candidate_model}"
+                ) from exc
+            body_text = exc.response.text if exc.response else ""
+            status = exc.response.status_code if exc.response else "unknown"
+            raise RuntimeError(f"Claude structured message failed (status={status}): {body_text}") from exc
+        except Exception as exc:  # noqa: BLE001
+            raise RuntimeError(f"Claude structured message failed: {exc}") from exc
 
-    parsed = None
-    output_block = payload.get("output")
-    if isinstance(output_block, dict):
-        parsed = output_block.get("parsed") or output_block.get("data") or output_block.get("content")
+        parsed = None
+        output_block = payload.get("output")
+        if isinstance(output_block, dict):
+            parsed = output_block.get("parsed") or output_block.get("data") or output_block.get("content")
 
-    text_content = ""
-    stop_reason = payload.get("stop_reason") if isinstance(payload, dict) else None
-    if parsed is None:
-        content_blocks = payload.get("content") or []
-        text_parts: List[str] = []
-        for block in content_blocks:
-            if isinstance(block, dict) and block.get("type") == "text":
-                text_parts.append(block.get("text") or "")
-        text_content = "".join(text_parts).strip()
-        if text_content:
-            try:
-                parsed = json.loads(text_content)
-            except Exception:
+        text_content = ""
+        stop_reason = payload.get("stop_reason") if isinstance(payload, dict) else None
+        if parsed is None:
+            content_blocks = payload.get("content") or []
+            text_parts: List[str] = []
+            for block in content_blocks:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    text_parts.append(block.get("text") or "")
+            text_content = "".join(text_parts).strip()
+            if text_content:
                 try:
-                    parsed = _extract_first_json_object(text_content)
+                    parsed = json.loads(text_content)
                 except Exception:
-                    parsed = None
+                    try:
+                        parsed = _extract_first_json_object(text_content)
+                    except Exception:
+                        parsed = None
 
-    if parsed is None:
-        summary = _summarize_claude_structured_payload(payload)
-        if stop_reason == "max_tokens":
-            # This is very often truncated JSON. Surface a clear error so callers can increase max_tokens.
+        if parsed is None:
+            summary = _summarize_claude_structured_payload(payload)
+            if stop_reason == "max_tokens":
+                # This is very often truncated JSON. Surface a clear error so callers can increase max_tokens.
+                raise RuntimeError(
+                    "Claude structured message returned non-JSON output (stop_reason=max_tokens). "
+                    f"Increase max_tokens. {summary}"
+                )
+
+            head = text_content[:400].replace("\n", "\\n") if text_content else ""
             raise RuntimeError(
-                "Claude structured message returned non-JSON output (stop_reason=max_tokens). "
-                f"Increase max_tokens. {summary}"
+                "Claude structured message returned no parsable output. "
+                f"{summary} text_head={head!r}"
             )
 
-        head = text_content[:400].replace("\n", "\\n") if text_content else ""
-        raise RuntimeError(
-            "Claude structured message returned no parsable output. "
-            f"{summary} text_head={head!r}"
-        )
+        if generation is not None:
+            generation.update(
+                output=_structured_output_summary(payload=payload, parsed=parsed, text_content=text_content),
+                usage_details=_extract_anthropic_usage_from_payload(payload),
+            )
 
-    return {"parsed": parsed, "raw": payload, "text": text_content}
+        return {"parsed": parsed, "raw": payload, "text": text_content}

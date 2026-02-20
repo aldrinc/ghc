@@ -5,6 +5,9 @@ import re
 from pathlib import Path
 from typing import Mapping, Set, Tuple
 
+from app.config import settings
+from app.llm_ops import fetch_prompt_text
+
 from .config import PROMPT_DIR
 
 PLACEHOLDER_PATTERN = re.compile(r"\{\{([A-Z0-9_]+)\}\}")
@@ -40,6 +43,10 @@ def render_prompt(template: str, variables: Mapping[str, str]) -> str:
 
 
 def read_prompt_file(filename: str, prompt_dir: Path | None = None) -> Tuple[str, str]:
+    if settings.AGENTA_ENABLED:
+        prompt_key = f"prompts/precanon_research/{filename}"
+        return fetch_prompt_text(prompt_key)
+
     path = _resolve_prompt_path(filename, prompt_dir)
     content = path.read_text(encoding="utf-8")
     prompt_sha256 = hashlib.sha256(content.encode("utf-8")).hexdigest()

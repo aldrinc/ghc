@@ -265,14 +265,14 @@ async def generate_campaign_funnels(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing creative brief types. Set creative brief types before creating funnels.",
         )
-    if not payload.experimentIds:
+    if not payload.experiment_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="experimentIds must include at least one angle.",
         )
     requested_experiment_ids: list[str] = []
     seen_experiment_ids: set[str] = set()
-    for experiment_id in payload.experimentIds:
+    for experiment_id in payload.experiment_ids:
         normalized_id = experiment_id.strip()
         if not normalized_id:
             raise HTTPException(
@@ -367,6 +367,7 @@ async def generate_campaign_funnels(
             product_id=str(campaign.product_id),
             campaign_id=str(campaign.id),
             experiment_ids=requested_experiment_ids,
+            variant_ids_by_experiment=payload.variant_ids_by_experiment,
             funnel_name_prefix=f"{campaign.name} Funnel",
             generate_testimonials=bool(payload.generateTestimonials),
         ),
@@ -391,6 +392,7 @@ async def generate_campaign_funnels(
             "campaign_id": str(campaign.id),
             "product_id": str(campaign.product_id),
             "experiment_ids": requested_experiment_ids,
+            "variant_ids_by_experiment": payload.variant_ids_by_experiment,
         },
     )
 

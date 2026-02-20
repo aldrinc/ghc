@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
-from pydantic import AnyUrl, field_validator
+from pydantic import AnyUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Load env values for components that read os.environ directly (e.g., Google clients).
@@ -42,6 +43,10 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str | None = None
     OPENAI_WEBHOOK_SECRET: str | None = None
+    AGENTA_ENABLED: bool = False
+    AGENTA_API_KEY: str | None = None
+    AGENTA_HOST: str = "https://cloud.agenta.ai"
+    AGENTA_PROMPT_REGISTRY: dict[str, dict[str, Any]] = Field(default_factory=dict)
     LANGFUSE_ENABLED: bool = False
     LANGFUSE_PUBLIC_KEY: str | None = None
     LANGFUSE_SECRET_KEY: str | None = None

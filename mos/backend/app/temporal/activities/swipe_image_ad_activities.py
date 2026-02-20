@@ -6,7 +6,12 @@ import time
 from typing import Any, Dict, List, Tuple
 
 import httpx
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+    _GENAI_IMPORT_ERROR: Exception | None = None
+except Exception as exc:  # pragma: no cover - environment-specific dependency issue
+    genai = None
+    _GENAI_IMPORT_ERROR = exc
 from sqlalchemy import select
 from temporalio import activity
 
@@ -54,6 +59,12 @@ def _ensure_gemini_configured() -> None:
     global _GEMINI_CONFIGURED
     if _GEMINI_CONFIGURED:
         return
+    if genai is None:
+        detail = str(_GENAI_IMPORT_ERROR) if _GENAI_IMPORT_ERROR else "unknown import error"
+        raise RuntimeError(
+            "google-generativeai dependency is unavailable for swipe image activity. "
+            f"Fix dependency compatibility and retry. Original error: {detail}"
+        )
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")

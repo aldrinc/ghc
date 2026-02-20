@@ -9,7 +9,12 @@ from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+    _GENAI_IMPORT_ERROR: Exception | None = None
+except Exception as exc:  # pragma: no cover - environment-specific dependency issue
+    genai = None
+    _GENAI_IMPORT_ERROR = exc
 from temporalio import activity
 
 from app.db.base import session_scope
@@ -67,6 +72,12 @@ def _ensure_gemini_configured() -> None:
     global _GEMINI_CONFIGURED
     if _GEMINI_CONFIGURED:
         return
+    if genai is None:
+        detail = str(_GENAI_IMPORT_ERROR) if _GENAI_IMPORT_ERROR else "unknown import error"
+        raise RuntimeError(
+            "google-generativeai dependency is unavailable for ad breakdown activity. "
+            f"Fix dependency compatibility and retry. Original error: {detail}"
+        )
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")

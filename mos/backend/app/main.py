@@ -11,6 +11,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from app.config import settings
 from app.db.base import engine
+from app.llm_ops import initialize_agenta, shutdown_agenta
 from app.observability import initialize_langfuse, shutdown_langfuse
 from app.services.media_storage import MediaStorageConfigurationError
 from app.routers import (
@@ -19,6 +20,7 @@ from app.routers import (
     assets,
     claude,
     campaigns,
+    compliance,
     brands,
     clients,
     design_systems,
@@ -59,11 +61,13 @@ def _is_schema_mismatch_programming_error(exc: ProgrammingError) -> bool:
 
 @asynccontextmanager
 async def _app_lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    initialize_agenta()
     initialize_langfuse()
     try:
         yield
     finally:
         shutdown_langfuse()
+        shutdown_agenta()
 
 
 def create_app() -> FastAPI:
@@ -126,6 +130,7 @@ def create_app() -> FastAPI:
     app.include_router(campaigns.router)
     app.include_router(artifacts.router)
     app.include_router(assets.router)
+    app.include_router(compliance.router)
     app.include_router(agent_runs.router)
     app.include_router(funnels.router)
     app.include_router(public_funnels.router)

@@ -45,6 +45,43 @@ def _group(label: str) -> funnel_testimonials._TestimonialGroup:
     )
 
 
+def test_collect_testimonial_targets_prefers_config_json_over_stale_config_for_sales_review_wall():
+    puck_data = {
+        "content": [
+            {
+                "type": "SalesPdpReviewWall",
+                "props": {
+                    "config": {"id": "reviews", "tiles": []},
+                    "configJson": json.dumps(
+                        {
+                            "id": "reviews",
+                            "tiles": [
+                                {
+                                    "id": "tile-1",
+                                    "image": {
+                                        "alt": "Customer review",
+                                        "testimonialTemplate": "review_card",
+                                    },
+                                }
+                            ],
+                        }
+                    ),
+                },
+            }
+        ]
+    }
+
+    groups, contexts = funnel_testimonials._collect_testimonial_targets(
+        puck_data=puck_data,
+        template_kind="sales-pdp",
+    )
+
+    assert len(groups) == 1
+    assert groups[0].label == "sales_pdp.reviewWall.tiles[0]"
+    assert groups[0].renders[0].label == "sales_pdp.reviewWall.tiles[0]"
+    assert len(contexts) == 1
+
+
 def test_social_comment_without_attachment_indices_empty_for_small_totals():
     assert funnel_testimonials._select_social_comment_without_attachment_indices(0, seed=123) == set()
     assert funnel_testimonials._select_social_comment_without_attachment_indices(1, seed=123) == set()

@@ -87,6 +87,20 @@ export type InventoryRule = {
   colorId: string
 }
 
+export type VariantSchemaDimensionType = "size" | "color" | "offer" | "custom"
+
+export type VariantSchemaDimension = {
+  id: string
+  type: VariantSchemaDimensionType
+  label: string
+  sourceKey?: string
+}
+
+export type VariantSchema = {
+  dimensions: VariantSchemaDimension[]
+  defaults?: Partial<Record<"sizeId" | "colorId" | "offerId", string>>
+}
+
 export type PurchaseConfig = {
   faqPills: FaqPill[]
 
@@ -127,6 +141,8 @@ export type PurchaseConfig = {
   outOfStock?: InventoryRule[]
   /** Combinations that should show the shipping delay banner. */
   shippingDelay?: InventoryRule[]
+  /** Optional schema describing which checkout selectors should be shown. */
+  variantSchema?: VariantSchema
 }
 
 export type HeroConfig = {

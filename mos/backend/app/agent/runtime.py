@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import time
 from collections.abc import Generator
 from dataclasses import dataclass
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.agent.types import ToolContext, ToolResult
 from app.db.enums import AgentRunStatusEnum, AgentToolCallStatusEnum
 from app.db.repositories.agent_runs import AgentRunsRepository, AgentToolCallsRepository
-from app.observability import LangfuseTraceContext, bind_langfuse_trace_context
+from app.observability import LangfuseTraceContext, bind_langfuse_trace_context, start_langfuse_span
 
 
 ArgsT = TypeVar("ArgsT", bound=BaseModel)
@@ -107,6 +108,35 @@ class AgentRuntime:
         except ValidationError as exc:
             raise ToolValidationError(f"Invalid args for tool {tool.name}: {exc}") from exc
 
+    @staticmethod
+    def _parse_error_details(error_message: str) -> dict[str, Any] | None:
+        marker = "details="
+        marker_index = error_message.find(marker)
+        if marker_index < 0:
+            return None
+        details_str = error_message[marker_index + len(marker) :].strip()
+        if not details_str:
+            return None
+        try:
+            parsed = ast.literal_eval(details_str)
+        except (ValueError, SyntaxError):
+            return None
+        if not isinstance(parsed, dict):
+            return None
+        return parsed
+
+    @classmethod
+    def _tool_error_metadata(cls, exc: Exception) -> dict[str, Any]:
+        error_message = str(exc)
+        metadata: dict[str, Any] = {
+            "toolErrorType": type(exc).__name__,
+            "toolErrorMessage": error_message,
+        }
+        details = cls._parse_error_details(error_message)
+        if details:
+            metadata["toolErrorDetails"] = details
+        return metadata
+
     def invoke_tool_stream(
         self,
         *,
@@ -185,9 +215,30 @@ class AgentRuntime:
         )
 
         started = time.monotonic()
+        tool_span = None
         try:
             with bind_langfuse_trace_context(trace_context):
-                result = yield from tool.run_stream(ctx=ctx, args=args)
+                with start_langfuse_span(
+                    name=f"agent.tool.{tool.name}",
+                    input={"args": _redact(call.args_json)},
+                    metadata={
+                        "operation": "invoke_tool_stream",
+                        "toolName": tool.name,
+                        "toolSeq": handle.seq,
+                        "toolCallId": str(call.id),
+                    },
+                    tags=["agent", "tool_call", tool.name],
+                    trace_name=f"agent.{tool.name}",
+                ) as tool_span:
+                    try:
+                        result = yield from tool.run_stream(ctx=ctx, args=args)
+                    except Exception as exc:  # noqa: BLE001
+                        if tool_span is not None:
+                            tool_span.update(
+                                metadata=self._tool_error_metadata(exc),
+                                output={"status": "failed"},
+                            )
+                        raise
         except Exception as exc:  # noqa: BLE001
             duration_ms = int((time.monotonic() - started) * 1000)
             self._calls_repo.finish_call(
@@ -211,6 +262,13 @@ class AgentRuntime:
             result_json=result.model_dump(mode="json"),
             duration_ms=duration_ms,
         )
+        if tool_span is not None:
+            tool_span.update(
+                output={
+                    "status": "completed",
+                    "durationMs": duration_ms,
+                }
+            )
         yield {
             "type": "tool_result",
             "runId": handle.run_id,

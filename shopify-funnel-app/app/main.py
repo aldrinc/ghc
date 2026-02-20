@@ -15,6 +15,7 @@ from app.config import settings
 from app.db import get_session, init_db
 from app.models import OAuthState, ProcessedWebhookEvent, ShopInstallation
 from app.schemas import (
+    CatalogProductVariant,
     CatalogProductSummary,
     CreateCatalogProductRequest,
     CreateCatalogProductResponse,
@@ -22,9 +23,16 @@ from app.schemas import (
     CreateCheckoutRequest,
     CreateCheckoutResponse,
     ForwardOrderPayload,
+    GetProductRequest,
+    GetProductResponse,
     InstallationResponse,
     ListProductsRequest,
     ListProductsResponse,
+    UpsertedPolicyPage,
+    UpsertPolicyPagesRequest,
+    UpsertPolicyPagesResponse,
+    UpdateCatalogVariantRequest,
+    UpdateCatalogVariantResponse,
     VerifyProductRequest,
     VerifyProductResponse,
     UpdateInstallationRequest,
@@ -363,6 +371,56 @@ async def list_catalog_products(
 
 
 @app.post(
+    "/v1/catalog/products/get",
+    response_model=GetProductResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def get_catalog_product(
+    payload: GetProductRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        product = await shopify_api.get_product(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            product_gid=payload.productGid,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return GetProductResponse(
+        shopDomain=installation.shop_domain,
+        productGid=product["productGid"],
+        title=product["title"],
+        handle=product["handle"],
+        status=product["status"],
+        variants=[
+            CatalogProductVariant(
+                variantGid=item["variantGid"],
+                title=item["title"],
+                priceCents=item["priceCents"],
+                currency=item["currency"],
+                compareAtPriceCents=item.get("compareAtPriceCents"),
+                sku=item.get("sku"),
+                barcode=item.get("barcode"),
+                taxable=item["taxable"],
+                requiresShipping=item["requiresShipping"],
+                inventoryPolicy=item.get("inventoryPolicy"),
+                inventoryManagement=item.get("inventoryManagement"),
+                inventoryQuantity=item.get("inventoryQuantity"),
+                optionValues=item.get("optionValues") or {},
+            )
+            for item in product["variants"]
+        ],
+    )
+
+
+@app.post(
     "/v1/catalog/products/create",
     response_model=CreateCatalogProductResponse,
     dependencies=[Depends(require_internal_api_token)],
@@ -406,6 +464,94 @@ async def create_catalog_product(
                 currency=item["currency"],
             )
             for item in created["variants"]
+        ],
+    )
+
+
+@app.patch(
+    "/v1/catalog/variants",
+    response_model=UpdateCatalogVariantResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def update_catalog_variant(
+    payload: UpdateCatalogVariantRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+
+    fields_set = payload.model_fields_set
+    update_fields: dict[str, Any] = {}
+    if "title" in fields_set:
+        update_fields["title"] = payload.title
+    if "priceCents" in fields_set:
+        update_fields["priceCents"] = payload.priceCents
+    if "compareAtPriceCents" in fields_set:
+        update_fields["compareAtPriceCents"] = payload.compareAtPriceCents
+    if "sku" in fields_set:
+        update_fields["sku"] = payload.sku
+    if "barcode" in fields_set:
+        update_fields["barcode"] = payload.barcode
+    if "inventoryPolicy" in fields_set:
+        update_fields["inventoryPolicy"] = payload.inventoryPolicy
+    if "inventoryManagement" in fields_set:
+        update_fields["inventoryManagement"] = payload.inventoryManagement
+
+    try:
+        updated = await shopify_api.update_variant(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            variant_gid=payload.variantGid,
+            fields=update_fields,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return UpdateCatalogVariantResponse(
+        shopDomain=installation.shop_domain,
+        productGid=updated["productGid"],
+        variantGid=updated["variantGid"],
+    )
+
+
+@app.post(
+    "/v1/policies/pages/upsert",
+    response_model=UpsertPolicyPagesResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def upsert_policy_pages(
+    payload: UpsertPolicyPagesRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        synced_pages = await shopify_api.upsert_policy_pages(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            pages=[page.model_dump() for page in payload.pages],
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return UpsertPolicyPagesResponse(
+        shopDomain=installation.shop_domain,
+        pages=[
+            UpsertedPolicyPage(
+                pageKey=item["pageKey"],
+                pageId=item["pageId"],
+                title=item["title"],
+                handle=item["handle"],
+                url=item["url"],
+                operation=item["operation"],
+            )
+            for item in synced_pages
         ],
     )
 

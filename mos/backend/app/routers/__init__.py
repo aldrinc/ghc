@@ -14,6 +14,7 @@ from app.routers import (
 )
 from app.routers import (
     claude,
+    compliance,
     deep_research,
     explore,
     openai_webhooks,
@@ -42,6 +43,7 @@ __all__ = [
     "workflows",
     "deploy",
     "claude",
+    "compliance",
     "deep_research",
     "explore",
     "openai_webhooks",

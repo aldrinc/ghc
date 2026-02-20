@@ -5,7 +5,10 @@ import pytest
 from app.schemas import (
     CreateCatalogProductRequest,
     CreateCheckoutRequest,
+    GetProductRequest,
     ListProductsRequest,
+    UpdateCatalogVariantRequest,
+    UpsertPolicyPagesRequest,
     VerifyProductRequest,
 )
 
@@ -73,6 +76,29 @@ def test_list_products_request_accepts_client_target():
     assert payload.limit == 10
 
 
+def test_get_product_request_requires_exactly_one_target():
+    with pytest.raises(ValueError):
+        GetProductRequest(productGid="gid://shopify/Product/1")
+
+    with pytest.raises(ValueError):
+        GetProductRequest(
+            clientId="client_1",
+            shopDomain="example.myshopify.com",
+            productGid="gid://shopify/Product/1",
+        )
+
+
+def test_get_product_request_accepts_shop_target():
+    payload = GetProductRequest(
+        shopDomain="example.myshopify.com",
+        productGid="gid://shopify/Product/123",
+    )
+
+    assert payload.clientId is None
+    assert payload.shopDomain == "example.myshopify.com"
+    assert payload.productGid == "gid://shopify/Product/123"
+
+
 def test_create_catalog_product_request_requires_exactly_one_target():
     with pytest.raises(ValueError):
         CreateCatalogProductRequest(
@@ -100,3 +126,101 @@ def test_create_catalog_product_request_accepts_shop_target():
     assert payload.clientId is None
     assert payload.shopDomain == "example.myshopify.com"
     assert payload.status == "DRAFT"
+
+
+def test_update_catalog_variant_request_requires_exactly_one_target():
+    with pytest.raises(ValueError):
+        UpdateCatalogVariantRequest(
+            variantGid="gid://shopify/ProductVariant/1",
+            priceCents=4900,
+        )
+
+    with pytest.raises(ValueError):
+        UpdateCatalogVariantRequest(
+            clientId="client_1",
+            shopDomain="example.myshopify.com",
+            variantGid="gid://shopify/ProductVariant/1",
+            priceCents=4900,
+        )
+
+
+def test_update_catalog_variant_request_requires_update_fields():
+    with pytest.raises(ValueError):
+        UpdateCatalogVariantRequest(
+            clientId="client_1",
+            variantGid="gid://shopify/ProductVariant/1",
+        )
+
+
+def test_update_catalog_variant_request_accepts_compare_at_price_clear():
+    payload = UpdateCatalogVariantRequest(
+        shopDomain="example.myshopify.com",
+        variantGid="gid://shopify/ProductVariant/1",
+        compareAtPriceCents=None,
+    )
+
+    assert payload.clientId is None
+    assert payload.shopDomain == "example.myshopify.com"
+    assert payload.compareAtPriceCents is None
+
+
+def test_update_catalog_variant_request_accepts_inventory_fields():
+    payload = UpdateCatalogVariantRequest(
+        clientId="client_1",
+        variantGid="gid://shopify/ProductVariant/1",
+        sku="SKU-001",
+        barcode="BAR-001",
+        inventoryPolicy="continue",
+        inventoryManagement="shopify",
+    )
+
+    assert payload.clientId == "client_1"
+    assert payload.sku == "SKU-001"
+    assert payload.barcode == "BAR-001"
+    assert payload.inventoryPolicy == "continue"
+    assert payload.inventoryManagement == "shopify"
+
+
+def test_upsert_policy_pages_request_requires_exactly_one_target():
+    with pytest.raises(ValueError):
+        UpsertPolicyPagesRequest(
+            pages=[
+                {
+                    "pageKey": "privacy_policy",
+                    "title": "Privacy Policy",
+                    "handle": "privacy-policy",
+                    "bodyHtml": "<p>hello</p>",
+                }
+            ],
+        )
+
+    with pytest.raises(ValueError):
+        UpsertPolicyPagesRequest(
+            clientId="client_1",
+            shopDomain="example.myshopify.com",
+            pages=[
+                {
+                    "pageKey": "privacy_policy",
+                    "title": "Privacy Policy",
+                    "handle": "privacy-policy",
+                    "bodyHtml": "<p>hello</p>",
+                }
+            ],
+        )
+
+
+def test_upsert_policy_pages_request_accepts_client_target():
+    payload = UpsertPolicyPagesRequest(
+        clientId="client_1",
+        pages=[
+            {
+                "pageKey": "privacy_policy",
+                "title": "Privacy Policy",
+                "handle": "privacy-policy",
+                "bodyHtml": "<p>hello</p>",
+            }
+        ],
+    )
+
+    assert payload.clientId == "client_1"
+    assert payload.shopDomain is None
