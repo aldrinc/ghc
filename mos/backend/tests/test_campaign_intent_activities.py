@@ -1,6 +1,7 @@
 import pytest
 
 from app.temporal.activities.campaign_intent_activities import (
+    _collect_image_generation_errors,
     _is_empty_page_generation_error,
     _run_generate_page_draft_with_retries,
 )
@@ -65,3 +66,52 @@ def test_run_generate_page_draft_with_retries_raises_after_max_empty_page_attemp
     assert attempts["count"] == 3
     assert retry_attempts == [1, 2]
 
+
+def test_collect_image_generation_errors_returns_structured_entries():
+    generated_images = [
+        {"assetPublicId": "abc"},
+        {"error": "Unsplash search returned 0 results"},
+        {"error": "  CDN timeout  "},
+        "not-an-object",
+        {"error": ""},
+    ]
+
+    errors = _collect_image_generation_errors(
+        generated_images=generated_images,
+        funnel_id="funnel-1",
+        page_id="page-1",
+        page_name="Sales",
+        template_id="sales-pdp",
+    )
+
+    assert errors == [
+        {
+            "type": "image_generation",
+            "severity": "warning",
+            "funnel_id": "funnel-1",
+            "page_id": "page-1",
+            "page_name": "Sales",
+            "template_id": "sales-pdp",
+            "message": "Unsplash search returned 0 results",
+        },
+        {
+            "type": "image_generation",
+            "severity": "warning",
+            "funnel_id": "funnel-1",
+            "page_id": "page-1",
+            "page_name": "Sales",
+            "template_id": "sales-pdp",
+            "message": "CDN timeout",
+        },
+    ]
+
+
+def test_collect_image_generation_errors_ignores_non_list_inputs():
+    errors = _collect_image_generation_errors(
+        generated_images={"error": "boom"},
+        funnel_id="funnel-1",
+        page_id="page-1",
+        page_name="Sales",
+        template_id=None,
+    )
+    assert errors == []

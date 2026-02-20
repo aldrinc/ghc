@@ -28,6 +28,37 @@ _EMPTY_PAGE_ERROR_MARKERS = (
 )
 
 
+def _collect_image_generation_errors(
+    *,
+    generated_images: Any,
+    funnel_id: str,
+    page_id: str,
+    page_name: str,
+    template_id: str | None,
+) -> list[dict[str, Any]]:
+    errors: list[dict[str, Any]] = []
+    if not isinstance(generated_images, list):
+        return errors
+    for item in generated_images:
+        if not isinstance(item, dict):
+            continue
+        message = item.get("error")
+        if not isinstance(message, str) or not message.strip():
+            continue
+        error_entry: dict[str, Any] = {
+            "type": "image_generation",
+            "severity": "warning",
+            "funnel_id": funnel_id,
+            "page_id": page_id,
+            "page_name": page_name,
+            "message": message.strip(),
+        }
+        if template_id:
+            error_entry["template_id"] = template_id
+        errors.append(error_entry)
+    return errors
+
+
 def _is_empty_page_generation_error(exc: Exception) -> bool:
     message = str(exc).strip().lower()
     return any(marker in message for marker in _EMPTY_PAGE_ERROR_MARKERS)
@@ -219,6 +250,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
         created_pages: list[dict[str, str]] = []
         resolved_pages: list[FunnelPage] = []
+        non_fatal_errors: list[dict[str, Any]] = []
         for idx, page_spec in enumerate(pages):
             template_id = page_spec.get("template_id") or page_spec.get("templateId")
             if not template_id:
@@ -327,14 +359,15 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     generated_images = result.get("generatedImages") or []
                     if not draft_version_id:
                         raise RuntimeError("AI draft generation returned no draftVersionId.")
-                    image_errors = [
-                        item for item in generated_images if isinstance(item, dict) and item.get("error")
-                    ]
+                    image_errors = _collect_image_generation_errors(
+                        generated_images=generated_images,
+                        funnel_id=str(funnel.id),
+                        page_id=str(page.id),
+                        page_name=page_name,
+                        template_id=template_id,
+                    )
                     if image_errors:
-                        first_error = image_errors[0].get("error") or "Unknown error."
-                        raise RuntimeError(
-                            f"Image generation failed for {len(image_errors)} image(s): {first_error}"
-                        )
+                        non_fatal_errors.extend(image_errors)
                 except Exception as exc:  # noqa: BLE001
                     log_activity(
                         "funnel_page_draft",
@@ -374,6 +407,8 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                             "page_id": str(page.id),
                             "draft_version_id": draft_version_id,
                             "funnel_id": str(funnel.id),
+                            "image_error_count": len(image_errors),
+                            "image_errors": [entry["message"] for entry in image_errors],
                         },
                     )
                     if generate_testimonials:
@@ -423,6 +458,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "funnel_id": str(funnel.id),
             "entry_page_id": created_pages[0]["page_id"] if created_pages else None,
             "pages": created_pages,
+            "non_fatal_errors": non_fatal_errors,
         }
 
 
@@ -542,6 +578,7 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
             asset_briefs_all = [b for b in raw_briefs if isinstance(b, dict)]
 
     results = []
+    non_fatal_errors: list[dict[str, Any]] = []
     for experiment in experiment_specs:
         if not isinstance(experiment, dict):
             raise ValueError("Experiment specs must be objects.")
@@ -608,6 +645,11 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
                         "experiment_id": experiment_id,
                         "variant_id": variant_id,
                         "funnel_id": funnel_result.get("funnel_id") if isinstance(funnel_result, dict) else None,
+                        "non_fatal_error_count": (
+                            len(funnel_result.get("non_fatal_errors") or [])
+                            if isinstance(funnel_result, dict)
+                            else 0
+                        ),
                     },
                 )
             except Exception as exc:  # noqa: BLE001
@@ -623,6 +665,23 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
                 )
                 raise
 
+            funnel_non_fatal = (
+                funnel_result.get("non_fatal_errors")
+                if isinstance(funnel_result, dict)
+                else None
+            )
+            if isinstance(funnel_non_fatal, list):
+                for entry in funnel_non_fatal:
+                    if not isinstance(entry, dict):
+                        continue
+                    non_fatal_errors.append(
+                        {
+                            **entry,
+                            "experiment_id": experiment_id,
+                            "variant_id": variant_id,
+                        }
+                    )
+
             results.append({"experiment_id": experiment_id, "variant_id": variant_id, "funnel": funnel_result})
 
-    return {"funnels": results}
+    return {"funnels": results, "non_fatal_errors": non_fatal_errors}
