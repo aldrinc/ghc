@@ -26,11 +26,12 @@ import {
   useRemoveOfferBonus,
   useSyncShopifyVariantsForProduct,
   useUpdateProduct,
+  useUpdateProductOffer,
   useUpdateVariant,
   useUploadProductAssets,
 } from "@/api/products";
 import { toast } from "@/components/ui/toast";
-import type { ProductAsset, ProductVariant } from "@/types/products";
+import type { ProductAsset, ProductOffer, ProductVariant } from "@/types/products";
 
 function formatBytes(value?: number | null): string | null {
   if (value === null || value === undefined) return null;
@@ -59,6 +60,73 @@ function formatTimestamp(value?: string | null): string | null {
   return parsed.toLocaleString();
 }
 
+type SalesPdpVariantMappingDraft = {
+  offerId: string;
+  sizeId: string;
+  colorId: string;
+};
+
+const SALES_PDP_MAPPING_KEYS: Array<keyof SalesPdpVariantMappingDraft> = ["offerId", "sizeId", "colorId"];
+
+function asPlainRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return { ...(value as Record<string, unknown>) };
+}
+
+function extractSalesPdpVariantMapping(
+  optionsSchema: Record<string, unknown> | null | undefined,
+): SalesPdpVariantMappingDraft {
+  const empty: SalesPdpVariantMappingDraft = {
+    offerId: "",
+    sizeId: "",
+    colorId: "",
+  };
+  const schema = asPlainRecord(optionsSchema);
+  if (!schema) return empty;
+  const rawMapping = schema.salesPdpVariantMapping;
+  if (!rawMapping || typeof rawMapping !== "object" || Array.isArray(rawMapping)) return empty;
+  const mapping = rawMapping as Record<string, unknown>;
+  return {
+    offerId: typeof mapping.offerId === "string" ? mapping.offerId.trim() : "",
+    sizeId: typeof mapping.sizeId === "string" ? mapping.sizeId.trim() : "",
+    colorId: typeof mapping.colorId === "string" ? mapping.colorId.trim() : "",
+  };
+}
+
+function buildSalesPdpVariantMapping(draft: SalesPdpVariantMappingDraft): {
+  mapping: Record<string, string> | null;
+  duplicateSourceKey: string | null;
+} {
+  const mapping: Record<string, string> = {};
+  const seenSourceKeys = new Set<string>();
+  for (const key of SALES_PDP_MAPPING_KEYS) {
+    const value = draft[key].trim();
+    if (!value) continue;
+    if (seenSourceKeys.has(value)) {
+      return { mapping: null, duplicateSourceKey: value };
+    }
+    seenSourceKeys.add(value);
+    mapping[key] = value;
+  }
+  return {
+    mapping: Object.keys(mapping).length ? mapping : null,
+    duplicateSourceKey: null,
+  };
+}
+
+function mergeSalesPdpVariantMappingIntoOptionsSchema(
+  baseOptionsSchema: Record<string, unknown> | null | undefined,
+  mapping: Record<string, string> | null,
+): Record<string, unknown> | null {
+  const nextOptionsSchema = asPlainRecord(baseOptionsSchema) || {};
+  if (mapping && Object.keys(mapping).length) {
+    nextOptionsSchema.salesPdpVariantMapping = mapping;
+  } else {
+    delete nextOptionsSchema.salesPdpVariantMapping;
+  }
+  return Object.keys(nextOptionsSchema).length ? nextOptionsSchema : null;
+}
+
 export function ProductDetailPage() {
   const { productId } = useParams();
   const { workspace } = useWorkspace();
@@ -83,6 +151,9 @@ export function ProductDetailPage() {
   const createShopifyProductForProduct = useCreateShopifyProductForProduct(productId || "");
   const syncShopifyVariants = useSyncShopifyVariantsForProduct(productId || "");
   const createOffer = useCreateProductOffer(productId || "");
+  const [offerFormMode, setOfferFormMode] = useState<"create" | "edit">("create");
+  const [editingOffer, setEditingOffer] = useState<ProductOffer | null>(null);
+  const updateOffer = useUpdateProductOffer(editingOffer?.id || "", productId || "");
   const addOfferBonus = useAddOfferBonus(productId || "");
   const removeOfferBonus = useRemoveOfferBonus(productId || "");
   const uploadProductAssets = useUploadProductAssets(productId || "");
@@ -123,6 +194,9 @@ export function ProductDetailPage() {
   const [offerName, setOfferName] = useState("");
   const [offerBusinessModel, setOfferBusinessModel] = useState("one_time");
   const [offerDescription, setOfferDescription] = useState("");
+  const [offerVariantOfferKey, setOfferVariantOfferKey] = useState("");
+  const [offerVariantSizeKey, setOfferVariantSizeKey] = useState("");
+  const [offerVariantColorKey, setOfferVariantColorKey] = useState("");
   const [bonusSelectionByOffer, setBonusSelectionByOffer] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -189,9 +263,32 @@ export function ProductDetailPage() {
   };
 
   const resetOfferForm = () => {
+    setOfferFormMode("create");
+    setEditingOffer(null);
     setOfferName("");
     setOfferBusinessModel("one_time");
     setOfferDescription("");
+    setOfferVariantOfferKey("");
+    setOfferVariantSizeKey("");
+    setOfferVariantColorKey("");
+  };
+
+  const openCreateOfferModal = () => {
+    resetOfferForm();
+    setIsOfferModalOpen(true);
+  };
+
+  const openEditOfferModal = (offer: ProductOffer) => {
+    const mapping = extractSalesPdpVariantMapping(offer.options_schema);
+    setOfferFormMode("edit");
+    setEditingOffer(offer);
+    setOfferName(offer.name || "");
+    setOfferBusinessModel(offer.business_model || "one_time");
+    setOfferDescription(offer.description || "");
+    setOfferVariantOfferKey(mapping.offerId);
+    setOfferVariantSizeKey(mapping.sizeId);
+    setOfferVariantColorKey(mapping.colorId);
+    setIsOfferModalOpen(true);
   };
 
   const handleSaveVariant = async (event: React.FormEvent) => {
@@ -534,23 +631,78 @@ export function ProductDetailPage() {
     setShopifyProductGidDraft(selectedShopifyProductGid);
   };
 
-  const handleCreateOffer = async (event: React.FormEvent) => {
+  const handleSaveOffer = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!productId) return;
-    if (!offerName.trim()) {
+    const normalizedOfferName = offerName.trim();
+    const normalizedBusinessModel = offerBusinessModel.trim();
+    const normalizedDescription = offerDescription.trim();
+
+    if (!normalizedOfferName) {
       toast.error("Offer name is required.");
       return;
     }
-    if (!offerBusinessModel.trim()) {
+    if (!normalizedBusinessModel) {
       toast.error("Business model is required.");
       return;
     }
-    await createOffer.mutateAsync({
-      productId,
-      name: offerName.trim(),
-      businessModel: offerBusinessModel.trim(),
-      description: offerDescription.trim() || undefined,
+
+    const { mapping, duplicateSourceKey } = buildSalesPdpVariantMapping({
+      offerId: offerVariantOfferKey,
+      sizeId: offerVariantSizeKey,
+      colorId: offerVariantColorKey,
     });
+    if (duplicateSourceKey) {
+      toast.error(`Variant mapping source keys must be unique. Duplicate: ${duplicateSourceKey}`);
+      return;
+    }
+
+    const baseOptionsSchema = offerFormMode === "edit" ? editingOffer?.options_schema : null;
+    const nextOptionsSchema = mergeSalesPdpVariantMappingIntoOptionsSchema(baseOptionsSchema, mapping);
+
+    if (offerFormMode === "create") {
+      await createOffer.mutateAsync({
+        productId,
+        name: normalizedOfferName,
+        businessModel: normalizedBusinessModel,
+        description: normalizedDescription || undefined,
+        optionsSchema: nextOptionsSchema || undefined,
+      });
+      resetOfferForm();
+      setIsOfferModalOpen(false);
+      return;
+    }
+
+    if (!editingOffer) {
+      toast.error("No offer selected for editing.");
+      return;
+    }
+
+    const patchPayload: {
+      name?: string;
+      description?: string | null;
+      businessModel?: string | null;
+      optionsSchema?: Record<string, unknown> | null;
+    } = {};
+    if (normalizedOfferName !== (editingOffer.name || "")) {
+      patchPayload.name = normalizedOfferName;
+    }
+    if (normalizedBusinessModel !== (editingOffer.business_model || "")) {
+      patchPayload.businessModel = normalizedBusinessModel;
+    }
+    if (normalizedDescription !== (editingOffer.description || "")) {
+      patchPayload.description = normalizedDescription || null;
+    }
+    const currentOptionsSchema = asPlainRecord(editingOffer.options_schema) || null;
+    if (JSON.stringify(currentOptionsSchema) !== JSON.stringify(nextOptionsSchema)) {
+      patchPayload.optionsSchema = nextOptionsSchema;
+    }
+    if (!Object.keys(patchPayload).length) {
+      toast.error("No offer changes to save.");
+      return;
+    }
+
+    await updateOffer.mutateAsync(patchPayload);
     resetOfferForm();
     setIsOfferModalOpen(false);
   };
@@ -635,6 +787,7 @@ export function ProductDetailPage() {
     updateShopifyInstallation.isPending ||
     disconnectShopifyInstallation.isPending ||
     setDefaultShop.isPending;
+  const isSavingOffer = createOffer.isPending || updateOffer.isPending;
   const isSavingVariant = createVariant.isPending || updateVariant.isPending;
   const isDeletingVariant = deleteVariant.isPending;
   const isShopifyReady = shopifyState === "ready";
@@ -666,7 +819,7 @@ export function ProductDetailPage() {
             <Button variant="secondary" size="sm" onClick={() => navigate("/workspaces/products")}>
               Back to products
             </Button>
-            <Button size="sm" variant="secondary" onClick={() => setIsOfferModalOpen(true)} disabled={!productDetail}>
+            <Button size="sm" variant="secondary" onClick={openCreateOfferModal} disabled={!productDetail}>
               New offer
             </Button>
             <Button size="sm" onClick={openCreateVariantModal} disabled={!productDetail}>
@@ -1082,7 +1235,7 @@ export function ProductDetailPage() {
                   <div className="text-xs font-semibold uppercase text-content-muted">Offers</div>
                   <div className="text-xs text-content-muted">Primary package plus bonus products.</div>
                 </div>
-                <Button size="sm" variant="secondary" onClick={() => setIsOfferModalOpen(true)}>
+                <Button size="sm" variant="secondary" onClick={openCreateOfferModal}>
                   New offer
                 </Button>
               </div>
@@ -1093,6 +1246,11 @@ export function ProductDetailPage() {
                     const linkedBonusProductIds = new Set((offer.bonuses || []).map((bonus) => bonus.bonus_product.id));
                     const addableBonuses = bonusProductCandidates.filter((candidate) => !linkedBonusProductIds.has(candidate.id));
                     const selectedBonusProductId = bonusSelectionByOffer[offer.id] || "";
+                    const variantMapping = extractSalesPdpVariantMapping(offer.options_schema);
+                    const variantMappingSummary = SALES_PDP_MAPPING_KEYS
+                      .filter((key) => Boolean(variantMapping[key]))
+                      .map((key) => `${key} -> ${variantMapping[key]}`)
+                      .join(" · ");
                     return (
                       <div key={offer.id} className="rounded-md border border-border bg-surface-2 p-3 space-y-3">
                         <div className="flex items-start justify-between gap-3">
@@ -1100,8 +1258,21 @@ export function ProductDetailPage() {
                             <div className="text-sm font-semibold text-content truncate">{offer.name}</div>
                             <div className="text-xs text-content-muted">{offer.business_model}</div>
                             {offer.description ? <div className="text-xs text-content-muted mt-1">{offer.description}</div> : null}
+                            <div className="text-[11px] text-content-muted mt-1">
+                              Variant mapping: {variantMappingSummary || "Auto-detect from option keys"}
+                            </div>
                           </div>
-                          <div className="text-[10px] text-content-muted">{offer.id.slice(0, 8)}</div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => openEditOfferModal(offer)}
+                              disabled={isSavingOffer}
+                            >
+                              Edit
+                            </Button>
+                            <div className="text-[10px] text-content-muted">{offer.id.slice(0, 8)}</div>
+                          </div>
                         </div>
 
                         <div className="space-y-2">
@@ -1272,11 +1443,21 @@ export function ProductDetailPage() {
         </div>
       )}
 
-      <DialogRoot open={isOfferModalOpen} onOpenChange={setIsOfferModalOpen}>
+      <DialogRoot
+        open={isOfferModalOpen}
+        onOpenChange={(open) => {
+          setIsOfferModalOpen(open);
+          if (!open) resetOfferForm();
+        }}
+      >
         <DialogContent>
-          <DialogTitle>New offer</DialogTitle>
-          <DialogDescription>Create an offer package and attach bonus products after creation.</DialogDescription>
-          <form className="space-y-3" onSubmit={handleCreateOffer}>
+          <DialogTitle>{offerFormMode === "create" ? "New offer" : "Edit offer"}</DialogTitle>
+          <DialogDescription>
+            {offerFormMode === "create"
+              ? "Create an offer package and attach bonus products after creation."
+              : "Update offer details and Sales PDP option mapping."}
+          </DialogDescription>
+          <form className="space-y-3" onSubmit={handleSaveOffer}>
             <div className="space-y-1">
               <label className="text-xs font-semibold text-content">Offer name</label>
               <Input
@@ -1306,14 +1487,53 @@ export function ProductDetailPage() {
               />
             </div>
 
+            <div className="rounded-md border border-border bg-surface p-3 space-y-2">
+              <div className="text-xs font-semibold text-content">Sales PDP Variant Mapping (optional)</div>
+              <div className="text-xs text-content-muted">
+                Map canonical keys to this offer&apos;s `variant.option_values` keys (example: offerId = Bundle).
+              </div>
+              <div className="grid gap-2 md:grid-cols-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-content">offerId source key</label>
+                  <Input
+                    placeholder="Bundle"
+                    value={offerVariantOfferKey}
+                    onChange={(e) => setOfferVariantOfferKey(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-content">sizeId source key</label>
+                  <Input
+                    placeholder="Size"
+                    value={offerVariantSizeKey}
+                    onChange={(e) => setOfferVariantSizeKey(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-content">colorId source key</label>
+                  <Input
+                    placeholder="Color"
+                    value={offerVariantColorKey}
+                    onChange={(e) => setOfferVariantColorKey(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2 pt-1">
               <DialogClose asChild>
                 <Button type="button" variant="secondary">
                   Cancel
                 </Button>
               </DialogClose>
-              <Button type="submit" disabled={!productId || createOffer.isPending}>
-                {createOffer.isPending ? "Creating…" : "Create offer"}
+              <Button type="submit" disabled={!productId || isSavingOffer}>
+                {isSavingOffer
+                  ? offerFormMode === "create"
+                    ? "Creating…"
+                    : "Saving…"
+                  : offerFormMode === "create"
+                    ? "Create offer"
+                    : "Save offer"}
               </Button>
             </div>
           </form>

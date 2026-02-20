@@ -208,3 +208,116 @@ def test_align_sales_checkout_option_ids_requires_variant_option_values():
             purchase=purchase,
             variants=[{"title": "Single Device", "amount_cents": 29900}],
         )
+
+
+def test_align_sales_checkout_option_ids_supports_single_offer_dimension_variants():
+    purchase = {
+        "size": {"options": [{"id": "small", "label": "Small", "sizeIn": "12x9", "sizeCm": "30x23"}]},
+        "color": {"options": [{"id": "gray", "label": "Gray"}]},
+        "offer": {
+            "options": [
+                {"id": "legacy-single", "title": "Single", "image": {"alt": "Single"}, "price": 299.0},
+            ]
+        },
+    }
+    variants = [
+        {"title": "Single Device", "amount_cents": 29900, "option_values": {"Bundle": "single"}},
+        {"title": "Share & Save Duo", "amount_cents": 49900, "option_values": {"Bundle": "double"}},
+        {"title": "Family Bundle", "amount_cents": 69900, "option_values": {"Bundle": "family"}},
+    ]
+
+    changed = funnel_ai._align_sales_pdp_purchase_options_to_variants(purchase=purchase, variants=variants)
+
+    assert changed is True
+    assert [item["id"] for item in purchase["size"]["options"]] == ["__default_size"]
+    assert [item["id"] for item in purchase["color"]["options"]] == ["__default_color"]
+    assert [item["id"] for item in purchase["offer"]["options"]] == ["single", "double", "family"]
+    variant_schema = purchase.get("variantSchema")
+    assert isinstance(variant_schema, dict)
+    assert variant_schema == {
+        "dimensions": [
+            {
+                "id": "offerId",
+                "type": "offer",
+                "label": "Offer",
+                "sourceKey": "Bundle",
+            }
+        ],
+        "defaults": {"sizeId": "__default_size", "colorId": "__default_color"},
+    }
+
+
+def test_align_sales_checkout_option_ids_uses_explicit_options_schema_mapping():
+    purchase = {
+        "size": {"options": [{"id": "small", "label": "Small", "sizeIn": "12x9", "sizeCm": "30x23"}]},
+        "color": {"options": [{"id": "gray", "label": "Gray"}]},
+        "offer": {
+            "options": [
+                {"id": "legacy", "title": "Legacy", "image": {"alt": "Legacy"}, "price": 299.0},
+            ]
+        },
+    }
+    variants = [
+        {
+            "title": "Single Device",
+            "amount_cents": 29900,
+            "option_values": {"Fit": "onesize", "Tone": "white", "Package": "single"},
+        },
+        {
+            "title": "Share & Save Duo",
+            "amount_cents": 49900,
+            "option_values": {"Fit": "onesize", "Tone": "white", "Package": "double"},
+        },
+    ]
+    options_schema = {
+        "salesPdpVariantMapping": {
+            "sizeId": "Fit",
+            "colorId": "Tone",
+            "offerId": "Package",
+        }
+    }
+
+    changed = funnel_ai._align_sales_pdp_purchase_options_to_variants(
+        purchase=purchase,
+        variants=variants,
+        options_schema=options_schema,
+    )
+
+    assert changed is True
+    assert [item["id"] for item in purchase["size"]["options"]] == ["onesize"]
+    assert [item["id"] for item in purchase["color"]["options"]] == ["white"]
+    assert [item["id"] for item in purchase["offer"]["options"]] == ["single", "double"]
+    variant_schema = purchase.get("variantSchema")
+    assert isinstance(variant_schema, dict)
+    assert variant_schema["dimensions"] == [
+        {"id": "sizeId", "type": "size", "label": "Size", "sourceKey": "Fit"},
+        {"id": "colorId", "type": "color", "label": "Color", "sourceKey": "Tone"},
+        {"id": "offerId", "type": "offer", "label": "Offer", "sourceKey": "Package"},
+    ]
+    assert "defaults" not in variant_schema
+
+
+def test_align_sales_checkout_option_ids_rejects_unmapped_variant_keys():
+    purchase = {
+        "size": {"options": [{"id": "onesize", "label": "One Size", "sizeIn": "", "sizeCm": ""}]},
+        "color": {"options": [{"id": "white", "label": "White"}]},
+        "offer": {"options": [{"id": "single", "title": "Single Device", "image": {"alt": "Single"}, "price": 299.0}]},
+    }
+    variants = [
+        {
+            "title": "Single Device",
+            "amount_cents": 29900,
+            "option_values": {"Bundle": "single", "Region": "us"},
+        },
+        {
+            "title": "Share & Save Duo",
+            "amount_cents": 49900,
+            "option_values": {"Bundle": "double", "Region": "us"},
+        },
+    ]
+
+    with pytest.raises(ValueError, match="unmapped keys"):
+        funnel_ai._align_sales_pdp_purchase_options_to_variants(
+            purchase=purchase,
+            variants=variants,
+        )

@@ -1196,35 +1196,339 @@ def _ordered_intersection_with_fallback(existing_ids: list[str], valid_ids: list
     return ordered
 
 
-def _align_sales_pdp_purchase_options_to_variants(
+_SALES_PDP_DEFAULT_SIZE_ID = "__default_size"
+_SALES_PDP_DEFAULT_COLOR_ID = "__default_color"
+_SALES_PDP_VARIANT_OPTION_KEYS: tuple[str, str, str] = ("sizeId", "colorId", "offerId")
+_SALES_PDP_VARIANT_OPTION_KEY_ALIASES: dict[str, tuple[str, ...]] = {
+    "sizeId": ("sizeid", "size"),
+    "colorId": ("colorid", "color", "colour", "colourid"),
+    "offerId": ("offerid", "offer", "bundle", "pack", "package"),
+}
+
+
+def _sales_pdp_variant_error(message: str, *, details: dict[str, Any]) -> ValueError:
+    return ValueError(f"{message} details={details}")
+
+
+def _extract_sales_pdp_variant_mapping(options_schema: dict[str, Any] | None) -> dict[str, str]:
+    if options_schema is None:
+        return {}
+    if not isinstance(options_schema, dict):
+        raise _sales_pdp_variant_error(
+            "Product offer options_schema must be a JSON object when provided.",
+            details={"optionsSchemaType": _describe_value(options_schema)},
+        )
+    raw_mapping = options_schema.get("salesPdpVariantMapping")
+    if raw_mapping is None:
+        return {}
+    if not isinstance(raw_mapping, dict):
+        raise _sales_pdp_variant_error(
+            "options_schema.salesPdpVariantMapping must be a JSON object.",
+            details={"salesPdpVariantMappingType": _describe_value(raw_mapping)},
+        )
+
+    unknown_keys = sorted(key for key in raw_mapping.keys() if key not in _SALES_PDP_VARIANT_OPTION_KEYS)
+    if unknown_keys:
+        raise _sales_pdp_variant_error(
+            "options_schema.salesPdpVariantMapping contains unknown keys.",
+            details={
+                "unknownKeys": unknown_keys,
+                "allowedKeys": list(_SALES_PDP_VARIANT_OPTION_KEYS),
+            },
+        )
+
+    mapping: dict[str, str] = {}
+    mapped_source_keys: set[str] = set()
+    for canonical_key in _SALES_PDP_VARIANT_OPTION_KEYS:
+        raw_source_key = raw_mapping.get(canonical_key)
+        if raw_source_key is None:
+            continue
+        source_key = _clean_non_empty_string(raw_source_key)
+        if not source_key:
+            raise _sales_pdp_variant_error(
+                f"options_schema.salesPdpVariantMapping.{canonical_key} must be a non-empty string.",
+                details={"canonicalKey": canonical_key, "value": raw_source_key},
+            )
+        if source_key in mapped_source_keys:
+            raise _sales_pdp_variant_error(
+                "options_schema.salesPdpVariantMapping cannot map multiple canonical keys to the same source key.",
+                details={"sourceKey": source_key, "mapping": mapping},
+            )
+        mapping[canonical_key] = source_key
+        mapped_source_keys.add(source_key)
+    return mapping
+
+
+def _normalize_sales_pdp_variant_option_values(
     *,
-    purchase: dict[str, Any],
     variants: list[dict[str, Any]],
-) -> bool:
-    if not isinstance(purchase, dict):
-        raise ValueError("SalesPdpHero.purchase must be an object to align checkout option ids.")
+    options_schema: dict[str, Any] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not isinstance(variants, list) or not variants:
         raise ValueError("At least one product variant is required to align checkout option ids.")
 
-    size_ids: list[str] = []
-    color_ids: list[str] = []
-    offer_ids: list[str] = []
-    offer_variant_defaults: dict[str, tuple[str | None, float | None]] = {}
+    explicit_mapping = _extract_sales_pdp_variant_mapping(options_schema)
+    normalized_source_variants: list[dict[str, Any]] = []
+    key_sets: list[set[str]] = []
+    lower_key_map: dict[str, str] = {}
 
     for idx, variant in enumerate(variants):
         if not isinstance(variant, dict):
             raise ValueError(f"Variant #{idx + 1} must be an object.")
         option_values = variant.get("option_values")
         if not isinstance(option_values, dict):
-            raise ValueError(
-                "Every product variant must include option_values with sizeId/colorId/offerId."
+            raise _sales_pdp_variant_error(
+                "Every product variant must include option_values.",
+                details={
+                    "variantIndex": idx + 1,
+                    "variantId": variant.get("id"),
+                    "variantTitle": variant.get("title"),
+                    "optionValuesType": _describe_value(option_values),
+                },
             )
-        size_id = _clean_non_empty_string(option_values.get("sizeId"))
-        color_id = _clean_non_empty_string(option_values.get("colorId"))
-        offer_id = _clean_non_empty_string(option_values.get("offerId"))
+
+        normalized_option_values: dict[str, str] = {}
+        for raw_key, raw_value in option_values.items():
+            key = _clean_non_empty_string(raw_key)
+            value = _clean_non_empty_string(raw_value)
+            if not key or not value:
+                raise _sales_pdp_variant_error(
+                    "Every product variant option_values entry must use non-empty string keys and values.",
+                    details={
+                        "variantIndex": idx + 1,
+                        "variantId": variant.get("id"),
+                        "variantTitle": variant.get("title"),
+                        "entry": {"key": raw_key, "value": raw_value},
+                    },
+                )
+            normalized_option_values[key] = value
+
+        if not normalized_option_values:
+            raise _sales_pdp_variant_error(
+                "Every product variant must include at least one option_values entry.",
+                details={
+                    "variantIndex": idx + 1,
+                    "variantId": variant.get("id"),
+                    "variantTitle": variant.get("title"),
+                },
+            )
+
+        key_set = set(normalized_option_values.keys())
+        key_sets.append(key_set)
+        normalized_source_variants.append(
+            {
+                "variantIndex": idx + 1,
+                "variantId": variant.get("id"),
+                "title": variant.get("title"),
+                "amount_cents": variant.get("amount_cents"),
+                "option_values": normalized_option_values,
+            }
+        )
+
+        for key in key_set:
+            lowered = key.lower()
+            existing = lower_key_map.get(lowered)
+            if existing and existing != key:
+                raise _sales_pdp_variant_error(
+                    "Variant option_values keys are ambiguous due to case-only differences.",
+                    details={"firstKey": existing, "secondKey": key},
+                )
+            lower_key_map[lowered] = key
+
+    canonical_key_set = key_sets[0]
+    for idx, key_set in enumerate(key_sets[1:], start=2):
+        if key_set != canonical_key_set:
+            raise _sales_pdp_variant_error(
+                "All variants must use the same option_values keys.",
+                details={
+                    "expectedKeys": sorted(canonical_key_set),
+                    "variantIndex": idx,
+                    "actualKeys": sorted(key_set),
+                },
+            )
+
+    slot_to_source_key: dict[str, str] = {}
+    used_source_keys: set[str] = set()
+
+    for slot, source_key in explicit_mapping.items():
+        if source_key not in canonical_key_set:
+            raise _sales_pdp_variant_error(
+                "options_schema.salesPdpVariantMapping references an option key that does not exist in variants.",
+                details={
+                    "canonicalKey": slot,
+                    "sourceKey": source_key,
+                    "availableOptionKeys": sorted(canonical_key_set),
+                },
+            )
+        slot_to_source_key[slot] = source_key
+        used_source_keys.add(source_key)
+
+    if "offerId" not in slot_to_source_key and len(canonical_key_set) == 1:
+        sole_key = next(iter(canonical_key_set))
+        slot_to_source_key["offerId"] = sole_key
+        used_source_keys.add(sole_key)
+
+    def maybe_map_slot(slot: str) -> None:
+        if slot in slot_to_source_key:
+            return
+
+        direct_key = slot if slot in canonical_key_set else None
+        if direct_key and direct_key not in used_source_keys:
+            slot_to_source_key[slot] = direct_key
+            used_source_keys.add(direct_key)
+            return
+
+        candidates: list[str] = []
+        for alias in _SALES_PDP_VARIANT_OPTION_KEY_ALIASES.get(slot, ()):
+            source = lower_key_map.get(alias)
+            if source and source not in used_source_keys and source not in candidates:
+                candidates.append(source)
+        if len(candidates) > 1:
+            raise _sales_pdp_variant_error(
+                f"Unable to map {slot} because multiple option keys match known aliases.",
+                details={"canonicalKey": slot, "candidates": sorted(candidates)},
+            )
+        if candidates:
+            slot_to_source_key[slot] = candidates[0]
+            used_source_keys.add(candidates[0])
+
+    maybe_map_slot("offerId")
+    maybe_map_slot("sizeId")
+    maybe_map_slot("colorId")
+
+    if "offerId" not in slot_to_source_key:
+        raise _sales_pdp_variant_error(
+            "Unable to map variant option_values to offerId.",
+            details={
+                "availableOptionKeys": sorted(canonical_key_set),
+                "explicitMapping": explicit_mapping,
+                "hint": "Provide options_schema.salesPdpVariantMapping.offerId with the source option key (e.g. 'Bundle').",
+            },
+        )
+
+    leftover_keys = sorted(key for key in canonical_key_set if key not in used_source_keys)
+    if leftover_keys:
+        raise _sales_pdp_variant_error(
+            "Variant option_values include unmapped keys.",
+            details={
+                "unmappedKeys": leftover_keys,
+                "mappedKeys": slot_to_source_key,
+                "hint": "Provide options_schema.salesPdpVariantMapping for all option keys used by checkout.",
+            },
+        )
+
+    normalized_variants: list[dict[str, Any]] = []
+    for variant in normalized_source_variants:
+        source_values = variant["option_values"]
+
+        offer_source_key = slot_to_source_key["offerId"]
+        size_source_key = slot_to_source_key.get("sizeId")
+        color_source_key = slot_to_source_key.get("colorId")
+
+        offer_id = _clean_non_empty_string(source_values.get(offer_source_key))
+        size_id = (
+            _clean_non_empty_string(source_values.get(size_source_key))
+            if size_source_key
+            else _SALES_PDP_DEFAULT_SIZE_ID
+        )
+        color_id = (
+            _clean_non_empty_string(source_values.get(color_source_key))
+            if color_source_key
+            else _SALES_PDP_DEFAULT_COLOR_ID
+        )
+        if not offer_id or not size_id or not color_id:
+            raise _sales_pdp_variant_error(
+                "Every product variant option_values must resolve to non-empty sizeId/colorId/offerId values.",
+                details={
+                    "variantIndex": variant["variantIndex"],
+                    "variantId": variant.get("variantId"),
+                    "variantTitle": variant.get("title"),
+                    "sourceOptionValues": source_values,
+                    "slotToSourceKey": slot_to_source_key,
+                },
+            )
+
+        normalized_variant = {
+            "variantIndex": variant["variantIndex"],
+            "title": variant.get("title"),
+            "amount_cents": variant.get("amount_cents"),
+            "sizeId": size_id,
+            "colorId": color_id,
+            "offerId": offer_id,
+            "option_values": {
+                "sizeId": size_id,
+                "colorId": color_id,
+                "offerId": offer_id,
+            },
+        }
+        variant_id = _clean_non_empty_string(variant.get("variantId"))
+        if variant_id:
+            normalized_variant["variantId"] = variant_id
+        normalized_variants.append(normalized_variant)
+
+    dimensions: list[dict[str, Any]] = []
+    for slot, dimension_type, label in (
+        ("sizeId", "size", "Size"),
+        ("colorId", "color", "Color"),
+        ("offerId", "offer", "Offer"),
+    ):
+        source_key = slot_to_source_key.get(slot)
+        if not source_key:
+            continue
+        dimensions.append(
+            {
+                "id": slot,
+                "type": dimension_type,
+                "label": label,
+                "sourceKey": source_key,
+            }
+        )
+
+    schema: dict[str, Any] = {"dimensions": dimensions}
+    defaults: dict[str, str] = {}
+    if "sizeId" not in slot_to_source_key:
+        defaults["sizeId"] = _SALES_PDP_DEFAULT_SIZE_ID
+    if "colorId" not in slot_to_source_key:
+        defaults["colorId"] = _SALES_PDP_DEFAULT_COLOR_ID
+    if defaults:
+        schema["defaults"] = defaults
+    return normalized_variants, schema
+
+
+def _align_sales_pdp_purchase_options_to_variants(
+    *,
+    purchase: dict[str, Any],
+    variants: list[dict[str, Any]],
+    options_schema: dict[str, Any] | None = None,
+    normalized_variants: list[dict[str, Any]] | None = None,
+    variant_schema: dict[str, Any] | None = None,
+) -> bool:
+    if not isinstance(purchase, dict):
+        raise ValueError("SalesPdpHero.purchase must be an object to align checkout option ids.")
+    if not isinstance(variants, list) or not variants:
+        raise ValueError("At least one product variant is required to align checkout option ids.")
+
+    if normalized_variants is None or variant_schema is None:
+        normalized_variants, variant_schema = _normalize_sales_pdp_variant_option_values(
+            variants=variants,
+            options_schema=options_schema,
+        )
+
+    size_ids: list[str] = []
+    color_ids: list[str] = []
+    offer_ids: list[str] = []
+    offer_variant_defaults: dict[str, tuple[str | None, float | None]] = {}
+
+    for idx, variant in enumerate(normalized_variants):
+        if not isinstance(variant, dict):
+            raise ValueError(f"Variant #{idx + 1} must be an object.")
+        size_id = _clean_non_empty_string(variant.get("sizeId"))
+        color_id = _clean_non_empty_string(variant.get("colorId"))
+        offer_id = _clean_non_empty_string(variant.get("offerId"))
         if not size_id or not color_id or not offer_id:
-            raise ValueError(
-                "Every product variant option_values must include non-empty sizeId/colorId/offerId strings."
+            raise _sales_pdp_variant_error(
+                "Every product variant option_values must resolve to non-empty sizeId/colorId/offerId values.",
+                details={"variantIndex": idx + 1, "variant": variant},
             )
         if size_id not in size_ids:
             size_ids.append(size_id)
@@ -1356,6 +1660,25 @@ def _align_sales_pdp_purchase_options_to_variants(
         rebuilt_offer_options.append(option)
 
     offer_cfg["options"] = rebuilt_offer_options
+    if isinstance(variant_schema, dict):
+        dimensions = variant_schema.get("dimensions")
+        defaults = variant_schema.get("defaults")
+        should_apply_variant_schema = bool(options_schema)
+        if isinstance(defaults, dict) and defaults:
+            should_apply_variant_schema = True
+        if isinstance(dimensions, list):
+            for dimension in dimensions:
+                if not isinstance(dimension, dict):
+                    continue
+                source_key = _clean_non_empty_string(dimension.get("sourceKey"))
+                canonical_id = _clean_non_empty_string(dimension.get("id"))
+                if source_key and canonical_id and source_key != canonical_id:
+                    should_apply_variant_schema = True
+                    break
+        if should_apply_variant_schema:
+            purchase["variantSchema"] = variant_schema
+        else:
+            purchase.pop("variantSchema", None)
 
     after = json.dumps(purchase, ensure_ascii=False, sort_keys=True)
     return before != after
