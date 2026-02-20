@@ -48,6 +48,7 @@ def run_generate_page_draft_stream(
     max_tokens: Optional[int] = None,
     generate_images: bool = True,
     generate_testimonials: bool = True,
+    skip_draft_generation: bool = False,
     max_images: int = 3,
     copy_pack: Optional[str] = None,
     ruleset_version: str = DEFAULT_RULESET_VERSION,
@@ -65,8 +66,9 @@ def run_generate_page_draft_stream(
     model_id = model or llm.default_model
 
     runtime = AgentRuntime(session=session, org_id=org_id, user_id=user_id)
+    objective_type = "objective.page_media_enrichment" if skip_draft_generation else "objective.page_draft"
     handle = runtime.begin_run(
-        objective_type="objective.page_draft",
+        objective_type=objective_type,
         funnel_id=funnel_id,
         page_id=page_id,
         model=model_id,
@@ -80,13 +82,14 @@ def run_generate_page_draft_stream(
             "ideaWorkspaceId": idea_workspace_id,
             "generateImages": generate_images,
             "generateTestimonials": generate_testimonials,
+            "skipDraftGeneration": skip_draft_generation,
             "maxImages": max_images,
         },
     )
 
     # Legacy event for the existing frontend.
     yield {"type": "start", "model": model_id, "runId": handle.run_id}
-    yield {"type": "run_started", "runId": handle.run_id, "model": model_id, "objectiveType": "page_draft"}
+    yield {"type": "run_started", "runId": handle.run_id, "model": model_id, "objectiveType": objective_type}
 
     try:
         # 1) Load funnel/page context
@@ -157,40 +160,48 @@ def run_generate_page_draft_stream(
         if (docs_ctx.get("documentBlocks") or []) and not model_id.lower().startswith("claude"):
             raise ValueError("Brand documents require a Claude model (model must start with 'claude').")
 
-        # 5) Generate candidate draft (LLM)
-        draft_res = yield from runtime.invoke_tool_stream(
-            handle=handle,
-            tool=DraftGeneratePageTool(),
-            raw_args={
-                "orgId": org_id,
-                "funnelId": funnel_id,
-                "pageId": page_id,
-                "pageName": funnel_ctx.get("pageName") or "",
-                "prompt": prompt,
-                "messages": messages or [],
-                "model": model,
-                "temperature": temperature,
-                "maxTokens": max_tokens,
-                "templateId": funnel_ctx.get("templateId"),
-                "templateKind": funnel_ctx.get("templateKind"),
-                "templateMode": bool(funnel_ctx.get("templateMode")),
-                "pageContext": funnel_ctx.get("pageContext") or [],
-                "basePuckData": funnel_ctx.get("basePuckData"),
-                "productContext": str(product_ctx.get("productContext") or ""),
-                "attachmentSummaries": attachment_summaries,
-                "brandDocuments": docs_ctx.get("documentBlocks") or [],
-                "copyPack": copy_pack,
-            },
-            client_id=client_id,
-            funnel_id=funnel_id,
-            page_id=page_id,
-        )
-        draft_ctx = draft_res.ui_details
-        if isinstance(draft_ctx.get("attachmentSummaries"), list):
-            attachment_summaries = draft_ctx["attachmentSummaries"]
-        puck_data = draft_ctx["puckData"]
-        assistant_message = str(draft_ctx.get("assistantMessage") or "")
-        final_model = str(draft_ctx.get("model") or model_id)
+        if skip_draft_generation:
+            base_puck = funnel_ctx.get("basePuckData")
+            if not isinstance(base_puck, dict):
+                raise ValueError("Cannot enrich media because page has no draft/base puckData.")
+            puck_data = base_puck
+            assistant_message = "Media enrichment only (draft generation skipped)."
+            final_model = str(model_id)
+        else:
+            # 5) Generate candidate draft (LLM)
+            draft_res = yield from runtime.invoke_tool_stream(
+                handle=handle,
+                tool=DraftGeneratePageTool(),
+                raw_args={
+                    "orgId": org_id,
+                    "funnelId": funnel_id,
+                    "pageId": page_id,
+                    "pageName": funnel_ctx.get("pageName") or "",
+                    "prompt": prompt,
+                    "messages": messages or [],
+                    "model": model,
+                    "temperature": temperature,
+                    "maxTokens": max_tokens,
+                    "templateId": funnel_ctx.get("templateId"),
+                    "templateKind": funnel_ctx.get("templateKind"),
+                    "templateMode": bool(funnel_ctx.get("templateMode")),
+                    "pageContext": funnel_ctx.get("pageContext") or [],
+                    "basePuckData": funnel_ctx.get("basePuckData"),
+                    "productContext": str(product_ctx.get("productContext") or ""),
+                    "attachmentSummaries": attachment_summaries,
+                    "brandDocuments": docs_ctx.get("documentBlocks") or [],
+                    "copyPack": copy_pack,
+                },
+                client_id=client_id,
+                funnel_id=funnel_id,
+                page_id=page_id,
+            )
+            draft_ctx = draft_res.ui_details
+            if isinstance(draft_ctx.get("attachmentSummaries"), list):
+                attachment_summaries = draft_ctx["attachmentSummaries"]
+            puck_data = draft_ctx["puckData"]
+            assistant_message = str(draft_ctx.get("assistantMessage") or "")
+            final_model = str(draft_ctx.get("model") or model_id)
 
         # 6) Apply deterministic overrides
         overrides_res = yield from runtime.invoke_tool_stream(
@@ -393,6 +404,7 @@ def run_generate_page_draft(
     max_tokens: Optional[int] = None,
     generate_images: bool = True,
     generate_testimonials: bool = True,
+    skip_draft_generation: bool = False,
     max_images: int = 3,
     copy_pack: Optional[str] = None,
     ruleset_version: str = DEFAULT_RULESET_VERSION,
@@ -414,6 +426,7 @@ def run_generate_page_draft(
         max_tokens=max_tokens,
         generate_images=generate_images,
         generate_testimonials=generate_testimonials,
+        skip_draft_generation=skip_draft_generation,
         max_images=max_images,
         copy_pack=copy_pack,
         ruleset_version=ruleset_version,

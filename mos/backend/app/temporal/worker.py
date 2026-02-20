@@ -14,6 +14,7 @@ from app.temporal.workflows.client_onboarding import ClientOnboardingWorkflow
 from app.temporal.workflows.campaign_planning import CampaignPlanningWorkflow
 from app.temporal.workflows.campaign_intent import CampaignIntentWorkflow
 from app.temporal.workflows.campaign_funnel_generation import CampaignFunnelGenerationWorkflow
+from app.temporal.workflows.campaign_funnel_media_enrichment import CampaignFunnelMediaEnrichmentWorkflow
 from app.temporal.workflows.experiment_design import ExperimentDesignWorkflow
 from app.temporal.workflows.creative_production import CreativeProductionWorkflow
 from app.temporal.workflows.swipe_image_ad import SwipeImageAdWorkflow
@@ -58,6 +59,7 @@ from app.temporal.activities.campaign_intent_activities import (
     create_campaign_activity,
     create_funnel_drafts_activity,
     create_funnels_from_experiments_activity,
+    enrich_funnel_page_media_activity,
 )
 from app.temporal.activities.asset_activities import generate_assets_for_brief_activity, persist_assets_activity
 from app.temporal.activities.qa_activities import run_brand_qa_activity, run_compliance_qa_activity
@@ -100,6 +102,7 @@ async def main() -> None:
                     CampaignPlanningWorkflow,
                     CampaignIntentWorkflow,
                     CampaignFunnelGenerationWorkflow,
+                    CampaignFunnelMediaEnrichmentWorkflow,
                     ExperimentDesignWorkflow,
                     CreativeProductionWorkflow,
                     SwipeImageAdWorkflow,
@@ -137,6 +140,7 @@ async def main() -> None:
                     create_campaign_activity,
                     create_funnel_drafts_activity,
                     create_funnels_from_experiments_activity,
+                    enrich_funnel_page_media_activity,
                     generate_assets_for_brief_activity,
                     persist_assets_activity,
                     run_brand_qa_activity,

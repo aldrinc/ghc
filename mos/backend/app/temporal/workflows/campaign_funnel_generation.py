@@ -12,6 +12,10 @@ with workflow.unsafe.imports_passed_through():
         fetch_experiment_specs_activity,
         create_asset_briefs_for_experiments_activity,
     )
+    from app.temporal.workflows.campaign_funnel_media_enrichment import (
+        CampaignFunnelMediaEnrichmentInput,
+        CampaignFunnelMediaEnrichmentWorkflow,
+    )
 
 
 DEFAULT_FUNNEL_PAGES = [
@@ -135,6 +139,7 @@ class CampaignFunnelGenerationInput:
     campaign_id: str
     experiment_ids: List[str]
     variant_ids_by_experiment: Optional[Dict[str, List[str]]] = None
+    async_media_enrichment: bool = True
     funnel_name_prefix: Optional[str] = None
     generate_testimonials: bool = False
 
@@ -174,9 +179,10 @@ class CampaignFunnelGenerationWorkflow:
         if funnel_count < 1:
             raise RuntimeError("No experiment variants available for funnel generation.")
 
-        per_variant_timeout = max(timedelta(minutes=45), timedelta(minutes=15))
+        per_variant_timeout = timedelta(minutes=25) if input.async_media_enrichment else timedelta(minutes=45)
         funnel_items: list[dict[str, Any]] = []
         non_fatal_errors: list[dict[str, Any]] = []
+        media_enrichment_jobs: list[dict[str, Any]] = []
         for experiment in experiment_specs:
             variants = experiment.get("variants") or []
             for variant in variants:
@@ -195,6 +201,7 @@ class CampaignFunnelGenerationWorkflow:
                         "actor_user_id": "workflow",
                         "generate_ai_drafts": True,
                         "generate_testimonials": bool(input.generate_testimonials),
+                        "async_media_enrichment": bool(input.async_media_enrichment),
                         "temporal_workflow_id": workflow.info().workflow_id,
                         "temporal_run_id": workflow.info().run_id,
                     },
@@ -212,11 +219,57 @@ class CampaignFunnelGenerationWorkflow:
                     for entry in result_non_fatal_errors:
                         if isinstance(entry, dict):
                             non_fatal_errors.append(entry)
+                result_media_jobs = batch_result.get("media_enrichment_jobs") or []
+                if isinstance(result_media_jobs, list):
+                    for entry in result_media_jobs:
+                        if isinstance(entry, dict):
+                            media_enrichment_jobs.append(entry)
 
         funnel_batch = {
             "funnels": funnel_items,
             "non_fatal_errors": non_fatal_errors,
+            "media_enrichment_jobs": media_enrichment_jobs,
         }
+
+        media_enrichment_workflows: list[dict[str, Any]] = []
+        if input.async_media_enrichment:
+            for idx, job in enumerate(media_enrichment_jobs):
+                funnel_id = str(job.get("funnel_id") or "").strip()
+                page_id = str(job.get("page_id") or "").strip()
+                if not funnel_id or not page_id:
+                    continue
+                child_workflow_id = (
+                    f"{workflow.info().workflow_id}-media-{funnel_id[:8]}-{page_id[:8]}-{idx}"
+                )
+                child_handle = await workflow.start_child_workflow(
+                    CampaignFunnelMediaEnrichmentWorkflow.run,
+                    CampaignFunnelMediaEnrichmentInput(
+                        org_id=input.org_id,
+                        actor_user_id=str(job.get("actor_user_id") or "workflow"),
+                        workflow_run_id=job.get("workflow_run_id"),
+                        funnel_id=funnel_id,
+                        page_id=page_id,
+                        page_name=str(job.get("page_name") or ""),
+                        template_id=job.get("template_id"),
+                        prompt=str(job.get("prompt") or "Media enrichment run"),
+                        idea_workspace_id=job.get("idea_workspace_id"),
+                        generate_testimonials=bool(job.get("generate_testimonials", False)),
+                        experiment_id=job.get("experiment_id"),
+                        variant_id=job.get("variant_id"),
+                    ),
+                    id=child_workflow_id,
+                    parent_close_policy=workflow.ParentClosePolicy.ABANDON,
+                )
+                media_enrichment_workflows.append(
+                    {
+                        "workflow_id": child_handle.id,
+                        "first_execution_run_id": child_handle.first_execution_run_id,
+                        "funnel_id": funnel_id,
+                        "page_id": page_id,
+                        "experiment_id": job.get("experiment_id"),
+                        "variant_id": job.get("variant_id"),
+                    }
+                )
 
         funnel_map: Dict[str, str] = {}
         if isinstance(funnel_batch, dict):
@@ -251,5 +304,9 @@ class CampaignFunnelGenerationWorkflow:
         return {
             "campaign_id": input.campaign_id,
             "funnels": funnel_batch,
+            "media_enrichment": {
+                "mode": "async" if input.async_media_enrichment else "inline",
+                "workflows": media_enrichment_workflows,
+            },
             "asset_briefs": briefs_result,
         }

@@ -18,6 +18,11 @@ class CampaignFunnelGenerationRequest(BaseModel):
         validation_alias="variantIdsByExperiment",
         serialization_alias="variantIdsByExperiment",
     )
+    async_media_enrichment: bool = Field(
+        default=True,
+        validation_alias="asyncMediaEnrichment",
+        serialization_alias="asyncMediaEnrichment",
+    )
     generateTestimonials: bool = False
 
     @field_validator("experiment_ids")
