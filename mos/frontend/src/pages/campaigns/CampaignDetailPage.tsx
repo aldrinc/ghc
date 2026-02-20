@@ -237,6 +237,7 @@ export function CampaignDetailPage() {
 
   const [experimentDrafts, setExperimentDrafts] = useState<ExperimentSpec[]>([]);
   const [selectedExperimentIds, setSelectedExperimentIds] = useState<string[]>([]);
+  const [selectedVariantIdsByExperiment, setSelectedVariantIdsByExperiment] = useState<Record<string, string[]>>({});
   const [selectedAssetBriefIds, setSelectedAssetBriefIds] = useState<string[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingSpec, setEditingSpec] = useState<ExperimentSpec | null>(null);
@@ -406,6 +407,34 @@ export function CampaignDetailPage() {
     setSelectedExperimentIds((prev) => prev.filter((id) => experimentSpecs.some((spec) => spec.id === id)));
   }, [experimentSpecs]);
 
+  const allVariantIdsByExperiment = useMemo(() => {
+    const next: Record<string, string[]> = {};
+    experimentDrafts.forEach((spec) => {
+      next[spec.id] = (spec.variants || [])
+        .map((variant) => variant.id)
+        .filter((variantId): variantId is string => Boolean(variantId));
+    });
+    return next;
+  }, [experimentDrafts]);
+
+  useEffect(() => {
+    setSelectedVariantIdsByExperiment((prev) => {
+      const selectedIds = new Set(selectedExperimentIds);
+      const next: Record<string, string[]> = {};
+      selectedIds.forEach((experimentId) => {
+        const availableVariantIds = allVariantIdsByExperiment[experimentId] || [];
+        if (!availableVariantIds.length) {
+          next[experimentId] = [];
+          return;
+        }
+        const previousSelection = prev[experimentId] || [];
+        const filteredSelection = previousSelection.filter((variantId) => availableVariantIds.includes(variantId));
+        next[experimentId] = filteredSelection.length ? filteredSelection : [...availableVariantIds];
+      });
+      return next;
+    });
+  }, [allVariantIdsByExperiment, selectedExperimentIds]);
+
   useEffect(() => {
     setSelectedAssetBriefIds((prev) => prev.filter((id) => assetBriefs.some((brief) => brief.id === id)));
   }, [assetBriefs]);
@@ -444,12 +473,37 @@ export function CampaignDetailPage() {
 
   const selectedVariantCount = useMemo(() => {
     if (!selectedExperimentIds.length) return 0;
-    const selected = new Set(selectedExperimentIds);
-    return experimentDrafts.reduce((sum, spec) => {
-      if (!selected.has(spec.id)) return sum;
-      return sum + (spec.variants?.length || 0);
+    return selectedExperimentIds.reduce((sum, experimentId) => {
+      return sum + (selectedVariantIdsByExperiment[experimentId]?.length || 0);
     }, 0);
-  }, [experimentDrafts, selectedExperimentIds]);
+  }, [selectedExperimentIds, selectedVariantIdsByExperiment]);
+
+  const toggleVariantSelection = (experimentId: string, variantId: string) => {
+    setSelectedVariantIdsByExperiment((prev) => {
+      const availableVariantIds = allVariantIdsByExperiment[experimentId] || [];
+      if (!availableVariantIds.includes(variantId)) return prev;
+      const currentSelection = prev[experimentId] || [];
+      const nextSelection = currentSelection.includes(variantId)
+        ? currentSelection.filter((id) => id !== variantId)
+        : [...currentSelection, variantId];
+      const orderedSelection = availableVariantIds.filter((id) => nextSelection.includes(id));
+      return { ...prev, [experimentId]: orderedSelection };
+    });
+  };
+
+  const toggleAllVariantsForExperiment = (experimentId: string) => {
+    setSelectedVariantIdsByExperiment((prev) => {
+      const availableVariantIds = allVariantIdsByExperiment[experimentId] || [];
+      if (!availableVariantIds.length) return prev;
+      const currentSelection = prev[experimentId] || [];
+      const hasAllSelected =
+        availableVariantIds.length > 0 && availableVariantIds.every((variantId) => currentSelection.includes(variantId));
+      return {
+        ...prev,
+        [experimentId]: hasAllSelected ? [] : [...availableVariantIds],
+      };
+    });
+  };
 
   const allAssetBriefIds = useMemo(() => assetBriefs.map((brief) => brief.id).filter(Boolean), [assetBriefs]);
   const allAssetBriefsSelected =
@@ -503,6 +557,17 @@ export function CampaignDetailPage() {
       setFunnelGenerationError("Select at least one angle to create funnels.");
       return;
     }
+    const missingVariantSelection = selectedExperimentIds.find(
+      (experimentId) => (selectedVariantIdsByExperiment[experimentId] || []).length === 0
+    );
+    if (missingVariantSelection) {
+      setFunnelGenerationError(
+        `Select at least one variant for angle ${
+          experimentNameById[missingVariantSelection] || missingVariantSelection
+        }.`
+      );
+      return;
+    }
     if (!campaign.product_id && !product?.id) {
       setFunnelGenerationError("Campaign is missing a product. Attach a product to start funnel generation.");
       return;
@@ -519,10 +584,16 @@ export function CampaignDetailPage() {
     setFunnelGenerationPending(true);
     setFunnelCreationRequested(true);
     try {
+      const variantIdsByExperiment = selectedExperimentIds.reduce<Record<string, string[]>>((acc, experimentId) => {
+        const selectedVariantIds = selectedVariantIdsByExperiment[experimentId] || [];
+        acc[experimentId] = selectedVariantIds;
+        return acc;
+      }, {});
       const response = await post<{ workflow_run_id: string }>(
         `/campaigns/${campaign.id}/funnels/generate`,
         {
           experimentIds: selectedExperimentIds,
+          variantIdsByExperiment,
           generateTestimonials: true,
         }
       );
@@ -1113,7 +1184,10 @@ export function CampaignDetailPage() {
                       Creating funnels uses the default pre-sales + sales templates and generates creative briefs for
                       the selected angles.
                     </div>
-                    <div>Selection is per angle spec. Selecting an angle includes all of its variants below.</div>
+                    <div>
+                      Selecting an angle includes all of its variants by default. Uncheck variants to run lighter,
+                      faster tests.
+                    </div>
                     {funnelGenerationError ? <div className="text-danger">{funnelGenerationError}</div> : null}
                     {funnelFailureSummary ? (
                       <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
@@ -1141,6 +1215,14 @@ export function CampaignDetailPage() {
                 <div className="space-y-4 p-4">
                   {experimentDrafts.map((exp) => {
                     const isSelected = selectedExperimentIds.includes(exp.id);
+                    const availableVariantIds = (exp.variants || [])
+                      .map((variant) => variant.id)
+                      .filter((variantId): variantId is string => Boolean(variantId));
+                    const selectedVariantIds = selectedVariantIdsByExperiment[exp.id] || [];
+                    const selectedVariantSet = new Set(selectedVariantIds);
+                    const allVariantsSelectedForExperiment =
+                      availableVariantIds.length > 0 &&
+                      availableVariantIds.every((variantId) => selectedVariantSet.has(variantId));
                     return (
                       <div
                         key={exp.id}
@@ -1204,19 +1286,57 @@ export function CampaignDetailPage() {
                               <div className="text-xs font-semibold uppercase tracking-wide text-content-muted">
                                 Variants
                               </div>
-                              <div className="text-xs text-content-muted">Included when angle is selected</div>
+                              <div className="flex items-center gap-3 text-xs text-content-muted">
+                                <span>
+                                  {selectedVariantIds.length}/{availableVariantIds.length} selected
+                                </span>
+                                <label className="flex items-center gap-1.5">
+                                  <input
+                                    type="checkbox"
+                                    className={cn(
+                                      "h-3.5 w-3.5 rounded border border-border bg-surface text-accent",
+                                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                                    )}
+                                    checked={allVariantsSelectedForExperiment}
+                                    onChange={() => toggleAllVariantsForExperiment(exp.id)}
+                                    disabled={!isSelected}
+                                  />
+                                  <span>Select all variants</span>
+                                </label>
+                              </div>
                             </div>
                             <div className="mt-2 space-y-2">
                               {exp.variants.map((variant) => (
                                 <div key={variant.id} className="rounded-md bg-surface px-3 py-2">
-                                  <div className="flex flex-wrap items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-semibold text-content">
-                                        {variant.name || variant.id}
+                                  <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div className="flex min-w-0 flex-1 items-start gap-2">
+                                      <input
+                                        type="checkbox"
+                                        className={cn(
+                                          "mt-1 h-4 w-4 rounded border border-border bg-surface text-accent",
+                                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                                        )}
+                                        checked={selectedVariantSet.has(variant.id)}
+                                        onChange={() => toggleVariantSelection(exp.id, variant.id)}
+                                        disabled={!isSelected}
+                                      />
+                                      <div className="min-w-0">
+                                        <div className="text-sm font-semibold text-content">
+                                          {variant.name || variant.id}
+                                          {selectedVariantSet.has(variant.id) ? (
+                                            <Badge tone="accent" className="ml-2">
+                                              Included
+                                            </Badge>
+                                          ) : (
+                                            <Badge tone="neutral" className="ml-2">
+                                              Excluded
+                                            </Badge>
+                                          )}
+                                        </div>
+                                        {variant.description ? (
+                                          <div className="mt-1 text-sm text-content-muted">{variant.description}</div>
+                                        ) : null}
                                       </div>
-                                      {variant.description ? (
-                                        <div className="mt-1 text-sm text-content-muted">{variant.description}</div>
-                                      ) : null}
                                     </div>
                                     <div className="shrink-0 font-mono text-xs text-content-muted">{variant.id}</div>
                                   </div>
