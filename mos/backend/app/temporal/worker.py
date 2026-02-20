@@ -6,6 +6,7 @@ import concurrent.futures
 from temporalio.worker import Worker
 
 from app.config import settings
+from app.llm_ops import initialize_agenta, shutdown_agenta
 from app.observability import initialize_langfuse, shutdown_langfuse
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows import placeholders as placeholder_workflow
@@ -84,6 +85,7 @@ from app.temporal.activities.swipe_image_ad_activities import (
 
 
 async def main() -> None:
+    initialize_agenta()
     initialize_langfuse()
     client = await get_temporal_client()
     try:
@@ -158,6 +160,7 @@ async def main() -> None:
             await worker.run()
     finally:
         shutdown_langfuse()
+        shutdown_agenta()
 
 
 if __name__ == "__main__":

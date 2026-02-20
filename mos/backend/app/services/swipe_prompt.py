@@ -5,6 +5,9 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
+from app.config import settings
+from app.llm_ops import fetch_prompt_text
+
 _PROMPT_CACHE: Dict[str, Tuple[str, str]] = {}
 
 
@@ -15,6 +18,12 @@ def load_swipe_to_image_ad_prompt() -> Tuple[str, str]:
     cache_key = "swipe_to_image_ad"
     if cache_key in _PROMPT_CACHE:
         return _PROMPT_CACHE[cache_key]
+
+    prompt_key = "prompts/swipe/swipe_to_image_ad.md"
+    if settings.AGENTA_ENABLED:
+        text, sha = fetch_prompt_text(prompt_key)
+        _PROMPT_CACHE[cache_key] = (text, sha)
+        return text, sha
 
     backend_app_root = Path(__file__).resolve().parents[1]
     prompt_path = backend_app_root / "prompts" / "swipe" / "swipe_to_image_ad.md"

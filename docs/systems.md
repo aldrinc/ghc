@@ -9,6 +9,11 @@ This file is a catalog of the AI-driven and automation-driven “agents” and w
 - **Workflow**: the step-by-step sequence an agent follows to get from “request” to “saved output”.
 - **Artifact**: something saved for later use (draft versions, images/assets, research outputs, design tokens).
 
+## LLM Ops and Observability
+
+- **Prompt management / versioning**: Agenta (when enabled via backend env).
+- **Runtime observability / traces**: Langfuse.
+
 ## Funnel Editing Agents (Tool-Based)
 
 These are the “interactive” agents that run as a sequence of tool calls and are traceable as an agent run.
