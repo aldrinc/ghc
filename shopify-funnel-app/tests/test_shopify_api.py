@@ -192,11 +192,14 @@ def test_get_product_returns_variants_with_inventory_fields():
                                     "compareAtPrice": "59.99",
                                     "barcode": "BAR-001",
                                     "taxable": True,
-                                    "requiresShipping": True,
                                     "inventoryPolicy": "CONTINUE",
                                     "inventoryQuantity": 12,
                                     "selectedOptions": [{"name": "Size", "value": "L"}],
-                                    "inventoryItem": {"sku": "SKU-001", "tracked": True},
+                                    "inventoryItem": {
+                                        "sku": "SKU-001",
+                                        "tracked": True,
+                                        "requiresShipping": True,
+                                    },
                                 }
                             }
                         ],
@@ -221,11 +224,14 @@ def test_get_product_returns_variants_with_inventory_fields():
                                 "compareAtPrice": None,
                                 "barcode": None,
                                 "taxable": False,
-                                "requiresShipping": False,
                                 "inventoryPolicy": "DENY",
                                 "inventoryQuantity": 0,
                                 "selectedOptions": [{"name": "Pack", "value": "2"}],
-                                "inventoryItem": {"sku": None, "tracked": False},
+                                "inventoryItem": {
+                                    "sku": None,
+                                    "tracked": False,
+                                    "requiresShipping": False,
+                                },
                             }
                         }
                     ],

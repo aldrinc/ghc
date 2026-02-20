@@ -349,7 +349,6 @@ class ShopifyApiClient:
                             compareAtPrice
                             barcode
                             taxable
-                            requiresShipping
                             inventoryPolicy
                             inventoryQuantity
                             selectedOptions {
@@ -359,6 +358,7 @@ class ShopifyApiClient:
                             inventoryItem {
                                 sku
                                 tracked
+                                requiresShipping
                             }
                         }
                     }
@@ -449,7 +449,6 @@ class ShopifyApiClient:
                 compare_at_price = node.get("compareAtPrice")
                 barcode = node.get("barcode")
                 taxable = node.get("taxable")
-                requires_shipping = node.get("requiresShipping")
                 inventory_policy = node.get("inventoryPolicy")
                 inventory_quantity = node.get("inventoryQuantity")
                 selected_options = node.get("selectedOptions")
@@ -467,15 +466,13 @@ class ShopifyApiClient:
                     raise ShopifyApiError(message="Product variant response has invalid barcode.")
                 if not isinstance(taxable, bool):
                     raise ShopifyApiError(message="Product variant response has invalid taxable value.")
-                if not isinstance(requires_shipping, bool):
-                    raise ShopifyApiError(message="Product variant response has invalid requiresShipping value.")
                 if inventory_policy is not None and not isinstance(inventory_policy, str):
                     raise ShopifyApiError(message="Product variant response has invalid inventoryPolicy value.")
                 if inventory_quantity is not None and not isinstance(inventory_quantity, int):
                     raise ShopifyApiError(message="Product variant response has invalid inventoryQuantity value.")
                 if not isinstance(selected_options, list):
                     raise ShopifyApiError(message="Product variant response has invalid selectedOptions value.")
-                if inventory_item is not None and not isinstance(inventory_item, dict):
+                if not isinstance(inventory_item, dict):
                     raise ShopifyApiError(message="Product variant response has invalid inventoryItem value.")
 
                 option_values: dict[str, str] = {}
@@ -492,15 +489,20 @@ class ShopifyApiClient:
 
                 sku: str | None = None
                 inventory_management: str | None = None
-                if inventory_item is not None:
-                    raw_sku = inventory_item.get("sku")
-                    raw_tracked = inventory_item.get("tracked")
-                    if raw_sku is not None and not isinstance(raw_sku, str):
-                        raise ShopifyApiError(message="Product variant response has invalid inventoryItem.sku.")
-                    if not isinstance(raw_tracked, bool):
-                        raise ShopifyApiError(message="Product variant response has invalid inventoryItem.tracked.")
-                    sku = raw_sku
-                    inventory_management = "shopify" if raw_tracked else None
+                raw_sku = inventory_item.get("sku")
+                raw_tracked = inventory_item.get("tracked")
+                raw_requires_shipping = inventory_item.get("requiresShipping")
+                if raw_sku is not None and not isinstance(raw_sku, str):
+                    raise ShopifyApiError(message="Product variant response has invalid inventoryItem.sku.")
+                if not isinstance(raw_tracked, bool):
+                    raise ShopifyApiError(message="Product variant response has invalid inventoryItem.tracked.")
+                if not isinstance(raw_requires_shipping, bool):
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid inventoryItem.requiresShipping."
+                    )
+                sku = raw_sku
+                inventory_management = "shopify" if raw_tracked else None
+                requires_shipping = raw_requires_shipping
 
                 variants.append(
                     {
