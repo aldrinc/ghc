@@ -95,7 +95,7 @@ def test_routes_overly_specific_stock_scene_to_ai():
     assert "imageSource" not in puck_data["content"][0]["props"]
 
 
-def test_collect_image_plans_normalizes_unsplash_reference_to_ai():
+def test_collect_image_plans_drops_reference_for_unsplash_images():
     puck_data = _puck_with_images(
         [
             {
@@ -111,14 +111,15 @@ def test_collect_image_plans_normalizes_unsplash_reference_to_ai():
     plans = funnel_ai._collect_image_plans(puck_data=puck_data, config_contexts=[])
 
     assert len(plans) == 1
-    assert plans[0]["imageSource"] == "ai"
-    assert plans[0]["referenceAssetPublicId"] == "reference-public-id"
+    assert plans[0]["imageSource"] == "unsplash"
+    assert plans[0]["referenceAssetPublicId"] is None
     assert plans[0]["routingExplicit"] is True
-    assert "Explicit imageSource='ai'" in plans[0]["routingReason"]
-    assert puck_data["content"][0]["props"]["imageSource"] == "ai"
+    assert "Explicit imageSource='unsplash'" in plans[0]["routingReason"]
+    assert puck_data["content"][0]["props"]["imageSource"] == "unsplash"
+    assert "referenceAssetPublicId" not in puck_data["content"][0]["props"]
 
 
-def test_collect_image_plans_normalizes_unsplash_reference_in_config_json_context():
+def test_collect_image_plans_drops_reference_for_unsplash_in_config_json_context():
     puck_data = {
         "root": {"props": {}},
         "content": [
@@ -147,9 +148,10 @@ def test_collect_image_plans_normalizes_unsplash_reference_in_config_json_contex
     funnel_ai._sync_config_json_contexts(config_contexts)
 
     assert len(plans) == 1
-    assert plans[0]["imageSource"] == "ai"
+    assert plans[0]["imageSource"] == "unsplash"
     config = json.loads(puck_data["content"][0]["props"]["configJson"])
-    assert config["image"]["imageSource"] == "ai"
+    assert config["image"]["imageSource"] == "unsplash"
+    assert "referenceAssetPublicId" not in config["image"]
 
 
 def test_pre_sales_badge_icons_are_repaired_from_fallback_template():
