@@ -1,4 +1,3 @@
-import ast
 import json
 from types import SimpleNamespace
 
@@ -96,7 +95,7 @@ def test_routes_overly_specific_stock_scene_to_ai():
     assert "imageSource" not in puck_data["content"][0]["props"]
 
 
-def test_collect_image_plans_unsplash_reference_error_includes_details():
+def test_collect_image_plans_normalizes_unsplash_reference_to_ai():
     puck_data = _puck_with_images(
         [
             {
@@ -109,19 +108,48 @@ def test_collect_image_plans_unsplash_reference_error_includes_details():
         ]
     )
 
-    with pytest.raises(funnel_ai.AiAttachmentError) as exc_info:
-        funnel_ai._collect_image_plans(puck_data=puck_data, config_contexts=[])
+    plans = funnel_ai._collect_image_plans(puck_data=puck_data, config_contexts=[])
 
-    message = str(exc_info.value)
-    assert "Unsplash images do not support referenceAssetPublicId." in message
-    assert "details=" in message
+    assert len(plans) == 1
+    assert plans[0]["imageSource"] == "ai"
+    assert plans[0]["referenceAssetPublicId"] == "reference-public-id"
+    assert plans[0]["routingExplicit"] is True
+    assert "Explicit imageSource='ai'" in plans[0]["routingReason"]
+    assert puck_data["content"][0]["props"]["imageSource"] == "ai"
 
-    details = ast.literal_eval(message.split("details=", maxsplit=1)[1])
-    assert details["path"] == "puckData.content[0].props"
-    assert details["assetKey"] == "assetPublicId"
-    assert details["imageSource"] == "unsplash"
-    assert details["referenceAssetPublicId"] == "reference-public-id"
-    assert details["hasPrompt"] is True
+
+def test_collect_image_plans_normalizes_unsplash_reference_in_config_json_context():
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "PreSalesPitch",
+                "props": {
+                    "id": "pitch",
+                    "configJson": json.dumps(
+                        {
+                            "image": {
+                                "alt": "Lifestyle scene",
+                                "prompt": "Candid lifestyle portrait in a bright kitchen with natural light.",
+                                "imageSource": "unsplash",
+                                "referenceAssetPublicId": "reference-public-id",
+                            }
+                        }
+                    ),
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+    config_contexts = funnel_ai._collect_config_json_contexts_all(puck_data)
+    plans = funnel_ai._collect_image_plans(puck_data=puck_data, config_contexts=config_contexts)
+    funnel_ai._sync_config_json_contexts(config_contexts)
+
+    assert len(plans) == 1
+    assert plans[0]["imageSource"] == "ai"
+    config = json.loads(puck_data["content"][0]["props"]["configJson"])
+    assert config["image"]["imageSource"] == "ai"
 
 
 def test_pre_sales_badge_icons_are_repaired_from_fallback_template():
