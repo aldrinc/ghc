@@ -6,7 +6,7 @@
 }
 
 .viewport {
-  height: var(--marquee-height);
+  height: calc(var(--marquee-height) + (var(--marquee-pad-y) * 2));
   overflow: hidden;
 }
 
@@ -22,7 +22,8 @@
   align-items: center;
   height: 100%;
   gap: var(--marquee-gap);
-  padding: 0 var(--marquee-pad-x);
+  padding: var(--marquee-pad-y) var(--marquee-pad-x);
+  box-sizing: border-box;
   margin-right: var(--marquee-gap);
 }
 

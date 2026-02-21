@@ -259,6 +259,7 @@
   --marquee-letter-spacing: 0.03em;
   --marquee-gap: clamp(50px, 8vw, 80px);
   --marquee-pad-x: 0px;
+  --marquee-pad-y: clamp(8px, 1vw, 12px);
 
   /* Quick FAQ Pills (auto-sliding like marquee) */
   --pill-marquee-speed: 60s;
