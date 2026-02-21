@@ -484,6 +484,19 @@ def update_funnel(
     return jsonable_encoder(updated)
 
 
+@router.delete("/{funnel_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_funnel(
+    funnel_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = FunnelsRepository(session)
+    deleted = repo.delete(org_id=auth.org_id, funnel_id=funnel_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Funnel not found")
+    return None
+
+
 @router.post("/{funnel_id}/disable")
 def disable_funnel(
     funnel_id: str,

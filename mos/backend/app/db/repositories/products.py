@@ -43,8 +43,34 @@ class ProductsRepository:
         stmt = select(Product).where(Product.org_id == org_id, Product.client_id == client_id)
         return list(self.session.scalars(stmt).all())
 
+    def _get_by_short_id_token(self, *, org_id: str, short_token: str) -> Optional[Product]:
+        matches = list(
+            self.session.scalars(
+                select(Product)
+                .where(
+                    Product.org_id == org_id,
+                    func.left(cast(Product.id, String), _SHORT_ID_LENGTH) == short_token,
+                )
+                .order_by(Product.created_at.asc(), Product.id.asc())
+                .limit(2)
+            ).all()
+        )
+        if len(matches) != 1:
+            return None
+        return matches[0]
+
     def get(self, *, org_id: str, product_id: str) -> Optional[Product]:
-        stmt = select(Product).where(Product.org_id == org_id, Product.id == product_id)
+        token = str(product_id or "").strip().lower()
+        if not token:
+            return None
+        try:
+            normalized_product_id = str(UUID(token))
+        except ValueError:
+            if len(token) != _SHORT_ID_LENGTH or any(ch not in "0123456789abcdef" for ch in token):
+                return None
+            return self._get_by_short_id_token(org_id=org_id, short_token=token)
+
+        stmt = select(Product).where(Product.org_id == org_id, Product.id == normalized_product_id)
         return self.session.scalars(stmt).first()
 
     def create(self, *, org_id: str, client_id: str, **fields: Any) -> Product:

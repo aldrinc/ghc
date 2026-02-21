@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAssets } from "@/api/assets";
-import { useWorkflowDetail, useWorkflowSignal } from "@/api/workflows";
+import { useStopWorkflow, useWorkflowDetail, useWorkflowSignal } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
 import type { Asset, ResearchArtifactRef } from "@/types/common";
 
@@ -31,8 +32,10 @@ function truncate(text?: string, max = 120) {
 
 export function WorkflowDetailPage() {
   const { workflowId } = useParams();
+  const navigate = useNavigate();
   const { data, isLoading, isError, refetch } = useWorkflowDetail(workflowId);
   const workflowSignal = useWorkflowSignal(workflowId);
+  const stopWorkflow = useStopWorkflow();
   const { product, products, selectProduct } = useProductContext();
 
   const run = data?.run;
@@ -181,6 +184,10 @@ export function WorkflowDetailPage() {
       },
     });
   };
+  const handleStopWorkflow = () => {
+    if (!run?.id || stopWorkflow.isPending) return;
+    stopWorkflow.mutate(run.id);
+  };
 
   return (
     <div className="space-y-4">
@@ -190,6 +197,21 @@ export function WorkflowDetailPage() {
           runProduct?.name
             ? `Inspect research artifacts for ${runProduct.name}.`
             : "Inspect research artifacts and unblock any required gates."
+        }
+        actions={
+          <Menu>
+            <MenuTrigger className={buttonClasses({ variant: "secondary", size: "sm" })}>Actions</MenuTrigger>
+            <MenuContent>
+              <MenuItem onClick={() => navigate("/workflows")}>Open all workflows</MenuItem>
+              <MenuItem onClick={() => void refetch()}>Refresh now</MenuItem>
+              {run?.id ? <MenuItem onClick={() => navigator.clipboard.writeText(run.id)}>Copy workflow ID</MenuItem> : null}
+              {run?.status === "running" ? (
+                <MenuItem onClick={handleStopWorkflow}>
+                  {stopWorkflow.isPending ? "Stopping workflow…" : "Stop workflow"}
+                </MenuItem>
+              ) : null}
+            </MenuContent>
+          </Menu>
         }
       />
 

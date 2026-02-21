@@ -137,16 +137,44 @@ function NavigationMenu({ label, items }: NavSection) {
     return true;
   };
 
+  const parsedItems = items.map((item) => {
+    const [basePath, query] = item.path.split("?");
+    return { item, basePath, query };
+  });
+
+  const activeItemPath =
+    parsedItems.reduce<{
+      path: string;
+      basePathLength: number;
+      queryParamCount: number;
+    } | null>((best, { item, basePath, query }) => {
+      const pathMatches =
+        location.pathname === basePath || location.pathname.startsWith(`${basePath}/`);
+      if (!pathMatches || !matchesQuery(query)) return best;
+
+      const candidate = {
+        path: item.path,
+        basePathLength: basePath.length,
+        queryParamCount: query ? new URLSearchParams(query).size : 0,
+      };
+
+      if (!best) return candidate;
+      if (candidate.basePathLength > best.basePathLength) return candidate;
+      if (
+        candidate.basePathLength === best.basePathLength &&
+        candidate.queryParamCount > best.queryParamCount
+      ) {
+        return candidate;
+      }
+      return best;
+    }, null)?.path ?? null;
+
   return (
     <SidebarGroup>
       <SidebarGroupLabel>{label}</SidebarGroupLabel>
       <SidebarMenu>
-        {items.map((item) => {
-          const [basePath, query] = item.path.split("?");
-          const isActive =
-            (location.pathname === basePath ||
-              location.pathname.startsWith(`${basePath}/`)) &&
-            matchesQuery(query);
+        {parsedItems.map(({ item }) => {
+          const isActive = item.path === activeItemPath;
 
           return (
             <SidebarMenuItem key={item.path}>

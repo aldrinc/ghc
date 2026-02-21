@@ -7,7 +7,7 @@ from sqlalchemy.exc import ProgrammingError
 
 from app.config import settings
 from app.db.enums import FunnelDomainStatusEnum
-from app.db.models import AgentRun, AgentToolCall, Funnel, FunnelDomain
+from app.db.models import AgentRun, AgentToolCall, Funnel, FunnelDomain, FunnelPage
 from app.db.repositories.funnels import FunnelsRepository
 from app.services import deploy as deploy_service
 
@@ -230,6 +230,49 @@ def test_funnel_publish_uses_short_product_id_slug_when_handle_missing(api_clien
     assert meta.status_code == 200
     assert meta.json()["productSlug"] == product_slug
     assert meta.json()["funnelSlug"] == route_slug
+
+
+def test_delete_funnel_removes_funnel_and_pages(api_client: TestClient, db_session):
+    funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Delete Funnel",
+    )
+
+    delete_resp = api_client.delete(f"/funnels/{funnel_id}")
+    assert delete_resp.status_code == 204
+
+    detail_resp = api_client.get(f"/funnels/{funnel_id}")
+    assert detail_resp.status_code == 404
+
+    remaining_funnel = db_session.scalars(select(Funnel).where(Funnel.id == funnel_id)).first()
+    assert remaining_funnel is None
+
+    remaining_pages = list(
+        db_session.scalars(select(FunnelPage).where(FunnelPage.funnel_id == funnel_id)).all()
+    )
+    assert remaining_pages == []
+
+
+def test_delete_published_funnel_removes_public_runtime(api_client: TestClient):
+    funnel_id, route_slug, _product_id, product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Delete Published Funnel",
+    )
+
+    publish = api_client.post(f"/funnels/{funnel_id}/publish")
+    assert publish.status_code == 201
+
+    meta_before = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta_before.status_code == 200
+
+    delete_resp = api_client.delete(f"/funnels/{funnel_id}")
+    assert delete_resp.status_code == 204
+
+    detail_resp = api_client.get(f"/funnels/{funnel_id}")
+    assert detail_resp.status_code == 404
+
+    meta_after = api_client.get(f"/public/funnels/{product_slug}/{route_slug}/meta")
+    assert meta_after.status_code == 404
 
 
 def test_create_product_retries_on_8_char_id_prefix_collision(api_client: TestClient, monkeypatch):

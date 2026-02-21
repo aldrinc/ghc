@@ -4,9 +4,17 @@
     "preset": "feed"
   },
   "brand": {
+    "name": "SampleLogo",
     "logoText": "SampleLogo",
     "stripBgColor": "#be3b7a",
-    "stripTextColor": "#ffffff"
+    "stripTextColor": "#ffffff",
+    "assets": {
+      "palette": {
+        "primary": "#be3b7a",
+        "accent": "#111827"
+      },
+      "notes": "Everyday UGC with natural lighting and realistic skin detail."
+    }
   },
   "rating": {
     "valueText": "4.9/5",
@@ -16,18 +24,18 @@
     "text": "BUY ONE, GET ONE FREE TODAY!"
   },
   "background": {
+    "imageModel": "gemini-3-pro-image-preview",
     "promptVars": {
       "product": "a supplement bottle with a bright pink label that reads HAIR, SKIN AND NAILS GUMMY, white cap, brand name covered by a black rectangle",
       "subject": "a 55-65 year old woman with gray shoulder-length hair, friendly smile",
       "scene": "indoors at home, natural daylight, casual smartphone photo",
-      "extra": "Hold the bottle close to the camera in one hand with the label facing the camera. Shallow depth of field. Realistic skin texture.",
-      "avoid": ["on-image captions", "watermarks", "UI overlays", "extra fingers", "distorted hands"]
+      "extra": "Hold the bottle close to the camera in one hand with the label facing the camera. Keep both the woman's face and the bottle label in crisp focus. Clear eyes and facial details, no subject blur. Realistic skin texture.",
+      "avoid": ["on-image captions", "watermarks", "UI overlays", "extra fingers", "distorted hands", "blurred face", "out-of-focus subject", "heavy bokeh on the person"]
     }
   },
   "comment": {
     "handle": "ValleyGirl64",
     "text": "People ask me all the time if i got extensions, this stuff is the REAL DEAL!!! insane.",
-    "avatarUrl": "samples/assets/avatar-harper.svg"
+    "avatarUrl": "../assets/avatar-harper.svg"
   }
 }
-

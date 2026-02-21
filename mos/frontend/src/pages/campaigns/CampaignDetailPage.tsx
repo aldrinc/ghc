@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Callout } from "@/components/ui/callout";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +15,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useArtifacts, useLatestArtifact } from "@/api/artifacts";
 import { useApiClient, type ApiError } from "@/api/client";
 import { useCampaign, useUpdateExperimentSpecs } from "@/api/campaigns";
-import { useFunnels } from "@/api/funnels";
+import { useDeleteFunnel, useFunnels } from "@/api/funnels";
 import { useProduct } from "@/api/products";
 import { useWorkflowLogs, useWorkflows, useWorkflowSignal } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
@@ -234,6 +235,7 @@ export function CampaignDetailPage() {
   const { data: campaign, isLoading: campaignLoading, isError: campaignError } = useCampaign(campaignId);
   const { data: workflows = [], isLoading: workflowsLoading } = useWorkflows();
   const updateExperimentSpecs = useUpdateExperimentSpecs(campaignId);
+  const deleteFunnel = useDeleteFunnel();
 
   const [experimentDrafts, setExperimentDrafts] = useState<ExperimentSpec[]>([]);
   const [selectedExperimentIds, setSelectedExperimentIds] = useState<string[]>([]);
@@ -249,6 +251,8 @@ export function CampaignDetailPage() {
   const [creativeProductionPending, setCreativeProductionPending] = useState(false);
   const [creativeProductionError, setCreativeProductionError] = useState<string | null>(null);
   const [selectedPreviewAssetByBrief, setSelectedPreviewAssetByBrief] = useState<Record<string, string>>({});
+  const [publishedDeleteTarget, setPublishedDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deletePendingFunnelId, setDeletePendingFunnelId] = useState<string | null>(null);
 
   const strategyFilters = useMemo(() => (campaignId ? { campaignId, type: "strategy_sheet" } : {}), [campaignId]);
   const experimentFilters = useMemo(() => (campaignId ? { campaignId, type: "experiment_spec" } : {}), [campaignId]);
@@ -276,13 +280,14 @@ export function CampaignDetailPage() {
   const funnelWorkflow = campaignWorkflows.find(
     (wf) => wf.kind === "campaign_funnel_generation" && wf.status === "running"
   );
+  const hasRunningFunnelWorkflow = Boolean(funnelWorkflow?.id);
 
   const planningSignal = useWorkflowSignal(planningWorkflow?.id);
   const canApproveExperiments = Boolean(planningWorkflow?.id);
   const isFunnelGenerationActive =
     funnelGenerationPending ||
     funnelCreationRequested ||
-    (Boolean(funnelWorkflow?.id) && funnels.length === 0);
+    hasRunningFunnelWorkflow;
 
   const latestFunnelFailure = useMemo(() => {
     if (!funnelLogs.length) return null;
@@ -344,6 +349,23 @@ export function CampaignDetailPage() {
     });
     return map;
   }, [funnels]);
+  const existingFunnelExperimentIds = useMemo(() => {
+    const ids = new Set<string>();
+    funnels.forEach((funnel) => {
+      if (!funnel.experiment_spec_id) return;
+      const normalized = funnel.experiment_spec_id.trim();
+      if (normalized) ids.add(normalized);
+    });
+    return ids;
+  }, [funnels]);
+  const selectedExperimentsWithFunnels = useMemo(
+    () => selectedExperimentIds.filter((id) => existingFunnelExperimentIds.has(id)),
+    [selectedExperimentIds, existingFunnelExperimentIds]
+  );
+  const selectedExperimentsWithFunnelsLabel = useMemo(
+    () => selectedExperimentsWithFunnels.map((id) => experimentNameById[id] || id).join(", "),
+    [selectedExperimentsWithFunnels, experimentNameById]
+  );
 
   const variantNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -557,6 +579,18 @@ export function CampaignDetailPage() {
       setFunnelGenerationError("Select at least one angle to create funnels.");
       return;
     }
+    if (selectedExperimentsWithFunnels.length) {
+      setFunnelGenerationError(
+        `Funnels already exist for: ${selectedExperimentsWithFunnelsLabel}. Unselect those angles before creating funnels.`
+      );
+      return;
+    }
+    if (hasRunningFunnelWorkflow) {
+      setFunnelGenerationError(
+        "A funnel generation workflow is already running for this campaign. Wait for it to finish before creating more."
+      );
+      return;
+    }
     const missingVariantSelection = selectedExperimentIds.find(
       (experimentId) => (selectedVariantIdsByExperiment[experimentId] || []).length === 0
     );
@@ -650,6 +684,37 @@ export function CampaignDetailPage() {
       setCreativeProductionError(`Failed to start creative production: ${getErrorMessage(err)}`);
     } finally {
       setCreativeProductionPending(false);
+    }
+  };
+
+  const performFunnelDelete = async (funnelId: string) => {
+    setDeletePendingFunnelId(funnelId);
+    try {
+      await deleteFunnel.mutateAsync({ funnelId });
+    } finally {
+      setDeletePendingFunnelId((current) => (current === funnelId ? null : current));
+    }
+  };
+
+  const requestFunnelDelete = async (funnel: { id: string; name: string; status: string }) => {
+    if (funnel.status === "published") {
+      setPublishedDeleteTarget({ id: funnel.id, name: funnel.name });
+      return;
+    }
+    try {
+      await performFunnelDelete(funnel.id);
+    } catch {
+      // Mutation surfaces errors through toast.
+    }
+  };
+
+  const confirmPublishedFunnelDelete = async () => {
+    if (!publishedDeleteTarget) return;
+    try {
+      await performFunnelDelete(publishedDeleteTarget.id);
+      setPublishedDeleteTarget(null);
+    } catch {
+      // Mutation surfaces errors through toast.
     }
   };
 
@@ -898,11 +963,21 @@ export function CampaignDetailPage() {
 
       <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="strategy">Strategy</TabsTrigger>
-          <TabsTrigger value="experiments">Angles</TabsTrigger>
-          <TabsTrigger value="assets">Creative briefs</TabsTrigger>
-          <TabsTrigger value="funnels">Funnels</TabsTrigger>
+          <TabsTrigger value="overview" className="data-[selected]:!text-black">
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="strategy" className="data-[selected]:!text-black">
+            Strategy
+          </TabsTrigger>
+          <TabsTrigger value="experiments" className="data-[selected]:!text-black">
+            Angles
+          </TabsTrigger>
+          <TabsTrigger value="assets" className="data-[selected]:!text-black">
+            Creative briefs
+          </TabsTrigger>
+          <TabsTrigger value="funnels" className="data-[selected]:!text-black">
+            Funnels
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" flush>
@@ -1153,7 +1228,10 @@ export function CampaignDetailPage() {
                         size="sm"
                         onClick={handleCreateFunnels}
                         disabled={
-                          funnelGenerationPending || isFunnelGenerationActive || selectedExperimentIds.length === 0
+                          funnelGenerationPending ||
+                          isFunnelGenerationActive ||
+                          selectedExperimentIds.length === 0 ||
+                          selectedExperimentsWithFunnels.length > 0
                         }
                       >
                         {funnelGenerationPending || isFunnelGenerationActive ? "Creating…" : "Create funnels"}
@@ -1185,9 +1263,23 @@ export function CampaignDetailPage() {
                       the selected angles.
                     </div>
                     <div>
-                      Selecting an angle includes all of its variants by default. Uncheck variants to run lighter,
-                      faster tests.
+                      Selection is per angle spec. Selecting an angle includes all of its variants by default.
                     </div>
+                    <div>
+                      Uncheck variants to run lighter, faster tests when you only want a subset for a selected angle.
+                    </div>
+                    {selectedExperimentsWithFunnels.length ? (
+                      <div className="text-danger">
+                        Funnels already exist for: {selectedExperimentsWithFunnelsLabel}. Unselect these angles to
+                        avoid duplicate workflows.
+                      </div>
+                    ) : null}
+                    {hasRunningFunnelWorkflow ? (
+                      <div className="text-danger">
+                        A funnel generation workflow is already running for this campaign. Wait for completion before
+                        creating more funnels.
+                      </div>
+                    ) : null}
                     {funnelGenerationError ? <div className="text-danger">{funnelGenerationError}</div> : null}
                     {funnelFailureSummary ? (
                       <div className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
@@ -1246,6 +1338,7 @@ export function CampaignDetailPage() {
                               <div className="flex flex-wrap items-center gap-2">
                                 <div className="text-base font-semibold text-content">{exp.name || exp.id}</div>
                                 {isSelected ? <Badge tone="accent">Selected</Badge> : null}
+                                {existingFunnelExperimentIds.has(exp.id) ? <Badge tone="neutral">Funnels created</Badge> : null}
                                 <Badge tone="neutral">{(exp.variants || []).length} variants</Badge>
                               </div>
                               <div className="mt-0.5 text-xs font-mono text-content-muted">{exp.id}</div>
@@ -1596,9 +1689,19 @@ export function CampaignDetailPage() {
                           </TableCell>
                           <TableCell className="text-sm text-content-muted">{formatDate(funnel.updated_at)}</TableCell>
                           <TableCell className="text-right">
-                            <Button variant="secondary" size="xs" onClick={() => navigate(`/research/funnels/${funnel.id}`)}>
-                              Open
-                            </Button>
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="secondary" size="xs" onClick={() => navigate(`/research/funnels/${funnel.id}`)}>
+                                Open
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="xs"
+                                onClick={() => void requestFunnelDelete(funnel)}
+                                disabled={deleteFunnel.isPending}
+                              >
+                                {deletePendingFunnelId === funnel.id ? "Deleting…" : "Delete"}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1619,6 +1722,43 @@ export function CampaignDetailPage() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <AlertDialog
+        open={Boolean(publishedDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deleteFunnel.isPending) setPublishedDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>Delete published funnel?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This funnel is currently published. Deleting it will remove the funnel and all of its pages.
+          </AlertDialogDescription>
+          {publishedDeleteTarget ? (
+            <div className="mt-3 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
+              <span className="font-semibold text-content">{publishedDeleteTarget.name}</span>
+            </div>
+          ) : null}
+          <div className="mt-6 flex items-center justify-end gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPublishedDeleteTarget(null)}
+              disabled={deleteFunnel.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => void confirmPublishedFunnelDelete()}
+              disabled={deleteFunnel.isPending}
+            >
+              {deletePendingFunnelId === publishedDeleteTarget?.id ? "Deleting…" : "Delete funnel"}
+            </Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <DialogRoot
         open={editDialogOpen}

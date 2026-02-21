@@ -1,10 +1,11 @@
 import { PageHeader } from "@/components/layout/PageHeader";
-import { useFunnels, useCreateFunnel } from "@/api/funnels";
+import { useFunnels, useCreateFunnel, useDeleteFunnel } from "@/api/funnels";
 import { useProduct } from "@/api/products";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DialogClose, DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
@@ -19,10 +20,13 @@ export function FunnelsPage() {
   const { data: productDetail } = useProduct(product?.id);
   const { data: funnels = [], isLoading } = useFunnels({ clientId, productId: product?.id });
   const createFunnel = useCreateFunnel();
+  const deleteFunnel = useDeleteFunnel();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [selectedOfferId, setSelectedOfferId] = useState("");
+  const [publishedDeleteTarget, setPublishedDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deletePendingId, setDeletePendingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isModalOpen) return;
@@ -61,6 +65,37 @@ export function FunnelsPage() {
     setName("");
     setDescription("");
     navigate(`/research/funnels/${funnel.id}`);
+  };
+
+  const performDelete = async (funnelId: string) => {
+    setDeletePendingId(funnelId);
+    try {
+      await deleteFunnel.mutateAsync({ funnelId });
+    } finally {
+      setDeletePendingId((current) => (current === funnelId ? null : current));
+    }
+  };
+
+  const requestDelete = async (funnel: { id: string; name: string; status: string }) => {
+    if (funnel.status === "published") {
+      setPublishedDeleteTarget({ id: funnel.id, name: funnel.name });
+      return;
+    }
+    try {
+      await performDelete(funnel.id);
+    } catch {
+      // Mutation surfaces errors through toast.
+    }
+  };
+
+  const confirmPublishedDelete = async () => {
+    if (!publishedDeleteTarget) return;
+    try {
+      await performDelete(publishedDeleteTarget.id);
+      setPublishedDeleteTarget(null);
+    } catch {
+      // Mutation surfaces errors through toast.
+    }
   };
 
   return (
@@ -117,10 +152,25 @@ export function FunnelsPage() {
                       </div>
                     </div>
                     <div className="text-xs text-content-muted">
-                      Public:{" "}
-                      <span className="font-mono">
-                        {productRouteSlug ? `/f/${productRouteSlug}/${shortUuidRouteToken(funnel.id)}` : "Route unavailable"}
-                      </span>
+                      <div>
+                        Public:{" "}
+                        <span className="font-mono">
+                          {productRouteSlug ? `/f/${productRouteSlug}/${shortUuidRouteToken(funnel.id)}` : "Route unavailable"}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-end gap-2">
+                        <Button variant="secondary" size="xs" onClick={() => navigate(`/research/funnels/${funnel.id}`)}>
+                          Open
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="xs"
+                          onClick={() => void requestDelete(funnel)}
+                          disabled={deleteFunnel.isPending}
+                        >
+                          {deletePendingId === funnel.id ? "Deleting…" : "Delete"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -193,6 +243,43 @@ export function FunnelsPage() {
           </form>
         </DialogContent>
       </DialogRoot>
+
+      <AlertDialog
+        open={Boolean(publishedDeleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && !deleteFunnel.isPending) setPublishedDeleteTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogTitle>Delete published funnel?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This funnel is currently published. Deleting it will remove the funnel and all of its pages.
+          </AlertDialogDescription>
+          {publishedDeleteTarget ? (
+            <div className="mt-3 rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
+              <span className="font-semibold text-content">{publishedDeleteTarget.name}</span>
+            </div>
+          ) : null}
+          <div className="mt-6 flex items-center justify-end gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPublishedDeleteTarget(null)}
+              disabled={deleteFunnel.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => void confirmPublishedDelete()}
+              disabled={deleteFunnel.isPending}
+            >
+              {deletePendingId === publishedDeleteTarget?.id ? "Deleting…" : "Delete funnel"}
+            </Button>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

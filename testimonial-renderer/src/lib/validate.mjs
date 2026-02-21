@@ -27,6 +27,15 @@ const MAX_PDP_CTA = 60;
 const MAX_PDP_LOGO_TEXT = 24;
 const MAX_PDP_RATING_VALUE = 16;
 const MAX_PDP_RATING_DETAIL = 60;
+const MAX_PDP_BRAND_NAME = 80;
+const MAX_PDP_BRAND_NOTES = 260;
+const NANO_REFERENCE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const NANO_REFERENCE_DATA_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+]);
 
 const isPlainObject = (value) =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -100,6 +109,35 @@ const resolveImageUrl = (value, baseDir, field) => {
   return pathToFileURL(resolvedPath).href;
 };
 
+const assertNanoReferenceImageUrl = (resolvedUrl, field) => {
+  if (typeof resolvedUrl !== 'string' || !resolvedUrl.trim()) {
+    throw new Error(`${field} must be a non-empty image source.`);
+  }
+  const trimmed = resolvedUrl.trim();
+  if (trimmed.startsWith('data:')) {
+    const match = trimmed.match(/^data:([^;]+);/i);
+    const mimeType = match ? match[1].trim().toLowerCase() : '';
+    if (!NANO_REFERENCE_DATA_MIME_TYPES.has(mimeType)) {
+      throw new Error(`${field} must use png/jpg/jpeg/webp when using data URLs.`);
+    }
+    return;
+  }
+
+  let pathname = trimmed;
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('file://')) {
+    try {
+      pathname = new URL(trimmed).pathname || trimmed;
+    } catch {
+      pathname = trimmed;
+    }
+  }
+
+  const extension = path.extname(pathname).toLowerCase();
+  if (!NANO_REFERENCE_EXTENSIONS.has(extension)) {
+    throw new Error(`${field} must reference a png/jpg/jpeg/webp image.`);
+  }
+};
+
 const validatePdpOutput = (output) => {
   if (output == null) {
     return { preset: PDP_DEFAULT_OUTPUT_PRESET };
@@ -125,7 +163,14 @@ const validatePdpBrand = (brand, baseDir) => {
   if (!isPlainObject(brand)) {
     throw new Error('brand must be an object.');
   }
-  const allowedKeys = new Set(['logoUrl', 'logoText', 'stripBgColor', 'stripTextColor']);
+  const allowedKeys = new Set([
+    'logoUrl',
+    'logoText',
+    'stripBgColor',
+    'stripTextColor',
+    'name',
+    'assets',
+  ]);
   for (const key of Object.keys(brand)) {
     if (!allowedKeys.has(key)) {
       throw new Error(`brand contains unsupported key: ${key}`);
@@ -145,7 +190,85 @@ const validatePdpBrand = (brand, baseDir) => {
     throw new Error('brand.logoUrl or brand.logoText is required.');
   }
 
-  return { stripBgColor, stripTextColor, logoUrl, logoText };
+  const name = assertOptionalString(brand.name, 'brand.name', MAX_PDP_BRAND_NAME);
+  const assets = validatePdpBrandAssets(brand.assets, baseDir);
+
+  return { stripBgColor, stripTextColor, logoUrl, logoText, name, assets };
+};
+
+const validatePdpBrandPalette = (palette) => {
+  if (!isPlainObject(palette)) {
+    throw new Error('brand.assets.palette must be an object when provided.');
+  }
+  const allowedKeys = new Set(['primary', 'secondary', 'accent']);
+  for (const key of Object.keys(palette)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`brand.assets.palette contains unsupported key: ${key}`);
+    }
+  }
+
+  const output = {};
+  if (palette.primary != null) {
+    output.primary = assertColor(palette.primary, 'brand.assets.palette.primary');
+  }
+  if (palette.secondary != null) {
+    output.secondary = assertColor(palette.secondary, 'brand.assets.palette.secondary');
+  }
+  if (palette.accent != null) {
+    output.accent = assertColor(palette.accent, 'brand.assets.palette.accent');
+  }
+
+  if (Object.keys(output).length === 0) {
+    throw new Error('brand.assets.palette must include at least one color token.');
+  }
+  return output;
+};
+
+const validatePdpBrandAssets = (assets, baseDir) => {
+  if (assets == null) {
+    return undefined;
+  }
+  if (!isPlainObject(assets)) {
+    throw new Error('brand.assets must be an object when provided.');
+  }
+  const allowedKeys = new Set(['logoUrl', 'referenceImages', 'palette', 'notes']);
+  for (const key of Object.keys(assets)) {
+    if (!allowedKeys.has(key)) {
+      throw new Error(`brand.assets contains unsupported key: ${key}`);
+    }
+  }
+
+  let logoUrl;
+  if (assets.logoUrl != null) {
+    logoUrl = resolveImageUrl(assets.logoUrl, baseDir, 'brand.assets.logoUrl');
+    assertNanoReferenceImageUrl(logoUrl, 'brand.assets.logoUrl');
+  }
+
+  let referenceImages;
+  if (assets.referenceImages != null) {
+    if (!Array.isArray(assets.referenceImages) || assets.referenceImages.length === 0) {
+      throw new Error('brand.assets.referenceImages must be a non-empty array when provided.');
+    }
+    referenceImages = assets.referenceImages.map((entry, index) =>
+      resolveImageUrl(entry, baseDir, `brand.assets.referenceImages[${index}]`),
+    );
+    referenceImages.forEach((entry, index) => {
+      assertNanoReferenceImageUrl(entry, `brand.assets.referenceImages[${index}]`);
+    });
+  }
+
+  let palette;
+  if (assets.palette != null) {
+    palette = validatePdpBrandPalette(assets.palette);
+  }
+
+  const notes = assertOptionalString(assets.notes, 'brand.assets.notes', MAX_PDP_BRAND_NOTES);
+
+  if (!logoUrl && !referenceImages && !palette && !notes) {
+    throw new Error('brand.assets must include at least one of logoUrl, referenceImages, palette, or notes.');
+  }
+
+  return { logoUrl, referenceImages, palette, notes };
 };
 
 const validatePdpRating = (rating) => {

@@ -43,6 +43,39 @@ def _create_offer(api_client, *, product_id: str) -> str:
     return response.json()["id"]
 
 
+def test_product_endpoints_accept_short_product_id_tokens(api_client):
+    client_id = _create_client(api_client, name="Short Product Token")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Short Token Product",
+    )
+    short_product_id = product_id.split("-", 1)[0]
+
+    detail = api_client.get(f"/products/{short_product_id}")
+    assert detail.status_code == 200
+    assert detail.json()["id"] == product_id
+
+    assets = api_client.get(f"/products/{short_product_id}/assets")
+    assert assets.status_code == 200
+    assert assets.json() == []
+
+    offers = api_client.get(f"/products/{short_product_id}/offers")
+    assert offers.status_code == 200
+    assert offers.json() == []
+
+    create_offer = api_client.post(
+        f"/products/{short_product_id}/offers",
+        json={
+            "productId": short_product_id,
+            "name": "Short Token Offer",
+            "businessModel": "one_time",
+        },
+    )
+    assert create_offer.status_code == 201
+    assert create_offer.json()["product_id"] == product_id
+
+
 def test_add_offer_bonus_verifies_shopify_product(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Offer Bonus Client")
     primary_product_id = _create_product(

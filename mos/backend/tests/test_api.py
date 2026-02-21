@@ -1,13 +1,41 @@
 from fastapi.testclient import TestClient
 from sqlalchemy import select
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from app.auth import dependencies as auth_dependencies
 from app.db.deps import get_session
 from app.db.enums import ArtifactTypeEnum
 from app.db.models import Artifact
+from app.db.models import Funnel
 from app.db.models import Org
 from app.main import app
+
+
+def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tuple[str, str, str]:
+    client_resp = api_client.post("/clients", json={"name": f"Client {suffix}", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": f"Product {suffix}"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    campaign_resp = api_client.post(
+        "/campaigns",
+        json={
+            "client_id": client_id,
+            "product_id": product_id,
+            "name": f"Campaign {suffix}",
+            "channels": ["meta"],
+            "asset_brief_types": ["image"],
+        },
+    )
+    assert campaign_resp.status_code == 201
+    campaign_id = campaign_resp.json()["id"]
+    return client_id, product_id, campaign_id
 
 
 def test_protected_routes_require_auth():
@@ -90,6 +118,11 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
     product_payload = product_detail.json()
     assert product_payload["title"] == "Test Product"
     assert isinstance(product_payload.get("variants"), list)
+
+    short_product_id = product_id.split("-", 1)[0]
+    product_detail_short = api_client.get(f"/products/{short_product_id}")
+    assert product_detail_short.status_code == 200
+    assert product_detail_short.json()["id"] == product_id
 
     # Planning prereqs: campaign planning requires canon + metric schema artifacts to exist.
     # Use the test auth org (the DB may contain non-test orgs as well).
@@ -188,6 +221,52 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
 
     planning_logs = api_client.get(f"/workflows/{planning_run}/logs").json()
     assert any(log["step"] == "campaign_planning" for log in planning_logs)
+
+
+def test_generate_campaign_funnels_rejects_existing_angle(api_client, fake_temporal, db_session, auth_context):
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="Duplicate Angle")
+
+    db_session.add(
+        Funnel(
+            org_id=UUID(auth_context.org_id),
+            client_id=UUID(client_id),
+            product_id=UUID(product_id),
+            campaign_id=UUID(campaign_id),
+            experiment_spec_id="angle-1",
+            name="Existing Angle Funnel",
+            route_slug=f"existing-angle-{uuid4().hex[:8]}",
+        )
+    )
+    db_session.commit()
+
+    generate_resp = api_client.post(
+        f"/campaigns/{campaign_id}/funnels/generate",
+        json={"experimentIds": ["angle-1"], "generateTestimonials": True},
+    )
+    assert generate_resp.status_code == 409
+    assert generate_resp.json()["detail"] == "Funnels already exist for angle ids: angle-1."
+    assert fake_temporal.started == []
+
+
+def test_generate_campaign_funnels_rejects_when_run_in_progress(api_client, fake_temporal):
+    _client_id, _product_id, campaign_id = _create_campaign_with_product(api_client, suffix="Running Workflow")
+
+    first_generate = api_client.post(
+        f"/campaigns/{campaign_id}/funnels/generate",
+        json={"experimentIds": ["angle-1"], "generateTestimonials": True},
+    )
+    assert first_generate.status_code == 200
+
+    second_generate = api_client.post(
+        f"/campaigns/{campaign_id}/funnels/generate",
+        json={"experimentIds": ["angle-2"], "generateTestimonials": True},
+    )
+    assert second_generate.status_code == 409
+    assert (
+        second_generate.json()["detail"]
+        == "A funnel generation workflow is already running for this campaign. Wait for it to finish."
+    )
+    assert len(fake_temporal.started) == 1
 
 
 def test_artifacts_assets_experiments_and_swipes(api_client, seed_data):

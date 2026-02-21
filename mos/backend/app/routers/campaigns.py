@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
-from app.db.repositories.campaigns import CampaignsRepository
-from app.db.repositories.artifacts import ArtifactsRepository
-from app.db.enums import ArtifactTypeEnum
+from app.db.enums import ArtifactTypeEnum, WorkflowStatusEnum
 from app.db.models import WorkflowRun
-from app.db.repositories.workflows import WorkflowsRepository
+from app.db.repositories.artifacts import ArtifactsRepository
+from app.db.repositories.campaigns import CampaignsRepository
+from app.db.repositories.funnels import FunnelsRepository
 from app.db.repositories.products import ProductsRepository
+from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
 from app.schemas.creative_production import CreativeProductionRequest
@@ -24,6 +25,33 @@ from app.temporal.workflows.campaign_funnel_generation import (
     CampaignFunnelGenerationWorkflow,
 )
 from app.temporal.workflows.creative_production import CreativeProductionInput, CreativeProductionWorkflow
+from temporalio.api.enums.v1 import WorkflowExecutionStatus
+
+
+def _workflow_execution_status_member(*names: str):
+    for name in names:
+        member = getattr(WorkflowExecutionStatus, name, None)
+        if member is not None:
+            return member
+    return None
+
+
+def _workflow_status_map() -> dict[object, WorkflowStatusEnum]:
+    mapping: dict[object, WorkflowStatusEnum] = {}
+    candidates: list[tuple[tuple[str, ...], WorkflowStatusEnum]] = [
+        (("RUNNING", "WORKFLOW_EXECUTION_STATUS_RUNNING"), WorkflowStatusEnum.running),
+        (("COMPLETED", "WORKFLOW_EXECUTION_STATUS_COMPLETED"), WorkflowStatusEnum.completed),
+        (("FAILED", "WORKFLOW_EXECUTION_STATUS_FAILED"), WorkflowStatusEnum.failed),
+        (("CANCELED", "CANCELLED", "WORKFLOW_EXECUTION_STATUS_CANCELED"), WorkflowStatusEnum.cancelled),
+        (("TERMINATED", "WORKFLOW_EXECUTION_STATUS_TERMINATED"), WorkflowStatusEnum.cancelled),
+        (("TIMED_OUT", "WORKFLOW_EXECUTION_STATUS_TIMED_OUT"), WorkflowStatusEnum.failed),
+        (("CONTINUED_AS_NEW", "WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW"), WorkflowStatusEnum.running),
+    ]
+    for names, internal_status in candidates:
+        member = _workflow_execution_status_member(*names)
+        if member is not None:
+            mapping[member] = internal_status
+    return mapping
 
 
 def _validate_planning_prereqs(
@@ -268,8 +296,81 @@ async def generate_campaign_funnels(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="experimentIds must include at least one angle.",
         )
+    requested_experiment_ids: list[str] = []
+    seen_experiment_ids: set[str] = set()
+    for experiment_id in payload.experiment_ids:
+        normalized_id = experiment_id.strip()
+        if not normalized_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="experimentIds cannot include empty values.",
+            )
+        if normalized_id in seen_experiment_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"experimentIds contains duplicate angle id '{normalized_id}'.",
+            )
+        seen_experiment_ids.add(normalized_id)
+        requested_experiment_ids.append(normalized_id)
 
+    wf_repo = WorkflowsRepository(session)
     temporal = await get_temporal_client()
+    campaign_workflows = wf_repo.list(org_id=auth.org_id, campaign_id=str(campaign.id))
+    running_funnel_workflows = [
+        run
+        for run in campaign_workflows
+        if run.kind == "campaign_funnel_generation" and run.status == "running"
+    ]
+    if running_funnel_workflows:
+        status_map = _workflow_status_map()
+        for running_run in running_funnel_workflows:
+            try:
+                handle = temporal.get_workflow_handle(
+                    running_run.temporal_workflow_id,
+                    first_execution_run_id=running_run.temporal_run_id,
+                )
+                desc = await handle.describe()
+            except Exception:
+                continue
+            new_status = status_map.get(getattr(desc, "status", None)) if desc else None
+            finished_at = getattr(desc, "close_time", None)
+            if new_status and (new_status != running_run.status or finished_at):
+                wf_repo.set_status(
+                    org_id=auth.org_id,
+                    workflow_run_id=str(running_run.id),
+                    status=new_status,
+                    finished_at=finished_at,
+                )
+        campaign_workflows = wf_repo.list(org_id=auth.org_id, campaign_id=str(campaign.id))
+    running_funnel_workflow = next(
+        (
+            run
+            for run in campaign_workflows
+            if run.kind == "campaign_funnel_generation" and run.status == "running"
+        ),
+        None,
+    )
+    if running_funnel_workflow:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A funnel generation workflow is already running for this campaign. Wait for it to finish.",
+        )
+
+    funnels_repo = FunnelsRepository(session)
+    existing_funnels = funnels_repo.list(org_id=auth.org_id, campaign_id=str(campaign.id))
+    existing_experiment_ids = {
+        str(funnel.experiment_spec_id).strip()
+        for funnel in existing_funnels
+        if isinstance(funnel.experiment_spec_id, str) and funnel.experiment_spec_id.strip()
+    }
+    duplicate_experiment_ids = [exp_id for exp_id in requested_experiment_ids if exp_id in existing_experiment_ids]
+    if duplicate_experiment_ids:
+        joined_ids = ", ".join(duplicate_experiment_ids)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Funnels already exist for angle ids: {joined_ids}.",
+        )
+
     handle = await temporal.start_workflow(
         CampaignFunnelGenerationWorkflow.run,
         CampaignFunnelGenerationInput(
@@ -277,7 +378,7 @@ async def generate_campaign_funnels(
             client_id=str(campaign.client_id),
             product_id=str(campaign.product_id),
             campaign_id=str(campaign.id),
-            experiment_ids=payload.experiment_ids,
+            experiment_ids=requested_experiment_ids,
             variant_ids_by_experiment=payload.variant_ids_by_experiment,
             variant_activity_concurrency=payload.variant_activity_concurrency,
             async_media_enrichment=bool(payload.async_media_enrichment),
@@ -288,7 +389,6 @@ async def generate_campaign_funnels(
         task_queue=settings.TEMPORAL_TASK_QUEUE,
     )
 
-    wf_repo = WorkflowsRepository(session)
     run = wf_repo.create_run(
         org_id=auth.org_id,
         client_id=str(campaign.client_id),
@@ -305,7 +405,7 @@ async def generate_campaign_funnels(
         payload_in={
             "campaign_id": str(campaign.id),
             "product_id": str(campaign.product_id),
-            "experiment_ids": payload.experiment_ids,
+            "experiment_ids": requested_experiment_ids,
             "variant_ids_by_experiment": payload.variant_ids_by_experiment,
             "variant_activity_concurrency": payload.variant_activity_concurrency,
             "async_media_enrichment": bool(payload.async_media_enrichment),

@@ -222,6 +222,25 @@ export function useDuplicateFunnel() {
   });
 }
 
+export function useDeleteFunnel() {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ funnelId }: { funnelId: string }) =>
+      request<void>(`/funnels/${funnelId}`, { method: "DELETE" }),
+    onSuccess: (_data, vars) => {
+      toast.success("Funnel deleted");
+      queryClient.invalidateQueries({ queryKey: ["funnels"] });
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      queryClient.removeQueries({ queryKey: ["funnels", "detail", vars.funnelId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to delete funnel";
+      toast.error(message);
+    },
+  });
+}
+
 export function useCreateFunnelPage() {
   const { post } = useApiClient();
   const queryClient = useQueryClient();

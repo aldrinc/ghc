@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class NodeType(str, Enum):
@@ -42,8 +42,7 @@ class Edge(BaseModel):
     to_id: str = Field(alias="to")
     type: EdgeType
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class CloudGraph(BaseModel):

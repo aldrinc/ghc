@@ -17,6 +17,33 @@ from temporalio.api.enums.v1 import WorkflowExecutionStatus
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
+
+def _workflow_execution_status_member(*names: str):
+    for name in names:
+        member = getattr(WorkflowExecutionStatus, name, None)
+        if member is not None:
+            return member
+    return None
+
+
+def _workflow_status_map() -> dict[object, WorkflowStatusEnum]:
+    mapping: dict[object, WorkflowStatusEnum] = {}
+    candidates: list[tuple[tuple[str, ...], WorkflowStatusEnum]] = [
+        (("RUNNING", "WORKFLOW_EXECUTION_STATUS_RUNNING"), WorkflowStatusEnum.running),
+        (("COMPLETED", "WORKFLOW_EXECUTION_STATUS_COMPLETED"), WorkflowStatusEnum.completed),
+        (("FAILED", "WORKFLOW_EXECUTION_STATUS_FAILED"), WorkflowStatusEnum.failed),
+        (("CANCELED", "CANCELLED", "WORKFLOW_EXECUTION_STATUS_CANCELED"), WorkflowStatusEnum.cancelled),
+        (("TERMINATED", "WORKFLOW_EXECUTION_STATUS_TERMINATED"), WorkflowStatusEnum.cancelled),
+        (("TIMED_OUT", "WORKFLOW_EXECUTION_STATUS_TIMED_OUT"), WorkflowStatusEnum.failed),
+        (("CONTINUED_AS_NEW", "WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW"), WorkflowStatusEnum.running),
+    ]
+    for names, internal_status in candidates:
+        member = _workflow_execution_status_member(*names)
+        if member is not None:
+            mapping[member] = internal_status
+    return mapping
+
+
 def _maybe_uuid(value: str) -> UUID | None:
     try:
         return UUID(value)
@@ -74,22 +101,14 @@ async def get_workflow_run(
         )
         desc = await handle.describe()
         temporal_status = desc.status.name if desc and getattr(desc, "status", None) else None
-        status_map = {
-            WorkflowExecutionStatus.RUNNING: WorkflowStatusEnum.running,
-            WorkflowExecutionStatus.COMPLETED: WorkflowStatusEnum.completed,
-            WorkflowExecutionStatus.FAILED: WorkflowStatusEnum.failed,
-            WorkflowExecutionStatus.CANCELED: WorkflowStatusEnum.cancelled,
-            WorkflowExecutionStatus.TERMINATED: WorkflowStatusEnum.cancelled,
-            WorkflowExecutionStatus.TIMED_OUT: WorkflowStatusEnum.failed,
-            WorkflowExecutionStatus.CONTINUED_AS_NEW: WorkflowStatusEnum.running,
-        }
-        new_status = status_map.get(desc.status) if desc else None
+        status_map = _workflow_status_map()
+        new_status = status_map.get(getattr(desc, "status", None)) if desc else None
         finished_at = getattr(desc, "close_time", None)
         if new_status and (new_status != run.status or finished_at):
             repo.set_status(
                 org_id=auth.org_id,
                 workflow_run_id=workflow_run_id,
-                status=new_status,  # type: ignore[arg-type]
+                status=new_status,
                 finished_at=finished_at,
             )
             run = repo.get(org_id=auth.org_id, workflow_run_id=workflow_run_id) or run

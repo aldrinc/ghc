@@ -20,8 +20,9 @@ body {
   --strip-text: #ffffff;
   --star: #f5b43a;
   --bubble-bg: #ffffff;
-  --bubble-shadow: 0 18px 46px rgba(0, 0, 0, 0.28);
-  --bubble-radius: 18px;
+  /* Lighter, TikTok-style comment bubble */
+  --bubble-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
+  --bubble-radius: 16px;
 
   position: relative;
   width: var(--card-w);
@@ -95,6 +96,7 @@ body {
   inset: 0;
   background: var(--bubble-bg);
   border-radius: var(--bubble-radius);
+  border-bottom-left-radius: 0;
   box-shadow: var(--bubble-shadow);
   z-index: -1;
 }
@@ -102,28 +104,29 @@ body {
 .pdp-bubble::after {
   content: '';
   position: absolute;
-  left: 22px;
+  left: 0;
   bottom: -10px;
-  width: 20px;
-  height: 18px;
+  width: 18px;
+  height: 16px;
   background: var(--bubble-bg);
   clip-path: polygon(0 0, 100% 0, 0 100%);
-  filter: drop-shadow(0 18px 40px rgba(0, 0, 0, 0.25));
+  /* Reference tail has little/no separate shadow. */
+  filter: none;
   z-index: -1;
 }
 
 #card.is-feed .pdp-bubble::after {
-  left: 20px;
-  bottom: -10px;
-  width: 18px;
-  height: 16px;
+  left: 0;
+  bottom: -9px;
+  width: 16px;
+  height: 14px;
 }
 
 .pdp-bubble-header {
   font-size: 12px;
-  line-height: 1.18;
+  line-height: 1.2;
   font-weight: 600;
-  color: rgba(15, 23, 42, 0.62);
+  color: #9ca3af;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -134,8 +137,8 @@ body {
 }
 
 .pdp-avatar {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 999px;
   object-fit: cover;
   background: rgba(15, 23, 42, 0.08);
@@ -144,24 +147,24 @@ body {
 }
 
 .pdp-handle {
-  font-weight: 800;
-  color: rgba(15, 23, 42, 0.8);
+  font-weight: 600;
+  color: #6b7280;
 }
 
 .pdp-verified {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 999px;
-  background: #1d9bf0;
+  background: #59cdd5;
   flex-shrink: 0;
 }
 
 .pdp-verified svg {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
   fill: #ffffff;
 }
 
@@ -177,6 +180,123 @@ body {
 
 #card.is-feed .pdp-bubble-text {
   font-size: 12px;
+}
+
+.pdp-bubble.pdp-comment-box {
+  padding: 14px 4px 16px 16px;
+}
+
+#card.is-feed .pdp-bubble.pdp-comment-box {
+  padding: 13px 3px 14px 14px;
+}
+
+.pdp-bubble.pdp-comment-box::before {
+  background: #ffffff;
+  border-radius: 10px;
+  border-bottom-left-radius: 0;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
+}
+
+.pdp-bubble.pdp-comment-box::after {
+  left: 0;
+  bottom: -10px;
+  width: 18px;
+  height: 16px;
+  background: #ffffff;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  filter: none;
+}
+
+#card.is-feed .pdp-bubble.pdp-comment-box::after {
+  left: 0;
+  bottom: -9px;
+  width: 16px;
+  height: 14px;
+}
+
+.pdp-comment-box .pdp-bubble-row {
+  gap: 10px;
+}
+
+.pdp-comment-box .pdp-avatar {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  margin-top: 18px;
+}
+
+#card.is-feed .pdp-comment-box .pdp-avatar {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  min-height: 30px;
+  margin-top: 16px;
+}
+
+.pdp-comment-box .pdp-bubble-header {
+  font-size: 12px;
+  line-height: 1.28;
+  font-weight: 600;
+  color: #9ca3af;
+  padding-top: 1px;
+}
+
+#card.is-feed .pdp-comment-box .pdp-bubble-header {
+  font-size: 12px;
+}
+
+.pdp-comment-box .pdp-handle {
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.pdp-comment-box .pdp-verified {
+  margin-left: 2px;
+  margin-right: 0;
+  width: 10px;
+  height: 10px;
+  transform: translate(-1px, -2px);
+}
+
+.pdp-comment-box .pdp-bubble-text {
+  margin-top: 6px;
+  font-size: 19.2px;
+  line-height: 1.08;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #111827;
+}
+
+#card.is-feed .pdp-comment-box .pdp-bubble-text {
+  font-size: 16px;
+  line-height: 1.09;
+}
+
+.pdp-comment-box div.pdp-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e5e7eb;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1;
+  font-weight: 700;
+  text-transform: uppercase;
+  overflow: hidden;
+  user-select: none;
+}
+
+#card.is-feed .pdp-comment-box div.pdp-avatar {
+  font-size: 14px;
+}
+
+.pdp-comment-box .pdp-avatar.has-image {
+  background-color: #e5e7eb;
+  background-size: cover;
+  background-position: center;
+  color: transparent;
 }
 
 .pdp-strip {
