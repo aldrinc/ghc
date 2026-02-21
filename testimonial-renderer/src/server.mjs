@@ -46,6 +46,87 @@ const resolvePdpPreset = (payload) => {
 
 const aspectRatioForPreset = (preset) => (preset === 'feed' ? '4:5' : '9:16');
 
+const dedupeStringArray = (values) => {
+  const out = [];
+  const seen = new Set();
+  for (const value of values) {
+    if (typeof value !== 'string') {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+};
+
+const buildBrandPromptGuidance = (brand) => {
+  if (!brand || typeof brand !== 'object') {
+    return '';
+  }
+  const clauses = [];
+  if (typeof brand.name === 'string' && brand.name.trim()) {
+    clauses.push(`Brand name: ${brand.name.trim()}.`);
+  }
+  if (typeof brand.logoText === 'string' && brand.logoText.trim()) {
+    clauses.push(`Logo text: ${brand.logoText.trim()}.`);
+  }
+  if (typeof brand.stripBgColor === 'string' && brand.stripBgColor.trim()) {
+    clauses.push(`Primary brand color: ${brand.stripBgColor.trim()}.`);
+  }
+  if (typeof brand.stripTextColor === 'string' && brand.stripTextColor.trim()) {
+    clauses.push(`Contrast text color: ${brand.stripTextColor.trim()}.`);
+  }
+
+  const assets = brand.assets;
+  if (assets && typeof assets === 'object') {
+    const palette = assets.palette;
+    if (palette && typeof palette === 'object') {
+      const paletteParts = [];
+      if (typeof palette.primary === 'string' && palette.primary.trim()) {
+        paletteParts.push(`primary ${palette.primary.trim()}`);
+      }
+      if (typeof palette.secondary === 'string' && palette.secondary.trim()) {
+        paletteParts.push(`secondary ${palette.secondary.trim()}`);
+      }
+      if (typeof palette.accent === 'string' && palette.accent.trim()) {
+        paletteParts.push(`accent ${palette.accent.trim()}`);
+      }
+      if (paletteParts.length) {
+        clauses.push(`Brand palette: ${paletteParts.join(', ')}.`);
+      }
+    }
+    if (typeof assets.notes === 'string' && assets.notes.trim()) {
+      clauses.push(`Brand styling notes: ${assets.notes.trim()}.`);
+    }
+    if (typeof assets.logoUrl === 'string' && assets.logoUrl.trim()) {
+      clauses.push('If any logo appears in frame, match the provided brand logo exactly.');
+    }
+  }
+  return clauses.join(' ');
+};
+
+const collectBrandReferenceImages = (brand) => {
+  if (!brand || typeof brand !== 'object') {
+    return [];
+  }
+  const assets = brand.assets;
+  if (!assets || typeof assets !== 'object') {
+    return [];
+  }
+  const refs = [];
+  if (typeof assets.logoUrl === 'string') {
+    refs.push(assets.logoUrl);
+  }
+  if (Array.isArray(assets.referenceImages)) {
+    refs.push(...assets.referenceImages);
+  }
+  return dedupeStringArray(refs);
+};
+
 const maybeGenerateReviewCardAssets = async (payload) => {
   if (!payload || payload.template !== 'review_card') {
     return payload;
@@ -123,9 +204,11 @@ const maybeGeneratePdpBackground = async (payload) => {
   }
 
   const preset = resolvePdpPreset(payload);
-  const prompt = hasPrompt
+  const basePrompt = hasPrompt
     ? background.prompt.trim()
     : buildPdpBackgroundPrompt({ template: payload.template, preset, vars: background.promptVars });
+  const brandPromptGuidance = buildBrandPromptGuidance(payload.brand);
+  const prompt = brandPromptGuidance ? `${basePrompt} ${brandPromptGuidance}` : basePrompt;
 
   let imageConfig = background.imageConfig;
   if (imageConfig != null) {
@@ -139,7 +222,11 @@ const maybeGeneratePdpBackground = async (payload) => {
     imageConfig = { aspectRatio: aspectRatioForPreset(preset) };
   }
 
-  const referenceImages = Array.isArray(background.referenceImages) ? background.referenceImages : [];
+  const backgroundReferenceImages = Array.isArray(background.referenceImages)
+    ? background.referenceImages
+    : [];
+  const brandReferenceImages = collectBrandReferenceImages(payload.brand);
+  const referenceImages = dedupeStringArray([...backgroundReferenceImages, ...brandReferenceImages]);
 
   const client = getNanoClient();
   const buffer = await generateNanoImage({

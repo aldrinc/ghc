@@ -73,9 +73,17 @@ npx playwright install chromium
     "preset": "tiktok"
   },
   "brand": {
+    "name": "Sample Brand",
     "logoText": "SampleLogo",
     "stripBgColor": "#be3b7a",
-    "stripTextColor": "#ffffff"
+    "stripTextColor": "#ffffff",
+    "assets": {
+      "palette": {
+        "primary": "#be3b7a",
+        "accent": "#111827"
+      },
+      "notes": "Clean, premium, and modern look."
+    }
   },
   "rating": {
     "valueText": "4.9/5",
@@ -112,6 +120,7 @@ npx playwright install chromium
   - `pdp_ugc_qa`
     - Required: `brand`, `rating`, `cta`, `background`, `question`, `answer`
     - Optional: `output` (defaults to TikTok preset)
+  - Optional brand generation fields (all templates): `brand.name`, `brand.assets.logoUrl`, `brand.assets.referenceImages[]`, `brand.assets.palette`, `brand.assets.notes`
 
 ### PDP output presets
 
@@ -127,6 +136,14 @@ If you omit `background.imageUrl`, the service will generate the background imag
 
 This requires `GEMINI_API_KEY` and a configured model (`NANO_BANANA_MODEL` or `background.imageModel` / `imageModel`).
 
+When generating PDP backgrounds, brand guidance is now native:
+
+- `brand.stripBgColor` and `brand.stripTextColor` are injected as color guidance.
+- Optional `brand.name`, `brand.logoText`, and `brand.assets.notes` are injected as style guidance.
+- Optional `brand.assets.logoUrl` and `brand.assets.referenceImages[]` are passed as Nano reference images.
+- Optional `brand.assets.palette` (`primary`, `secondary`, `accent`) is injected into the prompt.
+- `brand.assets.logoUrl` and `brand.assets.referenceImages[]` must be png/jpg/jpeg/webp sources.
+
 ### Validation rules
 
 - `rating` must be an integer 1–5.
@@ -140,6 +157,7 @@ This requires `GEMINI_API_KEY` and a configured model (`NANO_BANANA_MODEL` or `b
 - Image paths must resolve to an existing file (or a valid HTTP/HTTPS URL).
 - PDP templates require `brand.logoUrl` or `brand.logoText`.
 - PDP `brand.stripBgColor` / `brand.stripTextColor` must be hex colors like `#fff` or `#ffffff`.
+- `brand.assets.palette.*` values must be hex colors like `#fff` or `#ffffff`.
 
 ## Render a single image
 

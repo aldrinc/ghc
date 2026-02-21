@@ -8,37 +8,37 @@
     <link rel="stylesheet" href="./pdp_shared.css" />
     <style>
       #bubble-question {
-        top: 28px;
-        left: 18px;
-        max-width: 52%;
+        top: 56px;
+        left: 30px;
+        max-width: 72%;
       }
 
       #card.is-feed #bubble-question {
-        top: 20px;
-        left: 14px;
-        max-width: 54%;
+        top: 48px;
+        left: 34px;
+        max-width: 72%;
       }
 
       #bubble-answer {
-        top: 140px;
-        right: 18px;
-        max-width: 52%;
+        top: 182px;
+        left: 14px;
+        right: auto;
+        max-width: 74%;
       }
 
       #card.is-feed #bubble-answer {
-        top: 102px;
-        right: 14px;
-        max-width: 54%;
+        top: 182px;
+        left: 16px;
+        right: auto;
+        max-width: 74%;
       }
 
-      #bubble-answer .pdp-bubble-text {
-        font-size: 12px;
-        line-height: 1.18;
-        font-weight: 800;
+      #bubble-answer .pdp-bubble-copy {
+        max-width: 280px;
       }
 
-      #card.is-feed #bubble-answer .pdp-bubble-text {
-        font-size: 11px;
+      #card.is-feed #bubble-answer .pdp-bubble-copy {
+        max-width: 220px;
       }
     </style>
   </head>
@@ -47,7 +47,7 @@
       <img id="bg" class="pdp-bg" alt="" />
       <div class="pdp-vignette"></div>
 
-      <div id="bubble-question" class="pdp-bubble small">
+      <div id="bubble-question" class="pdp-bubble small pdp-comment-box">
         <div class="pdp-bubble-row">
           <img id="q-avatar" class="pdp-avatar" alt="" />
           <div class="pdp-bubble-copy">
@@ -57,17 +57,12 @@
         </div>
       </div>
 
-      <div id="bubble-answer" class="pdp-bubble small">
+      <div id="bubble-answer" class="pdp-bubble small pdp-comment-box">
         <div class="pdp-bubble-row">
           <img id="a-avatar" class="pdp-avatar" alt="" />
           <div class="pdp-bubble-copy">
             <div class="pdp-bubble-header-line">
               <div id="a-context" class="pdp-bubble-header"></div>
-              <span id="a-verified" class="pdp-verified" title="Verified" aria-label="Verified">
-                <svg viewBox="0 0 24 24" aria-hidden="true">
-                  <path d="M9.3 12.8 7.1 10.6 6 11.7l3.3 3.3L18 6.3l-1.1-1.1z"></path>
-                </svg>
-              </span>
             </div>
             <div id="a-text" class="pdp-bubble-text"></div>
           </div>
@@ -144,17 +139,26 @@
         text.style.display = 'block';
       };
 
-      const setContextLine = (el, handle) => {
+      const setContextLine = (el, handle, verified = false) => {
         el.innerHTML = '';
         const prefix = document.createElement('span');
         prefix.textContent = 'Reply to ';
         const handleSpan = document.createElement('span');
         handleSpan.className = 'pdp-handle';
-        handleSpan.textContent = handle;
+        handleSpan.textContent = `${handle}'s`;
+        const verifiedBadge = document.createElement('span');
+        verifiedBadge.className = 'pdp-verified';
+        verifiedBadge.title = 'Verified';
+        verifiedBadge.setAttribute('aria-label', 'Verified');
+        verifiedBadge.innerHTML =
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.3 12.8 7.1 10.6 6 11.7l3.3 3.3L18 6.3l-1.1-1.1z"></path></svg>';
         const suffix = document.createElement('span');
-        suffix.textContent = "'s comment";
+        suffix.textContent = ' comment';
         el.appendChild(prefix);
         el.appendChild(handleSpan);
+        if (verified) {
+          el.appendChild(verifiedBadge);
+        }
         el.appendChild(suffix);
       };
 
@@ -194,14 +198,11 @@
           aAvatar.style.display = 'none';
         }
 
-        setContextLine(document.getElementById('q-context'), data.question.handle);
+        setContextLine(document.getElementById('q-context'), data.question.handle, false);
         document.getElementById('q-text').textContent = data.question.text;
 
-        setContextLine(document.getElementById('a-context'), data.answer.handle);
+        setContextLine(document.getElementById('a-context'), data.answer.handle, data.answer.verified === true);
         document.getElementById('a-text').textContent = data.answer.text;
-
-        const verified = document.getElementById('a-verified');
-        verified.style.display = data.answer.verified ? 'inline-flex' : 'none';
 
         document.getElementById('rating-value').textContent = data.rating.valueText;
         document.getElementById('rating-detail').textContent = ` ${data.rating.detailText}`;
