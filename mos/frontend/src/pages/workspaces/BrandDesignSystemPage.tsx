@@ -8,7 +8,11 @@ import {
   useDeleteDesignSystem,
   useUploadDesignSystemLogo,
 } from "@/api/designSystems";
-import { useClient, useUpdateClient } from "@/api/clients";
+import { useClient, useClientShopifyStatus, useUpdateClient } from "@/api/clients";
+import {
+  useSyncComplianceShopifyPolicyPages,
+  type ComplianceShopifyPolicySyncResponse,
+} from "@/api/compliance";
 import { useAssets } from "@/api/assets";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -487,12 +491,14 @@ function parseTokens(raw: string): { value?: Record<string, unknown>; error?: st
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
   const { data: client } = useClient(workspace?.id);
+  const { data: shopifyStatus, isLoading: isLoadingShopifyStatus } = useClientShopifyStatus(workspace?.id);
   const { data: designSystems = [], isLoading } = useDesignSystems(workspace?.id);
   const updateClient = useUpdateClient();
   const createDesignSystem = useCreateDesignSystem();
   const updateDesignSystem = useUpdateDesignSystem();
   const uploadDesignSystemLogo = useUploadDesignSystemLogo();
   const deleteDesignSystem = useDeleteDesignSystem();
+  const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
     { enabled: Boolean(workspace?.id) }
@@ -508,6 +514,8 @@ export function BrandDesignSystemPage() {
   const [varsFilter, setVarsFilter] = useState("");
   const [logoErrored, setLogoErrored] = useState(false);
   const [selectedLogoPublicId, setSelectedLogoPublicId] = useState("");
+  const [policySyncShopDomain, setPolicySyncShopDomain] = useState("");
+  const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
 
   const designSystemOptions = useMemo(
@@ -517,13 +525,33 @@ export function BrandDesignSystemPage() {
     ],
     [designSystems]
   );
+  const shopDomainOptions = useMemo(
+    () => (shopifyStatus?.shopDomains || []).map((shopDomain) => ({ label: shopDomain, value: shopDomain })),
+    [shopifyStatus?.shopDomains]
+  );
+  const hasShopifyConnectionTarget = Boolean(shopifyStatus?.shopDomain || shopDomainOptions.length);
 
   useEffect(() => {
     setPreviewDesignSystemId("");
     setVarsFilter("");
     setLogoErrored(false);
     setSelectedLogoPublicId("");
+    setPolicySyncShopDomain("");
+    setPolicySyncResult(null);
   }, [workspace?.id]);
+
+  useEffect(() => {
+    if (!shopDomainOptions.length) {
+      setPolicySyncShopDomain("");
+      return;
+    }
+    setPolicySyncShopDomain((current) => {
+      if (current && shopDomainOptions.some((option) => option.value === current)) return current;
+      if (shopifyStatus?.selectedShopDomain) return shopifyStatus.selectedShopDomain;
+      if (shopifyStatus?.shopDomain) return shopifyStatus.shopDomain;
+      return shopDomainOptions[0]?.value || "";
+    });
+  }, [shopDomainOptions, shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain]);
 
   useEffect(() => {
     if (!designSystems.length) return;
@@ -612,6 +640,17 @@ export function BrandDesignSystemPage() {
     }, {
       onSuccess: () => setLogoErrored(false),
     });
+  };
+
+  const handleSyncCompliancePolicyPages = async () => {
+    if (!workspace?.id) return;
+    const payload = policySyncShopDomain ? { shopDomain: policySyncShopDomain } : {};
+    try {
+      const response = await syncCompliancePolicyPages.mutateAsync(payload);
+      setPolicySyncResult(response);
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
   };
 
   const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -775,6 +814,75 @@ export function BrandDesignSystemPage() {
             This design system powers funnel pages unless a funnel or page overrides it.
           </div>
         </div>
+      </div>
+
+      <div className="ds-card ds-card--md space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-content">Compliance policy pages (Shopify)</div>
+            <div className="text-xs text-content-muted">
+              Generate and sync brand/workspace policy pages to Shopify using your configured compliance profile.
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              void handleSyncCompliancePolicyPages();
+            }}
+            disabled={syncCompliancePolicyPages.isPending || !hasShopifyConnectionTarget}
+          >
+            {syncCompliancePolicyPages.isPending ? "Generating…" : "Generate policy pages"}
+          </Button>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
+          <Select
+            value={policySyncShopDomain}
+            onValueChange={(value) => setPolicySyncShopDomain(value)}
+            options={
+              shopDomainOptions.length
+                ? shopDomainOptions
+                : [{ label: isLoadingShopifyStatus ? "Loading stores…" : "No connected Shopify stores", value: "" }]
+            }
+            disabled={!shopDomainOptions.length}
+          />
+          <div className="text-xs text-content-muted">
+            {hasShopifyConnectionTarget
+              ? "If multiple stores are connected, choose the target store before syncing."
+              : "Connect a Shopify store in Product settings before generating policy pages."}
+          </div>
+        </div>
+
+        {policySyncResult ? (
+          <div className="space-y-2">
+            <div className="text-xs text-content-muted">
+              Last sync: <span className="font-semibold text-content">{policySyncResult.shopDomain}</span> ·{" "}
+              <span className="font-semibold text-content">{policySyncResult.pages.length}</span> page(s)
+            </div>
+            <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
+              <TableHeader>
+                <TableRow>
+                  <TableHeadCell className="w-[220px]">Page</TableHeadCell>
+                  <TableHeadCell>URL</TableHeadCell>
+                  <TableHeadCell className="w-[120px]">Operation</TableHeadCell>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {policySyncResult.pages.map((page) => (
+                  <TableRow key={page.pageId}>
+                    <TableCell className="text-xs text-content">{page.title}</TableCell>
+                    <TableCell className="text-xs">
+                      <a href={page.url} target="_blank" rel="noreferrer" className="break-all text-accent hover:underline">
+                        {page.url}
+                      </a>
+                    </TableCell>
+                    <TableCell className="text-xs text-content-muted">{page.operation}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : null}
       </div>
 
       <div className="ds-card ds-card--md space-y-3">

@@ -42,6 +42,22 @@ def _sync_ready_profile_payload() -> dict:
     return payload
 
 
+def _shopify_sync_response_pages(*, pages: list[dict], shop_domain: str = "example.myshopify.com") -> list[dict]:
+    response_pages: list[dict] = []
+    for idx, page in enumerate(pages, start=101):
+        response_pages.append(
+            {
+                "pageKey": page["pageKey"],
+                "pageId": f"gid://shopify/Page/{idx}",
+                "title": page["title"],
+                "handle": page["handle"],
+                "url": f"https://{shop_domain}/pages/{page['handle']}",
+                "operation": "created" if idx == 101 else "updated",
+            }
+        )
+    return response_pages
+
+
 def test_list_compliance_rulesets(api_client):
     response = api_client.get("/compliance/rulesets")
     assert response.status_code == 200
@@ -239,3 +255,96 @@ def test_sync_compliance_policy_pages_requires_placeholder_values(api_client):
     )
     assert sync_response.status_code == 400
     assert "Missing placeholder values" in sync_response.json()["detail"]
+
+
+def test_sync_compliance_policy_pages_for_subscription_model(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="SaaS Compliance Workspace")
+    profile_payload = _sync_ready_profile_payload()
+    profile_payload["businessModels"] = ["saas_subscription"]
+    profile_payload["shippingPolicyUrl"] = None
+    profile_payload["metadata"]["subscription_plan_table"] = "- Starter: $29/month\n- Pro: $79/month"
+    profile_payload["metadata"]["cancellation_steps"] = "1. Go to Billing Settings\n2. Click Cancel Subscription"
+    upsert_response = api_client.put(f"/clients/{client_id}/compliance/profile", json=profile_payload)
+    assert upsert_response.status_code == 200
+
+    observed: dict[str, object] = {}
+
+    def fake_sync(*, client_id: str, pages: list[dict], shop_domain: str | None):
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain
+        observed["page_keys"] = [page["pageKey"] for page in pages]
+        return {
+            "shopDomain": "example.myshopify.com",
+            "pages": _shopify_sync_response_pages(pages=pages),
+        }
+
+    monkeypatch.setattr(compliance_router, "upsert_client_shopify_policy_pages", fake_sync)
+
+    sync_response = api_client.post(
+        f"/clients/{client_id}/compliance/shopify/policy-pages/sync",
+        json={},
+    )
+    assert sync_response.status_code == 200
+    body = sync_response.json()
+    assert body["shopDomain"] == "example.myshopify.com"
+    assert observed["client_id"] == client_id
+    assert observed["shop_domain"] is None
+    assert set(observed["page_keys"]) == {
+        "privacy_policy",
+        "terms_of_service",
+        "returns_refunds_policy",
+        "contact_support",
+        "company_information",
+        "subscription_terms_and_cancellation",
+    }
+    assert "shipping_policy" not in set(observed["page_keys"])
+
+    profile_response = api_client.get(f"/clients/{client_id}/compliance/profile")
+    assert profile_response.status_code == 200
+    profile = profile_response.json()
+    assert profile["shippingPolicyUrl"] is None
+    assert profile["subscriptionTermsAndCancellationUrl"] == (
+        "https://example.myshopify.com/pages/subscription-terms-and-cancellation"
+    )
+    assert profile["contactSupportUrl"] == "https://example.myshopify.com/pages/contact-support"
+    assert profile["returnsRefundsPolicyUrl"] == "https://example.myshopify.com/pages/returns-refunds-policy"
+
+
+def test_sync_compliance_policy_pages_for_ecommerce_and_subscription_includes_all_targets(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Hybrid Compliance Workspace")
+    profile_payload = _sync_ready_profile_payload()
+    profile_payload["businessModels"] = ["ecommerce", "saas_subscription"]
+    profile_payload["metadata"]["subscription_plan_table"] = "- Monthly: $19\n- Annual: $190"
+    profile_payload["metadata"]["cancellation_steps"] = "1. Open Account\n2. Select Billing\n3. Choose Cancel"
+    upsert_response = api_client.put(f"/clients/{client_id}/compliance/profile", json=profile_payload)
+    assert upsert_response.status_code == 200
+
+    observed: dict[str, object] = {}
+
+    def fake_sync(*, client_id: str, pages: list[dict], shop_domain: str | None):
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain
+        observed["page_keys"] = [page["pageKey"] for page in pages]
+        return {
+            "shopDomain": "example.myshopify.com",
+            "pages": _shopify_sync_response_pages(pages=pages),
+        }
+
+    monkeypatch.setattr(compliance_router, "upsert_client_shopify_policy_pages", fake_sync)
+
+    sync_response = api_client.post(
+        f"/clients/{client_id}/compliance/shopify/policy-pages/sync",
+        json={},
+    )
+    assert sync_response.status_code == 200
+    assert observed["client_id"] == client_id
+    assert observed["shop_domain"] is None
+    assert set(observed["page_keys"]) == {
+        "privacy_policy",
+        "terms_of_service",
+        "returns_refunds_policy",
+        "shipping_policy",
+        "contact_support",
+        "company_information",
+        "subscription_terms_and_cancellation",
+    }
