@@ -260,7 +260,7 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
     page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/pages/presales.json"
     id_meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/meta.json"
     id_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/pages/presales.json"
-    asset_path = "/opt/apps/landing-artifact/site/api/public/assets/11111111-1111-1111-1111-111111111111"
+    asset_path = "/opt/apps/landing-artifact/site/api/public/assets/11111111-1111-1111-1111-111111111111.png"
     assert meta_path in uploaded
     assert page_path in uploaded
     assert id_meta_path in uploaded

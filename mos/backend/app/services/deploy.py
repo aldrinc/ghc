@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import io
 import json
 import os
 import shutil
@@ -28,7 +29,13 @@ _ARTIFACT_ASSET_PUBLIC_ID_KEYS = {
     "swatchAssetPublicId",
 }
 _DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES = int(
-    os.getenv("DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES", str(50 * 1024 * 1024))
+    os.getenv("DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES", str(150 * 1024 * 1024))
+)
+_DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION = int(
+    os.getenv("DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION", "1600")
+)
+_DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY = int(
+    os.getenv("DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY", "80")
 )
 
 
@@ -500,11 +507,17 @@ def _build_embedded_asset_payload(
                 f"Asset {public_id} has unsupported content type '{content_type or 'unknown'}'. Expected image/*."
             )
 
+        data, content_type = _optimize_embedded_artifact_image_bytes(
+            data=data,
+            content_type=content_type,
+            public_id=public_id,
+        )
+
         total_bytes += len(data)
         if total_bytes > _DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES:
             raise DeployError(
                 "Embedded funnel artifact assets exceed DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES "
-                f"({_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES} bytes)."
+                f"(current={total_bytes} bytes, limit={_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES} bytes)."
             )
 
         output[public_id] = {
@@ -514,6 +527,72 @@ def _build_embedded_asset_payload(
         }
 
     return output, total_bytes
+
+
+def _optimize_embedded_artifact_image_bytes(
+    *,
+    data: bytes,
+    content_type: str,
+    public_id: str,
+) -> tuple[bytes, str]:
+    """
+    Reduce embedded artifact size by resizing and re-encoding common raster assets to WebP.
+
+    We intentionally keep strict behavior: invalid optimization config or unreadable image bytes
+    fail fast with a descriptive error.
+    """
+
+    normalized_content_type = str(content_type or "").strip().lower()
+    if normalized_content_type not in {"image/png", "image/jpeg", "image/jpg", "image/webp"}:
+        return data, normalized_content_type
+
+    max_dimension = _DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION
+    quality = _DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY
+    if max_dimension <= 0:
+        raise DeployError("DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION must be greater than zero.")
+    if quality < 1 or quality > 100:
+        raise DeployError("DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY must be between 1 and 100.")
+
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(data)) as source:
+            image = source.copy()
+    except Exception as exc:
+        raise DeployError(
+            f"Failed to decode embedded artifact asset image bytes for {public_id}: {exc}"
+        ) from exc
+
+    width, height = image.size
+    if width <= 0 or height <= 0:
+        raise DeployError(f"Embedded artifact asset {public_id} has invalid image dimensions ({width}x{height}).")
+
+    longest_edge = max(width, height)
+    if longest_edge > max_dimension:
+        scale = max_dimension / float(longest_edge)
+        resized = (
+            max(1, int(round(width * scale))),
+            max(1, int(round(height * scale))),
+        )
+        image = image.resize(resized, Image.Resampling.LANCZOS)
+
+    # Preserve alpha when present; otherwise use RGB for denser encoding.
+    if "A" in image.getbands():
+        if image.mode != "RGBA":
+            image = image.convert("RGBA")
+    elif image.mode != "RGB":
+        image = image.convert("RGB")
+
+    output = io.BytesIO()
+    try:
+        image.save(output, format="WEBP", quality=quality, method=6)
+    except Exception as exc:
+        raise DeployError(f"Failed to encode embedded artifact asset {public_id} to WebP: {exc}") from exc
+
+    optimized = output.getvalue()
+    if not optimized:
+        raise DeployError(f"Embedded artifact asset {public_id} optimized to empty bytes.")
+    return optimized, "image/webp"
 
 
 def build_client_funnel_runtime_artifact_payload(

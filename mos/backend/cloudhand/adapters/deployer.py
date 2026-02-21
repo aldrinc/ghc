@@ -711,7 +711,15 @@ WantedBy=multi-user.target
                     raise ValueError(
                         f"Artifact asset '{normalized_public_id}' sizeBytes ({declared_size}) does not match decoded byte length ({len(decoded_bytes)})."
                     )
-            self.upload_bytes(decoded_bytes, f"{assets_root}/{normalized_public_id}")
+            extension = ""
+            if content_type == "image/webp":
+                extension = ".webp"
+            elif content_type in {"image/jpeg", "image/jpg"}:
+                extension = ".jpg"
+            elif content_type == "image/png":
+                extension = ".png"
+            target_path = f"{assets_root}/{normalized_public_id}{extension}"
+            self.upload_bytes(decoded_bytes, target_path)
 
         base_root = f"{site_dir}/api/public/funnels"
         self.run(f"mkdir -p {shlex.quote(base_root)}")
@@ -885,7 +893,7 @@ WantedBy=multi-user.target
     }}
 
     location ^~ /api/public/assets/ {{
-        try_files $uri =404;
+        try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png =404;
     }}
 
     location ^~ /api/public/funnels/ {{
