@@ -40,6 +40,14 @@ def langfuse_enabled() -> bool:
     return bool(settings.LANGFUSE_ENABLED)
 
 
+def _langfuse_runtime_environment() -> str:
+    return settings.LANGFUSE_ENVIRONMENT or settings.ENVIRONMENT
+
+
+def _langfuse_host() -> str:
+    return settings.LANGFUSE_BASE_URL or settings.LANGFUSE_HOST
+
+
 def _validate_settings() -> None:
     if not settings.LANGFUSE_PUBLIC_KEY:
         raise LangfuseConfigError(
@@ -62,9 +70,21 @@ def initialize_langfuse() -> None:
 
     if _langfuse_initialized:
         return
-    _langfuse_initialized = True
 
     if not langfuse_enabled():
+        if bool(settings.LANGFUSE_REQUIRED):
+            raise LangfuseConfigError(
+                "LANGFUSE_REQUIRED is true but LANGFUSE_ENABLED is false. "
+                "Set LANGFUSE_ENABLED=true and configure Langfuse credentials."
+            )
+        _langfuse_initialized = True
+        logger.info(
+            "Langfuse tracing disabled",
+            extra={
+                "host": _langfuse_host(),
+                "environment": _langfuse_runtime_environment(),
+            },
+        )
         return
 
     _validate_settings()
@@ -72,7 +92,7 @@ def initialize_langfuse() -> None:
         "public_key": settings.LANGFUSE_PUBLIC_KEY,
         "secret_key": settings.LANGFUSE_SECRET_KEY,
         "tracing_enabled": True,
-        "environment": settings.LANGFUSE_ENVIRONMENT or settings.ENVIRONMENT,
+        "environment": _langfuse_runtime_environment(),
         "release": settings.LANGFUSE_RELEASE,
         "sample_rate": float(settings.LANGFUSE_SAMPLE_RATE),
         "timeout": int(settings.LANGFUSE_TIMEOUT_SECONDS),
@@ -83,13 +103,30 @@ def initialize_langfuse() -> None:
     else:
         kwargs["host"] = settings.LANGFUSE_HOST
 
-    _langfuse_client = Langfuse(**kwargs)
+    client = Langfuse(**kwargs)
+    if bool(settings.LANGFUSE_AUTH_CHECK):
+        try:
+            auth_check_ok = bool(client.auth_check())
+        except Exception as exc:  # noqa: BLE001
+            raise LangfuseConfigError(
+                "Langfuse auth check failed during initialization. "
+                "Verify host/base URL and project API keys."
+            ) from exc
+        if not auth_check_ok:
+            raise LangfuseConfigError(
+                "Langfuse auth check returned false. "
+                "Verify LANGFUSE_PUBLIC_KEY, LANGFUSE_SECRET_KEY, and host/base URL."
+            )
+
+    _langfuse_client = client
+    _langfuse_initialized = True
     logger.info(
         "Langfuse initialized",
         extra={
-            "host": settings.LANGFUSE_BASE_URL or settings.LANGFUSE_HOST,
-            "environment": settings.LANGFUSE_ENVIRONMENT or settings.ENVIRONMENT,
+            "host": _langfuse_host(),
+            "environment": _langfuse_runtime_environment(),
             "sample_rate": settings.LANGFUSE_SAMPLE_RATE,
+            "auth_check": bool(settings.LANGFUSE_AUTH_CHECK),
         },
     )
 

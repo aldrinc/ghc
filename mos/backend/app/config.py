@@ -37,7 +37,10 @@ class Settings(BaseSettings):
 
     TEMPORAL_NAMESPACE: str = "default"
     TEMPORAL_TASK_QUEUE: str = "growth-agency"
+    TEMPORAL_MEDIA_ENRICHMENT_TASK_QUEUE: str = "growth-agency-media-enrichment"
+    TEMPORAL_MEDIA_ENRICHMENT_ACTIVITY_WORKERS: int = 8
     TEMPORAL_ADDRESS: str = "localhost:7234"
+    CAMPAIGN_FUNNEL_VARIANT_ACTIVITY_CONCURRENCY: int = 3
 
     BACKEND_CORS_ORIGINS: list[str]
 
@@ -56,6 +59,8 @@ class Settings(BaseSettings):
     LANGFUSE_RELEASE: str | None = None
     LANGFUSE_SAMPLE_RATE: float = 1.0
     LANGFUSE_DEBUG: bool = False
+    LANGFUSE_REQUIRED: bool = False
+    LANGFUSE_AUTH_CHECK: bool = True
     LANGFUSE_TIMEOUT_SECONDS: int = 20
 
     # Deploy control plane (Terraform apply + SSH deploy) embedded in the MOS backend.
@@ -111,6 +116,12 @@ class Settings(BaseSettings):
     MEDIA_MIRROR_PREVIEW_MAX_DIMENSION: int = 512
 
     PUBLIC_ASSET_BASE_URL: str | None = None
+    FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY: int = 4
+    FUNNEL_IMAGES_STEP_BUDGET_SECONDS: int = 900
+    FUNNEL_TESTIMONIALS_STEP_BUDGET_SECONDS: int = 900
+    FUNNEL_TESTIMONIAL_TOOL_RETRY_ATTEMPTS: int = 2
+    FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES: int = 30
+    FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_MAX_ATTEMPTS: int = 2
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
