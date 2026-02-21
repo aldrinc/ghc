@@ -85,7 +85,7 @@ def test_update_design_system_allows_low_contrast_muted_text(api_client: TestCli
     assert update_resp.status_code == 200
 
 
-def test_create_design_system_rejects_locked_layout_tokens(api_client: TestClient):
+def test_create_design_system_allows_layout_token_updates(api_client: TestClient):
     client_resp = api_client.post(
         "/clients", json={"name": "Design System Client", "industry": "SaaS"}
     )
@@ -99,13 +99,10 @@ def test_create_design_system_rejects_locked_layout_tokens(api_client: TestClien
         "/design-systems",
         json={"name": "Invalid DS", "tokens": tokens, "clientId": client_id},
     )
-    assert resp.status_code == 422
-    detail = resp.json().get("detail") or ""
-    assert "template-locked layout tokens" in detail
-    assert "--reviews-height" in detail
+    assert resp.status_code == 201
 
 
-def test_update_design_system_rejects_locked_layout_tokens(api_client: TestClient):
+def test_update_design_system_allows_layout_token_updates(api_client: TestClient):
     client_resp = api_client.post(
         "/clients", json={"name": "Design System Client", "industry": "SaaS"}
     )
@@ -126,10 +123,7 @@ def test_update_design_system_rejects_locked_layout_tokens(api_client: TestClien
         f"/design-systems/{design_system_id}",
         json={"tokens": invalid_tokens},
     )
-    assert update_resp.status_code == 422
-    detail = update_resp.json().get("detail") or ""
-    assert "template-locked layout tokens" in detail
-    assert "--cta-height-lg" in detail
+    assert update_resp.status_code == 200
 
 
 def test_upload_design_system_logo_updates_brand_logo_token(api_client: TestClient, monkeypatch):
