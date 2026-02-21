@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
 import os
 import shutil
@@ -19,6 +20,16 @@ class DeployError(RuntimeError):
 
 
 _DEPLOY_JOB_LOG_TAIL_CHARS = 12000
+_ARTIFACT_ASSET_PUBLIC_ID_KEYS = {
+    "assetPublicId",
+    "thumbAssetPublicId",
+    "posterAssetPublicId",
+    "iconAssetPublicId",
+    "swatchAssetPublicId",
+}
+_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES = int(
+    os.getenv("DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES", str(50 * 1024 * 1024))
+)
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -372,6 +383,139 @@ def build_funnel_artifact_workload_patch(
     )
 
 
+def _walk_json_dicts(node: Any):
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _walk_json_dicts(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _walk_json_dicts(item)
+
+
+def _extract_embedded_asset_public_ids(
+    *,
+    puck_data: dict[str, Any],
+    design_system_tokens: dict[str, Any] | None,
+    context_label: str,
+) -> set[str]:
+    public_ids: set[str] = set()
+
+    for obj in _walk_json_dicts(puck_data):
+        for key in _ARTIFACT_ASSET_PUBLIC_ID_KEYS:
+            if key not in obj:
+                continue
+            raw_value = obj.get(key)
+            if not isinstance(raw_value, str) or not raw_value.strip():
+                raise DeployError(
+                    f"{context_label} includes invalid {key}. Expected a non-empty UUID string."
+                )
+            cleaned = raw_value.strip()
+            try:
+                normalized = str(UUID(cleaned))
+            except ValueError as exc:
+                raise DeployError(
+                    f"{context_label} includes invalid {key} '{cleaned}'. Expected a UUID."
+                ) from exc
+            public_ids.add(normalized)
+
+    if isinstance(design_system_tokens, dict):
+        brand = design_system_tokens.get("brand")
+        if isinstance(brand, dict) and brand.get("logoAssetPublicId") is not None:
+            raw_logo_public_id = brand.get("logoAssetPublicId")
+            if not isinstance(raw_logo_public_id, str) or not raw_logo_public_id.strip():
+                raise DeployError(
+                    f"{context_label} designSystemTokens.brand.logoAssetPublicId must be a non-empty UUID string."
+                )
+            cleaned_logo_public_id = raw_logo_public_id.strip()
+            try:
+                normalized_logo_public_id = str(UUID(cleaned_logo_public_id))
+            except ValueError as exc:
+                raise DeployError(
+                    f"{context_label} designSystemTokens.brand.logoAssetPublicId "
+                    f"'{cleaned_logo_public_id}' is not a valid UUID."
+                ) from exc
+            public_ids.add(normalized_logo_public_id)
+
+    return public_ids
+
+
+def _build_embedded_asset_payload(
+    *,
+    session: Any,
+    org_id: str,
+    client_id: str,
+    public_ids: list[str],
+) -> tuple[dict[str, dict[str, Any]], int]:
+    if not public_ids:
+        return {}, 0
+
+    from sqlalchemy import select
+
+    from app.db.models import Asset
+    from app.services.media_storage import MediaStorage
+
+    asset_public_ids = [UUID(value) for value in public_ids]
+    assets = list(
+        session.scalars(
+            select(Asset).where(
+                Asset.org_id == org_id,
+                Asset.client_id == client_id,
+                Asset.public_id.in_(asset_public_ids),
+            )
+        ).all()
+    )
+    assets_by_public_id = {str(asset.public_id): asset for asset in assets}
+    missing_public_ids = [public_id for public_id in public_ids if public_id not in assets_by_public_id]
+    if missing_public_ids:
+        raise DeployError(
+            "Funnel artifact references assetPublicId values that do not exist for this client: "
+            + ", ".join(missing_public_ids)
+        )
+
+    storage = MediaStorage()
+    output: dict[str, dict[str, Any]] = {}
+    total_bytes = 0
+
+    for public_id in public_ids:
+        asset = assets_by_public_id[public_id]
+        if asset.asset_kind != "image":
+            raise DeployError(
+                f"Asset {public_id} has kind '{asset.asset_kind}'. Only image assets can be embedded in funnel artifacts."
+            )
+        if asset.file_status != "ready":
+            raise DeployError(
+                f"Asset {public_id} is not ready (file_status={asset.file_status or 'null'})."
+            )
+        if not asset.storage_key:
+            raise DeployError(f"Asset {public_id} is missing storage_key.")
+
+        data, downloaded_content_type = storage.download_bytes(key=asset.storage_key)
+        if not data:
+            raise DeployError(f"Asset {public_id} downloaded empty bytes from object storage.")
+
+        content_type = (asset.content_type or downloaded_content_type or "").split(";")[0].strip().lower()
+        if not content_type.startswith("image/"):
+            raise DeployError(
+                f"Asset {public_id} has unsupported content type '{content_type or 'unknown'}'. Expected image/*."
+            )
+
+        total_bytes += len(data)
+        if total_bytes > _DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES:
+            raise DeployError(
+                "Embedded funnel artifact assets exceed DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES "
+                f"({_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES} bytes)."
+            )
+
+        output[public_id] = {
+            "contentType": content_type,
+            "sizeBytes": len(data),
+            "bytesBase64": base64.b64encode(data).decode("ascii"),
+        }
+
+    return output, total_bytes
+
+
 def build_client_funnel_runtime_artifact_payload(
     *,
     session: Any,
@@ -432,6 +576,7 @@ def build_client_funnel_runtime_artifact_payload(
     public_repo = FunnelPublicRepository(session)
     products_payload: dict[str, dict[str, Any]] = {}
     product_slug_to_product_id: dict[str, str] = {}
+    embedded_asset_public_ids: set[str] = set()
 
     for client_funnel in client_funnels:
         route_slug = (client_funnel.route_slug or "").strip()
@@ -506,6 +651,15 @@ def build_client_funnel_runtime_artifact_payload(
                 funnel=client_funnel,
                 page=page,
             )
+            page_context_label = (
+                f"Funnel '{client_funnel.id}' page '{page_id}' ({product_slug}/{route_slug}/{artifact_slug})"
+            )
+            page_asset_public_ids = _extract_embedded_asset_public_ids(
+                puck_data=version.puck_data,
+                design_system_tokens=tokens if isinstance(tokens, dict) else None,
+                context_label=page_context_label,
+            )
+            embedded_asset_public_ids.update(page_asset_public_ids)
             pages_payload[artifact_slug] = {
                 "productSlug": product_slug,
                 "funnelId": str(client_funnel.id),
@@ -573,6 +727,13 @@ def build_client_funnel_runtime_artifact_payload(
             "commerce": commerce_payload,
         }
 
+    embedded_assets, total_embedded_asset_bytes = _build_embedded_asset_payload(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        public_ids=sorted(embedded_asset_public_ids),
+    )
+
     return {
         "meta": {
             "clientId": str(client_id),
@@ -580,6 +741,10 @@ def build_client_funnel_runtime_artifact_payload(
             "updatedFromPublicationId": updated_from_publication_id,
         },
         "products": products_payload,
+        "assets": {
+            "totalBytes": total_embedded_asset_bytes,
+            "items": embedded_assets,
+        },
     }
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 import pytest
 
@@ -81,6 +82,16 @@ def _artifact_app(
                 "meta": {
                     "clientId": "f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
                 },
+                "assets": {
+                    "totalBytes": 11,
+                    "items": {
+                        "11111111-1111-1111-1111-111111111111": {
+                            "contentType": "image/png",
+                            "sizeBytes": 11,
+                            "bytesBase64": base64.b64encode(b"hello-asset").decode("ascii"),
+                        }
+                    },
+                },
                 "products": {
                     "example-product": {
                         "meta": {
@@ -134,10 +145,13 @@ def _stub_deployer():
     deployer = object.__new__(ServerDeployer)
     deployer.ip = "127.0.0.1"
     deployer.local_root = Path.cwd()
-    uploaded: dict[str, str] = {}
+    uploaded: dict[str, str | bytes] = {}
     commands: list[str] = []
 
     def fake_upload(content: str, remote_path: str):
+        uploaded[remote_path] = content
+
+    def fake_upload_bytes(content: bytes, remote_path: str):
         uploaded[remote_path] = content
 
     def fake_run(cmd: str, cwd: str = None, mask=None) -> str:
@@ -145,6 +159,7 @@ def _stub_deployer():
         return ""
 
     deployer.upload_file = fake_upload
+    deployer.upload_bytes = fake_upload_bytes
     deployer.run = fake_run
     deployer._path_exists = lambda path: True
     deployer._enable_https = lambda server_names: None
@@ -236,6 +251,7 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
     assert "return 302 /f/" not in conf
     assert "location = /api/public/checkout" in conf
     assert "location ^~ /api/public/events" in conf
+    assert "location ^~ /api/public/assets/ {" in conf
     assert "location ^~ /api/public/funnels/ {" in conf
     assert "try_files $uri.json =404;" in conf
     assert "try_files $uri /index.html;" in conf
@@ -244,10 +260,13 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
     page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/example-funnel/pages/presales.json"
     id_meta_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/meta.json"
     id_page_path = "/opt/apps/landing-artifact/site/api/public/funnels/example-product/funnel-1/pages/presales.json"
+    asset_path = "/opt/apps/landing-artifact/site/api/public/assets/11111111-1111-1111-1111-111111111111"
     assert meta_path in uploaded
     assert page_path in uploaded
     assert id_meta_path in uploaded
     assert id_page_path in uploaded
+    assert asset_path in uploaded
+    assert uploaded[asset_path] == b"hello-asset"
 
     assert "nginx -t" in commands
     assert "systemctl reload nginx" in commands
@@ -279,6 +298,15 @@ def test_funnel_artifact_site_errors_when_funnel_id_alias_collides_with_existing
     deployer, _uploaded, _commands = _stub_deployer()
 
     with pytest.raises(ValueError, match="duplicates funnel path token"):
+        deployer._configure_funnel_artifact_site(app)
+
+
+def test_funnel_artifact_site_errors_when_embedded_asset_base64_is_invalid():
+    app = _artifact_app()
+    app.source_ref.artifact["assets"]["items"]["11111111-1111-1111-1111-111111111111"]["bytesBase64"] = "!!!"
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    with pytest.raises(ValueError, match="invalid bytesBase64"):
         deployer._configure_funnel_artifact_site(app)
 
 
