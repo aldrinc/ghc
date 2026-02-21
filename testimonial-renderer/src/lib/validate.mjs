@@ -1,13 +1,12 @@
 import fs from 'fs';
 import path from 'path';
-import { pathToFileURL } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const TEMPLATE_TYPES = new Set([
   'review_card',
   'social_comment',
   'testimonial_media',
   'pdp_ugc_standard',
-  'pdp_ugc_qa',
   'pdp_bold_claim',
   'pdp_personal_highlight',
 ]);
@@ -36,6 +35,16 @@ const NANO_REFERENCE_DATA_MIME_TYPES = new Set([
   'image/jpg',
   'image/webp',
 ]);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PDP_DEFAULT_AVATAR_PATH = path.resolve(__dirname, '../templates/assets/pdp-default-avatar.svg');
+
+const resolvePdpDefaultAvatarUrl = () => {
+  if (!fs.existsSync(PDP_DEFAULT_AVATAR_PATH)) {
+    throw new Error(`Default PDP avatar file does not exist: ${PDP_DEFAULT_AVATAR_PATH}`);
+  }
+  return pathToFileURL(PDP_DEFAULT_AVATAR_PATH).href;
+};
 
 const isPlainObject = (value) =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -430,9 +439,15 @@ const validatePdpComment = (comment, options) => {
   }
   const handle = assertString(comment.handle, `${prefix}.handle`, MAX_PDP_HANDLE);
   const text = assertString(comment.text, `${prefix}.text`, MAX_PDP_COMMENT);
-  let avatarUrl;
+  let avatarUrl = resolvePdpDefaultAvatarUrl();
   if (comment.avatarUrl != null) {
-    avatarUrl = resolveImageUrl(comment.avatarUrl, baseDir, `${prefix}.avatarUrl`);
+    if (typeof comment.avatarUrl !== 'string') {
+      throw new Error(`${prefix}.avatarUrl must be a string.`);
+    }
+    const candidate = comment.avatarUrl.trim();
+    if (candidate) {
+      avatarUrl = resolveImageUrl(candidate, baseDir, `${prefix}.avatarUrl`);
+    }
   }
   let verified;
   if (comment.verified != null) {
@@ -669,7 +684,6 @@ export const validatePayload = (payload, options = {}) => {
 
   if (
     template === 'pdp_ugc_standard' ||
-    template === 'pdp_ugc_qa' ||
     template === 'pdp_bold_claim' ||
     template === 'pdp_personal_highlight'
   ) {
@@ -681,8 +695,6 @@ export const validatePayload = (payload, options = {}) => {
       'cta',
       'background',
       'comment',
-      'question',
-      'answer',
       'imageModel',
     ]);
     for (const key of Object.keys(payload)) {
@@ -700,22 +712,6 @@ export const validatePayload = (payload, options = {}) => {
     let imageModel;
     if (payload.imageModel != null) {
       imageModel = assertString(payload.imageModel, 'imageModel', 120);
-    }
-
-    if (template === 'pdp_ugc_qa') {
-      const question = validatePdpComment(payload.question, { baseDir: options.baseDir, prefix: 'question' });
-      const answer = validatePdpComment(payload.answer, { baseDir: options.baseDir, prefix: 'answer' });
-      return {
-        template,
-        output,
-        brand,
-        rating,
-        cta,
-        background,
-        question,
-        answer,
-        imageModel,
-      };
     }
 
     const comment = validatePdpComment(payload.comment, { baseDir: options.baseDir, prefix: 'comment' });

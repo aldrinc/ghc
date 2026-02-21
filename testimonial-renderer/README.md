@@ -117,9 +117,6 @@ npx playwright install chromium
   - `pdp_ugc_standard`, `pdp_bold_claim`, `pdp_personal_highlight`
     - Required: `brand`, `rating`, `cta`, `background`, `comment`
     - Optional: `output` (defaults to TikTok preset)
-  - `pdp_ugc_qa`
-    - Required: `brand`, `rating`, `cta`, `background`, `question`, `answer`
-    - Optional: `output` (defaults to TikTok preset)
   - Optional brand generation fields (all templates): `brand.name`, `brand.assets.logoUrl`, `brand.assets.referenceImages[]`, `brand.assets.palette`, `brand.assets.notes`
 
 ### PDP output presets
@@ -196,7 +193,6 @@ See `samples/inputs/nano_banana_flow.json` for the full schema.
 - `src/templates/review_card.html`
 - `src/templates/social_comment.html`
 - `src/templates/pdp_ugc_standard.html`
-- `src/templates/pdp_ugc_qa.html`
 - `src/templates/pdp_bold_claim.html`
 - `src/templates/pdp_personal_highlight.html`
 

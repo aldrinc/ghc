@@ -28,7 +28,6 @@ const toDataUrl = (buffer, mimeType = 'image/png') =>
 
 const PDP_TEMPLATES = new Set([
   'pdp_ugc_standard',
-  'pdp_ugc_qa',
   'pdp_bold_claim',
   'pdp_personal_highlight',
 ]);

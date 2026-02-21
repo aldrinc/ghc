@@ -16,13 +16,14 @@ body {
   --card-w: 540px;
   --card-h: 960px;
   --strip-h: 112px;
+  --pdp-comment-box-width: calc(var(--card-w) * 205 / 500);
   --strip-bg: #111827;
   --strip-text: #ffffff;
   --star: #f5b43a;
   --bubble-bg: #ffffff;
   /* Lighter, TikTok-style comment bubble */
   --bubble-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
-  --bubble-radius: 16px;
+  --bubble-radius: 6.4px;
 
   position: relative;
   width: var(--card-w);
@@ -109,7 +110,7 @@ body {
   width: 18px;
   height: 16px;
   background: var(--bubble-bg);
-  clip-path: polygon(0 0, 100% 0, 0 100%);
+  clip-path: polygon(0 0, 100% 0, 62% 100%, 0 100%);
   /* Reference tail has little/no separate shadow. */
   filter: none;
   z-index: -1;
@@ -127,9 +128,8 @@ body {
   line-height: 1.2;
   font-weight: 600;
   color: #9ca3af;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 #card.is-feed .pdp-bubble-header {
@@ -183,16 +183,19 @@ body {
 }
 
 .pdp-bubble.pdp-comment-box {
-  padding: 14px 4px 16px 16px;
+  box-sizing: border-box;
+  width: var(--pdp-comment-box-width);
+  max-width: var(--pdp-comment-box-width);
+  padding: 8.4px 4px 16px 9px;
 }
 
 #card.is-feed .pdp-bubble.pdp-comment-box {
-  padding: 13px 3px 14px 14px;
+  padding: 7.8px 3px 14px 8px;
 }
 
 .pdp-bubble.pdp-comment-box::before {
   background: #ffffff;
-  border-radius: 10px;
+  border-radius: 3px;
   border-bottom-left-radius: 0;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
 }
@@ -200,76 +203,86 @@ body {
 .pdp-bubble.pdp-comment-box::after {
   left: 0;
   bottom: -10px;
-  width: 18px;
-  height: 16px;
-  background: #ffffff;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
+  width: 32px;
+  height: 30px;
+  background: url('./assets/pdp-comment-tail.svg') no-repeat center / 100% 100%;
+  clip-path: none;
+  border-radius: 0;
+  transform: none;
   filter: none;
 }
 
 #card.is-feed .pdp-bubble.pdp-comment-box::after {
   left: 0;
-  bottom: -9px;
-  width: 16px;
-  height: 14px;
+  bottom: -8px;
+  width: 32px;
+  height: 30px;
 }
 
 .pdp-comment-box .pdp-bubble-row {
-  gap: 10px;
+  gap: 6px;
+}
+
+.pdp-comment-box .pdp-bubble-copy {
+  flex: 1;
 }
 
 .pdp-comment-box .pdp-avatar {
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  min-height: 32px;
-  margin-top: 18px;
+  width: 23px;
+  height: 23px;
+  min-width: 23px;
+  min-height: 23px;
+  margin-top: 13px;
 }
 
 #card.is-feed .pdp-comment-box .pdp-avatar {
-  width: 30px;
-  height: 30px;
-  min-width: 30px;
-  min-height: 30px;
-  margin-top: 16px;
+  width: 19px;
+  height: 19px;
+  min-width: 19px;
+  min-height: 19px;
+  margin-top: 12px;
 }
 
 .pdp-comment-box .pdp-bubble-header {
-  font-size: 12px;
-  line-height: 1.28;
+  font-size: 9px;
+  line-height: 1.14;
   font-weight: 600;
-  color: #9ca3af;
+  color: #5f6368;
   padding-top: 1px;
+  padding-right: 12px;
 }
 
 #card.is-feed .pdp-comment-box .pdp-bubble-header {
-  font-size: 12px;
+  font-size: 8.5px;
+  padding-right: 11px;
 }
 
 .pdp-comment-box .pdp-handle {
-  color: #6b7280;
+  color: #5f6368;
   font-weight: 600;
 }
 
 .pdp-comment-box .pdp-verified {
-  margin-left: 2px;
+  margin-left: 3.5px;
   margin-right: 0;
   width: 10px;
   height: 10px;
-  transform: translate(-1px, -2px);
+  transform: translate(0, -2px);
 }
 
 .pdp-comment-box .pdp-bubble-text {
-  margin-top: 6px;
-  font-size: 19.2px;
+  margin-top: 4px;
+  font-size: 15.36px;
   line-height: 1.08;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: #111827;
+  padding-right: 5px;
+  overflow-wrap: anywhere;
 }
 
 #card.is-feed .pdp-comment-box .pdp-bubble-text {
-  font-size: 16px;
+  font-size: 12.8px;
   line-height: 1.09;
 }
 
