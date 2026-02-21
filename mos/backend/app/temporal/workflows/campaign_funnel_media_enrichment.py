@@ -8,6 +8,7 @@ from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
+    from app.config import settings
     from app.temporal.activities.campaign_intent_activities import enrich_funnel_page_media_activity
 
 
@@ -47,12 +48,14 @@ class CampaignFunnelMediaEnrichmentWorkflow:
                 "experiment_id": input.experiment_id,
                 "variant_id": input.variant_id,
             },
-            schedule_to_close_timeout=timedelta(minutes=45),
+            schedule_to_close_timeout=timedelta(
+                minutes=max(1, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_TIMEOUT_MINUTES)
+            ),
             retry_policy=RetryPolicy(
                 initial_interval=timedelta(seconds=30),
                 backoff_coefficient=2.0,
                 maximum_interval=timedelta(minutes=5),
-                maximum_attempts=3,
+                maximum_attempts=max(1, settings.FUNNEL_MEDIA_ENRICHMENT_ACTIVITY_MAX_ATTEMPTS),
             ),
         )
         if not isinstance(result, dict):

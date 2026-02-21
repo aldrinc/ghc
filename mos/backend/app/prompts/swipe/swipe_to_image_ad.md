@@ -7,7 +7,7 @@ INPUTS (DATA ONLY)
 
 <my_brand>
 Brand name: [BRAND_NAME]
-Product: [PRODUCT]
+Product: [EXACT_PRODUCT_NAME_FROM_CONTEXT]
 Audience: [AUDIENCE] (optional)
 Brand colors/fonts: [UNKNOWN if not given]
 Must-avoid claims: [UNKNOWN if not given]
@@ -18,6 +18,7 @@ RULES
 - ONE concept only. No options. No improvements.
 - If you can't read text: write [UNREADABLE]. If you can't tell: write [UNKNOWN]. Do not guess.
 - Do NOT copy competitor branding (name/logo/packaging). Use [BRAND_NAME] or placeholders.
+- Never output the token [PRODUCT]. Use the exact product name from context.
 - Do NOT invent results, reviews, certifications, pricing, guarantees, or timeframes.
 - Default format: 1:1.
 
@@ -29,7 +30,7 @@ OUTPUT (use these exact 3 sections)
 
 2) ADAPT IT TO MY BRAND (keep vs swap)
 - KEEP (structure): layout zones, number of badges/icons, overall look/contrast.
-- SWAP (brand): product becomes [PRODUCT], remove competitor logo/packaging, apply my brand style if provided.
+- SWAP (brand): product becomes the exact product name from context, remove competitor logo/packaging, apply my brand style if provided.
 - Copy/claims: only use readable competitor text OR placeholders like [HEADLINE].
 
 3) OUTPUT: NEW IMAGE IDEA (1:1)

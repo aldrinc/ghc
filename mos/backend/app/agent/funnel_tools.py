@@ -1135,6 +1135,15 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
         base_puck_for_restore: dict[str, Any] | None = (
             args.basePuckData if isinstance(args.basePuckData, dict) else None
         )
+        template_reference_puck: dict[str, Any] | None = None
+        template_puck: dict[str, Any] | None = None
+        if args.templateKind:
+            template = get_funnel_template(args.templateKind)
+            raw_template_puck = template.puck_data if template else None
+            if not isinstance(raw_template_puck, dict):
+                raise ValueError(f"Template {args.templateKind} puckData is missing or invalid.")
+            template_puck = raw_template_puck
+            template_reference_puck = raw_template_puck
 
         restored_sections = 0
         dropped_extra_sections = 0
@@ -1388,8 +1397,6 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
 
             # Merge the current base page puckData with the latest template structure so new template
             # blocks (e.g. reviews/free gifts) are not lost when regenerating existing pages.
-            template = get_funnel_template(args.templateKind)
-            template_puck = template.puck_data if template else None
             if not isinstance(template_puck, dict):
                 raise ValueError(f"Template {args.templateKind} puckData is missing or invalid.")
             base_puck_for_restore = deepcopy(base_puck_for_restore)
@@ -1887,6 +1894,24 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                     "Missing variants for selections: "
                     + ", ".join(missing_combos)
                 )
+            funnel_ai._enforce_sales_pdp_urgency_month_rows(
+                puck_data=args.puckData,
+                reference_puck_data=(
+                    template_reference_puck
+                    if isinstance(template_reference_puck, dict)
+                    else base_puck_for_restore
+                ),
+            )
+
+        if args.templateKind == "pre-sales-listicle":
+            funnel_ai._enforce_pre_sales_floating_cta_config(
+                puck_data=args.puckData,
+                reference_puck_data=(
+                    template_reference_puck
+                    if isinstance(template_reference_puck, dict)
+                    else base_puck_for_restore
+                ),
+            )
 
         root_props = args.puckData.get("root", {}).get("props") if isinstance(args.puckData.get("root"), dict) else None
         if isinstance(root_props, dict):
@@ -2047,6 +2072,7 @@ class ImagesGenerateArgs(BaseModel):
     # Deprecated: kept for request compatibility. Generation now uses all required image targets
     # (up to funnel_ai._MAX_PAGE_IMAGE_GENERATIONS).
     maxImages: int = 3
+    maxDurationSeconds: Optional[int] = None
 
 
 class ImagesGenerateTool(BaseTool[ImagesGenerateArgs]):
@@ -2077,6 +2103,7 @@ class ImagesGenerateTool(BaseTool[ImagesGenerateArgs]):
                 max_images=max_images,
                 funnel_id=args.funnelId,
                 product_id=args.productId,
+                max_duration_seconds=args.maxDurationSeconds,
             )
         except Exception as exc:  # noqa: BLE001
             generated_images = [{"error": str(exc)}]
@@ -2176,6 +2203,7 @@ class TestimonialsGenerateAndApplyArgs(BaseModel):
     model: Optional[str] = None
     temperature: float = 0.3
     maxTokens: Optional[int] = None
+    maxDurationSeconds: Optional[int] = None
     synthetic: bool = True
     agentRunId: Optional[str] = None
 
@@ -2203,6 +2231,7 @@ class TestimonialsGenerateAndApplyTool(BaseTool[TestimonialsGenerateAndApplyArgs
             model=args.model,
             temperature=args.temperature,
             max_tokens=args.maxTokens,
+            max_duration_seconds=args.maxDurationSeconds,
             synthetic=args.synthetic,
         )
 

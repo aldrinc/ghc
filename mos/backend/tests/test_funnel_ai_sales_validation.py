@@ -25,6 +25,12 @@ def _sales_template_puck_data() -> dict:
     return deepcopy(template.puck_data)
 
 
+def _pre_sales_template_puck_data() -> dict:
+    template = get_funnel_template("pre-sales-listicle")
+    assert template is not None
+    return deepcopy(template.puck_data)
+
+
 def _find_sales_hero_props(puck_data: dict) -> dict:
     for obj in _walk_json(puck_data):
         if isinstance(obj, dict) and obj.get("type") == "SalesPdpHero":
@@ -45,6 +51,30 @@ def _find_sales_hero_urgency(puck_data: dict) -> dict:
     urgency = cta.get("urgency")
     assert isinstance(urgency, dict)
     return urgency
+
+
+def _find_pre_sales_floating_cta_config(puck_data: dict) -> dict:
+    for obj in _walk_json(puck_data):
+        if isinstance(obj, dict) and obj.get("type") == "PreSalesFloatingCta":
+            props = obj.get("props")
+            if not isinstance(props, dict):
+                continue
+            config = props.get("config")
+            if isinstance(config, dict):
+                return config
+    raise AssertionError("PreSalesFloatingCta config not found in template puck data")
+
+
+def _find_pre_sales_reasons_config(puck_data: dict) -> list[dict]:
+    for obj in _walk_json(puck_data):
+        if isinstance(obj, dict) and obj.get("type") == "PreSalesReasons":
+            props = obj.get("props")
+            if not isinstance(props, dict):
+                continue
+            config = props.get("config")
+            if isinstance(config, list):
+                return config
+    raise AssertionError("PreSalesReasons config not found in template puck data")
 
 
 def test_sales_template_validation_accepts_default_sales_hero_modal_shape():
@@ -132,6 +162,49 @@ def test_sales_pdp_urgency_rows_require_sold_metrics():
             reference_puck_data=reference_puck_data,
             now=datetime(2026, 2, 16, tzinfo=timezone.utc),
         )
+
+
+def test_pre_sales_floating_cta_trigger_repairs_invalid_show_after_id():
+    reference_puck_data = _pre_sales_template_puck_data()
+    generated_puck_data = _pre_sales_template_puck_data()
+    cta = _find_pre_sales_floating_cta_config(generated_puck_data)
+    cta["showAfterId"] = "pre-sales-reasons"
+
+    funnel_ai._enforce_pre_sales_floating_cta_config(
+        puck_data=generated_puck_data,
+        reference_puck_data=reference_puck_data,
+    )
+
+    repaired = _find_pre_sales_floating_cta_config(generated_puck_data)
+    assert repaired.get("showAfterId") == "listicle-end"
+
+
+def test_pre_sales_floating_cta_trigger_falls_back_to_listicle_end_when_reasons_invalid():
+    reference_puck_data = _pre_sales_template_puck_data()
+    generated_puck_data = _pre_sales_template_puck_data()
+    reasons = _find_pre_sales_reasons_config(generated_puck_data)
+    for reason in reasons:
+        if isinstance(reason, dict):
+            reason["number"] = "invalid"
+    cta = _find_pre_sales_floating_cta_config(generated_puck_data)
+    cta["showAfterId"] = "reason-3"
+
+    funnel_ai._enforce_pre_sales_floating_cta_config(
+        puck_data=generated_puck_data,
+        reference_puck_data=reference_puck_data,
+    )
+
+    repaired = _find_pre_sales_floating_cta_config(generated_puck_data)
+    assert repaired.get("showAfterId") == "listicle-end"
+
+
+def test_pre_sales_validation_rejects_invalid_floating_cta_trigger_id():
+    puck_data = _pre_sales_template_puck_data()
+    cta = _find_pre_sales_floating_cta_config(puck_data)
+    cta["showAfterId"] = "pre-sales-reasons"
+
+    with pytest.raises(ValueError, match=r"showAfterId/showAfterReason must reference one of"):
+        funnel_ai._validate_pre_sales_listicle_component_configs(puck_data)
 
 
 def test_align_sales_checkout_option_ids_to_variant_matrix():

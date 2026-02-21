@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import base64
+import concurrent.futures
 import json
 import re
 import time
@@ -15,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.db.base import SessionLocal
 from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
 from app.db.models import (
     Asset,
@@ -43,6 +45,7 @@ _REPAIR_PREVIOUS_RESPONSE_MAX_CHARS = 4000
 _CLAUDE_MAX_OUTPUT_TOKENS = 64000
 _MAX_AI_ATTACHMENTS = 8
 _MAX_PAGE_IMAGE_GENERATIONS = 50
+_IMAGE_GENERATION_MAX_CONCURRENCY = max(1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY)
 _VISION_ALLOWED_MIME_TYPES = {
     "image/png",
     "image/jpeg",
@@ -66,6 +69,11 @@ _PLACEHOLDER_SRC_MARKERS = ("/assets/ph-", "/assets/placeholder")
 _URGENCY_SOLD_OUT_PATTERN = re.compile(r"\bsold\s*out\b", re.IGNORECASE)
 _URGENCY_NEARLY_SOLD_PATTERN = re.compile(r"\b\d{1,3}%\s*sold\b", re.IGNORECASE)
 _URGENCY_SELLING_OUT_PATTERN = re.compile(r"\bselling\s+out\b", re.IGNORECASE)
+_PRE_SALES_CTA_LINK_TYPE_CANONICAL: dict[str, str] = {
+    "nextpage": "nextPage",
+    "funnelpage": "funnelPage",
+    "external": "external",
+}
 _CSS_VAR_REFERENCE_PATTERN = re.compile(r"^var\(\s*(--[a-z0-9\-_]+)\s*\)$", re.IGNORECASE)
 _CSS_HEX_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE)
 _ICON_COLOR_TOKEN_KEYS: tuple[tuple[str, str], ...] = (
@@ -211,6 +219,8 @@ def _validate_pre_sales_listicle_component_configs(puck_data: dict[str, Any]) ->
             return props.get("config"), "config"
         return None
 
+    valid_trigger_ids = _collect_pre_sales_reason_anchor_ids(puck_data)
+
     for obj in walk_json(puck_data):
         if not isinstance(obj, dict):
             continue
@@ -322,6 +332,28 @@ def _validate_pre_sales_listicle_component_configs(puck_data: dict[str, Any]) ->
             if not isinstance(config.get("label"), str):
                 raise ValueError(
                     f"PreSalesFloatingCta.{source}.label must be a string{id_suffix}. Received {_describe_value(config.get('label'))}."
+                )
+            link_type = _normalize_pre_sales_cta_link_type(config.get("linkType"))
+            if link_type is None:
+                raise ValueError(
+                    f"PreSalesFloatingCta.{source}.linkType must be one of nextPage/funnelPage/external{id_suffix}."
+                )
+            if link_type == "external":
+                href = _clean_non_empty_string(config.get("href"))
+                if not href:
+                    raise ValueError(
+                        f"PreSalesFloatingCta.{source}.href is required when linkType=external{id_suffix}."
+                    )
+            if link_type == "funnelPage":
+                target_page_id = _clean_non_empty_string(config.get("targetPageId"))
+                if not target_page_id:
+                    raise ValueError(
+                        f"PreSalesFloatingCta.{source}.targetPageId is required when linkType=funnelPage{id_suffix}."
+                    )
+            trigger_id = _resolve_pre_sales_floating_cta_trigger_id(config, valid_trigger_ids=valid_trigger_ids)
+            if trigger_id is None:
+                raise ValueError(
+                    f"PreSalesFloatingCta.{source}.showAfterId/showAfterReason must reference one of {sorted(valid_trigger_ids)}{id_suffix}."
                 )
         elif comp_type == "PreSalesTemplate":
             if not isinstance(config, dict):
@@ -1167,6 +1199,234 @@ def _extract_sales_pdp_urgency_config(config: dict[str, Any]) -> dict[str, Any] 
     if not isinstance(urgency, dict):
         return None
     return urgency
+
+
+def _iter_pre_sales_floating_cta_configs(
+    puck_data: dict[str, Any],
+) -> Iterator[tuple[int, dict[str, Any], dict[str, Any], str]]:
+    index = 0
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict) or obj.get("type") != "PreSalesFloatingCta":
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        raw_config_json = props.get("configJson")
+        if isinstance(raw_config_json, str) and raw_config_json.strip():
+            try:
+                parsed_config = json.loads(raw_config_json)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"PreSalesFloatingCta.configJson must be valid JSON: {exc}") from exc
+            if not isinstance(parsed_config, dict):
+                raise ValueError(
+                    "PreSalesFloatingCta.configJson must decode to a JSON object. "
+                    f"Received {_describe_value(parsed_config)}."
+                )
+            yield index, props, parsed_config, "configJson"
+            index += 1
+            continue
+        config = props.get("config")
+        if config is None:
+            continue
+        if not isinstance(config, dict):
+            raise ValueError(
+                f"PreSalesFloatingCta.config must be a JSON object. Received {_describe_value(config)}."
+            )
+        yield index, props, config, "config"
+        index += 1
+
+
+def _extract_pre_sales_reasons_list(config: dict[str, Any]) -> list[Any] | None:
+    reasons = config.get("reasons")
+    if isinstance(reasons, list):
+        return reasons
+    return None
+
+
+def _iter_pre_sales_reasons_lists(puck_data: dict[str, Any]) -> Iterator[list[Any]]:
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        props = obj.get("props")
+        if not isinstance(comp_type, str) or not isinstance(props, dict):
+            continue
+
+        if comp_type == "PreSalesReasons":
+            loaded = None
+            raw_json = props.get("configJson")
+            if isinstance(raw_json, str) and raw_json.strip():
+                try:
+                    loaded = json.loads(raw_json)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"PreSalesReasons.configJson must be valid JSON: {exc}") from exc
+            elif "config" in props:
+                loaded = props.get("config")
+            if isinstance(loaded, list):
+                yield loaded
+            continue
+
+        if comp_type == "PreSalesTemplate":
+            loaded = None
+            raw_json = props.get("configJson")
+            if isinstance(raw_json, str) and raw_json.strip():
+                try:
+                    loaded = json.loads(raw_json)
+                except json.JSONDecodeError as exc:
+                    raise ValueError(f"PreSalesTemplate.configJson must be valid JSON: {exc}") from exc
+            elif "config" in props:
+                loaded = props.get("config")
+            if isinstance(loaded, dict):
+                reasons = _extract_pre_sales_reasons_list(loaded)
+                if isinstance(reasons, list):
+                    yield reasons
+
+
+def _coerce_positive_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, float):
+        if value <= 0 or not value.is_integer():
+            return None
+        return int(value)
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned.isdigit():
+            parsed = int(cleaned)
+            return parsed if parsed > 0 else None
+    return None
+
+
+def _collect_pre_sales_reason_anchor_ids(puck_data: dict[str, Any]) -> set[str]:
+    ids: set[str] = {"listicle-end"}
+    for reasons in _iter_pre_sales_reasons_lists(puck_data):
+        for reason in reasons:
+            if not isinstance(reason, dict):
+                continue
+            number = _coerce_positive_int(reason.get("number"))
+            if number is None:
+                continue
+            ids.add(f"reason-{number}")
+    return ids
+
+
+def _normalize_pre_sales_cta_link_type(value: Any) -> str | None:
+    cleaned = _clean_non_empty_string(value)
+    if not cleaned:
+        return None
+    return _PRE_SALES_CTA_LINK_TYPE_CANONICAL.get(cleaned.lower())
+
+
+def _resolve_pre_sales_floating_cta_trigger_id(
+    config: dict[str, Any],
+    *,
+    valid_trigger_ids: set[str],
+) -> str | None:
+    show_after_id = _clean_non_empty_string(config.get("showAfterId"))
+    if show_after_id and show_after_id in valid_trigger_ids:
+        return show_after_id
+    show_after_reason = _coerce_positive_int(config.get("showAfterReason"))
+    if show_after_reason is not None:
+        candidate = f"reason-{show_after_reason}"
+        if candidate in valid_trigger_ids:
+            return candidate
+    return None
+
+
+def _enforce_pre_sales_floating_cta_config(
+    *,
+    puck_data: dict[str, Any],
+    reference_puck_data: dict[str, Any] | None,
+) -> None:
+    valid_trigger_ids = _collect_pre_sales_reason_anchor_ids(puck_data)
+
+    reference_configs_by_id: dict[str, dict[str, Any]] = {}
+    reference_configs_by_index: list[dict[str, Any]] = []
+    if reference_puck_data is not None:
+        for ref_index, ref_props, ref_config, _ in _iter_pre_sales_floating_cta_configs(reference_puck_data):
+            while len(reference_configs_by_index) <= ref_index:
+                reference_configs_by_index.append({})
+            reference_configs_by_index[ref_index] = ref_config
+            ref_id = ref_props.get("id")
+            if isinstance(ref_id, str) and ref_id:
+                reference_configs_by_id[ref_id] = ref_config
+
+    for index, props, config, source in _iter_pre_sales_floating_cta_configs(puck_data):
+        cta_id = props.get("id")
+        id_suffix = f" (id={cta_id})" if isinstance(cta_id, str) and cta_id else ""
+
+        reference_config: dict[str, Any] | None = None
+        if isinstance(cta_id, str) and cta_id and cta_id in reference_configs_by_id:
+            reference_config = reference_configs_by_id[cta_id]
+        elif index < len(reference_configs_by_index):
+            candidate = reference_configs_by_index[index]
+            reference_config = candidate if isinstance(candidate, dict) and candidate else None
+
+        label = _clean_non_empty_string(config.get("label"))
+        if label is None and isinstance(reference_config, dict):
+            label = _clean_non_empty_string(reference_config.get("label"))
+        if label is None:
+            raise ValueError(
+                f"PreSalesFloatingCta.label must be a non-empty string{id_suffix}."
+            )
+        config["label"] = label
+
+        link_type = _normalize_pre_sales_cta_link_type(config.get("linkType"))
+        if link_type is None and isinstance(reference_config, dict):
+            link_type = _normalize_pre_sales_cta_link_type(reference_config.get("linkType"))
+        if link_type is None:
+            raise ValueError(
+                "PreSalesFloatingCta.linkType must be one of nextPage/funnelPage/external"
+                f"{id_suffix}."
+            )
+        config["linkType"] = link_type
+
+        if link_type == "external":
+            href = _clean_non_empty_string(config.get("href"))
+            if href is None and isinstance(reference_config, dict):
+                href = _clean_non_empty_string(reference_config.get("href"))
+            if href is None:
+                raise ValueError(
+                    f"PreSalesFloatingCta.href is required when linkType=external{id_suffix}."
+                )
+            config["href"] = href
+            config.pop("targetPageId", None)
+        elif link_type == "funnelPage":
+            target_page_id = _clean_non_empty_string(config.get("targetPageId"))
+            if target_page_id is None and isinstance(reference_config, dict):
+                target_page_id = _clean_non_empty_string(reference_config.get("targetPageId"))
+            if target_page_id is None:
+                raise ValueError(
+                    f"PreSalesFloatingCta.targetPageId is required when linkType=funnelPage{id_suffix}."
+                )
+            config["targetPageId"] = target_page_id
+            config.pop("href", None)
+        else:
+            config.pop("targetPageId", None)
+            config.pop("href", None)
+
+        trigger_id = _resolve_pre_sales_floating_cta_trigger_id(config, valid_trigger_ids=valid_trigger_ids)
+        if trigger_id is None and isinstance(reference_config, dict):
+            trigger_id = _resolve_pre_sales_floating_cta_trigger_id(
+                reference_config,
+                valid_trigger_ids=valid_trigger_ids,
+            )
+        if trigger_id is None and "listicle-end" in valid_trigger_ids:
+            trigger_id = "listicle-end"
+        if trigger_id is None:
+            raise ValueError(
+                "PreSalesFloatingCta.showAfterId/showAfterReason must reference an existing trigger id "
+                f"({sorted(valid_trigger_ids)}){id_suffix}."
+            )
+        config["showAfterId"] = trigger_id
+        config.pop("showAfterReason", None)
+
+        if source == "configJson":
+            props["configJson"] = json.dumps(config, ensure_ascii=False)
+        else:
+            props["config"] = config
 
 
 def _humanize_option_id(value: str) -> str:
@@ -4020,6 +4280,105 @@ def _resolve_image_generation_count(
     )
 
 
+@dataclass
+class _GeneratedImageAsset:
+    public_id: str
+    asset_id: str
+    content: dict[str, Any] | None = None
+
+
+def _generate_page_image_asset(
+    *,
+    org_id: str,
+    client_id: str,
+    prompt: str,
+    image_source: str,
+    aspect_ratio: Optional[str],
+    reference_public_id: Optional[str],
+    funnel_id: Optional[str],
+    product_id: Optional[str],
+    deadline_ts: Optional[float],
+) -> tuple[_GeneratedImageAsset, str]:
+    if deadline_ts is not None and time.monotonic() >= deadline_ts:
+        raise RuntimeError("Image generation step exceeded configured time budget.")
+
+    with SessionLocal() as thread_session:
+        if image_source == "unsplash":
+            asset = create_funnel_unsplash_asset(
+                session=thread_session,
+                org_id=org_id,
+                client_id=client_id,
+                query=prompt,
+                usage_context={"kind": "funnel_page_image"},
+                funnel_id=funnel_id,
+                product_id=product_id,
+                tags=["funnel", "funnel_page_image", "unsplash"],
+            )
+            return (
+                _GeneratedImageAsset(
+                    public_id=str(asset.public_id),
+                    asset_id=str(asset.id),
+                    content=asset.content if isinstance(asset.content, dict) else None,
+                ),
+                prompt,
+            )
+
+        resolved_prompt = _append_no_text_directive(prompt)
+        if reference_public_id:
+            ref_asset, ref_bytes, ref_mime = _load_reference_image(
+                session=thread_session,
+                org_id=org_id,
+                client_id=client_id,
+                public_id=reference_public_id,
+            )
+            asset = create_funnel_image_asset(
+                session=thread_session,
+                org_id=org_id,
+                client_id=client_id,
+                prompt=resolved_prompt,
+                aspect_ratio=aspect_ratio,
+                usage_context={
+                    "kind": "funnel_page_image",
+                    "referenceAssetPublicId": reference_public_id,
+                },
+                reference_image_bytes=ref_bytes,
+                reference_image_mime_type=ref_mime,
+                reference_asset_public_id=reference_public_id,
+                reference_asset_id=str(ref_asset.id),
+                funnel_id=funnel_id,
+                product_id=product_id,
+                tags=["funnel", "funnel_page_image"],
+            )
+            return (
+                _GeneratedImageAsset(
+                    public_id=str(asset.public_id),
+                    asset_id=str(asset.id),
+                    content=asset.content if isinstance(asset.content, dict) else None,
+                ),
+                resolved_prompt,
+            )
+
+        asset = create_funnel_image_asset(
+            session=thread_session,
+            org_id=org_id,
+            client_id=client_id,
+            prompt=resolved_prompt,
+            aspect_ratio=aspect_ratio,
+            usage_context={"kind": "funnel_page_image"},
+            funnel_id=funnel_id,
+            product_id=product_id,
+            tags=["funnel", "funnel_page_image"],
+        )
+        return (
+            _GeneratedImageAsset(
+                public_id=str(asset.public_id),
+                asset_id=str(asset.id),
+                content=asset.content if isinstance(asset.content, dict) else None,
+            ),
+            resolved_prompt,
+        )
+
+
 def _fill_ai_images(
     *,
     session: Session,
@@ -4029,71 +4388,79 @@ def _fill_ai_images(
     max_images: int = 3,
     funnel_id: Optional[str] = None,
     product_id: Optional[str] = None,
+    max_duration_seconds: Optional[int] = None,
 ) -> tuple[int, list[dict[str, Any]]]:
+    del session
     generated: list[dict[str, Any]] = []
     touched_contexts: list[_ConfigJsonContext] = []
     count = 0
     if max_images <= 0:
         return count, generated
+    if max_duration_seconds is not None and max_duration_seconds <= 0:
+        raise ValueError("max_duration_seconds must be > 0 when provided.")
 
-    for obj, asset_key, prompt, reference_public_id, image_source, aspect_ratio, ctx in _iter_ai_image_prompt_targets(
-        puck_data
-    ):
-        if count >= max_images:
+    deadline_ts = (
+        time.monotonic() + float(max_duration_seconds)
+        if max_duration_seconds is not None
+        else None
+    )
+    targets = []
+    for target in _iter_ai_image_prompt_targets(puck_data):
+        if len(targets) >= max_images:
             break
+        targets.append(target)
+    if not targets:
+        return count, generated
+
+    max_workers = min(_IMAGE_GENERATION_MAX_CONCURRENCY, len(targets))
+    outcomes: list[tuple[_GeneratedImageAsset, str] | Exception | None] = [None] * len(targets)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures: dict[concurrent.futures.Future[tuple[_GeneratedImageAsset, str]], int] = {}
+        for idx, target in enumerate(targets):
+            _, _, prompt, reference_public_id, image_source, aspect_ratio, _ = target
+            future = pool.submit(
+                _generate_page_image_asset,
+                org_id=org_id,
+                client_id=client_id,
+                prompt=prompt,
+                image_source=image_source,
+                aspect_ratio=aspect_ratio,
+                reference_public_id=reference_public_id,
+                funnel_id=funnel_id,
+                product_id=product_id,
+                deadline_ts=deadline_ts,
+            )
+            futures[future] = idx
+        for future in concurrent.futures.as_completed(futures):
+            idx = futures[future]
+            try:
+                outcomes[idx] = future.result()
+            except Exception as exc:  # noqa: BLE001
+                outcomes[idx] = exc
+
+    for idx, target in enumerate(targets):
+        obj, asset_key, prompt, reference_public_id, image_source, aspect_ratio, ctx = target
+        outcome = outcomes[idx]
+        if isinstance(outcome, Exception) or outcome is None:
+            exc = outcome if isinstance(outcome, Exception) else RuntimeError("Image generation task returned no outcome.")
+            error_item: dict[str, Any] = {"prompt": prompt, "error": str(exc), "imageSource": image_source}
+            if aspect_ratio:
+                error_item["aspectRatio"] = aspect_ratio
+            if asset_key != "assetPublicId":
+                error_item["assetKey"] = asset_key
+            if reference_public_id:
+                error_item["referenceAssetPublicId"] = reference_public_id
+            if ctx:
+                error_item["componentType"] = ctx.component_type
+                error_item["configKey"] = ctx.key
+            generated.append(error_item)
+            count += 1
+            continue
+
+        asset_ref, resolved_prompt = outcome
         try:
-            if image_source == "unsplash":
-                asset = create_funnel_unsplash_asset(
-                    session=session,
-                    org_id=org_id,
-                    client_id=client_id,
-                    query=prompt,
-                    usage_context={"kind": "funnel_page_image"},
-                    funnel_id=funnel_id,
-                    product_id=product_id,
-                    tags=["funnel", "funnel_page_image", "unsplash"],
-                )
-            elif reference_public_id:
-                prompt = _append_no_text_directive(prompt)
-                ref_asset, ref_bytes, ref_mime = _load_reference_image(
-                    session=session,
-                    org_id=org_id,
-                    client_id=client_id,
-                    public_id=reference_public_id,
-                )
-                asset = create_funnel_image_asset(
-                    session=session,
-                    org_id=org_id,
-                    client_id=client_id,
-                    prompt=prompt,
-                    aspect_ratio=aspect_ratio,
-                    usage_context={
-                        "kind": "funnel_page_image",
-                        "referenceAssetPublicId": reference_public_id,
-                    },
-                    reference_image_bytes=ref_bytes,
-                    reference_image_mime_type=ref_mime,
-                    reference_asset_public_id=reference_public_id,
-                    reference_asset_id=str(ref_asset.id),
-                    funnel_id=funnel_id,
-                    product_id=product_id,
-                    tags=["funnel", "funnel_page_image"],
-                )
-            else:
-                prompt = _append_no_text_directive(prompt)
-                asset = create_funnel_image_asset(
-                    session=session,
-                    org_id=org_id,
-                    client_id=client_id,
-                    prompt=prompt,
-                    aspect_ratio=aspect_ratio,
-                    usage_context={"kind": "funnel_page_image"},
-                    funnel_id=funnel_id,
-                    product_id=product_id,
-                    tags=["funnel", "funnel_page_image"],
-                )
             # Mark as resolved so future validation/scans don't treat it as an image prompt target.
-            obj[asset_key] = str(asset.public_id)
+            obj[asset_key] = asset_ref.public_id
             obj.pop("referenceAssetPublicId", None)
             obj.pop("reference_asset_public_id", None)
             obj.pop("prompt", None)
@@ -4105,16 +4472,16 @@ def _fill_ai_images(
                 ctx.dirty = True
                 touched_contexts.append(ctx)
             item: dict[str, Any] = {
-                "prompt": prompt,
-                "publicId": str(asset.public_id),
-                "assetId": str(asset.id),
+                "prompt": resolved_prompt,
+                "publicId": asset_ref.public_id,
+                "assetId": asset_ref.asset_id,
                 "imageSource": image_source,
             }
             if aspect_ratio:
                 item["aspectRatio"] = aspect_ratio
-            if image_source == "unsplash" and isinstance(asset.content, dict):
-                item["unsplashQuery"] = asset.content.get("query")
-                item["unsplash"] = asset.content.get("unsplash")
+            if image_source == "unsplash" and isinstance(asset_ref.content, dict):
+                item["unsplashQuery"] = asset_ref.content.get("query")
+                item["unsplash"] = asset_ref.content.get("unsplash")
             if asset_key != "assetPublicId":
                 item["assetKey"] = asset_key
             if reference_public_id:
@@ -4450,6 +4817,7 @@ def generate_funnel_page_draft(
             "- Default to Section.layout='full' for most sections (full-width background)\n"
             "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
             "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
+            "- On sales pages, keep header containers borderless on desktop and mobile (no outlined header shell)\n\n"
             f"{context_guidance}"
             f"{product_guidance}"
             f"{attachment_guidance}"
@@ -4751,11 +5119,23 @@ def generate_funnel_page_draft(
             root_props["description"] = ""
 
     if template_component_kind == "pre-sales-listicle":
+        _enforce_pre_sales_floating_cta_config(
+            puck_data=puck_data,
+            reference_puck_data=(
+                template.puck_data
+                if template_mode and template is not None and isinstance(template.puck_data, dict)
+                else (base_puck if isinstance(base_puck, dict) else None)
+            ),
+        )
         _validate_pre_sales_listicle_component_configs(puck_data)
     elif template_component_kind == "sales-pdp":
         _enforce_sales_pdp_urgency_month_rows(
             puck_data=puck_data,
-            reference_puck_data=base_puck if isinstance(base_puck, dict) else None,
+            reference_puck_data=(
+                template.puck_data
+                if template_mode and template is not None and isinstance(template.puck_data, dict)
+                else (base_puck if isinstance(base_puck, dict) else None)
+            ),
         )
         _validate_sales_pdp_component_configs(puck_data)
 
@@ -5191,6 +5571,7 @@ def stream_funnel_page_draft(
                 "- Default to Section.layout='full' for most sections (full-width background)\n"
                 "- Use Section.containerWidth='lg' for a modern website width (use 'xl' if you need more)\n"
                 "- Alternate Section.variant between 'default' and 'muted' to create clear visual sections\n\n"
+                "- On sales pages, keep header containers borderless on desktop and mobile (no outlined header shell)\n\n"
                 f"{product_guidance}"
                 f"{template_guidance}"
                 f"{template_image_guidance}"
@@ -5471,11 +5852,23 @@ def stream_funnel_page_draft(
                 root_props["description"] = ""
 
         if template_component_kind == "pre-sales-listicle":
+            _enforce_pre_sales_floating_cta_config(
+                puck_data=puck_data,
+                reference_puck_data=(
+                    template.puck_data
+                    if template_mode and template is not None and isinstance(template.puck_data, dict)
+                    else (base_puck if isinstance(base_puck, dict) else None)
+                ),
+            )
             _validate_pre_sales_listicle_component_configs(puck_data)
         elif template_component_kind == "sales-pdp":
             _enforce_sales_pdp_urgency_month_rows(
                 puck_data=puck_data,
-                reference_puck_data=base_puck if isinstance(base_puck, dict) else None,
+                reference_puck_data=(
+                    template.puck_data
+                    if template_mode and template is not None and isinstance(template.puck_data, dict)
+                    else (base_puck if isinstance(base_puck, dict) else None)
+                ),
             )
             _validate_sales_pdp_component_configs(puck_data)
 

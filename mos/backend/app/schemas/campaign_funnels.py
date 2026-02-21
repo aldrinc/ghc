@@ -23,6 +23,11 @@ class CampaignFunnelGenerationRequest(BaseModel):
         validation_alias="asyncMediaEnrichment",
         serialization_alias="asyncMediaEnrichment",
     )
+    variant_activity_concurrency: int | None = Field(
+        default=None,
+        validation_alias="variantActivityConcurrency",
+        serialization_alias="variantActivityConcurrency",
+    )
     generateTestimonials: bool = False
 
     @field_validator("experiment_ids")
@@ -74,3 +79,12 @@ class CampaignFunnelGenerationRequest(BaseModel):
                 deduped_variant_ids.append(variant_id)
             cleaned[experiment_id] = deduped_variant_ids
         return cleaned
+
+    @field_validator("variant_activity_concurrency")
+    @classmethod
+    def _validate_variant_activity_concurrency(cls, value: int | None) -> int | None:
+        if value is None:
+            return None
+        if value < 1:
+            raise ValueError("variantActivityConcurrency must be >= 1.")
+        return value

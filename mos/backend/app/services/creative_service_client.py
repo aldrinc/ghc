@@ -121,16 +121,27 @@ class CreativeServiceClient:
             form_data["metadata_json"] = json.dumps(metadata_json)
 
         files = {"file": (file_name, file_bytes, content_type)}
-        with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
-            resp = client.post(
-                "/assets/upload",
-                data=form_data,
-                files=files,
-                headers={
-                    "Authorization": f"Bearer {self.bearer_token}",
-                    "Accept": "application/json",
+        try:
+            with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
+                resp = client.post(
+                    "/assets/upload",
+                    data=form_data,
+                    files=files,
+                    headers={
+                        "Authorization": f"Bearer {self.bearer_token}",
+                        "Accept": "application/json",
+                    },
+                )
+        except httpx.HTTPError as exc:
+            raise CreativeServiceRequestError(
+                "Creative service network error during asset upload",
+                details={
+                    "method": "POST",
+                    "path": "/assets/upload",
+                    "base_url": self.base_url,
+                    "error": str(exc),
                 },
-            )
+            ) from None
 
         if resp.status_code >= 400:
             self._raise_request_error(resp)
@@ -222,13 +233,24 @@ class CreativeServiceClient:
         json_payload: dict[str, Any] | None = None,
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
-        with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
-            resp = client.request(
-                method=method,
-                url=path,
-                json=json_payload,
-                headers=self._headers(idempotency_key=idempotency_key),
-            )
+        try:
+            with httpx.Client(base_url=self.base_url, timeout=self.timeout_seconds) as client:
+                resp = client.request(
+                    method=method,
+                    url=path,
+                    json=json_payload,
+                    headers=self._headers(idempotency_key=idempotency_key),
+                )
+        except httpx.HTTPError as exc:
+            raise CreativeServiceRequestError(
+                "Creative service network error",
+                details={
+                    "method": method,
+                    "path": path,
+                    "base_url": self.base_url,
+                    "error": str(exc),
+                },
+            ) from None
 
         if resp.status_code >= 400:
             self._raise_request_error(resp)

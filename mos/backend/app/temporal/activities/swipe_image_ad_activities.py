@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -458,6 +459,21 @@ def _extract_gemini_usage_details(result: Any) -> Dict[str, int] | None:
     return usage_details or None
 
 
+def _is_retryable_render_failure(error_text: str | None) -> bool:
+    if not isinstance(error_text, str) or not error_text.strip():
+        return False
+    normalized = error_text.lower()
+    retryable_markers = (
+        "inline image",
+        "internal error",
+        "status\": \"internal\"",
+        "failed (500)",
+        "timed out",
+        "network error",
+    )
+    return any(marker in normalized for marker in retryable_markers)
+
+
 @activity.defn(name="swipes.generate_swipe_image_ad")
 def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -492,6 +508,9 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     if count <= 0:
         raise ValueError("count must be >= 1 for swipe image ad generation.")
     render_count = max(6, count)
+    render_max_attempts = int(os.getenv("SWIPE_IMAGE_RENDER_MAX_ATTEMPTS", "3"))
+    if render_max_attempts <= 0:
+        raise ValueError("SWIPE_IMAGE_RENDER_MAX_ATTEMPTS must be greater than zero.")
 
     def log_activity(step: str, status: str, *, payload_in=None, payload_out=None, error: str | None = None) -> None:
         if not workflow_run_id:
@@ -696,6 +715,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             image_prompt = extract_new_image_prompt_from_markdown(raw_output)
         except SwipePromptParseError as exc:
             raise RuntimeError(f"Failed to parse swipe prompt output: {exc}") from exc
+        if re.search(r"\[PRODUCT(?::[^\]]*)?\]", image_prompt):
+            raise RuntimeError(
+                "Swipe prompt generation produced an unresolved [PRODUCT] placeholder. "
+                "Expected the exact product name from context."
+            )
 
         idempotency_key = _stable_idempotency_key(
             org_id,
@@ -713,21 +737,44 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             offer_context_signature,
         )
 
-        image_payload = CreativeServiceImageAdsCreateIn(
-            prompt=image_prompt,
-            count=render_count,
-            aspect_ratio=aspect_ratio,
-            client_request_id=idempotency_key,
-        )
+        completed_job: Any | None = None
+        last_render_error: str | None = None
+        for attempt in range(1, render_max_attempts + 1):
+            attempt_idempotency_key = (
+                idempotency_key if attempt == 1 else _stable_idempotency_key(idempotency_key, f"attempt:{attempt}")
+            )
+            image_payload = CreativeServiceImageAdsCreateIn(
+                prompt=image_prompt,
+                count=render_count,
+                aspect_ratio=aspect_ratio,
+                client_request_id=attempt_idempotency_key,
+            )
 
-        try:
-            created_job = creative_client.create_image_ads(payload=image_payload, idempotency_key=idempotency_key)
-        except (CreativeServiceRequestError, RuntimeError) as exc:
-            raise RuntimeError(f"Image ad generation request failed: {exc}") from exc
+            try:
+                created_job = creative_client.create_image_ads(
+                    payload=image_payload,
+                    idempotency_key=attempt_idempotency_key,
+                )
+            except (CreativeServiceRequestError, RuntimeError) as exc:
+                last_render_error = f"Image ad generation request failed: {exc}"
+                if attempt < render_max_attempts and _is_retryable_render_failure(last_render_error):
+                    continue
+                raise RuntimeError(last_render_error) from exc
 
-        completed_job = _poll_image_job(creative_client=creative_client, job_id=created_job.id)
-        if completed_job.status != "succeeded":
-            raise RuntimeError(f"Image generation failed (job_id={completed_job.id}): {completed_job.error_detail or 'unknown error'}")
+            completed_job = _poll_image_job(creative_client=creative_client, job_id=created_job.id)
+            if completed_job.status == "succeeded":
+                break
+
+            last_render_error = completed_job.error_detail or "unknown error"
+            if attempt < render_max_attempts and _is_retryable_render_failure(last_render_error):
+                continue
+            raise RuntimeError(f"Image generation failed (job_id={completed_job.id}): {last_render_error}")
+
+        if completed_job is None or completed_job.status != "succeeded":
+            raise RuntimeError(
+                "Image generation failed after retry attempts. "
+                f"attempts={render_max_attempts} error={last_render_error or 'unknown error'}"
+            )
 
         if len(completed_job.outputs) < count:
             raise RuntimeError(
@@ -752,13 +799,16 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipeCompanyId": company_swipe_id,
                 "swipeSourceUrl": swipe_source_url,
                 "swipePromptModel": model,
+                "swipePromptTemplateKey": "prompts/swipe/swipe_to_image_ad.md",
                 "swipePromptTemplateSha256": prompt_sha,
+                "swipePromptContextBlock": context_block,
                 "swipeBriefContextSignature": brief_context_signature,
                 "swipeOfferContextSignature": offer_context_signature,
                 "swipeOfferId": offer_context_metadata.get("offerId"),
                 "swipeOfferName": offer_context_metadata.get("offerName"),
                 "swipeOfferPricePoints": offer_context_metadata.get("pricePoints"),
                 "swipePromptMarkdownSha256": hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
+                "swipePromptMarkdown": raw_output,
                 "swipePromptMarkdownPreview": raw_output[:4000],
             }
 

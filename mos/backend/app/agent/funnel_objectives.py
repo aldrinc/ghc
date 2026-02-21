@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+import time
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -21,13 +22,16 @@ from app.agent.funnel_tools import (
     PublishExecuteTool,
 )
 from app.agent.runtime import AgentRuntime
+from app.config import settings
 from app.db.enums import AgentRunStatusEnum
 from app.llm.client import LLMClient
 from app.services import funnel_ai as funnel_ai
 
 
 DEFAULT_RULESET_VERSION = "v1"
-DEFAULT_TESTIMONIAL_RETRY_ATTEMPTS = 5
+DEFAULT_TESTIMONIAL_RETRY_ATTEMPTS = max(1, settings.FUNNEL_TESTIMONIAL_TOOL_RETRY_ATTEMPTS)
+DEFAULT_IMAGES_STEP_BUDGET_SECONDS = settings.FUNNEL_IMAGES_STEP_BUDGET_SECONDS
+DEFAULT_TESTIMONIALS_STEP_BUDGET_SECONDS = settings.FUNNEL_TESTIMONIALS_STEP_BUDGET_SECONDS
 
 
 def run_generate_page_draft_stream(
@@ -269,6 +273,7 @@ def run_generate_page_draft_stream(
         # 9) Generate images (if enabled)
         generated_images: list[dict[str, Any]] = []
         if generate_images:
+            image_step_started_at = time.monotonic()
             gen_res = yield from runtime.invoke_tool_stream(
                 handle=handle,
                 tool=ImagesGenerateTool(),
@@ -279,6 +284,7 @@ def run_generate_page_draft_stream(
                     "productId": str(product_id),
                     "puckData": puck_data,
                     "maxImages": max_images,
+                    "maxDurationSeconds": DEFAULT_IMAGES_STEP_BUDGET_SECONDS,
                 },
                 client_id=client_id,
                 funnel_id=funnel_id,
@@ -286,6 +292,12 @@ def run_generate_page_draft_stream(
             )
             puck_data = gen_res.ui_details["puckData"]
             generated_images = gen_res.ui_details.get("generatedImages") or []
+            image_step_elapsed = int((time.monotonic() - image_step_started_at) * 1000)
+            if image_step_elapsed > (DEFAULT_IMAGES_STEP_BUDGET_SECONDS * 1000):
+                raise TimeoutError(
+                    "Image generation step exceeded budget: "
+                    f"{image_step_elapsed}ms > {DEFAULT_IMAGES_STEP_BUDGET_SECONDS * 1000}ms."
+                )
 
         # 10) Persist draft version
         persist_res = yield from runtime.invoke_tool_stream(
@@ -324,7 +336,14 @@ def run_generate_page_draft_stream(
             and funnel_ctx.get("templateKind") in ("sales-pdp", "pre-sales-listicle")
         ):
             testimonials_attempts = DEFAULT_TESTIMONIAL_RETRY_ATTEMPTS
+            testimonials_started_at = time.monotonic()
             for attempt in range(1, testimonials_attempts + 1):
+                testimonials_elapsed = int((time.monotonic() - testimonials_started_at) * 1000)
+                if testimonials_elapsed > (DEFAULT_TESTIMONIALS_STEP_BUDGET_SECONDS * 1000):
+                    raise TimeoutError(
+                        "Testimonials step exceeded budget before next attempt: "
+                        f"{testimonials_elapsed}ms > {DEFAULT_TESTIMONIALS_STEP_BUDGET_SECONDS * 1000}ms."
+                    )
                 try:
                     testimonials_res = yield from runtime.invoke_tool_stream(
                         handle=handle,
@@ -342,6 +361,7 @@ def run_generate_page_draft_stream(
                             "maxTokens": max_tokens,
                             "synthetic": True,
                             "agentRunId": handle.run_id,
+                            "maxDurationSeconds": DEFAULT_TESTIMONIALS_STEP_BUDGET_SECONDS,
                         },
                         client_id=client_id,
                         funnel_id=funnel_id,
