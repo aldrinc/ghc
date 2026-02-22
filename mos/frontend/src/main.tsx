@@ -1,26 +1,22 @@
-import React from "react";
-import ReactDOM from "react-dom/client";
-import { ClerkProvider } from "@clerk/clerk-react";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { ToastProvider } from "@/components/ui/toast";
-import { ThemeProvider } from "@/contexts/ThemeContext";
-import { queryClient } from "@/lib/queryClient";
-import App from "./App";
-import "./index.css";
-import "@measured/puck/puck.css";
+type DeployRuntimeConfig = {
+  bundleMode?: boolean;
+};
 
-const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || "pk_test_placeholder";
+declare global {
+  interface Window {
+    __MOS_DEPLOY_RUNTIME__?: DeployRuntimeConfig;
+  }
+}
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <ThemeProvider>
-      <ClerkProvider publishableKey={clerkKey}>
-        <QueryClientProvider client={queryClient}>
-          <ToastProvider>
-            <App />
-          </ToastProvider>
-        </QueryClientProvider>
-      </ClerkProvider>
-    </ThemeProvider>
-  </React.StrictMode>
-);
+async function bootstrap() {
+  const runtimeMode = Boolean(window.__MOS_DEPLOY_RUNTIME__?.bundleMode);
+  if (runtimeMode) {
+    const mod = await import("./runtimeBootstrap");
+    mod.bootstrapRuntimeApp();
+    return;
+  }
+  const mod = await import("./adminBootstrap");
+  mod.bootstrapAdminApp();
+}
+
+void bootstrap();

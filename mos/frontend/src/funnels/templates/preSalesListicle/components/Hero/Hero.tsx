@@ -39,6 +39,7 @@ export function Hero({ title, subtitle, media, badges }: Props) {
                 alt={media.alt}
                 loading="eager"
                 decoding="async"
+                fetchPriority="high"
               />
             )
           ) : (
