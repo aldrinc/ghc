@@ -302,6 +302,60 @@ def test_provision_bunny_custom_domains_skips_dns_when_no_domains(monkeypatch):
     }
 
 
+def test_provision_bunny_custom_domains_skips_ssl_request_when_disabled(monkeypatch):
+    bunny_zone = {
+        "Id": 777,
+        "Name": "workspace-123",
+        "Hostnames": [{"Value": "workspace-123.b-cdn.net"}],
+    }
+
+    monkeypatch.setattr(
+        deploy_service.namecheap_dns_service,
+        "upsert_cname_record",
+        lambda *, hostname, target_hostname: {
+            "provider": "namecheap",
+            "fqdn": hostname,
+            "target": target_hostname,
+        },
+    )
+
+    def _unexpected_auto_ssl(*, zone_id: int):
+        raise AssertionError(f"Auto SSL should not run on deploy-domain save path for zone {zone_id}")
+
+    def _unexpected_certificate(*, zone_id: int, hostname: str):
+        raise AssertionError(
+            f"Free certificate should not be requested on deploy-domain save path ({zone_id}, {hostname})"
+        )
+
+    monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone_auto_ssl_enabled", _unexpected_auto_ssl)
+    monkeypatch.setattr(deploy_service, "_request_bunny_pull_zone_certificate", _unexpected_certificate)
+    monkeypatch.setattr(
+        deploy_service,
+        "_ensure_bunny_pull_zone_hostname",
+        lambda *, zone_id, hostname: {"zone_id": zone_id, "hostname": hostname, "status": "created"},
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_get_bunny_pull_zone",
+        lambda *, zone_id: {
+            "Id": zone_id,
+            "Hostnames": [
+                {"Value": "workspace-123.b-cdn.net"},
+                {"Value": "shop.example.com"},
+            ],
+        },
+    )
+
+    output = deploy_service._provision_bunny_custom_domains(
+        bunny_zone=bunny_zone,
+        server_names=["shop.example.com"],
+        request_ssl=False,
+    )
+
+    assert output["domains"][0]["ssl"]["status"] == "pending_publish"
+    assert output["domains"][0]["ssl"]["certificateRequest"] is None
+
+
 def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
@@ -345,14 +399,14 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
     monkeypatch.setattr(
         deploy_service,
         "_provision_bunny_custom_domains",
-        lambda *, bunny_zone, server_names: {
+        lambda *, bunny_zone, server_names, request_ssl: {
             "dnsTargetHostname": "workspace-123.b-cdn.net",
             "domains": [
                 {
                     "hostname": "offers.example.com",
                     "dns": {"provider": "namecheap"},
                     "bunnyHostname": {"status": "created"},
-                    "ssl": {"status": "requested"},
+                    "ssl": {"status": "pending_publish" if not request_ssl else "requested"},
                 }
             ],
             "pullZoneHostnames": ["workspace-123.b-cdn.net", "offers.example.com"],

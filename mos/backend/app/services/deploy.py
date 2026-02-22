@@ -1627,6 +1627,7 @@ def _provision_bunny_custom_domains(
     *,
     bunny_zone: dict[str, Any],
     server_names: list[str],
+    request_ssl: bool = True,
 ) -> dict[str, Any]:
     normalized_server_names = _normalize_workload_server_names(server_names=server_names)
     if not normalized_server_names:
@@ -1638,7 +1639,8 @@ def _provision_bunny_custom_domains(
 
     zone_id = _coerce_bunny_pull_zone_id(zone=bunny_zone)
     dns_target_hostname = _extract_bunny_pull_zone_dns_target_hostname(bunny_zone)
-    _ensure_bunny_pull_zone_auto_ssl_enabled(zone_id=zone_id)
+    if request_ssl:
+        _ensure_bunny_pull_zone_auto_ssl_enabled(zone_id=zone_id)
 
     domain_results: list[dict[str, Any]] = []
     for hostname in normalized_server_names:
@@ -1651,7 +1653,11 @@ def _provision_bunny_custom_domains(
             raise DeployError(str(exc)) from exc
 
         hostname_result = _ensure_bunny_pull_zone_hostname(zone_id=zone_id, hostname=hostname)
-        certificate_result = _request_bunny_pull_zone_certificate(zone_id=zone_id, hostname=hostname)
+        certificate_result: dict[str, Any] | None = None
+        ssl_status = "pending_publish"
+        if request_ssl:
+            certificate_result = _request_bunny_pull_zone_certificate(zone_id=zone_id, hostname=hostname)
+            ssl_status = "requested"
         domain_results.append(
             {
                 "hostname": hostname,
@@ -1659,7 +1665,7 @@ def _provision_bunny_custom_domains(
                 "bunnyHostname": hostname_result,
                 "ssl": {
                     "provider": "bunny",
-                    "status": "requested",
+                    "status": ssl_status,
                     "certificateRequest": certificate_result,
                 },
             }
@@ -1880,6 +1886,7 @@ def configure_bunny_pull_zone_for_workload(
     domain_provisioning = _provision_bunny_custom_domains(
         bunny_zone=bunny_zone,
         server_names=workload_server_names,
+        request_ssl=False,
     )
 
     zone_for_access_urls = dict(bunny_zone)
@@ -1948,6 +1955,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
     domain_provisioning = _provision_bunny_custom_domains(
         bunny_zone=bunny_zone,
         server_names=workload_server_names,
+        request_ssl=True,
     )
 
     zone_for_access_urls = dict(bunny_zone)
