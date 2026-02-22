@@ -13,7 +13,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
+  gap: 12px;
   background: var(--color-cta);
   color: var(--color-cta-text);
   border-radius: 999px;
@@ -53,7 +53,7 @@
 .lg .inner {
   height: var(--cta-height-lg);
   min-width: var(--cta-min-width-lg);
-  padding: 0 var(--cta-pad-x-lg);
+  padding: 0 var(--cta-pad-right-lg) 0 var(--cta-pad-left-lg);
   font-size: var(--cta-font-size-lg);
 }
 
@@ -65,7 +65,7 @@
 .sm .inner {
   height: var(--cta-height-sm);
   min-width: var(--cta-min-width-sm);
-  padding: 0 var(--cta-pad-x-sm);
+  padding: 0 var(--cta-pad-right-sm) 0 var(--cta-pad-left-sm);
   font-size: var(--cta-font-size-sm);
 }
 
