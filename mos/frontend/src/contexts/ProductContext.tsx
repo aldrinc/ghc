@@ -13,7 +13,11 @@ type ProductContextValue = {
   product: ProductSummary | null;
   products: Product[];
   isLoading: boolean;
-  selectProduct: (productId: string, fallback?: Partial<ProductSummary>) => void;
+  selectProduct: (
+    productId: string,
+    fallback?: Partial<ProductSummary>,
+    options?: { clientId?: string }
+  ) => void;
   clearProduct: () => void;
   refetch: () => void;
 };
@@ -36,12 +40,13 @@ export function ProductProvider({ children }: { children: ReactNode }) {
   const product = activeProductData?.active_product ?? null;
 
   const selectProduct = useCallback(
-    (productId: string, fallback?: Partial<ProductSummary>) => {
-      if (!clientId) return;
+    (productId: string, fallback?: Partial<ProductSummary>, options?: { clientId?: string }) => {
+      const targetClientId = options?.clientId ?? clientId;
+      if (!targetClientId) return;
       if (!productId) return;
       if (product?.id === productId) return;
 
-      const match = products.find((item) => item.id === productId);
+      const match = products.find((item) => item.id === productId && item.client_id === targetClientId);
       const optimisticProduct: ActiveProductSummary | undefined = match
         ? {
             id: match.id,
@@ -53,12 +58,12 @@ export function ProductProvider({ children }: { children: ReactNode }) {
         ? {
             id: productId,
             title: fallback?.title || "Product",
-            client_id: fallback?.client_id || clientId,
+            client_id: fallback?.client_id || targetClientId,
             product_type: fallback?.product_type ?? null,
           }
         : undefined;
 
-      setActiveProduct.mutate({ clientId, productId, optimisticProduct });
+      setActiveProduct.mutate({ clientId: targetClientId, productId, optimisticProduct });
     },
     [clientId, product?.id, products, setActiveProduct]
   );
