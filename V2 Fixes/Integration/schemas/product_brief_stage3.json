@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Product Brief — Stage 3 (Post-Offer)",
+  "description": "Product brief enriched with the Offer Agent's output. This is the final version used to populate the Copywriting Agent's shared context.",
+  "type": "object",
+  "required": ["stage", "product_name", "description", "product_customizable", "category_niche", "selected_angle", "ump", "ums", "core_promise"],
+  "properties": {
+    "stage": { "type": "integer", "const": 3 },
+    "product_name": { "type": "string" },
+    "description": { "type": "string" },
+    "price": { "type": "string" },
+    "competitor_urls": { "type": "array", "items": { "type": "string" } },
+    "product_customizable": { "type": "boolean" },
+    "category_niche": { "type": "string" },
+    "market_maturity_stage": { "type": "string" },
+    "primary_segment": { "type": "object" },
+    "bottleneck": { "type": "string" },
+    "positioning_gaps": { "type": "array", "items": { "type": "string" } },
+    "competitor_count_validated": { "type": "integer" },
+    "primary_icps": { "type": "array", "items": { "type": "string" } },
+    "selected_angle": { "type": "object" },
+    "compliance_constraints": { "type": "object" },
+    "buyer_behavior_archetype": { "type": "string" },
+    "purchase_emotion": { "type": "string" },
+    "price_sensitivity": { "type": "string" },
+    "ump": {
+      "type": "string",
+      "description": "Unique Mechanism of the Problem. Source: Offer Agent Step 3 — selected UMP."
+    },
+    "ums": {
+      "type": "string",
+      "description": "Unique Mechanism of the Solution. Source: Offer Agent Step 3 — selected UMS."
+    },
+    "core_promise": {
+      "type": "string",
+      "description": "The central promise of the offer. Source: Offer Agent Step 4."
+    },
+    "value_stack_summary": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "List of value stack components. Source: Offer Agent Step 4 — value stack section."
+    },
+    "guarantee_type": {
+      "type": "string",
+      "description": "Type of guarantee offered. Source: Offer Agent Step 4 — guarantee section."
+    },
+    "pricing_rationale": {
+      "type": "string",
+      "description": "Why the price is set where it is. Source: Offer Agent Step 4 — pricing section."
+    },
+    "awareness_level_primary": {
+      "type": "string",
+      "enum": ["Unaware", "Problem-Aware", "Solution-Aware", "Product-Aware", "Most-Aware"],
+      "description": "Source: Offer Agent Step 2 — Market Calibration."
+    },
+    "sophistication_level": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "description": "Eugene Schwartz sophistication level (1-5). Source: Offer Agent Step 2."
+    },
+    "composite_score": {
+      "type": "number",
+      "description": "Offer Agent's final composite score (0-10). Source: Offer Agent Step 5."
+    },
+    "variant_selected": {
+      "type": "string",
+      "description": "Which offer variant the operator selected. Source: Offer Agent Step 5."
+    }
+  }
+}

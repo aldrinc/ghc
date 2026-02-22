@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Product Brief — Stage 2 (Post-Angle Selection)",
+  "description": "Product brief enriched with the selected Purple Ocean angle from Stage 2B.",
+  "type": "object",
+  "required": ["stage", "product_name", "description", "product_customizable", "category_niche", "selected_angle"],
+  "properties": {
+    "stage": {
+      "type": "integer",
+      "const": 2
+    },
+    "product_name": { "type": "string" },
+    "description": { "type": "string" },
+    "price": { "type": "string" },
+    "competitor_urls": { "type": "array", "items": { "type": "string" } },
+    "product_customizable": { "type": "boolean" },
+    "category_niche": { "type": "string" },
+    "market_maturity_stage": { "type": "string" },
+    "primary_segment": { "type": "object" },
+    "bottleneck": { "type": "string" },
+    "positioning_gaps": { "type": "array", "items": { "type": "string" } },
+    "competitor_count_validated": { "type": "integer" },
+    "primary_icps": { "type": "array", "items": { "type": "string" } },
+    "selected_angle": {
+      "type": "object",
+      "properties": {
+        "angle_id": { "type": "string", "description": "From angle_selection.yaml" },
+        "angle_name": { "type": "string" },
+        "who": { "type": "string" },
+        "pain_desire": { "type": "string" },
+        "mechanism_why": { "type": "string" },
+        "belief_shift_before": { "type": "string" },
+        "belief_shift_after": { "type": "string" },
+        "trigger": { "type": "string" }
+      },
+      "description": "Source: angle_selection.yaml completed by operator"
+    },
+    "compliance_constraints": {
+      "type": "object",
+      "properties": {
+        "overall_risk": { "type": "string", "enum": ["GREEN", "YELLOW", "RED"] },
+        "red_flag_patterns": { "type": "array", "items": { "type": "string" } },
+        "platform_notes": { "type": "string" }
+      },
+      "description": "Source: angle_selection.yaml compliance section + competitor_analysis.json"
+    },
+    "buyer_behavior_archetype": {
+      "type": "string",
+      "description": "Source: Infer from selected angle's buyer stage distribution and solution sophistication"
+    },
+    "purchase_emotion": {
+      "type": "string",
+      "description": "Source: Selected angle's dominant emotional valence"
+    },
+    "price_sensitivity": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "description": "Source: Infer from avatar brief budget range and solution sophistication"
+    }
+  }
+}

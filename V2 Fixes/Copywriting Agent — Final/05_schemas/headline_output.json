@@ -1,0 +1,259 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HeadlineOutput",
+  "description": "Output schema for the Headline Engineering workflow. Contains generated headlines with metadata, scores, and HookBank analysis.",
+  "type": "object",
+  "required": ["headlines", "metadata"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["page_type", "awareness_level", "generated_at", "scorer_version"],
+      "properties": {
+        "page_type": {
+          "type": "string",
+          "description": "The page type these headlines were generated for."
+        },
+        "awareness_level": {
+          "type": "string",
+          "description": "The awareness level these headlines target."
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of generation."
+        },
+        "scorer_version": {
+          "type": "string",
+          "description": "Version of headline_scorer used for evaluation (v1.0 or v2.0)."
+        },
+        "upstream_ad_hook": {
+          "type": "string",
+          "description": "The upstream ad hook, if provided for message match."
+        },
+        "upstream_presell_headline": {
+          "type": "string",
+          "description": "The upstream presell headline, if provided for message match."
+        }
+      }
+    },
+    "headlines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text", "archetype", "belief_targeted", "emotional_register", "score"],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "The headline text."
+          },
+          "archetype": {
+            "type": "string",
+            "enum": [
+              "problem_callout",
+              "identity_callout",
+              "contrarian_claim",
+              "curiosity_gap",
+              "safety_warning",
+              "social_proof_lead",
+              "story_anecdote",
+              "direct_benefit",
+              "expert_insight"
+            ],
+            "description": "The primary archetype this headline uses."
+          },
+          "belief_targeted": {
+            "type": "string",
+            "enum": ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8"],
+            "description": "The primary belief from the B1-B8 chain this headline targets."
+          },
+          "emotional_register": {
+            "type": "string",
+            "enum": ["clinical", "empathetic", "provocative"],
+            "description": "The emotional register of this headline."
+          },
+          "laws_demonstrated": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["law_1_open_loop", "law_2_pain_naming", "law_3_unique_mechanism", "law_4_specificity", "law_5_simplicity", "law_6_credibility", "law_7_time_compression"]
+            },
+            "description": "Which of the 7 Laws from the DR Headline Engine this headline demonstrates."
+          },
+          "anatomy": {
+            "type": "object",
+            "description": "The three-component anatomy of the hook.",
+            "properties": {
+              "pattern_interrupt": {
+                "type": "string",
+                "description": "What stops the scroll — the disruptive element."
+              },
+              "relevance_signal": {
+                "type": "string",
+                "description": "What makes the reader feel 'this is for me.'"
+              },
+              "implicit_promise": {
+                "type": "string",
+                "description": "What the reader expects to learn or gain by continuing."
+              }
+            }
+          },
+          "score": {
+            "type": "object",
+            "required": ["composite", "tier", "hard_gate_pass", "information_architecture", "psychological_triggers", "credibility_specificity", "brand_compliance"],
+            "properties": {
+              "composite": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 40,
+                "description": "Total score out of 40."
+              },
+              "composite_pct": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Composite score as percentage."
+              },
+              "tier": {
+                "type": "string",
+                "enum": ["S", "A", "B", "C", "D", "DISQUALIFIED"],
+                "description": "Quality tier. S=90%+, A=80-89%, B=70-79%, C=60-69%, D=<60%. DISQUALIFIED=hard gate failure."
+              },
+              "hard_gate_pass": {
+                "type": "boolean",
+                "description": "Whether the headline passed all hard gate tests (BC1, BC2, BC3). False = DISQUALIFIED."
+              },
+              "information_architecture": {
+                "type": "object",
+                "description": "Structural/engineering tests. 6 tests, 10 pts max.",
+                "properties": {
+                  "score": { "type": "integer", "minimum": 0, "maximum": 10 },
+                  "max": { "type": "integer", "const": 10 },
+                  "pct": { "type": "number" }
+                }
+              },
+              "psychological_triggers": {
+                "type": "object",
+                "description": "Behavioral science tests. 9 tests, 12 pts max.",
+                "properties": {
+                  "score": { "type": "integer", "minimum": 0, "maximum": 12 },
+                  "max": { "type": "integer", "const": 12 },
+                  "pct": { "type": "number" }
+                }
+              },
+              "credibility_specificity": {
+                "type": "object",
+                "description": "Trust/proof tests. 6 tests, 8 pts max.",
+                "properties": {
+                  "score": { "type": "integer", "minimum": 0, "maximum": 8 },
+                  "max": { "type": "integer", "const": 8 },
+                  "pct": { "type": "number" }
+                }
+              },
+              "brand_compliance": {
+                "type": "object",
+                "description": "Guard rail tests with hard gate. 7 tests, 10 pts max.",
+                "properties": {
+                  "score": { "type": "integer", "minimum": 0, "maximum": 10 },
+                  "max": { "type": "integer", "const": 10 },
+                  "pct": { "type": "number" }
+                }
+              }
+            }
+          },
+          "formula_used": {
+            "type": "string",
+            "description": "Which of the 30 formulas from dr-headline-engine.md was used to generate this headline."
+          },
+          "message_match_notes": {
+            "type": "string",
+            "description": "Notes on how this headline connects to the upstream ad hook or presell headline."
+          },
+          "promise_contract": {
+            "type": "object",
+            "description": "Promise Contract extracted at Step 4.5 of the Headline Engine. Defines what the page body must deliver to pay off the headline's implicit promise.",
+            "required": ["loop_question", "specific_promise", "delivery_test", "minimum_delivery"],
+            "properties": {
+              "loop_question": {
+                "type": "string",
+                "description": "The one-word question the reader asks after reading the headline (from Step 4 item 1)."
+              },
+              "specific_promise": {
+                "type": "string",
+                "description": "What information or content the reader expects to find on the page."
+              },
+              "delivery_test": {
+                "type": "string",
+                "description": "Falsifiable boolean starting with 'The body must contain...' — the concrete test for whether the body delivers.",
+                "pattern": "^The body must contain"
+              },
+              "minimum_delivery": {
+                "type": "string",
+                "description": "Which Section 2 template section must begin paying off the promise, and which must complete it."
+              }
+            }
+          }
+        }
+      },
+      "minItems": 1,
+      "maxItems": 20
+    },
+    "hookbank_analysis": {
+      "type": "object",
+      "description": "Batch-level analysis of the full HookBank. Only present when quantity >= 5.",
+      "properties": {
+        "archetype_diversity": {
+          "type": "object",
+          "properties": {
+            "unique_archetypes": { "type": "integer" },
+            "target_minimum": { "type": "integer", "const": 4 },
+            "pass": { "type": "boolean" },
+            "archetypes_used": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "belief_coverage": {
+          "type": "object",
+          "properties": {
+            "unique_beliefs": { "type": "integer" },
+            "target_minimum": { "type": "integer", "const": 3 },
+            "pass": { "type": "boolean" },
+            "beliefs_covered": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "register_diversity": {
+          "type": "object",
+          "properties": {
+            "registers_used": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "pass": { "type": "boolean" }
+          }
+        },
+        "tier_distribution": {
+          "type": "object",
+          "properties": {
+            "S": { "type": "integer" },
+            "A": { "type": "integer" },
+            "B": { "type": "integer" },
+            "C": { "type": "integer" },
+            "D": { "type": "integer" }
+          }
+        },
+        "average_composite": {
+          "type": "number",
+          "description": "Average composite score across all headlines."
+        },
+        "top_headline_index": {
+          "type": "integer",
+          "description": "Index of the highest-scoring headline in the array."
+        }
+      }
+    }
+  }
+}

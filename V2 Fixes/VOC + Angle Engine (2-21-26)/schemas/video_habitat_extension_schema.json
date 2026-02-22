@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Video Habitat Observation Extension",
+  "description": "11 additional fields for video-sourced habitats (TikTok, IG, YouTube). Applied ON TOP of the base 52-field habitat observation sheet.",
+  "type": "object",
+  "properties": {
+    "video_count_scraped": {
+      "type": "string",
+      "enum": ["UNDER_20", "20_TO_100", "100_TO_500", "OVER_500"],
+      "description": "Volume of video content found for this habitat"
+    },
+    "median_view_count": {
+      "type": "string",
+      "enum": ["UNDER_1K", "1K_TO_10K", "10K_TO_100K", "OVER_100K"],
+      "description": "Typical reach of videos in this habitat"
+    },
+    "viral_videos_found": {
+      "type": "string",
+      "enum": ["Y", "N"],
+      "description": "Any videos meeting VIRAL threshold from score_virality.py"
+    },
+    "viral_video_count": {
+      "type": "integer",
+      "description": "Number of VIRAL-tier videos (computed by score_virality.py, not by agent)"
+    },
+    "comment_sections_active": {
+      "type": "string",
+      "enum": ["Y", "N"],
+      "description": "Do videos have substantive comment discussions (not just emoji/tags)"
+    },
+    "comment_avg_length": {
+      "type": "string",
+      "enum": ["SHORT_EMOJI", "ONE_LINER", "PARAGRAPH", "DETAILED"],
+      "description": "Average comment quality/length indicator"
+    },
+    "hook_formats_identifiable": {
+      "type": "string",
+      "enum": ["Y", "N"],
+      "description": "Can distinct hook patterns be extracted from video openings"
+    },
+    "creator_diversity": {
+      "type": "string",
+      "enum": ["SINGLE_CREATOR", "FEW", "MANY"],
+      "description": "Content not dominated by a single account"
+    },
+    "contains_testimonial_language": {
+      "type": "string",
+      "enum": ["Y", "N"],
+      "description": "Comments contain personal experience stories"
+    },
+    "contains_objection_language": {
+      "type": "string",
+      "enum": ["Y", "N"],
+      "description": "Comments contain skepticism, pushback, or doubt"
+    },
+    "contains_purchase_intent": {
+      "type": "string",
+      "enum": ["Y", "N"],
+      "description": "Comments mention buying, trying, or recommending products"
+    }
+  }
+}
