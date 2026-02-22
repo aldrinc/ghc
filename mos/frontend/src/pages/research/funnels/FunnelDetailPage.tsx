@@ -344,7 +344,9 @@ export function FunnelDetailPage() {
         applyPlan: boolean;
         planPath?: string;
         instanceName?: string;
-        serverNames?: string[];
+        bunnyPullZone?: boolean;
+        bunnyPullZoneOriginIp?: string;
+        https?: boolean;
         upstreamBaseUrl?: string;
         upstreamApiBaseUrl?: string;
       };
@@ -353,11 +355,14 @@ export function FunnelDetailPage() {
         workloadName: `brand-funnels-${funnel.client_id}`,
         createIfMissing: true,
         applyPlan: true,
+        bunnyPullZone: true,
+        https: false,
       },
     };
 
     if (deployPlanPath) payload.deploy.planPath = deployPlanPath;
     if (deployInstanceName) payload.deploy.instanceName = deployInstanceName;
+    if (deployBunnyPullZoneOriginIp) payload.deploy.bunnyPullZoneOriginIp = deployBunnyPullZoneOriginIp;
     if (deployUpstreamBaseUrl) payload.deploy.upstreamBaseUrl = deployUpstreamBaseUrl;
     if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
 
