@@ -221,6 +221,29 @@ def test_resolve_bunny_pull_zone_origin_url_errors_when_origin_missing(monkeypat
         )
 
 
+def test_request_bunny_pull_zone_certificate_uses_global_endpoint(monkeypatch):
+    captured: dict[str, str] = {}
+
+    def fake_bunny_api_request(*, method: str, path: str, payload: dict | None = None):
+        captured["method"] = method
+        captured["path"] = path
+        _ = payload
+        return {"Success": True}
+
+    monkeypatch.setattr(deploy_service, "_bunny_api_request", fake_bunny_api_request)
+
+    response = deploy_service._request_bunny_pull_zone_certificate(
+        zone_id=5365591,
+        hostname="shop.moshq.app",
+    )
+
+    assert response == {"Success": True}
+    assert captured == {
+        "method": "GET",
+        "path": "/pullzone/loadFreeCertificate?hostname=shop.moshq.app",
+    }
+
+
 def test_ensure_bunny_pull_zone_creates_when_missing(monkeypatch):
     calls: list[tuple[str, str, dict | None]] = []
 

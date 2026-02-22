@@ -1607,10 +1607,11 @@ def _ensure_bunny_pull_zone_auto_ssl_enabled(*, zone_id: int) -> None:
 
 
 def _request_bunny_pull_zone_certificate(*, zone_id: int, hostname: str) -> dict[str, Any] | None:
+    _ = zone_id
     normalized_hostname = _normalize_hostname(value=hostname, context="Bunny certificate")
     response = _bunny_api_request(
         method="GET",
-        path=f"/pullzone/{zone_id}/loadFreeCertificate?hostname={quote(normalized_hostname, safe='')}",
+        path=f"/pullzone/loadFreeCertificate?hostname={quote(normalized_hostname, safe='')}",
     )
     if response is None:
         return None
