@@ -13,6 +13,7 @@ from app.db.repositories.claude_context_files import ClaudeContextFilesRepositor
 from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
 from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.research_artifacts import ResearchArtifactsRepository
+from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
 
 __all__ = [
     "ClientsRepository",
@@ -30,4 +31,5 @@ __all__ = [
     "ClientComplianceProfilesRepository",
     "MetaAdsRepository",
     "ResearchArtifactsRepository",
+    "OrgDeployDomainsRepository",
 ]

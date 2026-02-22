@@ -3,7 +3,9 @@ import os
 from pathlib import Path
 
 import pytest
+from sqlalchemy import select
 
+from app.db.models import Org, OrgDeployDomain
 from app.services import deploy as deploy_service
 
 
@@ -37,6 +39,94 @@ def test_deploy_latest_plan_404_on_missing(api_client, monkeypatch):
 
     resp = api_client.get("/deploy/plans/latest")
     assert resp.status_code == 404
+
+
+def test_patch_workload_endpoint_persists_org_deploy_domains(api_client, db_session, monkeypatch):
+    def fake_patch_workload_in_plan(
+        *,
+        org_id: str,
+        workload_patch: dict,
+        plan_path: str | None = None,
+        instance_name: str | None = None,
+        create_if_missing: bool = False,
+        in_place: bool = False,
+    ):
+        _ = org_id
+        _ = workload_patch
+        _ = plan_path
+        _ = instance_name
+        _ = create_if_missing
+        _ = in_place
+        return {
+            "status": "ok",
+            "base_plan_path": "/tmp/plan.json",
+            "updated_plan_path": "/tmp/plan.json",
+            "workload_name": "brand-funnels-test",
+            "updated_count": 1,
+        }
+
+    monkeypatch.setattr(deploy_service, "patch_workload_in_plan", fake_patch_workload_in_plan)
+
+    resp = api_client.post(
+        "/deploy/plans/workloads?plan_path=/tmp/plan.json",
+        json={
+            "name": "brand-funnels-test",
+            "service_config": {
+                "server_names": [
+                    "Offers.Example.com",
+                    "offers.example.com",
+                    "  ",
+                    "Landing.example.com",
+                ],
+                "https": True,
+            },
+        },
+    )
+    assert resp.status_code == 200
+
+    hostnames = db_session.scalars(
+        select(OrgDeployDomain.hostname).order_by(OrgDeployDomain.hostname.asc())
+    ).all()
+    assert hostnames == ["landing.example.com", "offers.example.com"]
+
+
+def test_get_workload_domains_includes_org_server_names(api_client, db_session, monkeypatch):
+    org_id = db_session.scalars(select(Org.id)).first()
+    assert org_id is not None
+    db_session.add_all(
+        [
+            OrgDeployDomain(org_id=org_id, hostname="offers.example.com"),
+        ]
+    )
+    db_session.commit()
+
+    def fake_get_workload_domains_from_plan(
+        *,
+        workload_name: str,
+        plan_path: str | None = None,
+        instance_name: str | None = None,
+    ):
+        _ = workload_name
+        _ = plan_path
+        _ = instance_name
+        return {
+            "plan_path": "/tmp/plan.json",
+            "workload_found": True,
+            "server_names": [],
+            "https": False,
+        }
+
+    monkeypatch.setattr(
+        deploy_service,
+        "get_workload_domains_from_plan",
+        fake_get_workload_domains_from_plan,
+    )
+
+    resp = api_client.get("/deploy/plans/workloads/domains?workload_name=brand-funnels-test")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["org_server_names"] == ["offers.example.com"]
+    assert body["server_names"] == []
 
 
 def test_build_bunny_pull_zone_name_uses_org_id():
@@ -120,6 +210,98 @@ def test_list_bunny_pull_zones_accepts_array_response(monkeypatch):
     assert zones[1]["Id"] == 456
 
 
+def test_provision_bunny_custom_domains_upserts_namecheap_and_requests_ssl(monkeypatch):
+    bunny_zone = {
+        "Id": 777,
+        "Name": "workspace-123",
+        "Hostnames": [{"Value": "workspace-123.b-cdn.net"}],
+    }
+
+    captured: dict[str, object] = {}
+
+    def fake_upsert_cname_record(*, hostname: str, target_hostname: str):
+        captured["hostname"] = hostname
+        captured["target_hostname"] = target_hostname
+        return {"provider": "namecheap", "fqdn": hostname, "target": target_hostname}
+
+    monkeypatch.setattr(
+        deploy_service.namecheap_dns_service,
+        "upsert_cname_record",
+        fake_upsert_cname_record,
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_ensure_bunny_pull_zone_auto_ssl_enabled",
+        lambda *, zone_id: captured.setdefault("auto_ssl_zone_id", zone_id),
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_ensure_bunny_pull_zone_hostname",
+        lambda *, zone_id, hostname: {"zone_id": zone_id, "hostname": hostname, "status": "created"},
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_request_bunny_pull_zone_certificate",
+        lambda *, zone_id, hostname: {"zone_id": zone_id, "hostname": hostname, "status": "queued"},
+    )
+    monkeypatch.setattr(
+        deploy_service,
+        "_get_bunny_pull_zone",
+        lambda *, zone_id: {
+            "Id": zone_id,
+            "Hostnames": [
+                {"Value": "workspace-123.b-cdn.net"},
+                {"Value": "shop.example.com"},
+            ],
+        },
+    )
+
+    output = deploy_service._provision_bunny_custom_domains(
+        bunny_zone=bunny_zone,
+        server_names=["shop.example.com"],
+    )
+
+    assert output["dnsTargetHostname"] == "workspace-123.b-cdn.net"
+    assert output["pullZoneHostnames"] == ["workspace-123.b-cdn.net", "shop.example.com"]
+    assert len(output["domains"]) == 1
+    assert output["domains"][0]["hostname"] == "shop.example.com"
+    assert output["domains"][0]["dns"]["provider"] == "namecheap"
+    assert output["domains"][0]["ssl"]["status"] == "requested"
+    assert captured == {
+        "hostname": "shop.example.com",
+        "target_hostname": "workspace-123.b-cdn.net",
+        "auto_ssl_zone_id": 777,
+    }
+
+
+def test_provision_bunny_custom_domains_skips_dns_when_no_domains(monkeypatch):
+    bunny_zone = {
+        "Id": 777,
+        "Name": "workspace-123",
+        "Hostnames": [{"Value": "workspace-123.b-cdn.net"}],
+    }
+
+    def _unexpected_upsert(*, hostname: str, target_hostname: str):
+        raise AssertionError(f"Namecheap should not be called, got {hostname} -> {target_hostname}")
+
+    monkeypatch.setattr(
+        deploy_service.namecheap_dns_service,
+        "upsert_cname_record",
+        _unexpected_upsert,
+    )
+
+    output = deploy_service._provision_bunny_custom_domains(
+        bunny_zone=bunny_zone,
+        server_names=[],
+    )
+
+    assert output == {
+        "dnsTargetHostname": None,
+        "domains": [],
+        "pullZoneHostnames": ["workspace-123.b-cdn.net"],
+    }
+
+
 def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
@@ -160,6 +342,22 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
         }
 
     monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
+    monkeypatch.setattr(
+        deploy_service,
+        "_provision_bunny_custom_domains",
+        lambda *, bunny_zone, server_names: {
+            "dnsTargetHostname": "workspace-123.b-cdn.net",
+            "domains": [
+                {
+                    "hostname": "offers.example.com",
+                    "dns": {"provider": "namecheap"},
+                    "bunnyHostname": {"status": "created"},
+                    "ssl": {"status": "requested"},
+                }
+            ],
+            "pullZoneHostnames": ["workspace-123.b-cdn.net", "offers.example.com"],
+        },
+    )
 
     output = deploy_service.configure_bunny_pull_zone_for_workload(
         org_id="workspace-123",
@@ -171,7 +369,9 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
     assert output["pull_zone"]["id"] == 999
     assert output["pull_zone"]["name"] == "workspace-123"
     assert output["pull_zone"]["originUrl"] == "http://46.225.124.104"
-    assert output["pull_zone"]["accessUrls"] == ["https://workspace-123.b-cdn.net/"]
+    assert output["pull_zone"]["accessUrls"] == ["https://workspace-123.b-cdn.net/", "https://offers.example.com/"]
+    assert output["pull_zone"]["dnsTargetHostname"] == "workspace-123.b-cdn.net"
+    assert isinstance(output["pull_zone"]["domainProvisioning"], list)
     assert captured == {
         "org_id": "workspace-123",
         "origin_url": "http://46.225.124.104",

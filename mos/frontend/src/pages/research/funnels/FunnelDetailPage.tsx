@@ -150,30 +150,6 @@ export function FunnelDetailPage() {
     instanceName: deployInstanceName || undefined,
   });
 
-  const deployedPageUrl = useMemo(() => {
-    if (!productRouteSlug || !funnelRouteSlug || !entryArtifact) return null;
-
-    const accessCandidate =
-      (deployJob?.accessUrl || "").trim() ||
-      (() => {
-        const host = deployDomains.data?.server_names?.[0];
-        if (!host) return "";
-        const scheme = deployDomains.data?.https ? "https" : "http";
-        return `${scheme}://${host}/`;
-      })();
-
-    const baseUrl = accessCandidate || `${window.location.origin}/`;
-    const normalizedBase = baseUrl.replace(/\/+$/, "");
-    return `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnelRouteSlug)}/${encodeURIComponent(entryArtifact)}`;
-  }, [
-    deployDomains.data?.https,
-    deployDomains.data?.server_names,
-    deployJob?.accessUrl,
-    entryArtifact,
-    funnelRouteSlug,
-    productRouteSlug,
-  ]);
-
   const normalizeDeployDomainList = (values: string[]): string[] => {
     const out: string[] = [];
     const seen = new Set<string>();
@@ -185,6 +161,38 @@ export function FunnelDetailPage() {
     }
     return out;
   };
+
+  const configuredDeployDomains = useMemo(() => {
+    const orgScoped = normalizeDeployDomainList(deployDomains.data?.org_server_names || []);
+    if (orgScoped.length) return orgScoped;
+    return normalizeDeployDomainList(deployDomains.data?.server_names || []);
+  }, [deployDomains.data?.org_server_names, deployDomains.data?.server_names]);
+
+  const deployHttpsEnabled = Boolean(deployDomains.data?.https ?? (configuredDeployDomains.length > 0));
+
+  const deployedPageUrl = useMemo(() => {
+    if (!productRouteSlug || !funnelRouteSlug || !entryArtifact) return null;
+
+    const accessCandidate =
+      (deployJob?.accessUrl || "").trim() ||
+      (() => {
+        const host = configuredDeployDomains[0];
+        if (!host) return "";
+        const scheme = deployHttpsEnabled ? "https" : "http";
+        return `${scheme}://${host}/`;
+      })();
+
+    const baseUrl = accessCandidate || `${window.location.origin}/`;
+    const normalizedBase = baseUrl.replace(/\/+$/, "");
+    return `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnelRouteSlug)}/${encodeURIComponent(entryArtifact)}`;
+  }, [
+    configuredDeployDomains,
+    deployHttpsEnabled,
+    deployJob?.accessUrl,
+    entryArtifact,
+    funnelRouteSlug,
+    productRouteSlug,
+  ]);
 
   const parseDeployDomains = (raw: string): string[] => {
     const tokens = raw
@@ -207,7 +215,7 @@ export function FunnelDetailPage() {
 
   const startEditingDeployDomains = () => {
     if (!deployDomains.data) return;
-    setDeployDomainsDraft(normalizeDeployDomainList(deployDomains.data.server_names || []));
+    setDeployDomainsDraft(configuredDeployDomains);
     setDeployDomainsInput("");
     setDeployDomainsSaveError(null);
     setIsEditingDeployDomains(true);
@@ -346,6 +354,7 @@ export function FunnelDetailPage() {
         instanceName?: string;
         bunnyPullZone?: boolean;
         bunnyPullZoneOriginIp?: string;
+        serverNames?: string[];
         https?: boolean;
         upstreamBaseUrl?: string;
         upstreamApiBaseUrl?: string;
@@ -356,9 +365,11 @@ export function FunnelDetailPage() {
         createIfMissing: true,
         applyPlan: true,
         bunnyPullZone: true,
-        https: false,
       },
     };
+
+    payload.deploy.serverNames = configuredDeployDomains;
+    payload.deploy.https = configuredDeployDomains.length > 0;
 
     if (deployPlanPath) payload.deploy.planPath = deployPlanPath;
     if (deployInstanceName) payload.deploy.instanceName = deployInstanceName;
@@ -657,14 +668,14 @@ export function FunnelDetailPage() {
                         <span className="truncate text-danger">
                           {(deployDomains.error as { message?: string })?.message || "Unable to load deploy domains."}
                         </span>
-                      ) : deployDomains.data?.workload_found ? (
+                      ) : deployDomains.data?.workload_found || configuredDeployDomains.length > 0 ? (
                         <>
-                          {deployDomains.data.server_names.length ? (
+                          {configuredDeployDomains.length ? (
                             <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-                              {deployDomains.data.server_names.map((hostname) => (
+                              {configuredDeployDomains.map((hostname) => (
                                 <a
                                   key={hostname}
-                                  href={`${deployDomains.data?.https ? "https" : "http"}://${hostname}/`}
+                                  href={`${deployHttpsEnabled ? "https" : "http"}://${hostname}/`}
                                   target="_blank"
                                   rel="noreferrer"
                                   className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content hover:bg-surface-3"

@@ -114,6 +114,14 @@ Generated from `prd.txt` using Taskmaster with `gpt-5` via the OpenAI provider.
 - `DEPLOY_PROJECT_ID` (default `mos`)
 - `DEPLOY_PUBLIC_BASE_URL` (for example `https://moshq.app`)
 - `DEPLOY_PUBLIC_API_BASE_URL` (for example `https://moshq.app/api`)
+- `BUNNY_API_KEY`
+- `BUNNY_API_BASE_URL` (default `https://api.bunny.net`)
+- `BUNNY_PULLZONE_ORIGIN_IP` (for example `46.225.124.104`)
+- `NAMECHEAP_API_USER`
+- `NAMECHEAP_API_KEY`
+- `NAMECHEAP_USERNAME`
+- `NAMECHEAP_CLIENT_IP` (must be whitelisted in Namecheap API settings)
+- `NAMECHEAP_API_BASE_URL` (default `https://api.namecheap.com/xml.response`)
 
 ### First-Run Plan Bootstrap (No Existing Plan)
 

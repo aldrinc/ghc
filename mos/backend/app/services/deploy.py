@@ -9,13 +9,14 @@ import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
 import httpx
 
 from app.config import settings
+from app.services import namecheap_dns as namecheap_dns_service
 
 
 class DeployError(RuntimeError):
@@ -25,6 +26,7 @@ class DeployError(RuntimeError):
 _DEPLOY_JOB_LOG_TAIL_CHARS = 12000
 _ORG_SCOPED_PORT_RANGE_START = 20000
 _ORG_SCOPED_PORT_RANGE_END = 29999
+_HOSTNAME_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -1513,6 +1515,164 @@ def _coerce_bunny_pull_zone_id(*, zone: dict[str, Any]) -> int:
     return zone_id
 
 
+def _normalize_hostname(*, value: str, context: str) -> str:
+    normalized = (value or "").strip().lower().rstrip(".")
+    if not normalized:
+        raise DeployError(f"{context} hostname is required.")
+    if "://" in normalized or "/" in normalized or "?" in normalized or "#" in normalized:
+        raise DeployError(
+            f"{context} hostname '{value}' is invalid. Use a bare hostname (for example: shop.example.com)."
+        )
+    if not _HOSTNAME_RE.match(normalized):
+        raise DeployError(f"{context} hostname '{value}' is invalid.")
+    return normalized
+
+
+def _normalize_workload_server_names(*, server_names: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in server_names:
+        hostname = _normalize_hostname(value=raw, context="Workload")
+        if hostname in seen:
+            continue
+        seen.add(hostname)
+        out.append(hostname)
+    return out
+
+
+def _extract_bunny_pull_zone_hostname_values(zone: dict[str, Any]) -> list[str]:
+    hostnames = zone.get("Hostnames")
+    if hostnames is None:
+        return []
+    if not isinstance(hostnames, list):
+        raise DeployError("Bunny pull zone response field Hostnames must be an array when provided.")
+
+    values: list[str] = []
+    seen: set[str] = set()
+    for idx, hostname in enumerate(hostnames):
+        if not isinstance(hostname, dict):
+            raise DeployError(f"Bunny pull zone hostname at index {idx} is invalid.")
+        value = str(hostname.get("Value") or "").strip().lower()
+        if not value:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        values.append(value)
+    return values
+
+
+def _extract_bunny_pull_zone_dns_target_hostname(zone: dict[str, Any]) -> str:
+    hostname_values = _extract_bunny_pull_zone_hostname_values(zone)
+    for value in hostname_values:
+        if value.endswith(".b-cdn.net"):
+            return value
+    raise DeployError(
+        "Bunny pull zone response does not include a default '*.b-cdn.net' hostname for CNAME target."
+    )
+
+
+def _get_bunny_pull_zone(*, zone_id: int) -> dict[str, Any]:
+    payload = _bunny_api_request(method="GET", path=f"/pullzone/{zone_id}")
+    if not isinstance(payload, dict):
+        raise DeployError("Bunny get pull zone response must be an object.")
+    return payload
+
+
+def _ensure_bunny_pull_zone_hostname(*, zone_id: int, hostname: str) -> dict[str, Any]:
+    normalized_hostname = _normalize_hostname(value=hostname, context="Bunny custom domain")
+    zone = _get_bunny_pull_zone(zone_id=zone_id)
+    existing = _extract_bunny_pull_zone_hostname_values(zone)
+    if normalized_hostname in existing:
+        return {"hostname": normalized_hostname, "status": "existing"}
+
+    response = _bunny_api_request(
+        method="POST",
+        path=f"/pullzone/{zone_id}/addHostname",
+        payload={"Hostname": normalized_hostname},
+    )
+    if response is not None and not isinstance(response, (dict, bool, str)):
+        raise DeployError("Bunny add hostname response must be an object, bool, or string when present.")
+    return {"hostname": normalized_hostname, "status": "created"}
+
+
+def _ensure_bunny_pull_zone_auto_ssl_enabled(*, zone_id: int) -> None:
+    response = _bunny_api_request(
+        method="POST",
+        path=f"/pullzone/{zone_id}",
+        payload={"EnableAutoSSL": True, "DisableLetsEncrypt": False},
+    )
+    if response is not None and not isinstance(response, (dict, bool, str)):
+        raise DeployError("Bunny pull zone SSL update response must be an object, bool, or string when present.")
+
+
+def _request_bunny_pull_zone_certificate(*, zone_id: int, hostname: str) -> dict[str, Any] | None:
+    normalized_hostname = _normalize_hostname(value=hostname, context="Bunny certificate")
+    response = _bunny_api_request(
+        method="GET",
+        path=f"/pullzone/{zone_id}/loadFreeCertificate?hostname={quote(normalized_hostname, safe='')}",
+    )
+    if response is None:
+        return None
+    if isinstance(response, dict):
+        return response
+    if isinstance(response, bool):
+        return {"ok": response}
+    if isinstance(response, str):
+        return {"message": response}
+    raise DeployError("Bunny free certificate response must be an object, bool, or string when present.")
+
+
+def _provision_bunny_custom_domains(
+    *,
+    bunny_zone: dict[str, Any],
+    server_names: list[str],
+) -> dict[str, Any]:
+    normalized_server_names = _normalize_workload_server_names(server_names=server_names)
+    if not normalized_server_names:
+        return {
+            "dnsTargetHostname": None,
+            "domains": [],
+            "pullZoneHostnames": _extract_bunny_pull_zone_hostname_values(bunny_zone),
+        }
+
+    zone_id = _coerce_bunny_pull_zone_id(zone=bunny_zone)
+    dns_target_hostname = _extract_bunny_pull_zone_dns_target_hostname(bunny_zone)
+    _ensure_bunny_pull_zone_auto_ssl_enabled(zone_id=zone_id)
+
+    domain_results: list[dict[str, Any]] = []
+    for hostname in normalized_server_names:
+        try:
+            dns_record = namecheap_dns_service.upsert_cname_record(
+                hostname=hostname,
+                target_hostname=dns_target_hostname,
+            )
+        except namecheap_dns_service.NamecheapDnsError as exc:
+            raise DeployError(str(exc)) from exc
+
+        hostname_result = _ensure_bunny_pull_zone_hostname(zone_id=zone_id, hostname=hostname)
+        certificate_result = _request_bunny_pull_zone_certificate(zone_id=zone_id, hostname=hostname)
+        domain_results.append(
+            {
+                "hostname": hostname,
+                "dns": dns_record,
+                "bunnyHostname": hostname_result,
+                "ssl": {
+                    "provider": "bunny",
+                    "status": "requested",
+                    "certificateRequest": certificate_result,
+                },
+            }
+        )
+
+    refreshed_zone = _get_bunny_pull_zone(zone_id=zone_id)
+    return {
+        "dnsTargetHostname": dns_target_hostname,
+        "domains": domain_results,
+        "pullZoneHostnames": _extract_bunny_pull_zone_hostname_values(refreshed_zone),
+    }
+
+
 def _resolve_bunny_pull_zone_origin_url(
     *,
     requested_origin_ip: Any,
@@ -1549,19 +1709,8 @@ def _resolve_bunny_pull_zone_origin_url(
 
 
 def _extract_bunny_pull_zone_access_urls(zone: dict[str, Any]) -> list[str]:
-    hostnames = zone.get("Hostnames")
-    if hostnames is None:
-        return []
-    if not isinstance(hostnames, list):
-        raise DeployError("Bunny pull zone response field Hostnames must be an array when provided.")
-
     urls: list[str] = []
-    for idx, hostname in enumerate(hostnames):
-        if not isinstance(hostname, dict):
-            raise DeployError(f"Bunny pull zone hostname at index {idx} is invalid.")
-        value = str(hostname.get("Value") or "").strip().lower()
-        if not value:
-            continue
+    for value in _extract_bunny_pull_zone_hostname_values(zone):
         urls.append(f"https://{value}/")
     return _normalize_access_urls(urls)
 
@@ -1611,6 +1760,7 @@ def _ensure_bunny_pull_zone(*, org_id: str, origin_url: str) -> dict[str, Any]:
     zone_name = _build_bunny_pull_zone_name(org_id=org_id)
     existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
 
+    zone: dict[str, Any]
     if existing_zone is None:
         created = _bunny_api_request(
             method="POST",
@@ -1619,21 +1769,26 @@ def _ensure_bunny_pull_zone(*, org_id: str, origin_url: str) -> dict[str, Any]:
         )
         if not isinstance(created, dict):
             raise DeployError("Bunny create pull zone response must be an object.")
-        return created
+        zone = created
+    else:
+        existing_zone_id = _coerce_bunny_pull_zone_id(zone=existing_zone)
+        current_origin = str(existing_zone.get("OriginUrl") or "").strip()
+        if current_origin != origin_url:
+            updated = _bunny_api_request(
+                method="POST",
+                path=f"/pullzone/{existing_zone_id}",
+                payload={"OriginUrl": origin_url},
+            )
+            if not isinstance(updated, dict):
+                raise DeployError("Bunny update pull zone response must be an object.")
+            zone = updated
+        else:
+            zone = existing_zone
 
-    existing_zone_id = _coerce_bunny_pull_zone_id(zone=existing_zone)
-    current_origin = str(existing_zone.get("OriginUrl") or "").strip()
-    if current_origin != origin_url:
-        updated = _bunny_api_request(
-            method="POST",
-            path=f"/pullzone/{existing_zone_id}",
-            payload={"OriginUrl": origin_url},
-        )
-        if not isinstance(updated, dict):
-            raise DeployError("Bunny update pull zone response must be an object.")
-        return updated
-
-    return existing_zone
+    if not isinstance(zone.get("Hostnames"), list):
+        zone_id = _coerce_bunny_pull_zone_id(zone=zone)
+        return _get_bunny_pull_zone(zone_id=zone_id)
+    return zone
 
 
 def _load_workload_from_plan(
@@ -1722,7 +1877,20 @@ def configure_bunny_pull_zone_for_workload(
         org_id=org_id,
         origin_url=origin_url,
     )
-    bunny_access_urls = _extract_bunny_pull_zone_access_urls(bunny_zone)
+    domain_provisioning = _provision_bunny_custom_domains(
+        bunny_zone=bunny_zone,
+        server_names=workload_server_names,
+    )
+
+    zone_for_access_urls = dict(bunny_zone)
+    provisioned_hostnames = domain_provisioning.get("pullZoneHostnames")
+    if isinstance(provisioned_hostnames, list):
+        zone_for_access_urls["Hostnames"] = [
+            {"Value": value}
+            for value in provisioned_hostnames
+            if isinstance(value, str)
+        ]
+    bunny_access_urls = _extract_bunny_pull_zone_access_urls(zone_for_access_urls)
     return {
         "provider": "bunny",
         "plan_path": resolved_plan_path,
@@ -1734,6 +1902,8 @@ def configure_bunny_pull_zone_for_workload(
             "workloadPort": workload_port,
             "workloadPortSource": workload_port_source,
             "workloadPortPending": port_pending,
+            "dnsTargetHostname": domain_provisioning.get("dnsTargetHostname"),
+            "domainProvisioning": domain_provisioning.get("domains"),
         },
     }
 
@@ -1775,7 +1945,20 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         org_id=org_id,
         origin_url=origin_url,
     )
-    bunny_access_urls = _extract_bunny_pull_zone_access_urls(bunny_zone)
+    domain_provisioning = _provision_bunny_custom_domains(
+        bunny_zone=bunny_zone,
+        server_names=workload_server_names,
+    )
+
+    zone_for_access_urls = dict(bunny_zone)
+    provisioned_hostnames = domain_provisioning.get("pullZoneHostnames")
+    if isinstance(provisioned_hostnames, list):
+        zone_for_access_urls["Hostnames"] = [
+            {"Value": value}
+            for value in provisioned_hostnames
+            if isinstance(value, str)
+        ]
+    bunny_access_urls = _extract_bunny_pull_zone_access_urls(zone_for_access_urls)
     return {
         "provider": "bunny",
         "plan_path": resolved_plan_path,
@@ -1787,6 +1970,8 @@ def _reconcile_bunny_pull_zone_for_published_workload(
             "workloadPort": workload_port,
             "workloadPortSource": workload_port_source,
             "workloadPortPending": bool(not workload_server_names and workload_port is None),
+            "dnsTargetHostname": domain_provisioning.get("dnsTargetHostname"),
+            "domainProvisioning": domain_provisioning.get("domains"),
         },
     }
 

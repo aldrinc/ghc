@@ -6,6 +6,7 @@ export type DeployWorkloadDomainsResponse = {
   plan_path: string;
   workload_found: boolean;
   server_names: string[];
+  org_server_names: string[];
   https?: boolean | null;
 };
 
@@ -33,4 +34,3 @@ export function useDeployWorkloadDomains({
     enabled,
   });
 }
-
