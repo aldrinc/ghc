@@ -257,6 +257,20 @@ def test_sync_compliance_policy_pages_requires_placeholder_values(api_client):
     assert "Missing placeholder values" in sync_response.json()["detail"]
 
 
+def test_sync_compliance_policy_pages_requires_existing_profile(api_client):
+    client_id = _create_client(api_client)
+
+    sync_response = api_client.post(
+        f"/clients/{client_id}/compliance/shopify/policy-pages/sync",
+        json={},
+    )
+
+    assert sync_response.status_code == 404
+    detail = sync_response.json()["detail"]
+    assert detail.startswith("Compliance profile not found for this client.")
+    assert f"PUT /clients/{client_id}/compliance/profile" in detail
+
+
 def test_sync_compliance_policy_pages_for_subscription_model(api_client, monkeypatch):
     client_id = _create_client(api_client, name="SaaS Compliance Workspace")
     profile_payload = _sync_ready_profile_payload()

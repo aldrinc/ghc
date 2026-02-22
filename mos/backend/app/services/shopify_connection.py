@@ -359,6 +359,7 @@ def get_client_shopify_connection_status(*, client_id: str, selected_shop_domain
         for installation in installations
         if installation.client_id == client_id and installation.uninstalled_at is None
     ]
+    active_shop_domains = sorted({installation.shop_domain for installation in active_for_client})
     normalized_selected_shop: str | None = None
     if selected_shop_domain is not None:
         normalized_selected_shop = normalize_shop_domain(selected_shop_domain)
@@ -392,7 +393,7 @@ def get_client_shopify_connection_status(*, client_id: str, selected_shop_domain
             "state": "multiple_installations_conflict",
             "message": detail,
             "shopDomain": None,
-            "shopDomains": sorted(installation.shop_domain for installation in active_for_client),
+            "shopDomains": active_shop_domains,
             "selectedShopDomain": normalized_selected_shop,
             "hasStorefrontAccessToken": False,
             "missingScopes": [],
@@ -409,7 +410,7 @@ def get_client_shopify_connection_status(*, client_id: str, selected_shop_domain
                 "If scopes were recently changed, reconnect/reinstall the app for this store."
             ),
             "shopDomain": installation.shop_domain,
-            "shopDomains": [],
+            "shopDomains": active_shop_domains,
             "selectedShopDomain": normalized_selected_shop,
             "hasStorefrontAccessToken": installation.has_storefront_access_token,
             "missingScopes": missing_scopes,
@@ -420,7 +421,7 @@ def get_client_shopify_connection_status(*, client_id: str, selected_shop_domain
             "state": "installed_missing_storefront_token",
             "message": "Shopify is installed but missing storefront access token.",
             "shopDomain": installation.shop_domain,
-            "shopDomains": [],
+            "shopDomains": active_shop_domains,
             "selectedShopDomain": normalized_selected_shop,
             "hasStorefrontAccessToken": False,
             "missingScopes": [],
@@ -430,7 +431,7 @@ def get_client_shopify_connection_status(*, client_id: str, selected_shop_domain
         "state": "ready",
         "message": "Shopify connection is ready.",
         "shopDomain": installation.shop_domain,
-        "shopDomains": [],
+        "shopDomains": active_shop_domains,
         "selectedShopDomain": normalized_selected_shop,
         "hasStorefrontAccessToken": True,
         "missingScopes": [],

@@ -49,6 +49,16 @@ def _ensure_client_exists(*, session: Session, org_id: str, client_id: str) -> N
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
 
+def _missing_compliance_profile_exception(*, client_id: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail=(
+            "Compliance profile not found for this client. "
+            f"Create it first via PUT /clients/{client_id}/compliance/profile."
+        ),
+    )
+
+
 def _clean_optional_text(value: str | None) -> str | None:
     if value is None:
         return None
@@ -340,10 +350,7 @@ def get_client_compliance_profile(
     repo = ClientComplianceProfilesRepository(session)
     profile = repo.get(org_id=auth.org_id, client_id=client_id)
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Compliance profile not found for this client.",
-        )
+        raise _missing_compliance_profile_exception(client_id=client_id)
     return _profile_to_response(profile)
 
 
@@ -423,10 +430,7 @@ def get_client_compliance_requirements(
     repo = ClientComplianceProfilesRepository(session)
     profile = repo.get(org_id=auth.org_id, client_id=client_id)
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Compliance profile not found for this client.",
-        )
+        raise _missing_compliance_profile_exception(client_id=client_id)
 
     requirements = build_page_requirements(
         ruleset_version=profile.ruleset_version,
@@ -451,10 +455,7 @@ def sync_client_compliance_policy_pages_to_shopify(
     repo = ClientComplianceProfilesRepository(session)
     profile = repo.get(org_id=auth.org_id, client_id=client_id)
     if not profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Compliance profile not found for this client.",
-        )
+        raise _missing_compliance_profile_exception(client_id=client_id)
 
     requirements = build_page_requirements(
         ruleset_version=profile.ruleset_version,
