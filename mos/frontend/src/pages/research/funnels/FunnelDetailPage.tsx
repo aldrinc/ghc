@@ -171,23 +171,23 @@ export function FunnelDetailPage() {
   const deployHttpsEnabled = Boolean(deployDomains.data?.https ?? (configuredDeployDomains.length > 0));
 
   const deployedPageUrl = useMemo(() => {
-    if (!productRouteSlug || !funnelRouteSlug || !entryArtifact) return null;
+    if (!productRouteSlug || !funnelRouteSlug) return null;
 
     const accessCandidate =
-      (deployJob?.accessUrl || "").trim() ||
       (() => {
         const host = configuredDeployDomains[0];
         if (!host) return "";
-        const scheme = deployHttpsEnabled ? "https" : "http";
-        return `${scheme}://${host}/`;
-      })();
+        return `https://${host}/`;
+      })() ||
+      (deployJob?.accessUrl || "").trim();
 
     const baseUrl = accessCandidate || `${window.location.origin}/`;
     const normalizedBase = baseUrl.replace(/\/+$/, "");
-    return `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnelRouteSlug)}/${encodeURIComponent(entryArtifact)}`;
+    const basePath = `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnelRouteSlug)}`;
+    if (!entryArtifact) return basePath;
+    return `${basePath}/${encodeURIComponent(entryArtifact)}`;
   }, [
     configuredDeployDomains,
-    deployHttpsEnabled,
     deployJob?.accessUrl,
     entryArtifact,
     funnelRouteSlug,
