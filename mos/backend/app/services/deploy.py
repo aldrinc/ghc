@@ -1851,6 +1851,7 @@ def configure_bunny_pull_zone_for_workload(
     plan_path: str | None,
     instance_name: str | None,
     requested_origin_ip: str | None = None,
+    server_names: list[str] | None = None,
 ) -> dict[str, Any]:
     workload, resolved_plan_path = _load_workload_from_plan(
         workload_name=workload_name,
@@ -1871,6 +1872,8 @@ def configure_bunny_pull_zone_for_workload(
         resolve_port_from_latest_spec=False,
         require_port_when_no_domains=False,
     )
+    if server_names is not None:
+        workload_server_names = _normalize_workload_server_names(server_names=server_names)
     port_pending = bool(not workload_server_names and workload_port is None)
     if port_pending:
         workload_port_source = "pending"
@@ -1923,6 +1926,7 @@ def _reconcile_bunny_pull_zone_for_published_workload(
     instance_name: str | None,
     requested_origin_ip: str | None,
     require_port_when_no_domains: bool,
+    server_names: list[str] | None = None,
 ) -> dict[str, Any]:
     workload, resolved_plan_path = _load_workload_from_plan(
         workload_name=workload_name,
@@ -1943,6 +1947,8 @@ def _reconcile_bunny_pull_zone_for_published_workload(
         resolve_port_from_latest_spec=True,
         require_port_when_no_domains=require_port_when_no_domains,
     )
+    if server_names is not None:
+        workload_server_names = _normalize_workload_server_names(server_names=server_names)
 
     origin_url = _resolve_bunny_pull_zone_origin_url(
         requested_origin_ip=requested_origin_ip,
@@ -2145,6 +2151,7 @@ async def _run_apply_plan_job(job_id: str) -> None:
 
 async def _run_funnel_publish_job(job_id: str) -> None:
     from app.db.base import SessionLocal
+    from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
     from app.services.funnels import publish_funnel
 
     job = _read_publish_job(job_id)
@@ -2259,6 +2266,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     workload_name = str(workload_patch.get("name") or "").strip()
                     if not workload_name:
                         raise DeployError("Publish deploy workload patch is missing workload name.")
+                    org_server_names = OrgDeployDomainsRepository(session).list_hostnames(org_id=org_id)
                     bunny_config = _reconcile_bunny_pull_zone_for_published_workload(
                         org_id=org_id,
                         workload_name=workload_name,
@@ -2266,6 +2274,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         instance_name=deploy_request.get("instance_name"),
                         requested_origin_ip=deploy_request.get("bunny_pull_zone_origin_ip"),
                         require_port_when_no_domains=apply_plan_enabled,
+                        server_names=org_server_names,
                     )
                     bunny_pull_zone_payload = bunny_config.get("pull_zone")
                     if isinstance(bunny_pull_zone_payload, dict) and isinstance(

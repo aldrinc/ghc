@@ -286,12 +286,13 @@ export function FunnelDetailPage() {
 
     const serverNames = normalizeDeployDomainList(deployDomainsDraft);
     const serviceConfig = {
-      server_names: serverNames,
-      https: serverNames.length > 0,
+      server_names: [],
+      https: false,
     };
     const workloadPayload: Record<string, unknown> = {
       name: deployWorkloadName,
       service_config: serviceConfig,
+      org_server_names: serverNames,
     };
     if (!createIfMissing && funnel?.client_id) {
       workloadPayload.source_ref = {
@@ -368,8 +369,8 @@ export function FunnelDetailPage() {
       },
     };
 
-    payload.deploy.serverNames = configuredDeployDomains;
-    payload.deploy.https = configuredDeployDomains.length > 0;
+    payload.deploy.serverNames = [];
+    payload.deploy.https = false;
 
     if (deployPlanPath) payload.deploy.planPath = deployPlanPath;
     if (deployInstanceName) payload.deploy.instanceName = deployInstanceName;

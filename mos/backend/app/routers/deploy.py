@@ -78,6 +78,15 @@ def _normalize_server_names(values: Any) -> list[str]:
     return normalized
 
 
+def _extract_org_server_names(workload: dict[str, Any]) -> list[str] | None:
+    if "org_server_names" in workload:
+        return _normalize_server_names(workload.get("org_server_names"))
+    service_config = workload.get("service_config")
+    if isinstance(service_config, dict) and "server_names" in service_config:
+        return _normalize_server_names(service_config.get("server_names"))
+    return None
+
+
 @router.get("/plans/latest")
 async def latest_plan(
     request: Request,
@@ -118,16 +127,34 @@ async def patch_workload(
 ):
     _require_internal_proxy(request)
     try:
+        org_server_names = _extract_org_server_names(workload)
+        workload_for_plan = dict(workload)
+        workload_for_plan.pop("org_server_names", None)
+        if configure_bunny_pull_zone:
+            service_config = workload_for_plan.get("service_config")
+            if service_config is None:
+                service_config = {}
+            if not isinstance(service_config, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Workload service_config must be an object.",
+                )
+            normalized_service_config = dict(service_config)
+            # Keep deploy plan port-based: domains are managed separately for Bunny/Namecheap.
+            normalized_service_config["server_names"] = []
+            normalized_service_config["https"] = False
+            workload_for_plan["service_config"] = normalized_service_config
+
         result = deploy_service.patch_workload_in_plan(
             org_id=auth.org_id,
-            workload_patch=workload,
+            workload_patch=workload_for_plan,
             plan_path=plan_path,
             instance_name=instance_name,
             create_if_missing=create_if_missing,
             in_place=in_place,
         )
         if configure_bunny_pull_zone:
-            workload_name = str(workload.get("name") or "").strip()
+            workload_name = str(workload_for_plan.get("name") or "").strip()
             if not workload_name:
                 raise deploy_service.DeployError("Workload patch must include a non-empty 'name' field.")
             result["cdn"] = deploy_service.configure_bunny_pull_zone_for_workload(
@@ -136,13 +163,12 @@ async def patch_workload(
                 plan_path=result.get("updated_plan_path"),
                 instance_name=instance_name,
                 requested_origin_ip=bunny_pull_zone_origin_ip,
+                server_names=(org_server_names or []),
             )
 
-        service_config = workload.get("service_config")
-        if isinstance(service_config, dict) and "server_names" in service_config:
-            hostnames = _normalize_server_names(service_config.get("server_names"))
+        if org_server_names is not None:
             repo = OrgDeployDomainsRepository(session)
-            repo.replace_hostnames(org_id=auth.org_id, hostnames=hostnames)
+            repo.replace_hostnames(org_id=auth.org_id, hostnames=org_server_names)
 
         return result
     except deploy_service.DeployError as exc:
