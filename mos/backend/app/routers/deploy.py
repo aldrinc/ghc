@@ -90,6 +90,7 @@ async def patch_workload(
     _require_internal_proxy(request)
     try:
         result = deploy_service.patch_workload_in_plan(
+            org_id=auth.org_id,
             workload_patch=workload,
             plan_path=plan_path,
             instance_name=instance_name,

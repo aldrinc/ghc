@@ -54,6 +54,15 @@ def test_resolve_bunny_pull_zone_origin_url_uses_requested_origin_ip(monkeypatch
     assert origin_url == "http://46.225.124.104"
 
 
+def test_resolve_bunny_pull_zone_origin_url_appends_workload_port(monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", None)
+    origin_url = deploy_service._resolve_bunny_pull_zone_origin_url(
+        requested_origin_ip="46.225.124.104",
+        workload_port=24123,
+    )
+    assert origin_url == "http://46.225.124.104:24123"
+
+
 def test_resolve_bunny_pull_zone_origin_url_errors_when_origin_missing(monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", None)
     with pytest.raises(deploy_service.DeployError, match="required"):
@@ -167,6 +176,326 @@ def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monk
         "org_id": "workspace-123",
         "origin_url": "http://46.225.124.104",
     }
+
+
+def test_configure_bunny_pull_zone_for_workload_uses_workload_port_when_no_domains(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
+
+    plan_path = tmp_path / "plan-test.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-brand-abc",
+                                    "source_type": "funnel_artifact",
+                                    "service_config": {"server_names": [], "https": False, "ports": [24123]},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
+        captured["origin_url"] = origin_url
+        return {
+            "Id": 999,
+            "Name": "workspace-123",
+            "OriginUrl": origin_url,
+            "Hostnames": [{"Value": "workspace-123.b-cdn.net"}],
+        }
+
+    monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
+
+    output = deploy_service.configure_bunny_pull_zone_for_workload(
+        org_id="workspace-123",
+        workload_name="brand-funnels-brand-abc",
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+    )
+    assert output["provider"] == "bunny"
+    assert output["pull_zone"]["id"] == 999
+    assert output["pull_zone"]["name"] == "workspace-123"
+    assert output["pull_zone"]["originUrl"] == "http://46.225.124.104:24123"
+    assert output["pull_zone"]["accessUrls"] == ["https://workspace-123.b-cdn.net/"]
+    assert output["pull_zone"]["workloadPort"] == 24123
+    assert captured == {
+        "org_id": "workspace-123",
+        "origin_url": "http://46.225.124.104:24123",
+    }
+
+
+def test_configure_bunny_pull_zone_for_workload_allows_missing_port(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
+
+    plan_path = tmp_path / "plan-test.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-brand-abc",
+                                    "source_type": "funnel_artifact",
+                                    "service_config": {"server_names": [], "https": False, "ports": []},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
+        captured["origin_url"] = origin_url
+        return {
+            "Id": 999,
+            "Name": "workspace-123",
+            "OriginUrl": origin_url,
+            "Hostnames": [{"Value": "workspace-123.b-cdn.net"}],
+        }
+
+    monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
+
+    output = deploy_service.configure_bunny_pull_zone_for_workload(
+        org_id="workspace-123",
+        workload_name="brand-funnels-brand-abc",
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+    )
+    assert output["provider"] == "bunny"
+    assert output["pull_zone"]["originUrl"] == "http://46.225.124.104"
+    assert output["pull_zone"]["workloadPort"] is None
+    assert output["pull_zone"]["workloadPortPending"] is True
+    assert output["pull_zone"]["workloadPortSource"] == "pending"
+    assert captured == {
+        "org_id": "workspace-123",
+        "origin_url": "http://46.225.124.104",
+    }
+
+
+def test_reconcile_bunny_pull_zone_for_published_workload_uses_spec_port(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
+
+    plan_path = tmp_path / "plan-test.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-brand-abc",
+                                    "source_type": "funnel_artifact",
+                                    "service_config": {"server_names": [], "https": False, "ports": []},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    (tmp_path / "spec.json").write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-brand-abc",
+                                    "service_config": {"ports": [24123]},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    def fake_ensure_bunny_pull_zone(*, org_id: str, origin_url: str):
+        captured["org_id"] = org_id
+        captured["origin_url"] = origin_url
+        return {
+            "Id": 999,
+            "Name": "workspace-123",
+            "OriginUrl": origin_url,
+            "Hostnames": [{"Value": "workspace-123.b-cdn.net"}],
+        }
+
+    monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
+
+    output = deploy_service._reconcile_bunny_pull_zone_for_published_workload(
+        org_id="workspace-123",
+        workload_name="brand-funnels-brand-abc",
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+        requested_origin_ip=None,
+        require_port_when_no_domains=True,
+    )
+    assert output["provider"] == "bunny"
+    assert output["pull_zone"]["originUrl"] == "http://46.225.124.104:24123"
+    assert output["pull_zone"]["workloadPort"] == 24123
+    assert output["pull_zone"]["workloadPortSource"] == "spec"
+    assert output["pull_zone"]["workloadPortPending"] is False
+    assert captured == {
+        "org_id": "workspace-123",
+        "origin_url": "http://46.225.124.104:24123",
+    }
+
+
+def test_patch_workload_in_plan_assigns_and_preserves_org_scoped_port(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    plan_path = tmp_path / "plan-test.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    create_patch = deploy_service.build_funnel_publication_workload_patch(
+        workload_name="brand-funnels-1",
+        client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        upstream_base_url="https://moshq.app",
+        upstream_api_base_url="https://moshq.app/api",
+        server_names=[],
+        https=False,
+        destination_path="/opt/apps",
+    )
+    deploy_service.patch_workload_in_plan(
+        org_id="workspace-123",
+        workload_patch=create_patch,
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+        create_if_missing=True,
+        in_place=True,
+    )
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    first_workload = payload["new_spec"]["instances"][0]["workloads"][0]
+    first_port = first_workload["service_config"]["ports"][0]
+    assert 20000 <= first_port <= 29999
+
+    update_patch = {
+        "name": "brand-funnels-1",
+        "service_config": {"server_names": [], "https": False, "ports": []},
+    }
+    deploy_service.patch_workload_in_plan(
+        org_id="workspace-123",
+        workload_patch=update_patch,
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+        create_if_missing=False,
+        in_place=True,
+    )
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    stable_port = payload["new_spec"]["instances"][0]["workloads"][0]["service_config"]["ports"][0]
+    assert stable_port == first_port
+
+
+def test_patch_workload_in_plan_assigns_different_ports_for_different_orgs(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    plan_path = tmp_path / "plan-test.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    patch_a = deploy_service.build_funnel_publication_workload_patch(
+        workload_name="brand-funnels-a",
+        client_id="f4f7f3e0-00c9-4c17-9a8f-4f3d72095f95",
+        upstream_base_url="https://moshq.app",
+        upstream_api_base_url="https://moshq.app/api",
+        server_names=[],
+        https=False,
+        destination_path="/opt/apps",
+    )
+    patch_b = deploy_service.build_funnel_publication_workload_patch(
+        workload_name="brand-funnels-b",
+        client_id="3d8cf9b0-6e31-4f8f-9a56-9c94bbf2d68d",
+        upstream_base_url="https://moshq.app",
+        upstream_api_base_url="https://moshq.app/api",
+        server_names=[],
+        https=False,
+        destination_path="/opt/apps",
+    )
+
+    deploy_service.patch_workload_in_plan(
+        org_id="workspace-123",
+        workload_patch=patch_a,
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+        create_if_missing=True,
+        in_place=True,
+    )
+    deploy_service.patch_workload_in_plan(
+        org_id="workspace-456",
+        workload_patch=patch_b,
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+        create_if_missing=True,
+        in_place=True,
+    )
+
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    workloads = payload["new_spec"]["instances"][0]["workloads"]
+    ports_by_workload = {
+        str(item["name"]): int(item["service_config"]["ports"][0])
+        for item in workloads
+    }
+    assert ports_by_workload["brand-funnels-a"] != ports_by_workload["brand-funnels-b"]
 
 
 def test_ensure_plan_for_funnel_publish_workload_bootstraps_when_missing(tmp_path, monkeypatch):
