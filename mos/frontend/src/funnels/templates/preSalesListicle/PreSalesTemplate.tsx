@@ -15,6 +15,7 @@ import type { ListicleConfig } from "./types";
 import type { ThemeConfig, UiCopy } from "./siteTypes";
 import defaults from "./defaults.json";
 import baseStyles from "./preSalesTemplate.module.css";
+import { useTemplateFonts } from "@/funnels/templates/templateFonts";
 
 export const preSalesDefaults = defaults as {
   config: ListicleConfig;
@@ -137,6 +138,7 @@ type PreSalesPageProps = {
 };
 
 export function PreSalesPage({ anchorId, theme, themeJson, content, children }: PreSalesPageProps) {
+  useTemplateFonts();
   const designSystemTokens = useDesignSystemTokens() as { cssVars?: Record<string, string | number>; dataTheme?: string } | null;
   const themeFromJson = parseJson<ThemeConfig>(themeJson);
   const defaultTheme = preSalesDefaults.theme;

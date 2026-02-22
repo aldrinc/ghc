@@ -29,6 +29,7 @@ import baseStyles from "./salesPdpTemplate.module.css";
 import { useDesignSystemTokens } from "@/components/design-system/DesignSystemProvider";
 import { useFunnelRuntime } from "@/funnels/puckConfig";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import { useTemplateFonts } from "@/funnels/templates/templateFonts";
 
 export const salesPdpDefaults = defaults as {
   config: PdpConfig;
@@ -456,7 +457,7 @@ function Gallery({
   return (
     <div className={styles.galleryCard}>
       <div className={styles.galleryMain}>
-        <img src={resolveImageSrc(active)} alt={active.alt} />
+        <img src={resolveImageSrc(active)} alt={active.alt} loading="eager" decoding="async" fetchPriority="high" />
 
         {freeGifts && index === 0 ? (
           <button
@@ -692,6 +693,7 @@ type SalesPdpPageProps = {
 }
 
 export function SalesPdpPage({ anchorId, theme, themeJson, content, children }: SalesPdpPageProps) {
+  useTemplateFonts();
   const designSystemTokens = useDesignSystemTokens() as { cssVars?: Record<string, string | number>; dataTheme?: string } | null
   const themeFromJson = parseJson<ThemeConfig>(themeJson)
   const defaultTheme = salesPdpDefaults.theme
