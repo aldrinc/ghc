@@ -334,7 +334,7 @@ export function FunnelDetailPage() {
     }
   };
 
-  const handlePublish = async (serverNames: string[]) => {
+  const handlePublish = async () => {
     if (!funnelId || !funnel) return;
     if (!funnel.client_id) return;
     const payload: {
@@ -358,7 +358,6 @@ export function FunnelDetailPage() {
 
     if (deployPlanPath) payload.deploy.planPath = deployPlanPath;
     if (deployInstanceName) payload.deploy.instanceName = deployInstanceName;
-    if (serverNames.length > 0) payload.deploy.serverNames = serverNames;
     if (deployUpstreamBaseUrl) payload.deploy.upstreamBaseUrl = deployUpstreamBaseUrl;
     if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
 
@@ -456,7 +455,7 @@ export function FunnelDetailPage() {
             ) : null}
             <Button
               size="sm"
-              onClick={() => void handlePublish(deployDomains.data?.server_names || [])}
+              onClick={() => void handlePublish()}
               disabled={!funnel?.canPublish || publish.isPending || deployDomains.isLoading}
             >
               {publish.isPending ? "Publishing…" : "Publish + Deploy"}

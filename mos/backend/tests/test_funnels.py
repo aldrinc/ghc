@@ -640,7 +640,7 @@ def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestCli
     assert deploy_request["bunny_pull_zone_origin_ip"] == "46.225.124.104"
 
 
-def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitted(
+def test_publish_with_deploy_does_not_use_funnel_domain_from_db_when_server_names_omitted(
     api_client: TestClient,
     db_session,
     monkeypatch,
@@ -702,9 +702,10 @@ def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitte
     deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
     assert workload_patch["source_ref"]["client_id"] == str(funnel.client_id)
-    assert workload_patch["service_config"]["server_names"] == ["offers.example.com"]
+    assert workload_patch["service_config"]["server_names"] == []
+    assert workload_patch["service_config"]["https"] is False
     assert deploy_request["apply_plan"] is False
-    assert captured["access_urls"] == ["https://offers.example.com/"]
+    assert captured["access_urls"] == []
 
 
 def test_publish_with_deploy_allows_no_server_names(api_client: TestClient, monkeypatch):

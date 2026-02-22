@@ -100,28 +100,13 @@ def _resolve_deploy_server_names(
     funnel_id: str,
     requested_server_names: list[str],
 ) -> list[str]:
-    requested = _normalize_server_names(requested_server_names)
-    if requested:
-        return requested
-
-    rows = session.scalars(
-        select(FunnelDomain.hostname).where(
-            FunnelDomain.org_id == org_id,
-            FunnelDomain.funnel_id == funnel_id,
-            FunnelDomain.status.in_(
-                [
-                    FunnelDomainStatusEnum.active,
-                    FunnelDomainStatusEnum.verified,
-                ]
-            ),
-        )
-    ).all()
-
-    from_db = _normalize_server_names([str(hostname) for hostname in rows if hostname])
-    if from_db:
-        return from_db
-
-    return []
+    # Deploy publish should only use explicitly requested domains.
+    # Do not implicitly inherit funnel domains from DB, which can unintentionally
+    # enable HTTPS + certbot provisioning for port-based deploys.
+    _ = session
+    _ = org_id
+    _ = funnel_id
+    return _normalize_server_names(requested_server_names)
 
 
 def _deploy_access_urls(*, server_names: list[str], https_enabled: bool) -> list[str]:
