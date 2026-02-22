@@ -6,10 +6,10 @@ import type { PublicFunnelMeta, PublicFunnelPage as PublicFunnelPageType } from 
 import type { PublicFunnelCommerce } from "@/types/commerce";
 import { createFunnelPuckConfig, FunnelRuntimeProvider } from "@/funnels/puckConfig";
 import { normalizePuckData } from "@/funnels/puckData";
-import { buildPublicFunnelPath, isStandaloneBundleMode } from "@/funnels/runtimeRouting";
+import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const apiBaseUrl = resolvePublicApiBaseUrl();
 const runtimeConfig = createFunnelPuckConfig();
 const managedFaviconAttr = "data-mos-managed-favicon";
 

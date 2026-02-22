@@ -24,6 +24,8 @@ function getDeployRuntimeConfig(): DeployRuntimeConfig {
   return candidate;
 }
 
+const configuredApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8008").replace(/\/+$/, "");
+
 export function normalizeRouteToken(value: string | null | undefined): string {
   const normalized = (value || "")
     .trim()
@@ -46,6 +48,13 @@ export function shortUuidRouteToken(value: string | null | undefined): string {
 
 export function isStandaloneBundleMode(): boolean {
   return Boolean(getDeployRuntimeConfig().bundleMode);
+}
+
+export function resolvePublicApiBaseUrl(): string {
+  if (isStandaloneBundleMode()) {
+    return "/api";
+  }
+  return configuredApiBaseUrl;
 }
 
 export function getStandaloneDefaultRoute(): { productSlug: string; funnelSlug: string } | null {

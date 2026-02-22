@@ -45,6 +45,12 @@ _DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION = int(
 _DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY = int(
     os.getenv("DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY", "80")
 )
+_PUBLIC_ASSET_URL_PREFIXES = (
+    "/public/assets/",
+    "public/assets/",
+    "/api/public/assets/",
+    "api/public/assets/",
+)
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -543,6 +549,33 @@ def _walk_json_dicts(node: Any):
             yield from _walk_json_dicts(item)
 
 
+def _extract_public_asset_id_from_url(raw_value: str) -> str | None:
+    value = str(raw_value or "").strip()
+    if not value:
+        return None
+
+    path = value
+    if value.startswith(("http://", "https://")):
+        path = urlsplit(value).path or ""
+
+    trimmed_path = path.strip()
+    lowered_path = trimmed_path.lower()
+    for prefix in _PUBLIC_ASSET_URL_PREFIXES:
+        if not lowered_path.startswith(prefix):
+            continue
+        remainder = trimmed_path[len(prefix):]
+        token = remainder.split("/", 1)[0].split("?", 1)[0].split("#", 1)[0].strip()
+        if not token:
+            return None
+        if "." in token:
+            token = token.split(".", 1)[0]
+        if not token:
+            return None
+        return token
+
+    return None
+
+
 def _extract_embedded_asset_public_ids(
     *,
     puck_data: dict[str, Any],
@@ -568,6 +601,21 @@ def _extract_embedded_asset_public_ids(
                     f"{context_label} includes invalid {key} '{cleaned}'. Expected a UUID."
                 ) from exc
             public_ids.add(normalized)
+
+        for raw_value in obj.values():
+            if not isinstance(raw_value, str):
+                continue
+            public_id_from_url = _extract_public_asset_id_from_url(raw_value)
+            if not public_id_from_url:
+                continue
+            try:
+                normalized_from_url = str(UUID(public_id_from_url))
+            except ValueError as exc:
+                raise DeployError(
+                    f"{context_label} includes invalid public asset URL '{raw_value}'. "
+                    "Expected /public/assets/<uuid>."
+                ) from exc
+            public_ids.add(normalized_from_url)
 
     if isinstance(design_system_tokens, dict):
         brand = design_system_tokens.get("brand")

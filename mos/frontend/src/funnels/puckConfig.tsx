@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from "react";
 import type { Config } from "@measured/puck";
 import { Link } from "react-router-dom";
+import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import {
   SalesPdpComparison,
   SalesPdpFaq,
@@ -35,7 +36,7 @@ import {
 import { BlockErrorBoundary } from "@/funnels/BlockErrorBoundary";
 import type { PublicFunnelCommerce } from "@/types/commerce";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const apiBaseUrl = resolvePublicApiBaseUrl();
 const salesPdpFeedImages = salesPdpDefaults.config.reviewWall?.tiles?.map((tile) => tile.image) || [];
 
 type FunnelRuntimeContextValue = {

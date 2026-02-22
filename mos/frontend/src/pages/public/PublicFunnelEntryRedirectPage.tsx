@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { PublicFunnelMeta } from "@/types/funnels";
-import { buildPublicFunnelPath, isStandaloneBundleMode } from "@/funnels/runtimeRouting";
+import { buildPublicFunnelPath, isStandaloneBundleMode, resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const apiBaseUrl = resolvePublicApiBaseUrl();
 
 function ensureNoIndex() {
   const name = "robots";

@@ -1,4 +1,6 @@
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+
+const apiBaseUrl = resolvePublicApiBaseUrl();
 
 type AssetRef = {
   src?: string;

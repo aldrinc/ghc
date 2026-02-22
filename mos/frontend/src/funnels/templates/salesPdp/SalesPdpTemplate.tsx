@@ -28,6 +28,7 @@ import styles from "./pdpPage.module.css";
 import baseStyles from "./salesPdpTemplate.module.css";
 import { useDesignSystemTokens } from "@/components/design-system/DesignSystemProvider";
 import { useFunnelRuntime } from "@/funnels/puckConfig";
+import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 
 export const salesPdpDefaults = defaults as {
   config: PdpConfig;
@@ -45,7 +46,7 @@ type Props = {
   themeJson?: string;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const apiBaseUrl = resolvePublicApiBaseUrl();
 const MOBILE_BREAKPOINT_QUERY = "(max-width: 980px)";
 const ORDER_NOW_SCROLL_TARGET_ID = "order-now";
 const URGENCY_MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
