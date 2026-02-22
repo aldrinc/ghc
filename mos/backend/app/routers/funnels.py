@@ -855,6 +855,8 @@ async def publish_funnel_route(
                 "create_if_missing": deploy.createIfMissing,
                 "in_place": deploy.inPlace,
                 "apply_plan": deploy.applyPlan,
+                "bunny_pull_zone": deploy.bunnyPullZone,
+                "bunny_pull_zone_origin_ip": deploy.bunnyPullZoneOriginIp,
                 "access_urls": access_urls,
             },
             access_urls=access_urls,

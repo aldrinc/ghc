@@ -20,6 +20,7 @@ const deployUpstreamBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_BASE_URL || 
 const deployUpstreamApiBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_API_BASE_URL || "").trim();
 const deployApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const deployDestinationPath = (import.meta.env.VITE_DEPLOY_DESTINATION_PATH || "/opt/apps").trim();
+const deployBunnyPullZoneOriginIp = (import.meta.env.VITE_DEPLOY_BUNNY_PULLZONE_ORIGIN_IP || "").trim();
 
 type PatchWorkloadResponse = {
   status: string;
@@ -332,6 +333,8 @@ export function FunnelDetailPage() {
         workloadName: string;
         createIfMissing: boolean;
         applyPlan: boolean;
+        bunnyPullZone: boolean;
+        bunnyPullZoneOriginIp?: string;
         planPath?: string;
         instanceName?: string;
         serverNames?: string[];
@@ -343,6 +346,7 @@ export function FunnelDetailPage() {
         workloadName: `brand-funnels-${funnel.client_id}`,
         createIfMissing: true,
         applyPlan: true,
+        bunnyPullZone: true,
       },
     };
 
@@ -351,6 +355,7 @@ export function FunnelDetailPage() {
     if (serverNames.length > 0) payload.deploy.serverNames = serverNames;
     if (deployUpstreamBaseUrl) payload.deploy.upstreamBaseUrl = deployUpstreamBaseUrl;
     if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
+    if (deployBunnyPullZoneOriginIp) payload.deploy.bunnyPullZoneOriginIp = deployBunnyPullZoneOriginIp;
 
     const response = await publish.mutateAsync({ funnelId, payload });
     void deployDomains.refetch();

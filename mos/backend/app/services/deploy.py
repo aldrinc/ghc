@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
@@ -10,6 +11,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from typing import Any, Optional
 from uuid import UUID, uuid4
+
+import httpx
 
 from app.config import settings
 
@@ -1235,6 +1238,197 @@ def _normalize_access_urls(urls: list[str] | None) -> list[str]:
     return out
 
 
+def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
+    normalized = re.sub(r"[^a-z0-9-]+", "-", (value or "").strip().lower())
+    normalized = re.sub(r"-{2,}", "-", normalized).strip("-")
+    if not normalized:
+        raise DeployError(
+            f"Bunny pull zone name component '{label}' is empty after normalization. "
+            f"Received value='{value}'."
+        )
+    return normalized
+
+
+def _build_bunny_pull_zone_name(*, workspace_id: str, brand_id: str) -> str:
+    workspace_component = _normalize_bunny_pull_zone_name_component(
+        value=workspace_id,
+        label="workspace_id",
+    )
+    brand_component = _normalize_bunny_pull_zone_name_component(
+        value=brand_id,
+        label="brand_id",
+    )
+    return f"{workspace_component}-{brand_component}"
+
+
+def _bunny_api_request(*, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+    api_key = str(settings.BUNNY_API_KEY or "").strip()
+    if not api_key:
+        raise DeployError("Bunny pull zone provisioning requires BUNNY_API_KEY.")
+
+    base_url = str(settings.BUNNY_API_BASE_URL or "").strip().rstrip("/")
+    if not base_url:
+        raise DeployError("BUNNY_API_BASE_URL must be configured for Bunny pull zone provisioning.")
+
+    normalized_method = (method or "").strip().upper()
+    if not normalized_method:
+        raise DeployError("Bunny API request method is required.")
+
+    endpoint = f"{base_url}/{path.lstrip('/')}"
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.request(
+                normalized_method,
+                endpoint,
+                headers={"AccessKey": api_key, "Content-Type": "application/json"},
+                json=payload,
+            )
+    except httpx.HTTPError as exc:
+        raise DeployError(f"Bunny API request failed ({normalized_method} {path}): {exc}") from exc
+
+    if response.status_code >= 400:
+        detail = response.text.strip()
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict):
+            message = body.get("Message") or body.get("Error") or body.get("detail") or body.get("message")
+            if isinstance(message, str) and message.strip():
+                detail = message.strip()
+            elif not detail:
+                detail = json.dumps(body, ensure_ascii=True)
+        elif not detail:
+            detail = "<empty response body>"
+        raise DeployError(
+            f"Bunny API request failed ({normalized_method} {path}) "
+            f"with status {response.status_code}: {detail}"
+        )
+
+    if not response.content:
+        return None
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise DeployError(
+            f"Bunny API request returned non-JSON response ({normalized_method} {path})."
+        ) from exc
+
+
+def _list_bunny_pull_zones() -> list[dict[str, Any]]:
+    payload = _bunny_api_request(method="GET", path="/pullzone")
+    if not isinstance(payload, dict):
+        raise DeployError("Bunny list pull zones response must be an object.")
+    items = payload.get("Items")
+    if not isinstance(items, list):
+        raise DeployError("Bunny list pull zones response is missing an Items array.")
+    zones: list[dict[str, Any]] = []
+    for idx, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise DeployError(f"Bunny list pull zones response item at index {idx} is invalid.")
+        zones.append(item)
+    return zones
+
+
+def _find_bunny_pull_zone_by_name(*, zone_name: str) -> dict[str, Any] | None:
+    normalized_target = zone_name.strip().lower()
+    matches: list[dict[str, Any]] = []
+    for zone in _list_bunny_pull_zones():
+        candidate = str(zone.get("Name") or "").strip().lower()
+        if candidate == normalized_target:
+            matches.append(zone)
+    if len(matches) > 1:
+        raise DeployError(f"Multiple Bunny pull zones found for name '{zone_name}'.")
+    return matches[0] if matches else None
+
+
+def _coerce_bunny_pull_zone_id(*, zone: dict[str, Any]) -> int:
+    raw_id = zone.get("Id")
+    try:
+        zone_id = int(raw_id)
+    except Exception as exc:
+        raise DeployError("Bunny pull zone payload is missing a valid Id.") from exc
+    if zone_id <= 0:
+        raise DeployError("Bunny pull zone Id must be greater than zero.")
+    return zone_id
+
+
+def _resolve_bunny_pull_zone_origin_url(
+    *,
+    requested_origin_ip: Any,
+) -> str:
+    requested = str(requested_origin_ip or "").strip()
+    configured_default = str(settings.BUNNY_PULLZONE_ORIGIN_IP or "").strip()
+    origin_input = requested or configured_default
+
+    if not origin_input:
+        raise DeployError(
+            "Bunny pull zone origin IP is required. "
+            "Set deploy.bunnyPullZoneOriginIp or BUNNY_PULLZONE_ORIGIN_IP."
+        )
+
+    if origin_input.startswith(("http://", "https://")):
+        parsed = urlsplit(origin_input)
+        if not parsed.scheme or not parsed.netloc:
+            raise DeployError(
+                "Bunny pull zone origin URL is invalid. Expected http(s)://<host>."
+            )
+        return origin_input.rstrip("/")
+
+    if " " in origin_input or "/" in origin_input:
+        raise DeployError(
+            "Bunny pull zone origin must be a bare host/IP or a full http(s) URL."
+        )
+    return f"http://{origin_input}"
+
+
+def _extract_bunny_pull_zone_access_urls(zone: dict[str, Any]) -> list[str]:
+    hostnames = zone.get("Hostnames")
+    if hostnames is None:
+        return []
+    if not isinstance(hostnames, list):
+        raise DeployError("Bunny pull zone response field Hostnames must be an array when provided.")
+
+    urls: list[str] = []
+    for idx, hostname in enumerate(hostnames):
+        if not isinstance(hostname, dict):
+            raise DeployError(f"Bunny pull zone hostname at index {idx} is invalid.")
+        value = str(hostname.get("Value") or "").strip().lower()
+        if not value:
+            continue
+        urls.append(f"https://{value}/")
+    return _normalize_access_urls(urls)
+
+
+def _ensure_bunny_pull_zone(*, workspace_id: str, brand_id: str, origin_url: str) -> dict[str, Any]:
+    zone_name = _build_bunny_pull_zone_name(workspace_id=workspace_id, brand_id=brand_id)
+    existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
+
+    if existing_zone is None:
+        created = _bunny_api_request(
+            method="POST",
+            path="/pullzone",
+            payload={"Name": zone_name, "OriginUrl": origin_url},
+        )
+        if not isinstance(created, dict):
+            raise DeployError("Bunny create pull zone response must be an object.")
+        return created
+
+    existing_zone_id = _coerce_bunny_pull_zone_id(zone=existing_zone)
+    current_origin = str(existing_zone.get("OriginUrl") or "").strip()
+    if current_origin != origin_url:
+        updated = _bunny_api_request(
+            method="POST",
+            path=f"/pullzone/{existing_zone_id}",
+            payload={"OriginUrl": origin_url},
+        )
+        if not isinstance(updated, dict):
+            raise DeployError("Bunny update pull zone response must be an object.")
+        return updated
+
+    return existing_zone
+
+
 def _latest_spec_path() -> Path:
     return _cloudhand_dir() / "spec.json"
 
@@ -1504,6 +1698,35 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         )
                     summary["access_urls"] = access_urls
                     deploy_response["apply"] = summary
+
+                if bool(deploy_request.get("bunny_pull_zone", False)):
+                    source_ref = workload_patch.get("source_ref")
+                    if not isinstance(source_ref, dict):
+                        raise DeployError("Publish deploy workload patch is missing source_ref for Bunny provisioning.")
+                    brand_id = str(source_ref.get("client_id") or "").strip()
+                    if not brand_id:
+                        raise DeployError(
+                            "Publish deploy workload patch is missing source_ref.client_id for Bunny provisioning."
+                        )
+                    origin_url = _resolve_bunny_pull_zone_origin_url(
+                        requested_origin_ip=deploy_request.get("bunny_pull_zone_origin_ip"),
+                    )
+                    bunny_zone = _ensure_bunny_pull_zone(
+                        workspace_id=org_id,
+                        brand_id=brand_id,
+                        origin_url=origin_url,
+                    )
+                    bunny_access_urls = _extract_bunny_pull_zone_access_urls(bunny_zone)
+                    access_urls = _normalize_access_urls(access_urls + bunny_access_urls)
+                    deploy_response["cdn"] = {
+                        "provider": "bunny",
+                        "pull_zone": {
+                            "id": bunny_zone.get("Id"),
+                            "name": bunny_zone.get("Name"),
+                            "originUrl": bunny_zone.get("OriginUrl"),
+                            "accessUrls": bunny_access_urls,
+                        },
+                    }
 
                 result_payload["deploy"] = deploy_response
         finally:

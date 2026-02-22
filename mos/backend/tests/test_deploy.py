@@ -39,6 +39,65 @@ def test_deploy_latest_plan_404_on_missing(api_client, monkeypatch):
     assert resp.status_code == 404
 
 
+def test_build_bunny_pull_zone_name_uses_workspace_and_brand_ids():
+    name = deploy_service._build_bunny_pull_zone_name(
+        workspace_id="Workspace_123",
+        brand_id="Brand/ABC",
+    )
+    assert name == "workspace-123-brand-abc"
+
+
+def test_resolve_bunny_pull_zone_origin_url_uses_requested_origin_ip(monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", None)
+    origin_url = deploy_service._resolve_bunny_pull_zone_origin_url(
+        requested_origin_ip="46.225.124.104",
+    )
+    assert origin_url == "http://46.225.124.104"
+
+
+def test_resolve_bunny_pull_zone_origin_url_errors_when_origin_missing(monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", None)
+    with pytest.raises(deploy_service.DeployError, match="required"):
+        deploy_service._resolve_bunny_pull_zone_origin_url(
+            requested_origin_ip=None,
+        )
+
+
+def test_ensure_bunny_pull_zone_creates_when_missing(monkeypatch):
+    calls: list[tuple[str, str, dict | None]] = []
+
+    def fake_bunny_api_request(*, method: str, path: str, payload: dict | None = None):
+        calls.append((method, path, payload))
+        if method == "GET" and path == "/pullzone":
+            return {"Items": []}
+        if method == "POST" and path == "/pullzone":
+            assert payload == {
+                "Name": "workspace-123-brand-abc",
+                "OriginUrl": "http://46.225.124.104",
+            }
+            return {
+                "Id": 123,
+                "Name": "workspace-123-brand-abc",
+                "OriginUrl": "http://46.225.124.104",
+                "Hostnames": [{"Value": "workspace-123-brand-abc.b-cdn.net"}],
+            }
+        raise AssertionError(f"Unexpected Bunny API call: method={method}, path={path}, payload={payload}")
+
+    monkeypatch.setattr(deploy_service, "_bunny_api_request", fake_bunny_api_request)
+    zone = deploy_service._ensure_bunny_pull_zone(
+        workspace_id="workspace-123",
+        brand_id="brand-abc",
+        origin_url="http://46.225.124.104",
+    )
+    urls = deploy_service._extract_bunny_pull_zone_access_urls(zone)
+
+    assert zone["Id"] == 123
+    assert urls == ["https://workspace-123-brand-abc.b-cdn.net/"]
+    assert calls[0] == ("GET", "/pullzone", None)
+    assert calls[1][0] == "POST"
+    assert calls[1][1] == "/pullzone"
+
+
 def test_ensure_plan_for_funnel_publish_workload_bootstraps_when_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
 
