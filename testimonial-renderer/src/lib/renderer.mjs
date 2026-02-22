@@ -12,7 +12,6 @@ const TEMPLATE_PATHS = {
   social_comment: path.resolve(__dirname, '../templates/social_comment.html'),
   testimonial_media: path.resolve(__dirname, '../templates/testimonial_media.html'),
   pdp_ugc_standard: path.resolve(__dirname, '../templates/pdp_ugc_standard.html'),
-  pdp_ugc_qa: path.resolve(__dirname, '../templates/pdp_ugc_qa.html'),
   pdp_bold_claim: path.resolve(__dirname, '../templates/pdp_bold_claim.html'),
   pdp_personal_highlight: path.resolve(__dirname, '../templates/pdp_personal_highlight.html'),
 };

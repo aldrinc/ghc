@@ -15,11 +15,6 @@ const bubbleSpaceHintForTemplate = (template) => {
         'Leave clean negative space in the lower-left area for a small comment bubble overlay.',
         'Keep the product and hands on the right side of the frame and do not place the product in the lower-left.',
       ].join(' ');
-    case 'pdp_ugc_qa':
-      return [
-        'Leave clean negative space at the top-left and mid-right for two small comment bubble overlays.',
-        'Keep the product in the lower-middle of the frame and do not place the product in those overlay areas.',
-      ].join(' ');
     case 'pdp_bold_claim':
       return [
         'Leave clean negative space in the top-right area for a small comment bubble overlay.',

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
+import io
 import json
 import os
 import re
@@ -27,6 +29,22 @@ _DEPLOY_JOB_LOG_TAIL_CHARS = 12000
 _ORG_SCOPED_PORT_RANGE_START = 20000
 _ORG_SCOPED_PORT_RANGE_END = 29999
 _HOSTNAME_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
+_ARTIFACT_ASSET_PUBLIC_ID_KEYS = {
+    "assetPublicId",
+    "thumbAssetPublicId",
+    "posterAssetPublicId",
+    "iconAssetPublicId",
+    "swatchAssetPublicId",
+}
+_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES = int(
+    os.getenv("DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES", str(150 * 1024 * 1024))
+)
+_DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION = int(
+    os.getenv("DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION", "1600")
+)
+_DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY = int(
+    os.getenv("DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY", "80")
+)
 
 
 def _find_repo_root(start: Path) -> Path:
@@ -515,6 +533,211 @@ def build_funnel_artifact_workload_patch(
     )
 
 
+def _walk_json_dicts(node: Any):
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _walk_json_dicts(value)
+    elif isinstance(node, list):
+        for item in node:
+            yield from _walk_json_dicts(item)
+
+
+def _extract_embedded_asset_public_ids(
+    *,
+    puck_data: dict[str, Any],
+    design_system_tokens: dict[str, Any] | None,
+    context_label: str,
+) -> set[str]:
+    public_ids: set[str] = set()
+
+    for obj in _walk_json_dicts(puck_data):
+        for key in _ARTIFACT_ASSET_PUBLIC_ID_KEYS:
+            if key not in obj:
+                continue
+            raw_value = obj.get(key)
+            if not isinstance(raw_value, str) or not raw_value.strip():
+                raise DeployError(
+                    f"{context_label} includes invalid {key}. Expected a non-empty UUID string."
+                )
+            cleaned = raw_value.strip()
+            try:
+                normalized = str(UUID(cleaned))
+            except ValueError as exc:
+                raise DeployError(
+                    f"{context_label} includes invalid {key} '{cleaned}'. Expected a UUID."
+                ) from exc
+            public_ids.add(normalized)
+
+    if isinstance(design_system_tokens, dict):
+        brand = design_system_tokens.get("brand")
+        if isinstance(brand, dict) and brand.get("logoAssetPublicId") is not None:
+            raw_logo_public_id = brand.get("logoAssetPublicId")
+            if not isinstance(raw_logo_public_id, str) or not raw_logo_public_id.strip():
+                raise DeployError(
+                    f"{context_label} designSystemTokens.brand.logoAssetPublicId must be a non-empty UUID string."
+                )
+            cleaned_logo_public_id = raw_logo_public_id.strip()
+            try:
+                normalized_logo_public_id = str(UUID(cleaned_logo_public_id))
+            except ValueError as exc:
+                raise DeployError(
+                    f"{context_label} designSystemTokens.brand.logoAssetPublicId "
+                    f"'{cleaned_logo_public_id}' is not a valid UUID."
+                ) from exc
+            public_ids.add(normalized_logo_public_id)
+
+    return public_ids
+
+
+def _build_embedded_asset_payload(
+    *,
+    session: Any,
+    org_id: str,
+    client_id: str,
+    public_ids: list[str],
+) -> tuple[dict[str, dict[str, Any]], int]:
+    if not public_ids:
+        return {}, 0
+
+    from sqlalchemy import select
+
+    from app.db.models import Asset
+    from app.services.media_storage import MediaStorage
+
+    asset_public_ids = [UUID(value) for value in public_ids]
+    assets = list(
+        session.scalars(
+            select(Asset).where(
+                Asset.org_id == org_id,
+                Asset.client_id == client_id,
+                Asset.public_id.in_(asset_public_ids),
+            )
+        ).all()
+    )
+    assets_by_public_id = {str(asset.public_id): asset for asset in assets}
+    missing_public_ids = [public_id for public_id in public_ids if public_id not in assets_by_public_id]
+    if missing_public_ids:
+        raise DeployError(
+            "Funnel artifact references assetPublicId values that do not exist for this client: "
+            + ", ".join(missing_public_ids)
+        )
+
+    storage = MediaStorage()
+    output: dict[str, dict[str, Any]] = {}
+    total_bytes = 0
+
+    for public_id in public_ids:
+        asset = assets_by_public_id[public_id]
+        if asset.asset_kind != "image":
+            raise DeployError(
+                f"Asset {public_id} has kind '{asset.asset_kind}'. Only image assets can be embedded in funnel artifacts."
+            )
+        if asset.file_status != "ready":
+            raise DeployError(
+                f"Asset {public_id} is not ready (file_status={asset.file_status or 'null'})."
+            )
+        if not asset.storage_key:
+            raise DeployError(f"Asset {public_id} is missing storage_key.")
+
+        data, downloaded_content_type = storage.download_bytes(key=asset.storage_key)
+        if not data:
+            raise DeployError(f"Asset {public_id} downloaded empty bytes from object storage.")
+
+        content_type = (asset.content_type or downloaded_content_type or "").split(";")[0].strip().lower()
+        if not content_type.startswith("image/"):
+            raise DeployError(
+                f"Asset {public_id} has unsupported content type '{content_type or 'unknown'}'. Expected image/*."
+            )
+
+        data, content_type = _optimize_embedded_artifact_image_bytes(
+            data=data,
+            content_type=content_type,
+            public_id=public_id,
+        )
+
+        total_bytes += len(data)
+        if total_bytes > _DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES:
+            raise DeployError(
+                "Embedded funnel artifact assets exceed DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES "
+                f"(current={total_bytes} bytes, limit={_DEPLOY_ARTIFACT_MAX_EMBEDDED_ASSET_BYTES} bytes)."
+            )
+
+        output[public_id] = {
+            "contentType": content_type,
+            "sizeBytes": len(data),
+            "bytesBase64": base64.b64encode(data).decode("ascii"),
+        }
+
+    return output, total_bytes
+
+
+def _optimize_embedded_artifact_image_bytes(
+    *,
+    data: bytes,
+    content_type: str,
+    public_id: str,
+) -> tuple[bytes, str]:
+    """
+    Reduce embedded artifact size by resizing and re-encoding common raster assets to WebP.
+
+    We intentionally keep strict behavior: invalid optimization config or unreadable image bytes
+    fail fast with a descriptive error.
+    """
+
+    normalized_content_type = str(content_type or "").strip().lower()
+    if normalized_content_type not in {"image/png", "image/jpeg", "image/jpg", "image/webp"}:
+        return data, normalized_content_type
+
+    max_dimension = _DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION
+    quality = _DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY
+    if max_dimension <= 0:
+        raise DeployError("DEPLOY_ARTIFACT_EMBED_IMAGE_MAX_DIMENSION must be greater than zero.")
+    if quality < 1 or quality > 100:
+        raise DeployError("DEPLOY_ARTIFACT_EMBED_IMAGE_QUALITY must be between 1 and 100.")
+
+    from PIL import Image
+
+    try:
+        with Image.open(io.BytesIO(data)) as source:
+            image = source.copy()
+    except Exception as exc:
+        raise DeployError(
+            f"Failed to decode embedded artifact asset image bytes for {public_id}: {exc}"
+        ) from exc
+
+    width, height = image.size
+    if width <= 0 or height <= 0:
+        raise DeployError(f"Embedded artifact asset {public_id} has invalid image dimensions ({width}x{height}).")
+
+    longest_edge = max(width, height)
+    if longest_edge > max_dimension:
+        scale = max_dimension / float(longest_edge)
+        resized = (
+            max(1, int(round(width * scale))),
+            max(1, int(round(height * scale))),
+        )
+        image = image.resize(resized, Image.Resampling.LANCZOS)
+
+    # Preserve alpha when present; otherwise use RGB for denser encoding.
+    if "A" in image.getbands():
+        if image.mode != "RGBA":
+            image = image.convert("RGBA")
+    elif image.mode != "RGB":
+        image = image.convert("RGB")
+
+    output = io.BytesIO()
+    try:
+        image.save(output, format="WEBP", quality=quality, method=6)
+    except Exception as exc:
+        raise DeployError(f"Failed to encode embedded artifact asset {public_id} to WebP: {exc}") from exc
+
+    optimized = output.getvalue()
+    if not optimized:
+        raise DeployError(f"Embedded artifact asset {public_id} optimized to empty bytes.")
+    return optimized, "image/webp"
+
+
 def build_client_funnel_runtime_artifact_payload(
     *,
     session: Any,
@@ -575,6 +798,7 @@ def build_client_funnel_runtime_artifact_payload(
     public_repo = FunnelPublicRepository(session)
     products_payload: dict[str, dict[str, Any]] = {}
     product_slug_to_product_id: dict[str, str] = {}
+    embedded_asset_public_ids: set[str] = set()
 
     for client_funnel in client_funnels:
         route_slug = (client_funnel.route_slug or "").strip()
@@ -649,6 +873,15 @@ def build_client_funnel_runtime_artifact_payload(
                 funnel=client_funnel,
                 page=page,
             )
+            page_context_label = (
+                f"Funnel '{client_funnel.id}' page '{page_id}' ({product_slug}/{route_slug}/{artifact_slug})"
+            )
+            page_asset_public_ids = _extract_embedded_asset_public_ids(
+                puck_data=version.puck_data,
+                design_system_tokens=tokens if isinstance(tokens, dict) else None,
+                context_label=page_context_label,
+            )
+            embedded_asset_public_ids.update(page_asset_public_ids)
             pages_payload[artifact_slug] = {
                 "productSlug": product_slug,
                 "funnelId": str(client_funnel.id),
@@ -716,6 +949,13 @@ def build_client_funnel_runtime_artifact_payload(
             "commerce": commerce_payload,
         }
 
+    embedded_assets, total_embedded_asset_bytes = _build_embedded_asset_payload(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        public_ids=sorted(embedded_asset_public_ids),
+    )
+
     return {
         "meta": {
             "clientId": str(client_id),
@@ -723,6 +963,10 @@ def build_client_funnel_runtime_artifact_payload(
             "updatedFromPublicationId": updated_from_publication_id,
         },
         "products": products_payload,
+        "assets": {
+            "totalBytes": total_embedded_asset_bytes,
+            "items": embedded_assets,
+        },
     }
 
 

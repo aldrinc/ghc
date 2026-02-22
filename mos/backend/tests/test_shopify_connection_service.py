@@ -41,6 +41,7 @@ def test_status_missing_storefront_token(monkeypatch):
 
     assert status["state"] == "installed_missing_storefront_token"
     assert status["shopDomain"] == "example.myshopify.com"
+    assert status["shopDomains"] == ["example.myshopify.com"]
     assert status["hasStorefrontAccessToken"] is False
 
 
@@ -174,6 +175,7 @@ def test_status_ready(monkeypatch):
 
     assert status["state"] == "ready"
     assert status["shopDomain"] == "example.myshopify.com"
+    assert status["shopDomains"] == ["example.myshopify.com"]
     assert status["hasStorefrontAccessToken"] is True
 
 

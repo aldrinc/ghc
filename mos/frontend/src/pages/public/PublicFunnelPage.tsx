@@ -11,6 +11,45 @@ import { DesignSystemProvider } from "@/components/design-system/DesignSystemPro
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
 const runtimeConfig = createFunnelPuckConfig();
+const managedFaviconAttr = "data-mos-managed-favicon";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getBrandLogoAssetPublicId(tokens: unknown): string | null {
+  if (!isRecord(tokens)) return null;
+  const brand = tokens.brand;
+  if (!isRecord(brand)) return null;
+  const logoAssetPublicId = brand.logoAssetPublicId;
+  if (typeof logoAssetPublicId !== "string") return null;
+  const trimmed = logoAssetPublicId.trim();
+  return trimmed || null;
+}
+
+function clearManagedFavicons() {
+  document
+    .querySelectorAll(`link[${managedFaviconAttr}="true"]`)
+    .forEach((node) => node.parentNode?.removeChild(node));
+}
+
+function appendManagedFavicon(rel: string, href: string) {
+  const link = document.createElement("link");
+  link.setAttribute("rel", rel);
+  link.setAttribute("href", href);
+  link.setAttribute(managedFaviconAttr, "true");
+  document.head.appendChild(link);
+}
+
+function setPageFavicon(logoAssetPublicId: string | null) {
+  clearManagedFavicons();
+  if (!logoAssetPublicId) return;
+  const trimmedApiBase = apiBaseUrl.replace(/\/$/, "");
+  const logoHref = `${trimmedApiBase}/public/assets/${encodeURIComponent(logoAssetPublicId)}`;
+  appendManagedFavicon("icon", logoHref);
+  appendManagedFavicon("shortcut icon", logoHref);
+  appendManagedFavicon("apple-touch-icon", logoHref);
+}
 
 function ensureNoIndex() {
   const name = "robots";
@@ -216,6 +255,13 @@ export function PublicFunnelPage() {
     const description = typeof rootProps.description === "string" ? rootProps.description : undefined;
     setPageMetadata(title, description);
   }, [page]);
+
+  useEffect(() => {
+    setPageFavicon(getBrandLogoAssetPublicId(page?.designSystemTokens));
+    return () => {
+      clearManagedFavicons();
+    };
+  }, [page?.designSystemTokens]);
 
   useEffect(() => {
     if (!page || !meta) return;

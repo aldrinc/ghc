@@ -1274,3 +1274,64 @@ def test_materialize_funnel_artifacts_for_apply_converts_legacy_artifact_public_
     assert source_ref["public_id"] == "dc6431ec-6f65-4fac-9492-6581a93690b0"
     assert source_ref["upstream_base_url"] == "https://moshq.app"
     assert source_ref["upstream_api_base_url"] == "https://moshq.app/api"
+
+
+def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens():
+    output = deploy_service._extract_embedded_asset_public_ids(
+        puck_data={
+            "root": {"props": {}},
+            "content": [
+                {
+                    "type": "Image",
+                    "props": {
+                        "assetPublicId": "11111111-1111-1111-1111-111111111111",
+                    },
+                },
+                {
+                    "type": "SalesPdpHero",
+                    "props": {
+                        "config": {
+                            "gallery": {
+                                "slides": [
+                                    {"thumbAssetPublicId": "22222222-2222-2222-2222-222222222222"},
+                                ]
+                            }
+                        }
+                    },
+                },
+            ],
+            "zones": {},
+        },
+        design_system_tokens={
+            "brand": {
+                "logoAssetPublicId": "33333333-3333-3333-3333-333333333333",
+            }
+        },
+        context_label="test-page",
+    )
+
+    assert output == {
+        "11111111-1111-1111-1111-111111111111",
+        "22222222-2222-2222-2222-222222222222",
+        "33333333-3333-3333-3333-333333333333",
+    }
+
+
+def test_extract_embedded_asset_public_ids_errors_on_invalid_uuid():
+    with pytest.raises(deploy_service.DeployError, match="invalid assetPublicId"):
+        deploy_service._extract_embedded_asset_public_ids(
+            puck_data={
+                "root": {"props": {}},
+                "content": [
+                    {
+                        "type": "Image",
+                        "props": {
+                            "assetPublicId": "not-a-uuid",
+                        },
+                    }
+                ],
+                "zones": {},
+            },
+            design_system_tokens=None,
+            context_label="test-page",
+        )

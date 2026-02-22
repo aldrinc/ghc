@@ -152,6 +152,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     actor_user_id = params.get("actor_user_id") or "workflow"
     generate_ai_drafts = bool(params.get("generate_ai_drafts", False))
     generate_testimonials = bool(params.get("generate_testimonials", False))
+    async_media_enrichment = bool(params.get("async_media_enrichment", True))
     workflow_run_id = params.get("workflow_run_id")
     raw_ai_draft_max_attempts = params.get("ai_draft_max_attempts")
     if raw_ai_draft_max_attempts is None:
@@ -251,6 +252,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         created_pages: list[dict[str, str]] = []
         resolved_pages: list[FunnelPage] = []
         non_fatal_errors: list[dict[str, Any]] = []
+        media_enrichment_jobs: list[dict[str, Any]] = []
         for idx, page_spec in enumerate(pages):
             template_id = page_spec.get("template_id") or page_spec.get("templateId")
             if not template_id:
@@ -321,11 +323,12 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     },
                 )
                 if generate_testimonials:
-                    log_activity(
-                        "funnel_page_testimonials",
-                        "started",
-                        payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
-                    )
+                    if not async_media_enrichment:
+                        log_activity(
+                            "funnel_page_testimonials",
+                            "started",
+                            payload_in={"page_id": str(page.id), "funnel_id": str(funnel.id)},
+                        )
                 try:
                     result = _run_generate_page_draft_with_retries(
                         run_generation=lambda: run_generate_page_draft(
@@ -338,7 +341,8 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                             current_puck_data=puck_data,
                             template_id=template_id,
                             idea_workspace_id=idea_workspace_id,
-                            generate_testimonials=generate_testimonials,
+                            generate_images=not async_media_enrichment,
+                            generate_testimonials=generate_testimonials and not async_media_enrichment,
                         ),
                         max_attempts=ai_draft_max_attempts,
                         on_retry=lambda attempt, exc: log_activity(
@@ -368,6 +372,30 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     )
                     if image_errors:
                         non_fatal_errors.extend(image_errors)
+                    if async_media_enrichment:
+                        media_enrichment_jobs.append(
+                            {
+                                "funnel_id": str(funnel.id),
+                                "page_id": str(page.id),
+                                "page_name": page_name,
+                                "template_id": template_id,
+                                "prompt": prompt,
+                                "idea_workspace_id": idea_workspace_id,
+                                "actor_user_id": str(actor_user_id),
+                                "generate_testimonials": bool(generate_testimonials),
+                                "workflow_run_id": workflow_run_id,
+                            }
+                        )
+                        log_activity(
+                            "funnel_page_media_enrichment",
+                            "queued",
+                            payload_in={
+                                "page_id": str(page.id),
+                                "funnel_id": str(funnel.id),
+                                "template_id": template_id,
+                                "generate_testimonials": bool(generate_testimonials),
+                            },
+                        )
                 except Exception as exc:  # noqa: BLE001
                     log_activity(
                         "funnel_page_draft",
@@ -381,7 +409,17 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     )
                     if generate_testimonials:
                         error_text = str(exc)
-                        if "testimonial" in error_text.lower():
+                        if async_media_enrichment:
+                            log_activity(
+                                "funnel_page_testimonials",
+                                "skipped",
+                                payload_in={
+                                    "page_id": str(page.id),
+                                    "funnel_id": str(funnel.id),
+                                    "reason": "Draft generation failed before async testimonial enrichment.",
+                                },
+                            )
+                        elif "testimonial" in error_text.lower():
                             log_activity(
                                 "funnel_page_testimonials",
                                 "failed",
@@ -412,16 +450,28 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         },
                     )
                     if generate_testimonials:
-                        log_activity(
-                            "funnel_page_testimonials",
-                            "completed",
-                            payload_out={
-                                "page_id": str(page.id),
-                                "funnel_id": str(funnel.id),
-                                "draft_version_id": draft_version_id,
-                                "mode": "inline_page_draft",
-                            },
-                        )
+                        if async_media_enrichment:
+                            log_activity(
+                                "funnel_page_testimonials",
+                                "queued",
+                                payload_in={
+                                    "page_id": str(page.id),
+                                    "funnel_id": str(funnel.id),
+                                    "draft_version_id": draft_version_id,
+                                    "mode": "async_media_enrichment",
+                                },
+                            )
+                        else:
+                            log_activity(
+                                "funnel_page_testimonials",
+                                "completed",
+                                payload_out={
+                                    "page_id": str(page.id),
+                                    "funnel_id": str(funnel.id),
+                                    "draft_version_id": draft_version_id,
+                                    "mode": "inline_page_draft",
+                                },
+                            )
                     else:
                         log_activity(
                             "funnel_page_testimonials",
@@ -459,6 +509,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "entry_page_id": created_pages[0]["page_id"] if created_pages else None,
             "pages": created_pages,
             "non_fatal_errors": non_fatal_errors,
+            "media_enrichment_jobs": media_enrichment_jobs,
         }
 
 
@@ -508,6 +559,167 @@ Instructions:
 
 
 @activity.defn
+def enrich_funnel_page_media_activity(params: Dict[str, Any]) -> Dict[str, Any]:
+    org_id = params["org_id"]
+    funnel_id = params.get("funnel_id")
+    page_id = params.get("page_id")
+    page_name = params.get("page_name") or "Page"
+    template_id = params.get("template_id")
+    prompt = params.get("prompt") or "Media enrichment run"
+    idea_workspace_id = params.get("idea_workspace_id")
+    actor_user_id = params.get("actor_user_id") or "workflow"
+    generate_testimonials = bool(params.get("generate_testimonials", False))
+    workflow_run_id = params.get("workflow_run_id")
+
+    if not funnel_id:
+        raise ValueError("funnel_id is required for media enrichment")
+    if not page_id:
+        raise ValueError("page_id is required for media enrichment")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise ValueError("prompt is required for media enrichment")
+
+    def log_activity(step: str, status: str, *, payload_in=None, payload_out=None, error: str | None = None) -> None:
+        if not workflow_run_id:
+            return
+        with session_scope() as session:
+            wf_repo = WorkflowsRepository(session)
+            wf_repo.log_activity(
+                workflow_run_id=workflow_run_id,
+                step=step,
+                status=status,
+                payload_in=payload_in,
+                payload_out=payload_out,
+                error=error,
+            )
+
+    log_activity(
+        "funnel_page_media_enrichment",
+        "started",
+        payload_in={
+            "funnel_id": str(funnel_id),
+            "page_id": str(page_id),
+            "template_id": template_id,
+            "generate_testimonials": generate_testimonials,
+        },
+    )
+    if generate_testimonials:
+        log_activity(
+            "funnel_page_testimonials",
+            "started",
+            payload_in={
+                "funnel_id": str(funnel_id),
+                "page_id": str(page_id),
+                "mode": "async_media_enrichment",
+            },
+        )
+
+    with session_scope() as session:
+        try:
+            result = run_generate_page_draft(
+                session=session,
+                org_id=org_id,
+                user_id=str(actor_user_id),
+                funnel_id=str(funnel_id),
+                page_id=str(page_id),
+                prompt=str(prompt),
+                template_id=str(template_id) if template_id else None,
+                idea_workspace_id=str(idea_workspace_id) if idea_workspace_id else None,
+                generate_images=True,
+                generate_testimonials=generate_testimonials,
+                skip_draft_generation=True,
+            )
+        except Exception as exc:  # noqa: BLE001
+            error_text = str(exc)
+            log_activity(
+                "funnel_page_media_enrichment",
+                "failed",
+                error=error_text,
+                payload_in={
+                    "funnel_id": str(funnel_id),
+                    "page_id": str(page_id),
+                    "template_id": template_id,
+                },
+            )
+            if generate_testimonials:
+                if "testimonial" in error_text.lower():
+                    log_activity(
+                        "funnel_page_testimonials",
+                        "failed",
+                        error=error_text,
+                        payload_in={
+                            "funnel_id": str(funnel_id),
+                            "page_id": str(page_id),
+                            "mode": "async_media_enrichment",
+                        },
+                    )
+                else:
+                    log_activity(
+                        "funnel_page_testimonials",
+                        "skipped",
+                        payload_in={
+                            "funnel_id": str(funnel_id),
+                            "page_id": str(page_id),
+                            "mode": "async_media_enrichment",
+                            "reason": "Media enrichment failed before testimonials completed.",
+                        },
+                    )
+            raise
+
+    generated_images = result.get("generatedImages") or []
+    image_errors = _collect_image_generation_errors(
+        generated_images=generated_images,
+        funnel_id=str(funnel_id),
+        page_id=str(page_id),
+        page_name=str(page_name),
+        template_id=str(template_id) if template_id else None,
+    )
+    log_activity(
+        "funnel_page_media_enrichment",
+        "completed",
+        payload_out={
+            "funnel_id": str(funnel_id),
+            "page_id": str(page_id),
+            "draft_version_id": result.get("draftVersionId"),
+            "image_error_count": len(image_errors),
+            "image_errors": [entry["message"] for entry in image_errors],
+        },
+    )
+    if generate_testimonials:
+        log_activity(
+            "funnel_page_testimonials",
+            "completed",
+            payload_out={
+                "funnel_id": str(funnel_id),
+                "page_id": str(page_id),
+                "draft_version_id": result.get("draftVersionId"),
+                "mode": "async_media_enrichment",
+            },
+        )
+    else:
+        log_activity(
+            "funnel_page_testimonials",
+            "skipped",
+            payload_in={
+                "funnel_id": str(funnel_id),
+                "page_id": str(page_id),
+                "mode": "async_media_enrichment",
+                "reason": "Synthetic testimonials generation disabled for this run.",
+            },
+        )
+
+    return {
+        "funnel_id": str(funnel_id),
+        "page_id": str(page_id),
+        "page_name": str(page_name),
+        "template_id": str(template_id) if template_id else None,
+        "draft_version_id": result.get("draftVersionId"),
+        "generated_images": generated_images,
+        "non_fatal_errors": image_errors,
+        "agent_run_id": result.get("runId"),
+    }
+
+
+@activity.defn
 def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     org_id = params["org_id"]
     client_id = params["client_id"]
@@ -520,6 +732,7 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
     actor_user_id = params.get("actor_user_id") or "workflow"
     generate_ai_drafts = bool(params.get("generate_ai_drafts", False))
     generate_testimonials = bool(params.get("generate_testimonials", False))
+    async_media_enrichment = bool(params.get("async_media_enrichment", True))
     temporal_workflow_id = params.get("temporal_workflow_id")
     temporal_run_id = params.get("temporal_run_id")
 
@@ -579,6 +792,7 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
 
     results = []
     non_fatal_errors: list[dict[str, Any]] = []
+    media_enrichment_jobs: list[dict[str, Any]] = []
     for experiment in experiment_specs:
         if not isinstance(experiment, dict):
             raise ValueError("Experiment specs must be objects.")
@@ -634,6 +848,7 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
                         "actor_user_id": actor_user_id,
                         "generate_ai_drafts": generate_ai_drafts,
                         "generate_testimonials": generate_testimonials,
+                        "async_media_enrichment": async_media_enrichment,
                         "ai_draft_max_attempts": params.get("ai_draft_max_attempts"),
                         "workflow_run_id": workflow_run_id,
                     }
@@ -682,6 +897,27 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
                         }
                     )
 
+            funnel_media_jobs = (
+                funnel_result.get("media_enrichment_jobs")
+                if isinstance(funnel_result, dict)
+                else None
+            )
+            if isinstance(funnel_media_jobs, list):
+                for entry in funnel_media_jobs:
+                    if not isinstance(entry, dict):
+                        continue
+                    media_enrichment_jobs.append(
+                        {
+                            **entry,
+                            "experiment_id": experiment_id,
+                            "variant_id": variant_id,
+                        }
+                    )
+
             results.append({"experiment_id": experiment_id, "variant_id": variant_id, "funnel": funnel_result})
 
-    return {"funnels": results, "non_fatal_errors": non_fatal_errors}
+    return {
+        "funnels": results,
+        "non_fatal_errors": non_fatal_errors,
+        "media_enrichment_jobs": media_enrichment_jobs,
+    }

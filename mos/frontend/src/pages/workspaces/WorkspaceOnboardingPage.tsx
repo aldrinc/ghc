@@ -21,7 +21,14 @@ export function WorkspaceOnboardingPage() {
     productName?: string;
   }) => {
     selectWorkspace(clientId, { name: clientName });
-    selectProduct(productId, { name: productName, client_id: clientId });
+    selectProduct(
+      productId,
+      {
+        title: productName,
+        client_id: clientId,
+      },
+      { clientId }
+    );
     navigate("/workspaces/overview");
   };
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
 import { Container } from "./Container";
 import { Marquee } from "./Marquee";
 import { Modal } from "./Modal";
@@ -46,6 +46,8 @@ type Props = {
 };
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const MOBILE_BREAKPOINT_QUERY = "(max-width: 980px)";
+const ORDER_NOW_SCROLL_TARGET_ID = "order-now";
 const URGENCY_MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
   month: "long",
   timeZone: "UTC",
@@ -369,6 +371,24 @@ function HeaderBar({
   visible: boolean
   activeSectionId?: string | null
 }) {
+  const handleHeaderCtaClick = (event: ReactMouseEvent<HTMLAnchorElement>) => {
+    if (config.cta.href !== "#top") return
+    if (!window.matchMedia(MOBILE_BREAKPOINT_QUERY).matches) return
+
+    const target = document.getElementById(ORDER_NOW_SCROLL_TARGET_ID)
+    if (!target) {
+      console.error(
+        `SalesPdpHeader: cannot find section #${ORDER_NOW_SCROLL_TARGET_ID}. ` +
+          "Mobile header CTA cannot scroll to the purchase section."
+      )
+      return
+    }
+
+    event.preventDefault()
+    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "center" })
+  }
+
   return (
     <div className={styles.header} aria-hidden={!visible}>
       <Container className={styles.headerContainer}>
@@ -389,7 +409,7 @@ function HeaderBar({
             ))}
           </nav>
 
-          <a className={styles.headerCta} href={config.cta.href}>
+          <a className={styles.headerCta} href={config.cta.href} onClick={handleHeaderCtaClick}>
             {config.cta.label}
             <span className={styles.headerCtaIcon} aria-hidden="true">
               <IconArrow dir="right" size={14} />
@@ -1157,7 +1177,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
               />
             </div>
 
-            <div>
+            <div id={ORDER_NOW_SCROLL_TARGET_ID}>
               {/*
                 Auto-sliding FAQ pills (marquee-style)
                 - Continuously scrolls horizontally like the marquee band.

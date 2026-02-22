@@ -7,10 +7,15 @@ from typing import Any, Dict, List, Optional
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
+    from app.config import settings
     from app.temporal.activities.campaign_intent_activities import create_funnels_from_experiments_activity
     from app.temporal.activities.experiment_activities import (
         fetch_experiment_specs_activity,
         create_asset_briefs_for_experiments_activity,
+    )
+    from app.temporal.workflows.campaign_funnel_media_enrichment import (
+        CampaignFunnelMediaEnrichmentInput,
+        CampaignFunnelMediaEnrichmentWorkflow,
     )
 
 
@@ -135,6 +140,8 @@ class CampaignFunnelGenerationInput:
     campaign_id: str
     experiment_ids: List[str]
     variant_ids_by_experiment: Optional[Dict[str, List[str]]] = None
+    variant_activity_concurrency: Optional[int] = None
+    async_media_enrichment: bool = True
     funnel_name_prefix: Optional[str] = None
     generate_testimonials: bool = False
 
@@ -174,13 +181,28 @@ class CampaignFunnelGenerationWorkflow:
         if funnel_count < 1:
             raise RuntimeError("No experiment variants available for funnel generation.")
 
-        per_variant_timeout = max(timedelta(minutes=45), timedelta(minutes=15))
-        funnel_items: list[dict[str, Any]] = []
-        non_fatal_errors: list[dict[str, Any]] = []
+        per_variant_timeout = timedelta(minutes=25) if input.async_media_enrichment else timedelta(minutes=45)
+        requested_concurrency = input.variant_activity_concurrency
+        if requested_concurrency is not None and requested_concurrency < 1:
+            raise RuntimeError("variant_activity_concurrency must be >= 1 when provided.")
+        variant_activity_concurrency = (
+            requested_concurrency or settings.CAMPAIGN_FUNNEL_VARIANT_ACTIVITY_CONCURRENCY
+        )
+        if variant_activity_concurrency > funnel_count:
+            variant_activity_concurrency = funnel_count
+
+        variant_specs: list[dict[str, Any]] = []
         for experiment in experiment_specs:
             variants = experiment.get("variants") or []
             for variant in variants:
-                per_variant_spec = {**experiment, "variants": [variant]}
+                variant_specs.append({**experiment, "variants": [variant]})
+
+        batch_results: list[dict[str, Any] | None] = [None] * len(variant_specs)
+
+        semaphore = workflow.asyncio.Semaphore(max(1, variant_activity_concurrency))
+
+        async def _run_variant_activity(variant_index: int, per_variant_spec: dict[str, Any]) -> None:
+            async with semaphore:
                 batch_result = await workflow.execute_activity(
                     create_funnels_from_experiments_activity,
                     {
@@ -195,6 +217,7 @@ class CampaignFunnelGenerationWorkflow:
                         "actor_user_id": "workflow",
                         "generate_ai_drafts": True,
                         "generate_testimonials": bool(input.generate_testimonials),
+                        "async_media_enrichment": bool(input.async_media_enrichment),
                         "temporal_workflow_id": workflow.info().workflow_id,
                         "temporal_run_id": workflow.info().run_id,
                     },
@@ -202,21 +225,86 @@ class CampaignFunnelGenerationWorkflow:
                 )
                 if not isinstance(batch_result, dict):
                     raise RuntimeError("Funnel generation activity returned an invalid result payload.")
-                result_items = batch_result.get("funnels") or []
-                if isinstance(result_items, list):
-                    for item in result_items:
-                        if isinstance(item, dict):
-                            funnel_items.append(item)
-                result_non_fatal_errors = batch_result.get("non_fatal_errors") or []
-                if isinstance(result_non_fatal_errors, list):
-                    for entry in result_non_fatal_errors:
-                        if isinstance(entry, dict):
-                            non_fatal_errors.append(entry)
+                batch_results[variant_index] = batch_result
+
+        tasks = [
+            workflow.asyncio.create_task(_run_variant_activity(idx, spec))
+            for idx, spec in enumerate(variant_specs)
+        ]
+        await workflow.wait(tasks)
+        for task in tasks:
+            exc = task.exception()
+            if exc is not None:
+                raise exc
+
+        funnel_items: list[dict[str, Any]] = []
+        non_fatal_errors: list[dict[str, Any]] = []
+        media_enrichment_jobs: list[dict[str, Any]] = []
+        for batch_result in batch_results:
+            if not isinstance(batch_result, dict):
+                raise RuntimeError("Funnel generation activity returned an empty result payload.")
+            result_items = batch_result.get("funnels") or []
+            if isinstance(result_items, list):
+                for item in result_items:
+                    if isinstance(item, dict):
+                        funnel_items.append(item)
+            result_non_fatal_errors = batch_result.get("non_fatal_errors") or []
+            if isinstance(result_non_fatal_errors, list):
+                for entry in result_non_fatal_errors:
+                    if isinstance(entry, dict):
+                        non_fatal_errors.append(entry)
+            result_media_jobs = batch_result.get("media_enrichment_jobs") or []
+            if isinstance(result_media_jobs, list):
+                for entry in result_media_jobs:
+                    if isinstance(entry, dict):
+                        media_enrichment_jobs.append(entry)
 
         funnel_batch = {
             "funnels": funnel_items,
             "non_fatal_errors": non_fatal_errors,
+            "media_enrichment_jobs": media_enrichment_jobs,
         }
+
+        media_enrichment_workflows: list[dict[str, Any]] = []
+        if input.async_media_enrichment:
+            for idx, job in enumerate(media_enrichment_jobs):
+                funnel_id = str(job.get("funnel_id") or "").strip()
+                page_id = str(job.get("page_id") or "").strip()
+                if not funnel_id or not page_id:
+                    continue
+                child_workflow_id = (
+                    f"{workflow.info().workflow_id}-media-{funnel_id[:8]}-{page_id[:8]}-{idx}"
+                )
+                child_handle = await workflow.start_child_workflow(
+                    CampaignFunnelMediaEnrichmentWorkflow.run,
+                    CampaignFunnelMediaEnrichmentInput(
+                        org_id=input.org_id,
+                        actor_user_id=str(job.get("actor_user_id") or "workflow"),
+                        workflow_run_id=job.get("workflow_run_id"),
+                        funnel_id=funnel_id,
+                        page_id=page_id,
+                        page_name=str(job.get("page_name") or ""),
+                        template_id=job.get("template_id"),
+                        prompt=str(job.get("prompt") or "Media enrichment run"),
+                        idea_workspace_id=job.get("idea_workspace_id"),
+                        generate_testimonials=bool(job.get("generate_testimonials", False)),
+                        experiment_id=job.get("experiment_id"),
+                        variant_id=job.get("variant_id"),
+                    ),
+                    id=child_workflow_id,
+                    task_queue=settings.TEMPORAL_MEDIA_ENRICHMENT_TASK_QUEUE,
+                    parent_close_policy=workflow.ParentClosePolicy.ABANDON,
+                )
+                media_enrichment_workflows.append(
+                    {
+                        "workflow_id": child_handle.id,
+                        "first_execution_run_id": child_handle.first_execution_run_id,
+                        "funnel_id": funnel_id,
+                        "page_id": page_id,
+                        "experiment_id": job.get("experiment_id"),
+                        "variant_id": job.get("variant_id"),
+                    }
+                )
 
         funnel_map: Dict[str, str] = {}
         if isinstance(funnel_batch, dict):
@@ -251,5 +339,9 @@ class CampaignFunnelGenerationWorkflow:
         return {
             "campaign_id": input.campaign_id,
             "funnels": funnel_batch,
+            "media_enrichment": {
+                "mode": "async" if input.async_media_enrichment else "inline",
+                "workflows": media_enrichment_workflows,
+            },
             "asset_briefs": briefs_result,
         }

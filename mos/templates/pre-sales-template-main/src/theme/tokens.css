@@ -226,7 +226,7 @@
   --pitch-media-shadow: 0 18px 42px rgba(0, 0, 0, 0.12);
 
   /* Shop Now button */
-  --cta-shell-pad: 10px;
+  --cta-shell-pad: 7px;
   --cta-shell-shadow: 0 16px 44px rgba(0, 0, 0, 0.16);
 
   /* Base (overridden per size in Button.module.css) */
@@ -240,9 +240,12 @@
   --cta-min-width-md: 360px;
   --cta-min-width-sm: 260px;
 
-  --cta-pad-x-lg: 34px;
-  --cta-pad-x-md: 30px;
-  --cta-pad-x-sm: 22px;
+  --cta-pad-left-lg: 28px;
+  --cta-pad-right-lg: 10px;
+  --cta-pad-left-md: 24px;
+  --cta-pad-right-md: 9px;
+  --cta-pad-left-sm: 18px;
+  --cta-pad-right-sm: 8px;
 
   --cta-font-size-lg: 18px;
   --cta-font-size-md: 17px;
@@ -251,13 +254,13 @@
   --cta-letter-spacing: 0.06em;
   --cta-font-weight: 900;
 
-  --cta-circle-size-lg: 40px;
-  --cta-circle-size-md: 38px;
-  --cta-circle-size-sm: 34px;
+  --cta-circle-size-lg: 34px;
+  --cta-circle-size-md: 32px;
+  --cta-circle-size-sm: 28px;
 
-  --cta-icon-size-lg: 18px;
-  --cta-icon-size-md: 18px;
-  --cta-icon-size-sm: 16px;
+  --cta-icon-size-lg: 16px;
+  --cta-icon-size-md: 16px;
+  --cta-icon-size-sm: 14px;
 
   /* Review wall */
   --wall-pad-y: 80px;

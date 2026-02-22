@@ -1,21 +1,24 @@
 from __future__ import annotations
 
 import base64
+import concurrent.futures
 import copy
 import json
 import os
 import random
 import re
+import time
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterator, Optional
+from typing import Any, Iterator, Optional, cast
 from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.db.base import SessionLocal
 from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum
 from app.db.models import Asset, Funnel, FunnelPage, FunnelPageVersion, Product
 from app.llm.client import LLMClient, LLMGenerationParams
@@ -75,6 +78,7 @@ _MEDIA_SCENE_MODE_CYCLE = (
 )
 _SINGLE_SCENE_MODE_CYCLE = (_SCENE_MODE_WITH_PEOPLE, _SCENE_MODE_NO_PEOPLE)
 _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS = int(os.getenv("FUNNEL_TESTIMONIAL_IDENTITY_ATTEMPTS", "1"))
+_TESTIMONIAL_ASSET_MAX_CONCURRENCY = max(1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY)
 
 
 def _clean_single_line(text: str) -> str:
@@ -878,6 +882,73 @@ def _asset_data_url(asset: Asset) -> str:
     mime = (asset.content_type or content_type or "application/octet-stream").split(";")[0].strip()
     encoded = base64.b64encode(data).decode("ascii")
     return f"data:{mime};base64,{encoded}"
+
+
+@dataclass
+class _GeneratedTestimonialAsset:
+    public_id: str
+    asset_id: str
+    storage_key: str | None
+    content_type: str | None
+
+
+def _generated_testimonial_asset(asset: Asset) -> _GeneratedTestimonialAsset:
+    return _GeneratedTestimonialAsset(
+        public_id=str(asset.public_id),
+        asset_id=str(asset.id),
+        storage_key=asset.storage_key,
+        content_type=asset.content_type,
+    )
+
+
+def _asset_data_url_from_generated(asset: _GeneratedTestimonialAsset) -> str:
+    if not asset.storage_key:
+        raise TestimonialGenerationError(
+            "Generated testimonial asset is missing storage_key (cannot build data URL)."
+        )
+    storage = MediaStorage()
+    data, content_type = storage.download_bytes(key=asset.storage_key)
+    if not data:
+        raise TestimonialGenerationError(
+            f"Downloaded asset bytes are empty (publicId={asset.public_id})."
+        )
+    mime = (asset.content_type or content_type or "application/octet-stream").split(";")[0].strip()
+    encoded = base64.b64encode(data).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
+def _generate_testimonial_image_asset(
+    *,
+    org_id: str,
+    client_id: str,
+    prompt: str,
+    aspect_ratio: Optional[str] = None,
+    usage_context: Optional[dict[str, Any]] = None,
+    reference_image_bytes: Optional[bytes] = None,
+    reference_image_mime_type: Optional[str] = None,
+    reference_asset_public_id: Optional[str] = None,
+    reference_asset_id: Optional[str] = None,
+    funnel_id: Optional[str] = None,
+    product_id: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+) -> _GeneratedTestimonialAsset:
+    with SessionLocal() as thread_session:
+        asset = create_funnel_image_asset(
+            session=thread_session,
+            org_id=org_id,
+            client_id=client_id,
+            prompt=prompt,
+            aspect_ratio=aspect_ratio,
+            usage_context=usage_context,
+            reference_image_bytes=reference_image_bytes,
+            reference_image_mime_type=reference_image_mime_type,
+            reference_asset_public_id=reference_asset_public_id,
+            reference_asset_id=reference_asset_id,
+            funnel_id=funnel_id,
+            product_id=product_id,
+            tags=tags,
+        )
+        return _generated_testimonial_asset(asset)
 
 
 def _resolve_testimonial_template(image: dict[str, Any]) -> str:
@@ -1857,6 +1928,7 @@ def generate_funnel_page_testimonials(
     model: Optional[str] = None,
     temperature: float = 0.3,
     max_tokens: Optional[int] = None,
+    max_duration_seconds: Optional[int] = None,
     synthetic: bool = True,
 ) -> tuple[FunnelPageVersion, dict[str, Any], list[dict[str, Any]]]:
     if not synthetic:
@@ -1931,6 +2003,20 @@ def generate_funnel_page_testimonials(
 
     llm = LLMClient()
     model_id = model or llm.default_model
+    if max_duration_seconds is not None and max_duration_seconds <= 0:
+        raise TestimonialGenerationError("maxDurationSeconds must be > 0 when provided.")
+    deadline_ts = (
+        time.monotonic() + float(max_duration_seconds)
+        if max_duration_seconds is not None
+        else None
+    )
+
+    def ensure_within_budget(step: str) -> None:
+        if deadline_ts is not None and time.monotonic() >= deadline_ts:
+            raise TestimonialGenerationError(
+                f"Testimonials step exceeded configured time budget while {step}."
+            )
+
     today = datetime.now(timezone.utc).date().isoformat()
     batch_size = 6
     sales_review_wall_social_index = 0
@@ -1960,6 +2046,7 @@ def generate_funnel_page_testimonials(
 
     validated_testimonials: list[dict[str, Any]] = []
     for identity_attempt in range(1, _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS + 1):
+        ensure_within_budget("generating testimonial identities")
         candidate_validated: list[dict[str, Any]] = []
         reserved_names: list[str] = []
         reserved_name_keys: set[str] = set()
@@ -1967,6 +2054,7 @@ def generate_funnel_page_testimonials(
         attempt_nonce = f"{funnel_id}:{page_id}:{resolved_template_id}:{identity_attempt}:{uuid4().hex[:8]}"
 
         for batch_idx, start in enumerate(range(0, len(groups), batch_size)):
+            ensure_within_budget("requesting testimonial LLM batches")
             batch = groups[start : start + batch_size]
             prompt = _build_testimonial_prompt(
                 count=len(batch),
@@ -2077,6 +2165,7 @@ def generate_funnel_page_testimonials(
     try:
         with ThreadedTestimonialRenderer() as renderer:
             for idx, group in enumerate(groups):
+                ensure_within_budget("rendering testimonial groups")
                 validated = validated_testimonials[idx]
 
                 if group.slide is not None:
@@ -2104,6 +2193,7 @@ def generate_funnel_page_testimonials(
                     media_prompt_iter = iter(enumerate(media_prompts))
 
                 for render in group.renders:
+                    ensure_within_budget(f"rendering {render.label}")
                     setting_value = _derive_setting(
                         validated=validated,
                         fallback_text=validated["heroImagePrompt"],
@@ -2140,8 +2230,7 @@ def generate_funnel_page_testimonials(
                             include_text_screen_line=False,
                             prohibit_visible_text=True,
                         )
-                        media_asset = create_funnel_image_asset(
-                            session=session,
+                        media_asset = _generate_testimonial_image_asset(
                             org_id=org_id,
                             client_id=str(funnel.client_id),
                             prompt=media_prompt,
@@ -2163,11 +2252,11 @@ def generate_funnel_page_testimonials(
 
                         payload = {
                             "template": "testimonial_media",
-                            "imageUrl": _public_asset_url(str(media_asset.public_id)),
+                            "imageUrl": _public_asset_url(media_asset.public_id),
                             "alt": f"Customer scene for {validated['name']}",
                         }
                         render_payload = dict(payload)
-                        render_payload["imageUrl"] = _asset_data_url(media_asset)
+                        render_payload["imageUrl"] = _asset_data_url_from_generated(media_asset)
                         image_bytes = renderer.render_png(render_payload)
                         asset = create_funnel_upload_asset(
                             session=session,
@@ -2198,7 +2287,7 @@ def generate_funnel_page_testimonials(
                                 "payload": payload,
                                 "publicId": str(asset.public_id),
                                 "assetId": str(asset.id),
-                                "mediaSourcePublicId": str(media_asset.public_id),
+                                "mediaSourcePublicId": media_asset.public_id,
                                 "mediaPrompt": media_prompt,
                                 "sceneMode": media_scene_mode,
                             }
@@ -2216,7 +2305,7 @@ def generate_funnel_page_testimonials(
                         review_scene_mode = _select_single_scene_mode(review_card_scene_index)
                         review_card_scene_index += 1
                         review_hero_prompt = None
-                        hero_asset: Optional[Asset] = None
+                        hero_asset: Optional[_GeneratedTestimonialAsset] = None
                         hero_error: str | None = None
                         if not omit_hero:
                             review_hero_prompt = _build_testimonial_scene_prompt(
@@ -2239,17 +2328,24 @@ def generate_funnel_page_testimonials(
                             direction=validated["avatarPrompt"],
                             variant_label="review-card-avatar",
                         )
+                        review_avatar_asset: Optional[_GeneratedTestimonialAsset] = None
+                        avatar_error: str | None = None
+                        asset_jobs: dict[str, concurrent.futures.Future[_GeneratedTestimonialAsset]] = {}
                         if not omit_hero:
                             if review_hero_prompt is None:
                                 raise TestimonialGenerationError(
                                     "Review card hero prompt was not generated even though hero rendering is enabled."
                                 )
-                            try:
-                                hero_asset = create_funnel_image_asset(
-                                    session=session,
+                        ensure_within_budget(f"generating source assets for {render.label}")
+                        with concurrent.futures.ThreadPoolExecutor(
+                            max_workers=min(_TESTIMONIAL_ASSET_MAX_CONCURRENCY, 2)
+                        ) as pool:
+                            if not omit_hero:
+                                asset_jobs["hero"] = pool.submit(
+                                    _generate_testimonial_image_asset,
                                     org_id=org_id,
                                     client_id=str(funnel.client_id),
-                                    prompt=review_hero_prompt,
+                                    prompt=cast(str, review_hero_prompt),
                                     aspect_ratio="9:16",
                                     usage_context={
                                         "kind": "testimonial_review_hero",
@@ -2265,18 +2361,8 @@ def generate_funnel_page_testimonials(
                                     product_id=str(funnel.product_id) if funnel.product_id else None,
                                     tags=["funnel", "testimonial", "review_card", "hero"],
                                 )
-                            except Exception as exc:  # noqa: BLE001
-                                if _should_soft_fail_gemini_missing_inline_data(exc):
-                                    hero_asset = None
-                                    hero_error = str(exc)
-                                else:
-                                    raise
-
-                        review_avatar_asset: Optional[Asset] = None
-                        avatar_error: str | None = None
-                        try:
-                            review_avatar_asset = create_funnel_image_asset(
-                                session=session,
+                            asset_jobs["avatar"] = pool.submit(
+                                _generate_testimonial_image_asset,
                                 org_id=org_id,
                                 client_id=str(funnel.client_id),
                                 prompt=review_avatar_prompt,
@@ -2291,12 +2377,21 @@ def generate_funnel_page_testimonials(
                                 product_id=str(funnel.product_id) if funnel.product_id else None,
                                 tags=["funnel", "testimonial", "review_card", "avatar"],
                             )
-                        except Exception as exc:  # noqa: BLE001
-                            if _should_soft_fail_gemini_missing_inline_data(exc):
-                                review_avatar_asset = None
-                                avatar_error = str(exc)
-                            else:
-                                raise
+                            for key, future in asset_jobs.items():
+                                try:
+                                    result = future.result()
+                                except Exception as exc:  # noqa: BLE001
+                                    if _should_soft_fail_gemini_missing_inline_data(exc):
+                                        if key == "hero":
+                                            hero_error = str(exc)
+                                        if key == "avatar":
+                                            avatar_error = str(exc)
+                                        continue
+                                    raise
+                                if key == "hero":
+                                    hero_asset = result
+                                if key == "avatar":
+                                    review_avatar_asset = result
 
                         payload: dict[str, Any] = {
                             "template": "review_card",
@@ -2306,9 +2401,9 @@ def generate_funnel_page_testimonials(
                             "review": validated["review"],
                         }
                         if review_avatar_asset is not None:
-                            payload["avatarUrl"] = _public_asset_url(str(review_avatar_asset.public_id))
+                            payload["avatarUrl"] = _public_asset_url(review_avatar_asset.public_id)
                         if hero_asset is not None:
-                            payload["heroImageUrl"] = _public_asset_url(str(hero_asset.public_id))
+                            payload["heroImageUrl"] = _public_asset_url(hero_asset.public_id)
                         if validated.get("meta") is not None:
                             payload["meta"] = validated["meta"]
                         payload["renderContext"] = {
@@ -2319,9 +2414,9 @@ def generate_funnel_page_testimonials(
 
                         render_payload = dict(payload)
                         if review_avatar_asset is not None:
-                            render_payload["avatarUrl"] = _asset_data_url(review_avatar_asset)
+                            render_payload["avatarUrl"] = _asset_data_url_from_generated(review_avatar_asset)
                         if hero_asset is not None:
-                            render_payload["heroImageUrl"] = _asset_data_url(hero_asset)
+                            render_payload["heroImageUrl"] = _asset_data_url_from_generated(hero_asset)
 
                         image_bytes = renderer.render_png(render_payload)
                         asset = create_funnel_upload_asset(
@@ -2354,10 +2449,10 @@ def generate_funnel_page_testimonials(
                                 "publicId": str(asset.public_id),
                                 "assetId": str(asset.id),
                                 "heroSourcePublicId": (
-                                    str(hero_asset.public_id) if hero_asset is not None else None
+                                    hero_asset.public_id if hero_asset is not None else None
                                 ),
                                 "avatarSourcePublicId": (
-                                    str(review_avatar_asset.public_id)
+                                    review_avatar_asset.public_id
                                     if review_avatar_asset is not None
                                     else None
                                 ),
@@ -2395,11 +2490,17 @@ def generate_funnel_page_testimonials(
                         include_text_screen_line=False,
                         prohibit_visible_text=True,
                     )
-                    avatar_asset: Optional[Asset] = None
+                    avatar_asset: Optional[_GeneratedTestimonialAsset] = None
                     avatar_error: str | None = None
-                    try:
-                        avatar_asset = create_funnel_image_asset(
-                            session=session,
+                    attachment_asset: Optional[_GeneratedTestimonialAsset] = None
+                    attachment_error: str | None = None
+                    social_jobs: dict[str, concurrent.futures.Future[_GeneratedTestimonialAsset]] = {}
+                    ensure_within_budget(f"generating source assets for {render.label}")
+                    with concurrent.futures.ThreadPoolExecutor(
+                        max_workers=min(_TESTIMONIAL_ASSET_MAX_CONCURRENCY, 2 if not omit_attachment else 1)
+                    ) as pool:
+                        social_jobs["avatar"] = pool.submit(
+                            _generate_testimonial_image_asset,
                             org_id=org_id,
                             client_id=str(funnel.client_id),
                             prompt=social_avatar_prompt,
@@ -2414,19 +2515,9 @@ def generate_funnel_page_testimonials(
                             product_id=str(funnel.product_id) if funnel.product_id else None,
                             tags=["funnel", "testimonial", "social_comment", "avatar"],
                         )
-                    except Exception as exc:  # noqa: BLE001
-                        if _should_soft_fail_gemini_missing_inline_data(exc):
-                            avatar_asset = None
-                            avatar_error = str(exc)
-                        else:
-                            raise
-
-                    attachment_asset: Optional[Asset] = None
-                    attachment_error: str | None = None
-                    if not omit_attachment:
-                        try:
-                            attachment_asset = create_funnel_image_asset(
-                                session=session,
+                        if not omit_attachment:
+                            social_jobs["attachment"] = pool.submit(
+                                _generate_testimonial_image_asset,
                                 org_id=org_id,
                                 client_id=str(funnel.client_id),
                                 prompt=social_attachment_prompt,
@@ -2445,12 +2536,21 @@ def generate_funnel_page_testimonials(
                                 product_id=str(funnel.product_id) if funnel.product_id else None,
                                 tags=["funnel", "testimonial", "social_comment", "attachment"],
                             )
-                        except Exception as exc:  # noqa: BLE001
-                            if _should_soft_fail_gemini_missing_inline_data(exc):
-                                attachment_asset = None
-                                attachment_error = str(exc)
-                            else:
+                        for key, future in social_jobs.items():
+                            try:
+                                result = future.result()
+                            except Exception as exc:  # noqa: BLE001
+                                if _should_soft_fail_gemini_missing_inline_data(exc):
+                                    if key == "avatar":
+                                        avatar_error = str(exc)
+                                    if key == "attachment":
+                                        attachment_error = str(exc)
+                                    continue
                                 raise
+                            if key == "avatar":
+                                avatar_asset = result
+                            if key == "attachment":
+                                attachment_asset = result
                     time_value = today
                     if isinstance(validated.get("meta"), dict):
                         meta_date = validated["meta"].get("date")
@@ -2465,10 +2565,10 @@ def generate_funnel_page_testimonials(
                     reaction_count = 3 + (seed % 17)
                     follow_label = "Follow" if variant == 1 else None
                     reply_payload = validated["reply"]
-                    reply_avatar_asset: Optional[Asset] = None
+                    reply_avatar_asset: Optional[_GeneratedTestimonialAsset] = None
                     reply_avatar_error: str | None = None
 
-                    def ensure_reply_avatar_asset() -> Optional[Asset]:
+                    def ensure_reply_avatar_asset() -> Optional[_GeneratedTestimonialAsset]:
                         nonlocal reply_avatar_asset, reply_avatar_error
                         if reply_avatar_asset is not None or reply_avatar_error is not None:
                             return reply_avatar_asset
@@ -2480,8 +2580,7 @@ def generate_funnel_page_testimonials(
                             variant_label="social-reply-avatar",
                         )
                         try:
-                            reply_avatar_asset = create_funnel_image_asset(
-                                session=session,
+                            reply_avatar_asset = _generate_testimonial_image_asset(
                                 org_id=org_id,
                                 client_id=str(funnel.client_id),
                                 prompt=reply_avatar_prompt,
@@ -2521,8 +2620,8 @@ def generate_funnel_page_testimonials(
                             }
                             reply_entry_render = dict(reply_entry_public)
                             if reply_avatar is not None:
-                                reply_entry_public["avatarUrl"] = _public_asset_url(str(reply_avatar.public_id))
-                                reply_entry_render["avatarUrl"] = _asset_data_url(reply_avatar)
+                                reply_entry_public["avatarUrl"] = _public_asset_url(reply_avatar.public_id)
+                                reply_entry_render["avatarUrl"] = _asset_data_url_from_generated(reply_avatar)
                             replies_public = [reply_entry_public]
                             replies_render = [reply_entry_render]
                             view_replies_text = "View 1 reply"
@@ -2537,8 +2636,8 @@ def generate_funnel_page_testimonials(
                         }
                         reply_entry_render = dict(reply_entry_public)
                         if reply_avatar is not None:
-                            reply_entry_public["avatarUrl"] = _public_asset_url(str(reply_avatar.public_id))
-                            reply_entry_render["avatarUrl"] = _asset_data_url(reply_avatar)
+                            reply_entry_public["avatarUrl"] = _public_asset_url(reply_avatar.public_id)
+                            reply_entry_render["avatarUrl"] = _asset_data_url_from_generated(reply_avatar)
                         replies_public = [reply_entry_public]
                         replies_render = [reply_entry_render]
                         view_replies_text = "View 1 reply"
@@ -2566,11 +2665,11 @@ def generate_funnel_page_testimonials(
                         ),
                     }
                     if avatar_asset is not None:
-                        primary_comment_public["avatarUrl"] = _public_asset_url(str(avatar_asset.public_id))
-                        primary_comment_render["avatarUrl"] = _asset_data_url(avatar_asset)
+                        primary_comment_public["avatarUrl"] = _public_asset_url(avatar_asset.public_id)
+                        primary_comment_render["avatarUrl"] = _asset_data_url_from_generated(avatar_asset)
                     if attachment_asset is not None:
-                        primary_comment_public["attachmentUrl"] = _public_asset_url(str(attachment_asset.public_id))
-                        primary_comment_render["attachmentUrl"] = _asset_data_url(attachment_asset)
+                        primary_comment_public["attachmentUrl"] = _public_asset_url(attachment_asset.public_id)
+                        primary_comment_render["attachmentUrl"] = _asset_data_url_from_generated(attachment_asset)
 
                     social_template = _next_social_card_variant(social_card_variant_index)
                     social_card_variant_index += 1
@@ -2590,8 +2689,8 @@ def generate_funnel_page_testimonials(
                         }
                         post_payload_render = dict(post_payload)
                         if avatar_asset is not None:
-                            post_payload["avatarUrl"] = _public_asset_url(str(avatar_asset.public_id))
-                            post_payload_render["avatarUrl"] = _asset_data_url(avatar_asset)
+                            post_payload["avatarUrl"] = _public_asset_url(avatar_asset.public_id)
+                            post_payload_render["avatarUrl"] = _asset_data_url_from_generated(avatar_asset)
                         if location_value:
                             post_payload["location"] = location_value
                             post_payload_render["location"] = location_value
@@ -2656,13 +2755,13 @@ def generate_funnel_page_testimonials(
                             "publicId": str(asset.public_id),
                             "assetId": str(asset.id),
                             "avatarPublicId": (
-                                str(avatar_asset.public_id) if avatar_asset is not None else None
+                                avatar_asset.public_id if avatar_asset is not None else None
                             ),
                             "attachmentPublicId": (
-                                str(attachment_asset.public_id) if attachment_asset is not None else None
+                                attachment_asset.public_id if attachment_asset is not None else None
                             ),
                             "replyAvatarPublicId": (
-                                str(reply_avatar_asset.public_id) if reply_avatar_asset else None
+                                reply_avatar_asset.public_id if reply_avatar_asset else None
                             ),
                             "replyName": (reply_payload["name"] if replies_public else None),
                             "replyPersona": (reply_payload["persona"] if replies_public else None),

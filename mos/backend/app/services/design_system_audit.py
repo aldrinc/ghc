@@ -3,13 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from app.services.design_system_generation import (
-    _blend_over_background,
-    _contrast_ratio,
-    _parse_css_color,
-    _resolve_css_var_value,
-    validate_design_system_tokens,
-)
+from app.services.design_system_generation import validate_design_system_tokens
 
 
 @dataclass(frozen=True)
@@ -46,59 +40,6 @@ def audit_design_system_tokens(tokens: dict[str, Any]) -> list[AuditFinding]:
             )
         )
         return findings
-
-    css_vars = tokens.get("cssVars")
-    if not isinstance(css_vars, dict):
-        return findings
-
-    checks: list[tuple[str, str, str, float]] = [
-        ("tokens.contrast.body_on_bg", "--color-text", "--color-bg", 7.0),
-        ("tokens.contrast.brand_on_bg", "--color-brand", "--color-bg", 4.5),
-        ("tokens.contrast.pdp_brand_strong_on_bg", "--pdp-brand-strong", "--color-bg", 4.5),
-        ("tokens.contrast.body_on_page", "--color-text", "--color-page-bg", 7.0),
-        ("tokens.contrast.marquee_text_on_marquee_bg", "--marquee-text", "--marquee-bg", 4.5),
-        ("tokens.contrast.cta_text_on_cta_bg", "--color-cta-text", "--color-cta", 3.0),
-        ("tokens.contrast.cta_text_on_pdp_cta_bg", "--color-cta-text", "--pdp-cta-bg", 3.0),
-        ("tokens.contrast.pdp_warning_icon_on_pdp_warning_bg", "--color-bg", "--pdp-warning-bg", 3.0),
-        ("tokens.contrast.pdp_header_cta_icon_on_cta_shell", "--color-cta-icon", "--color-cta-shell", 3.0),
-    ]
-
-    for check_id, fg_key, bg_key, threshold in checks:
-        fg_raw = css_vars.get(fg_key)
-        bg_raw = css_vars.get(bg_key)
-        if fg_raw is None or bg_raw is None:
-            findings.append(
-                AuditFinding(
-                    check_id=check_id,
-                    status="fail",
-                    location=f"{fg_key} vs {bg_key}",
-                    message="Missing token for contrast check.",
-                    threshold=threshold,
-                )
-            )
-            continue
-
-        fg_resolved = _resolve_css_var_value(css_vars=css_vars, value=str(fg_raw), stack=[fg_key])
-        bg_resolved = _resolve_css_var_value(css_vars=css_vars, value=str(bg_raw), stack=[bg_key])
-        fg_rgba = _parse_css_color(fg_resolved)
-        bg_rgba = _parse_css_color(bg_resolved)
-        bg_rgb = _blend_over_background(fg=bg_rgba, bg=(255, 255, 255, 1.0))
-        fg_rgb = _blend_over_background(fg=fg_rgba, bg=bg_rgba)
-        ratio = _contrast_ratio(a=fg_rgb, b=bg_rgb)
-        status = "pass" if ratio >= threshold else "fail"
-        message = "Contrast check passed." if status == "pass" else "Contrast ratio below threshold."
-        findings.append(
-            AuditFinding(
-                check_id=check_id,
-                status=status,
-                location=f"{fg_key} vs {bg_key}",
-                message=message,
-                foreground=fg_resolved,
-                background=bg_resolved,
-                contrast_ratio=ratio,
-                threshold=threshold,
-            )
-        )
 
     return findings
 

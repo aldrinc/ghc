@@ -1,3 +1,5 @@
+import base64
+import binascii
 import io
 import json
 import os
@@ -79,6 +81,14 @@ class ServerDeployer:
             self.connect()
         sftp = self.client.open_sftp()
         with sftp.file(remote_path, "w") as f:
+            f.write(content)
+        sftp.close()
+
+    def upload_bytes(self, content: bytes, remote_path: str):
+        if self.client.get_transport() is None or not self.client.get_transport().is_active():
+            self.connect()
+        sftp = self.client.open_sftp()
+        with sftp.file(remote_path, "wb") as f:
             f.write(content)
         sftp.close()
 
@@ -643,10 +653,73 @@ WantedBy=multi-user.target
         artifact = source.artifact or {}
         meta = artifact.get("meta")
         products = artifact.get("products")
+        assets = artifact.get("assets")
         if not isinstance(meta, dict):
             raise ValueError("source_ref.artifact.meta must be an object.")
         if not isinstance(products, dict):
             raise ValueError("source_ref.artifact.products must be an object.")
+
+        if assets is not None and not isinstance(assets, dict):
+            raise ValueError("source_ref.artifact.assets must be an object when provided.")
+
+        asset_items: dict[str, object] = {}
+        if isinstance(assets, dict):
+            raw_items = assets.get("items")
+            if raw_items is None:
+                asset_items = {}
+            elif isinstance(raw_items, dict):
+                asset_items = raw_items
+            else:
+                raise ValueError("source_ref.artifact.assets.items must be an object when provided.")
+
+        assets_root = f"{site_dir}/api/public/assets"
+        self.run(f"mkdir -p {shlex.quote(assets_root)}")
+        for raw_public_id, raw_asset_payload in asset_items.items():
+            public_id = str(raw_public_id or "").strip().lower()
+            if not public_id:
+                raise ValueError("Artifact assets.items keys must be non-empty UUID strings.")
+            try:
+                normalized_public_id = str(UUID(public_id))
+            except ValueError as exc:
+                raise ValueError(f"Invalid artifact asset public id '{public_id}'.") from exc
+            if not isinstance(raw_asset_payload, dict):
+                raise ValueError(f"Artifact asset payload for '{normalized_public_id}' must be an object.")
+            raw_content_type = raw_asset_payload.get("contentType")
+            if not isinstance(raw_content_type, str) or not raw_content_type.strip():
+                raise ValueError(f"Artifact asset '{normalized_public_id}' must include non-empty contentType.")
+            content_type = raw_content_type.strip().lower()
+            if not content_type.startswith("image/"):
+                raise ValueError(
+                    f"Artifact asset '{normalized_public_id}' has unsupported contentType '{raw_content_type}'."
+                )
+            raw_bytes_base64 = raw_asset_payload.get("bytesBase64")
+            if not isinstance(raw_bytes_base64, str) or not raw_bytes_base64.strip():
+                raise ValueError(f"Artifact asset '{normalized_public_id}' must include non-empty bytesBase64.")
+            try:
+                decoded_bytes = base64.b64decode(raw_bytes_base64, validate=True)
+            except binascii.Error as exc:
+                raise ValueError(f"Artifact asset '{normalized_public_id}' has invalid bytesBase64.") from exc
+            if not decoded_bytes:
+                raise ValueError(f"Artifact asset '{normalized_public_id}' decoded to empty bytes.")
+            declared_size = raw_asset_payload.get("sizeBytes")
+            if declared_size is not None:
+                if not isinstance(declared_size, int) or declared_size < 0:
+                    raise ValueError(
+                        f"Artifact asset '{normalized_public_id}' sizeBytes must be a non-negative integer."
+                    )
+                if declared_size != len(decoded_bytes):
+                    raise ValueError(
+                        f"Artifact asset '{normalized_public_id}' sizeBytes ({declared_size}) does not match decoded byte length ({len(decoded_bytes)})."
+                    )
+            extension = ""
+            if content_type == "image/webp":
+                extension = ".webp"
+            elif content_type in {"image/jpeg", "image/jpg"}:
+                extension = ".jpg"
+            elif content_type == "image/png":
+                extension = ".png"
+            target_path = f"{assets_root}/{normalized_public_id}{extension}"
+            self.upload_bytes(decoded_bytes, target_path)
 
         base_root = f"{site_dir}/api/public/funnels"
         self.run(f"mkdir -p {shlex.quote(base_root)}")
@@ -817,6 +890,10 @@ WantedBy=multi-user.target
 
     location ^~ /api/public/events {{
         return 204;
+    }}
+
+    location ^~ /api/public/assets/ {{
+        try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png =404;
     }}
 
     location ^~ /api/public/funnels/ {{

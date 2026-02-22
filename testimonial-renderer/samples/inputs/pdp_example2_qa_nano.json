@@ -1,5 +1,5 @@
 {
-  "template": "pdp_ugc_qa",
+  "template": "pdp_ugc_standard",
   "output": {
     "preset": "feed"
   },
@@ -20,20 +20,14 @@
       "product": "a supplement bottle with a bright pink label that reads HAIR, SKIN AND NAILS GUMMY, white cap, brand name covered by a black rectangle",
       "subject": "a 50-60 year old blonde woman smiling",
       "scene": "indoors at home, neutral background, casual smartphone photo",
-      "extra": "She is holding the bottle close to the camera and lightly pointing at it with a finger. Label faces the camera. Realistic skin texture.",
-      "avoid": ["on-image captions", "watermarks", "UI overlays", "extra fingers", "distorted hands"]
+      "extra": "She is holding the bottle close to the camera and lightly pointing at it with a finger. Label faces the camera. Keep her face centered in frame and fully visible. Keep the bottle and hands near the center/right-center, not in corners. Leave the lower-left area clean and uncluttered for a single overlay bubble. Realistic skin texture.",
+      "avoid": ["on-image captions", "watermarks", "UI overlays", "extra fingers", "distorted hands", "product in lower-left corner", "subject or product cropped/occluded by overlay area"]
     }
   },
-  "question": {
-    "handle": "DaphnaJo3",
-    "text": "Is this just a collagen supplement? @tracym",
-    "avatarUrl": "samples/assets/avatar-priya.svg"
-  },
-  "answer": {
+  "comment": {
     "handle": "tracym",
     "text": "absolutely not! this is actually a clinically proven menopause hair thickening formula for women 55+... been a game changer for me",
-    "avatarUrl": "samples/assets/avatar-elaine.svg",
+    "avatarUrl": "",
     "verified": true
   }
 }
-
