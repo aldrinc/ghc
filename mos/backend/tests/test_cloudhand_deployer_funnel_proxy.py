@@ -252,6 +252,7 @@ def test_funnel_artifact_site_writes_local_api_payload_and_nginx_routes():
     assert "location = /api/public/checkout" in conf
     assert "location ^~ /api/public/events" in conf
     assert "location ^~ /api/public/assets/ {" in conf
+    assert "location ^~ /public/assets/ {" in conf
     assert "location ^~ /api/public/funnels/ {" in conf
     assert "try_files $uri.json =404;" in conf
     assert "try_files $uri /index.html;" in conf
