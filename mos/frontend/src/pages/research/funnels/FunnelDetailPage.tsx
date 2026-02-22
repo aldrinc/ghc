@@ -168,10 +168,15 @@ export function FunnelDetailPage() {
     return normalizeDeployDomainList(deployDomains.data?.server_names || []);
   }, [deployDomains.data?.org_server_names, deployDomains.data?.server_names]);
 
-  const deployHttpsEnabled = Boolean(deployDomains.data?.https ?? (configuredDeployDomains.length > 0));
+  const deployedPathSuffix = useMemo(() => {
+    if (!productRouteSlug || !funnelRouteSlug) return null;
+    const segments = [encodeURIComponent(productRouteSlug), encodeURIComponent(funnelRouteSlug)];
+    if (entryArtifact) segments.push(encodeURIComponent(entryArtifact));
+    return `/${segments.join("/")}`;
+  }, [entryArtifact, funnelRouteSlug, productRouteSlug]);
 
   const deployedPageUrl = useMemo(() => {
-    if (!productRouteSlug || !funnelRouteSlug) return null;
+    if (!deployedPathSuffix) return null;
 
     const accessCandidate =
       (() => {
@@ -183,16 +188,17 @@ export function FunnelDetailPage() {
 
     const baseUrl = accessCandidate || `${window.location.origin}/`;
     const normalizedBase = baseUrl.replace(/\/+$/, "");
-    const basePath = `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnelRouteSlug)}`;
-    if (!entryArtifact) return basePath;
-    return `${basePath}/${encodeURIComponent(entryArtifact)}`;
+    return `${normalizedBase}${deployedPathSuffix}`;
   }, [
     configuredDeployDomains,
     deployJob?.accessUrl,
-    entryArtifact,
-    funnelRouteSlug,
-    productRouteSlug,
+    deployedPathSuffix,
   ]);
+
+  const deployedDomainUrlForHost = (hostname: string): string | null => {
+    if (!deployedPathSuffix) return null;
+    return `https://${hostname}${deployedPathSuffix}`;
+  };
 
   const parseDeployDomains = (raw: string): string[] => {
     const tokens = raw
@@ -673,17 +679,30 @@ export function FunnelDetailPage() {
                         <>
                           {configuredDeployDomains.length ? (
                             <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-                              {configuredDeployDomains.map((hostname) => (
-                                <a
-                                  key={hostname}
-                                  href={`${deployHttpsEnabled ? "https" : "http"}://${hostname}/`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content hover:bg-surface-3"
-                                >
-                                  {hostname}
-                                </a>
-                              ))}
+                              {configuredDeployDomains.map((hostname) => {
+                                const deployedDomainUrl = deployedDomainUrlForHost(hostname);
+                                if (!deployedDomainUrl) {
+                                  return (
+                                    <span
+                                      key={hostname}
+                                      className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content"
+                                    >
+                                      {hostname}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <a
+                                    key={hostname}
+                                    href={deployedDomainUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content hover:bg-surface-3"
+                                  >
+                                    {hostname}
+                                  </a>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="truncate text-content-muted">—</span>
