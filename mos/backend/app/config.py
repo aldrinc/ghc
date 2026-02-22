@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     DEPLOY_PUBLIC_BASE_URL: str | None = None
     DEPLOY_PUBLIC_API_BASE_URL: str | None = None
     DEPLOY_ARTIFACT_RUNTIME_DIST_PATH: str = "mos/frontend/dist"
+    BUNNY_API_KEY: str | None = None
+    BUNNY_API_BASE_URL: str = "https://api.bunny.net"
+    BUNNY_PULLZONE_ORIGIN_IP: str | None = None
+    NAMECHEAP_API_USER: str | None = None
+    NAMECHEAP_API_KEY: str | None = None
+    NAMECHEAP_USERNAME: str | None = None
+    NAMECHEAP_CLIENT_IP: str | None = None
+    NAMECHEAP_API_BASE_URL: str = "https://api.namecheap.com/xml.response"
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None

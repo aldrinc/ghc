@@ -41,6 +41,8 @@ class FunnelPublishDeployRequest(BaseModel):
     createIfMissing: bool = True
     inPlace: bool = False
     applyPlan: bool = True
+    bunnyPullZone: bool = False
+    bunnyPullZoneOriginIp: Optional[str] = None
     serverNames: list[str] = Field(default_factory=list)
     https: bool = True
     destinationPath: str = "/opt/apps"

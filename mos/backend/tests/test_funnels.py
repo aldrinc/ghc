@@ -587,10 +587,60 @@ def test_publish_with_deploy_builds_funnel_artifact_workload_from_db(api_client:
     assert deploy_request["create_if_missing"] is True
     assert deploy_request["in_place"] is False
     assert deploy_request["apply_plan"] is True
+    assert deploy_request["bunny_pull_zone"] is False
+    assert deploy_request["bunny_pull_zone_origin_ip"] is None
     assert captured["access_urls"] == ["https://landing.example.com/"]
 
 
-def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitted(
+def test_publish_with_deploy_passes_bunny_pull_zone_settings(api_client: TestClient, monkeypatch):
+    funnel_id, _route_slug, _product_id, _product_slug = _create_publish_ready_funnel(
+        api_client,
+        funnel_name="Bunny Deploy Funnel",
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_start_funnel_publish_job(
+        *,
+        org_id=None,
+        user_id=None,
+        funnel_id=None,
+        deploy_request=None,
+        access_urls=None,
+    ):
+        captured["deploy_request"] = deploy_request
+        captured["access_urls"] = access_urls
+        return {
+            "id": "publish-job-bunny",
+            "status": "queued",
+            "created_at": "2026-01-01T00:00:00+00:00",
+            "access_urls": access_urls or [],
+            "result": None,
+            "error": None,
+        }
+
+    monkeypatch.setattr(deploy_service, "start_funnel_publish_job", fake_start_funnel_publish_job)
+
+    resp = api_client.post(
+        f"/funnels/{funnel_id}/publish",
+        json={
+            "deploy": {
+                "workloadName": "landing-page",
+                "upstreamBaseUrl": "https://moshq.app",
+                "upstreamApiBaseUrl": "https://moshq.app/api",
+                "bunnyPullZone": True,
+                "bunnyPullZoneOriginIp": "46.225.124.104",
+            }
+        },
+    )
+    assert resp.status_code == 201
+
+    deploy_request = captured["deploy_request"]
+    assert deploy_request["bunny_pull_zone"] is True
+    assert deploy_request["bunny_pull_zone_origin_ip"] == "46.225.124.104"
+
+
+def test_publish_with_deploy_does_not_use_funnel_domain_from_db_when_server_names_omitted(
     api_client: TestClient,
     db_session,
     monkeypatch,
@@ -652,9 +702,10 @@ def test_publish_with_deploy_uses_funnel_domain_from_db_when_server_names_omitte
     deploy_request = captured["deploy_request"]
     workload_patch = deploy_request["workload_patch"]
     assert workload_patch["source_ref"]["client_id"] == str(funnel.client_id)
-    assert workload_patch["service_config"]["server_names"] == ["offers.example.com"]
+    assert workload_patch["service_config"]["server_names"] == []
+    assert workload_patch["service_config"]["https"] is False
     assert deploy_request["apply_plan"] is False
-    assert captured["access_urls"] == ["https://offers.example.com/"]
+    assert captured["access_urls"] == []
 
 
 def test_publish_with_deploy_allows_no_server_names(api_client: TestClient, monkeypatch):

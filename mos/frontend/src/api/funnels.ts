@@ -28,6 +28,8 @@ type PublishFunnelDeployPayload = {
   createIfMissing?: boolean;
   inPlace?: boolean;
   applyPlan?: boolean;
+  bunnyPullZone?: boolean;
+  bunnyPullZoneOriginIp?: string;
   serverNames?: string[];
   https?: boolean;
   destinationPath?: string;

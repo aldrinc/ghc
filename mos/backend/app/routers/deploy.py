@@ -5,8 +5,11 @@ from typing import Any, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
+from app.db.deps import get_session
+from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
 from app.services import deploy as deploy_service
 
 router = APIRouter(prefix="/deploy", tags=["deploy"])
@@ -47,7 +50,41 @@ class WorkloadDomainsResponse(BaseModel):
     plan_path: str
     workload_found: bool
     server_names: list[str]
+    org_server_names: list[str]
     https: Optional[bool] = None
+
+
+def _normalize_server_names(values: Any) -> list[str]:
+    if values is None:
+        return []
+    if not isinstance(values, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Workload service_config.server_names must be a list.",
+        )
+    seen: set[str] = set()
+    normalized: list[str] = []
+    for raw in values:
+        if not isinstance(raw, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Workload service_config.server_names entries must be strings.",
+            )
+        hostname = raw.strip().lower()
+        if not hostname or hostname in seen:
+            continue
+        seen.add(hostname)
+        normalized.append(hostname)
+    return normalized
+
+
+def _extract_org_server_names(workload: dict[str, Any]) -> list[str] | None:
+    if "org_server_names" in workload:
+        return _normalize_server_names(workload.get("org_server_names"))
+    service_config = workload.get("service_config")
+    if isinstance(service_config, dict) and "server_names" in service_config:
+        return _normalize_server_names(service_config.get("server_names"))
+    return None
 
 
 @router.get("/plans/latest")
@@ -83,17 +120,57 @@ async def patch_workload(
     instance_name: Optional[str] = Query(default=None),
     create_if_missing: bool = Query(default=False),
     in_place: bool = Query(default=False),
-    _auth: AuthContext = Depends(get_current_user),
+    configure_bunny_pull_zone: bool = Query(default=False),
+    bunny_pull_zone_origin_ip: Optional[str] = Query(default=None),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
 ):
     _require_internal_proxy(request)
     try:
-        return deploy_service.patch_workload_in_plan(
-            workload_patch=workload,
+        org_server_names = _extract_org_server_names(workload)
+        workload_for_plan = dict(workload)
+        workload_for_plan.pop("org_server_names", None)
+        if configure_bunny_pull_zone:
+            service_config = workload_for_plan.get("service_config")
+            if service_config is None:
+                service_config = {}
+            if not isinstance(service_config, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Workload service_config must be an object.",
+                )
+            normalized_service_config = dict(service_config)
+            # Keep deploy plan port-based: domains are managed separately for Bunny/Namecheap.
+            normalized_service_config["server_names"] = []
+            normalized_service_config["https"] = False
+            workload_for_plan["service_config"] = normalized_service_config
+
+        result = deploy_service.patch_workload_in_plan(
+            org_id=auth.org_id,
+            workload_patch=workload_for_plan,
             plan_path=plan_path,
             instance_name=instance_name,
             create_if_missing=create_if_missing,
             in_place=in_place,
         )
+        if configure_bunny_pull_zone:
+            workload_name = str(workload_for_plan.get("name") or "").strip()
+            if not workload_name:
+                raise deploy_service.DeployError("Workload patch must include a non-empty 'name' field.")
+            result["cdn"] = deploy_service.configure_bunny_pull_zone_for_workload(
+                org_id=auth.org_id,
+                workload_name=workload_name,
+                plan_path=result.get("updated_plan_path"),
+                instance_name=instance_name,
+                requested_origin_ip=bunny_pull_zone_origin_ip,
+                server_names=(org_server_names or []),
+            )
+
+        if org_server_names is not None:
+            repo = OrgDeployDomainsRepository(session)
+            repo.replace_hostnames(org_id=auth.org_id, hostnames=org_server_names)
+
+        return result
     except deploy_service.DeployError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -104,7 +181,8 @@ async def get_workload_domains(
     workload_name: str = Query(..., description="Workload name to locate inside the deploy plan"),
     plan_path: Optional[str] = Query(default=None),
     instance_name: Optional[str] = Query(default=None),
-    _auth: AuthContext = Depends(get_current_user),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
 ):
     _require_internal_proxy(request)
     try:
@@ -113,8 +191,10 @@ async def get_workload_domains(
             plan_path=plan_path,
             instance_name=instance_name,
         )
+        org_server_names = OrgDeployDomainsRepository(session).list_hostnames(org_id=auth.org_id)
         return {
             "workload_name": workload_name,
+            "org_server_names": org_server_names,
             **result,
         }
     except deploy_service.DeployError as exc:

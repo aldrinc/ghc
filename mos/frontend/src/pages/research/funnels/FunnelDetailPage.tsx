@@ -20,6 +20,7 @@ const deployUpstreamBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_BASE_URL || 
 const deployUpstreamApiBaseUrl = (import.meta.env.VITE_DEPLOY_UPSTREAM_API_BASE_URL || "").trim();
 const deployApiBaseUrl = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const deployDestinationPath = (import.meta.env.VITE_DEPLOY_DESTINATION_PATH || "/opt/apps").trim();
+const deployBunnyPullZoneOriginIp = (import.meta.env.VITE_DEPLOY_BUNNY_PULLZONE_ORIGIN_IP || "").trim();
 
 type PatchWorkloadResponse = {
   status: string;
@@ -149,30 +150,6 @@ export function FunnelDetailPage() {
     instanceName: deployInstanceName || undefined,
   });
 
-  const deployedPageUrl = useMemo(() => {
-    if (!productRouteSlug || !funnelRouteSlug || !entryArtifact) return null;
-
-    const accessCandidate =
-      (deployJob?.accessUrl || "").trim() ||
-      (() => {
-        const host = deployDomains.data?.server_names?.[0];
-        if (!host) return "";
-        const scheme = deployDomains.data?.https ? "https" : "http";
-        return `${scheme}://${host}/`;
-      })();
-
-    const baseUrl = accessCandidate || `${window.location.origin}/`;
-    const normalizedBase = baseUrl.replace(/\/+$/, "");
-    return `${normalizedBase}/${encodeURIComponent(productRouteSlug)}/${encodeURIComponent(funnelRouteSlug)}/${encodeURIComponent(entryArtifact)}`;
-  }, [
-    deployDomains.data?.https,
-    deployDomains.data?.server_names,
-    deployJob?.accessUrl,
-    entryArtifact,
-    funnelRouteSlug,
-    productRouteSlug,
-  ]);
-
   const normalizeDeployDomainList = (values: string[]): string[] => {
     const out: string[] = [];
     const seen = new Set<string>();
@@ -183,6 +160,44 @@ export function FunnelDetailPage() {
       out.push(token);
     }
     return out;
+  };
+
+  const configuredDeployDomains = useMemo(() => {
+    const orgScoped = normalizeDeployDomainList(deployDomains.data?.org_server_names || []);
+    if (orgScoped.length) return orgScoped;
+    return normalizeDeployDomainList(deployDomains.data?.server_names || []);
+  }, [deployDomains.data?.org_server_names, deployDomains.data?.server_names]);
+
+  const deployedPathSuffix = useMemo(() => {
+    if (!productRouteSlug || !funnelRouteSlug) return null;
+    const segments = [encodeURIComponent(productRouteSlug), encodeURIComponent(funnelRouteSlug)];
+    if (entryArtifact) segments.push(encodeURIComponent(entryArtifact));
+    return `/${segments.join("/")}`;
+  }, [entryArtifact, funnelRouteSlug, productRouteSlug]);
+
+  const deployedPageUrl = useMemo(() => {
+    if (!deployedPathSuffix) return null;
+
+    const accessCandidate =
+      (() => {
+        const host = configuredDeployDomains[0];
+        if (!host) return "";
+        return `https://${host}/`;
+      })() ||
+      (deployJob?.accessUrl || "").trim();
+
+    const baseUrl = accessCandidate || `${window.location.origin}/`;
+    const normalizedBase = baseUrl.replace(/\/+$/, "");
+    return `${normalizedBase}${deployedPathSuffix}`;
+  }, [
+    configuredDeployDomains,
+    deployJob?.accessUrl,
+    deployedPathSuffix,
+  ]);
+
+  const deployedDomainUrlForHost = (hostname: string): string | null => {
+    if (!deployedPathSuffix) return null;
+    return `https://${hostname}${deployedPathSuffix}`;
   };
 
   const parseDeployDomains = (raw: string): string[] => {
@@ -206,7 +221,7 @@ export function FunnelDetailPage() {
 
   const startEditingDeployDomains = () => {
     if (!deployDomains.data) return;
-    setDeployDomainsDraft(normalizeDeployDomainList(deployDomains.data.server_names || []));
+    setDeployDomainsDraft(configuredDeployDomains);
     setDeployDomainsInput("");
     setDeployDomainsSaveError(null);
     setIsEditingDeployDomains(true);
@@ -277,13 +292,19 @@ export function FunnelDetailPage() {
 
     const serverNames = normalizeDeployDomainList(deployDomainsDraft);
     const serviceConfig = {
-      server_names: serverNames,
-      https: serverNames.length > 0,
+      server_names: [],
+      https: false,
     };
     const workloadPayload: Record<string, unknown> = {
       name: deployWorkloadName,
       service_config: serviceConfig,
+      org_server_names: serverNames,
     };
+    if (!createIfMissing && funnel?.client_id) {
+      workloadPayload.source_ref = {
+        client_id: funnel.client_id,
+      };
+    }
     if (createIfMissing) {
       workloadPayload.source_type = "funnel_artifact";
       workloadPayload.runtime = "static";
@@ -308,6 +329,10 @@ export function FunnelDetailPage() {
       if (deployInstanceName) params.set("instance_name", deployInstanceName);
       params.set("create_if_missing", createIfMissing ? "true" : "false");
       params.set("in_place", "true");
+      params.set("configure_bunny_pull_zone", "true");
+      if (deployBunnyPullZoneOriginIp) {
+        params.set("bunny_pull_zone_origin_ip", deployBunnyPullZoneOriginIp);
+      }
 
       await post<PatchWorkloadResponse>(`/deploy/plans/workloads?${params.toString()}`, workloadPayload);
 
@@ -324,7 +349,7 @@ export function FunnelDetailPage() {
     }
   };
 
-  const handlePublish = async (serverNames: string[]) => {
+  const handlePublish = async () => {
     if (!funnelId || !funnel) return;
     if (!funnel.client_id) return;
     const payload: {
@@ -334,7 +359,10 @@ export function FunnelDetailPage() {
         applyPlan: boolean;
         planPath?: string;
         instanceName?: string;
+        bunnyPullZone?: boolean;
+        bunnyPullZoneOriginIp?: string;
         serverNames?: string[];
+        https?: boolean;
         upstreamBaseUrl?: string;
         upstreamApiBaseUrl?: string;
       };
@@ -343,12 +371,16 @@ export function FunnelDetailPage() {
         workloadName: `brand-funnels-${funnel.client_id}`,
         createIfMissing: true,
         applyPlan: true,
+        bunnyPullZone: true,
       },
     };
 
+    payload.deploy.serverNames = [];
+    payload.deploy.https = false;
+
     if (deployPlanPath) payload.deploy.planPath = deployPlanPath;
     if (deployInstanceName) payload.deploy.instanceName = deployInstanceName;
-    if (serverNames.length > 0) payload.deploy.serverNames = serverNames;
+    if (deployBunnyPullZoneOriginIp) payload.deploy.bunnyPullZoneOriginIp = deployBunnyPullZoneOriginIp;
     if (deployUpstreamBaseUrl) payload.deploy.upstreamBaseUrl = deployUpstreamBaseUrl;
     if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
 
@@ -446,7 +478,7 @@ export function FunnelDetailPage() {
             ) : null}
             <Button
               size="sm"
-              onClick={() => void handlePublish(deployDomains.data?.server_names || [])}
+              onClick={() => void handlePublish()}
               disabled={!funnel?.canPublish || publish.isPending || deployDomains.isLoading}
             >
               {publish.isPending ? "Publishing…" : "Publish + Deploy"}
@@ -643,21 +675,34 @@ export function FunnelDetailPage() {
                         <span className="truncate text-danger">
                           {(deployDomains.error as { message?: string })?.message || "Unable to load deploy domains."}
                         </span>
-                      ) : deployDomains.data?.workload_found ? (
+                      ) : deployDomains.data?.workload_found || configuredDeployDomains.length > 0 ? (
                         <>
-                          {deployDomains.data.server_names.length ? (
+                          {configuredDeployDomains.length ? (
                             <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
-                              {deployDomains.data.server_names.map((hostname) => (
-                                <a
-                                  key={hostname}
-                                  href={`${deployDomains.data?.https ? "https" : "http"}://${hostname}/`}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content hover:bg-surface-3"
-                                >
-                                  {hostname}
-                                </a>
-                              ))}
+                              {configuredDeployDomains.map((hostname) => {
+                                const deployedDomainUrl = deployedDomainUrlForHost(hostname);
+                                if (!deployedDomainUrl) {
+                                  return (
+                                    <span
+                                      key={hostname}
+                                      className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content"
+                                    >
+                                      {hostname}
+                                    </span>
+                                  );
+                                }
+                                return (
+                                  <a
+                                    key={hostname}
+                                    href={deployedDomainUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-block max-w-[180px] truncate rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[11px] text-content hover:bg-surface-3"
+                                  >
+                                    {hostname}
+                                  </a>
+                                );
+                              })}
                             </div>
                           ) : (
                             <span className="truncate text-content-muted">—</span>

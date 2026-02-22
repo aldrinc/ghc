@@ -2,18 +2,23 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 from typing import Any, Optional
 from uuid import UUID, uuid4
 
+import httpx
+
 from app.config import settings
+from app.services import namecheap_dns as namecheap_dns_service
 
 
 class DeployError(RuntimeError):
@@ -21,6 +26,9 @@ class DeployError(RuntimeError):
 
 
 _DEPLOY_JOB_LOG_TAIL_CHARS = 12000
+_ORG_SCOPED_PORT_RANGE_START = 20000
+_ORG_SCOPED_PORT_RANGE_END = 29999
+_HOSTNAME_RE = re.compile(r"^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$")
 _ARTIFACT_ASSET_PUBLIC_ID_KEYS = {
     "assetPublicId",
     "thumbAssetPublicId",
@@ -293,6 +301,141 @@ def _deep_merge(dst: Any, patch: Any) -> Any:
             out[k] = _deep_merge(out.get(k), v)
         return out
     return patch
+
+
+def _coerce_service_port(*, raw_port: Any, context: str) -> int:
+    try:
+        port = int(raw_port)
+    except Exception as exc:
+        raise DeployError(f"{context} port '{raw_port}' is invalid.") from exc
+    if port < 1 or port > 65535:
+        raise DeployError(f"{context} port {port} is out of range (1-65535).")
+    return port
+
+
+def _extract_primary_service_port(*, workload: dict[str, Any], context: str) -> int | None:
+    service_config = workload.get("service_config")
+    if service_config is None:
+        return None
+    if not isinstance(service_config, dict):
+        raise DeployError(f"{context} service_config must be an object.")
+    ports = service_config.get("ports")
+    if ports is None:
+        return None
+    if not isinstance(ports, list):
+        raise DeployError(f"{context} service_config.ports must be a list.")
+    if not ports:
+        return None
+    return _coerce_service_port(raw_port=ports[0], context=f"{context} service_config")
+
+
+def _extract_workload_server_names(*, workload: dict[str, Any], context: str) -> list[str]:
+    service_config = workload.get("service_config")
+    if not isinstance(service_config, dict):
+        raise DeployError(f"{context} service_config must be an object.")
+    raw_server_names = service_config.get("server_names")
+    if raw_server_names is None:
+        return []
+    if not isinstance(raw_server_names, list):
+        raise DeployError(f"{context} service_config.server_names must be a list.")
+    server_names: list[str] = []
+    for idx, value in enumerate(raw_server_names):
+        if not isinstance(value, str):
+            raise DeployError(f"{context} service_config.server_names[{idx}] must be a string.")
+        hostname = value.strip()
+        if hostname:
+            server_names.append(hostname)
+    return server_names
+
+
+def _collect_used_instance_ports(*, plan: dict[str, Any], instance_name: str | None) -> set[int]:
+    new_spec = plan.get("new_spec")
+    if not isinstance(new_spec, dict):
+        raise DeployError("Plan new_spec must be an object.")
+    instances = new_spec.get("instances")
+    if not isinstance(instances, list):
+        raise DeployError("Plan new_spec.instances must be a list.")
+
+    target_instance_name = (instance_name or "").strip()
+    used_ports: set[int] = set()
+    for inst in instances:
+        if not isinstance(inst, dict):
+            continue
+        current_instance_name = str(inst.get("name") or "").strip()
+        if target_instance_name and current_instance_name != target_instance_name:
+            continue
+        workloads = inst.get("workloads")
+        if not isinstance(workloads, list):
+            continue
+        for workload in workloads:
+            if not isinstance(workload, dict):
+                continue
+            service_config = workload.get("service_config")
+            if not isinstance(service_config, dict):
+                continue
+            raw_ports = service_config.get("ports")
+            if raw_ports is None:
+                continue
+            if not isinstance(raw_ports, list):
+                raise DeployError("Workload service_config.ports must be a list.")
+            for raw_port in raw_ports:
+                used_ports.add(_coerce_service_port(raw_port=raw_port, context="Workload service_config"))
+    return used_ports
+
+
+def _org_scoped_service_port(*, org_id: str, used_ports: set[int]) -> int:
+    normalized_org = (org_id or "").strip().lower()
+    if not normalized_org:
+        raise DeployError("org_id is required for deterministic workload port assignment.")
+
+    span = _ORG_SCOPED_PORT_RANGE_END - _ORG_SCOPED_PORT_RANGE_START + 1
+    if span <= 0:
+        raise DeployError("Invalid org-scoped port range configuration.")
+
+    seed = hashlib.sha256(normalized_org.encode("utf-8")).hexdigest()
+    offset = int(seed[:8], 16) % span
+    for step in range(span):
+        candidate = _ORG_SCOPED_PORT_RANGE_START + ((offset + step) % span)
+        if candidate not in used_ports:
+            return candidate
+    raise DeployError(
+        f"No free org-scoped ports available in range {_ORG_SCOPED_PORT_RANGE_START}-{_ORG_SCOPED_PORT_RANGE_END}."
+    )
+
+
+def _ensure_org_scoped_workload_port(
+    *,
+    workload: dict[str, Any],
+    existing_workload: dict[str, Any] | None,
+    org_id: str,
+    plan: dict[str, Any],
+    instance_name: str | None,
+) -> dict[str, Any]:
+    service_config = workload.get("service_config")
+    if not isinstance(service_config, dict):
+        raise DeployError("Workload service_config must be an object.")
+
+    server_names = _extract_workload_server_names(workload=workload, context="Workload patch")
+    # Domain-based routing does not require an org-scoped origin port.
+    if server_names:
+        return workload
+
+    explicit_port = _extract_primary_service_port(workload=workload, context="Workload patch")
+    if explicit_port is not None:
+        return workload
+
+    if existing_workload is not None:
+        existing_port = _extract_primary_service_port(workload=existing_workload, context="Existing workload")
+        if existing_port is not None:
+            service_config["ports"] = [existing_port]
+            workload["service_config"] = service_config
+            return workload
+
+    used_ports = _collect_used_instance_ports(plan=plan, instance_name=instance_name)
+    assigned_port = _org_scoped_service_port(org_id=org_id, used_ports=used_ports)
+    service_config["ports"] = [assigned_port]
+    workload["service_config"] = service_config
+    return workload
 
 
 def build_funnel_publication_workload_patch(
@@ -917,6 +1060,7 @@ def hydrate_funnel_artifact_workload_patch(
 
 def patch_workload_in_plan(
     *,
+    org_id: str,
     workload_patch: dict[str, Any],
     plan_path: str | None = None,
     instance_name: str | None = None,
@@ -928,6 +1072,9 @@ def patch_workload_in_plan(
     name = (workload_patch.get("name") or "").strip()
     if not name:
         raise DeployError("Workload patch must include a non-empty 'name' field.")
+    resolved_org_id = (org_id or "").strip()
+    if not resolved_org_id:
+        raise DeployError("org_id is required when patching a workload.")
 
     ch_dir = _cloudhand_dir()
     ch_dir.mkdir(parents=True, exist_ok=True)
@@ -957,6 +1104,13 @@ def patch_workload_in_plan(
             if (existing.get("name") or "").strip() != name:
                 continue
             merged = _deep_merge(existing, workload_patch)
+            merged = _ensure_org_scoped_workload_port(
+                workload=merged,
+                existing_workload=existing if isinstance(existing, dict) else None,
+                org_id=resolved_org_id,
+                plan=plan,
+                instance_name=str(inst.get("name") or "").strip() or None,
+            )
             try:
                 validated = ApplicationSpec.model_validate(merged)
             except Exception as exc:
@@ -979,8 +1133,16 @@ def patch_workload_in_plan(
                 raise DeployError("instance_name is required when plan contains multiple instances.")
             target_inst = instances[0]
 
+        workload_for_create = _ensure_org_scoped_workload_port(
+            workload=dict(workload_patch),
+            existing_workload=None,
+            org_id=resolved_org_id,
+            plan=plan,
+            instance_name=str(target_inst.get("name") or "").strip() or None,
+        )
+
         try:
-            validated = ApplicationSpec.model_validate(workload_patch)
+            validated = ApplicationSpec.model_validate(workload_for_create)
         except Exception as exc:
             raise DeployError(f"Workload is invalid: {exc}") from exc
 
@@ -1479,6 +1641,600 @@ def _normalize_access_urls(urls: list[str] | None) -> list[str]:
     return out
 
 
+def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
+    normalized = re.sub(r"[^a-z0-9-]+", "-", (value or "").strip().lower())
+    normalized = re.sub(r"-{2,}", "-", normalized).strip("-")
+    if not normalized:
+        raise DeployError(
+            f"Bunny pull zone name component '{label}' is empty after normalization. "
+            f"Received value='{value}'."
+        )
+    return normalized
+
+
+def _build_bunny_pull_zone_name(*, org_id: str) -> str:
+    org_component = _normalize_bunny_pull_zone_name_component(
+        value=org_id,
+        label="org_id",
+    )
+    return org_component
+
+
+def _bunny_api_request(*, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
+    api_key = str(settings.BUNNY_API_KEY or "").strip()
+    if not api_key:
+        raise DeployError("Bunny pull zone provisioning requires BUNNY_API_KEY.")
+
+    base_url = str(settings.BUNNY_API_BASE_URL or "").strip().rstrip("/")
+    if not base_url:
+        raise DeployError("BUNNY_API_BASE_URL must be configured for Bunny pull zone provisioning.")
+
+    normalized_method = (method or "").strip().upper()
+    if not normalized_method:
+        raise DeployError("Bunny API request method is required.")
+
+    endpoint = f"{base_url}/{path.lstrip('/')}"
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            response = client.request(
+                normalized_method,
+                endpoint,
+                headers={"AccessKey": api_key, "Content-Type": "application/json"},
+                json=payload,
+            )
+    except httpx.HTTPError as exc:
+        raise DeployError(f"Bunny API request failed ({normalized_method} {path}): {exc}") from exc
+
+    if response.status_code >= 400:
+        detail = response.text.strip()
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict):
+            message = body.get("Message") or body.get("Error") or body.get("detail") or body.get("message")
+            if isinstance(message, str) and message.strip():
+                detail = message.strip()
+            elif not detail:
+                detail = json.dumps(body, ensure_ascii=True)
+        elif not detail:
+            detail = "<empty response body>"
+        raise DeployError(
+            f"Bunny API request failed ({normalized_method} {path}) "
+            f"with status {response.status_code}: {detail}"
+        )
+
+    if not response.content:
+        return None
+    try:
+        return response.json()
+    except ValueError as exc:
+        raise DeployError(
+            f"Bunny API request returned non-JSON response ({normalized_method} {path})."
+        ) from exc
+
+
+def _list_bunny_pull_zones() -> list[dict[str, Any]]:
+    payload = _bunny_api_request(method="GET", path="/pullzone")
+    items: Any
+    if isinstance(payload, dict):
+        items = payload.get("Items")
+    elif isinstance(payload, list):
+        # Some Bunny accounts/environments return the collection directly.
+        items = payload
+    else:
+        raise DeployError(
+            "Bunny list pull zones response must be an object with Items or an array."
+        )
+    if not isinstance(items, list):
+        raise DeployError("Bunny list pull zones response must contain an array of pull zones.")
+    zones: list[dict[str, Any]] = []
+    for idx, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise DeployError(f"Bunny list pull zones response item at index {idx} is invalid.")
+        zones.append(item)
+    return zones
+
+
+def _find_bunny_pull_zone_by_name(*, zone_name: str) -> dict[str, Any] | None:
+    normalized_target = zone_name.strip().lower()
+    matches: list[dict[str, Any]] = []
+    for zone in _list_bunny_pull_zones():
+        candidate = str(zone.get("Name") or "").strip().lower()
+        if candidate == normalized_target:
+            matches.append(zone)
+    if len(matches) > 1:
+        raise DeployError(f"Multiple Bunny pull zones found for name '{zone_name}'.")
+    return matches[0] if matches else None
+
+
+def _coerce_bunny_pull_zone_id(*, zone: dict[str, Any]) -> int:
+    raw_id = zone.get("Id")
+    try:
+        zone_id = int(raw_id)
+    except Exception as exc:
+        raise DeployError("Bunny pull zone payload is missing a valid Id.") from exc
+    if zone_id <= 0:
+        raise DeployError("Bunny pull zone Id must be greater than zero.")
+    return zone_id
+
+
+def _normalize_hostname(*, value: str, context: str) -> str:
+    normalized = (value or "").strip().lower().rstrip(".")
+    if not normalized:
+        raise DeployError(f"{context} hostname is required.")
+    if "://" in normalized or "/" in normalized or "?" in normalized or "#" in normalized:
+        raise DeployError(
+            f"{context} hostname '{value}' is invalid. Use a bare hostname (for example: shop.example.com)."
+        )
+    if not _HOSTNAME_RE.match(normalized):
+        raise DeployError(f"{context} hostname '{value}' is invalid.")
+    return normalized
+
+
+def _normalize_workload_server_names(*, server_names: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in server_names:
+        hostname = _normalize_hostname(value=raw, context="Workload")
+        if hostname in seen:
+            continue
+        seen.add(hostname)
+        out.append(hostname)
+    return out
+
+
+def _extract_bunny_pull_zone_hostname_values(zone: dict[str, Any]) -> list[str]:
+    hostnames = zone.get("Hostnames")
+    if hostnames is None:
+        return []
+    if not isinstance(hostnames, list):
+        raise DeployError("Bunny pull zone response field Hostnames must be an array when provided.")
+
+    values: list[str] = []
+    seen: set[str] = set()
+    for idx, hostname in enumerate(hostnames):
+        if not isinstance(hostname, dict):
+            raise DeployError(f"Bunny pull zone hostname at index {idx} is invalid.")
+        value = str(hostname.get("Value") or "").strip().lower()
+        if not value:
+            continue
+        if value in seen:
+            continue
+        seen.add(value)
+        values.append(value)
+    return values
+
+
+def _extract_bunny_pull_zone_dns_target_hostname(zone: dict[str, Any]) -> str:
+    hostname_values = _extract_bunny_pull_zone_hostname_values(zone)
+    for value in hostname_values:
+        if value.endswith(".b-cdn.net"):
+            return value
+    raise DeployError(
+        "Bunny pull zone response does not include a default '*.b-cdn.net' hostname for CNAME target."
+    )
+
+
+def _get_bunny_pull_zone(*, zone_id: int) -> dict[str, Any]:
+    payload = _bunny_api_request(method="GET", path=f"/pullzone/{zone_id}")
+    if not isinstance(payload, dict):
+        raise DeployError("Bunny get pull zone response must be an object.")
+    return payload
+
+
+def _ensure_bunny_pull_zone_hostname(*, zone_id: int, hostname: str) -> dict[str, Any]:
+    normalized_hostname = _normalize_hostname(value=hostname, context="Bunny custom domain")
+    zone = _get_bunny_pull_zone(zone_id=zone_id)
+    existing = _extract_bunny_pull_zone_hostname_values(zone)
+    if normalized_hostname in existing:
+        return {"hostname": normalized_hostname, "status": "existing"}
+
+    response = _bunny_api_request(
+        method="POST",
+        path=f"/pullzone/{zone_id}/addHostname",
+        payload={"Hostname": normalized_hostname},
+    )
+    if response is not None and not isinstance(response, (dict, bool, str)):
+        raise DeployError("Bunny add hostname response must be an object, bool, or string when present.")
+    return {"hostname": normalized_hostname, "status": "created"}
+
+
+def _ensure_bunny_pull_zone_auto_ssl_enabled(*, zone_id: int) -> None:
+    response = _bunny_api_request(
+        method="POST",
+        path=f"/pullzone/{zone_id}",
+        payload={"EnableAutoSSL": True, "DisableLetsEncrypt": False},
+    )
+    if response is not None and not isinstance(response, (dict, bool, str)):
+        raise DeployError("Bunny pull zone SSL update response must be an object, bool, or string when present.")
+
+
+def _request_bunny_pull_zone_certificate(*, zone_id: int, hostname: str) -> dict[str, Any] | None:
+    _ = zone_id
+    normalized_hostname = _normalize_hostname(value=hostname, context="Bunny certificate")
+    response = _bunny_api_request(
+        method="GET",
+        path=f"/pullzone/loadFreeCertificate?hostname={quote(normalized_hostname, safe='')}",
+    )
+    if response is None:
+        return None
+    if isinstance(response, dict):
+        return response
+    if isinstance(response, bool):
+        return {"ok": response}
+    if isinstance(response, str):
+        return {"message": response}
+    raise DeployError("Bunny free certificate response must be an object, bool, or string when present.")
+
+
+def _provision_bunny_custom_domains(
+    *,
+    bunny_zone: dict[str, Any],
+    server_names: list[str],
+    request_ssl: bool = True,
+) -> dict[str, Any]:
+    normalized_server_names = _normalize_workload_server_names(server_names=server_names)
+    if not normalized_server_names:
+        return {
+            "dnsTargetHostname": None,
+            "domains": [],
+            "pullZoneHostnames": _extract_bunny_pull_zone_hostname_values(bunny_zone),
+        }
+
+    zone_id = _coerce_bunny_pull_zone_id(zone=bunny_zone)
+    dns_target_hostname = _extract_bunny_pull_zone_dns_target_hostname(bunny_zone)
+    if request_ssl:
+        _ensure_bunny_pull_zone_auto_ssl_enabled(zone_id=zone_id)
+
+    domain_results: list[dict[str, Any]] = []
+    for hostname in normalized_server_names:
+        try:
+            dns_record = namecheap_dns_service.upsert_cname_record(
+                hostname=hostname,
+                target_hostname=dns_target_hostname,
+            )
+        except namecheap_dns_service.NamecheapDnsError as exc:
+            raise DeployError(str(exc)) from exc
+
+        hostname_result = _ensure_bunny_pull_zone_hostname(zone_id=zone_id, hostname=hostname)
+        certificate_result: dict[str, Any] | None = None
+        ssl_status = "pending_publish"
+        if request_ssl:
+            certificate_result = _request_bunny_pull_zone_certificate(zone_id=zone_id, hostname=hostname)
+            ssl_status = "requested"
+        domain_results.append(
+            {
+                "hostname": hostname,
+                "dns": dns_record,
+                "bunnyHostname": hostname_result,
+                "ssl": {
+                    "provider": "bunny",
+                    "status": ssl_status,
+                    "certificateRequest": certificate_result,
+                },
+            }
+        )
+
+    refreshed_zone = _get_bunny_pull_zone(zone_id=zone_id)
+    return {
+        "dnsTargetHostname": dns_target_hostname,
+        "domains": domain_results,
+        "pullZoneHostnames": _extract_bunny_pull_zone_hostname_values(refreshed_zone),
+    }
+
+
+def _resolve_bunny_pull_zone_origin_url(
+    *,
+    requested_origin_ip: Any,
+    workload_port: int | None = None,
+) -> str:
+    requested = str(requested_origin_ip or "").strip()
+    configured_default = str(settings.BUNNY_PULLZONE_ORIGIN_IP or "").strip()
+    origin_input = requested or configured_default
+    resolved_port: int | None = None
+    if workload_port is not None:
+        resolved_port = _coerce_service_port(raw_port=workload_port, context="Workload")
+
+    if not origin_input:
+        raise DeployError(
+            "Bunny pull zone origin IP is required. "
+            "Set deploy.bunnyPullZoneOriginIp or BUNNY_PULLZONE_ORIGIN_IP."
+        )
+
+    if origin_input.startswith(("http://", "https://")):
+        parsed = urlsplit(origin_input)
+        if not parsed.scheme or not parsed.netloc:
+            raise DeployError(
+                "Bunny pull zone origin URL is invalid. Expected http(s)://<host>."
+            )
+        return origin_input.rstrip("/")
+
+    if " " in origin_input or "/" in origin_input:
+        raise DeployError(
+            "Bunny pull zone origin must be a bare host/IP or a full http(s) URL."
+        )
+    if resolved_port is not None and ":" not in origin_input:
+        return f"http://{origin_input}:{resolved_port}"
+    return f"http://{origin_input}"
+
+
+def _extract_bunny_pull_zone_access_urls(zone: dict[str, Any]) -> list[str]:
+    urls: list[str] = []
+    for value in _extract_bunny_pull_zone_hostname_values(zone):
+        urls.append(f"https://{value}/")
+    return _normalize_access_urls(urls)
+
+
+def _resolve_bunny_origin_context_for_workload(
+    *,
+    workload: dict[str, Any],
+    workload_name: str,
+    instance_name: str | None,
+    resolve_port_from_latest_spec: bool,
+    require_port_when_no_domains: bool,
+) -> tuple[list[str], int | None, str | None]:
+    server_names = _extract_workload_server_names(
+        workload=workload,
+        context=f"Workload '{workload_name}'",
+    )
+    workload_port = _extract_primary_service_port(
+        workload=workload,
+        context=f"Workload '{workload_name}'",
+    )
+    workload_port_source: str | None = "plan" if workload_port is not None else None
+
+    if workload_port is None and not server_names and resolve_port_from_latest_spec:
+        try:
+            workload_port = _workload_port_from_latest_spec(
+                workload_name=workload_name,
+                instance_name=instance_name,
+            )
+            workload_port_source = "spec"
+        except DeployError as exc:
+            if require_port_when_no_domains:
+                raise DeployError(
+                    f"Workload '{workload_name}' has no server_names and no assigned service port "
+                    "after apply; cannot build Bunny pull zone origin URL."
+                ) from exc
+
+    if workload_port is None and not server_names and require_port_when_no_domains:
+        raise DeployError(
+            f"Workload '{workload_name}' has no server_names and no assigned service port; "
+            "cannot build Bunny pull zone origin URL."
+        )
+
+    return server_names, workload_port, workload_port_source
+
+
+def _ensure_bunny_pull_zone(*, org_id: str, origin_url: str) -> dict[str, Any]:
+    zone_name = _build_bunny_pull_zone_name(org_id=org_id)
+    existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
+
+    zone: dict[str, Any]
+    if existing_zone is None:
+        created = _bunny_api_request(
+            method="POST",
+            path="/pullzone",
+            payload={"Name": zone_name, "OriginUrl": origin_url},
+        )
+        if not isinstance(created, dict):
+            raise DeployError("Bunny create pull zone response must be an object.")
+        zone = created
+    else:
+        existing_zone_id = _coerce_bunny_pull_zone_id(zone=existing_zone)
+        current_origin = str(existing_zone.get("OriginUrl") or "").strip()
+        if current_origin != origin_url:
+            updated = _bunny_api_request(
+                method="POST",
+                path=f"/pullzone/{existing_zone_id}",
+                payload={"OriginUrl": origin_url},
+            )
+            if not isinstance(updated, dict):
+                raise DeployError("Bunny update pull zone response must be an object.")
+            zone = updated
+        else:
+            zone = existing_zone
+
+    if not isinstance(zone.get("Hostnames"), list):
+        zone_id = _coerce_bunny_pull_zone_id(zone=zone)
+        return _get_bunny_pull_zone(zone_id=zone_id)
+    return zone
+
+
+def _load_workload_from_plan(
+    *,
+    workload_name: str,
+    plan_path: str | None,
+    instance_name: str | None,
+) -> tuple[dict[str, Any], str]:
+    name = (workload_name or "").strip()
+    if not name:
+        raise DeployError("workload_name is required.")
+
+    base_plan_path = _assert_under_cloudhand(Path(plan_path)) if plan_path else _find_latest_plan()
+    if not base_plan_path or not base_plan_path.exists():
+        raise DeployError("No plan found.")
+
+    try:
+        plan = json.loads(base_plan_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise DeployError(f"Failed to read plan JSON: {exc}") from exc
+
+    new_spec = plan.get("new_spec") or {}
+    instances = new_spec.get("instances") or []
+    if not isinstance(instances, list):
+        raise DeployError("Plan new_spec.instances must be a list.")
+
+    matches: list[dict[str, Any]] = []
+    for inst in instances:
+        if instance_name and inst.get("name") != instance_name:
+            continue
+        workloads = inst.get("workloads") or []
+        if not isinstance(workloads, list):
+            continue
+        for workload in workloads:
+            if not isinstance(workload, dict):
+                continue
+            if (workload.get("name") or "").strip() != name:
+                continue
+            matches.append(workload)
+
+    if not matches:
+        raise DeployError(f"No workload named '{name}' found in plan.")
+    if len(matches) > 1 and not (instance_name or "").strip():
+        raise DeployError(
+            f"Multiple workloads named '{name}' found in plan. Specify instance_name."
+        )
+    return matches[0], str(base_plan_path)
+
+
+def configure_bunny_pull_zone_for_workload(
+    *,
+    org_id: str,
+    workload_name: str,
+    plan_path: str | None,
+    instance_name: str | None,
+    requested_origin_ip: str | None = None,
+    server_names: list[str] | None = None,
+) -> dict[str, Any]:
+    workload, resolved_plan_path = _load_workload_from_plan(
+        workload_name=workload_name,
+        plan_path=plan_path,
+        instance_name=instance_name,
+    )
+
+    source_type = str(workload.get("source_type") or "").strip().lower()
+    if source_type != "funnel_artifact":
+        raise DeployError(
+            "Bunny pull zone provisioning from deploy domain save requires source_type 'funnel_artifact'."
+        )
+
+    workload_server_names, workload_port, workload_port_source = _resolve_bunny_origin_context_for_workload(
+        workload=workload,
+        workload_name=workload_name,
+        instance_name=instance_name,
+        resolve_port_from_latest_spec=False,
+        require_port_when_no_domains=False,
+    )
+    if server_names is not None:
+        workload_server_names = _normalize_workload_server_names(server_names=server_names)
+    port_pending = bool(not workload_server_names and workload_port is None)
+    if port_pending:
+        workload_port_source = "pending"
+
+    origin_url = _resolve_bunny_pull_zone_origin_url(
+        requested_origin_ip=requested_origin_ip,
+        workload_port=workload_port,
+    )
+    bunny_zone = _ensure_bunny_pull_zone(
+        org_id=org_id,
+        origin_url=origin_url,
+    )
+    domain_provisioning = _provision_bunny_custom_domains(
+        bunny_zone=bunny_zone,
+        server_names=workload_server_names,
+        request_ssl=False,
+    )
+
+    zone_for_access_urls = dict(bunny_zone)
+    provisioned_hostnames = domain_provisioning.get("pullZoneHostnames")
+    if isinstance(provisioned_hostnames, list):
+        zone_for_access_urls["Hostnames"] = [
+            {"Value": value}
+            for value in provisioned_hostnames
+            if isinstance(value, str)
+        ]
+    bunny_access_urls = _extract_bunny_pull_zone_access_urls(zone_for_access_urls)
+    return {
+        "provider": "bunny",
+        "plan_path": resolved_plan_path,
+        "pull_zone": {
+            "id": bunny_zone.get("Id"),
+            "name": bunny_zone.get("Name"),
+            "originUrl": bunny_zone.get("OriginUrl"),
+            "accessUrls": bunny_access_urls,
+            "workloadPort": workload_port,
+            "workloadPortSource": workload_port_source,
+            "workloadPortPending": port_pending,
+            "dnsTargetHostname": domain_provisioning.get("dnsTargetHostname"),
+            "domainProvisioning": domain_provisioning.get("domains"),
+        },
+    }
+
+
+def _reconcile_bunny_pull_zone_for_published_workload(
+    *,
+    org_id: str,
+    workload_name: str,
+    plan_path: str | None,
+    instance_name: str | None,
+    requested_origin_ip: str | None,
+    require_port_when_no_domains: bool,
+    server_names: list[str] | None = None,
+) -> dict[str, Any]:
+    workload, resolved_plan_path = _load_workload_from_plan(
+        workload_name=workload_name,
+        plan_path=plan_path,
+        instance_name=instance_name,
+    )
+
+    source_type = str(workload.get("source_type") or "").strip().lower()
+    if source_type != "funnel_artifact":
+        raise DeployError(
+            "Bunny pull zone provisioning from publish requires source_type 'funnel_artifact'."
+        )
+
+    workload_server_names, workload_port, workload_port_source = _resolve_bunny_origin_context_for_workload(
+        workload=workload,
+        workload_name=workload_name,
+        instance_name=instance_name,
+        resolve_port_from_latest_spec=True,
+        require_port_when_no_domains=require_port_when_no_domains,
+    )
+    if server_names is not None:
+        workload_server_names = _normalize_workload_server_names(server_names=server_names)
+
+    origin_url = _resolve_bunny_pull_zone_origin_url(
+        requested_origin_ip=requested_origin_ip,
+        workload_port=workload_port,
+    )
+    bunny_zone = _ensure_bunny_pull_zone(
+        org_id=org_id,
+        origin_url=origin_url,
+    )
+    domain_provisioning = _provision_bunny_custom_domains(
+        bunny_zone=bunny_zone,
+        server_names=workload_server_names,
+        request_ssl=True,
+    )
+
+    zone_for_access_urls = dict(bunny_zone)
+    provisioned_hostnames = domain_provisioning.get("pullZoneHostnames")
+    if isinstance(provisioned_hostnames, list):
+        zone_for_access_urls["Hostnames"] = [
+            {"Value": value}
+            for value in provisioned_hostnames
+            if isinstance(value, str)
+        ]
+    bunny_access_urls = _extract_bunny_pull_zone_access_urls(zone_for_access_urls)
+    return {
+        "provider": "bunny",
+        "plan_path": resolved_plan_path,
+        "pull_zone": {
+            "id": bunny_zone.get("Id"),
+            "name": bunny_zone.get("Name"),
+            "originUrl": bunny_zone.get("OriginUrl"),
+            "accessUrls": bunny_access_urls,
+            "workloadPort": workload_port,
+            "workloadPortSource": workload_port_source,
+            "workloadPortPending": bool(not workload_server_names and workload_port is None),
+            "dnsTargetHostname": domain_provisioning.get("dnsTargetHostname"),
+            "domainProvisioning": domain_provisioning.get("domains"),
+        },
+    }
+
+
 def _latest_spec_path() -> Path:
     return _cloudhand_dir() / "spec.json"
 
@@ -1640,6 +2396,7 @@ async def _run_apply_plan_job(job_id: str) -> None:
 
 async def _run_funnel_publish_job(job_id: str) -> None:
     from app.db.base import SessionLocal
+    from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
     from app.services.funnels import publish_funnel
 
     job = _read_publish_job(job_id)
@@ -1709,6 +2466,7 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                 )
 
                 patch_result = patch_workload_in_plan(
+                    org_id=org_id,
                     workload_patch=workload_patch,
                     plan_path=plan_resolution["plan_path"],
                     instance_name=deploy_request.get("instance_name"),
@@ -1748,6 +2506,30 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                         )
                     summary["access_urls"] = access_urls
                     deploy_response["apply"] = summary
+
+                if bool(deploy_request.get("bunny_pull_zone", False)):
+                    workload_name = str(workload_patch.get("name") or "").strip()
+                    if not workload_name:
+                        raise DeployError("Publish deploy workload patch is missing workload name.")
+                    org_server_names = OrgDeployDomainsRepository(session).list_hostnames(org_id=org_id)
+                    bunny_config = _reconcile_bunny_pull_zone_for_published_workload(
+                        org_id=org_id,
+                        workload_name=workload_name,
+                        plan_path=patch_result.get("updated_plan_path"),
+                        instance_name=deploy_request.get("instance_name"),
+                        requested_origin_ip=deploy_request.get("bunny_pull_zone_origin_ip"),
+                        require_port_when_no_domains=apply_plan_enabled,
+                        server_names=org_server_names,
+                    )
+                    bunny_pull_zone_payload = bunny_config.get("pull_zone")
+                    if isinstance(bunny_pull_zone_payload, dict) and isinstance(
+                        bunny_pull_zone_payload.get("accessUrls"), list
+                    ):
+                        bunny_access_urls = bunny_pull_zone_payload.get("accessUrls")
+                    else:
+                        bunny_access_urls = []
+                    access_urls = _normalize_access_urls(access_urls + bunny_access_urls)
+                    deploy_response["cdn"] = bunny_config
 
                 result_payload["deploy"] = deploy_response
         finally:
