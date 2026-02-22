@@ -525,11 +525,24 @@ export function BrandDesignSystemPage() {
     ],
     [designSystems]
   );
-  const shopDomainOptions = useMemo(
-    () => (shopifyStatus?.shopDomains || []).map((shopDomain) => ({ label: shopDomain, value: shopDomain })),
-    [shopifyStatus?.shopDomains]
-  );
-  const hasShopifyConnectionTarget = Boolean(shopifyStatus?.shopDomain || shopDomainOptions.length);
+  const shopDomainOptions = useMemo(() => {
+    const candidates = new Set<string>();
+    const addCandidate = (shopDomain: string | null | undefined) => {
+      if (typeof shopDomain !== "string") return;
+      const normalized = shopDomain.trim().toLowerCase();
+      if (!normalized) return;
+      candidates.add(normalized);
+    };
+
+    addCandidate(shopifyStatus?.selectedShopDomain);
+    addCandidate(shopifyStatus?.shopDomain);
+    (shopifyStatus?.shopDomains || []).forEach((shopDomain) => addCandidate(shopDomain));
+
+    return Array.from(candidates)
+      .sort((a, b) => a.localeCompare(b))
+      .map((shopDomain) => ({ label: shopDomain, value: shopDomain }));
+  }, [shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain, shopifyStatus?.shopDomains]);
+  const hasShopifyConnectionTarget = shopDomainOptions.length > 0;
 
   useEffect(() => {
     setPreviewDesignSystemId("");
@@ -547,8 +560,14 @@ export function BrandDesignSystemPage() {
     }
     setPolicySyncShopDomain((current) => {
       if (current && shopDomainOptions.some((option) => option.value === current)) return current;
-      if (shopifyStatus?.selectedShopDomain) return shopifyStatus.selectedShopDomain;
-      if (shopifyStatus?.shopDomain) return shopifyStatus.shopDomain;
+      const selectedShopDomain = shopifyStatus?.selectedShopDomain?.trim().toLowerCase();
+      if (selectedShopDomain && shopDomainOptions.some((option) => option.value === selectedShopDomain)) {
+        return selectedShopDomain;
+      }
+      const readyShopDomain = shopifyStatus?.shopDomain?.trim().toLowerCase();
+      if (readyShopDomain && shopDomainOptions.some((option) => option.value === readyShopDomain)) {
+        return readyShopDomain;
+      }
       return shopDomainOptions[0]?.value || "";
     });
   }, [shopDomainOptions, shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain]);
