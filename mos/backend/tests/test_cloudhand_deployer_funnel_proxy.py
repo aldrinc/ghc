@@ -113,7 +113,39 @@ def _artifact_app(
                                         "publicationId": "pub-1",
                                         "pageId": "page-1",
                                         "slug": "presales",
-                                        "puckData": {"root": {"props": {}}, "content": [], "zones": {}},
+                                        "puckData": {
+                                            "root": {"props": {}},
+                                            "content": [
+                                                {
+                                                    "type": "PreSalesPage",
+                                                    "props": {
+                                                        "id": "root-page",
+                                                        "anchorId": "top",
+                                                        "content": [
+                                                            {
+                                                                "type": "PreSalesHero",
+                                                                "props": {
+                                                                    "id": "hero-1",
+                                                                    "config": {
+                                                                        "hero": {
+                                                                            "title": "Hero title",
+                                                                            "subtitle": "Hero subtitle",
+                                                                            "media": {
+                                                                                "type": "image",
+                                                                                "alt": "Hero image",
+                                                                                "assetPublicId": "11111111-1111-1111-1111-111111111111",
+                                                                            },
+                                                                        },
+                                                                        "badges": [],
+                                                                    },
+                                                                },
+                                                            }
+                                                        ],
+                                                    },
+                                                }
+                                            ],
+                                            "zones": {},
+                                        },
                                         "pageMap": {"page-1": "presales"},
                                     }
                                 },
@@ -350,6 +382,31 @@ def test_funnel_artifact_site_injects_default_route_into_runtime_config():
     assert runtime_inject_cmd
     assert '"defaultProductSlug":"example-product"' in runtime_inject_cmd
     assert '"defaultFunnelSlug":"f85405a4"' in runtime_inject_cmd
+    assert "raw = raw.replace" in runtime_inject_cmd
+    assert '<script type="module"' in runtime_inject_cmd
+    assert '"entryImagePreloadMap"' in runtime_inject_cmd
+    assert (
+        '"example-product/example-funnel/presales":"11111111-1111-1111-1111-111111111111"'
+        in runtime_inject_cmd
+    )
+    assert (
+        '"example-product/f85405a4/presales":"11111111-1111-1111-1111-111111111111"'
+        in runtime_inject_cmd
+    )
+
+
+def test_funnel_artifact_site_errors_when_preload_asset_public_id_is_invalid_uuid():
+    app = _artifact_app()
+    hero_config = (
+        app.source_ref.artifact["products"]["example-product"]["funnels"]["example-funnel"]["pages"]["presales"]["puckData"][
+            "content"
+        ][0]["props"]["content"][0]["props"]["config"]
+    )
+    hero_config["hero"]["media"]["assetPublicId"] = "not-a-uuid"
+    deployer, _uploaded, _commands = _stub_deployer()
+
+    with pytest.raises(ValueError, match="hero.media.assetPublicId"):
+        deployer._configure_funnel_artifact_site(app)
 
 
 def test_funnel_artifact_site_errors_with_clear_message_when_runtime_dist_missing():
@@ -384,7 +441,7 @@ def test_funnel_artifact_site_uploads_local_runtime_when_remote_missing(tmp_path
 
     deployer._configure_funnel_artifact_site(app)
 
-    assert deployed["local_dir"] == str(local_dist)
+    assert Path(deployed["local_dir"]).resolve() == local_dist.resolve()
     assert deployed["remote_dir"].startswith("/opt/apps/.cloudhand-runtime-cache/")
     assert any(
         cmd.startswith("cp -R /opt/apps/.cloudhand-runtime-cache/") and cmd.endswith("/. /opt/apps/landing-artifact/site/")
