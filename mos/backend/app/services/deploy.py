@@ -1249,16 +1249,12 @@ def _normalize_bunny_pull_zone_name_component(*, value: str, label: str) -> str:
     return normalized
 
 
-def _build_bunny_pull_zone_name(*, workspace_id: str, brand_id: str) -> str:
-    workspace_component = _normalize_bunny_pull_zone_name_component(
-        value=workspace_id,
-        label="workspace_id",
+def _build_bunny_pull_zone_name(*, org_id: str) -> str:
+    org_component = _normalize_bunny_pull_zone_name_component(
+        value=org_id,
+        label="org_id",
     )
-    brand_component = _normalize_bunny_pull_zone_name_component(
-        value=brand_id,
-        label="brand_id",
-    )
-    return f"{workspace_component}-{brand_component}"
+    return org_component
 
 
 def _bunny_api_request(*, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
@@ -1407,8 +1403,8 @@ def _extract_bunny_pull_zone_access_urls(zone: dict[str, Any]) -> list[str]:
     return _normalize_access_urls(urls)
 
 
-def _ensure_bunny_pull_zone(*, workspace_id: str, brand_id: str, origin_url: str) -> dict[str, Any]:
-    zone_name = _build_bunny_pull_zone_name(workspace_id=workspace_id, brand_id=brand_id)
+def _ensure_bunny_pull_zone(*, org_id: str, origin_url: str) -> dict[str, Any]:
+    zone_name = _build_bunny_pull_zone_name(org_id=org_id)
     existing_zone = _find_bunny_pull_zone_by_name(zone_name=zone_name)
 
     if existing_zone is None:
@@ -1503,19 +1499,11 @@ def configure_bunny_pull_zone_for_workload(
             "Bunny pull zone provisioning from deploy domain save requires source_type 'funnel_artifact'."
         )
 
-    source_ref = workload.get("source_ref")
-    if not isinstance(source_ref, dict):
-        raise DeployError("Workload source_ref is required for Bunny pull zone provisioning.")
-    brand_id = str(source_ref.get("client_id") or "").strip()
-    if not brand_id:
-        raise DeployError("Workload source_ref.client_id is required for Bunny pull zone provisioning.")
-
     origin_url = _resolve_bunny_pull_zone_origin_url(
         requested_origin_ip=requested_origin_ip,
     )
     bunny_zone = _ensure_bunny_pull_zone(
-        workspace_id=org_id,
-        brand_id=brand_id,
+        org_id=org_id,
         origin_url=origin_url,
     )
     bunny_access_urls = _extract_bunny_pull_zone_access_urls(bunny_zone)
@@ -1802,20 +1790,11 @@ async def _run_funnel_publish_job(job_id: str) -> None:
                     deploy_response["apply"] = summary
 
                 if bool(deploy_request.get("bunny_pull_zone", False)):
-                    source_ref = workload_patch.get("source_ref")
-                    if not isinstance(source_ref, dict):
-                        raise DeployError("Publish deploy workload patch is missing source_ref for Bunny provisioning.")
-                    brand_id = str(source_ref.get("client_id") or "").strip()
-                    if not brand_id:
-                        raise DeployError(
-                            "Publish deploy workload patch is missing source_ref.client_id for Bunny provisioning."
-                        )
                     origin_url = _resolve_bunny_pull_zone_origin_url(
                         requested_origin_ip=deploy_request.get("bunny_pull_zone_origin_ip"),
                     )
                     bunny_zone = _ensure_bunny_pull_zone(
-                        workspace_id=org_id,
-                        brand_id=brand_id,
+                        org_id=org_id,
                         origin_url=origin_url,
                     )
                     bunny_access_urls = _extract_bunny_pull_zone_access_urls(bunny_zone)
