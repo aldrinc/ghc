@@ -285,6 +285,11 @@ export function FunnelDetailPage() {
       name: deployWorkloadName,
       service_config: serviceConfig,
     };
+    if (!createIfMissing && funnel?.client_id) {
+      workloadPayload.source_ref = {
+        client_id: funnel.client_id,
+      };
+    }
     if (createIfMissing) {
       workloadPayload.source_type = "funnel_artifact";
       workloadPayload.runtime = "static";
@@ -309,6 +314,10 @@ export function FunnelDetailPage() {
       if (deployInstanceName) params.set("instance_name", deployInstanceName);
       params.set("create_if_missing", createIfMissing ? "true" : "false");
       params.set("in_place", "true");
+      params.set("configure_bunny_pull_zone", "true");
+      if (deployBunnyPullZoneOriginIp) {
+        params.set("bunny_pull_zone_origin_ip", deployBunnyPullZoneOriginIp);
+      }
 
       await post<PatchWorkloadResponse>(`/deploy/plans/workloads?${params.toString()}`, workloadPayload);
 
@@ -333,8 +342,6 @@ export function FunnelDetailPage() {
         workloadName: string;
         createIfMissing: boolean;
         applyPlan: boolean;
-        bunnyPullZone: boolean;
-        bunnyPullZoneOriginIp?: string;
         planPath?: string;
         instanceName?: string;
         serverNames?: string[];
@@ -346,7 +353,6 @@ export function FunnelDetailPage() {
         workloadName: `brand-funnels-${funnel.client_id}`,
         createIfMissing: true,
         applyPlan: true,
-        bunnyPullZone: true,
       },
     };
 
@@ -355,7 +361,6 @@ export function FunnelDetailPage() {
     if (serverNames.length > 0) payload.deploy.serverNames = serverNames;
     if (deployUpstreamBaseUrl) payload.deploy.upstreamBaseUrl = deployUpstreamBaseUrl;
     if (deployUpstreamApiBaseUrl) payload.deploy.upstreamApiBaseUrl = deployUpstreamApiBaseUrl;
-    if (deployBunnyPullZoneOriginIp) payload.deploy.bunnyPullZoneOriginIp = deployBunnyPullZoneOriginIp;
 
     const response = await publish.mutateAsync({ funnelId, payload });
     void deployDomains.refetch();

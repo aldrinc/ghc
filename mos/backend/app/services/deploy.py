@@ -1317,11 +1317,18 @@ def _bunny_api_request(*, method: str, path: str, payload: dict[str, Any] | None
 
 def _list_bunny_pull_zones() -> list[dict[str, Any]]:
     payload = _bunny_api_request(method="GET", path="/pullzone")
-    if not isinstance(payload, dict):
-        raise DeployError("Bunny list pull zones response must be an object.")
-    items = payload.get("Items")
+    items: Any
+    if isinstance(payload, dict):
+        items = payload.get("Items")
+    elif isinstance(payload, list):
+        # Some Bunny accounts/environments return the collection directly.
+        items = payload
+    else:
+        raise DeployError(
+            "Bunny list pull zones response must be an object with Items or an array."
+        )
     if not isinstance(items, list):
-        raise DeployError("Bunny list pull zones response is missing an Items array.")
+        raise DeployError("Bunny list pull zones response must contain an array of pull zones.")
     zones: list[dict[str, Any]] = []
     for idx, item in enumerate(items):
         if not isinstance(item, dict):
@@ -1427,6 +1434,101 @@ def _ensure_bunny_pull_zone(*, workspace_id: str, brand_id: str, origin_url: str
         return updated
 
     return existing_zone
+
+
+def _load_workload_from_plan(
+    *,
+    workload_name: str,
+    plan_path: str | None,
+    instance_name: str | None,
+) -> tuple[dict[str, Any], str]:
+    name = (workload_name or "").strip()
+    if not name:
+        raise DeployError("workload_name is required.")
+
+    base_plan_path = _assert_under_cloudhand(Path(plan_path)) if plan_path else _find_latest_plan()
+    if not base_plan_path or not base_plan_path.exists():
+        raise DeployError("No plan found.")
+
+    try:
+        plan = json.loads(base_plan_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        raise DeployError(f"Failed to read plan JSON: {exc}") from exc
+
+    new_spec = plan.get("new_spec") or {}
+    instances = new_spec.get("instances") or []
+    if not isinstance(instances, list):
+        raise DeployError("Plan new_spec.instances must be a list.")
+
+    matches: list[dict[str, Any]] = []
+    for inst in instances:
+        if instance_name and inst.get("name") != instance_name:
+            continue
+        workloads = inst.get("workloads") or []
+        if not isinstance(workloads, list):
+            continue
+        for workload in workloads:
+            if not isinstance(workload, dict):
+                continue
+            if (workload.get("name") or "").strip() != name:
+                continue
+            matches.append(workload)
+
+    if not matches:
+        raise DeployError(f"No workload named '{name}' found in plan.")
+    if len(matches) > 1 and not (instance_name or "").strip():
+        raise DeployError(
+            f"Multiple workloads named '{name}' found in plan. Specify instance_name."
+        )
+    return matches[0], str(base_plan_path)
+
+
+def configure_bunny_pull_zone_for_workload(
+    *,
+    org_id: str,
+    workload_name: str,
+    plan_path: str | None,
+    instance_name: str | None,
+    requested_origin_ip: str | None = None,
+) -> dict[str, Any]:
+    workload, resolved_plan_path = _load_workload_from_plan(
+        workload_name=workload_name,
+        plan_path=plan_path,
+        instance_name=instance_name,
+    )
+
+    source_type = str(workload.get("source_type") or "").strip().lower()
+    if source_type != "funnel_artifact":
+        raise DeployError(
+            "Bunny pull zone provisioning from deploy domain save requires source_type 'funnel_artifact'."
+        )
+
+    source_ref = workload.get("source_ref")
+    if not isinstance(source_ref, dict):
+        raise DeployError("Workload source_ref is required for Bunny pull zone provisioning.")
+    brand_id = str(source_ref.get("client_id") or "").strip()
+    if not brand_id:
+        raise DeployError("Workload source_ref.client_id is required for Bunny pull zone provisioning.")
+
+    origin_url = _resolve_bunny_pull_zone_origin_url(
+        requested_origin_ip=requested_origin_ip,
+    )
+    bunny_zone = _ensure_bunny_pull_zone(
+        workspace_id=org_id,
+        brand_id=brand_id,
+        origin_url=origin_url,
+    )
+    bunny_access_urls = _extract_bunny_pull_zone_access_urls(bunny_zone)
+    return {
+        "provider": "bunny",
+        "plan_path": resolved_plan_path,
+        "pull_zone": {
+            "id": bunny_zone.get("Id"),
+            "name": bunny_zone.get("Name"),
+            "originUrl": bunny_zone.get("OriginUrl"),
+            "accessUrls": bunny_access_urls,
+        },
+    }
 
 
 def _latest_spec_path() -> Path:

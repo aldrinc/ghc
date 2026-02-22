@@ -98,6 +98,82 @@ def test_ensure_bunny_pull_zone_creates_when_missing(monkeypatch):
     assert calls[1][1] == "/pullzone"
 
 
+def test_list_bunny_pull_zones_accepts_array_response(monkeypatch):
+    monkeypatch.setattr(
+        deploy_service,
+        "_bunny_api_request",
+        lambda *, method, path, payload=None: [
+            {"Id": 123, "Name": "workspace-123-brand-abc"},
+            {"Id": 456, "Name": "workspace-123-brand-def"},
+        ],
+    )
+    zones = deploy_service._list_bunny_pull_zones()
+    assert len(zones) == 2
+    assert zones[0]["Id"] == 123
+    assert zones[1]["Id"] == 456
+
+
+def test_configure_bunny_pull_zone_for_workload_uses_updated_plan(tmp_path, monkeypatch):
+    monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
+    monkeypatch.setattr(deploy_service.settings, "BUNNY_PULLZONE_ORIGIN_IP", "46.225.124.104")
+
+    plan_path = tmp_path / "plan-test.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "new_spec": {
+                    "instances": [
+                        {
+                            "name": "mos-ghc-1",
+                            "workloads": [
+                                {
+                                    "name": "brand-funnels-brand-abc",
+                                    "source_type": "funnel_artifact",
+                                    "source_ref": {"client_id": "brand-abc"},
+                                    "service_config": {"server_names": ["offers.example.com"], "https": True},
+                                }
+                            ],
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    captured: dict[str, str] = {}
+
+    def fake_ensure_bunny_pull_zone(*, workspace_id: str, brand_id: str, origin_url: str):
+        captured["workspace_id"] = workspace_id
+        captured["brand_id"] = brand_id
+        captured["origin_url"] = origin_url
+        return {
+            "Id": 999,
+            "Name": "workspace-123-brand-abc",
+            "OriginUrl": origin_url,
+            "Hostnames": [{"Value": "workspace-123-brand-abc.b-cdn.net"}],
+        }
+
+    monkeypatch.setattr(deploy_service, "_ensure_bunny_pull_zone", fake_ensure_bunny_pull_zone)
+
+    output = deploy_service.configure_bunny_pull_zone_for_workload(
+        org_id="workspace-123",
+        workload_name="brand-funnels-brand-abc",
+        plan_path=str(plan_path),
+        instance_name="mos-ghc-1",
+    )
+    assert output["provider"] == "bunny"
+    assert output["pull_zone"]["id"] == 999
+    assert output["pull_zone"]["name"] == "workspace-123-brand-abc"
+    assert output["pull_zone"]["originUrl"] == "http://46.225.124.104"
+    assert output["pull_zone"]["accessUrls"] == ["https://workspace-123-brand-abc.b-cdn.net/"]
+    assert captured == {
+        "workspace_id": "workspace-123",
+        "brand_id": "brand-abc",
+        "origin_url": "http://46.225.124.104",
+    }
+
+
 def test_ensure_plan_for_funnel_publish_workload_bootstraps_when_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(deploy_service.settings, "DEPLOY_ROOT_DIR", str(tmp_path))
 

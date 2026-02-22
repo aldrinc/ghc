@@ -83,17 +83,31 @@ async def patch_workload(
     instance_name: Optional[str] = Query(default=None),
     create_if_missing: bool = Query(default=False),
     in_place: bool = Query(default=False),
-    _auth: AuthContext = Depends(get_current_user),
+    configure_bunny_pull_zone: bool = Query(default=False),
+    bunny_pull_zone_origin_ip: Optional[str] = Query(default=None),
+    auth: AuthContext = Depends(get_current_user),
 ):
     _require_internal_proxy(request)
     try:
-        return deploy_service.patch_workload_in_plan(
+        result = deploy_service.patch_workload_in_plan(
             workload_patch=workload,
             plan_path=plan_path,
             instance_name=instance_name,
             create_if_missing=create_if_missing,
             in_place=in_place,
         )
+        if configure_bunny_pull_zone:
+            workload_name = str(workload.get("name") or "").strip()
+            if not workload_name:
+                raise deploy_service.DeployError("Workload patch must include a non-empty 'name' field.")
+            result["cdn"] = deploy_service.configure_bunny_pull_zone_for_workload(
+                org_id=auth.org_id,
+                workload_name=workload_name,
+                plan_path=result.get("updated_plan_path"),
+                instance_name=instance_name,
+                requested_origin_ip=bunny_pull_zone_origin_ip,
+            )
+        return result
     except deploy_service.DeployError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
