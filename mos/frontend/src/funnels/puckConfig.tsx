@@ -240,8 +240,27 @@ type ImageProps = {
   radius?: "none" | "md" | "lg";
 };
 
+function normalizeFallbackAssetSrc(fallback?: string): string | undefined {
+  if (!fallback) return fallback;
+  const trimmedFallback = fallback.trim();
+  if (!trimmedFallback) return undefined;
+  if (/^https?:\/\//i.test(trimmedFallback)) return trimmedFallback;
+
+  // Legacy funnel payloads may store root-relative public asset paths.
+  // In deployed artifact mode, assets are served from /api/public/assets.
+  if (trimmedFallback.startsWith("/public/assets/")) {
+    return `${apiBaseUrl.replace(/\/+$/, "")}${trimmedFallback}`;
+  }
+  if (trimmedFallback.startsWith("public/assets/")) {
+    return `${apiBaseUrl.replace(/\/+$/, "")}/${trimmedFallback}`;
+  }
+  return trimmedFallback;
+}
+
 function FunnelImage({ src, assetPublicId, alt, radius }: ImageProps) {
-  const resolvedSrc = assetPublicId ? `${apiBaseUrl}/public/assets/${assetPublicId}` : src;
+  const resolvedSrc = assetPublicId
+    ? `${apiBaseUrl}/public/assets/${assetPublicId}`
+    : normalizeFallbackAssetSrc(src);
   if (!resolvedSrc) {
     return <div className="rounded-md border border-dashed border-border bg-surface-2 p-6 text-sm text-content-muted">No image</div>;
   }

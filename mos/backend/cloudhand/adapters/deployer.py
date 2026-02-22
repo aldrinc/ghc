@@ -896,6 +896,10 @@ WantedBy=multi-user.target
         try_files $uri $uri.webp $uri.jpg $uri.jpeg $uri.png =404;
     }}
 
+    location ^~ /public/assets/ {{
+        try_files /api$uri /api$uri.webp /api$uri.jpg /api$uri.jpeg /api$uri.png =404;
+    }}
+
     location ^~ /api/public/funnels/ {{
         default_type application/json;
         try_files $uri.json =404;
