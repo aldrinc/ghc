@@ -1294,6 +1294,8 @@ def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens(
                             "gallery": {
                                 "slides": [
                                     {"thumbAssetPublicId": "22222222-2222-2222-2222-222222222222"},
+                                    {"src": "/public/assets/44444444-4444-4444-4444-444444444444"},
+                                    {"poster": "https://cdn.example.com/api/public/assets/55555555-5555-5555-5555-555555555555.png"},
                                 ]
                             }
                         }
@@ -1314,6 +1316,8 @@ def test_extract_embedded_asset_public_ids_collects_from_page_and_design_tokens(
         "11111111-1111-1111-1111-111111111111",
         "22222222-2222-2222-2222-222222222222",
         "33333333-3333-3333-3333-333333333333",
+        "44444444-4444-4444-4444-444444444444",
+        "55555555-5555-5555-5555-555555555555",
     }
 
 
