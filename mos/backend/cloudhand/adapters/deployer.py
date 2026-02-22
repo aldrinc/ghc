@@ -12,7 +12,7 @@ import re
 from uuid import UUID
 from pathlib import Path
 import paramiko
-from typing import Dict, List, Optional  # noqa: F401
+from typing import Any, Dict, List, Optional  # noqa: F401
 
 from ..models import (
     ApplicationSourceType,
@@ -28,6 +28,7 @@ _NGINX_PROXY_SEND_TIMEOUT = "3600s"
 _NGINX_PROXY_READ_TIMEOUT = "3600s"
 _RUNTIME_CACHE_DIR = "/opt/apps/.cloudhand-runtime-cache"
 _SHORT_UUID_TOKEN_PATTERN = re.compile(r"^[0-9a-f]{8}$")
+_ENTRY_PRELOAD_COMPONENT_TYPES = {"PreSalesHero", "PreSalesTemplate", "SalesPdpHero", "SalesPdpTemplate"}
 
 
 class ServerDeployer:
@@ -571,6 +572,237 @@ WantedBy=multi-user.target
         )
         self.run(f"python3 -c {shlex.quote(script)}")
 
+    def _iter_puck_components(self, node: object):
+        if isinstance(node, dict):
+            node_type = node.get("type")
+            props = node.get("props")
+            if isinstance(node_type, str) and isinstance(props, dict):
+                yield node_type, props
+            for value in node.values():
+                yield from self._iter_puck_components(value)
+            return
+        if isinstance(node, list):
+            for item in node:
+                yield from self._iter_puck_components(item)
+
+    def _normalize_uuid_token(self, *, raw_value: object, context_label: str) -> str:
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            raise ValueError(f"{context_label} must be a non-empty UUID string.")
+        cleaned = raw_value.strip().lower()
+        try:
+            return str(UUID(cleaned))
+        except ValueError as exc:
+            raise ValueError(f"{context_label} '{cleaned}' is not a valid UUID.") from exc
+
+    def _resolve_component_config(
+        self,
+        *,
+        component_type: str,
+        props: Dict[str, Any],
+        context_label: str,
+    ) -> Optional[dict[str, object]]:
+        raw_config = props.get("config")
+        if isinstance(raw_config, dict):
+            return raw_config
+
+        raw_config_json = props.get("configJson")
+        if raw_config_json is None:
+            return None
+        if not isinstance(raw_config_json, str):
+            raise ValueError(
+                f"{context_label} component '{component_type}' configJson must be a string when provided."
+            )
+        trimmed = raw_config_json.strip()
+        if not trimmed:
+            return None
+        try:
+            parsed = json.loads(trimmed)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{context_label} component '{component_type}' configJson must be valid JSON.") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError(
+                f"{context_label} component '{component_type}' configJson must decode to a JSON object."
+            )
+        return parsed
+
+    def _extract_presales_entry_asset_public_id(
+        self,
+        *,
+        config: Dict[str, Any],
+        context_label: str,
+    ) -> Optional[str]:
+        hero = config.get("hero")
+        if not isinstance(hero, dict):
+            return None
+        media = hero.get("media")
+        if not isinstance(media, dict):
+            return None
+        raw_asset_public_id = media.get("assetPublicId")
+        if raw_asset_public_id is None:
+            return None
+        return self._normalize_uuid_token(
+            raw_value=raw_asset_public_id,
+            context_label=f"{context_label} hero.media.assetPublicId",
+        )
+
+    def _extract_sales_entry_asset_public_id(
+        self,
+        *,
+        config: Dict[str, Any],
+        context_label: str,
+    ) -> Optional[str]:
+        hero_config = config
+        nested_hero = config.get("hero")
+        if isinstance(nested_hero, dict):
+            hero_config = nested_hero
+        gallery = hero_config.get("gallery")
+        if not isinstance(gallery, dict):
+            return None
+        slides = gallery.get("slides")
+        if not isinstance(slides, list) or not slides:
+            return None
+        first_slide = slides[0]
+        if not isinstance(first_slide, dict):
+            raise ValueError(f"{context_label} hero.gallery.slides[0] must be an object.")
+        raw_asset_public_id = first_slide.get("assetPublicId")
+        if raw_asset_public_id is None:
+            return None
+        return self._normalize_uuid_token(
+            raw_value=raw_asset_public_id,
+            context_label=f"{context_label} hero.gallery.slides[0].assetPublicId",
+        )
+
+    def _resolve_entry_preload_asset_public_id(self, *, page_payload: Dict[str, Any], context_label: str) -> Optional[str]:
+        puck_data = page_payload.get("puckData")
+        if not isinstance(puck_data, dict):
+            raise ValueError(f"{context_label} puckData must be an object.")
+
+        for component_type, props in self._iter_puck_components(puck_data):
+            if component_type not in _ENTRY_PRELOAD_COMPONENT_TYPES:
+                continue
+            resolved_config = self._resolve_component_config(
+                component_type=component_type,
+                props=props,
+                context_label=context_label,
+            )
+            if not resolved_config:
+                continue
+
+            if component_type in {"PreSalesHero", "PreSalesTemplate"}:
+                pre_sales_asset_public_id = self._extract_presales_entry_asset_public_id(
+                    config=resolved_config,
+                    context_label=context_label,
+                )
+                if pre_sales_asset_public_id:
+                    return pre_sales_asset_public_id
+
+            if component_type in {"SalesPdpHero", "SalesPdpTemplate"}:
+                sales_asset_public_id = self._extract_sales_entry_asset_public_id(
+                    config=resolved_config,
+                    context_label=context_label,
+                )
+                if sales_asset_public_id:
+                    return sales_asset_public_id
+
+        return None
+
+    def _resolve_funnel_path_tokens(
+        self,
+        *,
+        product_slug: str,
+        funnel_slug: str,
+        funnel_meta: Dict[str, Any],
+    ) -> list[str]:
+        funnel_path_tokens = [funnel_slug]
+        funnel_id_token = str(funnel_meta.get("funnelId") or "").strip()
+        if funnel_id_token:
+            if "/" in funnel_id_token or "\\" in funnel_id_token:
+                raise ValueError(f"Invalid artifact funnelId '{funnel_id_token}' for '{product_slug}/{funnel_slug}'.")
+            if funnel_id_token != funnel_slug:
+                funnel_path_tokens.append(funnel_id_token)
+            try:
+                short_funnel_id_token = str(UUID(funnel_id_token)).split("-", 1)[0]
+            except ValueError:
+                short_funnel_id_token = ""
+            if short_funnel_id_token and short_funnel_id_token not in funnel_path_tokens:
+                funnel_path_tokens.append(short_funnel_id_token)
+        return funnel_path_tokens
+
+    def _build_entry_image_preload_map(self, *, source: FunnelArtifactSourceSpec) -> Dict[str, str]:
+        artifact = source.artifact or {}
+        products = artifact.get("products")
+        if not isinstance(products, dict):
+            return {}
+
+        preload_map: Dict[str, str] = {}
+        for raw_product_slug, product_payload in products.items():
+            product_slug = str(raw_product_slug or "").strip().lower()
+            if not product_slug:
+                continue
+            if not isinstance(product_payload, dict):
+                continue
+            funnels = product_payload.get("funnels")
+            if not isinstance(funnels, dict):
+                continue
+
+            for raw_funnel_slug, funnel_payload in funnels.items():
+                funnel_slug = str(raw_funnel_slug or "").strip().lower()
+                if not funnel_slug:
+                    continue
+                if not isinstance(funnel_payload, dict):
+                    continue
+                funnel_meta = funnel_payload.get("meta")
+                pages = funnel_payload.get("pages")
+                if not isinstance(funnel_meta, dict) or not isinstance(pages, dict):
+                    continue
+
+                entry_slug = str(funnel_meta.get("entrySlug") or "").strip().lower()
+                if not entry_slug:
+                    continue
+
+                entry_page_payload: Optional[Dict[str, Any]] = None
+                for raw_page_slug, page_payload in pages.items():
+                    page_slug = str(raw_page_slug or "").strip().lower()
+                    if page_slug != entry_slug:
+                        continue
+                    if not isinstance(page_payload, dict):
+                        raise ValueError(
+                            f"Artifact page payload for '{product_slug}/{funnel_slug}/{entry_slug}' must be an object."
+                        )
+                    entry_page_payload = page_payload
+                    break
+
+                if entry_page_payload is None:
+                    raise ValueError(
+                        f"Artifact funnel '{product_slug}/{funnel_slug}' entrySlug '{entry_slug}' was not found in pages."
+                    )
+
+                preload_asset_public_id = self._resolve_entry_preload_asset_public_id(
+                    page_payload=entry_page_payload,
+                    context_label=f"Artifact funnel '{product_slug}/{funnel_slug}/{entry_slug}'",
+                )
+                if not preload_asset_public_id:
+                    continue
+
+                for funnel_path_token in self._resolve_funnel_path_tokens(
+                    product_slug=product_slug,
+                    funnel_slug=funnel_slug,
+                    funnel_meta=funnel_meta,
+                ):
+                    normalized_funnel_path_token = str(funnel_path_token or "").strip().lower()
+                    if not normalized_funnel_path_token:
+                        continue
+                    route_key = f"{product_slug}/{normalized_funnel_path_token}/{entry_slug}"
+                    existing_asset = preload_map.get(route_key)
+                    if existing_asset and existing_asset != preload_asset_public_id:
+                        raise ValueError(
+                            f"Entry preload route '{route_key}' maps to multiple asset ids ('{existing_asset}' and "
+                            f"'{preload_asset_public_id}')."
+                        )
+                    preload_map[route_key] = preload_asset_public_id
+
+        return preload_map
+
     def _resolve_funnel_artifact_default_route(
         self, *, source: FunnelArtifactSourceSpec
     ) -> Optional[tuple[str, str]]:
@@ -596,20 +828,16 @@ WantedBy=multi-user.target
                 if not isinstance(funnel_payload, dict):
                     continue
 
-                resolved_funnel_token = funnel_slug
                 funnel_meta = funnel_payload.get("meta")
-                if isinstance(funnel_meta, dict):
-                    funnel_id_token = str(funnel_meta.get("funnelId") or "").strip().lower()
-                    if funnel_id_token:
-                        try:
-                            short_funnel_id_token = str(UUID(funnel_id_token)).split("-", 1)[0]
-                        except ValueError:
-                            short_funnel_id_token = ""
-                        if short_funnel_id_token and _SHORT_UUID_TOKEN_PATTERN.fullmatch(short_funnel_id_token):
-                            resolved_funnel_token = short_funnel_id_token
-                        else:
-                            resolved_funnel_token = funnel_id_token
+                if not isinstance(funnel_meta, dict):
+                    return product_slug, funnel_slug
 
+                funnel_tokens = self._resolve_funnel_path_tokens(
+                    product_slug=product_slug,
+                    funnel_slug=funnel_slug,
+                    funnel_meta=funnel_meta,
+                )
+                resolved_funnel_token = funnel_tokens[-1] if funnel_tokens else funnel_slug
                 return product_slug, resolved_funnel_token
 
         return None
@@ -622,10 +850,35 @@ WantedBy=multi-user.target
             runtime_config["defaultProductSlug"] = product_slug
             runtime_config["defaultFunnelSlug"] = funnel_slug
 
+        entry_image_preload_map = self._build_entry_image_preload_map(source=source)
+        if entry_image_preload_map:
+            runtime_config["entryImagePreloadMap"] = entry_image_preload_map
+
         config_json = json.dumps(runtime_config, separators=(",", ":"))
+        runtime_script = (
+            "<script>"
+            f"window.__MOS_DEPLOY_RUNTIME__={config_json};"
+            "(function(){"
+            "var config=window.__MOS_DEPLOY_RUNTIME__;"
+            "if(!config||typeof config!=='object'){return;}"
+            "var preloadMap=config.entryImagePreloadMap;"
+            "if(!preloadMap||typeof preloadMap!=='object'){return;}"
+            "var pathname=(window.location&&typeof window.location.pathname==='string')?window.location.pathname:'';"
+            "if(!pathname){return;}"
+            "var decodedPathname=pathname;"
+            "try{decodedPathname=decodeURIComponent(pathname);}catch(_){decodedPathname=pathname;}"
+            "var normalizedPath=decodedPathname.trim().toLowerCase().replace(/^\\/+|\\/+$/g,'');"
+            "if(!normalizedPath){return;}"
+            "var assetPublicId=preloadMap[normalizedPath];"
+            "if(typeof assetPublicId!=='string'||!assetPublicId.trim()){return;}"
+            "var href='/api/public/assets/'+encodeURIComponent(assetPublicId.trim().toLowerCase());"
+            "document.write('<link rel=\"preload\" as=\"image\" fetchpriority=\"high\" href=\"'+href+'\" data-mos-entry-preload=\"true\">');"
+            "})();"
+            "</script>"
+        )
         block = (
             "<!-- MOS_DEPLOY_RUNTIME_START -->"
-            f"<script>window.__MOS_DEPLOY_RUNTIME__={config_json};</script>"
+            f"{runtime_script}"
             "<!-- MOS_DEPLOY_RUNTIME_END -->"
         )
         script = (
@@ -641,6 +894,8 @@ WantedBy=multi-user.target
             "    start_idx = raw.index(start_marker)\n"
             "    end_idx = raw.index(end_marker) + len(end_marker)\n"
             "    raw = raw[:start_idx] + block + raw[end_idx:]\n"
+            "elif '<script type=\"module\"' in raw:\n"
+            "    raw = raw.replace('<script type=\"module\"', block + '<script type=\"module\"', 1)\n"
             "elif '</head>' in raw:\n"
             "    raw = raw.replace('</head>', block + '</head>', 1)\n"
             "else:\n"
@@ -770,21 +1025,11 @@ WantedBy=multi-user.target
                         f"Artifact funnel '{product_slug}/{funnel_slug}' is missing a pages object."
                     )
 
-                funnel_path_tokens = [funnel_slug]
-                funnel_id_token = str(funnel_meta.get("funnelId") or "").strip()
-                if funnel_id_token:
-                    if "/" in funnel_id_token or "\\" in funnel_id_token:
-                        raise ValueError(
-                            f"Invalid artifact funnelId '{funnel_id_token}' for '{product_slug}/{funnel_slug}'."
-                        )
-                    if funnel_id_token != funnel_slug:
-                        funnel_path_tokens.append(funnel_id_token)
-                    try:
-                        short_funnel_id_token = str(UUID(funnel_id_token)).split("-", 1)[0]
-                    except ValueError:
-                        short_funnel_id_token = ""
-                    if short_funnel_id_token and short_funnel_id_token not in funnel_path_tokens:
-                        funnel_path_tokens.append(short_funnel_id_token)
+                funnel_path_tokens = self._resolve_funnel_path_tokens(
+                    product_slug=product_slug,
+                    funnel_slug=funnel_slug,
+                    funnel_meta=funnel_meta,
+                )
 
                 for funnel_path_token in funnel_path_tokens:
                     if funnel_path_token in seen_funnel_path_tokens:
