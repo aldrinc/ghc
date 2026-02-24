@@ -28,6 +28,8 @@ from app.schemas import (
     InstallationResponse,
     ListProductsRequest,
     ListProductsResponse,
+    SyncThemeBrandRequest,
+    SyncThemeBrandResponse,
     UpsertedPolicyPage,
     UpsertPolicyPagesRequest,
     UpsertPolicyPagesResponse,
@@ -553,6 +555,47 @@ async def upsert_policy_pages(
             )
             for item in synced_pages
         ],
+    )
+
+
+@app.post(
+    "/v1/themes/brand/sync",
+    response_model=SyncThemeBrandResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def sync_theme_brand(
+    payload: SyncThemeBrandRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        synced = await shopify_api.sync_theme_brand(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            workspace_name=payload.workspaceName,
+            brand_name=payload.brandName,
+            logo_url=payload.logoUrl,
+            css_vars=payload.cssVars,
+            font_urls=payload.fontUrls,
+            data_theme=payload.dataTheme,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return SyncThemeBrandResponse(
+        shopDomain=installation.shop_domain,
+        themeId=synced["themeId"],
+        themeName=synced["themeName"],
+        themeRole=synced["themeRole"],
+        layoutFilename=synced["layoutFilename"],
+        cssFilename=synced["cssFilename"],
+        jobId=synced["jobId"],
     )
 
 

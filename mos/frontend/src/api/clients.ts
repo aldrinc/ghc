@@ -60,6 +60,29 @@ export type ClientShopifyCreateProductResponse = {
   variants: ClientShopifyCreatedVariant[];
 };
 
+export type ClientShopifyThemeBrandSyncPayload = {
+  designSystemId?: string;
+  shopDomain?: string;
+  themeId?: string;
+  themeName?: string;
+};
+
+export type ClientShopifyThemeBrandSyncResponse = {
+  shopDomain: string;
+  workspaceName: string;
+  designSystemId: string;
+  designSystemName: string;
+  brandName: string;
+  logoAssetPublicId: string;
+  logoUrl: string;
+  themeId: string;
+  themeName: string;
+  themeRole: string;
+  layoutFilename: string;
+  cssFilename: string;
+  jobId: string;
+};
+
 export function useClients() {
   const { get } = useApiClient();
   return useQuery<Client[]>({
@@ -202,6 +225,27 @@ export function useCreateClientShopifyProduct(clientId: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to create Shopify product";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSyncClientShopifyThemeBrand(clientId?: string) {
+  const { post } = useApiClient();
+
+  return useMutation({
+    mutationFn: (payload: ClientShopifyThemeBrandSyncPayload) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<ClientShopifyThemeBrandSyncResponse>(
+        `/clients/${clientId}/shopify/theme/brand/sync`,
+        payload,
+      );
+    },
+    onSuccess: (response) => {
+      toast.success(`Synced Shopify theme brand for ${response.shopDomain}`);
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to sync Shopify theme brand";
       toast.error(message);
     },
   });

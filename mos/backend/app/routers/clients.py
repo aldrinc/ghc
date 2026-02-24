@@ -9,6 +9,7 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
 from app.db.models import ClientUserPreference, Product
+from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.design_systems import DesignSystemsRepository
 from app.db.repositories.products import ProductOffersRepository, ProductsRepository
@@ -31,7 +32,10 @@ from app.schemas.shopify_connection import (
     ShopifyInstallationUpdateRequest,
     ShopifyInstallUrlRequest,
     ShopifyInstallUrlResponse,
+    ShopifyThemeBrandSyncRequest,
+    ShopifyThemeBrandSyncResponse,
 )
+from app.services.design_system_generation import DesignSystemGenerationError, validate_design_system_tokens
 from app.services.shopify_connection import (
     build_client_shopify_install_url,
     create_client_shopify_product,
@@ -41,6 +45,7 @@ from app.services.shopify_connection import (
     list_shopify_installations,
     normalize_shop_domain,
     set_client_shopify_storefront_token,
+    sync_client_shopify_theme_brand,
 )
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.client_onboarding import ClientOnboardingInput, ClientOnboardingWorkflow
@@ -91,10 +96,28 @@ def _serialize_active_product(product: Product) -> dict:
     }
 
 
-def _require_client_exists(*, session: Session, org_id: str, client_id: str) -> None:
+def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
     client = ClientsRepository(session).get(org_id=org_id, client_id=client_id)
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    return client
+
+
+def _require_client_exists(*, session: Session, org_id: str, client_id: str) -> None:
+    _get_client_or_404(session=session, org_id=org_id, client_id=client_id)
+
+
+def _require_public_asset_base_url() -> str:
+    base_url = settings.PUBLIC_ASSET_BASE_URL
+    if not isinstance(base_url, str) or not base_url.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "PUBLIC_ASSET_BASE_URL is required to sync Shopify theme brand assets. "
+                "Set it in mos/backend and restart."
+            ),
+        )
+    return base_url.rstrip("/")
 
 
 def _get_client_user_pref(*, session: Session, org_id: str, client_id: str, user_external_id: str) -> ClientUserPreference | None:
@@ -334,6 +357,194 @@ def create_client_shopify_product_route(
         shop_domain=effective_shop_domain,
     )
     return ShopifyProductCreateResponse(**created)
+
+
+@router.post("/{client_id}/shopify/theme/brand/sync", response_model=ShopifyThemeBrandSyncResponse)
+def sync_client_shopify_theme_brand_route(
+    client_id: str,
+    payload: ShopifyThemeBrandSyncRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    effective_shop_domain = payload.shopDomain or selected_shop_domain
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=effective_shop_domain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Shopify connection is not ready: {status_payload['message']}",
+        )
+
+    requested_design_system_id = payload.designSystemId.strip() if payload.designSystemId else None
+    resolved_design_system_id = requested_design_system_id or (
+        str(client.design_system_id) if client.design_system_id else None
+    )
+    if not resolved_design_system_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No design system selected for Shopify theme sync. "
+                "Set a workspace default design system or provide designSystemId."
+            ),
+        )
+
+    design_system_repo = DesignSystemsRepository(session)
+    design_system = design_system_repo.get(
+        org_id=auth.org_id,
+        design_system_id=resolved_design_system_id,
+    )
+    if not design_system:
+        if requested_design_system_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Design system not found")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace default design system was not found.",
+        )
+
+    design_system_client_id = str(design_system.client_id) if design_system.client_id else None
+    if design_system_client_id and design_system_client_id != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Design system must belong to this workspace.",
+        )
+
+    try:
+        validated_tokens = validate_design_system_tokens(design_system.tokens)
+    except DesignSystemGenerationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+    brand_obj = validated_tokens.get("brand")
+    if not isinstance(brand_obj, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Design system tokens.brand must be a JSON object.",
+        )
+    brand_name_raw = brand_obj.get("name")
+    if not isinstance(brand_name_raw, str) or not brand_name_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Design system tokens.brand.name must be a non-empty string.",
+        )
+    logo_public_id_raw = brand_obj.get("logoAssetPublicId")
+    if not isinstance(logo_public_id_raw, str) or not logo_public_id_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Design system tokens.brand.logoAssetPublicId must be a non-empty string.",
+        )
+    brand_name = brand_name_raw.strip()
+    logo_public_id = logo_public_id_raw.strip()
+
+    css_vars_raw = validated_tokens.get("cssVars")
+    if not isinstance(css_vars_raw, dict) or not css_vars_raw:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Design system tokens.cssVars must be a non-empty JSON object.",
+        )
+    css_vars: dict[str, str] = {}
+    for raw_key, raw_value in css_vars_raw.items():
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Design system tokens.cssVars keys must be non-empty strings.",
+            )
+        if not isinstance(raw_value, (str, int, float)):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Design system cssVars[{raw_key}] must be a string or number.",
+            )
+        if isinstance(raw_value, str):
+            cleaned_value = raw_value.strip()
+            if not cleaned_value:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=f"Design system cssVars[{raw_key}] must not be an empty string.",
+                )
+        else:
+            cleaned_value = str(raw_value)
+        css_vars[raw_key.strip()] = cleaned_value
+
+    font_urls_raw = validated_tokens.get("fontUrls")
+    if not isinstance(font_urls_raw, list):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Design system tokens.fontUrls must be a list of non-empty strings.",
+        )
+    font_urls: list[str] = []
+    for item in font_urls_raw:
+        if not isinstance(item, str) or not item.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Design system tokens.fontUrls must be a list of non-empty strings.",
+            )
+        font_urls.append(item.strip())
+
+    data_theme_raw = validated_tokens.get("dataTheme")
+    if not isinstance(data_theme_raw, str) or not data_theme_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Design system tokens.dataTheme must be a non-empty string.",
+        )
+    data_theme = data_theme_raw.strip()
+
+    logo_asset = AssetsRepository(session).get_by_public_id(
+        org_id=auth.org_id,
+        public_id=logo_public_id,
+        client_id=client_id,
+    )
+    if not logo_asset:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Design system brand.logoAssetPublicId does not reference an existing logo asset "
+                "for this workspace."
+            ),
+        )
+
+    workspace_name = str(client.name).strip()
+    if not workspace_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Workspace name is required to sync Shopify theme brand assets.",
+        )
+
+    logo_url = f"{_require_public_asset_base_url()}/public/assets/{logo_public_id}"
+    synced = sync_client_shopify_theme_brand(
+        client_id=client_id,
+        workspace_name=workspace_name,
+        brand_name=brand_name,
+        logo_url=logo_url,
+        css_vars=css_vars,
+        font_urls=font_urls,
+        data_theme=data_theme,
+        theme_id=payload.themeId,
+        theme_name=payload.themeName,
+        shop_domain=effective_shop_domain,
+    )
+
+    return ShopifyThemeBrandSyncResponse(
+        shopDomain=synced["shopDomain"],
+        workspaceName=workspace_name,
+        designSystemId=str(design_system.id),
+        designSystemName=str(design_system.name),
+        brandName=brand_name,
+        logoAssetPublicId=logo_public_id,
+        logoUrl=logo_url,
+        themeId=synced["themeId"],
+        themeName=synced["themeName"],
+        themeRole=synced["themeRole"],
+        layoutFilename=synced["layoutFilename"],
+        cssFilename=synced["cssFilename"],
+        jobId=synced["jobId"],
+    )
 
 
 @router.get("/{client_id}/active-product")

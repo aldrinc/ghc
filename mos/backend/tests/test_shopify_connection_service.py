@@ -534,3 +534,64 @@ def test_upsert_client_shopify_policy_pages_rejects_empty_pages():
         assert exc.detail == "pages must contain at least one policy page."
     else:
         raise AssertionError("Expected upsert_client_shopify_policy_pages to reject empty pages")
+
+
+def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/sync"
+        assert json_body["clientId"] == "client_1"
+        assert json_body["workspaceName"] == "Acme Workspace"
+        assert json_body["brandName"] == "Acme"
+        assert json_body["themeName"] == "futrgroup2-0theme"
+        assert json_body["logoUrl"] == "https://assets.example.com/public/assets/logo-1"
+        assert json_body["cssVars"]["--color-brand"] == "#123456"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "jobId": "gid://shopify/Job/1",
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.sync_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        css_vars={"--color-brand": "#123456"},
+        font_urls=["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
+        data_theme="light",
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert response == {
+        "shopDomain": "example.myshopify.com",
+        "themeId": "gid://shopify/OnlineStoreTheme/1",
+        "themeName": "Main Theme",
+        "themeRole": "MAIN",
+        "layoutFilename": "layout/theme.liquid",
+        "cssFilename": "assets/acme-workspace-workspace-brand.css",
+        "jobId": "gid://shopify/Job/1",
+    }
+
+
+def test_sync_client_shopify_theme_brand_rejects_invalid_css_key():
+    try:
+        shopify_connection.sync_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"color-brand": "#123456"},
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "cssVars keys must be valid CSS custom properties" in exc.detail
+    else:
+        raise AssertionError("Expected sync_client_shopify_theme_brand to reject invalid cssVars keys")

@@ -8,7 +8,13 @@ import {
   useDeleteDesignSystem,
   useUploadDesignSystemLogo,
 } from "@/api/designSystems";
-import { useClient, useClientShopifyStatus, useUpdateClient } from "@/api/clients";
+import {
+  useClient,
+  useClientShopifyStatus,
+  useSyncClientShopifyThemeBrand,
+  useUpdateClient,
+  type ClientShopifyThemeBrandSyncResponse,
+} from "@/api/clients";
 import {
   useSyncComplianceShopifyPolicyPages,
   type ComplianceShopifyPolicySyncResponse,
@@ -499,6 +505,7 @@ export function BrandDesignSystemPage() {
   const uploadDesignSystemLogo = useUploadDesignSystemLogo();
   const deleteDesignSystem = useDeleteDesignSystem();
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
+  const syncShopifyThemeBrand = useSyncClientShopifyThemeBrand(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
     { enabled: Boolean(workspace?.id) }
@@ -514,6 +521,10 @@ export function BrandDesignSystemPage() {
   const [varsFilter, setVarsFilter] = useState("");
   const [logoErrored, setLogoErrored] = useState(false);
   const [selectedLogoPublicId, setSelectedLogoPublicId] = useState("");
+  const [themeSyncShopDomain, setThemeSyncShopDomain] = useState("");
+  const [themeSyncDesignSystemId, setThemeSyncDesignSystemId] = useState("");
+  const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
+  const [themeSyncResult, setThemeSyncResult] = useState<ClientShopifyThemeBrandSyncResponse | null>(null);
   const [policySyncShopDomain, setPolicySyncShopDomain] = useState("");
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -549,16 +560,21 @@ export function BrandDesignSystemPage() {
     setVarsFilter("");
     setLogoErrored(false);
     setSelectedLogoPublicId("");
+    setThemeSyncShopDomain("");
+    setThemeSyncDesignSystemId("");
+    setThemeSyncThemeName("futrgroup2-0theme");
+    setThemeSyncResult(null);
     setPolicySyncShopDomain("");
     setPolicySyncResult(null);
   }, [workspace?.id]);
 
   useEffect(() => {
     if (!shopDomainOptions.length) {
+      setThemeSyncShopDomain("");
       setPolicySyncShopDomain("");
       return;
     }
-    setPolicySyncShopDomain((current) => {
+    const resolveNextShopDomain = (current: string) => {
       if (current && shopDomainOptions.some((option) => option.value === current)) return current;
       const selectedShopDomain = shopifyStatus?.selectedShopDomain?.trim().toLowerCase();
       if (selectedShopDomain && shopDomainOptions.some((option) => option.value === selectedShopDomain)) {
@@ -569,7 +585,9 @@ export function BrandDesignSystemPage() {
         return readyShopDomain;
       }
       return shopDomainOptions[0]?.value || "";
-    });
+    };
+    setThemeSyncShopDomain(resolveNextShopDomain);
+    setPolicySyncShopDomain(resolveNextShopDomain);
   }, [shopDomainOptions, shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain]);
 
   useEffect(() => {
@@ -578,6 +596,17 @@ export function BrandDesignSystemPage() {
       if (current) return current;
       const active = client?.design_system_id || "";
       return active || designSystems[0]?.id || "";
+    });
+  }, [client?.design_system_id, designSystems]);
+
+  useEffect(() => {
+    if (!designSystems.length) {
+      setThemeSyncDesignSystemId("");
+      return;
+    }
+    setThemeSyncDesignSystemId((current) => {
+      if (current && designSystems.some((ds) => ds.id === current)) return current;
+      return "";
     });
   }, [client?.design_system_id, designSystems]);
 
@@ -659,6 +688,26 @@ export function BrandDesignSystemPage() {
     }, {
       onSuccess: () => setLogoErrored(false),
     });
+  };
+
+  const handleSyncShopifyThemeBrand = async () => {
+    if (!workspace?.id) return;
+    const cleanedThemeName = themeSyncThemeName.trim();
+    if (!cleanedThemeName) {
+      toast.error("Enter a Shopify theme name.");
+      return;
+    }
+    const payload: { designSystemId?: string; shopDomain?: string; themeName: string } = {
+      themeName: cleanedThemeName,
+    };
+    if (themeSyncDesignSystemId) payload.designSystemId = themeSyncDesignSystemId;
+    if (themeSyncShopDomain) payload.shopDomain = themeSyncShopDomain;
+    try {
+      const response = await syncShopifyThemeBrand.mutateAsync(payload);
+      setThemeSyncResult(response);
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
   };
 
   const handleSyncCompliancePolicyPages = async () => {
@@ -833,6 +882,111 @@ export function BrandDesignSystemPage() {
             This design system powers funnel pages unless a funnel or page overrides it.
           </div>
         </div>
+      </div>
+
+      <div className="ds-card ds-card--md space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-content">Base theme brand sync (Shopify)</div>
+            <div className="text-xs text-content-muted">
+              Sync Brand tab tokens into a specific Shopify theme by name. Your `layout/theme.liquid` must include the managed marker block.
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              void handleSyncShopifyThemeBrand();
+            }}
+            disabled={
+              syncShopifyThemeBrand.isPending ||
+              !hasShopifyConnectionTarget ||
+              !themeSyncThemeName.trim()
+            }
+          >
+            {syncShopifyThemeBrand.isPending ? "Syncing…" : "Sync base theme"}
+          </Button>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
+          <Select
+            value={themeSyncShopDomain}
+            onValueChange={(value) => setThemeSyncShopDomain(value)}
+            options={
+              shopDomainOptions.length
+                ? shopDomainOptions
+                : [{ label: isLoadingShopifyStatus ? "Loading stores…" : "No connected Shopify stores", value: "" }]
+            }
+            disabled={!shopDomainOptions.length}
+          />
+          <div className="text-xs text-content-muted">
+            {hasShopifyConnectionTarget
+              ? "Choose the Shopify store to update."
+              : "Connect a Shopify store in Product settings before syncing theme brand assets."}
+          </div>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
+          <Input
+            value={themeSyncThemeName}
+            onChange={(event) => setThemeSyncThemeName(event.target.value)}
+            placeholder="futrgroup2-0theme"
+          />
+          <div className="text-xs text-content-muted">
+            Target Shopify theme name. Default is set to <span className="font-semibold text-content">futrgroup2-0theme</span>.
+          </div>
+        </div>
+
+        <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
+          <Select
+            value={themeSyncDesignSystemId}
+            onValueChange={(value) => setThemeSyncDesignSystemId(value)}
+            options={
+              designSystems.length
+                ? [
+                    { label: "Workspace default", value: "" },
+                    ...designSystems.map((ds) => ({ label: ds.name, value: ds.id })),
+                  ]
+                : [{ label: isLoading ? "Loading design systems…" : "No design systems", value: "" }]
+            }
+            disabled={!designSystems.length}
+          />
+          <div className="text-xs text-content-muted">
+            Leave as workspace default to use the default design system, or pick a specific design system override.
+          </div>
+        </div>
+
+        {themeSyncResult ? (
+          <div className="space-y-2">
+            <div className="text-xs text-content-muted">
+              Last sync: <span className="font-semibold text-content">{themeSyncResult.shopDomain}</span> ·{" "}
+              <span className="font-semibold text-content">{themeSyncResult.themeName}</span>
+            </div>
+            <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
+              <TableBody>
+                <TableRow>
+                  <TableCell className="w-[240px] text-xs text-content-muted">Design system</TableCell>
+                  <TableCell className="text-xs text-content">{themeSyncResult.designSystemName}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-xs text-content-muted">Brand</TableCell>
+                  <TableCell className="text-xs text-content">{themeSyncResult.brandName}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-xs text-content-muted">Theme role</TableCell>
+                  <TableCell className="text-xs text-content">{themeSyncResult.themeRole}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-xs text-content-muted">CSS asset</TableCell>
+                  <TableCell className="text-xs text-content break-all">{themeSyncResult.cssFilename}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="text-xs text-content-muted">Job ID</TableCell>
+                  <TableCell className="text-xs text-content break-all">{themeSyncResult.jobId}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+        ) : null}
       </div>
 
       <div className="ds-card ds-card--md space-y-3">

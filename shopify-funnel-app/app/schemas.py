@@ -249,6 +249,41 @@ class UpsertPolicyPagesResponse(BaseModel):
     pages: list[UpsertedPolicyPage]
 
 
+class SyncThemeBrandRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    workspaceName: str = Field(min_length=1)
+    brandName: str = Field(min_length=1)
+    logoUrl: str = Field(min_length=1)
+    cssVars: dict[str, str] = Field(default_factory=dict, min_length=1)
+    fontUrls: list[str] = Field(default_factory=list)
+    dataTheme: str | None = None
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "SyncThemeBrandRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class SyncThemeBrandResponse(BaseModel):
+    shopDomain: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    layoutFilename: str
+    cssFilename: str
+    jobId: str
+
+
 class UpdateInstallationRequest(BaseModel):
     clientId: str | None = None
     storefrontAccessToken: str | None = None

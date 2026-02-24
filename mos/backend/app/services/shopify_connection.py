@@ -13,6 +13,7 @@ from app.config import settings
 _SHOP_DOMAIN_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
 _SHOPIFY_PRODUCT_GID_PREFIX = "gid://shopify/Product/"
 _SHOPIFY_VARIANT_GID_PREFIX = "gid://shopify/ProductVariant/"
+_SHOPIFY_THEME_GID_PREFIX = "gid://shopify/OnlineStoreTheme/"
 _REQUIRED_SHOPIFY_SCOPES = {
     "read_orders",
     "write_orders",
@@ -1079,6 +1080,243 @@ def upsert_client_shopify_policy_pages(
     return {
         "shopDomain": response_shop_domain.strip().lower(),
         "pages": response_pages,
+    }
+
+
+def sync_client_shopify_theme_brand(
+    *,
+    client_id: str,
+    workspace_name: str,
+    brand_name: str,
+    logo_url: str,
+    css_vars: dict[str, str],
+    font_urls: list[str] | None = None,
+    data_theme: str | None = None,
+    theme_id: str | None = None,
+    theme_name: str | None = None,
+    shop_domain: str | None = None,
+) -> dict[str, str]:
+    cleaned_workspace_name = workspace_name.strip()
+    if not cleaned_workspace_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="workspaceName is required.",
+        )
+
+    cleaned_brand_name = brand_name.strip()
+    if not cleaned_brand_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="brandName is required.",
+        )
+
+    cleaned_logo_url = logo_url.strip()
+    if not cleaned_logo_url or not (
+        cleaned_logo_url.startswith("https://") or cleaned_logo_url.startswith("http://")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="logoUrl must be an absolute http(s) URL.",
+        )
+    if any(char in cleaned_logo_url for char in ('"', "'", "<", ">", "\n", "\r")):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="logoUrl contains unsupported characters.",
+        )
+
+    if not isinstance(css_vars, dict) or not css_vars:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="cssVars must be a non-empty object.",
+        )
+
+    normalized_css_vars: dict[str, str] = {}
+    for raw_key, raw_value in css_vars.items():
+        if not isinstance(raw_key, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="cssVars keys must be strings.",
+            )
+        key = raw_key.strip()
+        if not re.fullmatch(r"--[A-Za-z0-9_-]+", key):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="cssVars keys must be valid CSS custom properties (for example: --color-brand).",
+            )
+        if key in normalized_css_vars:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate cssVars key after normalization: {key}",
+            )
+
+        if not isinstance(raw_value, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="cssVars values must be strings.",
+            )
+        value = raw_value.strip()
+        if not value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"cssVars[{key}] cannot be empty.",
+            )
+        if any(char in value for char in ("\n", "\r", "{", "}", ";")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"cssVars[{key}] contains unsupported characters.",
+            )
+        normalized_css_vars[key] = value
+
+    normalized_font_urls: list[str] = []
+    seen_font_urls: set[str] = set()
+    for raw_url in font_urls or []:
+        if not isinstance(raw_url, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="fontUrls entries must be strings.",
+            )
+        url = raw_url.strip()
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="fontUrls entries cannot be empty.",
+            )
+        if not (url.startswith("https://") or url.startswith("http://")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"fontUrls entry must be an absolute http(s) URL: {url}",
+            )
+        if any(char in url for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"fontUrls entry contains unsupported characters: {url}",
+            )
+        if url in seen_font_urls:
+            continue
+        seen_font_urls.add(url)
+        normalized_font_urls.append(url)
+
+    cleaned_data_theme: str | None = None
+    if data_theme is not None:
+        cleaned_data_theme = data_theme.strip()
+        if not cleaned_data_theme:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="dataTheme cannot be empty when provided.",
+            )
+        if any(char in cleaned_data_theme for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="dataTheme contains unsupported characters.",
+            )
+
+    cleaned_theme_id: str | None = None
+    if theme_id is not None:
+        cleaned_theme_id = theme_id.strip()
+        if not cleaned_theme_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="themeId cannot be empty when provided.",
+            )
+        if not cleaned_theme_id.startswith(_SHOPIFY_THEME_GID_PREFIX):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="themeId must be a Shopify OnlineStoreTheme GID.",
+            )
+    cleaned_theme_name: str | None = None
+    if theme_name is not None:
+        cleaned_theme_name = theme_name.strip()
+        if not cleaned_theme_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="themeName cannot be empty when provided.",
+            )
+    if bool(cleaned_theme_id) == bool(cleaned_theme_name):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Exactly one of themeId or themeName is required.",
+        )
+
+    request_payload: dict[str, Any] = {
+        "workspaceName": cleaned_workspace_name,
+        "brandName": cleaned_brand_name,
+        "logoUrl": cleaned_logo_url,
+        "cssVars": normalized_css_vars,
+        "fontUrls": normalized_font_urls,
+    }
+    if cleaned_data_theme is not None:
+        request_payload["dataTheme"] = cleaned_data_theme
+    if cleaned_theme_id is not None:
+        request_payload["themeId"] = cleaned_theme_id
+    if cleaned_theme_name is not None:
+        request_payload["themeName"] = cleaned_theme_name
+    if shop_domain is not None:
+        request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
+    else:
+        request_payload["clientId"] = client_id
+
+    payload = _bridge_request(
+        method="POST",
+        path="/v1/themes/brand/sync",
+        json_body=request_payload,
+    )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid theme brand sync payload.",
+        )
+
+    response_shop_domain = payload.get("shopDomain")
+    if not isinstance(response_shop_domain, str) or not response_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid shopDomain for theme brand sync.",
+        )
+    response_theme_id = payload.get("themeId")
+    if not isinstance(response_theme_id, str) or not response_theme_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid themeId for theme brand sync.",
+        )
+    response_theme_name = payload.get("themeName")
+    if not isinstance(response_theme_name, str) or not response_theme_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid themeName for theme brand sync.",
+        )
+    response_theme_role = payload.get("themeRole")
+    if not isinstance(response_theme_role, str) or not response_theme_role.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid themeRole for theme brand sync.",
+        )
+    response_layout_filename = payload.get("layoutFilename")
+    if not isinstance(response_layout_filename, str) or not response_layout_filename.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid layoutFilename for theme brand sync.",
+        )
+    response_css_filename = payload.get("cssFilename")
+    if not isinstance(response_css_filename, str) or not response_css_filename.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid cssFilename for theme brand sync.",
+        )
+    response_job_id = payload.get("jobId")
+    if not isinstance(response_job_id, str) or not response_job_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid jobId for theme brand sync.",
+        )
+
+    return {
+        "shopDomain": response_shop_domain.strip().lower(),
+        "themeId": response_theme_id.strip(),
+        "themeName": response_theme_name.strip(),
+        "themeRole": response_theme_role.strip(),
+        "layoutFilename": response_layout_filename.strip(),
+        "cssFilename": response_css_filename.strip(),
+        "jobId": response_job_id.strip(),
     }
 
 

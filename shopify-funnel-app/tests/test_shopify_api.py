@@ -643,3 +643,176 @@ def test_upsert_policy_pages_updates_existing_page():
     assert len(observed_payloads) == 2
     assert result[0]["operation"] == "updated"
     assert result[0]["pageId"] == "gid://shopify/Page/101"
+
+
+def test_sync_theme_brand_updates_layout_and_css():
+    client = ShopifyApiClient()
+    observed_payloads: list[dict] = []
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        observed_payloads.append(payload)
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "mutation themeFilesUpsert" in query:
+            variables = payload.get("variables") or {}
+            assert variables.get("themeId") == "gid://shopify/OnlineStoreTheme/1"
+            files = variables.get("files") or []
+            assert len(files) == 2
+            filenames = {item["filename"] for item in files}
+            assert filenames == {
+                "layout/theme.liquid",
+                "assets/acme-workspace-workspace-brand.css",
+            }
+            layout_file = next(item for item in files if item["filename"] == "layout/theme.liquid")
+            layout_content = layout_file["body"]["value"]
+            assert "acme-workspace-workspace-brand.css" in layout_content
+            assert 'meta name="mos-brand-name" content="Acme"' in layout_content
+            css_file = next(item for item in files if item["filename"] == "assets/acme-workspace-workspace-brand.css")
+            css_content = css_file["body"]["value"]
+            assert "--color-brand: #123456;" in css_content
+            assert "--mos-brand-logo-url: \"https://assets.example.com/public/assets/logo-1\";" in css_content
+            return {
+                "themeFilesUpsert": {
+                    "upsertedThemeFiles": [
+                        {"filename": "layout/theme.liquid"},
+                        {"filename": "assets/acme-workspace-workspace-brand.css"},
+                    ],
+                    "job": {"id": "gid://shopify/Job/1", "done": False},
+                    "userErrors": [],
+                }
+            }
+        if "query themeFileJobStatus" in query:
+            return {"job": {"id": "gid://shopify/Job/1", "done": True}}
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"--color-brand": "#123456"},
+            font_urls=["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert result == {
+        "themeId": "gid://shopify/OnlineStoreTheme/1",
+        "themeName": "futrgroup2-0theme",
+        "themeRole": "MAIN",
+        "layoutFilename": "layout/theme.liquid",
+        "cssFilename": "assets/acme-workspace-workspace-brand.css",
+        "jobId": "gid://shopify/Job/1",
+    }
+    assert len(observed_payloads) == 4
+
+
+def test_sync_theme_brand_requires_managed_layout_markers():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": "<html><head></head><body></body></html>",
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    with pytest.raises(ShopifyApiError, match="Theme layout must include exactly one managed brand marker block"):
+        asyncio.run(
+            client.sync_theme_brand(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                workspace_name="Acme Workspace",
+                brand_name="Acme",
+                logo_url="https://assets.example.com/public/assets/logo-1",
+                css_vars={"--color-brand": "#123456"},
+                font_urls=[],
+                data_theme="light",
+                theme_name="futrgroup2-0theme",
+            )
+        )
+
+
+def test_sync_theme_brand_requires_one_theme_selector():
+    client = ShopifyApiClient()
+
+    with pytest.raises(ShopifyApiError, match="Exactly one of themeId or themeName is required"):
+        asyncio.run(
+            client.sync_theme_brand(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                workspace_name="Acme Workspace",
+                brand_name="Acme",
+                logo_url="https://assets.example.com/public/assets/logo-1",
+                css_vars={"--color-brand": "#123456"},
+                font_urls=[],
+                data_theme="light",
+            )
+        )

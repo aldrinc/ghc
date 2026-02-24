@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from html import escape
 import re
 from typing import Any, Literal
 
 import httpx
 
 from app.config import settings
+
+_THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
+_THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
+_THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
 
 
 class ShopifyApiError(RuntimeError):
@@ -1335,6 +1341,596 @@ class ShopifyApiClient:
                 }
             )
         return results
+
+    @staticmethod
+    def _normalize_workspace_slug(workspace_name: str) -> str:
+        cleaned_workspace = workspace_name.strip().lower()
+        if not cleaned_workspace:
+            raise ShopifyApiError(message="workspaceName must be a non-empty string.", status_code=400)
+        slug = re.sub(r"[^a-z0-9]+", "-", cleaned_workspace)
+        slug = re.sub(r"-{2,}", "-", slug).strip("-")
+        if not slug:
+            raise ShopifyApiError(
+                message="workspaceName must include at least one letter or number.",
+                status_code=400,
+            )
+        return slug[:64].rstrip("-")
+
+    @staticmethod
+    def _normalize_css_var_key(raw_key: str) -> str:
+        key = raw_key.strip()
+        if not re.fullmatch(r"--[A-Za-z0-9_-]+", key):
+            raise ShopifyApiError(
+                message=(
+                    "Invalid cssVars key. Keys must look like CSS custom properties "
+                    "(for example: --color-brand)."
+                ),
+                status_code=400,
+            )
+        return key
+
+    @staticmethod
+    def _normalize_css_var_value(raw_value: str) -> str:
+        value = raw_value.strip()
+        if not value:
+            raise ShopifyApiError(message="cssVars values cannot be empty.", status_code=400)
+        if any(char in value for char in ("\n", "\r", "{", "}", ";")):
+            raise ShopifyApiError(
+                message="cssVars values cannot contain newlines, braces, or semicolons.",
+                status_code=400,
+            )
+        return value
+
+    @classmethod
+    def _normalize_theme_brand_css_vars(cls, css_vars: dict[str, str]) -> dict[str, str]:
+        if not isinstance(css_vars, dict) or not css_vars:
+            raise ShopifyApiError(message="cssVars must be a non-empty object.", status_code=400)
+
+        normalized: dict[str, str] = {}
+        for raw_key, raw_value in css_vars.items():
+            if not isinstance(raw_key, str):
+                raise ShopifyApiError(message="cssVars keys must be strings.", status_code=400)
+            if not isinstance(raw_value, str):
+                raise ShopifyApiError(message="cssVars values must be strings.", status_code=400)
+            key = cls._normalize_css_var_key(raw_key)
+            if key in normalized:
+                raise ShopifyApiError(
+                    message=f"Duplicate cssVars key after normalization: {key}",
+                    status_code=400,
+                )
+            normalized[key] = cls._normalize_css_var_value(raw_value)
+        return normalized
+
+    @staticmethod
+    def _normalize_theme_brand_font_urls(font_urls: list[str]) -> list[str]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for raw_url in font_urls:
+            if not isinstance(raw_url, str):
+                raise ShopifyApiError(message="fontUrls entries must be strings.", status_code=400)
+            url = raw_url.strip()
+            if not url:
+                raise ShopifyApiError(message="fontUrls entries cannot be empty.", status_code=400)
+            if not (url.startswith("https://") or url.startswith("http://")):
+                raise ShopifyApiError(
+                    message=f"fontUrls entry must be an absolute http(s) URL: {url}",
+                    status_code=400,
+                )
+            if any(char in url for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message=f"fontUrls entry contains unsupported characters: {url}",
+                    status_code=400,
+                )
+            if url in seen:
+                continue
+            seen.add(url)
+            normalized.append(url)
+        return normalized
+
+    @staticmethod
+    def _escape_css_string(raw_value: str) -> str:
+        return raw_value.replace("\\", "\\\\").replace('"', '\\"')
+
+    @classmethod
+    def _render_theme_brand_css(
+        cls,
+        *,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        data_theme: str | None,
+        css_vars: dict[str, str],
+        font_urls: list[str],
+    ) -> str:
+        lines: list[str] = [
+            "/* Managed by mOS workspace brand sync. */",
+            f"/* Workspace: {workspace_name} */",
+            f"/* Brand: {brand_name} */",
+        ]
+        if data_theme:
+            lines.append(f"/* dataTheme: {data_theme} */")
+        if font_urls:
+            lines.append("")
+            for font_url in font_urls:
+                lines.append(f'@import url("{font_url}");')
+        lines.extend(["", ":root {"])
+        for key in sorted(css_vars.keys()):
+            lines.append(f"  {key}: {css_vars[key]};")
+        lines.append(f'  --mos-workspace-name: "{cls._escape_css_string(workspace_name)}";')
+        lines.append(f'  --mos-brand-name: "{cls._escape_css_string(brand_name)}";')
+        lines.append(f'  --mos-brand-logo-url: "{cls._escape_css_string(logo_url)}";')
+        if data_theme:
+            lines.append(f'  --mos-data-theme: "{cls._escape_css_string(data_theme)}";')
+        lines.append("}")
+        lines.append("")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _render_theme_brand_liquid_block(
+        *,
+        css_filename: str,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        data_theme: str | None,
+    ) -> str:
+        asset_name = css_filename
+        if css_filename.startswith("assets/"):
+            asset_name = css_filename.split("/", 1)[1]
+        block_lines = [
+            _THEME_BRAND_MARKER_START,
+            "{% comment %}Managed by mOS workspace brand sync. Do not edit manually.{% endcomment %}",
+            f"{{{{ '{asset_name}' | asset_url | stylesheet_tag }}}}",
+            f'<meta name="mos-workspace-name" content="{escape(workspace_name, quote=True)}">',
+            f'<meta name="mos-brand-name" content="{escape(brand_name, quote=True)}">',
+            f'<meta name="mos-brand-logo-url" content="{escape(logo_url, quote=True)}">',
+        ]
+        if data_theme:
+            block_lines.append(f'<meta name="mos-data-theme" content="{escape(data_theme, quote=True)}">')
+        block_lines.append(_THEME_BRAND_MARKER_END)
+        return "\n".join(block_lines)
+
+    @staticmethod
+    def _replace_theme_brand_liquid_block(
+        *,
+        layout_content: str,
+        replacement_block: str,
+    ) -> str:
+        start_count = layout_content.count(_THEME_BRAND_MARKER_START)
+        end_count = layout_content.count(_THEME_BRAND_MARKER_END)
+        if start_count != 1 or end_count != 1:
+            raise ShopifyApiError(
+                message=(
+                    "Theme layout must include exactly one managed brand marker block: "
+                    f"{_THEME_BRAND_MARKER_START} ... {_THEME_BRAND_MARKER_END}"
+                ),
+                status_code=409,
+            )
+
+        start_idx = layout_content.find(_THEME_BRAND_MARKER_START)
+        end_idx = layout_content.find(_THEME_BRAND_MARKER_END)
+        if start_idx < 0 or end_idx < 0 or end_idx < start_idx:
+            raise ShopifyApiError(
+                message="Theme layout contains an invalid managed brand marker block.",
+                status_code=409,
+            )
+        end_idx += len(_THEME_BRAND_MARKER_END)
+
+        prefix = layout_content[:start_idx]
+        suffix = layout_content[end_idx:]
+        if prefix and not prefix.endswith("\n"):
+            prefix += "\n"
+        if suffix and not suffix.startswith("\n"):
+            suffix = "\n" + suffix
+        return f"{prefix}{replacement_block}{suffix}"
+
+    @staticmethod
+    def _coerce_theme_data(*, node: Any, query_name: str) -> dict[str, str]:
+        if not isinstance(node, dict):
+            raise ShopifyApiError(message=f"{query_name} response is missing theme data.")
+        theme_id = node.get("id")
+        theme_name = node.get("name")
+        theme_role = node.get("role")
+        if not isinstance(theme_id, str) or not theme_id:
+            raise ShopifyApiError(message=f"{query_name} response is missing theme.id.")
+        if not isinstance(theme_name, str) or not theme_name:
+            raise ShopifyApiError(message=f"{query_name} response is missing theme.name.")
+        if not isinstance(theme_role, str) or not theme_role:
+            raise ShopifyApiError(message=f"{query_name} response is missing theme.role.")
+        return {"id": theme_id, "name": theme_name, "role": theme_role}
+
+    async def _resolve_theme_for_brand_sync(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        theme_id: str | None,
+        theme_name: str | None,
+    ) -> dict[str, str]:
+        if theme_id and theme_name:
+            raise ShopifyApiError(
+                message="Provide exactly one of themeId or themeName.",
+                status_code=400,
+            )
+        if theme_id:
+            query = """
+            query themeById($id: ID!) {
+                theme(id: $id) {
+                    id
+                    name
+                    role
+                }
+            }
+            """
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={"query": query, "variables": {"id": theme_id}},
+            )
+            theme = response.get("theme")
+            if theme is None:
+                raise ShopifyApiError(
+                    message=f"Theme not found for themeId={theme_id}.",
+                    status_code=404,
+                )
+            return self._coerce_theme_data(node=theme, query_name="theme")
+
+        if theme_name:
+            cleaned_theme_name = theme_name.strip()
+            if not cleaned_theme_name:
+                raise ShopifyApiError(
+                    message="themeName cannot be empty when provided.",
+                    status_code=400,
+                )
+            query = """
+            query themesForBrandSync($first: Int!) {
+                themes(first: $first) {
+                    nodes {
+                        id
+                        name
+                        role
+                    }
+                }
+            }
+            """
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={"query": query, "variables": {"first": 100}},
+            )
+            raw_nodes = (response.get("themes") or {}).get("nodes")
+            if not isinstance(raw_nodes, list):
+                raise ShopifyApiError(message="themes query response is invalid.")
+            requested_name = cleaned_theme_name.lower()
+            matches: list[dict[str, str]] = []
+            for node in raw_nodes:
+                parsed = self._coerce_theme_data(node=node, query_name="themes")
+                if parsed["name"].strip().lower() == requested_name:
+                    matches.append(parsed)
+            if not matches:
+                raise ShopifyApiError(
+                    message=f"Theme not found for themeName={cleaned_theme_name}.",
+                    status_code=404,
+                )
+            if len(matches) > 1:
+                theme_ids = ", ".join(theme["id"] for theme in matches)
+                raise ShopifyApiError(
+                    message=(
+                        f"Multiple themes matched themeName={cleaned_theme_name}. "
+                        f"Provide themeId instead. matchedThemeIds={theme_ids}"
+                    ),
+                    status_code=409,
+                )
+            return matches[0]
+
+        raise ShopifyApiError(
+            message="Exactly one of themeId or themeName is required.",
+            status_code=400,
+        )
+
+    async def _load_theme_file_text(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        theme_id: str,
+        filename: str,
+    ) -> str:
+        query = """
+        query themeFileByName($id: ID!, $filenames: [String!]!) {
+            theme(id: $id) {
+                files(first: 10, filenames: $filenames) {
+                    nodes {
+                        filename
+                        body {
+                            __typename
+                            ... on OnlineStoreThemeFileBodyText {
+                                content
+                            }
+                        }
+                    }
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": query,
+                "variables": {
+                    "id": theme_id,
+                    "filenames": [filename],
+                },
+            },
+        )
+        theme = response.get("theme")
+        if not isinstance(theme, dict):
+            raise ShopifyApiError(message=f"Theme not found for themeId={theme_id}.", status_code=404)
+        files = theme.get("files")
+        if not isinstance(files, dict):
+            raise ShopifyApiError(message="theme files query response is invalid.")
+        user_errors = files.get("userErrors") or []
+        if user_errors:
+            messages = "; ".join(str(error.get("message")) for error in user_errors)
+            raise ShopifyApiError(message=f"theme files query failed: {messages}", status_code=409)
+        nodes = files.get("nodes")
+        if not isinstance(nodes, list):
+            raise ShopifyApiError(message="theme files query response is missing nodes.")
+
+        matched_node: dict[str, Any] | None = None
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            node_filename = node.get("filename")
+            if isinstance(node_filename, str) and node_filename == filename:
+                matched_node = node
+                break
+        if matched_node is None:
+            raise ShopifyApiError(
+                message=f"Theme file not found: {filename}",
+                status_code=404,
+            )
+
+        body = matched_node.get("body")
+        if not isinstance(body, dict):
+            raise ShopifyApiError(message=f"Theme file body is missing for {filename}.")
+        typename = body.get("__typename")
+        if typename != "OnlineStoreThemeFileBodyText":
+            raise ShopifyApiError(
+                message=(
+                    f"Theme file {filename} is not text-backed (typename={typename}). "
+                    "Use a text theme file for managed brand sync."
+                ),
+                status_code=409,
+            )
+        content = body.get("content")
+        if not isinstance(content, str):
+            raise ShopifyApiError(message=f"Theme file body content is missing for {filename}.")
+        return content
+
+    async def _upsert_theme_files(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        theme_id: str,
+        files: list[dict[str, str]],
+    ) -> str:
+        mutation = """
+        mutation themeFilesUpsert($themeId: ID!, $files: [OnlineStoreThemeFilesUpsertFileInput!]!) {
+            themeFilesUpsert(themeId: $themeId, files: $files) {
+                upsertedThemeFiles {
+                    filename
+                }
+                job {
+                    id
+                    done
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "themeId": theme_id,
+                    "files": [
+                        {
+                            "filename": item["filename"],
+                            "body": {
+                                "type": "TEXT",
+                                "value": item["content"],
+                            },
+                        }
+                        for item in files
+                    ],
+                },
+            },
+        )
+        upsert_data = response.get("themeFilesUpsert") or {}
+        user_errors = upsert_data.get("userErrors") or []
+        if user_errors:
+            messages = "; ".join(str(error.get("message")) for error in user_errors)
+            raise ShopifyApiError(message=f"themeFilesUpsert failed: {messages}", status_code=409)
+
+        upserted = upsert_data.get("upsertedThemeFiles")
+        if not isinstance(upserted, list):
+            raise ShopifyApiError(message="themeFilesUpsert response is missing upsertedThemeFiles.")
+        upserted_filenames = {
+            item.get("filename")
+            for item in upserted
+            if isinstance(item, dict) and isinstance(item.get("filename"), str)
+        }
+        expected_filenames = {item["filename"] for item in files}
+        if expected_filenames - upserted_filenames:
+            missing = ", ".join(sorted(expected_filenames - upserted_filenames))
+            raise ShopifyApiError(message=f"themeFilesUpsert did not report updated files: {missing}")
+
+        job = upsert_data.get("job")
+        if not isinstance(job, dict):
+            raise ShopifyApiError(message="themeFilesUpsert response is missing job metadata.")
+        job_id = job.get("id")
+        if not isinstance(job_id, str) or not job_id:
+            raise ShopifyApiError(message="themeFilesUpsert response is missing job.id.")
+        return job_id
+
+    async def _wait_for_job_completion(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        job_id: str,
+        poll_interval_seconds: float = 1.0,
+        max_attempts: int = 30,
+    ) -> None:
+        query = """
+        query themeFileJobStatus($id: ID!) {
+            job(id: $id) {
+                id
+                done
+            }
+        }
+        """
+        for _ in range(max_attempts):
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={"query": query, "variables": {"id": job_id}},
+            )
+            job = response.get("job")
+            if not isinstance(job, dict):
+                raise ShopifyApiError(message=f"Job not found for id={job_id}.", status_code=404)
+            done = job.get("done")
+            if not isinstance(done, bool):
+                raise ShopifyApiError(message=f"Job response is missing done state for id={job_id}.")
+            if done:
+                return
+            await asyncio.sleep(poll_interval_seconds)
+
+        raise ShopifyApiError(
+            message=f"Timed out while waiting for theme file job {job_id} to complete.",
+            status_code=504,
+        )
+
+    async def sync_theme_brand(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        css_vars: dict[str, str],
+        font_urls: list[str],
+        data_theme: str | None = None,
+        theme_id: str | None = None,
+        theme_name: str | None = None,
+    ) -> dict[str, str]:
+        cleaned_workspace_name = workspace_name.strip()
+        if not cleaned_workspace_name:
+            raise ShopifyApiError(message="workspaceName must be a non-empty string.", status_code=400)
+        cleaned_brand_name = brand_name.strip()
+        if not cleaned_brand_name:
+            raise ShopifyApiError(message="brandName must be a non-empty string.", status_code=400)
+        cleaned_logo_url = logo_url.strip()
+        if not (cleaned_logo_url.startswith("https://") or cleaned_logo_url.startswith("http://")):
+            raise ShopifyApiError(message="logoUrl must be an absolute http(s) URL.", status_code=400)
+        if any(char in cleaned_logo_url for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise ShopifyApiError(
+                message="logoUrl contains unsupported characters.",
+                status_code=400,
+            )
+
+        normalized_css_vars = self._normalize_theme_brand_css_vars(css_vars)
+        normalized_font_urls = self._normalize_theme_brand_font_urls(font_urls)
+        cleaned_data_theme: str | None = None
+        if data_theme is not None:
+            cleaned_data_theme = data_theme.strip()
+            if not cleaned_data_theme:
+                raise ShopifyApiError(message="dataTheme cannot be empty when provided.", status_code=400)
+            if any(char in cleaned_data_theme for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message="dataTheme contains unsupported characters.",
+                    status_code=400,
+                )
+
+        normalized_theme_id = theme_id.strip() if isinstance(theme_id, str) and theme_id.strip() else None
+        normalized_theme_name = theme_name.strip() if isinstance(theme_name, str) and theme_name.strip() else None
+        if bool(normalized_theme_id) == bool(normalized_theme_name):
+            raise ShopifyApiError(
+                message="Exactly one of themeId or themeName is required.",
+                status_code=400,
+            )
+        theme = await self._resolve_theme_for_brand_sync(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=normalized_theme_id,
+            theme_name=normalized_theme_name,
+        )
+
+        layout_content = await self._load_theme_file_text(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme["id"],
+            filename=_THEME_BRAND_LAYOUT_FILENAME,
+        )
+
+        workspace_slug = self._normalize_workspace_slug(cleaned_workspace_name)
+        css_filename = f"assets/{workspace_slug}-workspace-brand.css"
+        replacement_block = self._render_theme_brand_liquid_block(
+            css_filename=css_filename,
+            workspace_name=cleaned_workspace_name,
+            brand_name=cleaned_brand_name,
+            logo_url=cleaned_logo_url,
+            data_theme=cleaned_data_theme,
+        )
+        next_layout = self._replace_theme_brand_liquid_block(
+            layout_content=layout_content,
+            replacement_block=replacement_block,
+        )
+        css_content = self._render_theme_brand_css(
+            workspace_name=cleaned_workspace_name,
+            brand_name=cleaned_brand_name,
+            logo_url=cleaned_logo_url,
+            data_theme=cleaned_data_theme,
+            css_vars=normalized_css_vars,
+            font_urls=normalized_font_urls,
+        )
+
+        job_id = await self._upsert_theme_files(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme["id"],
+            files=[
+                {"filename": _THEME_BRAND_LAYOUT_FILENAME, "content": next_layout},
+                {"filename": css_filename, "content": css_content},
+            ],
+        )
+        await self._wait_for_job_completion(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            job_id=job_id,
+        )
+
+        return {
+            "themeId": theme["id"],
+            "themeName": theme["name"],
+            "themeRole": theme["role"],
+            "layoutFilename": _THEME_BRAND_LAYOUT_FILENAME,
+            "cssFilename": css_filename,
+            "jobId": job_id,
+        }
 
     async def _admin_graphql(
         self,

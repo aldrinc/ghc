@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ShopifyInstallUrlRequest(BaseModel):
@@ -110,6 +110,41 @@ class ShopifyProductCreateResponse(BaseModel):
     handle: str
     status: str
     variants: list[ShopifyCreatedVariant] = Field(default_factory=list)
+
+
+class ShopifyThemeBrandSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str | None = None
+    designSystemId: str | None = Field(default=None, min_length=1)
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_theme_selector(self) -> "ShopifyThemeBrandSyncRequest":
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class ShopifyThemeBrandSyncResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str
+    workspaceName: str
+    designSystemId: str
+    designSystemName: str
+    brandName: str
+    logoAssetPublicId: str
+    logoUrl: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    layoutFilename: str
+    cssFilename: str
+    jobId: str
 
 
 class ShopifySyncProductVariantsRequest(BaseModel):
