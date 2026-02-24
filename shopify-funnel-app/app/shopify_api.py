@@ -1803,6 +1803,27 @@ class ShopifyApiClient:
             return [current[index]]
         return cls._read_json_path_values_tokens(node=current[index], tokens=tokens[1:])
 
+    @staticmethod
+    def _parse_theme_settings_json(*, settings_content: str) -> dict[str, Any]:
+        # Shopify settings_data.json may be emitted with a UTF-8 BOM.
+        normalized_content = settings_content[1:] if settings_content.startswith("\ufeff") else settings_content
+        try:
+            parsed = json.loads(normalized_content)
+        except ValueError as exc:
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} is not valid JSON. "
+                    f"parserError={exc}"
+                ),
+                status_code=409,
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise ShopifyApiError(
+                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} must contain a JSON object.",
+                status_code=409,
+            )
+        return parsed
+
     @classmethod
     def _sync_theme_settings_data(
         cls,
@@ -1821,18 +1842,7 @@ class ShopifyApiClient:
         if not profile.settings_value_paths:
             return settings_content, report
 
-        try:
-            settings_data = json.loads(settings_content)
-        except ValueError as exc:
-            raise ShopifyApiError(
-                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} is not valid JSON.",
-                status_code=409,
-            ) from exc
-        if not isinstance(settings_data, dict):
-            raise ShopifyApiError(
-                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} must contain a JSON object.",
-                status_code=409,
-            )
+        settings_data = cls._parse_theme_settings_json(settings_content=settings_content)
 
         updated_paths: list[str] = []
         missing_paths: list[str] = []
@@ -1887,18 +1897,7 @@ class ShopifyApiClient:
         if not profile.settings_value_paths:
             return report
 
-        try:
-            settings_data = json.loads(settings_content)
-        except ValueError as exc:
-            raise ShopifyApiError(
-                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} is not valid JSON.",
-                status_code=409,
-            ) from exc
-        if not isinstance(settings_data, dict):
-            raise ShopifyApiError(
-                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} must contain a JSON object.",
-                status_code=409,
-            )
+        settings_data = cls._parse_theme_settings_json(settings_content=settings_content)
 
         synced_paths: list[str] = []
         mismatched_paths: list[str] = []
