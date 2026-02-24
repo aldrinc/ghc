@@ -981,7 +981,7 @@ export function BrandDesignSystemPage() {
                 </TableRow>
                 <TableRow>
                   <TableCell className="text-xs text-content-muted">Job ID</TableCell>
-                  <TableCell className="text-xs text-content break-all">{themeSyncResult.jobId}</TableCell>
+                  <TableCell className="text-xs text-content break-all">{themeSyncResult.jobId || "n/a (completed without async job)"}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

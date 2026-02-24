@@ -1095,7 +1095,7 @@ def sync_client_shopify_theme_brand(
     theme_id: str | None = None,
     theme_name: str | None = None,
     shop_domain: str | None = None,
-) -> dict[str, str]:
+) -> dict[str, str | None]:
     cleaned_workspace_name = workspace_name.strip()
     if not cleaned_workspace_name:
         raise HTTPException(
@@ -1303,11 +1303,15 @@ def sync_client_shopify_theme_brand(
             detail="Shopify checkout app returned invalid cssFilename for theme brand sync.",
         )
     response_job_id = payload.get("jobId")
-    if not isinstance(response_job_id, str) or not response_job_id.strip():
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Shopify checkout app returned invalid jobId for theme brand sync.",
-        )
+    if response_job_id is None:
+        normalized_job_id = None
+    else:
+        if not isinstance(response_job_id, str) or not response_job_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid jobId for theme brand sync.",
+            )
+        normalized_job_id = response_job_id.strip()
 
     return {
         "shopDomain": response_shop_domain.strip().lower(),
@@ -1316,7 +1320,7 @@ def sync_client_shopify_theme_brand(
         "themeRole": response_theme_role.strip(),
         "layoutFilename": response_layout_filename.strip(),
         "cssFilename": response_css_filename.strip(),
-        "jobId": response_job_id.strip(),
+        "jobId": normalized_job_id,
     }
 
 

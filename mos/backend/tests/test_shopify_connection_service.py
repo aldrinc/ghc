@@ -595,3 +595,31 @@ def test_sync_client_shopify_theme_brand_rejects_invalid_css_key():
         assert "cssVars keys must be valid CSS custom properties" in exc.detail
     else:
         raise AssertionError("Expected sync_client_shopify_theme_brand to reject invalid cssVars keys")
+
+
+def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/sync"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "jobId": None,
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.sync_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        css_vars={"--color-brand": "#123456"},
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert response["jobId"] is None

@@ -1732,7 +1732,7 @@ class ShopifyApiClient:
         access_token: str,
         theme_id: str,
         files: list[dict[str, str]],
-    ) -> str:
+    ) -> str | None:
         mutation = """
         mutation themeFilesUpsert($themeId: ID!, $files: [OnlineStoreThemeFilesUpsertFileInput!]!) {
             themeFilesUpsert(themeId: $themeId, files: $files) {
@@ -1790,8 +1790,10 @@ class ShopifyApiClient:
             raise ShopifyApiError(message=f"themeFilesUpsert did not report updated files: {missing}")
 
         job = upsert_data.get("job")
+        if job is None:
+            return None
         if not isinstance(job, dict):
-            raise ShopifyApiError(message="themeFilesUpsert response is missing job metadata.")
+            raise ShopifyApiError(message="themeFilesUpsert response returned invalid job metadata.")
         job_id = job.get("id")
         if not isinstance(job_id, str) or not job_id:
             raise ShopifyApiError(message="themeFilesUpsert response is missing job.id.")
@@ -1848,7 +1850,7 @@ class ShopifyApiClient:
         data_theme: str | None = None,
         theme_id: str | None = None,
         theme_name: str | None = None,
-    ) -> dict[str, str]:
+    ) -> dict[str, str | None]:
         cleaned_workspace_name = workspace_name.strip()
         if not cleaned_workspace_name:
             raise ShopifyApiError(message="workspaceName must be a non-empty string.", status_code=400)
@@ -1929,11 +1931,12 @@ class ShopifyApiClient:
                 {"filename": css_filename, "content": css_content},
             ],
         )
-        await self._wait_for_job_completion(
-            shop_domain=shop_domain,
-            access_token=access_token,
-            job_id=job_id,
-        )
+        if job_id is not None:
+            await self._wait_for_job_completion(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                job_id=job_id,
+            )
 
         return {
             "themeId": theme["id"],

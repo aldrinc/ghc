@@ -80,7 +80,7 @@ export type ClientShopifyThemeBrandSyncResponse = {
   themeRole: string;
   layoutFilename: string;
   cssFilename: string;
-  jobId: string;
+  jobId?: string | null;
 };
 
 export function useClients() {

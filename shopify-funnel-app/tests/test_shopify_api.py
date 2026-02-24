@@ -746,6 +746,88 @@ def test_sync_theme_brand_updates_layout_and_css():
     assert len(observed_payloads) == 4
 
 
+def test_sync_theme_brand_allows_upsert_without_job():
+    client = ShopifyApiClient()
+    observed_payloads: list[dict] = []
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        observed_payloads.append(payload)
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "mutation themeFilesUpsert" in query:
+            return {
+                "themeFilesUpsert": {
+                    "upsertedThemeFiles": [
+                        {"filename": "layout/theme.liquid"},
+                        {"filename": "assets/acme-workspace-workspace-brand.css"},
+                    ],
+                    "job": None,
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"--color-brand": "#123456"},
+            font_urls=[],
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert result == {
+        "themeId": "gid://shopify/OnlineStoreTheme/1",
+        "themeName": "futrgroup2-0theme",
+        "themeRole": "MAIN",
+        "layoutFilename": "layout/theme.liquid",
+        "cssFilename": "assets/acme-workspace-workspace-brand.css",
+        "jobId": None,
+    }
+    assert len(observed_payloads) == 3
+
+
 def test_sync_theme_brand_requires_managed_layout_markers():
     client = ShopifyApiClient()
 

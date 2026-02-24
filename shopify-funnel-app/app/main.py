@@ -595,7 +595,7 @@ async def sync_theme_brand(
         themeRole=synced["themeRole"],
         layoutFilename=synced["layoutFilename"],
         cssFilename=synced["cssFilename"],
-        jobId=synced["jobId"],
+        jobId=synced.get("jobId"),
     )
 
 

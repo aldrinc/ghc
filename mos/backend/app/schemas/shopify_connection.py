@@ -144,7 +144,7 @@ class ShopifyThemeBrandSyncResponse(BaseModel):
     themeRole: str
     layoutFilename: str
     cssFilename: str
-    jobId: str
+    jobId: str | None = None
 
 
 class ShopifySyncProductVariantsRequest(BaseModel):

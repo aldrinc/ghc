@@ -281,7 +281,7 @@ class SyncThemeBrandResponse(BaseModel):
     themeRole: str
     layoutFilename: str
     cssFilename: str
-    jobId: str
+    jobId: str | None = None
 
 
 class UpdateInstallationRequest(BaseModel):
