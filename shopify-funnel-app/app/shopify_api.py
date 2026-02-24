@@ -13,6 +13,70 @@ from app.config import settings
 _THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
+_THEME_COMPAT_ALIASES_BY_NAME: dict[str, dict[str, tuple[str, ...]]] = {
+    "futrgroup2-0theme": {
+        "--color-page-bg": (
+            "--color-base-background",
+            "--color-background",
+        ),
+        "--color-bg": (
+            "--color-background-2",
+            "--color-base-highlight",
+            "--color-drawer-background",
+        ),
+        "--color-text": (
+            "--color-base-text",
+            "--color-foreground",
+            "--color-drawer-text",
+        ),
+        "--color-muted": ("--color-placeholder",),
+        "--color-border": ("--color-button-border",),
+        "--color-brand": ("--color-highlight",),
+        "--color-cta": (
+            "--color-base-button",
+            "--color-base-button-gradient",
+            "--color-button-background",
+            "--color-button-gradient",
+            "--color-drawer-button-background",
+            "--color-drawer-button-gradient",
+        ),
+        "--color-cta-text": (
+            "--color-base-button-text",
+            "--color-button-text",
+            "--color-drawer-button-text",
+        ),
+        "--color-soft": ("--color-drawer-overlay",),
+        "--focus-outline-color": ("--color-keyboard-focus",),
+        "--font-sans": (
+            "--font-body-family",
+            "--font-navigation-family",
+            "--font-button-family",
+            "--font-product-family",
+        ),
+        "--font-heading": ("--font-heading-family",),
+        "--line": ("--font-body-line-height",),
+        "--heading-weight": ("--font-heading-weight",),
+        "--heading-line": ("--font-heading-line-height",),
+        "--hero-title-letter-spacing": ("--font-heading-letter-spacing",),
+        "--cta-font-size-md": ("--font-button-size",),
+        "--text-sm": ("--font-navigation-size",),
+        "--text-base": ("--font-product-size",),
+        "--radius-sm": (
+            "--border-radius-small",
+            "--inputs-radius",
+        ),
+        "--radius-md": (
+            "--border-radius-medium",
+            "--buttons-radius",
+        ),
+        "--radius-lg": ("--border-radius",),
+        "--container-max": (
+            "--page-width",
+            "--page-container",
+        ),
+        "--container-pad": ("--page-padding",),
+    }
+}
 
 
 class ShopifyApiError(RuntimeError):
@@ -1432,9 +1496,32 @@ class ShopifyApiClient:
         return raw_value.replace("\\", "\\\\").replace('"', '\\"')
 
     @classmethod
+    def _build_theme_compat_css_vars(
+        cls,
+        *,
+        theme_name: str,
+        css_vars: dict[str, str],
+    ) -> dict[str, str]:
+        normalized_theme_name = theme_name.strip().lower()
+        alias_rules = _THEME_COMPAT_ALIASES_BY_NAME.get(normalized_theme_name)
+        if not alias_rules:
+            return dict(css_vars)
+
+        expanded = dict(css_vars)
+        for source_key, alias_keys in alias_rules.items():
+            if source_key not in css_vars:
+                continue
+            for alias_key in alias_keys:
+                if alias_key in expanded:
+                    continue
+                expanded[alias_key] = f"var({source_key})"
+        return expanded
+
+    @classmethod
     def _render_theme_brand_css(
         cls,
         *,
+        theme_name: str,
         workspace_name: str,
         brand_name: str,
         logo_url: str,
@@ -1442,10 +1529,15 @@ class ShopifyApiClient:
         css_vars: dict[str, str],
         font_urls: list[str],
     ) -> str:
+        effective_css_vars = cls._build_theme_compat_css_vars(
+            theme_name=theme_name,
+            css_vars=css_vars,
+        )
         lines: list[str] = [
             "/* Managed by mOS workspace brand sync. */",
             f"/* Workspace: {workspace_name} */",
             f"/* Brand: {brand_name} */",
+            f"/* Theme: {theme_name} */",
         ]
         if data_theme:
             lines.append(f"/* dataTheme: {data_theme} */")
@@ -1454,10 +1546,10 @@ class ShopifyApiClient:
             for font_url in font_urls:
                 lines.append(f'@import url("{font_url}");')
 
-        sorted_keys = sorted(css_vars.keys())
+        sorted_keys = sorted(effective_css_vars.keys())
         lines.extend(["", ":root {"])
         for key in sorted_keys:
-            lines.append(f"  {key}: {css_vars[key]} !important;")
+            lines.append(f"  {key}: {effective_css_vars[key]} !important;")
         lines.append(f'  --mos-workspace-name: "{cls._escape_css_string(workspace_name)}";')
         lines.append(f'  --mos-brand-name: "{cls._escape_css_string(brand_name)}";')
         lines.append(f'  --mos-brand-logo-url: "{cls._escape_css_string(logo_url)}";')
@@ -1470,7 +1562,7 @@ class ShopifyApiClient:
             lines.append("")
             lines.append(f'html[data-theme="{escaped_theme}"] {{')
             for key in sorted_keys:
-                lines.append(f"  {key}: {css_vars[key]} !important;")
+                lines.append(f"  {key}: {effective_css_vars[key]} !important;")
             lines.append("}")
 
         lines.append("")
@@ -1934,6 +2026,7 @@ class ShopifyApiClient:
             replacement_block=replacement_block,
         )
         css_content = self._render_theme_brand_css(
+            theme_name=theme["name"],
             workspace_name=cleaned_workspace_name,
             brand_name=cleaned_brand_name,
             logo_url=cleaned_logo_url,

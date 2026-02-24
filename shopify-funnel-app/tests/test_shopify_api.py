@@ -709,6 +709,7 @@ def test_sync_theme_brand_updates_layout_and_css():
             css_file = next(item for item in files if item["filename"] == "assets/acme-workspace-workspace-brand.css")
             css_content = css_file["body"]["value"]
             assert "--color-brand: #123456 !important;" in css_content
+            assert "--color-highlight: var(--color-brand) !important;" in css_content
             assert "--mos-brand-logo-url: \"https://assets.example.com/public/assets/logo-1\";" in css_content
             return {
                 "themeFilesUpsert": {
@@ -945,6 +946,84 @@ def test_sync_theme_brand_requires_closing_head_tag():
                 theme_name="futrgroup2-0theme",
             )
         )
+
+
+def test_sync_theme_brand_skips_compat_aliases_for_other_theme():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "custom-theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "mutation themeFilesUpsert" in query:
+            files = (payload.get("variables") or {}).get("files") or []
+            css_file = next(item for item in files if item["filename"] == "assets/acme-workspace-workspace-brand.css")
+            css_content = css_file["body"]["value"]
+            assert "--color-brand: #123456 !important;" in css_content
+            assert "--color-highlight: var(--color-brand) !important;" not in css_content
+            return {
+                "themeFilesUpsert": {
+                    "upsertedThemeFiles": [
+                        {"filename": "layout/theme.liquid"},
+                        {"filename": "assets/acme-workspace-workspace-brand.css"},
+                    ],
+                    "job": None,
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"--color-brand": "#123456"},
+            font_urls=[],
+            data_theme="light",
+            theme_name="custom-theme",
+        )
+    )
+
+    assert result["themeName"] == "custom-theme"
+    assert result["jobId"] is None
 
 
 def test_sync_theme_brand_requires_one_theme_selector():
