@@ -1807,13 +1807,22 @@ class ShopifyApiClient:
     def _parse_theme_settings_json(*, settings_content: str) -> dict[str, Any]:
         # Shopify settings_data.json may be emitted with a UTF-8 BOM.
         normalized_content = settings_content[1:] if settings_content.startswith("\ufeff") else settings_content
+        if not normalized_content.strip():
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} is empty or whitespace-only. "
+                    "Populate it with a valid JSON object."
+                ),
+                status_code=409,
+            )
         try:
             parsed = json.loads(normalized_content)
         except ValueError as exc:
+            prefix = normalized_content[:80].encode("unicode_escape").decode("ascii")
             raise ShopifyApiError(
                 message=(
                     f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} is not valid JSON. "
-                    f"parserError={exc}"
+                    f"parserError={exc}. contentLength={len(normalized_content)}. contentPrefix={prefix}"
                 ),
                 status_code=409,
             ) from exc

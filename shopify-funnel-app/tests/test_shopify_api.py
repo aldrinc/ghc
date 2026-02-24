@@ -1528,3 +1528,86 @@ def test_audit_theme_brand_reports_gaps_for_missing_marker_and_css_asset():
     assert result["layoutIncludesManagedCssAsset"] is False
     assert result["managedCssAssetExists"] is False
     assert "--footer-bg" in result["coverage"]["missingSourceVars"]
+
+
+def test_sync_theme_brand_errors_when_settings_data_is_empty():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "layout/theme.liquid":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "layout/theme.liquid",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": (
+                                            "<html><head>\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                            "old content\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                            "</head><body></body></html>"
+                                        ),
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": "",
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="Theme settings file config/settings_data.json is empty or whitespace-only",
+    ):
+        asyncio.run(
+            client.sync_theme_brand(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                workspace_name="Acme Workspace",
+                brand_name="Acme",
+                logo_url="https://assets.example.com/public/assets/logo-1",
+                css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+                font_urls=[],
+                data_theme="light",
+                theme_name="futrgroup2-0theme",
+            )
+        )
