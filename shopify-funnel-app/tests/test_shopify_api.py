@@ -710,6 +710,8 @@ def test_sync_theme_brand_updates_layout_and_css():
             css_content = css_file["body"]["value"]
             assert "--color-brand: #123456 !important;" in css_content
             assert "--color-highlight: var(--color-brand) !important;" in css_content
+            assert '[class*="color-"]' in css_content
+            assert '[class*="footer"]' in css_content
             assert "--color-base-button: var(--color-cta) !important;" in css_content
             assert "--color-button-text: var(--color-cta-text) !important;" in css_content
             assert "--color-price: var(--color-brand) !important;" in css_content
@@ -1067,6 +1069,24 @@ def test_render_theme_brand_css_preserves_explicit_theme_var_values():
 
     assert "--color-base-button: #001122 !important;" in css
     assert "--color-base-button: var(--color-cta) !important;" not in css
+
+
+def test_render_theme_brand_css_includes_theme_scope_selectors():
+    css = ShopifyApiClient._render_theme_brand_css(
+        theme_name="futrgroup2-0theme",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        data_theme="light",
+        css_vars={"--footer-bg": "#f4ede6"},
+        font_urls=[],
+    )
+
+    assert ':root, html, body, .color-scheme, .gradient, .footer, [data-color-scheme], [class*="color-scheme"], [class*="scheme-"], [class*="color-"], [class*="footer"] {' in css
+    assert 'html[data-theme="light"] .footer {' not in css
+    assert 'html[data-theme="light"], html[data-theme="light"] html, html[data-theme="light"] body, html[data-theme="light"] .color-scheme' in css
+    assert 'html[data-theme="light"] [class*="footer"] {' in css
+    assert '--footer-bg: #f4ede6 !important;' in css
 
 
 def test_sync_theme_brand_requires_one_theme_selector():

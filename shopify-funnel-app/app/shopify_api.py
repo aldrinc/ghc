@@ -13,6 +13,19 @@ from app.config import settings
 _THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
+_THEME_BRAND_VAR_SCOPE_SELECTORS: tuple[str, ...] = (
+    ":root",
+    "html",
+    "body",
+    ".color-scheme",
+    ".gradient",
+    ".footer",
+    "[data-color-scheme]",
+    '[class*="color-scheme"]',
+    '[class*="scheme-"]',
+    '[class*="color-"]',
+    '[class*="footer"]',
+)
 _THEME_COMPAT_ALIASES_BY_NAME: dict[str, dict[str, tuple[str, ...]]] = {
     "futrgroup2-0theme": {
         "--color-page-bg": (
@@ -1588,7 +1601,7 @@ class ShopifyApiClient:
                 lines.append(f'@import url("{font_url}");')
 
         sorted_keys = sorted(effective_css_vars.keys())
-        lines.extend(["", ":root {"])
+        lines.extend(["", ", ".join(_THEME_BRAND_VAR_SCOPE_SELECTORS) + " {"])
         for key in sorted_keys:
             lines.append(f"  {key}: {effective_css_vars[key]} !important;")
         lines.append(f'  --mos-workspace-name: "{cls._escape_css_string(workspace_name)}";')
@@ -1600,8 +1613,13 @@ class ShopifyApiClient:
 
         if data_theme:
             escaped_theme = escape(data_theme, quote=True)
+            theme_scoped_selectors: list[str] = [f'html[data-theme="{escaped_theme}"]']
+            for selector in _THEME_BRAND_VAR_SCOPE_SELECTORS:
+                if selector == ":root":
+                    continue
+                theme_scoped_selectors.append(f'html[data-theme="{escaped_theme}"] {selector}')
             lines.append("")
-            lines.append(f'html[data-theme="{escaped_theme}"] {{')
+            lines.append(", ".join(theme_scoped_selectors) + " {")
             for key in sorted_keys:
                 lines.append(f"  {key}: {effective_css_vars[key]} !important;")
             lines.append("}")

@@ -874,7 +874,7 @@ export function BrandDesignSystemPage() {
             options={designSystemOptions}
             disabled={updateClient.isPending || !designSystems.length}
           />
-          <div className="text-xs text-content-muted">
+          <div className="text-xs text-content-muted md:flex md:items-center">
             This design system powers funnel pages unless a funnel or page overrides it.
           </div>
         </div>
@@ -899,7 +899,7 @@ export function BrandDesignSystemPage() {
             }
             disabled={!shopDomainOptions.length}
           />
-          <div className="text-xs text-content-muted">
+          <div className="text-xs text-content-muted md:flex md:items-center">
             {hasShopifyConnectionTarget
               ? "Choose the target Shopify store for all sync actions below."
               : "Connect a Shopify store in Product settings before syncing theme or policy pages."}
@@ -935,7 +935,7 @@ export function BrandDesignSystemPage() {
               onChange={(event) => setThemeSyncThemeName(event.target.value)}
               placeholder="futrgroup2-0theme"
             />
-            <div className="text-xs text-content-muted">
+            <div className="text-xs text-content-muted md:flex md:items-center">
               Target Shopify theme name. Default is set to <span className="font-semibold text-content">futrgroup2-0theme</span>.
             </div>
           </div>
@@ -954,7 +954,7 @@ export function BrandDesignSystemPage() {
               }
               disabled={!designSystems.length}
             />
-            <div className="text-xs text-content-muted">
+            <div className="text-xs text-content-muted md:flex md:items-center">
               Leave as workspace default to use the default design system, or pick a specific design system override.
             </div>
           </div>
