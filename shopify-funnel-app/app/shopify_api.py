@@ -1453,15 +1453,26 @@ class ShopifyApiClient:
             lines.append("")
             for font_url in font_urls:
                 lines.append(f'@import url("{font_url}");')
+
+        sorted_keys = sorted(css_vars.keys())
         lines.extend(["", ":root {"])
-        for key in sorted(css_vars.keys()):
-            lines.append(f"  {key}: {css_vars[key]};")
+        for key in sorted_keys:
+            lines.append(f"  {key}: {css_vars[key]} !important;")
         lines.append(f'  --mos-workspace-name: "{cls._escape_css_string(workspace_name)}";')
         lines.append(f'  --mos-brand-name: "{cls._escape_css_string(brand_name)}";')
         lines.append(f'  --mos-brand-logo-url: "{cls._escape_css_string(logo_url)}";')
         if data_theme:
             lines.append(f'  --mos-data-theme: "{cls._escape_css_string(data_theme)}";')
         lines.append("}")
+
+        if data_theme:
+            escaped_theme = escape(data_theme, quote=True)
+            lines.append("")
+            lines.append(f'html[data-theme="{escaped_theme}"] {{')
+            for key in sorted_keys:
+                lines.append(f"  {key}: {css_vars[key]} !important;")
+            lines.append("}")
+
         lines.append("")
         return "\n".join(lines)
 

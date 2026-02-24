@@ -703,7 +703,7 @@ def test_sync_theme_brand_updates_layout_and_css():
             assert 'meta name="mos-brand-name" content="Acme"' in layout_content
             css_file = next(item for item in files if item["filename"] == "assets/acme-workspace-workspace-brand.css")
             css_content = css_file["body"]["value"]
-            assert "--color-brand: #123456;" in css_content
+            assert "--color-brand: #123456 !important;" in css_content
             assert "--mos-brand-logo-url: \"https://assets.example.com/public/assets/logo-1\";" in css_content
             return {
                 "themeFilesUpsert": {
