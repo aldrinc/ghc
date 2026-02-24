@@ -28,10 +28,28 @@ _THEME_COMPAT_ALIASES_BY_NAME: dict[str, dict[str, tuple[str, ...]]] = {
             "--color-base-text",
             "--color-foreground",
             "--color-drawer-text",
+            "--color-info-text",
+            "--color-success-text",
+            "--color-error-text",
         ),
-        "--color-muted": ("--color-placeholder",),
-        "--color-border": ("--color-button-border",),
-        "--color-brand": ("--color-highlight",),
+        "--color-muted": (
+            "--color-placeholder",
+            "--color-shadow",
+        ),
+        "--color-border": (
+            "--color-button-border",
+            "--color-border-light",
+            "--color-border-dark",
+        ),
+        "--color-brand": (
+            "--color-highlight",
+            "--color-price",
+            "--color-rating",
+            "--product-in-stock-color",
+            "--product-low-stock-color",
+            "--color-red-200",
+            "--color-red-300",
+        ),
         "--color-cta": (
             "--color-base-button",
             "--color-base-button-gradient",
@@ -39,14 +57,25 @@ _THEME_COMPAT_ALIASES_BY_NAME: dict[str, dict[str, tuple[str, ...]]] = {
             "--color-button-gradient",
             "--color-drawer-button-background",
             "--color-drawer-button-gradient",
+            "--color-sale-price",
+            "--color-sale-tag",
         ),
         "--color-cta-text": (
             "--color-base-button-text",
             "--color-button-text",
             "--color-drawer-button-text",
+            "--color-sale-tag-text",
         ),
-        "--color-soft": ("--color-drawer-overlay",),
-        "--focus-outline-color": ("--color-keyboard-focus",),
+        "--color-soft": (
+            "--color-drawer-overlay",
+            "--color-info-background",
+            "--color-success-background",
+            "--color-error-background",
+        ),
+        "--focus-outline-color": (
+            "--color-keyboard-focus",
+            "--focus-outline-color-soft",
+        ),
         "--font-sans": (
             "--font-body-family",
             "--font-navigation-family",
@@ -64,17 +93,29 @@ _THEME_COMPAT_ALIASES_BY_NAME: dict[str, dict[str, tuple[str, ...]]] = {
         "--radius-sm": (
             "--border-radius-small",
             "--inputs-radius",
+            "--rounded-input",
         ),
         "--radius-md": (
             "--border-radius-medium",
             "--buttons-radius",
+            "--card-radius",
+            "--rounded-button",
+            "--rounded-block",
         ),
-        "--radius-lg": ("--border-radius",),
+        "--radius-lg": (
+            "--border-radius",
+            "--rounded-card",
+            "--wall-card-radius",
+        ),
         "--container-max": (
             "--page-width",
             "--page-container",
         ),
-        "--container-pad": ("--page-padding",),
+        "--container-pad": (
+            "--page-padding",
+            "--gap-padding",
+        ),
+        "--section-pad-y": ("--footer-pad-y",),
     }
 }
 

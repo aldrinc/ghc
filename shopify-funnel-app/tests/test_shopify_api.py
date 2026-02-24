@@ -710,6 +710,16 @@ def test_sync_theme_brand_updates_layout_and_css():
             css_content = css_file["body"]["value"]
             assert "--color-brand: #123456 !important;" in css_content
             assert "--color-highlight: var(--color-brand) !important;" in css_content
+            assert "--color-base-button: var(--color-cta) !important;" in css_content
+            assert "--color-button-text: var(--color-cta-text) !important;" in css_content
+            assert "--color-price: var(--color-brand) !important;" in css_content
+            assert "--color-info-background: var(--color-soft) !important;" in css_content
+            assert "--color-keyboard-focus: var(--focus-outline-color) !important;" in css_content
+            assert "--font-body-family: var(--font-sans) !important;" in css_content
+            assert "--border-radius-medium: var(--radius-md) !important;" in css_content
+            assert "--page-width: var(--container-max) !important;" in css_content
+            assert "--page-padding: var(--container-pad) !important;" in css_content
+            assert "--footer-pad-y: var(--section-pad-y) !important;" in css_content
             assert "--mos-brand-logo-url: \"https://assets.example.com/public/assets/logo-1\";" in css_content
             return {
                 "themeFilesUpsert": {
@@ -734,7 +744,22 @@ def test_sync_theme_brand_updates_layout_and_css():
             workspace_name="Acme Workspace",
             brand_name="Acme",
             logo_url="https://assets.example.com/public/assets/logo-1",
-            css_vars={"--color-brand": "#123456"},
+            css_vars={
+                "--color-brand": "#123456",
+                "--color-cta": "#0a8f3c",
+                "--color-cta-text": "#ffffff",
+                "--color-border": "rgba(0, 0, 0, 0.2)",
+                "--color-soft": "rgba(0, 0, 0, 0.08)",
+                "--focus-outline-color": "rgba(6, 26, 112, 0.35)",
+                "--font-sans": "Inter, sans-serif",
+                "--radius-md": "14px",
+                "--container-max": "1380px",
+                "--container-pad": "24px",
+                "--section-pad-y": "120px",
+                "--color-text": "#222222",
+                "--color-bg": "#ffffff",
+                "--color-page-bg": "#f5f5f5",
+            },
             font_urls=["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
             data_theme="light",
             theme_name="futrgroup2-0theme",
@@ -1024,6 +1049,24 @@ def test_sync_theme_brand_skips_compat_aliases_for_other_theme():
 
     assert result["themeName"] == "custom-theme"
     assert result["jobId"] is None
+
+
+def test_render_theme_brand_css_preserves_explicit_theme_var_values():
+    css = ShopifyApiClient._render_theme_brand_css(
+        theme_name="futrgroup2-0theme",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        data_theme="light",
+        css_vars={
+            "--color-cta": "#0a8f3c",
+            "--color-base-button": "#001122",
+        },
+        font_urls=[],
+    )
+
+    assert "--color-base-button: #001122 !important;" in css
+    assert "--color-base-button: var(--color-cta) !important;" not in css
 
 
 def test_sync_theme_brand_requires_one_theme_selector():
