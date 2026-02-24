@@ -1527,8 +1527,17 @@ class ShopifyApiClient:
             )
         end_idx += len(_THEME_BRAND_MARKER_END)
 
-        prefix = layout_content[:start_idx]
-        suffix = layout_content[end_idx:]
+        layout_without_block = f"{layout_content[:start_idx]}{layout_content[end_idx:]}"
+        head_close_match = re.search(r"</head\s*>", layout_without_block, flags=re.IGNORECASE)
+        if head_close_match is None:
+            raise ShopifyApiError(
+                message="Theme layout must include a closing </head> tag for managed brand sync.",
+                status_code=409,
+            )
+
+        insertion_index = head_close_match.start()
+        prefix = layout_without_block[:insertion_index]
+        suffix = layout_without_block[insertion_index:]
         if prefix and not prefix.endswith("\n"):
             prefix += "\n"
         if suffix and not suffix.startswith("\n"):

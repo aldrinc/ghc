@@ -521,11 +521,10 @@ export function BrandDesignSystemPage() {
   const [varsFilter, setVarsFilter] = useState("");
   const [logoErrored, setLogoErrored] = useState(false);
   const [selectedLogoPublicId, setSelectedLogoPublicId] = useState("");
-  const [themeSyncShopDomain, setThemeSyncShopDomain] = useState("");
+  const [shopifySyncShopDomain, setShopifySyncShopDomain] = useState("");
   const [themeSyncDesignSystemId, setThemeSyncDesignSystemId] = useState("");
   const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
   const [themeSyncResult, setThemeSyncResult] = useState<ClientShopifyThemeBrandSyncResponse | null>(null);
-  const [policySyncShopDomain, setPolicySyncShopDomain] = useState("");
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -560,18 +559,16 @@ export function BrandDesignSystemPage() {
     setVarsFilter("");
     setLogoErrored(false);
     setSelectedLogoPublicId("");
-    setThemeSyncShopDomain("");
+    setShopifySyncShopDomain("");
     setThemeSyncDesignSystemId("");
     setThemeSyncThemeName("futrgroup2-0theme");
     setThemeSyncResult(null);
-    setPolicySyncShopDomain("");
     setPolicySyncResult(null);
   }, [workspace?.id]);
 
   useEffect(() => {
     if (!shopDomainOptions.length) {
-      setThemeSyncShopDomain("");
-      setPolicySyncShopDomain("");
+      setShopifySyncShopDomain("");
       return;
     }
     const resolveNextShopDomain = (current: string) => {
@@ -586,8 +583,7 @@ export function BrandDesignSystemPage() {
       }
       return shopDomainOptions[0]?.value || "";
     };
-    setThemeSyncShopDomain(resolveNextShopDomain);
-    setPolicySyncShopDomain(resolveNextShopDomain);
+    setShopifySyncShopDomain(resolveNextShopDomain);
   }, [shopDomainOptions, shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain]);
 
   useEffect(() => {
@@ -701,7 +697,7 @@ export function BrandDesignSystemPage() {
       themeName: cleanedThemeName,
     };
     if (themeSyncDesignSystemId) payload.designSystemId = themeSyncDesignSystemId;
-    if (themeSyncShopDomain) payload.shopDomain = themeSyncShopDomain;
+    if (shopifySyncShopDomain) payload.shopDomain = shopifySyncShopDomain;
     try {
       const response = await syncShopifyThemeBrand.mutateAsync(payload);
       setThemeSyncResult(response);
@@ -712,7 +708,7 @@ export function BrandDesignSystemPage() {
 
   const handleSyncCompliancePolicyPages = async () => {
     if (!workspace?.id) return;
-    const payload = policySyncShopDomain ? { shopDomain: policySyncShopDomain } : {};
+    const payload = shopifySyncShopDomain ? { shopDomain: shopifySyncShopDomain } : {};
     try {
       const response = await syncCompliancePolicyPages.mutateAsync(payload);
       setPolicySyncResult(response);
@@ -884,33 +880,18 @@ export function BrandDesignSystemPage() {
         </div>
       </div>
 
-      <div className="ds-card ds-card--md space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-content">Base theme brand sync (Shopify)</div>
-            <div className="text-xs text-content-muted">
-              Sync Brand tab tokens into a specific Shopify theme by name. Your `layout/theme.liquid` must include the managed marker block.
-            </div>
+      <div className="ds-card ds-card--md space-y-4">
+        <div>
+          <div className="text-sm font-semibold text-content">Shopify sync</div>
+          <div className="text-xs text-content-muted">
+            Sync both theme brand tokens and compliance policy pages to Shopify from one place.
           </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              void handleSyncShopifyThemeBrand();
-            }}
-            disabled={
-              syncShopifyThemeBrand.isPending ||
-              !hasShopifyConnectionTarget ||
-              !themeSyncThemeName.trim()
-            }
-          >
-            {syncShopifyThemeBrand.isPending ? "Syncing…" : "Sync base theme"}
-          </Button>
         </div>
 
         <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
           <Select
-            value={themeSyncShopDomain}
-            onValueChange={(value) => setThemeSyncShopDomain(value)}
+            value={shopifySyncShopDomain}
+            onValueChange={(value) => setShopifySyncShopDomain(value)}
             options={
               shopDomainOptions.length
                 ? shopDomainOptions
@@ -920,142 +901,148 @@ export function BrandDesignSystemPage() {
           />
           <div className="text-xs text-content-muted">
             {hasShopifyConnectionTarget
-              ? "Choose the Shopify store to update."
-              : "Connect a Shopify store in Product settings before syncing theme brand assets."}
+              ? "Choose the target Shopify store for all sync actions below."
+              : "Connect a Shopify store in Product settings before syncing theme or policy pages."}
           </div>
         </div>
 
-        <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
-          <Input
-            value={themeSyncThemeName}
-            onChange={(event) => setThemeSyncThemeName(event.target.value)}
-            placeholder="futrgroup2-0theme"
-          />
-          <div className="text-xs text-content-muted">
-            Target Shopify theme name. Default is set to <span className="font-semibold text-content">futrgroup2-0theme</span>.
-          </div>
-        </div>
-
-        <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
-          <Select
-            value={themeSyncDesignSystemId}
-            onValueChange={(value) => setThemeSyncDesignSystemId(value)}
-            options={
-              designSystems.length
-                ? [
-                    { label: "Workspace default", value: "" },
-                    ...designSystems.map((ds) => ({ label: ds.name, value: ds.id })),
-                  ]
-                : [{ label: isLoading ? "Loading design systems…" : "No design systems", value: "" }]
-            }
-            disabled={!designSystems.length}
-          />
-          <div className="text-xs text-content-muted">
-            Leave as workspace default to use the default design system, or pick a specific design system override.
-          </div>
-        </div>
-
-        {themeSyncResult ? (
-          <div className="space-y-2">
-            <div className="text-xs text-content-muted">
-              Last sync: <span className="font-semibold text-content">{themeSyncResult.shopDomain}</span> ·{" "}
-              <span className="font-semibold text-content">{themeSyncResult.themeName}</span>
+        <div className="rounded-md border border-divider p-3 space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-content">Base theme brand sync</div>
+              <div className="text-xs text-content-muted">
+                Sync Brand tab tokens into a specific Shopify theme by name. Your `layout/theme.liquid` must include the managed marker block.
+              </div>
             </div>
-            <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
-              <TableBody>
-                <TableRow>
-                  <TableCell className="w-[240px] text-xs text-content-muted">Design system</TableCell>
-                  <TableCell className="text-xs text-content">{themeSyncResult.designSystemName}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="text-xs text-content-muted">Brand</TableCell>
-                  <TableCell className="text-xs text-content">{themeSyncResult.brandName}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="text-xs text-content-muted">Theme role</TableCell>
-                  <TableCell className="text-xs text-content">{themeSyncResult.themeRole}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="text-xs text-content-muted">CSS asset</TableCell>
-                  <TableCell className="text-xs text-content break-all">{themeSyncResult.cssFilename}</TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="text-xs text-content-muted">Job ID</TableCell>
-                  <TableCell className="text-xs text-content break-all">{themeSyncResult.jobId || "n/a (completed without async job)"}</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
+            <Button
+              size="sm"
+              onClick={() => {
+                void handleSyncShopifyThemeBrand();
+              }}
+              disabled={
+                syncShopifyThemeBrand.isPending ||
+                !hasShopifyConnectionTarget ||
+                !themeSyncThemeName.trim()
+              }
+            >
+              {syncShopifyThemeBrand.isPending ? "Syncing…" : "Sync base theme"}
+            </Button>
           </div>
-        ) : null}
-      </div>
 
-      <div className="ds-card ds-card--md space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-content">Compliance policy pages (Shopify)</div>
+          <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
+            <Input
+              value={themeSyncThemeName}
+              onChange={(event) => setThemeSyncThemeName(event.target.value)}
+              placeholder="futrgroup2-0theme"
+            />
             <div className="text-xs text-content-muted">
-              Generate and sync brand/workspace policy pages to Shopify using your configured compliance profile.
+              Target Shopify theme name. Default is set to <span className="font-semibold text-content">futrgroup2-0theme</span>.
             </div>
           </div>
-          <Button
-            size="sm"
-            onClick={() => {
-              void handleSyncCompliancePolicyPages();
-            }}
-            disabled={syncCompliancePolicyPages.isPending || !hasShopifyConnectionTarget}
-          >
-            {syncCompliancePolicyPages.isPending ? "Generating…" : "Generate policy pages"}
-          </Button>
-        </div>
 
-        <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
-          <Select
-            value={policySyncShopDomain}
-            onValueChange={(value) => setPolicySyncShopDomain(value)}
-            options={
-              shopDomainOptions.length
-                ? shopDomainOptions
-                : [{ label: isLoadingShopifyStatus ? "Loading stores…" : "No connected Shopify stores", value: "" }]
-            }
-            disabled={!shopDomainOptions.length}
-          />
-          <div className="text-xs text-content-muted">
-            {hasShopifyConnectionTarget
-              ? "If multiple stores are connected, choose the target store before syncing."
-              : "Connect a Shopify store in Product settings before generating policy pages."}
-          </div>
-        </div>
-
-        {policySyncResult ? (
-          <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
+            <Select
+              value={themeSyncDesignSystemId}
+              onValueChange={(value) => setThemeSyncDesignSystemId(value)}
+              options={
+                designSystems.length
+                  ? [
+                      { label: "Workspace default", value: "" },
+                      ...designSystems.map((ds) => ({ label: ds.name, value: ds.id })),
+                    ]
+                  : [{ label: isLoading ? "Loading design systems…" : "No design systems", value: "" }]
+              }
+              disabled={!designSystems.length}
+            />
             <div className="text-xs text-content-muted">
-              Last sync: <span className="font-semibold text-content">{policySyncResult.shopDomain}</span> ·{" "}
-              <span className="font-semibold text-content">{policySyncResult.pages.length}</span> page(s)
+              Leave as workspace default to use the default design system, or pick a specific design system override.
             </div>
-            <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
-              <TableHeader>
-                <TableRow>
-                  <TableHeadCell className="w-[220px]">Page</TableHeadCell>
-                  <TableHeadCell>URL</TableHeadCell>
-                  <TableHeadCell className="w-[120px]">Operation</TableHeadCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {policySyncResult.pages.map((page) => (
-                  <TableRow key={page.pageId}>
-                    <TableCell className="text-xs text-content">{page.title}</TableCell>
-                    <TableCell className="text-xs">
-                      <a href={page.url} target="_blank" rel="noreferrer" className="break-all text-accent hover:underline">
-                        {page.url}
-                      </a>
-                    </TableCell>
-                    <TableCell className="text-xs text-content-muted">{page.operation}</TableCell>
+          </div>
+
+          {themeSyncResult ? (
+            <div className="space-y-2">
+              <div className="text-xs text-content-muted">
+                Last sync: <span className="font-semibold text-content">{themeSyncResult.shopDomain}</span> ·{" "}
+                <span className="font-semibold text-content">{themeSyncResult.themeName}</span>
+              </div>
+              <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="w-[240px] text-xs text-content-muted">Design system</TableCell>
+                    <TableCell className="text-xs text-content">{themeSyncResult.designSystemName}</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Brand</TableCell>
+                    <TableCell className="text-xs text-content">{themeSyncResult.brandName}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Theme role</TableCell>
+                    <TableCell className="text-xs text-content">{themeSyncResult.themeRole}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">CSS asset</TableCell>
+                    <TableCell className="text-xs text-content break-all">{themeSyncResult.cssFilename}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Job ID</TableCell>
+                    <TableCell className="text-xs text-content break-all">{themeSyncResult.jobId || "n/a (completed without async job)"}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="rounded-md border border-divider p-3 space-y-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-content">Compliance policy pages</div>
+              <div className="text-xs text-content-muted">
+                Generate and sync brand/workspace policy pages to Shopify using your configured compliance profile.
+              </div>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => {
+                void handleSyncCompliancePolicyPages();
+              }}
+              disabled={syncCompliancePolicyPages.isPending || !hasShopifyConnectionTarget}
+            >
+              {syncCompliancePolicyPages.isPending ? "Generating…" : "Generate policy pages"}
+            </Button>
           </div>
-        ) : null}
+
+          {policySyncResult ? (
+            <div className="space-y-2">
+              <div className="text-xs text-content-muted">
+                Last sync: <span className="font-semibold text-content">{policySyncResult.shopDomain}</span> ·{" "}
+                <span className="font-semibold text-content">{policySyncResult.pages.length}</span> page(s)
+              </div>
+              <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
+                <TableHeader>
+                  <TableRow>
+                    <TableHeadCell className="w-[220px]">Page</TableHeadCell>
+                    <TableHeadCell>URL</TableHeadCell>
+                    <TableHeadCell className="w-[120px]">Operation</TableHeadCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {policySyncResult.pages.map((page) => (
+                    <TableRow key={page.pageId}>
+                      <TableCell className="text-xs text-content">{page.title}</TableCell>
+                      <TableCell className="text-xs">
+                        <a href={page.url} target="_blank" rel="noreferrer" className="break-all text-accent hover:underline">
+                          {page.url}
+                        </a>
+                      </TableCell>
+                      <TableCell className="text-xs text-content-muted">{page.operation}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="ds-card ds-card--md space-y-3">
