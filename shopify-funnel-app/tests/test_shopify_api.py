@@ -874,7 +874,14 @@ def test_sync_theme_brand_updates_layout_and_css():
 def test_sync_theme_brand_allows_upsert_without_job():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []
-    settings_json = '\ufeff{"current":{"settings":{"color_background":"#ffffff"}}}\n'
+    settings_json = (
+        "\ufeff/*\n"
+        " * ------------------------------------------------------------\n"
+        " * IMPORTANT: This file is auto-generated.\n"
+        " * ------------------------------------------------------------\n"
+        " */\n"
+        '{"current":{"settings":{"color_background":"#ffffff"}}}\n'
+    )
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         observed_payloads.append(payload)
