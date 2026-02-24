@@ -1650,8 +1650,8 @@ class ShopifyApiClient:
                         }
                     }
                     userErrors {
-                        field
-                        message
+                        code
+                        filename
                     }
                 }
             }
@@ -1676,8 +1676,20 @@ class ShopifyApiClient:
             raise ShopifyApiError(message="theme files query response is invalid.")
         user_errors = files.get("userErrors") or []
         if user_errors:
-            messages = "; ".join(str(error.get("message")) for error in user_errors)
-            raise ShopifyApiError(message=f"theme files query failed: {messages}", status_code=409)
+            details: list[str] = []
+            for error in user_errors:
+                if not isinstance(error, dict):
+                    continue
+                code = error.get("code")
+                errored_filename = error.get("filename")
+                if isinstance(code, str) and isinstance(errored_filename, str):
+                    details.append(f"{code} ({errored_filename})")
+                elif isinstance(code, str):
+                    details.append(code)
+                elif isinstance(errored_filename, str):
+                    details.append(errored_filename)
+            detail_text = "; ".join(details) if details else str(user_errors)
+            raise ShopifyApiError(message=f"theme files query failed: {detail_text}", status_code=409)
         nodes = files.get("nodes")
         if not isinstance(nodes, list):
             raise ShopifyApiError(message="theme files query response is missing nodes.")
