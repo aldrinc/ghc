@@ -129,6 +129,37 @@ class ShopifyThemeBrandSyncRequest(BaseModel):
         return self
 
 
+class ShopifyThemeCoverageSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requiredSourceVars: list[str] = Field(default_factory=list)
+    requiredThemeVars: list[str] = Field(default_factory=list)
+    missingSourceVars: list[str] = Field(default_factory=list)
+    missingThemeVars: list[str] = Field(default_factory=list)
+
+
+class ShopifyThemeSettingsSyncSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    settingsFilename: str | None = None
+    expectedPaths: list[str] = Field(default_factory=list)
+    updatedPaths: list[str] = Field(default_factory=list)
+    missingPaths: list[str] = Field(default_factory=list)
+    requiredMissingPaths: list[str] = Field(default_factory=list)
+
+
+class ShopifyThemeSettingsAuditSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    settingsFilename: str | None = None
+    expectedPaths: list[str] = Field(default_factory=list)
+    syncedPaths: list[str] = Field(default_factory=list)
+    mismatchedPaths: list[str] = Field(default_factory=list)
+    missingPaths: list[str] = Field(default_factory=list)
+    requiredMissingPaths: list[str] = Field(default_factory=list)
+    requiredMismatchedPaths: list[str] = Field(default_factory=list)
+
+
 class ShopifyThemeBrandSyncResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -144,7 +175,48 @@ class ShopifyThemeBrandSyncResponse(BaseModel):
     themeRole: str
     layoutFilename: str
     cssFilename: str
+    settingsFilename: str | None = None
     jobId: str | None = None
+    coverage: ShopifyThemeCoverageSummary
+    settingsSync: ShopifyThemeSettingsSyncSummary
+
+
+class ShopifyThemeBrandAuditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str | None = None
+    designSystemId: str | None = Field(default=None, min_length=1)
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_theme_selector(self) -> "ShopifyThemeBrandAuditRequest":
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class ShopifyThemeBrandAuditResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str
+    workspaceName: str
+    designSystemId: str
+    designSystemName: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    layoutFilename: str
+    cssFilename: str
+    settingsFilename: str | None = None
+    hasManagedMarkerBlock: bool
+    layoutIncludesManagedCssAsset: bool
+    managedCssAssetExists: bool
+    coverage: ShopifyThemeCoverageSummary
+    settingsAudit: ShopifyThemeSettingsAuditSummary
+    isReady: bool
 
 
 class ShopifySyncProductVariantsRequest(BaseModel):

@@ -385,7 +385,21 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
             "themeRole": "MAIN",
             "layoutFilename": "layout/theme.liquid",
             "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
             "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+            },
         }
 
     monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
@@ -489,7 +503,21 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
             "themeRole": "MAIN",
             "layoutFilename": "layout/theme.liquid",
             "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
             "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+            },
         }
 
     monkeypatch.setattr(clients_router.ClientsRepository, "get", fake_get_client)
@@ -537,6 +565,141 @@ def test_sync_shopify_theme_brand_requires_ready_connection(api_client, monkeypa
     assert "Shopify connection is not ready" in response.json()["detail"]
 
 
+def test_audit_shopify_theme_brand_returns_audit_payload(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    observed: dict[str, object] = {}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        observed["status_client_id"] = client_id
+        observed["selected_shop_domain"] = selected_shop_domain
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_design_system_get(self, *, org_id: str, design_system_id: str):
+        observed["design_system_id"] = design_system_id
+        return type(
+            "FakeDesignSystem",
+            (),
+            {
+                "id": design_system_id,
+                "name": "Acme Design System",
+                "client_id": client_id,
+                "tokens": {"placeholder": True},
+            },
+        )()
+
+    def fake_validate(tokens):
+        assert tokens == {"placeholder": True}
+        return {
+            "dataTheme": "light",
+            "cssVars": {"--color-brand": "#123456"},
+            "fontUrls": [],
+            "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
+            "funnelDefaults": {"containerWidth": "lg"},
+        }
+
+    def fake_audit_theme_brand(
+        *,
+        client_id: str,
+        workspace_name: str,
+        css_vars: dict[str, str],
+        data_theme: str | None,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        observed["audit_client_id"] = client_id
+        observed["workspace_name"] = workspace_name
+        observed["css_vars"] = css_vars
+        observed["data_theme"] = data_theme
+        observed["theme_id"] = theme_id
+        observed["theme_name"] = theme_name
+        observed["shop_domain"] = shop_domain
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "futrgroup2-0theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "hasManagedMarkerBlock": True,
+            "layoutIncludesManagedCssAsset": True,
+            "managedCssAssetExists": True,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsAudit": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "syncedPaths": [],
+                "mismatchedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "requiredMismatchedPaths": [],
+            },
+            "isReady": True,
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
+    monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
+    monkeypatch.setattr(clients_router, "audit_client_shopify_theme_brand", fake_audit_theme_brand)
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/audit",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "themeName": "futrgroup2-0theme",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["shopDomain"] == "example.myshopify.com"
+    assert payload["themeName"] == "futrgroup2-0theme"
+    assert payload["isReady"] is True
+    assert observed["workspace_name"] == "Acme Workspace"
+    assert observed["data_theme"] == "light"
+    assert observed["shop_domain"] == "example.myshopify.com"
+
+
+def test_audit_shopify_theme_brand_requires_ready_connection(api_client, monkeypatch):
+    client_id = _create_client(api_client)
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "installed_missing_storefront_token",
+            "message": "Shopify is installed but missing storefront access token.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": False,
+            "missingScopes": [],
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/audit",
+        json={"designSystemId": "design-system-1", "themeName": "futrgroup2-0theme"},
+    )
+
+    assert response.status_code == 409
+    assert "Shopify connection is not ready" in response.json()["detail"]
+
+
 def test_shopify_routes_require_existing_client(api_client):
     missing_client_id = "00000000-0000-0000-0000-00000000abcd"
 
@@ -570,6 +733,10 @@ def test_shopify_routes_require_existing_client(api_client):
         f"/clients/{missing_client_id}/shopify/theme/brand/sync",
         json={"designSystemId": "design-system-1", "themeName": "futrgroup2-0theme"},
     )
+    audit_theme_brand_response = api_client.post(
+        f"/clients/{missing_client_id}/shopify/theme/brand/audit",
+        json={"designSystemId": "design-system-1", "themeName": "futrgroup2-0theme"},
+    )
 
     assert status_response.status_code == 404
     assert install_response.status_code == 404
@@ -578,3 +745,4 @@ def test_shopify_routes_require_existing_client(api_client):
     assert default_shop_response.status_code == 404
     assert create_product_response.status_code == 404
     assert sync_theme_brand_response.status_code == 404
+    assert audit_theme_brand_response.status_code == 404

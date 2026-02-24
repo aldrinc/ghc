@@ -67,6 +67,31 @@ export type ClientShopifyThemeBrandSyncPayload = {
   themeName?: string;
 };
 
+export type ClientShopifyThemeCoverageSummary = {
+  requiredSourceVars: string[];
+  requiredThemeVars: string[];
+  missingSourceVars: string[];
+  missingThemeVars: string[];
+};
+
+export type ClientShopifyThemeSettingsSyncSummary = {
+  settingsFilename?: string | null;
+  expectedPaths: string[];
+  updatedPaths: string[];
+  missingPaths: string[];
+  requiredMissingPaths: string[];
+};
+
+export type ClientShopifyThemeSettingsAuditSummary = {
+  settingsFilename?: string | null;
+  expectedPaths: string[];
+  syncedPaths: string[];
+  mismatchedPaths: string[];
+  missingPaths: string[];
+  requiredMissingPaths: string[];
+  requiredMismatchedPaths: string[];
+};
+
 export type ClientShopifyThemeBrandSyncResponse = {
   shopDomain: string;
   workspaceName: string;
@@ -80,7 +105,29 @@ export type ClientShopifyThemeBrandSyncResponse = {
   themeRole: string;
   layoutFilename: string;
   cssFilename: string;
+  settingsFilename?: string | null;
   jobId?: string | null;
+  coverage: ClientShopifyThemeCoverageSummary;
+  settingsSync: ClientShopifyThemeSettingsSyncSummary;
+};
+
+export type ClientShopifyThemeBrandAuditResponse = {
+  shopDomain: string;
+  workspaceName: string;
+  designSystemId: string;
+  designSystemName: string;
+  themeId: string;
+  themeName: string;
+  themeRole: string;
+  layoutFilename: string;
+  cssFilename: string;
+  settingsFilename?: string | null;
+  hasManagedMarkerBlock: boolean;
+  layoutIncludesManagedCssAsset: boolean;
+  managedCssAssetExists: boolean;
+  coverage: ClientShopifyThemeCoverageSummary;
+  settingsAudit: ClientShopifyThemeSettingsAuditSummary;
+  isReady: boolean;
 };
 
 export function useClients() {
@@ -246,6 +293,28 @@ export function useSyncClientShopifyThemeBrand(clientId?: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to sync Shopify theme brand";
+      toast.error(message);
+    },
+  });
+}
+
+export function useAuditClientShopifyThemeBrand(clientId?: string) {
+  const { post } = useApiClient();
+
+  return useMutation({
+    mutationFn: (payload: ClientShopifyThemeBrandSyncPayload) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<ClientShopifyThemeBrandAuditResponse>(
+        `/clients/${clientId}/shopify/theme/brand/audit`,
+        payload,
+      );
+    },
+    onSuccess: (response) => {
+      const status = response.isReady ? "ready" : "has gaps";
+      toast.success(`Shopify theme audit completed (${status}) for ${response.shopDomain}`);
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to audit Shopify theme brand";
       toast.error(message);
     },
   });

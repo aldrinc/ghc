@@ -15,6 +15,8 @@ from app.config import settings
 from app.db import get_session, init_db
 from app.models import OAuthState, ProcessedWebhookEvent, ShopInstallation
 from app.schemas import (
+    AuditThemeBrandRequest,
+    AuditThemeBrandResponse,
     CatalogProductVariant,
     CatalogProductSummary,
     CreateCatalogProductRequest,
@@ -595,7 +597,54 @@ async def sync_theme_brand(
         themeRole=synced["themeRole"],
         layoutFilename=synced["layoutFilename"],
         cssFilename=synced["cssFilename"],
+        settingsFilename=synced.get("settingsFilename"),
         jobId=synced.get("jobId"),
+        coverage=synced["coverage"],
+        settingsSync=synced["settingsSync"],
+    )
+
+
+@app.post(
+    "/v1/themes/brand/audit",
+    response_model=AuditThemeBrandResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def audit_theme_brand(
+    payload: AuditThemeBrandRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        audited = await shopify_api.audit_theme_brand(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            workspace_name=payload.workspaceName,
+            css_vars=payload.cssVars,
+            data_theme=payload.dataTheme,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return AuditThemeBrandResponse(
+        shopDomain=installation.shop_domain,
+        themeId=audited["themeId"],
+        themeName=audited["themeName"],
+        themeRole=audited["themeRole"],
+        layoutFilename=audited["layoutFilename"],
+        cssFilename=audited["cssFilename"],
+        settingsFilename=audited.get("settingsFilename"),
+        hasManagedMarkerBlock=audited["hasManagedMarkerBlock"],
+        layoutIncludesManagedCssAsset=audited["layoutIncludesManagedCssAsset"],
+        managedCssAssetExists=audited["managedCssAssetExists"],
+        coverage=audited["coverage"],
+        settingsAudit=audited["settingsAudit"],
+        isReady=audited["isReady"],
     )
 
 

@@ -23,6 +23,8 @@ from app.schemas.clients import ClientDeleteRequest, ClientUpdateRequest
 from app.schemas.onboarding import OnboardingStartRequest
 from app.schemas.intent import CampaignIntentRequest
 from app.schemas.shopify_connection import (
+    ShopifyThemeBrandAuditRequest,
+    ShopifyThemeBrandAuditResponse,
     ShopifyCreateProductRequest,
     ShopifyDefaultShopRequest,
     ShopifyInstallationDisconnectRequest,
@@ -45,6 +47,7 @@ from app.services.shopify_connection import (
     list_shopify_installations,
     normalize_shop_domain,
     set_client_shopify_storefront_token,
+    audit_client_shopify_theme_brand,
     sync_client_shopify_theme_brand,
 )
 from app.temporal.client import get_temporal_client
@@ -543,7 +546,147 @@ def sync_client_shopify_theme_brand_route(
         themeRole=synced["themeRole"],
         layoutFilename=synced["layoutFilename"],
         cssFilename=synced["cssFilename"],
+        settingsFilename=synced.get("settingsFilename"),
         jobId=synced["jobId"],
+        coverage=synced["coverage"],
+        settingsSync=synced["settingsSync"],
+    )
+
+
+@router.post("/{client_id}/shopify/theme/brand/audit", response_model=ShopifyThemeBrandAuditResponse)
+def audit_client_shopify_theme_brand_route(
+    client_id: str,
+    payload: ShopifyThemeBrandAuditRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    effective_shop_domain = payload.shopDomain or selected_shop_domain
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=effective_shop_domain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Shopify connection is not ready: {status_payload['message']}",
+        )
+
+    requested_design_system_id = payload.designSystemId.strip() if payload.designSystemId else None
+    resolved_design_system_id = requested_design_system_id or (
+        str(client.design_system_id) if client.design_system_id else None
+    )
+    if not resolved_design_system_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No design system selected for Shopify theme audit. "
+                "Set a workspace default design system or provide designSystemId."
+            ),
+        )
+
+    design_system_repo = DesignSystemsRepository(session)
+    design_system = design_system_repo.get(
+        org_id=auth.org_id,
+        design_system_id=resolved_design_system_id,
+    )
+    if not design_system:
+        if requested_design_system_id:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Design system not found")
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace default design system was not found.",
+        )
+
+    design_system_client_id = str(design_system.client_id) if design_system.client_id else None
+    if design_system_client_id and design_system_client_id != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Design system must belong to this workspace.",
+        )
+
+    try:
+        validated_tokens = validate_design_system_tokens(design_system.tokens)
+    except DesignSystemGenerationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+
+    css_vars_raw = validated_tokens.get("cssVars")
+    if not isinstance(css_vars_raw, dict) or not css_vars_raw:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Design system tokens.cssVars must be a non-empty JSON object.",
+        )
+    css_vars: dict[str, str] = {}
+    for raw_key, raw_value in css_vars_raw.items():
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Design system tokens.cssVars keys must be non-empty strings.",
+            )
+        if not isinstance(raw_value, (str, int, float)):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Design system cssVars[{raw_key}] must be a string or number.",
+            )
+        if isinstance(raw_value, str):
+            cleaned_value = raw_value.strip()
+            if not cleaned_value:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=f"Design system cssVars[{raw_key}] must not be an empty string.",
+                )
+        else:
+            cleaned_value = str(raw_value)
+        css_vars[raw_key.strip()] = cleaned_value
+
+    data_theme_raw = validated_tokens.get("dataTheme")
+    if not isinstance(data_theme_raw, str) or not data_theme_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Design system tokens.dataTheme must be a non-empty string.",
+        )
+    data_theme = data_theme_raw.strip()
+
+    workspace_name = str(client.name).strip()
+    if not workspace_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Workspace name is required to audit Shopify theme brand assets.",
+        )
+
+    audited = audit_client_shopify_theme_brand(
+        client_id=client_id,
+        workspace_name=workspace_name,
+        css_vars=css_vars,
+        data_theme=data_theme,
+        theme_id=payload.themeId,
+        theme_name=payload.themeName,
+        shop_domain=effective_shop_domain,
+    )
+
+    return ShopifyThemeBrandAuditResponse(
+        shopDomain=audited["shopDomain"],
+        workspaceName=workspace_name,
+        designSystemId=str(design_system.id),
+        designSystemName=str(design_system.name),
+        themeId=audited["themeId"],
+        themeName=audited["themeName"],
+        themeRole=audited["themeRole"],
+        layoutFilename=audited["layoutFilename"],
+        cssFilename=audited["cssFilename"],
+        settingsFilename=audited.get("settingsFilename"),
+        hasManagedMarkerBlock=audited["hasManagedMarkerBlock"],
+        layoutIncludesManagedCssAsset=audited["layoutIncludesManagedCssAsset"],
+        managedCssAssetExists=audited["managedCssAssetExists"],
+        coverage=audited["coverage"],
+        settingsAudit=audited["settingsAudit"],
+        isReady=audited["isReady"],
     )
 
 

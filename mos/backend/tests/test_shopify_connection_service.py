@@ -553,7 +553,21 @@ def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
             "themeRole": "MAIN",
             "layoutFilename": "layout/theme.liquid",
             "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
             "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+            },
         }
 
     monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
@@ -576,7 +590,21 @@ def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
         "themeRole": "MAIN",
         "layoutFilename": "layout/theme.liquid",
         "cssFilename": "assets/acme-workspace-workspace-brand.css",
+        "settingsFilename": "config/settings_data.json",
         "jobId": "gid://shopify/Job/1",
+        "coverage": {
+            "requiredSourceVars": [],
+            "requiredThemeVars": [],
+            "missingSourceVars": [],
+            "missingThemeVars": [],
+        },
+        "settingsSync": {
+            "settingsFilename": "config/settings_data.json",
+            "expectedPaths": [],
+            "updatedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+        },
     }
 
 
@@ -608,7 +636,21 @@ def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
             "themeRole": "MAIN",
             "layoutFilename": "layout/theme.liquid",
             "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": None,
             "jobId": None,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": None,
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+            },
         }
 
     monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
@@ -623,3 +665,129 @@ def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
     )
 
     assert response["jobId"] is None
+
+
+def test_audit_client_shopify_theme_brand_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/audit"
+        assert json_body["clientId"] == "client_1"
+        assert json_body["workspaceName"] == "Acme Workspace"
+        assert json_body["themeName"] == "futrgroup2-0theme"
+        assert json_body["cssVars"]["--color-brand"] == "#123456"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "hasManagedMarkerBlock": True,
+            "layoutIncludesManagedCssAsset": True,
+            "managedCssAssetExists": True,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsAudit": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "syncedPaths": [],
+                "mismatchedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "requiredMismatchedPaths": [],
+            },
+            "isReady": True,
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.audit_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        css_vars={"--color-brand": "#123456"},
+        data_theme="light",
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert response == {
+        "shopDomain": "example.myshopify.com",
+        "themeId": "gid://shopify/OnlineStoreTheme/1",
+        "themeName": "Main Theme",
+        "themeRole": "MAIN",
+        "layoutFilename": "layout/theme.liquid",
+        "cssFilename": "assets/acme-workspace-workspace-brand.css",
+        "settingsFilename": "config/settings_data.json",
+        "hasManagedMarkerBlock": True,
+        "layoutIncludesManagedCssAsset": True,
+        "managedCssAssetExists": True,
+        "coverage": {
+            "requiredSourceVars": [],
+            "requiredThemeVars": [],
+            "missingSourceVars": [],
+            "missingThemeVars": [],
+        },
+        "settingsAudit": {
+            "settingsFilename": "config/settings_data.json",
+            "expectedPaths": [],
+            "syncedPaths": [],
+            "mismatchedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+            "requiredMismatchedPaths": [],
+        },
+        "isReady": True,
+    }
+
+
+def test_audit_client_shopify_theme_brand_rejects_invalid_marker_flag(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/audit"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "hasManagedMarkerBlock": "yes",
+            "layoutIncludesManagedCssAsset": True,
+            "managedCssAssetExists": True,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsAudit": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "syncedPaths": [],
+                "mismatchedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "requiredMismatchedPaths": [],
+            },
+            "isReady": True,
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    try:
+        shopify_connection.audit_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            css_vars={"--color-brand": "#123456"},
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 502
+        assert "invalid hasManagedMarkerBlock" in exc.detail
+    else:
+        raise AssertionError("Expected audit_client_shopify_theme_brand to reject invalid marker flag")

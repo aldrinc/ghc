@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import json
 from html import escape
 import re
 from typing import Any, Literal
@@ -11,21 +13,25 @@ import httpx
 from app.config import settings
 
 _THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
+_THEME_BRAND_SETTINGS_FILENAME = "config/settings_data.json"
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
-_THEME_BRAND_VAR_SCOPE_SELECTORS: tuple[str, ...] = (
-    ":root",
-    "html",
-    "body",
-    ".color-scheme",
-    ".gradient",
-    ".footer",
-    "[data-color-scheme]",
-    '[class*="color-scheme"]',
-    '[class*="scheme-"]',
-    '[class*="color-"]',
-    '[class*="footer"]',
-)
+_DEFAULT_THEME_VAR_SCOPE_SELECTORS: tuple[str, ...] = (":root",)
+_THEME_VAR_SCOPE_SELECTORS_BY_NAME: dict[str, tuple[str, ...]] = {
+    "futrgroup2-0theme": (
+        ":root",
+        "html",
+        "body",
+        ".color-scheme",
+        ".gradient",
+        ".footer",
+        "[data-color-scheme]",
+        '[class*="color-scheme"]',
+        '[class*="scheme-"]',
+        '[class*="color-"]',
+        '[class*="footer"]',
+    ),
+}
 _THEME_COMPAT_ALIASES_BY_NAME: dict[str, dict[str, tuple[str, ...]]] = {
     "futrgroup2-0theme": {
         "--color-page-bg": (
@@ -131,6 +137,75 @@ _THEME_COMPAT_ALIASES_BY_NAME: dict[str, dict[str, tuple[str, ...]]] = {
         "--section-pad-y": ("--footer-pad-y",),
     }
 }
+_THEME_REQUIRED_SOURCE_VARS_BY_NAME: dict[str, tuple[str, ...]] = {
+    "futrgroup2-0theme": (
+        "--color-page-bg",
+        "--color-bg",
+        "--color-text",
+        "--color-brand",
+        "--color-cta",
+        "--color-cta-text",
+        "--color-border",
+        "--color-soft",
+        "--focus-outline-color",
+        "--font-sans",
+        "--radius-md",
+        "--container-max",
+        "--container-pad",
+        "--section-pad-y",
+        "--footer-bg",
+    ),
+}
+_THEME_REQUIRED_THEME_VARS_BY_NAME: dict[str, tuple[str, ...]] = {
+    "futrgroup2-0theme": (
+        "--color-base-background",
+        "--color-background",
+        "--color-base-text",
+        "--color-base-button",
+        "--color-base-button-text",
+        "--color-button-border",
+        "--color-keyboard-focus",
+        "--font-body-family",
+        "--border-radius-medium",
+        "--page-width",
+        "--page-padding",
+        "--footer-pad-y",
+        "--footer-bg",
+    ),
+}
+_THEME_SETTINGS_VALUE_PATHS_BY_NAME: dict[str, dict[str, str]] = {
+    "futrgroup2-0theme": {
+        "current.settings.color_background": "--color-page-bg",
+        "current.settings.color_foreground": "--color-text",
+        "current.settings.color_button": "--color-cta",
+        "current.settings.color_button_text": "--color-cta-text",
+        "current.settings.color_link": "--color-brand",
+        "current.settings.color_accent": "--color-brand",
+        "current.settings.footer_background": "--footer-bg",
+        "current.settings.footer_text": "--color-text",
+        "current.settings.color_schemes[*].settings.background": "--color-page-bg",
+        "current.settings.color_schemes[*].settings.text": "--color-text",
+        "current.settings.color_schemes[*].settings.button": "--color-cta",
+        "current.settings.color_schemes[*].settings.button_label": "--color-cta-text",
+        "current.settings.color_schemes[*].settings.secondary_button": "--color-bg",
+        "current.settings.color_schemes[*].settings.secondary_button_label": "--color-text",
+    }
+}
+_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME: dict[str, tuple[str, ...]] = {
+    "futrgroup2-0theme": (),
+}
+_SETTINGS_PATH_SEGMENT_RE = re.compile(r"^([A-Za-z0-9_-]+)(?:\[(\*|\d+)\])?$")
+
+
+@dataclass(frozen=True)
+class ThemeBrandProfile:
+    theme_name: str
+    var_scope_selectors: tuple[str, ...]
+    compat_aliases: dict[str, tuple[str, ...]]
+    required_source_vars: tuple[str, ...]
+    required_theme_vars: tuple[str, ...]
+    settings_value_paths: dict[str, str]
+    required_settings_paths: tuple[str, ...]
 
 
 class ShopifyApiError(RuntimeError):
@@ -1550,19 +1625,33 @@ class ShopifyApiClient:
         return raw_value.replace("\\", "\\\\").replace('"', '\\"')
 
     @classmethod
+    def _resolve_theme_brand_profile(cls, *, theme_name: str) -> ThemeBrandProfile:
+        normalized_theme_name = theme_name.strip().lower()
+        return ThemeBrandProfile(
+            theme_name=normalized_theme_name,
+            var_scope_selectors=_THEME_VAR_SCOPE_SELECTORS_BY_NAME.get(
+                normalized_theme_name,
+                _DEFAULT_THEME_VAR_SCOPE_SELECTORS,
+            ),
+            compat_aliases=_THEME_COMPAT_ALIASES_BY_NAME.get(normalized_theme_name, {}),
+            required_source_vars=_THEME_REQUIRED_SOURCE_VARS_BY_NAME.get(normalized_theme_name, ()),
+            required_theme_vars=_THEME_REQUIRED_THEME_VARS_BY_NAME.get(normalized_theme_name, ()),
+            settings_value_paths=_THEME_SETTINGS_VALUE_PATHS_BY_NAME.get(normalized_theme_name, {}),
+            required_settings_paths=_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME.get(normalized_theme_name, ()),
+        )
+
+    @classmethod
     def _build_theme_compat_css_vars(
         cls,
         *,
-        theme_name: str,
+        profile: ThemeBrandProfile,
         css_vars: dict[str, str],
     ) -> dict[str, str]:
-        normalized_theme_name = theme_name.strip().lower()
-        alias_rules = _THEME_COMPAT_ALIASES_BY_NAME.get(normalized_theme_name)
-        if not alias_rules:
+        if not profile.compat_aliases:
             return dict(css_vars)
 
         expanded = dict(css_vars)
-        for source_key, alias_keys in alias_rules.items():
+        for source_key, alias_keys in profile.compat_aliases.items():
             if source_key not in css_vars:
                 continue
             for alias_key in alias_keys:
@@ -1570,6 +1659,273 @@ class ShopifyApiClient:
                     continue
                 expanded[alias_key] = f"var({source_key})"
         return expanded
+
+    @classmethod
+    def _build_theme_brand_coverage_summary(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        source_css_vars: dict[str, str],
+        effective_css_vars: dict[str, str],
+    ) -> dict[str, list[str]]:
+        missing_source_vars = sorted(key for key in profile.required_source_vars if key not in source_css_vars)
+        missing_theme_vars = sorted(key for key in profile.required_theme_vars if key not in effective_css_vars)
+        return {
+            "requiredSourceVars": sorted(profile.required_source_vars),
+            "requiredThemeVars": sorted(profile.required_theme_vars),
+            "missingSourceVars": missing_source_vars,
+            "missingThemeVars": missing_theme_vars,
+        }
+
+    @staticmethod
+    def _assert_theme_brand_coverage_complete(*, theme_name: str, coverage: dict[str, list[str]]) -> None:
+        missing_source_vars = coverage.get("missingSourceVars") or []
+        missing_theme_vars = coverage.get("missingThemeVars") or []
+        if not missing_source_vars and not missing_theme_vars:
+            return
+        detail_parts: list[str] = [f"Theme profile coverage failed for themeName={theme_name}."]
+        if missing_source_vars:
+            detail_parts.append(f"Missing source cssVars: {', '.join(missing_source_vars)}.")
+        if missing_theme_vars:
+            detail_parts.append(f"Missing mapped theme vars: {', '.join(missing_theme_vars)}.")
+        raise ShopifyApiError(message=" ".join(detail_parts), status_code=422)
+
+    @staticmethod
+    def _parse_settings_path_tokens(path: str) -> list[tuple[str, str | None]]:
+        raw_segments = [segment.strip() for segment in path.split(".") if segment.strip()]
+        if not raw_segments:
+            raise ShopifyApiError(message=f"Invalid theme settings path: {path}", status_code=500)
+        tokens: list[tuple[str, str | None]] = []
+        for raw_segment in raw_segments:
+            match = _SETTINGS_PATH_SEGMENT_RE.fullmatch(raw_segment)
+            if not match:
+                raise ShopifyApiError(message=f"Invalid theme settings path segment: {raw_segment}", status_code=500)
+            tokens.append((match.group(1), match.group(2)))
+        return tokens
+
+    @classmethod
+    def _set_json_path_value(
+        cls,
+        *,
+        node: Any,
+        path: str,
+        value: str,
+    ) -> int:
+        tokens = cls._parse_settings_path_tokens(path)
+        return cls._set_json_path_value_tokens(node=node, tokens=tokens, value=value)
+
+    @classmethod
+    def _set_json_path_value_tokens(
+        cls,
+        *,
+        node: Any,
+        tokens: list[tuple[str, str | None]],
+        value: str,
+    ) -> int:
+        if not tokens or not isinstance(node, dict):
+            return 0
+        key, index_selector = tokens[0]
+        if key not in node:
+            return 0
+
+        current = node[key]
+        if index_selector is None:
+            if len(tokens) == 1:
+                node[key] = value
+                return 1
+            return cls._set_json_path_value_tokens(node=current, tokens=tokens[1:], value=value)
+
+        if not isinstance(current, list):
+            return 0
+        if index_selector == "*":
+            if not current:
+                return 0
+            update_count = 0
+            for idx, item in enumerate(current):
+                if len(tokens) == 1:
+                    current[idx] = value
+                    update_count += 1
+                else:
+                    update_count += cls._set_json_path_value_tokens(node=item, tokens=tokens[1:], value=value)
+            return update_count
+
+        index = int(index_selector)
+        if index < 0 or index >= len(current):
+            return 0
+        if len(tokens) == 1:
+            current[index] = value
+            return 1
+        return cls._set_json_path_value_tokens(node=current[index], tokens=tokens[1:], value=value)
+
+    @classmethod
+    def _read_json_path_values(
+        cls,
+        *,
+        node: Any,
+        path: str,
+    ) -> list[Any]:
+        tokens = cls._parse_settings_path_tokens(path)
+        return cls._read_json_path_values_tokens(node=node, tokens=tokens)
+
+    @classmethod
+    def _read_json_path_values_tokens(
+        cls,
+        *,
+        node: Any,
+        tokens: list[tuple[str, str | None]],
+    ) -> list[Any]:
+        if not tokens or not isinstance(node, dict):
+            return []
+        key, index_selector = tokens[0]
+        if key not in node:
+            return []
+        current = node[key]
+        if index_selector is None:
+            if len(tokens) == 1:
+                return [current]
+            return cls._read_json_path_values_tokens(node=current, tokens=tokens[1:])
+
+        if not isinstance(current, list):
+            return []
+        if index_selector == "*":
+            values: list[Any] = []
+            for item in current:
+                if len(tokens) == 1:
+                    values.append(item)
+                else:
+                    values.extend(cls._read_json_path_values_tokens(node=item, tokens=tokens[1:]))
+            return values
+
+        index = int(index_selector)
+        if index < 0 or index >= len(current):
+            return []
+        if len(tokens) == 1:
+            return [current[index]]
+        return cls._read_json_path_values_tokens(node=current[index], tokens=tokens[1:])
+
+    @classmethod
+    def _sync_theme_settings_data(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        settings_content: str,
+        effective_css_vars: dict[str, str],
+    ) -> tuple[str, dict[str, Any]]:
+        report = {
+            "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME,
+            "expectedPaths": sorted(profile.settings_value_paths.keys()),
+            "updatedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+        }
+        if not profile.settings_value_paths:
+            return settings_content, report
+
+        try:
+            settings_data = json.loads(settings_content)
+        except ValueError as exc:
+            raise ShopifyApiError(
+                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} is not valid JSON.",
+                status_code=409,
+            ) from exc
+        if not isinstance(settings_data, dict):
+            raise ShopifyApiError(
+                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} must contain a JSON object.",
+                status_code=409,
+            )
+
+        updated_paths: list[str] = []
+        missing_paths: list[str] = []
+        for path, source_var in sorted(profile.settings_value_paths.items()):
+            expected_value = effective_css_vars.get(source_var)
+            if expected_value is None:
+                raise ShopifyApiError(
+                    message=(
+                        f"Theme settings mapping requires css var {source_var} for path {path}. "
+                        "Add the missing token to the design system."
+                    ),
+                    status_code=422,
+                )
+            update_count = cls._set_json_path_value(node=settings_data, path=path, value=expected_value)
+            if update_count > 0:
+                updated_paths.append(path)
+            else:
+                missing_paths.append(path)
+
+        required_missing_paths = sorted(path for path in profile.required_settings_paths if path in missing_paths)
+        if required_missing_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Theme settings sync missing required paths: "
+                    f"{', '.join(required_missing_paths)}."
+                ),
+                status_code=409,
+            )
+
+        report["updatedPaths"] = sorted(updated_paths)
+        report["missingPaths"] = sorted(missing_paths)
+        report["requiredMissingPaths"] = required_missing_paths
+        return json.dumps(settings_data, indent=2, ensure_ascii=False) + "\n", report
+
+    @classmethod
+    def _audit_theme_settings_data(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        settings_content: str,
+        effective_css_vars: dict[str, str],
+    ) -> dict[str, Any]:
+        report = {
+            "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME,
+            "expectedPaths": sorted(profile.settings_value_paths.keys()),
+            "syncedPaths": [],
+            "mismatchedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+            "requiredMismatchedPaths": [],
+        }
+        if not profile.settings_value_paths:
+            return report
+
+        try:
+            settings_data = json.loads(settings_content)
+        except ValueError as exc:
+            raise ShopifyApiError(
+                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} is not valid JSON.",
+                status_code=409,
+            ) from exc
+        if not isinstance(settings_data, dict):
+            raise ShopifyApiError(
+                message=f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} must contain a JSON object.",
+                status_code=409,
+            )
+
+        synced_paths: list[str] = []
+        mismatched_paths: list[str] = []
+        missing_paths: list[str] = []
+        for path, source_var in sorted(profile.settings_value_paths.items()):
+            expected_value = effective_css_vars.get(source_var)
+            if expected_value is None:
+                mismatched_paths.append(path)
+                continue
+            observed_values = cls._read_json_path_values(node=settings_data, path=path)
+            if not observed_values:
+                missing_paths.append(path)
+                continue
+            if all(isinstance(value, str) and value.strip() == expected_value for value in observed_values):
+                synced_paths.append(path)
+            else:
+                mismatched_paths.append(path)
+
+        required_missing_paths = sorted(path for path in profile.required_settings_paths if path in missing_paths)
+        required_mismatched_paths = sorted(path for path in profile.required_settings_paths if path in mismatched_paths)
+
+        report["syncedPaths"] = sorted(synced_paths)
+        report["mismatchedPaths"] = sorted(mismatched_paths)
+        report["missingPaths"] = sorted(missing_paths)
+        report["requiredMissingPaths"] = required_missing_paths
+        report["requiredMismatchedPaths"] = required_mismatched_paths
+        return report
 
     @classmethod
     def _render_theme_brand_css(
@@ -1582,9 +1938,11 @@ class ShopifyApiClient:
         data_theme: str | None,
         css_vars: dict[str, str],
         font_urls: list[str],
+        effective_css_vars: dict[str, str] | None = None,
     ) -> str:
-        effective_css_vars = cls._build_theme_compat_css_vars(
-            theme_name=theme_name,
+        profile = cls._resolve_theme_brand_profile(theme_name=theme_name)
+        resolved_effective_css_vars = effective_css_vars or cls._build_theme_compat_css_vars(
+            profile=profile,
             css_vars=css_vars,
         )
         lines: list[str] = [
@@ -1600,10 +1958,10 @@ class ShopifyApiClient:
             for font_url in font_urls:
                 lines.append(f'@import url("{font_url}");')
 
-        sorted_keys = sorted(effective_css_vars.keys())
-        lines.extend(["", ", ".join(_THEME_BRAND_VAR_SCOPE_SELECTORS) + " {"])
+        sorted_keys = sorted(resolved_effective_css_vars.keys())
+        lines.extend(["", ", ".join(profile.var_scope_selectors) + " {"])
         for key in sorted_keys:
-            lines.append(f"  {key}: {effective_css_vars[key]} !important;")
+            lines.append(f"  {key}: {resolved_effective_css_vars[key]} !important;")
         lines.append(f'  --mos-workspace-name: "{cls._escape_css_string(workspace_name)}";')
         lines.append(f'  --mos-brand-name: "{cls._escape_css_string(brand_name)}";')
         lines.append(f'  --mos-brand-logo-url: "{cls._escape_css_string(logo_url)}";')
@@ -1614,14 +1972,14 @@ class ShopifyApiClient:
         if data_theme:
             escaped_theme = escape(data_theme, quote=True)
             theme_scoped_selectors: list[str] = [f'html[data-theme="{escaped_theme}"]']
-            for selector in _THEME_BRAND_VAR_SCOPE_SELECTORS:
+            for selector in profile.var_scope_selectors:
                 if selector == ":root":
                     continue
                 theme_scoped_selectors.append(f'html[data-theme="{escaped_theme}"] {selector}')
             lines.append("")
             lines.append(", ".join(theme_scoped_selectors) + " {")
             for key in sorted_keys:
-                lines.append(f"  {key}: {effective_css_vars[key]} !important;")
+                lines.append(f"  {key}: {resolved_effective_css_vars[key]} !important;")
             lines.append("}")
 
         lines.append("")
@@ -2008,6 +2366,71 @@ class ShopifyApiClient:
             status_code=504,
         )
 
+    @staticmethod
+    def _normalize_theme_selector(
+        *,
+        theme_id: str | None,
+        theme_name: str | None,
+    ) -> tuple[str | None, str | None]:
+        normalized_theme_id = theme_id.strip() if isinstance(theme_id, str) and theme_id.strip() else None
+        normalized_theme_name = theme_name.strip() if isinstance(theme_name, str) and theme_name.strip() else None
+        if bool(normalized_theme_id) == bool(normalized_theme_name):
+            raise ShopifyApiError(
+                message="Exactly one of themeId or themeName is required.",
+                status_code=400,
+            )
+        return normalized_theme_id, normalized_theme_name
+
+    @staticmethod
+    def _normalize_theme_data_theme(data_theme: str | None) -> str | None:
+        if data_theme is None:
+            return None
+        cleaned_data_theme = data_theme.strip()
+        if not cleaned_data_theme:
+            raise ShopifyApiError(message="dataTheme cannot be empty when provided.", status_code=400)
+        if any(char in cleaned_data_theme for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise ShopifyApiError(
+                message="dataTheme contains unsupported characters.",
+                status_code=400,
+            )
+        return cleaned_data_theme
+
+    async def _try_load_theme_file_text(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        theme_id: str,
+        filename: str,
+    ) -> str | None:
+        try:
+            return await self._load_theme_file_text(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                theme_id=theme_id,
+                filename=filename,
+            )
+        except ShopifyApiError as exc:
+            if exc.status_code == 404:
+                return None
+            raise
+
+    @staticmethod
+    def _audit_theme_layout(
+        *,
+        layout_content: str,
+        css_filename: str,
+    ) -> dict[str, bool]:
+        start_count = layout_content.count(_THEME_BRAND_MARKER_START)
+        end_count = layout_content.count(_THEME_BRAND_MARKER_END)
+        has_marker_block = start_count == 1 and end_count == 1
+        asset_name = css_filename.split("/", 1)[1] if css_filename.startswith("assets/") else css_filename
+        includes_css_asset = asset_name in layout_content
+        return {
+            "hasManagedMarkerBlock": has_marker_block,
+            "layoutIncludesManagedCssAsset": includes_css_asset,
+        }
+
     async def sync_theme_brand(
         self,
         *,
@@ -2021,7 +2444,7 @@ class ShopifyApiClient:
         data_theme: str | None = None,
         theme_id: str | None = None,
         theme_name: str | None = None,
-    ) -> dict[str, str | None]:
+    ) -> dict[str, Any]:
         cleaned_workspace_name = workspace_name.strip()
         if not cleaned_workspace_name:
             raise ShopifyApiError(message="workspaceName must be a non-empty string.", status_code=400)
@@ -2039,29 +2462,30 @@ class ShopifyApiClient:
 
         normalized_css_vars = self._normalize_theme_brand_css_vars(css_vars)
         normalized_font_urls = self._normalize_theme_brand_font_urls(font_urls)
-        cleaned_data_theme: str | None = None
-        if data_theme is not None:
-            cleaned_data_theme = data_theme.strip()
-            if not cleaned_data_theme:
-                raise ShopifyApiError(message="dataTheme cannot be empty when provided.", status_code=400)
-            if any(char in cleaned_data_theme for char in ('"', "'", "<", ">", "\n", "\r")):
-                raise ShopifyApiError(
-                    message="dataTheme contains unsupported characters.",
-                    status_code=400,
-                )
-
-        normalized_theme_id = theme_id.strip() if isinstance(theme_id, str) and theme_id.strip() else None
-        normalized_theme_name = theme_name.strip() if isinstance(theme_name, str) and theme_name.strip() else None
-        if bool(normalized_theme_id) == bool(normalized_theme_name):
-            raise ShopifyApiError(
-                message="Exactly one of themeId or themeName is required.",
-                status_code=400,
-            )
+        cleaned_data_theme = self._normalize_theme_data_theme(data_theme)
+        normalized_theme_id, normalized_theme_name = self._normalize_theme_selector(
+            theme_id=theme_id,
+            theme_name=theme_name,
+        )
         theme = await self._resolve_theme_for_brand_sync(
             shop_domain=shop_domain,
             access_token=access_token,
             theme_id=normalized_theme_id,
             theme_name=normalized_theme_name,
+        )
+        profile = self._resolve_theme_brand_profile(theme_name=theme["name"])
+        effective_css_vars = self._build_theme_compat_css_vars(
+            profile=profile,
+            css_vars=normalized_css_vars,
+        )
+        coverage = self._build_theme_brand_coverage_summary(
+            profile=profile,
+            source_css_vars=normalized_css_vars,
+            effective_css_vars=effective_css_vars,
+        )
+        self._assert_theme_brand_coverage_complete(
+            theme_name=theme["name"],
+            coverage=coverage,
         )
 
         layout_content = await self._load_theme_file_text(
@@ -2070,6 +2494,17 @@ class ShopifyApiClient:
             theme_id=theme["id"],
             filename=_THEME_BRAND_LAYOUT_FILENAME,
         )
+        settings_content = await self._try_load_theme_file_text(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme["id"],
+            filename=_THEME_BRAND_SETTINGS_FILENAME,
+        )
+        if profile.settings_value_paths and settings_content is None:
+            raise ShopifyApiError(
+                message=f"Theme file not found: {_THEME_BRAND_SETTINGS_FILENAME}",
+                status_code=404,
+            )
 
         workspace_slug = self._normalize_workspace_slug(cleaned_workspace_name)
         css_filename = f"assets/{workspace_slug}-workspace-brand.css"
@@ -2092,16 +2527,34 @@ class ShopifyApiClient:
             data_theme=cleaned_data_theme,
             css_vars=normalized_css_vars,
             font_urls=normalized_font_urls,
+            effective_css_vars=effective_css_vars,
         )
+        settings_sync = {
+            "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None,
+            "expectedPaths": sorted(profile.settings_value_paths.keys()),
+            "updatedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+        }
+        next_settings_content: str | None = None
+        if settings_content is not None and profile.settings_value_paths:
+            next_settings_content, settings_sync = self._sync_theme_settings_data(
+                profile=profile,
+                settings_content=settings_content,
+                effective_css_vars=effective_css_vars,
+            )
 
+        files_to_upsert = [
+            {"filename": _THEME_BRAND_LAYOUT_FILENAME, "content": next_layout},
+            {"filename": css_filename, "content": css_content},
+        ]
+        if next_settings_content is not None:
+            files_to_upsert.append({"filename": _THEME_BRAND_SETTINGS_FILENAME, "content": next_settings_content})
         job_id = await self._upsert_theme_files(
             shop_domain=shop_domain,
             access_token=access_token,
             theme_id=theme["id"],
-            files=[
-                {"filename": _THEME_BRAND_LAYOUT_FILENAME, "content": next_layout},
-                {"filename": css_filename, "content": css_content},
-            ],
+            files=files_to_upsert,
         )
         if job_id is not None:
             await self._wait_for_job_completion(
@@ -2116,7 +2569,116 @@ class ShopifyApiClient:
             "themeRole": theme["role"],
             "layoutFilename": _THEME_BRAND_LAYOUT_FILENAME,
             "cssFilename": css_filename,
+            "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None,
             "jobId": job_id,
+            "coverage": coverage,
+            "settingsSync": settings_sync,
+        }
+
+    async def audit_theme_brand(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        workspace_name: str,
+        css_vars: dict[str, str],
+        data_theme: str | None = None,
+        theme_id: str | None = None,
+        theme_name: str | None = None,
+    ) -> dict[str, Any]:
+        cleaned_workspace_name = workspace_name.strip()
+        if not cleaned_workspace_name:
+            raise ShopifyApiError(message="workspaceName must be a non-empty string.", status_code=400)
+        normalized_css_vars = self._normalize_theme_brand_css_vars(css_vars)
+        self._normalize_theme_data_theme(data_theme)
+        normalized_theme_id, normalized_theme_name = self._normalize_theme_selector(
+            theme_id=theme_id,
+            theme_name=theme_name,
+        )
+        theme = await self._resolve_theme_for_brand_sync(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=normalized_theme_id,
+            theme_name=normalized_theme_name,
+        )
+
+        profile = self._resolve_theme_brand_profile(theme_name=theme["name"])
+        effective_css_vars = self._build_theme_compat_css_vars(
+            profile=profile,
+            css_vars=normalized_css_vars,
+        )
+        coverage = self._build_theme_brand_coverage_summary(
+            profile=profile,
+            source_css_vars=normalized_css_vars,
+            effective_css_vars=effective_css_vars,
+        )
+        workspace_slug = self._normalize_workspace_slug(cleaned_workspace_name)
+        css_filename = f"assets/{workspace_slug}-workspace-brand.css"
+
+        layout_content = await self._load_theme_file_text(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme["id"],
+            filename=_THEME_BRAND_LAYOUT_FILENAME,
+        )
+        layout_audit = self._audit_theme_layout(
+            layout_content=layout_content,
+            css_filename=css_filename,
+        )
+        css_content = await self._try_load_theme_file_text(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme["id"],
+            filename=css_filename,
+        )
+        settings_content = await self._try_load_theme_file_text(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme["id"],
+            filename=_THEME_BRAND_SETTINGS_FILENAME,
+        )
+        settings_audit = {
+            "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None,
+            "expectedPaths": sorted(profile.settings_value_paths.keys()),
+            "syncedPaths": [],
+            "mismatchedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+            "requiredMismatchedPaths": [],
+        }
+        if settings_content is not None and profile.settings_value_paths:
+            settings_audit = self._audit_theme_settings_data(
+                profile=profile,
+                settings_content=settings_content,
+                effective_css_vars=effective_css_vars,
+            )
+        elif settings_content is None and profile.settings_value_paths:
+            settings_audit["missingPaths"] = sorted(profile.settings_value_paths.keys())
+            settings_audit["requiredMissingPaths"] = sorted(profile.required_settings_paths)
+
+        is_ready = (
+            not coverage["missingSourceVars"]
+            and not coverage["missingThemeVars"]
+            and layout_audit["hasManagedMarkerBlock"]
+            and layout_audit["layoutIncludesManagedCssAsset"]
+            and css_content is not None
+            and not settings_audit["requiredMissingPaths"]
+            and not settings_audit["requiredMismatchedPaths"]
+        )
+
+        return {
+            "themeId": theme["id"],
+            "themeName": theme["name"],
+            "themeRole": theme["role"],
+            "layoutFilename": _THEME_BRAND_LAYOUT_FILENAME,
+            "cssFilename": css_filename,
+            "settingsFilename": settings_audit["settingsFilename"],
+            "hasManagedMarkerBlock": layout_audit["hasManagedMarkerBlock"],
+            "layoutIncludesManagedCssAsset": layout_audit["layoutIncludesManagedCssAsset"],
+            "managedCssAssetExists": css_content is not None,
+            "coverage": coverage,
+            "settingsAudit": settings_audit,
+            "isReady": is_ready,
         }
 
     async def _admin_graphql(

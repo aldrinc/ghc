@@ -9,10 +9,12 @@ import {
   useUploadDesignSystemLogo,
 } from "@/api/designSystems";
 import {
+  useAuditClientShopifyThemeBrand,
   useClient,
   useClientShopifyStatus,
   useSyncClientShopifyThemeBrand,
   useUpdateClient,
+  type ClientShopifyThemeBrandAuditResponse,
   type ClientShopifyThemeBrandSyncResponse,
 } from "@/api/clients";
 import {
@@ -506,6 +508,7 @@ export function BrandDesignSystemPage() {
   const deleteDesignSystem = useDeleteDesignSystem();
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
   const syncShopifyThemeBrand = useSyncClientShopifyThemeBrand(workspace?.id);
+  const auditShopifyThemeBrand = useAuditClientShopifyThemeBrand(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
     { enabled: Boolean(workspace?.id) }
@@ -525,6 +528,7 @@ export function BrandDesignSystemPage() {
   const [themeSyncDesignSystemId, setThemeSyncDesignSystemId] = useState("");
   const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
   const [themeSyncResult, setThemeSyncResult] = useState<ClientShopifyThemeBrandSyncResponse | null>(null);
+  const [themeAuditResult, setThemeAuditResult] = useState<ClientShopifyThemeBrandAuditResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -563,6 +567,7 @@ export function BrandDesignSystemPage() {
     setThemeSyncDesignSystemId("");
     setThemeSyncThemeName("futrgroup2-0theme");
     setThemeSyncResult(null);
+    setThemeAuditResult(null);
     setPolicySyncResult(null);
   }, [workspace?.id]);
 
@@ -701,6 +706,26 @@ export function BrandDesignSystemPage() {
     try {
       const response = await syncShopifyThemeBrand.mutateAsync(payload);
       setThemeSyncResult(response);
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
+  };
+
+  const handleAuditShopifyThemeBrand = async () => {
+    if (!workspace?.id) return;
+    const cleanedThemeName = themeSyncThemeName.trim();
+    if (!cleanedThemeName) {
+      toast.error("Enter a Shopify theme name.");
+      return;
+    }
+    const payload: { designSystemId?: string; shopDomain?: string; themeName: string } = {
+      themeName: cleanedThemeName,
+    };
+    if (themeSyncDesignSystemId) payload.designSystemId = themeSyncDesignSystemId;
+    if (shopifySyncShopDomain) payload.shopDomain = shopifySyncShopDomain;
+    try {
+      const response = await auditShopifyThemeBrand.mutateAsync(payload);
+      setThemeAuditResult(response);
     } catch {
       // Error toast is emitted by the mutation hook.
     }
@@ -914,19 +939,35 @@ export function BrandDesignSystemPage() {
                 Sync Brand tab tokens into a specific Shopify theme by name. Your `layout/theme.liquid` must include the managed marker block.
               </div>
             </div>
-            <Button
-              size="sm"
-              onClick={() => {
-                void handleSyncShopifyThemeBrand();
-              }}
-              disabled={
-                syncShopifyThemeBrand.isPending ||
-                !hasShopifyConnectionTarget ||
-                !themeSyncThemeName.trim()
-              }
-            >
-              {syncShopifyThemeBrand.isPending ? "Syncing…" : "Sync base theme"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  void handleAuditShopifyThemeBrand();
+                }}
+                disabled={
+                  auditShopifyThemeBrand.isPending ||
+                  !hasShopifyConnectionTarget ||
+                  !themeSyncThemeName.trim()
+                }
+              >
+                {auditShopifyThemeBrand.isPending ? "Auditing…" : "Audit theme"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  void handleSyncShopifyThemeBrand();
+                }}
+                disabled={
+                  syncShopifyThemeBrand.isPending ||
+                  !hasShopifyConnectionTarget ||
+                  !themeSyncThemeName.trim()
+                }
+              >
+                {syncShopifyThemeBrand.isPending ? "Syncing…" : "Sync base theme"}
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
@@ -984,8 +1025,68 @@ export function BrandDesignSystemPage() {
                     <TableCell className="text-xs text-content break-all">{themeSyncResult.cssFilename}</TableCell>
                   </TableRow>
                   <TableRow>
+                    <TableCell className="text-xs text-content-muted">Settings file</TableCell>
+                    <TableCell className="text-xs text-content break-all">{themeSyncResult.settingsFilename || "n/a"}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Coverage</TableCell>
+                    <TableCell className="text-xs text-content">
+                      {themeSyncResult.coverage.requiredThemeVars.length} required theme vars ·{" "}
+                      {themeSyncResult.coverage.missingThemeVars.length} missing
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Settings paths</TableCell>
+                    <TableCell className="text-xs text-content">
+                      {themeSyncResult.settingsSync.updatedPaths.length} updated ·{" "}
+                      {themeSyncResult.settingsSync.missingPaths.length} missing
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
                     <TableCell className="text-xs text-content-muted">Job ID</TableCell>
                     <TableCell className="text-xs text-content break-all">{themeSyncResult.jobId || "n/a (completed without async job)"}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+          ) : null}
+
+          {themeAuditResult ? (
+            <div className="space-y-2 rounded-md border border-divider p-3">
+              <div className="text-xs text-content-muted">
+                Last audit: <span className="font-semibold text-content">{themeAuditResult.shopDomain}</span> ·{" "}
+                <span className="font-semibold text-content">{themeAuditResult.themeName}</span>
+              </div>
+              <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="w-[240px] text-xs text-content-muted">Status</TableCell>
+                    <TableCell className={cn("text-xs font-semibold", themeAuditResult.isReady ? "text-emerald-600" : "text-amber-600")}>
+                      {themeAuditResult.isReady ? "Ready" : "Has gaps"}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Marker block</TableCell>
+                    <TableCell className="text-xs text-content">{themeAuditResult.hasManagedMarkerBlock ? "Present" : "Missing/invalid"}</TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Managed CSS asset</TableCell>
+                    <TableCell className="text-xs text-content">
+                      {themeAuditResult.managedCssAssetExists ? "Found" : "Missing"} ·{" "}
+                      {themeAuditResult.layoutIncludesManagedCssAsset ? "Linked in layout" : "Not linked in layout"}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Coverage gaps</TableCell>
+                    <TableCell className="text-xs text-content">
+                      {themeAuditResult.coverage.missingSourceVars.length + themeAuditResult.coverage.missingThemeVars.length}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Settings gaps</TableCell>
+                    <TableCell className="text-xs text-content">
+                      {themeAuditResult.settingsAudit.missingPaths.length + themeAuditResult.settingsAudit.mismatchedPaths.length}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
