@@ -42,7 +42,7 @@ def _validated_tokens_or_422(tokens: dict[str, object]) -> dict[str, object]:
         return validate_design_system_tokens(tokens)
     except DesignSystemGenerationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
 
 
@@ -74,7 +74,7 @@ def _apply_logo_to_tokens_or_422(
 ) -> dict[str, object]:
     if not isinstance(tokens, dict):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens must be a JSON object.",
         )
     next_tokens = deepcopy(tokens)
@@ -85,7 +85,7 @@ def _apply_logo_to_tokens_or_422(
         brand_obj = deepcopy(brand)
     else:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.brand must be a JSON object.",
         )
     brand_obj["logoAssetPublicId"] = logo_public_id

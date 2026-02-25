@@ -696,25 +696,25 @@ def sync_client_shopify_theme_brand_route(
         validated_tokens = validate_design_system_tokens(design_system.tokens)
     except DesignSystemGenerationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
 
     brand_obj = validated_tokens.get("brand")
     if not isinstance(brand_obj, dict):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.brand must be a JSON object.",
         )
     brand_name_raw = brand_obj.get("name")
     if not isinstance(brand_name_raw, str) or not brand_name_raw.strip():
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.brand.name must be a non-empty string.",
         )
     logo_public_id_raw = brand_obj.get("logoAssetPublicId")
     if not isinstance(logo_public_id_raw, str) or not logo_public_id_raw.strip():
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.brand.logoAssetPublicId must be a non-empty string.",
         )
     brand_name = brand_name_raw.strip()
@@ -723,26 +723,26 @@ def sync_client_shopify_theme_brand_route(
     css_vars_raw = validated_tokens.get("cssVars")
     if not isinstance(css_vars_raw, dict) or not css_vars_raw:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.cssVars must be a non-empty JSON object.",
         )
     css_vars: dict[str, str] = {}
     for raw_key, raw_value in css_vars_raw.items():
         if not isinstance(raw_key, str) or not raw_key.strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Design system tokens.cssVars keys must be non-empty strings.",
             )
         if not isinstance(raw_value, (str, int, float)):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Design system cssVars[{raw_key}] must be a string or number.",
             )
         if isinstance(raw_value, str):
             cleaned_value = raw_value.strip()
             if not cleaned_value:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"Design system cssVars[{raw_key}] must not be an empty string.",
                 )
         else:
@@ -752,14 +752,14 @@ def sync_client_shopify_theme_brand_route(
     font_urls_raw = validated_tokens.get("fontUrls")
     if not isinstance(font_urls_raw, list):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.fontUrls must be a list of non-empty strings.",
         )
     font_urls: list[str] = []
     for item in font_urls_raw:
         if not isinstance(item, str) or not item.strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Design system tokens.fontUrls must be a list of non-empty strings.",
             )
         font_urls.append(item.strip())
@@ -767,7 +767,7 @@ def sync_client_shopify_theme_brand_route(
     data_theme_raw = validated_tokens.get("dataTheme")
     if not isinstance(data_theme_raw, str) or not data_theme_raw.strip():
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.dataTheme must be a non-empty string.",
         )
     data_theme = data_theme_raw.strip()
@@ -780,7 +780,7 @@ def sync_client_shopify_theme_brand_route(
     )
     if not logo_asset:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
                 "Design system brand.logoAssetPublicId does not reference an existing logo asset "
                 "for this workspace."
@@ -792,18 +792,18 @@ def sync_client_shopify_theme_brand_route(
     for raw_setting_path, raw_asset_public_id in component_image_asset_map_raw.items():
         if not isinstance(raw_setting_path, str) or not raw_setting_path.strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="componentImageAssetMap keys must be non-empty strings.",
             )
         setting_path = raw_setting_path.strip()
         if setting_path in normalized_component_image_asset_map:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"componentImageAssetMap contains duplicate path after normalization: {setting_path}",
             )
         if not isinstance(raw_asset_public_id, str) or not raw_asset_public_id.strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
                     "componentImageAssetMap values must be non-empty asset public ids. "
                     f"Invalid value at path {setting_path}."
@@ -839,7 +839,7 @@ def sync_client_shopify_theme_brand_route(
             )
         except ValueError as exc:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Unable to resolve product image assets for productId={requested_product_id}: {exc}",
             ) from exc
         product_image_asset_public_ids = [
@@ -847,7 +847,7 @@ def sync_client_shopify_theme_brand_route(
         ]
         if not product_image_asset_public_ids:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
                     "No product image assets available for theme sync after excluding the brand logo. "
                     f"productId={requested_product_id}."
@@ -857,7 +857,7 @@ def sync_client_shopify_theme_brand_route(
     workspace_name = str(client.name).strip()
     if not workspace_name:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Workspace name is required to sync Shopify theme brand assets.",
         )
 
@@ -877,7 +877,7 @@ def sync_client_shopify_theme_brand_route(
             )
             if not mapped_asset:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=(
                         "componentImageAssetMap references an asset that does not exist for this workspace. "
                         f"path={setting_path}, assetPublicId={asset_public_id}."
@@ -910,7 +910,7 @@ def sync_client_shopify_theme_brand_route(
 
         if not planner_image_slots and not text_slots:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
                     "No image or text component slots were discovered for AI product content mapping. "
                     f"productId={requested_product_id}."
@@ -927,7 +927,7 @@ def sync_client_shopify_theme_brand_route(
             )
             if not mapped_asset:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=(
                         "Product image asset for theme sync could not be resolved in this workspace. "
                         f"assetPublicId={asset_public_id}, productId={requested_product_id}."
@@ -949,7 +949,7 @@ def sync_client_shopify_theme_brand_route(
             )
         except ValueError as exc:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
                     "AI theme component planner failed for Shopify sync. "
                     f"productId={requested_product_id}. {exc}"
@@ -1133,32 +1133,32 @@ def audit_client_shopify_theme_brand_route(
         validated_tokens = validate_design_system_tokens(design_system.tokens)
     except DesignSystemGenerationError as exc:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
         ) from exc
 
     css_vars_raw = validated_tokens.get("cssVars")
     if not isinstance(css_vars_raw, dict) or not css_vars_raw:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.cssVars must be a non-empty JSON object.",
         )
     css_vars: dict[str, str] = {}
     for raw_key, raw_value in css_vars_raw.items():
         if not isinstance(raw_key, str) or not raw_key.strip():
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Design system tokens.cssVars keys must be non-empty strings.",
             )
         if not isinstance(raw_value, (str, int, float)):
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Design system cssVars[{raw_key}] must be a string or number.",
             )
         if isinstance(raw_value, str):
             cleaned_value = raw_value.strip()
             if not cleaned_value:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"Design system cssVars[{raw_key}] must not be an empty string.",
                 )
         else:
@@ -1168,7 +1168,7 @@ def audit_client_shopify_theme_brand_route(
     data_theme_raw = validated_tokens.get("dataTheme")
     if not isinstance(data_theme_raw, str) or not data_theme_raw.strip():
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Design system tokens.dataTheme must be a non-empty string.",
         )
     data_theme = data_theme_raw.strip()
@@ -1176,7 +1176,7 @@ def audit_client_shopify_theme_brand_route(
     workspace_name = str(client.name).strip()
     if not workspace_name:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Workspace name is required to audit Shopify theme brand assets.",
         )
 
