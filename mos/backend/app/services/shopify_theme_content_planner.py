@@ -23,6 +23,145 @@ def _clip_text_to_max_length(*, value: str, max_length: int | None) -> str:
     return value[:max_length]
 
 
+def _score_asset_for_slot(
+    *,
+    slot_role: str,
+    slot_recommended_aspect: str,
+    asset_orientation: str,
+) -> int:
+    score = 0
+    if slot_recommended_aspect == "any":
+        score += 1
+    elif slot_recommended_aspect == asset_orientation:
+        score += 5
+    elif slot_recommended_aspect in {"landscape", "portrait"} and asset_orientation == "square":
+        score += 2
+    elif slot_recommended_aspect == "square" and asset_orientation in {"landscape", "portrait"}:
+        score += 1
+
+    if slot_role == "hero" and asset_orientation == "landscape":
+        score += 2
+    elif slot_role == "gallery" and asset_orientation in {"square", "landscape"}:
+        score += 2
+    elif slot_role == "supporting" and asset_orientation in {"square", "portrait"}:
+        score += 1
+    return score
+
+
+def _rebalance_image_assignments(
+    *,
+    component_image_asset_map: dict[str, str],
+    image_slots: list[dict[str, Any]],
+    image_assets: list[dict[str, Any]],
+) -> dict[str, str]:
+    slot_paths = [
+        str(slot["path"])
+        for slot in image_slots
+        if isinstance(slot, dict)
+        and isinstance(slot.get("path"), str)
+        and str(slot["path"]).strip()
+    ]
+    if len(slot_paths) <= 1:
+        return component_image_asset_map
+
+    unique_assets_in_order: list[dict[str, Any]] = []
+    seen_asset_ids: set[str] = set()
+    for asset in image_assets:
+        if not isinstance(asset, dict):
+            continue
+        public_id = asset.get("publicId")
+        if not isinstance(public_id, str) or not public_id.strip():
+            continue
+        normalized_public_id = public_id.strip()
+        if normalized_public_id in seen_asset_ids:
+            continue
+        seen_asset_ids.add(normalized_public_id)
+        unique_assets_in_order.append(asset)
+
+    if len(unique_assets_in_order) <= 1:
+        return component_image_asset_map
+
+    expected_unique = min(len(slot_paths), len(unique_assets_in_order))
+    current_unique = len(
+        {
+            component_image_asset_map[path]
+            for path in slot_paths
+            if isinstance(component_image_asset_map.get(path), str)
+            and component_image_asset_map[path].strip()
+        }
+    )
+    if current_unique >= expected_unique:
+        return component_image_asset_map
+
+    usage_by_asset_public_id: dict[str, int] = {}
+    rebalanced: dict[str, str] = {}
+
+    for slot in image_slots:
+        if not isinstance(slot, dict):
+            continue
+        raw_path = slot.get("path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        path = raw_path.strip()
+        slot_role = (
+            str(slot.get("role")).strip().lower()
+            if isinstance(slot.get("role"), str)
+            else "generic"
+        )
+        slot_recommended_aspect = (
+            str(slot.get("recommendedAspect")).strip().lower()
+            if isinstance(slot.get("recommendedAspect"), str)
+            else "any"
+        )
+        if slot_recommended_aspect not in {"landscape", "portrait", "square", "any"}:
+            slot_recommended_aspect = "any"
+
+        best_asset_public_id: str | None = None
+        best_score: tuple[int, int, int] | None = None
+        for index, asset in enumerate(unique_assets_in_order):
+            raw_public_id = asset.get("publicId")
+            if not isinstance(raw_public_id, str) or not raw_public_id.strip():
+                continue
+            asset_public_id = raw_public_id.strip()
+            asset_orientation = (
+                str(asset.get("orientation")).strip().lower()
+                if isinstance(asset.get("orientation"), str)
+                else "unknown"
+            )
+            usage_count = usage_by_asset_public_id.get(asset_public_id, 0)
+            unused_bonus = 100 if usage_count == 0 else 0
+            suitability = _score_asset_for_slot(
+                slot_role=slot_role,
+                slot_recommended_aspect=slot_recommended_aspect,
+                asset_orientation=asset_orientation,
+            )
+            candidate_score = (
+                unused_bonus + suitability - (usage_count * 10),
+                -usage_count,
+                -index,
+            )
+            if best_score is None or candidate_score > best_score:
+                best_score = candidate_score
+                best_asset_public_id = asset_public_id
+
+        if not best_asset_public_id:
+            raise ValueError(
+                f"Theme content planner could not assign an image asset for slot {path}."
+            )
+        rebalanced[path] = best_asset_public_id
+        usage_by_asset_public_id[best_asset_public_id] = (
+            usage_by_asset_public_id.get(best_asset_public_id, 0) + 1
+        )
+
+    if set(rebalanced.keys()) != set(slot_paths):
+        missing_paths = sorted(set(slot_paths) - set(rebalanced.keys()))
+        raise ValueError(
+            "Theme content planner did not assign all image slots after rebalancing: "
+            + ", ".join(missing_paths)
+        )
+    return rebalanced
+
+
 def _asset_orientation(*, width: int | None, height: int | None) -> str:
     if not isinstance(width, int) or not isinstance(height, int) or width <= 0 or height <= 0:
         return "unknown"
@@ -189,14 +328,6 @@ def _parse_and_validate_planner_output(
             f"Theme content planner did not assign all image slots: {', '.join(missing)}."
         )
 
-    if len(image_slot_paths) >= 2 and len(asset_public_ids) >= 2:
-        unique_asset_count = len(set(component_image_asset_map.values()))
-        if unique_asset_count < 2:
-            raise ValueError(
-                "Theme content planner assigned the same image to all slots despite multiple assets. "
-                "Use varied assets."
-            )
-
     component_text_values: dict[str, str] = {}
     for assignment in raw_text_assignments:
         if not isinstance(assignment, dict):
@@ -321,9 +452,24 @@ def plan_shopify_theme_component_content(
         raise ValueError(f"Theme content planner failed: {exc}") from exc
 
     asset_public_ids = {str(asset["publicId"]) for asset in image_assets_payload}
-    return _parse_and_validate_planner_output(
+    parsed_output = _parse_and_validate_planner_output(
         parsed=parsed,
         image_slots=truncated_image_slots,
         text_slots=truncated_text_slots,
         asset_public_ids=asset_public_ids,
     )
+    component_image_asset_map = parsed_output.get("componentImageAssetMap") or {}
+    rebalanced_image_asset_map = _rebalance_image_assignments(
+        component_image_asset_map=component_image_asset_map,
+        image_slots=truncated_image_slots,
+        image_assets=image_assets_payload,
+    )
+    if len(truncated_image_slots) >= 2 and len(asset_public_ids) >= 2:
+        unique_asset_count = len(set(rebalanced_image_asset_map.values()))
+        if unique_asset_count < 2:
+            raise ValueError(
+                "Theme content planner assigned the same image to all slots despite multiple assets. "
+                "Use varied assets."
+            )
+    parsed_output["componentImageAssetMap"] = rebalanced_image_asset_map
+    return parsed_output

@@ -856,6 +856,122 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
     assert observed["auto_component_image_urls"] == []
 
 
+def test_sync_shopify_theme_brand_requires_multiple_product_images_for_multiple_slots(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_design_system_get(self, *, org_id: str, design_system_id: str):
+        return type(
+            "FakeDesignSystem",
+            (),
+            {
+                "id": design_system_id,
+                "name": "Acme Design System",
+                "client_id": client_id,
+                "tokens": {"placeholder": True},
+            },
+        )()
+
+    def fake_validate(tokens):
+        assert tokens == {"placeholder": True}
+        return {
+            "dataTheme": "light",
+            "fontUrls": [
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
+            "cssVars": {"--color-brand": "#123456"},
+            "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
+            "funnelDefaults": {"containerWidth": "lg"},
+        }
+
+    def fake_get_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
+        if public_id in {"logo-public-id", "product-image-1"}:
+            return type("FakeAsset", (), {"public_id": public_id})()
+        return None
+
+    def fake_get_product(self, *, org_id: str, product_id: str):
+        return type(
+            "FakeProduct",
+            (),
+            {
+                "id": product_id,
+                "client_id": client_id,
+            },
+        )()
+
+    def fake_collect_product_image_public_ids(*, session, org_id: str, client_id: str, product):
+        return ["logo-public-id", "product-image-1"]
+
+    def fake_list_template_slots(
+        *,
+        client_id: str,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        return {
+            "imageSlots": [
+                {
+                    "path": "templates/index.json.sections.hero.settings.image",
+                    "role": "hero",
+                    "recommendedAspect": "16:9",
+                    "currentValue": None,
+                },
+                {
+                    "path": "templates/product.json.sections.gallery.settings.image",
+                    "role": "gallery",
+                    "recommendedAspect": "1:1",
+                    "currentValue": None,
+                },
+            ],
+            "textSlots": [],
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
+    monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
+    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_asset)
+    monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
+    monkeypatch.setattr(
+        clients_router,
+        "list_client_shopify_theme_template_slots",
+        fake_list_template_slots,
+    )
+    monkeypatch.setattr(
+        clients_router.funnel_ai,
+        "_collect_product_image_public_ids",
+        fake_collect_product_image_public_ids,
+    )
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/sync",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "productId": "product-123",
+            "themeName": "futrgroup2-0theme",
+        },
+    )
+
+    assert response.status_code == 422
+    assert "fewer than two eligible product images were available" in response.json()["detail"]
+
+
 def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omitted(
     api_client, monkeypatch
 ):

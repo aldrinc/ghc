@@ -907,6 +907,22 @@ def sync_client_shopify_theme_brand_route(
             and isinstance(slot.get("path"), str)
             and slot["path"] not in explicit_image_paths
         ]
+        unique_product_image_asset_public_ids = {
+            public_id.strip()
+            for public_id in product_image_asset_public_ids
+            if isinstance(public_id, str) and public_id.strip()
+        }
+
+        if len(planner_image_slots) > 1 and len(unique_product_image_asset_public_ids) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Theme sync discovered multiple image component slots, but fewer than two "
+                    "eligible product images were available after filtering. "
+                    f"productId={requested_product_id}. Provide additional product images or set "
+                    "componentImageAssetMap for explicit slot mapping."
+                ),
+            )
 
         if not planner_image_slots and not text_slots:
             raise HTTPException(
