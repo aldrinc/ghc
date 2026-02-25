@@ -281,6 +281,11 @@ _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
         "footer_background": "--footer-bg",
         "footer_text": "--color-text",
         "border": "--color-border",
+        "price": "--color-brand",
+        "sale_price": "--color-cta",
+        "sale_tag": "--color-cta",
+        "drawer_overlay": "--color-soft",
+        "checkout_error": "--color-text",
     }
 }
 _THEME_SETTINGS_COLOR_KEY_MARKERS = frozenset(

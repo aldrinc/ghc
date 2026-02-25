@@ -1609,6 +1609,45 @@ def test_sync_theme_settings_data_updates_semantic_color_paths():
     assert report["unmappedColorPaths"] == []
 
 
+def test_sync_theme_settings_data_updates_checkout_and_sale_semantic_color_paths():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "checkout_error_color": "#ff0000",
+            "color_price": "#ff0000",
+            "color_sale_price": "#ff0000",
+            "color_sale_tag": "#ff0000",
+            "sections": {
+                "main-password-header": {
+                    "settings": {
+                        "color_drawer_overlay": "#ff0000",
+                    }
+                }
+            },
+        }
+    )
+
+    next_settings_content, report = ShopifyApiClient._sync_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+
+    assert synced_settings["current"]["checkout_error_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert synced_settings["current"]["color_price"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
+    assert synced_settings["current"]["color_sale_price"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    assert synced_settings["current"]["color_sale_tag"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    assert synced_settings["current"]["sections"]["main-password-header"]["settings"]["color_drawer_overlay"] == (
+        _THEME_SYNC_REQUIRED_CSS_VARS["--color-soft"]
+    )
+    assert report["unmappedColorPaths"] == []
+
+
 def test_sync_theme_settings_data_errors_for_unmapped_color_paths():
     profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
