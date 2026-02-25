@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 
 import pytest
 
@@ -24,6 +25,38 @@ _THEME_SYNC_REQUIRED_CSS_VARS = {
     "--section-pad-y": "120px",
     "--footer-bg": "#f4ede6",
 }
+
+
+def _build_minimal_theme_settings_json(*, extra_current: dict[str, object] | None = None) -> str:
+    current: dict[str, object] = {
+        "color_background": "#ffffff",
+        "color_foreground": "#111111",
+        "color_button": "#000000",
+        "color_button_text": "#ffffff",
+        "color_link": "#000000",
+        "color_accent": "#000000",
+        "footer_background": "#ffffff",
+        "footer_text": "#111111",
+        "color_schemes": [
+            {
+                "settings": {
+                    "background": "#ffffff",
+                    "text": "#111111",
+                    "button": "#000000",
+                    "button_label": "#ffffff",
+                    "secondary_button": "#eeeeee",
+                    "secondary_button_label": "#111111",
+                    "highlight": "rgba(0, 0, 0, 0.08)",
+                    "keyboard_focus": "rgba(6, 26, 112, 0.35)",
+                    "shadow": "rgba(34, 34, 34, 0.72)",
+                    "image_background": "#ffffff",
+                }
+            }
+        ],
+    }
+    if extra_current:
+        current.update(extra_current)
+    return json.dumps({"current": current}) + "\n"
 
 
 def test_register_webhook_reuses_existing_subscription_when_address_taken():
@@ -850,8 +883,12 @@ def test_sync_theme_brand_updates_layout_and_css():
                 "current.color_schemes[*].settings.background",
                 "current.color_schemes[*].settings.button",
                 "current.color_schemes[*].settings.button_label",
+                "current.color_schemes[*].settings.highlight",
+                "current.color_schemes[*].settings.image_background",
+                "current.color_schemes[*].settings.keyboard_focus",
                 "current.color_schemes[*].settings.secondary_button",
                 "current.color_schemes[*].settings.secondary_button_label",
+                "current.color_schemes[*].settings.shadow",
                 "current.color_schemes[*].settings.text",
                 "current.footer_background",
                 "current.footer_text",
@@ -866,14 +903,20 @@ def test_sync_theme_brand_updates_layout_and_css():
                 "current.color_schemes[*].settings.background",
                 "current.color_schemes[*].settings.button",
                 "current.color_schemes[*].settings.button_label",
+                "current.color_schemes[*].settings.highlight",
+                "current.color_schemes[*].settings.image_background",
+                "current.color_schemes[*].settings.keyboard_focus",
                 "current.color_schemes[*].settings.secondary_button",
                 "current.color_schemes[*].settings.secondary_button_label",
+                "current.color_schemes[*].settings.shadow",
                 "current.color_schemes[*].settings.text",
                 "current.footer_background",
                 "current.footer_text",
             ],
             "missingPaths": [],
             "requiredMissingPaths": [],
+            "semanticUpdatedPaths": [],
+            "unmappedColorPaths": [],
         },
     }
     assert len(observed_payloads) == 5
@@ -1033,6 +1076,8 @@ def test_sync_theme_brand_allows_upsert_without_job():
             ],
             "missingPaths": [],
             "requiredMissingPaths": [],
+            "semanticUpdatedPaths": [],
+            "unmappedColorPaths": [],
         },
     }
     assert len(observed_payloads) == 4
@@ -1148,8 +1193,12 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_presets():
         "current.color_schemes[*].settings.background",
         "current.color_schemes[*].settings.button",
         "current.color_schemes[*].settings.button_label",
+        "current.color_schemes[*].settings.highlight",
+        "current.color_schemes[*].settings.image_background",
+        "current.color_schemes[*].settings.keyboard_focus",
         "current.color_schemes[*].settings.secondary_button",
         "current.color_schemes[*].settings.secondary_button_label",
+        "current.color_schemes[*].settings.shadow",
         "current.color_schemes[*].settings.text",
         "current.footer_background",
         "current.footer_text",
@@ -1257,7 +1306,7 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_nested_root_node
         )
     )
 
-    assert len(result["settingsSync"]["updatedPaths"]) == 14
+    assert len(result["settingsSync"]["updatedPaths"]) == 18
     assert result["settingsSync"]["missingPaths"] == []
 
 
@@ -1523,6 +1572,92 @@ def test_resolve_theme_brand_profile_supports_canonicalized_theme_aliases():
     assert "current.color_background" in profile.required_settings_paths
 
 
+def test_sync_theme_settings_data_updates_semantic_color_paths():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "sections": {
+                "announcement": {
+                    "text_color": "#ffffff",
+                    "border_color": "#ffffff",
+                }
+            }
+        }
+    )
+
+    next_settings_content, report = ShopifyApiClient._sync_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+
+    assert synced_settings["current"]["sections"]["announcement"]["text_color"] == _THEME_SYNC_REQUIRED_CSS_VARS[
+        "--color-text"
+    ]
+    assert synced_settings["current"]["sections"]["announcement"]["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS[
+        "--color-border"
+    ]
+    assert report["semanticUpdatedPaths"] == [
+        "current.sections.announcement.border_color",
+        "current.sections.announcement.text_color",
+    ]
+    assert report["unmappedColorPaths"] == []
+
+
+def test_sync_theme_settings_data_errors_for_unmapped_color_paths():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "color_badge": "#ff00ff",
+        }
+    )
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="unmapped color setting paths: current.color_badge",
+    ):
+        ShopifyApiClient._sync_theme_settings_data(
+            profile=profile,
+            settings_content=settings_content,
+            effective_css_vars=effective_css_vars,
+        )
+
+
+def test_audit_theme_settings_data_reports_semantic_mismatch():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "sections": {
+                "announcement": {
+                    "text_color": "#ffffff",
+                }
+            }
+        }
+    )
+
+    report = ShopifyApiClient._audit_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+    )
+
+    assert "current.sections.announcement.text_color" in report["semanticMismatchedPaths"]
+    assert report["unmappedColorPaths"] == []
+
+
 def test_sync_theme_brand_requires_one_theme_selector():
     client = ShopifyApiClient()
 
@@ -1561,6 +1696,10 @@ def test_audit_theme_brand_reports_ready_when_layout_css_and_settings_are_synced
           "text": "#222222",
           "button": "#0a8f3c",
           "button_label": "#ffffff",
+          "highlight": "rgba(0, 0, 0, 0.08)",
+          "keyboard_focus": "rgba(6, 26, 112, 0.35)",
+          "shadow": "rgba(34, 34, 34, 0.72)",
+          "image_background": "#ffffff",
           "secondary_button": "#ffffff",
           "secondary_button_label": "#222222"
         }
@@ -1668,6 +1807,8 @@ def test_audit_theme_brand_reports_ready_when_layout_css_and_settings_are_synced
     assert result["coverage"]["missingThemeVars"] == []
     assert result["settingsAudit"]["missingPaths"] == []
     assert result["settingsAudit"]["mismatchedPaths"] == []
+    assert result["settingsAudit"]["semanticMismatchedPaths"] == []
+    assert result["settingsAudit"]["unmappedColorPaths"] == []
 
 
 def test_audit_theme_brand_reports_gaps_for_missing_marker_and_css_asset():

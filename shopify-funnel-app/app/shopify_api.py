@@ -195,6 +195,10 @@ _THEME_SETTINGS_VALUE_PATHS_BY_NAME: dict[str, dict[str, str]] = {
         "current.color_schemes[*].settings.button_label": "--color-cta-text",
         "current.color_schemes[*].settings.secondary_button": "--color-bg",
         "current.color_schemes[*].settings.secondary_button_label": "--color-text",
+        "current.color_schemes[*].settings.highlight": "--color-soft",
+        "current.color_schemes[*].settings.keyboard_focus": "--focus-outline-color",
+        "current.color_schemes[*].settings.shadow": "--color-muted",
+        "current.color_schemes[*].settings.image_background": "--color-bg",
     }
 }
 _THEME_REQUIRED_SETTINGS_PATHS_BY_NAME: dict[str, tuple[str, ...]] = {
@@ -213,6 +217,10 @@ _THEME_REQUIRED_SETTINGS_PATHS_BY_NAME: dict[str, tuple[str, ...]] = {
         "current.color_schemes[*].settings.button_label",
         "current.color_schemes[*].settings.secondary_button",
         "current.color_schemes[*].settings.secondary_button_label",
+        "current.color_schemes[*].settings.highlight",
+        "current.color_schemes[*].settings.keyboard_focus",
+        "current.color_schemes[*].settings.shadow",
+        "current.color_schemes[*].settings.image_background",
     ),
 }
 _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[str, tuple[tuple[str, tuple[tuple[str, str], ...]], ...]] = {
@@ -254,6 +262,69 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[str, tuple[tuple[str, tuple[tuple
         ),
     ),
 }
+_THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
+    "futrgroup2-0theme": {
+        "background": "--color-page-bg",
+        "foreground": "--color-text",
+        "text": "--color-text",
+        "button": "--color-cta",
+        "button_text": "--color-cta-text",
+        "button_label": "--color-cta-text",
+        "secondary_button": "--color-bg",
+        "secondary_button_label": "--color-text",
+        "link": "--color-brand",
+        "accent": "--color-brand",
+        "highlight": "--color-soft",
+        "keyboard_focus": "--focus-outline-color",
+        "shadow": "--color-muted",
+        "image_background": "--color-bg",
+        "footer_background": "--footer-bg",
+        "footer_text": "--color-text",
+        "border": "--color-border",
+    }
+}
+_THEME_SETTINGS_COLOR_KEY_MARKERS = frozenset(
+    {
+        "background",
+        "foreground",
+        "text",
+        "button",
+        "label",
+        "link",
+        "accent",
+        "highlight",
+        "focus",
+        "shadow",
+        "image",
+        "border",
+        "color",
+    }
+)
+_THEME_SETTINGS_SEMANTIC_KEY_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
+_THEME_SETTINGS_SEMANTIC_KEY_COLLAPSE_RE = re.compile(r"_+")
+_THEME_SETTINGS_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE)
+_THEME_SETTINGS_CSS_COLOR_FUNCTION_RE = re.compile(r"^(?:rgb|rgba|hsl|hsla)\s*\(", re.IGNORECASE)
+_THEME_SETTINGS_CSS_VAR_RE = re.compile(r"^var\(\s*--[A-Za-z0-9_-]+(?:\s*,\s*[^)]+)?\s*\)$")
+_THEME_SETTINGS_COLOR_VALUE_KEYWORDS = frozenset({"transparent", "currentcolor", "inherit", "initial", "unset"})
+_THEME_SETTINGS_SEMANTIC_TOKEN_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("secondary", "button", "label"), "secondary_button_label"),
+    (("secondary", "button"), "secondary_button"),
+    (("button", "label"), "button_label"),
+    (("button", "text"), "button_text"),
+    (("keyboard", "focus"), "keyboard_focus"),
+    (("image", "background"), "image_background"),
+    (("footer", "background"), "footer_background"),
+    (("footer", "text"), "footer_text"),
+    (("background",), "background"),
+    (("foreground",), "foreground"),
+    (("highlight",), "highlight"),
+    (("shadow",), "shadow"),
+    (("accent",), "accent"),
+    (("link",), "link"),
+    (("border",), "border"),
+    (("text",), "text"),
+    (("button",), "button"),
+)
 _SETTINGS_PATH_SEGMENT_RE = re.compile(r"^([A-Za-z0-9_-]+)(?:\[(\*|\d+)\])?$")
 
 
@@ -275,6 +346,7 @@ def _build_theme_profile_lookup_by_canonical_name() -> dict[str, str]:
         + list(_THEME_REQUIRED_THEME_VARS_BY_NAME.keys())
         + list(_THEME_SETTINGS_VALUE_PATHS_BY_NAME.keys())
         + list(_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME.keys())
+        + list(_THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.keys())
     )
     for profile_name in profile_names:
         lookup[_canonicalize_theme_profile_lookup_key(profile_name)] = profile_name
@@ -2076,6 +2148,175 @@ class ShopifyApiClient:
         return False
 
     @staticmethod
+    def _normalize_theme_settings_semantic_key(*, raw_key: str) -> str:
+        sanitized = _THEME_SETTINGS_SEMANTIC_KEY_SANITIZE_RE.sub("_", raw_key.strip().lower())
+        collapsed = _THEME_SETTINGS_SEMANTIC_KEY_COLLAPSE_RE.sub("_", sanitized)
+        return collapsed.strip("_")
+
+    @classmethod
+    def _is_theme_settings_color_key(cls, *, key: str) -> bool:
+        normalized_key = cls._normalize_theme_settings_semantic_key(raw_key=key)
+        if not normalized_key:
+            return False
+        key_tokens = {token for token in normalized_key.split("_") if token}
+        return bool(key_tokens & _THEME_SETTINGS_COLOR_KEY_MARKERS)
+
+    @staticmethod
+    def _is_theme_settings_color_like_value(*, value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        normalized_value = value.strip()
+        if not normalized_value:
+            return False
+        lowered_value = normalized_value.lower()
+        if _THEME_SETTINGS_HEX_COLOR_RE.fullmatch(normalized_value):
+            return True
+        if _THEME_SETTINGS_CSS_COLOR_FUNCTION_RE.match(normalized_value):
+            return True
+        if _THEME_SETTINGS_CSS_VAR_RE.fullmatch(normalized_value):
+            return True
+        return lowered_value in _THEME_SETTINGS_COLOR_VALUE_KEYWORDS
+
+    @classmethod
+    def _resolve_theme_settings_semantic_key(
+        cls,
+        *,
+        semantic_source_vars: dict[str, str],
+        raw_key: str,
+    ) -> str | None:
+        normalized_key = cls._normalize_theme_settings_semantic_key(raw_key=raw_key)
+        if not normalized_key:
+            return None
+        if normalized_key in semantic_source_vars:
+            return normalized_key
+
+        variant_candidates = (
+            normalized_key.removeprefix("color_"),
+            normalized_key.removesuffix("_color"),
+            normalized_key.removeprefix("color_").removesuffix("_color"),
+        )
+        for candidate in variant_candidates:
+            if candidate and candidate in semantic_source_vars:
+                return candidate
+
+        key_tokens = {token for token in normalized_key.split("_") if token}
+        if not key_tokens:
+            return None
+        for required_tokens, semantic_key in _THEME_SETTINGS_SEMANTIC_TOKEN_RULES:
+            if semantic_key not in semantic_source_vars:
+                continue
+            if all(token in key_tokens for token in required_tokens):
+                return semantic_key
+        return None
+
+    @classmethod
+    def _collect_theme_current_color_setting_leaves(
+        cls,
+        *,
+        settings_data: dict[str, Any],
+    ) -> list[tuple[dict[str, Any], str, str]]:
+        current = settings_data.get("current")
+        if not isinstance(current, dict):
+            return []
+        leaves: list[tuple[dict[str, Any], str, str]] = []
+
+        def collect(node: Any, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    child_path = f"{path}.{key}" if path else key
+                    if isinstance(value, (dict, list)):
+                        collect(value, child_path)
+                        continue
+                    if not cls._is_theme_settings_color_key(key=key):
+                        continue
+                    if not cls._is_theme_settings_color_like_value(value=value):
+                        continue
+                    leaves.append((node, key, child_path))
+                return
+            if isinstance(node, list):
+                for index, item in enumerate(node):
+                    collect(item, f"{path}[{index}]")
+
+        collect(current, "current")
+        return leaves
+
+    @classmethod
+    def _sync_theme_semantic_color_settings(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        settings_data: dict[str, Any],
+        effective_css_vars: dict[str, str],
+    ) -> tuple[list[str], list[str]]:
+        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        if not semantic_source_vars:
+            return [], []
+
+        updated_paths: list[str] = []
+        unmapped_paths: list[str] = []
+        for parent, key, path in cls._collect_theme_current_color_setting_leaves(settings_data=settings_data):
+            semantic_key = cls._resolve_theme_settings_semantic_key(
+                semantic_source_vars=semantic_source_vars,
+                raw_key=key,
+            )
+            if semantic_key is None:
+                unmapped_paths.append(path)
+                continue
+            source_var = semantic_source_vars[semantic_key]
+            expected_value = effective_css_vars.get(source_var)
+            if expected_value is None:
+                raise ShopifyApiError(
+                    message=(
+                        f"Theme settings semantic mapping requires css var {source_var} for path {path}. "
+                        "Add the missing token to the design system."
+                    ),
+                    status_code=422,
+                )
+            existing_value = parent.get(key)
+            if isinstance(existing_value, str) and existing_value.strip() == expected_value:
+                continue
+            parent[key] = expected_value
+            updated_paths.append(path)
+
+        return sorted(set(updated_paths)), sorted(set(unmapped_paths))
+
+    @classmethod
+    def _audit_theme_semantic_color_settings(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        settings_data: dict[str, Any],
+        effective_css_vars: dict[str, str],
+    ) -> tuple[list[str], list[str], list[str]]:
+        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        if not semantic_source_vars:
+            return [], [], []
+
+        synced_paths: list[str] = []
+        mismatched_paths: list[str] = []
+        unmapped_paths: list[str] = []
+        for parent, key, path in cls._collect_theme_current_color_setting_leaves(settings_data=settings_data):
+            semantic_key = cls._resolve_theme_settings_semantic_key(
+                semantic_source_vars=semantic_source_vars,
+                raw_key=key,
+            )
+            if semantic_key is None:
+                unmapped_paths.append(path)
+                continue
+            source_var = semantic_source_vars[semantic_key]
+            expected_value = effective_css_vars.get(source_var)
+            if expected_value is None:
+                mismatched_paths.append(path)
+                continue
+            existing_value = parent.get(key)
+            if isinstance(existing_value, str) and existing_value.strip() == expected_value:
+                synced_paths.append(path)
+            else:
+                mismatched_paths.append(path)
+
+        return sorted(set(synced_paths)), sorted(set(mismatched_paths)), sorted(set(unmapped_paths))
+
+    @staticmethod
     def _parse_theme_settings_json(*, settings_content: str) -> dict[str, Any]:
         # Shopify settings_data.json may include a UTF-8 BOM and a leading
         # autogenerated comment block before the JSON object.
@@ -2133,6 +2374,8 @@ class ShopifyApiClient:
             "updatedPaths": [],
             "missingPaths": [],
             "requiredMissingPaths": [],
+            "semanticUpdatedPaths": [],
+            "unmappedColorPaths": [],
         }
         if not profile.settings_value_paths:
             return settings_content, report
@@ -2202,9 +2445,26 @@ class ShopifyApiClient:
                 status_code=409,
             )
 
+        semantic_updated_paths, unmapped_color_paths = cls._sync_theme_semantic_color_settings(
+            profile=profile,
+            settings_data=settings_data,
+            effective_css_vars=effective_css_vars,
+        )
+        if unmapped_color_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Theme settings sync discovered unmapped color setting paths: "
+                    f"{', '.join(unmapped_color_paths)}. "
+                    "Add semantic mappings in _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME."
+                ),
+                status_code=422,
+            )
+
         report["updatedPaths"] = sorted(updated_paths)
         report["missingPaths"] = sorted(missing_paths)
         report["requiredMissingPaths"] = required_missing_paths
+        report["semanticUpdatedPaths"] = semantic_updated_paths
+        report["unmappedColorPaths"] = unmapped_color_paths
         return json.dumps(settings_data, indent=2, ensure_ascii=False) + "\n", report
 
     @classmethod
@@ -2223,6 +2483,9 @@ class ShopifyApiClient:
             "missingPaths": [],
             "requiredMissingPaths": [],
             "requiredMismatchedPaths": [],
+            "semanticSyncedPaths": [],
+            "semanticMismatchedPaths": [],
+            "unmappedColorPaths": [],
         }
         if not profile.settings_value_paths:
             return report
@@ -2264,12 +2527,20 @@ class ShopifyApiClient:
 
         required_missing_paths = sorted(path for path in profile.required_settings_paths if path in missing_paths)
         required_mismatched_paths = sorted(path for path in profile.required_settings_paths if path in mismatched_paths)
+        semantic_synced_paths, semantic_mismatched_paths, unmapped_color_paths = cls._audit_theme_semantic_color_settings(
+            profile=profile,
+            settings_data=settings_data,
+            effective_css_vars=effective_css_vars,
+        )
 
         report["syncedPaths"] = sorted(synced_paths)
         report["mismatchedPaths"] = sorted(mismatched_paths)
         report["missingPaths"] = sorted(missing_paths)
         report["requiredMissingPaths"] = required_missing_paths
         report["requiredMismatchedPaths"] = required_mismatched_paths
+        report["semanticSyncedPaths"] = semantic_synced_paths
+        report["semanticMismatchedPaths"] = semantic_mismatched_paths
+        report["unmappedColorPaths"] = unmapped_color_paths
         return report
 
     @classmethod
@@ -2891,6 +3162,8 @@ class ShopifyApiClient:
             "updatedPaths": [],
             "missingPaths": [],
             "requiredMissingPaths": [],
+            "semanticUpdatedPaths": [],
+            "unmappedColorPaths": [],
         }
         next_settings_content: str | None = None
         if settings_content is not None and profile.settings_value_paths:
@@ -3002,6 +3275,9 @@ class ShopifyApiClient:
             "missingPaths": [],
             "requiredMissingPaths": [],
             "requiredMismatchedPaths": [],
+            "semanticSyncedPaths": [],
+            "semanticMismatchedPaths": [],
+            "unmappedColorPaths": [],
         }
         if settings_content is not None and profile.settings_value_paths:
             settings_audit = self._audit_theme_settings_data(
@@ -3021,6 +3297,8 @@ class ShopifyApiClient:
             and css_content is not None
             and not settings_audit["requiredMissingPaths"]
             and not settings_audit["requiredMismatchedPaths"]
+            and not settings_audit["semanticMismatchedPaths"]
+            and not settings_audit["unmappedColorPaths"]
         )
 
         return {
