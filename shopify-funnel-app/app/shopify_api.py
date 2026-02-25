@@ -2305,6 +2305,7 @@ class ShopifyApiClient:
         *,
         semantic_source_vars: dict[str, str],
         raw_key: str,
+        raw_path: str | None = None,
     ) -> str | None:
         normalized_key = cls._normalize_theme_settings_semantic_key(raw_key=raw_key)
         if not normalized_key:
@@ -2314,6 +2315,38 @@ class ShopifyApiClient:
         key_tokens = {token for token in normalized_key.split("_") if token}
         if not key_tokens:
             return None
+        path_tokens = cls._tokenize_theme_settings_path(path=raw_path) if raw_path else set()
+
+        # Section-level footer components should map generic background keys to
+        # the footer background semantic token, not the global page background.
+        if (
+            "footer_background" in semantic_source_vars
+            and "footer" in path_tokens
+            and ({"background", "bg"} & key_tokens)
+        ):
+            return "footer_background"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
+            and "newsletter" in key_tokens
+            and ({"color", "text", "foreground"} & key_tokens)
+        ):
+            return "footer_text"
+        if (
+            "button" in semantic_source_vars
+            and "announcement" in path_tokens
+            and ({"background", "bg"} & key_tokens)
+            and "border" not in key_tokens
+        ):
+            return "button"
+        if (
+            "text" in semantic_source_vars
+            and "announcement" in path_tokens
+            and ({"text", "foreground"} & key_tokens)
+            and "color" in key_tokens
+            and not ({"background", "bg", "border"} & key_tokens)
+        ):
+            return "text"
 
         # `button_color` should map to button text before generic variant matching
         # (`button`) so component text colors do not become button backgrounds.
@@ -2391,6 +2424,7 @@ class ShopifyApiClient:
             semantic_key = cls._resolve_theme_settings_semantic_key(
                 semantic_source_vars=semantic_source_vars,
                 raw_key=key,
+                raw_path=path,
             )
             if semantic_key is None:
                 unmapped_paths.append(path)
@@ -2432,6 +2466,7 @@ class ShopifyApiClient:
             semantic_key = cls._resolve_theme_settings_semantic_key(
                 semantic_source_vars=semantic_source_vars,
                 raw_key=key,
+                raw_path=path,
             )
             if semantic_key is None:
                 unmapped_paths.append(path)
@@ -2976,6 +3011,7 @@ class ShopifyApiClient:
             semantic_key = cls._resolve_theme_settings_semantic_key(
                 semantic_source_vars=semantic_source_vars,
                 raw_key=key,
+                raw_path=path,
             )
             if semantic_key is None:
                 unmapped_paths.append(path)
@@ -3037,6 +3073,7 @@ class ShopifyApiClient:
             semantic_key = cls._resolve_theme_settings_semantic_key(
                 semantic_source_vars=semantic_source_vars,
                 raw_key=key,
+                raw_path=path,
             )
             if semantic_key is None:
                 unmapped_paths.append(path)

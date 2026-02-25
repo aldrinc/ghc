@@ -1832,6 +1832,7 @@ def test_sync_theme_settings_data_updates_semantic_color_paths():
         extra_current={
             "sections": {
                 "announcement": {
+                    "background_color": "#000000",
                     "text_color": "#ffffff",
                     "border_color": "#ffffff",
                 }
@@ -1846,6 +1847,9 @@ def test_sync_theme_settings_data_updates_semantic_color_paths():
     )
     synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
 
+    assert synced_settings["current"]["sections"]["announcement"]["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS[
+        "--color-cta"
+    ]
     assert synced_settings["current"]["sections"]["announcement"]["text_color"] == _THEME_SYNC_REQUIRED_CSS_VARS[
         "--color-text"
     ]
@@ -1853,9 +1857,48 @@ def test_sync_theme_settings_data_updates_semantic_color_paths():
         "--color-border"
     ]
     assert report["semanticUpdatedPaths"] == [
+        "current.sections.announcement.background_color",
         "current.sections.announcement.border_color",
         "current.sections.announcement.text_color",
     ]
+    assert report["unmappedColorPaths"] == []
+
+
+def test_sync_theme_settings_data_maps_footer_section_background_to_footer_bg():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "sections": {
+                "ss_footer_4_abc123": {
+                    "type": "ss-footer-4",
+                    "settings": {
+                        "background_color": "#111111",
+                        "border_color": "#222222",
+                        "newsletter_color": "#333333",
+                    },
+                }
+            }
+        }
+    )
+
+    next_settings_content, report = ShopifyApiClient._sync_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    footer_settings = synced_settings["current"]["sections"]["ss_footer_4_abc123"]["settings"]
+
+    assert footer_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
+    assert footer_settings["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    assert footer_settings["newsletter_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert "current.sections.ss_footer_4_abc123.settings.background_color" in report["semanticUpdatedPaths"]
+    assert "current.sections.ss_footer_4_abc123.settings.border_color" in report["semanticUpdatedPaths"]
+    assert "current.sections.ss_footer_4_abc123.settings.newsletter_color" in report["semanticUpdatedPaths"]
     assert report["unmappedColorPaths"] == []
 
 
@@ -2133,6 +2176,91 @@ def test_sync_theme_template_color_settings_data_updates_component_paths():
     assert heading_block_settings["icon_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
     assert report["unmappedColorPaths"] == []
     assert "templates/index.json.sections.hero.settings.heading_color" in report["updatedPaths"]
+
+
+def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_footer_bg():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "ss_footer_4_9rJacA": {
+                    "type": "ss-footer-4",
+                    "settings": {
+                        "background_color": "#000000",
+                        "border_color": "#000000",
+                        "newsletter_color": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/footer-group.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/footer-group.json",
+        template_content=next_template_content,
+    )
+    footer_settings = synced_template["sections"]["ss_footer_4_9rJacA"]["settings"]
+
+    assert footer_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
+    assert footer_settings["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    assert footer_settings["newsletter_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.background_color" in report[
+        "updatedPaths"
+    ]
+    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.newsletter_color" in report[
+        "updatedPaths"
+    ]
+    assert report["unmappedColorPaths"] == []
+
+
+def test_sync_theme_template_color_settings_data_maps_announcement_background_to_cta_bg():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "announcement_bar_main": {
+                    "type": "announcement-bar",
+                    "settings": {
+                        "background_color": "#000000",
+                        "text_color": "#000000",
+                        "border_color": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/index.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/index.json",
+        template_content=next_template_content,
+    )
+    announcement_settings = synced_template["sections"]["announcement_bar_main"]["settings"]
+
+    assert announcement_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    assert announcement_settings["text_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert announcement_settings["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    assert "templates/index.json.sections.announcement_bar_main.settings.background_color" in report["updatedPaths"]
+    assert report["unmappedColorPaths"] == []
 
 
 def test_parse_theme_template_json_supports_leading_comment_block():
