@@ -2276,6 +2276,24 @@ def test_create_logo_staged_upload_target_errors_for_invalid_parameter_value():
         )
 
 
+def test_coerce_staged_upload_form_data_errors_for_duplicate_parameter_name():
+    with pytest.raises(
+        ShopifyApiError,
+        match="stagedUploadsCreate returned duplicate parameter names for logo upload",
+    ):
+        ShopifyApiClient._coerce_staged_upload_form_data(
+            parameters=[("key", "one"), ("acl", "private"), ("key", "two")]
+        )
+
+
+def test_coerce_staged_upload_form_data_returns_dict():
+    form_data = ShopifyApiClient._coerce_staged_upload_form_data(
+        parameters=[("key", "logo-key"), ("acl", "private")]
+    )
+
+    assert form_data == {"key": "logo-key", "acl": "private"}
+
+
 def test_resolve_logo_upload_metadata_appends_missing_extension():
     filename, mime_type = ShopifyApiClient._resolve_logo_upload_metadata(
         source_url="https://assets.example.com/public/assets/logo-1",

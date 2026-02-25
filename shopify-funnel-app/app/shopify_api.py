@@ -4278,11 +4278,12 @@ class ShopifyApiClient:
         mime_type: str,
         content: bytes,
     ) -> None:
+        form_data = self._coerce_staged_upload_form_data(parameters=parameters)
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.post(
                     upload_url,
-                    data=parameters,
+                    data=form_data,
                     files={"file": (filename, content, mime_type)},
                 )
         except httpx.InvalidURL as exc:
@@ -4302,6 +4303,21 @@ class ShopifyApiClient:
                 ),
                 status_code=409,
             )
+
+    @staticmethod
+    def _coerce_staged_upload_form_data(*, parameters: list[tuple[str, str]]) -> dict[str, str]:
+        form_data: dict[str, str] = {}
+        for name, value in parameters:
+            if name in form_data:
+                raise ShopifyApiError(
+                    message=(
+                        "stagedUploadsCreate returned duplicate parameter names for logo upload. "
+                        f"parameterName={name!r}."
+                    ),
+                    status_code=409,
+                )
+            form_data[name] = value
+        return form_data
 
     @staticmethod
     def _coerce_logo_file_node(*, node: Any) -> tuple[str | None, str | None, str | None, str | None]:
