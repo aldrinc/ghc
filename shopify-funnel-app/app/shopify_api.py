@@ -540,6 +540,10 @@ _THEME_COMPONENT_TEXT_VALUE_SKIP_RE = re.compile(
     r"^(?:https?://|shopify://|#[0-9a-f]{3,8}|var\(|rgba?\(|hsla?\(|\d+(?:\.\d+)?(?:px|rem|em|%)?)",
     re.IGNORECASE,
 )
+_THEME_COMPONENT_RICHTEXT_TOP_LEVEL_TAG_RE = re.compile(
+    r"^\s*<(?:p|ul|ol|h[1-6])(?:\s[^>]*)?>",
+    re.IGNORECASE,
+)
 _THEME_SETTINGS_SEMANTIC_TOKEN_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("secondary", "button", "label"), "secondary_button_label"),
     (("secondary", "button"), "secondary_button"),
@@ -5133,10 +5137,18 @@ class ShopifyApiClient:
                     ),
                     status_code=500,
                 )
+            existing_values = cls._read_json_path_values(
+                node=template_data,
+                path=json_path,
+            )
+            resolved_text_value = cls._coerce_theme_component_text_value_for_setting(
+                text_value=text_value,
+                existing_values=existing_values,
+            )
             update_count = cls._set_json_path_value(
                 node=template_data,
                 path=json_path,
-                value=text_value,
+                value=resolved_text_value,
                 create_missing_leaf=False,
             )
             if update_count > 0:
@@ -5152,6 +5164,30 @@ class ShopifyApiClient:
             json.dumps(template_data, ensure_ascii=False, separators=(",", ":")) + "\n",
             report,
         )
+
+    @staticmethod
+    def _is_theme_component_richtext_value(*, value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        normalized = value.strip()
+        if not normalized:
+            return False
+        return bool(_THEME_COMPONENT_RICHTEXT_TOP_LEVEL_TAG_RE.match(normalized))
+
+    @classmethod
+    def _coerce_theme_component_text_value_for_setting(
+        cls,
+        *,
+        text_value: str,
+        existing_values: list[Any],
+    ) -> str:
+        if any(
+            cls._is_theme_component_richtext_value(value=value)
+            for value in existing_values
+        ):
+            collapsed = " ".join(text_value.split()).strip()
+            return f"<p>{escape(collapsed)}</p>"
+        return text_value
 
     @classmethod
     def _sync_theme_template_component_image_settings_data(
@@ -7549,15 +7585,12 @@ class ShopifyApiClient:
                     normalized_message = (
                         message.strip().lower() if isinstance(message, str) else ""
                     )
-                    if (
-                        "access denied for menus field" in normalized_message
-                        or (
-                            isinstance(path, list)
-                            and any(
-                                isinstance(path_part, str)
-                                and path_part.strip().lower() == "menus"
-                                for path_part in path
-                            )
+                    if "access denied for menus field" in normalized_message or (
+                        isinstance(path, list)
+                        and any(
+                            isinstance(path_part, str)
+                            and path_part.strip().lower() == "menus"
+                            for path_part in path
                         )
                     ):
                         raise ShopifyApiError(

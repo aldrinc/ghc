@@ -68,6 +68,73 @@ def _build_minimal_theme_settings_json(
     return json.dumps({"current": current}) + "\n"
 
 
+def test_sync_theme_template_component_text_settings_wraps_richtext_values():
+    template_filename = "sections/footer-group.json"
+    setting_path = f"{template_filename}.sections.footer.settings.text"
+    template_content = (
+        json.dumps(
+            {
+                "sections": {
+                    "footer": {
+                        "settings": {
+                            "text": "<p>Old value</p>",
+                        }
+                    }
+                }
+            }
+        )
+        + "\n"
+    )
+
+    updated_content, report = (
+        ShopifyApiClient._sync_theme_template_component_text_settings_data(
+            template_filename=template_filename,
+            template_content=template_content,
+            component_text_values_by_path={setting_path: "Fresh copy & details"},
+        )
+    )
+
+    updated_json = json.loads(updated_content)
+    assert (
+        updated_json["sections"]["footer"]["settings"]["text"]
+        == "<p>Fresh copy &amp; details</p>"
+    )
+    assert report["updatedPaths"] == [setting_path]
+    assert report["missingPaths"] == []
+
+
+def test_sync_theme_template_component_text_settings_keeps_plain_text_values():
+    template_filename = "sections/footer-group.json"
+    setting_path = f"{template_filename}.sections.footer.settings.heading"
+    template_content = (
+        json.dumps(
+            {
+                "sections": {
+                    "footer": {
+                        "settings": {
+                            "heading": "Old heading",
+                        }
+                    }
+                }
+            }
+        )
+        + "\n"
+    )
+
+    updated_content, report = (
+        ShopifyApiClient._sync_theme_template_component_text_settings_data(
+            template_filename=template_filename,
+            template_content=template_content,
+            component_text_values_by_path={setting_path: "New heading"},
+        )
+    )
+
+    updated_json = json.loads(updated_content)
+    assert updated_json["sections"]["footer"]["settings"]["heading"] == "New heading"
+    assert report["updatedPaths"] == [setting_path]
+    assert report["missingPaths"] == []
+
+
 def test_admin_graphql_reports_missing_navigation_scopes_for_menus_access_denied():
     client = ShopifyApiClient()
 
