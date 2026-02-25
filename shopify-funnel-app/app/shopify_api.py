@@ -4116,6 +4116,11 @@ class ShopifyApiClient:
         try:
             async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
                 response = await client.get(logo_url)
+        except httpx.InvalidURL as exc:
+            raise ShopifyApiError(
+                message=f"logoUrl is not a valid URL for logo download: {logo_url!r}.",
+                status_code=400,
+            ) from exc
         except httpx.RequestError as exc:
             raise ShopifyApiError(message=f"Network error while downloading logo source URL: {exc}", status_code=409) from exc
 
@@ -4234,15 +4239,34 @@ class ShopifyApiClient:
                 status_code=409,
             )
         raw_parameters = staged_target.get("parameters")
+        if not isinstance(raw_parameters, list) or not raw_parameters:
+            raise ShopifyApiError(
+                message="stagedUploadsCreate response is missing staged upload parameters for logo upload.",
+                status_code=409,
+            )
         parameters: list[tuple[str, str]] = []
-        if isinstance(raw_parameters, list):
-            for raw_parameter in raw_parameters:
-                if not isinstance(raw_parameter, dict):
-                    continue
-                name = raw_parameter.get("name")
-                value = raw_parameter.get("value")
-                if isinstance(name, str) and isinstance(value, str):
-                    parameters.append((name, value))
+        for raw_parameter in raw_parameters:
+            if not isinstance(raw_parameter, dict):
+                raise ShopifyApiError(
+                    message="stagedUploadsCreate response returned an invalid staged upload parameter entry.",
+                    status_code=409,
+                )
+            name = raw_parameter.get("name")
+            value = raw_parameter.get("value")
+            if not isinstance(name, str) or not name.strip():
+                raise ShopifyApiError(
+                    message="stagedUploadsCreate response returned a staged upload parameter without a valid name.",
+                    status_code=409,
+                )
+            if not isinstance(value, str):
+                raise ShopifyApiError(
+                    message=(
+                        "stagedUploadsCreate response returned a staged upload parameter without a valid value. "
+                        f"parameterName={name!r}."
+                    ),
+                    status_code=409,
+                )
+            parameters.append((name, value))
         return upload_url.strip(), resource_url.strip(), parameters
 
     async def _upload_logo_file_to_staged_target(
@@ -4261,6 +4285,11 @@ class ShopifyApiClient:
                     data=parameters,
                     files={"file": (filename, content, mime_type)},
                 )
+        except httpx.InvalidURL as exc:
+            raise ShopifyApiError(
+                message=f"Shopify staged upload URL is invalid: {upload_url!r}.",
+                status_code=409,
+            ) from exc
         except httpx.RequestError as exc:
             raise ShopifyApiError(message=f"Network error while uploading logo to staged target: {exc}", status_code=409) from exc
 
@@ -4527,6 +4556,18 @@ class ShopifyApiClient:
                 message="logoUrl contains unsupported characters.",
                 status_code=400,
             )
+        if any(char.isspace() for char in cleaned_logo_url):
+            raise ShopifyApiError(
+                message="logoUrl must not include whitespace characters.",
+                status_code=400,
+            )
+        if not self._is_shopify_file_url(value=cleaned_logo_url):
+            parsed_logo_url = urlparse(cleaned_logo_url)
+            if parsed_logo_url.scheme not in {"http", "https"} or not parsed_logo_url.netloc:
+                raise ShopifyApiError(
+                    message="logoUrl must be a valid absolute http(s) URL.",
+                    status_code=400,
+                )
 
         normalized_css_vars = self._normalize_theme_brand_css_vars(css_vars)
         normalized_font_urls = self._normalize_theme_brand_font_urls(font_urls)

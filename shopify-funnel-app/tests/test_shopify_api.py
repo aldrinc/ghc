@@ -1913,6 +1913,25 @@ def test_sync_theme_brand_errors_for_unsupported_theme_profile():
         )
 
 
+def test_sync_theme_brand_errors_for_logo_url_with_whitespace():
+    client = ShopifyApiClient()
+
+    with pytest.raises(ShopifyApiError, match="logoUrl must not include whitespace characters"):
+        asyncio.run(
+            client.sync_theme_brand(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                workspace_name="Acme Workspace",
+                brand_name="Acme",
+                logo_url="https://assets.example.com/public/assets/logo 1",
+                css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+                font_urls=[],
+                data_theme="light",
+                theme_name="futrgroup2-0theme",
+            )
+        )
+
+
 def test_render_theme_brand_css_preserves_explicit_theme_var_values():
     css = ShopifyApiClient._render_theme_brand_css(
         theme_name="futrgroup2-0theme",
@@ -2210,6 +2229,50 @@ def test_sync_theme_settings_data_errors_for_non_shopify_logo_url():
             settings_content=settings_content,
             effective_css_vars=effective_css_vars,
             logo_url="https://assets.example.com/public/assets/logo-1",
+        )
+
+
+def test_download_logo_source_file_errors_for_invalid_url():
+    client = ShopifyApiClient()
+
+    with pytest.raises(ShopifyApiError, match="logoUrl is not a valid URL for logo download"):
+        asyncio.run(client._download_logo_source_file(logo_url="https://example.com/\x00"))  # type: ignore[arg-type]
+
+
+def test_create_logo_staged_upload_target_errors_for_invalid_parameter_value():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        return {
+            "stagedUploadsCreate": {
+                "stagedTargets": [
+                    {
+                        "url": "https://shopify-upload.example.com",
+                        "resourceUrl": "https://shopify-staged.example.com/logo-1.png",
+                        "parameters": [
+                            {"name": "key", "value": "logo-key"},
+                            {"name": "acl", "value": 123},
+                        ],
+                    }
+                ],
+                "userErrors": [],
+            }
+        }
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="stagedUploadsCreate response returned a staged upload parameter without a valid value",
+    ):
+        asyncio.run(
+            client._create_logo_staged_upload_target(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                filename="logo-1.png",
+                mime_type="image/png",
+                file_size=42,
+            )
         )
 
 
