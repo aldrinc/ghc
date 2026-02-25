@@ -215,6 +215,45 @@ _THEME_REQUIRED_SETTINGS_PATHS_BY_NAME: dict[str, tuple[str, ...]] = {
         "current.color_schemes[*].settings.secondary_button_label",
     ),
 }
+_THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[str, tuple[tuple[str, tuple[tuple[str, str], ...]], ...]] = {
+    "futrgroup2-0theme": (
+        (
+            "body",
+            (
+                ("background-color", "var(--color-page-bg)"),
+                ("color", "var(--color-text)"),
+            ),
+        ),
+        (
+            'a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"])',
+            (("color", "var(--color-brand)"),),
+        ),
+        (
+            'button, .button, .btn, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]',
+            (
+                ("background-color", "var(--color-cta)"),
+                ("color", "var(--color-cta-text)"),
+                ("border-color", "var(--color-border)"),
+            ),
+        ),
+        (
+            "input, textarea, select",
+            (
+                ("background-color", "var(--color-bg)"),
+                ("color", "var(--color-text)"),
+                ("border-color", "var(--color-border)"),
+            ),
+        ),
+        (
+            'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"]',
+            (
+                ("background-color", "var(--footer-bg)"),
+                ("color", "var(--color-text)"),
+                ("border-color", "var(--color-border)"),
+            ),
+        ),
+    ),
+}
 _SETTINGS_PATH_SEGMENT_RE = re.compile(r"^([A-Za-z0-9_-]+)(?:\[(\*|\d+)\])?$")
 
 
@@ -2287,6 +2326,16 @@ class ShopifyApiClient:
             for key in sorted_keys:
                 lines.append(f"  {key}: {resolved_effective_css_vars[key]} !important;")
             lines.append("}")
+
+        component_style_overrides = _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME.get(profile.theme_name, ())
+        if component_style_overrides:
+            lines.append("")
+            lines.append("/* Managed theme component overrides. */")
+            for selector, declarations in component_style_overrides:
+                lines.append(f"{selector} {{")
+                for prop, value in declarations:
+                    lines.append(f"  {prop}: {value} !important;")
+                lines.append("}")
 
         lines.append("")
         return "\n".join(lines)

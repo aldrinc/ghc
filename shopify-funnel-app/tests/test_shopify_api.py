@@ -769,6 +769,12 @@ def test_sync_theme_brand_updates_layout_and_css():
             assert "--page-padding: var(--container-pad) !important;" in css_content
             assert "--footer-pad-y: var(--section-pad-y) !important;" in css_content
             assert "--mos-brand-logo-url: \"https://assets.example.com/public/assets/logo-1\";" in css_content
+            assert "/* Managed theme component overrides. */" in css_content
+            assert "body {" in css_content
+            assert "background-color: var(--color-page-bg) !important;" in css_content
+            assert 'a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]) {' in css_content
+            assert 'button, .button, .btn, input[type="button"], input[type="submit"], input[type="reset"], [role="button"] {' in css_content
+            assert 'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"] {' in css_content
             settings_file = next(item for item in files if item["filename"] == "config/settings_data.json")
             settings_content = settings_file["body"]["value"]
             assert '"color_background": "#f5f5f5"' in settings_content
