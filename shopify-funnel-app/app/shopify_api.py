@@ -314,6 +314,7 @@ _THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
         "heading_line_height": "--heading-line",
         "body_line_height": "--line",
         "heading_letter_spacing": "--hero-title-letter-spacing",
+        "body_letter_spacing": "--hero-title-letter-spacing",
         "body_base_size": "--text-base",
         "navigation_base_size": "--text-sm",
         "button_base_size": "--cta-font-size-md",
@@ -2477,6 +2478,7 @@ class ShopifyApiClient:
         has_font = "font" in tokens
         has_line_height = "line" in tokens and "height" in tokens
         has_letter_spacing = "letter" in tokens and "spacing" in tokens
+        has_spacing = "spacing" in tokens
         has_size = "size" in tokens
 
         semantic_key: str | None = None
@@ -2499,6 +2501,13 @@ class ShopifyApiClient:
         elif has_letter_spacing:
             if is_heading:
                 semantic_key = "heading_letter_spacing"
+            elif is_body:
+                semantic_key = "body_letter_spacing"
+        elif has_spacing:
+            if is_heading:
+                semantic_key = "heading_letter_spacing"
+            elif is_body:
+                semantic_key = "body_letter_spacing"
         elif has_size:
             if is_navigation:
                 semantic_key = "navigation_base_size"

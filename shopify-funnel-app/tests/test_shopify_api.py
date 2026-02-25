@@ -1908,10 +1908,11 @@ def test_sync_theme_settings_data_updates_typography_semantic_paths():
         extra_current={
             "type_header_font": "Inter",
             "type_header_line_height": 0.9,
-            "type_header_letter_spacing": 0,
+            "type_header_spacing": 0,
             "type_body_font": "Inter",
             "type_body_base_size": 12,
             "type_body_line_height": 1.0,
+            "type_body_spacing": 0,
             "type_nav_font": "heading",
             "type_nav_base_size": 14,
             "type_buttons_font": "heading",
@@ -1931,10 +1932,11 @@ def test_sync_theme_settings_data_updates_typography_semantic_paths():
 
     assert synced_current["type_header_font"] == "Merriweather"
     assert synced_current["type_header_line_height"] == 1.0
-    assert synced_current["type_header_letter_spacing"] == -30
+    assert synced_current["type_header_spacing"] == -30
     assert synced_current["type_body_font"] == "Inter"
     assert synced_current["type_body_base_size"] == 15
     assert synced_current["type_body_line_height"] == 1.2
+    assert synced_current["type_body_spacing"] == -30
     assert synced_current["type_nav_font"] == "body"
     assert synced_current["type_nav_base_size"] == 16
     assert synced_current["type_buttons_font"] == "body"
