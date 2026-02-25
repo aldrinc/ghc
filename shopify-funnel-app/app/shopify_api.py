@@ -147,6 +147,7 @@ _THEME_REQUIRED_SOURCE_VARS_BY_NAME: dict[str, tuple[str, ...]] = {
         "--color-page-bg",
         "--color-bg",
         "--color-text",
+        "--color-muted",
         "--color-brand",
         "--color-cta",
         "--color-cta-text",
@@ -197,9 +198,54 @@ _THEME_SETTINGS_VALUE_PATHS_BY_NAME: dict[str, dict[str, str]] = {
     }
 }
 _THEME_REQUIRED_SETTINGS_PATHS_BY_NAME: dict[str, tuple[str, ...]] = {
-    "futrgroup2-0theme": (),
+    "futrgroup2-0theme": (
+        "current.color_background",
+        "current.color_foreground",
+        "current.color_button",
+        "current.color_button_text",
+        "current.color_link",
+        "current.color_accent",
+        "current.footer_background",
+        "current.footer_text",
+        "current.color_schemes[*].settings.background",
+        "current.color_schemes[*].settings.text",
+        "current.color_schemes[*].settings.button",
+        "current.color_schemes[*].settings.button_label",
+        "current.color_schemes[*].settings.secondary_button",
+        "current.color_schemes[*].settings.secondary_button_label",
+    ),
 }
 _SETTINGS_PATH_SEGMENT_RE = re.compile(r"^([A-Za-z0-9_-]+)(?:\[(\*|\d+)\])?$")
+
+
+def _canonicalize_theme_profile_lookup_key(raw_name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", raw_name.strip().lower())
+
+
+_THEME_PROFILE_NAME_ALIASES_BY_KEY: dict[str, str] = {
+    "futr group 2.0 theme": "futrgroup2-0theme",
+}
+
+
+def _build_theme_profile_lookup_by_canonical_name() -> dict[str, str]:
+    lookup: dict[str, str] = {}
+    profile_names = (
+        list(_THEME_VAR_SCOPE_SELECTORS_BY_NAME.keys())
+        + list(_THEME_COMPAT_ALIASES_BY_NAME.keys())
+        + list(_THEME_REQUIRED_SOURCE_VARS_BY_NAME.keys())
+        + list(_THEME_REQUIRED_THEME_VARS_BY_NAME.keys())
+        + list(_THEME_SETTINGS_VALUE_PATHS_BY_NAME.keys())
+        + list(_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME.keys())
+    )
+    for profile_name in profile_names:
+        lookup[_canonicalize_theme_profile_lookup_key(profile_name)] = profile_name
+    for alias_name, profile_name in _THEME_PROFILE_NAME_ALIASES_BY_KEY.items():
+        lookup[_canonicalize_theme_profile_lookup_key(alias_name)] = profile_name
+    return lookup
+
+
+_THEME_PROFILE_BY_CANONICAL_NAME = _build_theme_profile_lookup_by_canonical_name()
+_SUPPORTED_THEME_PROFILE_NAMES = tuple(sorted(set(_THEME_PROFILE_BY_CANONICAL_NAME.values())))
 
 
 @dataclass(frozen=True)
@@ -1632,17 +1678,34 @@ class ShopifyApiClient:
     @classmethod
     def _resolve_theme_brand_profile(cls, *, theme_name: str) -> ThemeBrandProfile:
         normalized_theme_name = theme_name.strip().lower()
+        profile_key = _THEME_PROFILE_BY_CANONICAL_NAME.get(
+            _canonicalize_theme_profile_lookup_key(normalized_theme_name),
+            normalized_theme_name,
+        )
         return ThemeBrandProfile(
-            theme_name=normalized_theme_name,
+            theme_name=profile_key,
             var_scope_selectors=_THEME_VAR_SCOPE_SELECTORS_BY_NAME.get(
-                normalized_theme_name,
+                profile_key,
                 _DEFAULT_THEME_VAR_SCOPE_SELECTORS,
             ),
-            compat_aliases=_THEME_COMPAT_ALIASES_BY_NAME.get(normalized_theme_name, {}),
-            required_source_vars=_THEME_REQUIRED_SOURCE_VARS_BY_NAME.get(normalized_theme_name, ()),
-            required_theme_vars=_THEME_REQUIRED_THEME_VARS_BY_NAME.get(normalized_theme_name, ()),
-            settings_value_paths=_THEME_SETTINGS_VALUE_PATHS_BY_NAME.get(normalized_theme_name, {}),
-            required_settings_paths=_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME.get(normalized_theme_name, ()),
+            compat_aliases=_THEME_COMPAT_ALIASES_BY_NAME.get(profile_key, {}),
+            required_source_vars=_THEME_REQUIRED_SOURCE_VARS_BY_NAME.get(profile_key, ()),
+            required_theme_vars=_THEME_REQUIRED_THEME_VARS_BY_NAME.get(profile_key, ()),
+            settings_value_paths=_THEME_SETTINGS_VALUE_PATHS_BY_NAME.get(profile_key, {}),
+            required_settings_paths=_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME.get(profile_key, ()),
+        )
+
+    @staticmethod
+    def _assert_theme_brand_profile_supported(*, theme_name: str, profile: ThemeBrandProfile) -> None:
+        if profile.theme_name in _SUPPORTED_THEME_PROFILE_NAMES:
+            return
+        supported = ", ".join(_SUPPORTED_THEME_PROFILE_NAMES)
+        raise ShopifyApiError(
+            message=(
+                f"Unsupported theme profile for themeName={theme_name}. "
+                f"Supported theme profiles: {supported}."
+            ),
+            status_code=422,
         )
 
     @classmethod
@@ -2088,6 +2151,14 @@ class ShopifyApiClient:
                 message=(
                     "Theme settings sync missing required paths: "
                     f"{', '.join(required_missing_paths)}."
+                ),
+                status_code=409,
+            )
+        if missing_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Theme settings sync could not update mapped paths: "
+                    f"{', '.join(sorted(missing_paths))}."
                 ),
                 status_code=409,
             )
@@ -2709,6 +2780,7 @@ class ShopifyApiClient:
             theme_name=normalized_theme_name,
         )
         profile = self._resolve_theme_brand_profile(theme_name=theme["name"])
+        self._assert_theme_brand_profile_supported(theme_name=theme["name"], profile=profile)
         effective_css_vars = self._build_theme_compat_css_vars(
             profile=profile,
             css_vars=normalized_css_vars,
@@ -2838,6 +2910,7 @@ class ShopifyApiClient:
         )
 
         profile = self._resolve_theme_brand_profile(theme_name=theme["name"])
+        self._assert_theme_brand_profile_supported(theme_name=theme["name"], profile=profile)
         effective_css_vars = self._build_theme_compat_css_vars(
             profile=profile,
             css_vars=normalized_css_vars,

@@ -10,6 +10,7 @@ _THEME_SYNC_REQUIRED_CSS_VARS = {
     "--color-page-bg": "#f5f5f5",
     "--color-bg": "#ffffff",
     "--color-text": "#222222",
+    "--color-muted": "rgba(34, 34, 34, 0.72)",
     "--color-brand": "#123456",
     "--color-cta": "#0a8f3c",
     "--color-cta-text": "#ffffff",
@@ -761,6 +762,7 @@ def test_sync_theme_brand_updates_layout_and_css():
             assert "--color-price: var(--color-brand) !important;" in css_content
             assert "--color-info-background: var(--color-soft) !important;" in css_content
             assert "--color-keyboard-focus: var(--focus-outline-color) !important;" in css_content
+            assert "--color-placeholder: var(--color-muted) !important;" in css_content
             assert "--font-body-family: var(--font-sans) !important;" in css_content
             assert "--border-radius-medium: var(--radius-md) !important;" in css_content
             assert "--page-width: var(--container-max) !important;" in css_content
@@ -1407,7 +1409,7 @@ def test_sync_theme_brand_requires_closing_head_tag():
         )
 
 
-def test_sync_theme_brand_skips_compat_aliases_for_other_theme():
+def test_sync_theme_brand_errors_for_unsupported_theme_profile():
     client = ShopifyApiClient()
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
@@ -1447,42 +1449,27 @@ def test_sync_theme_brand_skips_compat_aliases_for_other_theme():
                     }
                 }
             }
-        if "mutation themeFilesUpsert" in query:
-            files = (payload.get("variables") or {}).get("files") or []
-            css_file = next(item for item in files if item["filename"] == "assets/acme-workspace-workspace-brand.css")
-            css_content = css_file["body"]["value"]
-            assert "--color-brand: #123456 !important;" in css_content
-            assert "--color-highlight: var(--color-brand) !important;" not in css_content
-            return {
-                "themeFilesUpsert": {
-                    "upsertedThemeFiles": [
-                        {"filename": "layout/theme.liquid"},
-                        {"filename": "assets/acme-workspace-workspace-brand.css"},
-                    ],
-                    "job": None,
-                    "userErrors": [],
-                }
-            }
         raise AssertionError("Unexpected query payload")
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
 
-    result = asyncio.run(
-        client.sync_theme_brand(
-            shop_domain="example.myshopify.com",
-            access_token="token",
-            workspace_name="Acme Workspace",
-            brand_name="Acme",
-            logo_url="https://assets.example.com/public/assets/logo-1",
-            css_vars={"--color-brand": "#123456"},
-            font_urls=[],
-            data_theme="light",
-            theme_name="custom-theme",
+    with pytest.raises(
+        ShopifyApiError,
+        match="Unsupported theme profile for themeName=custom-theme",
+    ):
+        asyncio.run(
+            client.sync_theme_brand(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                workspace_name="Acme Workspace",
+                brand_name="Acme",
+                logo_url="https://assets.example.com/public/assets/logo-1",
+                css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+                font_urls=[],
+                data_theme="light",
+                theme_name="custom-theme",
+            )
         )
-    )
-
-    assert result["themeName"] == "custom-theme"
-    assert result["jobId"] is None
 
 
 def test_render_theme_brand_css_preserves_explicit_theme_var_values():
@@ -1519,6 +1506,15 @@ def test_render_theme_brand_css_includes_theme_scope_selectors():
     assert 'html[data-theme="light"], html[data-theme="light"] html, html[data-theme="light"] body, html[data-theme="light"] .color-scheme' in css
     assert 'html[data-theme="light"] [class*="footer"] {' in css
     assert '--footer-bg: #f4ede6 !important;' in css
+
+
+def test_resolve_theme_brand_profile_supports_canonicalized_theme_aliases():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="Futr Group 2.0 Theme")
+
+    assert profile.theme_name == "futrgroup2-0theme"
+    assert profile.settings_value_paths["current.footer_background"] == "--footer-bg"
+    assert "--color-muted" in profile.required_source_vars
+    assert "current.color_background" in profile.required_settings_paths
 
 
 def test_sync_theme_brand_requires_one_theme_selector():
