@@ -179,20 +179,20 @@ _THEME_REQUIRED_THEME_VARS_BY_NAME: dict[str, tuple[str, ...]] = {
 }
 _THEME_SETTINGS_VALUE_PATHS_BY_NAME: dict[str, dict[str, str]] = {
     "futrgroup2-0theme": {
-        "current.settings.color_background": "--color-page-bg",
-        "current.settings.color_foreground": "--color-text",
-        "current.settings.color_button": "--color-cta",
-        "current.settings.color_button_text": "--color-cta-text",
-        "current.settings.color_link": "--color-brand",
-        "current.settings.color_accent": "--color-brand",
-        "current.settings.footer_background": "--footer-bg",
-        "current.settings.footer_text": "--color-text",
-        "current.settings.color_schemes[*].settings.background": "--color-page-bg",
-        "current.settings.color_schemes[*].settings.text": "--color-text",
-        "current.settings.color_schemes[*].settings.button": "--color-cta",
-        "current.settings.color_schemes[*].settings.button_label": "--color-cta-text",
-        "current.settings.color_schemes[*].settings.secondary_button": "--color-bg",
-        "current.settings.color_schemes[*].settings.secondary_button_label": "--color-text",
+        "current.color_background": "--color-page-bg",
+        "current.color_foreground": "--color-text",
+        "current.color_button": "--color-cta",
+        "current.color_button_text": "--color-cta-text",
+        "current.color_link": "--color-brand",
+        "current.color_accent": "--color-brand",
+        "current.footer_background": "--footer-bg",
+        "current.footer_text": "--color-text",
+        "current.color_schemes[*].settings.background": "--color-page-bg",
+        "current.color_schemes[*].settings.text": "--color-text",
+        "current.color_schemes[*].settings.button": "--color-cta",
+        "current.color_schemes[*].settings.button_label": "--color-cta-text",
+        "current.color_schemes[*].settings.secondary_button": "--color-bg",
+        "current.color_schemes[*].settings.secondary_button_label": "--color-text",
     }
 }
 _THEME_REQUIRED_SETTINGS_PATHS_BY_NAME: dict[str, tuple[str, ...]] = {
@@ -1739,19 +1739,32 @@ class ShopifyApiClient:
                 return 1
             return cls._set_json_path_value_tokens(node=current, tokens=tokens[1:], value=value)
 
+        if index_selector == "*":
+            update_count = 0
+            if isinstance(current, list):
+                if not current:
+                    return 0
+                for idx, item in enumerate(current):
+                    if len(tokens) == 1:
+                        current[idx] = value
+                        update_count += 1
+                    else:
+                        update_count += cls._set_json_path_value_tokens(node=item, tokens=tokens[1:], value=value)
+                return update_count
+            if isinstance(current, dict):
+                if not current:
+                    return 0
+                for nested_key, item in current.items():
+                    if len(tokens) == 1:
+                        current[nested_key] = value
+                        update_count += 1
+                    else:
+                        update_count += cls._set_json_path_value_tokens(node=item, tokens=tokens[1:], value=value)
+                return update_count
+            return 0
+
         if not isinstance(current, list):
             return 0
-        if index_selector == "*":
-            if not current:
-                return 0
-            update_count = 0
-            for idx, item in enumerate(current):
-                if len(tokens) == 1:
-                    current[idx] = value
-                    update_count += 1
-                else:
-                    update_count += cls._set_json_path_value_tokens(node=item, tokens=tokens[1:], value=value)
-            return update_count
 
         index = int(index_selector)
         if index < 0 or index >= len(current):
@@ -1789,16 +1802,26 @@ class ShopifyApiClient:
                 return [current]
             return cls._read_json_path_values_tokens(node=current, tokens=tokens[1:])
 
-        if not isinstance(current, list):
-            return []
         if index_selector == "*":
             values: list[Any] = []
-            for item in current:
-                if len(tokens) == 1:
-                    values.append(item)
-                else:
-                    values.extend(cls._read_json_path_values_tokens(node=item, tokens=tokens[1:]))
+            if isinstance(current, list):
+                for item in current:
+                    if len(tokens) == 1:
+                        values.append(item)
+                    else:
+                        values.extend(cls._read_json_path_values_tokens(node=item, tokens=tokens[1:]))
+                return values
+            if isinstance(current, dict):
+                for item in current.values():
+                    if len(tokens) == 1:
+                        values.append(item)
+                    else:
+                        values.extend(cls._read_json_path_values_tokens(node=item, tokens=tokens[1:]))
+                return values
             return values
+
+        if not isinstance(current, list):
+            return []
 
         index = int(index_selector)
         if index < 0 or index >= len(current):

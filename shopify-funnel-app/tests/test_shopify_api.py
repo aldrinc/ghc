@@ -667,10 +667,10 @@ def test_sync_theme_brand_updates_layout_and_css():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []
     settings_json = (
-        '{"current":{"settings":{"color_background":"#ffffff","color_foreground":"#111111","color_button":"#000000",'
+        '{"current":{"color_background":"#ffffff","color_foreground":"#111111","color_button":"#000000",'
         '"color_button_text":"#ffffff","color_link":"#000000","color_accent":"#000000","footer_background":"#ffffff",'
         '"footer_text":"#111111","color_schemes":[{"settings":{"background":"#ffffff","text":"#111111","button":"#000000",'
-        '"button_label":"#ffffff","secondary_button":"#eeeeee","secondary_button_label":"#111111"}}]}}}\n'
+        '"button_label":"#ffffff","secondary_button":"#eeeeee","secondary_button_label":"#111111"}}]}}\n'
     )
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
@@ -833,36 +833,36 @@ def test_sync_theme_brand_updates_layout_and_css():
         "settingsSync": {
             "settingsFilename": "config/settings_data.json",
             "expectedPaths": [
-                "current.settings.color_accent",
-                "current.settings.color_background",
-                "current.settings.color_button",
-                "current.settings.color_button_text",
-                "current.settings.color_foreground",
-                "current.settings.color_link",
-                "current.settings.color_schemes[*].settings.background",
-                "current.settings.color_schemes[*].settings.button",
-                "current.settings.color_schemes[*].settings.button_label",
-                "current.settings.color_schemes[*].settings.secondary_button",
-                "current.settings.color_schemes[*].settings.secondary_button_label",
-                "current.settings.color_schemes[*].settings.text",
-                "current.settings.footer_background",
-                "current.settings.footer_text",
+                "current.color_accent",
+                "current.color_background",
+                "current.color_button",
+                "current.color_button_text",
+                "current.color_foreground",
+                "current.color_link",
+                "current.color_schemes[*].settings.background",
+                "current.color_schemes[*].settings.button",
+                "current.color_schemes[*].settings.button_label",
+                "current.color_schemes[*].settings.secondary_button",
+                "current.color_schemes[*].settings.secondary_button_label",
+                "current.color_schemes[*].settings.text",
+                "current.footer_background",
+                "current.footer_text",
             ],
             "updatedPaths": [
-                "current.settings.color_accent",
-                "current.settings.color_background",
-                "current.settings.color_button",
-                "current.settings.color_button_text",
-                "current.settings.color_foreground",
-                "current.settings.color_link",
-                "current.settings.color_schemes[*].settings.background",
-                "current.settings.color_schemes[*].settings.button",
-                "current.settings.color_schemes[*].settings.button_label",
-                "current.settings.color_schemes[*].settings.secondary_button",
-                "current.settings.color_schemes[*].settings.secondary_button_label",
-                "current.settings.color_schemes[*].settings.text",
-                "current.settings.footer_background",
-                "current.settings.footer_text",
+                "current.color_accent",
+                "current.color_background",
+                "current.color_button",
+                "current.color_button_text",
+                "current.color_foreground",
+                "current.color_link",
+                "current.color_schemes[*].settings.background",
+                "current.color_schemes[*].settings.button",
+                "current.color_schemes[*].settings.button_label",
+                "current.color_schemes[*].settings.secondary_button",
+                "current.color_schemes[*].settings.secondary_button_label",
+                "current.color_schemes[*].settings.text",
+                "current.footer_background",
+                "current.footer_text",
             ],
             "missingPaths": [],
             "requiredMissingPaths": [],
@@ -880,7 +880,7 @@ def test_sync_theme_brand_allows_upsert_without_job():
         " * IMPORTANT: This file is auto-generated.\n"
         " * ------------------------------------------------------------\n"
         " */\n"
-        '{"current":{"settings":{"color_background":"#ffffff"}}}\n'
+        '{"current":{"color_background":"#ffffff"}}\n'
     )
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
@@ -1004,36 +1004,36 @@ def test_sync_theme_brand_allows_upsert_without_job():
         "settingsSync": {
             "settingsFilename": "config/settings_data.json",
             "expectedPaths": [
-                "current.settings.color_accent",
-                "current.settings.color_background",
-                "current.settings.color_button",
-                "current.settings.color_button_text",
-                "current.settings.color_foreground",
-                "current.settings.color_link",
-                "current.settings.color_schemes[*].settings.background",
-                "current.settings.color_schemes[*].settings.button",
-                "current.settings.color_schemes[*].settings.button_label",
-                "current.settings.color_schemes[*].settings.secondary_button",
-                "current.settings.color_schemes[*].settings.secondary_button_label",
-                "current.settings.color_schemes[*].settings.text",
-                "current.settings.footer_background",
-                "current.settings.footer_text",
+                "current.color_accent",
+                "current.color_background",
+                "current.color_button",
+                "current.color_button_text",
+                "current.color_foreground",
+                "current.color_link",
+                "current.color_schemes[*].settings.background",
+                "current.color_schemes[*].settings.button",
+                "current.color_schemes[*].settings.button_label",
+                "current.color_schemes[*].settings.secondary_button",
+                "current.color_schemes[*].settings.secondary_button_label",
+                "current.color_schemes[*].settings.text",
+                "current.footer_background",
+                "current.footer_text",
             ],
-            "updatedPaths": ["current.settings.color_background"],
+            "updatedPaths": ["current.color_background"],
             "missingPaths": [
-                "current.settings.color_accent",
-                "current.settings.color_button",
-                "current.settings.color_button_text",
-                "current.settings.color_foreground",
-                "current.settings.color_link",
-                "current.settings.color_schemes[*].settings.background",
-                "current.settings.color_schemes[*].settings.button",
-                "current.settings.color_schemes[*].settings.button_label",
-                "current.settings.color_schemes[*].settings.secondary_button",
-                "current.settings.color_schemes[*].settings.secondary_button_label",
-                "current.settings.color_schemes[*].settings.text",
-                "current.settings.footer_background",
-                "current.settings.footer_text",
+                "current.color_accent",
+                "current.color_button",
+                "current.color_button_text",
+                "current.color_foreground",
+                "current.color_link",
+                "current.color_schemes[*].settings.background",
+                "current.color_schemes[*].settings.button",
+                "current.color_schemes[*].settings.button_label",
+                "current.color_schemes[*].settings.secondary_button",
+                "current.color_schemes[*].settings.secondary_button_label",
+                "current.color_schemes[*].settings.text",
+                "current.footer_background",
+                "current.footer_text",
             ],
             "requiredMissingPaths": [],
         },
@@ -1043,7 +1043,7 @@ def test_sync_theme_brand_allows_upsert_without_job():
 
 def test_sync_theme_brand_requires_managed_layout_markers():
     client = ShopifyApiClient()
-    settings_json = '{"current":{"settings":{"color_background":"#ffffff"}}}\n'
+    settings_json = '{"current":{"color_background":"#ffffff"}}\n'
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         query = payload.get("query", "")
@@ -1117,7 +1117,7 @@ def test_sync_theme_brand_requires_managed_layout_markers():
 
 def test_sync_theme_brand_requires_closing_head_tag():
     client = ShopifyApiClient()
-    settings_json = '{"current":{"settings":{"color_background":"#ffffff"}}}\n'
+    settings_json = '{"current":{"color_background":"#ffffff"}}\n'
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         query = payload.get("query", "")
@@ -1332,28 +1332,26 @@ def test_audit_theme_brand_reports_ready_when_layout_css_and_settings_are_synced
     settings_json = """
 {
   "current": {
-    "settings": {
-      "color_background": "#f5f5f5",
-      "color_foreground": "#222222",
-      "color_button": "#0a8f3c",
-      "color_button_text": "#ffffff",
-      "color_link": "#123456",
-      "color_accent": "#123456",
-      "footer_background": "#f4ede6",
-      "footer_text": "#222222",
-      "color_schemes": [
-        {
-          "settings": {
-            "background": "#f5f5f5",
-            "text": "#222222",
-            "button": "#0a8f3c",
-            "button_label": "#ffffff",
-            "secondary_button": "#ffffff",
-            "secondary_button_label": "#222222"
-          }
+    "color_background": "#f5f5f5",
+    "color_foreground": "#222222",
+    "color_button": "#0a8f3c",
+    "color_button_text": "#ffffff",
+    "color_link": "#123456",
+    "color_accent": "#123456",
+    "footer_background": "#f4ede6",
+    "footer_text": "#222222",
+    "color_schemes": [
+      {
+        "settings": {
+          "background": "#f5f5f5",
+          "text": "#222222",
+          "button": "#0a8f3c",
+          "button_label": "#ffffff",
+          "secondary_button": "#ffffff",
+          "secondary_button_label": "#222222"
         }
-      ]
-    }
+      }
+    ]
   }
 }
 """.strip() + "\n"
@@ -1460,7 +1458,7 @@ def test_audit_theme_brand_reports_ready_when_layout_css_and_settings_are_synced
 
 def test_audit_theme_brand_reports_gaps_for_missing_marker_and_css_asset():
     client = ShopifyApiClient()
-    settings_json = '{"current":{"settings":{"color_background":"#f5f5f5"}}}\n'
+    settings_json = '{"current":{"color_background":"#f5f5f5"}}\n'
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         query = payload.get("query", "")
