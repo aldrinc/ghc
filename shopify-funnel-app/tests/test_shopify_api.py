@@ -68,6 +68,36 @@ def _build_minimal_theme_settings_json(
     return json.dumps({"current": current}) + "\n"
 
 
+def test_admin_graphql_reports_missing_navigation_scopes_for_menus_access_denied():
+    client = ShopifyApiClient()
+
+    async def fake_post_json(*, url: str, payload: dict, headers: dict | None = None):
+        return {
+            "data": None,
+            "errors": [
+                {
+                    "message": "Access denied for menus field.",
+                    "path": ["menus"],
+                }
+            ],
+        }
+
+    client._post_json = fake_post_json  # type: ignore[method-assign]
+
+    with pytest.raises(ShopifyApiError) as captured:
+        asyncio.run(
+            client._admin_graphql(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                payload={"query": "{ shop { name } }"},
+            )
+        )
+
+    assert captured.value.status_code == 403
+    assert "read_online_store_navigation" in str(captured.value)
+    assert "write_online_store_navigation" in str(captured.value)
+
+
 def test_register_webhook_reuses_existing_subscription_when_address_taken():
     client = ShopifyApiClient()
     created_payloads: list[dict] = []

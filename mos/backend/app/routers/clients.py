@@ -679,16 +679,8 @@ def sync_client_shopify_theme_brand_route(
         )
         raw_image_slots = discovered_slots.get("imageSlots")
         raw_text_slots = discovered_slots.get("textSlots")
-        image_slots = (
-            raw_image_slots
-            if isinstance(raw_image_slots, list)
-            else []
-        )
-        text_slots = (
-            raw_text_slots
-            if isinstance(raw_text_slots, list)
-            else []
-        )
+        image_slots = raw_image_slots if isinstance(raw_image_slots, list) else []
+        text_slots = raw_text_slots if isinstance(raw_text_slots, list) else []
         explicit_image_paths = set(normalized_component_image_asset_map.keys())
         planner_image_slots = [
             slot
@@ -802,7 +794,10 @@ def sync_client_shopify_theme_brand_route(
                 )
             component_text_values[setting_path.strip()] = value.strip()
 
-        for setting_path, asset_public_id in normalized_component_image_asset_map.items():
+        for (
+            setting_path,
+            asset_public_id,
+        ) in normalized_component_image_asset_map.items():
             component_image_urls[setting_path] = (
                 f"{public_asset_base_url}/public/assets/{asset_public_id}"
             )

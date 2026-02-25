@@ -400,6 +400,7 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
         font_urls: list[str] | None,
         data_theme: str | None,
         component_image_urls: dict[str, str] | None,
+        component_text_values: dict[str, str] | None,
         auto_component_image_urls: list[str] | None,
         theme_id: str | None,
         theme_name: str | None,
@@ -413,6 +414,7 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
         observed["font_urls"] = font_urls
         observed["data_theme"] = data_theme
         observed["component_image_urls"] = component_image_urls
+        observed["component_text_values"] = component_text_values
         observed["auto_component_image_urls"] = auto_component_image_urls
         observed["theme_id"] = theme_id
         observed["theme_name"] = theme_name
@@ -477,6 +479,7 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
     assert observed["shop_domain"] == "example.myshopify.com"
     assert observed["theme_name"] == "futrgroup2-0theme"
     assert observed["component_image_urls"] == {}
+    assert observed["component_text_values"] == {}
     assert observed["auto_component_image_urls"] == []
 
 
@@ -543,12 +546,14 @@ def test_sync_shopify_theme_brand_resolves_component_image_asset_map(
         font_urls: list[str] | None,
         data_theme: str | None,
         component_image_urls: dict[str, str] | None,
+        component_text_values: dict[str, str] | None,
         auto_component_image_urls: list[str] | None,
         theme_id: str | None,
         theme_name: str | None,
         shop_domain: str | None,
     ):
         observed["component_image_urls"] = component_image_urls
+        observed["component_text_values"] = component_text_values
         observed["auto_component_image_urls"] = auto_component_image_urls
         return {
             "shopDomain": "example.myshopify.com",
@@ -616,6 +621,7 @@ def test_sync_shopify_theme_brand_resolves_component_image_asset_map(
             "https://assets.example.com/public/assets/footer-image-public-id"
         ),
     }
+    assert observed["component_text_values"] == {}
     assert observed["auto_component_image_urls"] == []
 
 
@@ -660,11 +666,11 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
             "funnelDefaults": {"containerWidth": "lg"},
         }
 
-    def fake_get_logo_asset(
+    def fake_get_asset(
         self, *, org_id: str, public_id: str, client_id: str | None = None
     ):
-        if public_id == "logo-public-id":
-            return object()
+        if public_id in {"logo-public-id", "product-image-1", "product-image-2"}:
+            return type("FakeAsset", (), {"public_id": public_id})()
         return None
 
     def fake_get_product(self, *, org_id: str, product_id: str):
@@ -684,6 +690,66 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
         observed["collect_product_id"] = str(product.id)
         return ["logo-public-id", "product-image-1", "product-image-2"]
 
+    def fake_list_template_slots(
+        *,
+        client_id: str,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        observed["slot_theme_name"] = theme_name
+        return {
+            "imageSlots": [
+                {
+                    "path": "templates/index.json.sections.hero.settings.image",
+                    "role": "hero",
+                    "recommendedAspect": "16:9",
+                    "currentValue": None,
+                },
+                {
+                    "path": "templates/product.json.sections.gallery.settings.image",
+                    "role": "gallery",
+                    "recommendedAspect": "1:1",
+                    "currentValue": None,
+                },
+            ],
+            "textSlots": [
+                {
+                    "path": "templates/index.json.sections.hero.settings.heading",
+                    "role": "headline",
+                    "maxLength": 80,
+                    "currentValue": "Old headline",
+                }
+            ],
+        }
+
+    def fake_list_offers(self, *, product_id: str):
+        observed["offers_product_id"] = product_id
+        return []
+
+    def fake_plan_component_content(
+        *,
+        product,
+        offers,
+        product_image_assets,
+        image_slots,
+        text_slots,
+    ):
+        observed["planner_image_slot_paths"] = [slot["path"] for slot in image_slots]
+        observed["planner_text_slot_paths"] = [slot["path"] for slot in text_slots]
+        observed["planner_asset_public_ids"] = [
+            getattr(asset, "public_id", None) for asset in product_image_assets
+        ]
+        return {
+            "componentImageAssetMap": {
+                "templates/index.json.sections.hero.settings.image": "product-image-2",
+                "templates/product.json.sections.gallery.settings.image": "product-image-1",
+            },
+            "componentTextValues": {
+                "templates/index.json.sections.hero.settings.heading": "Sleep better tonight"
+            },
+        }
+
     def fake_sync_theme_brand(
         *,
         client_id: str,
@@ -694,12 +760,14 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
         font_urls: list[str] | None,
         data_theme: str | None,
         component_image_urls: dict[str, str] | None,
+        component_text_values: dict[str, str] | None,
         auto_component_image_urls: list[str] | None,
         theme_id: str | None,
         theme_name: str | None,
         shop_domain: str | None,
     ):
         observed["component_image_urls"] = component_image_urls
+        observed["component_text_values"] = component_text_values
         observed["auto_component_image_urls"] = auto_component_image_urls
         return {
             "shopDomain": "example.myshopify.com",
@@ -733,9 +801,22 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
     )
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
     monkeypatch.setattr(
-        clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset
+        clients_router.AssetsRepository, "get_by_public_id", fake_get_asset
     )
     monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
+    monkeypatch.setattr(
+        clients_router,
+        "list_client_shopify_theme_template_slots",
+        fake_list_template_slots,
+    )
+    monkeypatch.setattr(
+        clients_router.ProductOffersRepository, "list_by_product", fake_list_offers
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "plan_shopify_theme_component_content",
+        fake_plan_component_content,
+    )
     monkeypatch.setattr(
         clients_router.funnel_ai,
         "_collect_product_image_public_ids",
@@ -761,11 +842,31 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
     assert response.status_code == 200
     assert observed["product_id"] == "product-123"
     assert observed["collect_product_id"] == "product-123"
-    assert observed["component_image_urls"] == {}
-    assert observed["auto_component_image_urls"] == [
-        "https://assets.example.com/public/assets/product-image-1",
-        "https://assets.example.com/public/assets/product-image-2",
+    assert observed["slot_theme_name"] == "futrgroup2-0theme"
+    assert observed["offers_product_id"] == "product-123"
+    assert observed["planner_asset_public_ids"] == [
+        "product-image-1",
+        "product-image-2",
     ]
+    assert observed["planner_image_slot_paths"] == [
+        "templates/index.json.sections.hero.settings.image",
+        "templates/product.json.sections.gallery.settings.image",
+    ]
+    assert observed["planner_text_slot_paths"] == [
+        "templates/index.json.sections.hero.settings.heading"
+    ]
+    assert observed["component_image_urls"] == {
+        "templates/index.json.sections.hero.settings.image": (
+            "https://assets.example.com/public/assets/product-image-2"
+        ),
+        "templates/product.json.sections.gallery.settings.image": (
+            "https://assets.example.com/public/assets/product-image-1"
+        ),
+    }
+    assert observed["component_text_values"] == {
+        "templates/index.json.sections.hero.settings.heading": "Sleep better tonight"
+    }
+    assert observed["auto_component_image_urls"] == []
 
 
 def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omitted(
@@ -837,6 +938,7 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
         font_urls: list[str] | None,
         data_theme: str | None,
         component_image_urls: dict[str, str] | None,
+        component_text_values: dict[str, str] | None,
         auto_component_image_urls: list[str] | None,
         theme_id: str | None,
         theme_name: str | None,
@@ -844,6 +946,7 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
     ):
         observed["sync_theme_name"] = theme_name
         observed["component_image_urls"] = component_image_urls
+        observed["component_text_values"] = component_text_values
         observed["auto_component_image_urls"] = auto_component_image_urls
         return {
             "shopDomain": "example.myshopify.com",
@@ -898,6 +1001,7 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
     assert observed["design_system_id"] == "workspace-default-design-system"
     assert observed["sync_theme_name"] == "futrgroup2-0theme"
     assert observed["component_image_urls"] == {}
+    assert observed["component_text_values"] == {}
     assert observed["auto_component_image_urls"] == []
 
 

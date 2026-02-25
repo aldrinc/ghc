@@ -1989,16 +1989,22 @@ class ShopifyApiClient:
         query_name: str,
     ) -> dict[str, str]:
         if not isinstance(node, dict):
-            raise ShopifyApiError(message=f"{query_name} response is missing menu node.")
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing menu node."
+            )
         menu_id = node.get("id")
         title = node.get("title")
         handle = node.get("handle")
         if not isinstance(menu_id, str) or not menu_id:
             raise ShopifyApiError(message=f"{query_name} response is missing menu.id.")
         if not isinstance(title, str) or not title:
-            raise ShopifyApiError(message=f"{query_name} response is missing menu.title.")
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing menu.title."
+            )
         if not isinstance(handle, str) or not handle:
-            raise ShopifyApiError(message=f"{query_name} response is missing menu.handle.")
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing menu.handle."
+            )
         return {
             "id": menu_id,
             "title": title,
@@ -2620,9 +2626,7 @@ class ShopifyApiClient:
                 status_code=409,
             )
         user_errors = create_data.get("userErrors") or []
-        self._assert_no_user_errors(
-            user_errors=user_errors, mutation_name="menuCreate"
-        )
+        self._assert_no_user_errors(user_errors=user_errors, mutation_name="menuCreate")
         return self._coerce_menu_summary_node(
             node=create_data.get("menu"),
             query_name="menuCreate",
@@ -2678,9 +2682,7 @@ class ShopifyApiClient:
                 status_code=409,
             )
         user_errors = update_data.get("userErrors") or []
-        self._assert_no_user_errors(
-            user_errors=user_errors, mutation_name="menuUpdate"
-        )
+        self._assert_no_user_errors(user_errors=user_errors, mutation_name="menuUpdate")
         return self._coerce_menu_summary_node(
             node=update_data.get("menu"),
             query_name="menuUpdate",
@@ -2735,7 +2737,9 @@ class ShopifyApiClient:
                     title=self._derive_menu_title_from_handle(menu_handle),
                     items=policy_menu_items,
                 )
-                menu_summaries_by_handle.setdefault(menu_handle, []).append(created_menu)
+                menu_summaries_by_handle.setdefault(menu_handle, []).append(
+                    created_menu
+                )
                 continue
 
             matching_menu = matching_menus[0]
@@ -4719,15 +4723,13 @@ class ShopifyApiClient:
         return False
 
     @classmethod
-    def _infer_theme_template_image_slot_role(
-        cls, *, path: str, key: str
-    ) -> str:
+    def _infer_theme_template_image_slot_role(cls, *, path: str, key: str) -> str:
         path_tokens = cls._tokenize_theme_settings_path(path=path)
         key_tokens = {
             token
-            for token in cls._normalize_theme_settings_semantic_key(
-                raw_key=key
-            ).split("_")
+            for token in cls._normalize_theme_settings_semantic_key(raw_key=key).split(
+                "_"
+            )
             if token
         }
         tokens = path_tokens | key_tokens
@@ -4748,9 +4750,9 @@ class ShopifyApiClient:
         path_tokens = cls._tokenize_theme_settings_path(path=path)
         key_tokens = {
             token
-            for token in cls._normalize_theme_settings_semantic_key(
-                raw_key=key
-            ).split("_")
+            for token in cls._normalize_theme_settings_semantic_key(raw_key=key).split(
+                "_"
+            )
             if token
         }
         tokens = path_tokens | key_tokens
@@ -4803,9 +4805,9 @@ class ShopifyApiClient:
         path_tokens = cls._tokenize_theme_settings_path(path=path)
         key_tokens = {
             token
-            for token in cls._normalize_theme_settings_semantic_key(
-                raw_key=key
-            ).split("_")
+            for token in cls._normalize_theme_settings_semantic_key(raw_key=key).split(
+                "_"
+            )
             if token
         }
         tokens = path_tokens | key_tokens
@@ -4813,7 +4815,14 @@ class ShopifyApiClient:
             return "cta"
         if {"title", "heading", "headline"} & tokens:
             return "headline"
-        if {"subtitle", "subheading", "description", "copy", "content", "body"} & tokens:
+        if {
+            "subtitle",
+            "subheading",
+            "description",
+            "copy",
+            "content",
+            "body",
+        } & tokens:
             return "body"
         if {"caption", "message", "benefit", "feature"} & tokens:
             return "supporting"
@@ -4860,7 +4869,9 @@ class ShopifyApiClient:
                         continue
                     if not cls._is_theme_template_component_image_setting_key(key=key):
                         continue
-                    if not cls._is_theme_template_component_image_setting_value(value=value):
+                    if not cls._is_theme_template_component_image_setting_value(
+                        value=value
+                    ):
                         continue
                     role = cls._infer_theme_template_image_slot_role(
                         path=child_path,
@@ -4870,7 +4881,9 @@ class ShopifyApiClient:
                         {
                             "path": child_path,
                             "key": key,
-                            "currentValue": value.strip() if isinstance(value, str) else None,
+                            "currentValue": (
+                                value.strip() if isinstance(value, str) else None
+                            ),
                             "role": role,
                             "recommendedAspect": cls._infer_theme_template_image_recommended_aspect(
                                 path=child_path,
@@ -4958,7 +4971,9 @@ class ShopifyApiClient:
                         continue
                     if not cls._is_theme_template_component_text_setting_key(key=key):
                         continue
-                    if not cls._is_theme_template_component_text_setting_value(value=value):
+                    if not cls._is_theme_template_component_text_setting_value(
+                        value=value
+                    ):
                         continue
                     role = cls._infer_theme_template_text_slot_role(
                         path=child_path,
@@ -4968,7 +4983,9 @@ class ShopifyApiClient:
                         {
                             "path": child_path,
                             "key": key,
-                            "currentValue": value.strip() if isinstance(value, str) else None,
+                            "currentValue": (
+                                value.strip() if isinstance(value, str) else None
+                            ),
                             "role": role,
                             "maxLength": cls._infer_theme_template_text_slot_max_length(
                                 role=role,
@@ -5105,8 +5122,8 @@ class ShopifyApiClient:
         updated_paths: list[str] = []
         missing_paths: list[str] = []
         for setting_path, text_value in component_text_values_by_path.items():
-            parsed_template_filename, json_path = cls._split_theme_template_setting_path(
-                setting_path=setting_path
+            parsed_template_filename, json_path = (
+                cls._split_theme_template_setting_path(setting_path=setting_path)
             )
             if parsed_template_filename != template_filename:
                 raise ShopifyApiError(
@@ -6790,7 +6807,9 @@ class ShopifyApiClient:
             theme_name=normalized_theme_name,
         )
         profile = self._resolve_theme_brand_profile(theme_name=theme["name"])
-        self._assert_theme_brand_profile_supported(theme_name=theme["name"], profile=profile)
+        self._assert_theme_brand_profile_supported(
+            theme_name=theme["name"], profile=profile
+        )
 
         template_filenames = await self._list_theme_template_json_filenames(
             shop_domain=shop_domain,
@@ -7150,7 +7169,10 @@ class ShopifyApiClient:
         )
 
         template_component_text_missing_paths: list[str] = []
-        for template_filename, component_text_map in component_text_values_by_template.items():
+        for (
+            template_filename,
+            component_text_map,
+        ) in component_text_values_by_template.items():
             template_content = next_template_contents.get(template_filename)
             if template_content is None:
                 raise ShopifyApiError(
@@ -7162,9 +7184,13 @@ class ShopifyApiClient:
                 template_content=template_content,
                 component_text_values_by_path=component_text_map,
             )
-            template_component_text_missing_paths.extend(validation_sync["missingPaths"])
+            template_component_text_missing_paths.extend(
+                validation_sync["missingPaths"]
+            )
 
-        template_component_text_missing_paths = sorted(set(template_component_text_missing_paths))
+        template_component_text_missing_paths = sorted(
+            set(template_component_text_missing_paths)
+        )
         if template_component_text_missing_paths:
             raise ShopifyApiError(
                 message=(
@@ -7175,12 +7201,17 @@ class ShopifyApiClient:
             )
 
         if component_text_values_by_template:
-            for template_filename, component_text_map in component_text_values_by_template.items():
+            for (
+                template_filename,
+                component_text_map,
+            ) in component_text_values_by_template.items():
                 template_content = next_template_contents[template_filename]
-                next_template_content, _ = self._sync_theme_template_component_text_settings_data(
-                    template_filename=template_filename,
-                    template_content=template_content,
-                    component_text_values_by_path=component_text_map,
+                next_template_content, _ = (
+                    self._sync_theme_template_component_text_settings_data(
+                        template_filename=template_filename,
+                        template_content=template_content,
+                        component_text_values_by_path=component_text_map,
+                    )
                 )
                 next_template_contents[template_filename] = next_template_content
 
@@ -7509,6 +7540,35 @@ class ShopifyApiClient:
         data = response.get("data")
         errors = response.get("errors")
         if errors:
+            if isinstance(errors, list):
+                for error in errors:
+                    if not isinstance(error, dict):
+                        continue
+                    message = error.get("message")
+                    path = error.get("path")
+                    normalized_message = (
+                        message.strip().lower() if isinstance(message, str) else ""
+                    )
+                    if (
+                        "access denied for menus field" in normalized_message
+                        or (
+                            isinstance(path, list)
+                            and any(
+                                isinstance(path_part, str)
+                                and path_part.strip().lower() == "menus"
+                                for path_part in path
+                            )
+                        )
+                    ):
+                        raise ShopifyApiError(
+                            message=(
+                                "Admin GraphQL access denied for menu operations. "
+                                "Missing required scopes: read_online_store_navigation, "
+                                "write_online_store_navigation. "
+                                "Update app scopes, then reauthorize the store installation."
+                            ),
+                            status_code=403,
+                        )
             raise ShopifyApiError(message=f"Admin GraphQL errors: {errors}")
         if not isinstance(data, dict):
             raise ShopifyApiError(message="Admin GraphQL response is missing data")

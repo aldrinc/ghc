@@ -1379,7 +1379,10 @@ def sync_client_shopify_theme_brand(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="componentTextValues keys must be non-empty setting paths.",
             )
-        if not (setting_path.startswith("templates/") or setting_path.startswith("sections/")):
+        if not (
+            setting_path.startswith("templates/")
+            or setting_path.startswith("sections/")
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=(
@@ -1838,7 +1841,9 @@ def list_client_shopify_theme_template_slots(
             {
                 "path": path.strip(),
                 "key": key.strip(),
-                "currentValue": current_value.strip() if isinstance(current_value, str) else None,
+                "currentValue": (
+                    current_value.strip() if isinstance(current_value, str) else None
+                ),
                 "role": role.strip(),
                 "recommendedAspect": recommended_aspect,
             }
@@ -1891,7 +1896,9 @@ def list_client_shopify_theme_template_slots(
             {
                 "path": path.strip(),
                 "key": key.strip(),
-                "currentValue": current_value.strip() if isinstance(current_value, str) else None,
+                "currentValue": (
+                    current_value.strip() if isinstance(current_value, str) else None
+                ),
                 "role": role.strip(),
                 "maxLength": max_length,
             }
