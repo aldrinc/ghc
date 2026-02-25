@@ -51,9 +51,13 @@ export function useApiClient(baseUrl: string = defaultBaseUrl) {
         resp = await fetch(url, { ...init, headers });
       } catch (error) {
         const networkMessage = error instanceof Error && error.message ? error.message : "Request failed";
+        const currentOrigin =
+          typeof window !== "undefined" && window.location?.origin ? window.location.origin : "unknown";
+        const browserOnline = typeof navigator !== "undefined" ? String(navigator.onLine) : "unknown";
         throw {
           message:
-            `Network error while calling ${url}: ${networkMessage}. ` +
+            `Network error while calling ${url} from origin ${currentOrigin}: ${networkMessage}. ` +
+            `Browser online=${browserOnline}. ` +
             "Check VITE_API_BASE_URL, backend availability, and CORS.",
           status: 0,
           raw: error,

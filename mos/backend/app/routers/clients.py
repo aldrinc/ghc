@@ -1,18 +1,27 @@
-from uuid import uuid4
+import logging
 from typing import Any
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
+from app.db.base import SessionLocal
 from app.db.deps import get_session
 from app.db.models import ClientUserPreference, Product
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.design_systems import DesignSystemsRepository
+from app.db.repositories.jobs import (
+    JOB_STATUS_FAILED,
+    JOB_STATUS_QUEUED,
+    JOB_STATUS_RUNNING,
+    JOB_STATUS_SUCCEEDED,
+    JobsRepository,
+)
 from app.db.repositories.products import ProductOffersRepository, ProductsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
@@ -36,6 +45,8 @@ from app.schemas.shopify_connection import (
     ShopifyInstallUrlRequest,
     ShopifyInstallUrlResponse,
     ShopifyThemeBrandSyncRequest,
+    ShopifyThemeBrandSyncJobStartResponse,
+    ShopifyThemeBrandSyncJobStatusResponse,
     ShopifyThemeBrandSyncResponse,
 )
 from app.services.design_system_generation import (
@@ -70,6 +81,10 @@ from app.temporal.workflows.campaign_intent import (
 )
 
 router = APIRouter(prefix="/clients", tags=["clients"])
+logger = logging.getLogger(__name__)
+
+_JOB_TYPE_SHOPIFY_THEME_BRAND_SYNC = "shopify_theme_brand_sync"
+_JOB_SUBJECT_TYPE_CLIENT = "client"
 
 
 @router.get("")
@@ -88,9 +103,7 @@ def create_client(
     session: Session = Depends(get_session),
 ):
     repo = ClientsRepository(session)
-    client = repo.create(
-        org_id=auth.org_id, name=payload.name, industry=payload.industry
-    )
+    client = repo.create(org_id=auth.org_id, name=payload.name, industry=payload.industry)
     return jsonable_encoder(client)
 
 
@@ -103,9 +116,7 @@ def get_client(
     repo = ClientsRepository(session)
     client = repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     return jsonable_encoder(client)
 
 
@@ -121,9 +132,7 @@ def _serialize_active_product(product: Product) -> dict:
 def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
     client = ClientsRepository(session).get(org_id=org_id, client_id=client_id)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     return client
 
 
@@ -173,9 +182,125 @@ def _get_selected_shop_domain(
     return selected.strip().lower()
 
 
-@router.get(
-    "/{client_id}/shopify/status", response_model=ShopifyConnectionStatusResponse
-)
+def _serialize_http_exception_detail(detail: Any) -> dict[str, Any]:
+    if isinstance(detail, dict):
+        return detail
+    if isinstance(detail, list):
+        return {"items": detail}
+    if isinstance(detail, str):
+        return {"message": detail}
+    return {"message": str(detail)}
+
+
+def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
+    session = SessionLocal()
+    try:
+        jobs_repo = JobsRepository(session)
+        job = jobs_repo.mark_running(job_id)
+        if not job:
+            return
+
+        input_payload = job.input if isinstance(job.input, dict) else {}
+        client_id = input_payload.get("clientId")
+        raw_request_payload = input_payload.get("payload")
+        raw_auth_context = input_payload.get("auth")
+
+        if not isinstance(client_id, str) or not client_id.strip():
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: missing clientId.",
+            )
+            return
+        if not isinstance(raw_request_payload, dict):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: payload must be an object.",
+            )
+            return
+        if not isinstance(raw_auth_context, dict):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: auth context must be an object.",
+            )
+            return
+
+        user_id = raw_auth_context.get("userId")
+        org_id = raw_auth_context.get("orgId")
+        if (
+            not isinstance(user_id, str)
+            or not user_id.strip()
+            or not isinstance(org_id, str)
+            or not org_id.strip()
+        ):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: missing auth.userId or auth.orgId.",
+            )
+            return
+
+        try:
+            payload = ShopifyThemeBrandSyncRequest(**raw_request_payload)
+        except Exception as exc:  # noqa: BLE001
+            jobs_repo.mark_failed(
+                job_id,
+                error=f"Invalid queued job payload: {exc}",
+            )
+            return
+
+        auth = AuthContext(user_id=user_id.strip(), org_id=org_id.strip())
+        try:
+            sync_response = sync_client_shopify_theme_brand_route(
+                client_id=client_id.strip(),
+                payload=payload,
+                auth=auth,
+                session=session,
+            )
+        except HTTPException as exc:
+            detail_payload = _serialize_http_exception_detail(exc.detail)
+            error_message = detail_payload.get("message")
+            if not isinstance(error_message, str) or not error_message.strip():
+                error_message = f"Shopify theme brand sync failed with status {exc.status_code}."
+            jobs_repo.mark_failed(
+                job_id,
+                error=error_message,
+                output={
+                    "statusCode": exc.status_code,
+                    "detail": detail_payload,
+                },
+            )
+            return
+
+        if isinstance(sync_response, ShopifyThemeBrandSyncResponse):
+            result_payload = sync_response.model_dump(mode="json")
+        elif isinstance(sync_response, dict):
+            result_payload = sync_response
+        else:
+            result_payload = jsonable_encoder(sync_response)
+
+        jobs_repo.mark_succeeded(
+            job_id,
+            output={"result": result_payload},
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "Unhandled exception while running Shopify theme brand sync job",
+            extra={"job_id": job_id},
+        )
+        try:
+            JobsRepository(session).mark_failed(
+                job_id,
+                error=str(exc) or "Unhandled error while running Shopify theme brand sync job.",
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Failed to mark Shopify theme brand sync job as failed after exception",
+                extra={"job_id": job_id},
+            )
+    finally:
+        session.close()
+
+
+@router.get("/{client_id}/shopify/status", response_model=ShopifyConnectionStatusResponse)
 def get_client_shopify_status(
     client_id: str,
     auth: AuthContext = Depends(get_current_user),
@@ -195,9 +320,7 @@ def get_client_shopify_status(
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
-@router.post(
-    "/{client_id}/shopify/install-url", response_model=ShopifyInstallUrlResponse
-)
+@router.post("/{client_id}/shopify/install-url", response_model=ShopifyInstallUrlResponse)
 def create_client_shopify_install_url(
     client_id: str,
     payload: ShopifyInstallUrlRequest,
@@ -211,9 +334,7 @@ def create_client_shopify_install_url(
     return ShopifyInstallUrlResponse(installUrl=install_url)
 
 
-@router.patch(
-    "/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse
-)
+@router.patch("/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse)
 def update_client_shopify_installation(
     client_id: str,
     payload: ShopifyInstallationUpdateRequest,
@@ -239,9 +360,7 @@ def update_client_shopify_installation(
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
-@router.delete(
-    "/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse
-)
+@router.delete("/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse)
 def disconnect_client_shopify_installation(
     client_id: str,
     payload: ShopifyInstallationDisconnectRequest,
@@ -278,9 +397,7 @@ def disconnect_client_shopify_installation(
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
-@router.put(
-    "/{client_id}/shopify/default-shop", response_model=ShopifyConnectionStatusResponse
-)
+@router.put("/{client_id}/shopify/default-shop", response_model=ShopifyConnectionStatusResponse)
 def set_client_shopify_default_shop(
     client_id: str,
     payload: ShopifyDefaultShopRequest,
@@ -360,9 +477,7 @@ def list_client_shopify_products_route(
     return ShopifyProductListResponse(**payload)
 
 
-@router.post(
-    "/{client_id}/shopify/products", response_model=ShopifyProductCreateResponse
-)
+@router.post("/{client_id}/shopify/products", response_model=ShopifyProductCreateResponse)
 def create_client_shopify_product_route(
     client_id: str,
     payload: ShopifyCreateProductRequest,
@@ -402,6 +517,104 @@ def create_client_shopify_product_route(
 
 
 @router.post(
+    "/{client_id}/shopify/theme/brand/sync-async",
+    response_model=ShopifyThemeBrandSyncJobStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def enqueue_client_shopify_theme_brand_sync_route(
+    client_id: str,
+    payload: ShopifyThemeBrandSyncRequest,
+    background_tasks: BackgroundTasks,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+
+    jobs_repo = JobsRepository(session)
+    job, _ = jobs_repo.get_or_create(
+        org_id=auth.org_id,
+        client_id=client_id,
+        research_run_id=None,
+        job_type=_JOB_TYPE_SHOPIFY_THEME_BRAND_SYNC,
+        subject_type=_JOB_SUBJECT_TYPE_CLIENT,
+        subject_id=client_id,
+        dedupe_key=None,
+        input_payload={
+            "clientId": client_id,
+            "payload": payload.model_dump(mode="json"),
+            "auth": {
+                "userId": auth.user_id,
+                "orgId": auth.org_id,
+            },
+        },
+        status=JOB_STATUS_QUEUED,
+    )
+    background_tasks.add_task(_run_client_shopify_theme_brand_sync_job, str(job.id))
+
+    return ShopifyThemeBrandSyncJobStartResponse(
+        jobId=str(job.id),
+        status=job.status,
+        statusPath=f"/clients/{client_id}/shopify/theme/brand/sync-jobs/{job.id}",
+    )
+
+
+@router.get(
+    "/{client_id}/shopify/theme/brand/sync-jobs/{job_id}",
+    response_model=ShopifyThemeBrandSyncJobStatusResponse,
+)
+def get_client_shopify_theme_brand_sync_job_status_route(
+    client_id: str,
+    job_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    job = JobsRepository(session).get(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sync job not found.")
+
+    if (
+        str(job.org_id) != auth.org_id
+        or str(job.subject_id) != client_id
+        or job.job_type != _JOB_TYPE_SHOPIFY_THEME_BRAND_SYNC
+        or job.subject_type != _JOB_SUBJECT_TYPE_CLIENT
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sync job not found.")
+
+    if job.status not in {
+        JOB_STATUS_QUEUED,
+        JOB_STATUS_RUNNING,
+        JOB_STATUS_SUCCEEDED,
+        JOB_STATUS_FAILED,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Sync job is in an unsupported state: {job.status}",
+        )
+
+    output_payload = job.output if isinstance(job.output, dict) else {}
+    raw_result = output_payload.get("result")
+    result: ShopifyThemeBrandSyncResponse | None = None
+    if isinstance(raw_result, dict):
+        try:
+            result = ShopifyThemeBrandSyncResponse(**raw_result)
+        except Exception:  # noqa: BLE001
+            result = None
+
+    error = job.error.strip() if isinstance(job.error, str) and job.error.strip() else None
+    return ShopifyThemeBrandSyncJobStatusResponse(
+        jobId=str(job.id),
+        status=job.status,
+        error=error,
+        result=result,
+        createdAt=job.created_at,
+        updatedAt=job.updated_at,
+        startedAt=job.started_at,
+        finishedAt=job.finished_at,
+    )
+
+
+@router.post(
     "/{client_id}/shopify/theme/brand/sync",
     response_model=ShopifyThemeBrandSyncResponse,
 )
@@ -411,9 +624,7 @@ def sync_client_shopify_theme_brand_route(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    client = _get_client_or_404(
-        session=session, org_id=auth.org_id, client_id=client_id
-    )
+    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
     selected_shop_domain = _get_selected_shop_domain(
         session=session,
         org_id=auth.org_id,
@@ -431,9 +642,7 @@ def sync_client_shopify_theme_brand_route(
             detail=f"Shopify connection is not ready: {status_payload['message']}",
         )
 
-    requested_design_system_id = (
-        payload.designSystemId.strip() if payload.designSystemId else None
-    )
+    requested_design_system_id = payload.designSystemId.strip() if payload.designSystemId else None
     resolved_design_system_id = requested_design_system_id or (
         str(client.design_system_id) if client.design_system_id else None
     )
@@ -461,9 +670,7 @@ def sync_client_shopify_theme_brand_route(
             detail="Workspace default design system was not found.",
         )
 
-    design_system_client_id = (
-        str(design_system.client_id) if design_system.client_id else None
-    )
+    design_system_client_id = str(design_system.client_id) if design_system.client_id else None
     if design_system_client_id and design_system_client_id != client_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -609,13 +816,11 @@ def sync_client_shopify_theme_brand_route(
                 detail="Product must belong to this workspace.",
             )
         try:
-            product_image_asset_public_ids = (
-                funnel_ai._collect_product_image_public_ids(
-                    session=session,
-                    org_id=auth.org_id,
-                    client_id=client_id,
-                    product=product,
-                )
+            product_image_asset_public_ids = funnel_ai._collect_product_image_public_ids(
+                session=session,
+                org_id=auth.org_id,
+                client_id=client_id,
+                product=product,
             )
         except ValueError as exc:
             raise HTTPException(
@@ -623,9 +828,7 @@ def sync_client_shopify_theme_brand_route(
                 detail=f"Unable to resolve product image assets for productId={requested_product_id}: {exc}",
             ) from exc
         product_image_asset_public_ids = [
-            public_id
-            for public_id in product_image_asset_public_ids
-            if public_id != logo_public_id
+            public_id for public_id in product_image_asset_public_ids if public_id != logo_public_id
         ]
         if not product_image_asset_public_ids:
             raise HTTPException(
@@ -848,9 +1051,7 @@ def audit_client_shopify_theme_brand_route(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    client = _get_client_or_404(
-        session=session, org_id=auth.org_id, client_id=client_id
-    )
+    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
     selected_shop_domain = _get_selected_shop_domain(
         session=session,
         org_id=auth.org_id,
@@ -868,9 +1069,7 @@ def audit_client_shopify_theme_brand_route(
             detail=f"Shopify connection is not ready: {status_payload['message']}",
         )
 
-    requested_design_system_id = (
-        payload.designSystemId.strip() if payload.designSystemId else None
-    )
+    requested_design_system_id = payload.designSystemId.strip() if payload.designSystemId else None
     resolved_design_system_id = requested_design_system_id or (
         str(client.design_system_id) if client.design_system_id else None
     )
@@ -898,9 +1097,7 @@ def audit_client_shopify_theme_brand_route(
             detail="Workspace default design system was not found.",
         )
 
-    design_system_client_id = (
-        str(design_system.client_id) if design_system.client_id else None
-    )
+    design_system_client_id = str(design_system.client_id) if design_system.client_id else None
     if design_system_client_id and design_system_client_id != client_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -997,9 +1194,7 @@ def get_active_product(
     clients_repo = ClientsRepository(session)
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
     pref = session.scalar(
         select(ClientUserPreference).where(
@@ -1063,9 +1258,7 @@ def set_active_product(
     clients_repo = ClientsRepository(session)
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
     product = session.scalar(
         select(Product).where(
@@ -1074,9 +1267,7 @@ def set_active_product(
         )
     )
     if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     if str(product.client_id) != str(client_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -1120,9 +1311,7 @@ def update_client(
     repo = ClientsRepository(session)
     client = repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
     fields: dict[str, object] = {}
     if payload.name is not None:
@@ -1141,9 +1330,7 @@ def update_client(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Design system not found",
                 )
-            if design_system.client_id and str(design_system.client_id) != str(
-                client_id
-            ):
+            if design_system.client_id and str(design_system.client_id) != str(client_id):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Design system must belong to the same client",
@@ -1164,9 +1351,7 @@ def delete_client(
     repo = ClientsRepository(session)
     client = repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
     if not payload.confirm:
         raise HTTPException(
@@ -1208,9 +1393,7 @@ async def start_client_onboarding(
 
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
 
     product_fields: dict[str, object] = {"title": payload.product_name}
     if payload.product_description is not None:
@@ -1314,16 +1497,12 @@ async def start_campaign_intent(
     clients_repo = ClientsRepository(session)
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
     product_id = payload.productId
     products_repo = ProductsRepository(session)
     product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     if str(product.client_id) != client_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

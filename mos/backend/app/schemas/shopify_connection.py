@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -191,6 +192,27 @@ class ShopifyThemeBrandSyncResponse(BaseModel):
     jobId: str | None = None
     coverage: ShopifyThemeCoverageSummary
     settingsSync: ShopifyThemeSettingsSyncSummary
+
+
+class ShopifyThemeBrandSyncJobStartResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    statusPath: str
+
+
+class ShopifyThemeBrandSyncJobStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    error: str | None = None
+    result: ShopifyThemeBrandSyncResponse | None = None
+    createdAt: datetime
+    updatedAt: datetime
+    startedAt: datetime | None = None
+    finishedAt: datetime | None = None
 
 
 class ShopifyThemeBrandAuditRequest(BaseModel):

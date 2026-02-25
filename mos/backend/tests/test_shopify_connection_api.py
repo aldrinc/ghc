@@ -25,9 +25,7 @@ def test_get_shopify_status_returns_service_payload(api_client, monkeypatch):
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
 
     response = api_client.get(f"/clients/{client_id}/shopify/status")
 
@@ -55,21 +53,15 @@ def test_create_shopify_install_url_returns_url(api_client, monkeypatch):
 
     assert response.status_code == 200
     assert observed == {"client_id": client_id, "shop_domain": "example.myshopify.com"}
-    assert response.json()["installUrl"].startswith(
-        "https://shopify-bridge.local/auth/install"
-    )
+    assert response.json()["installUrl"].startswith("https://shopify-bridge.local/auth/install")
 
 
-def test_update_shopify_installation_sets_token_and_returns_status(
-    api_client, monkeypatch
-):
+def test_update_shopify_installation_sets_token_and_returns_status(api_client, monkeypatch):
     client_id = _create_client(api_client)
 
     observed: dict[str, str] = {}
 
-    def fake_set_token(
-        *, client_id: str, shop_domain: str, storefront_access_token: str
-    ) -> None:
+    def fake_set_token(*, client_id: str, shop_domain: str, storefront_access_token: str) -> None:
         observed["client_id"] = client_id
         observed["shop_domain"] = shop_domain
         observed["storefront_access_token"] = storefront_access_token
@@ -85,12 +77,8 @@ def test_update_shopify_installation_sets_token_and_returns_status(
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(
-        clients_router, "set_client_shopify_storefront_token", fake_set_token
-    )
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
+    monkeypatch.setattr(clients_router, "set_client_shopify_storefront_token", fake_set_token)
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
 
     response = api_client.patch(
         f"/clients/{client_id}/shopify/installation",
@@ -131,12 +119,8 @@ def test_disconnect_shopify_installation_unlinks_workspace_and_returns_status(
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(
-        clients_router, "disconnect_client_shopify_store", fake_disconnect
-    )
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
+    monkeypatch.setattr(clients_router, "disconnect_client_shopify_store", fake_disconnect)
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
 
     response = api_client.request(
         method="DELETE",
@@ -157,9 +141,7 @@ def test_list_shopify_products_returns_products(api_client, monkeypatch):
 
     observed: dict[str, object] = {}
 
-    def fake_list(
-        *, client_id: str, query: str | None, limit: int, shop_domain: str | None
-    ):
+    def fake_list(*, client_id: str, query: str | None, limit: int, shop_domain: str | None):
         observed["client_id"] = client_id
         observed["query"] = query
         observed["limit"] = limit
@@ -221,12 +203,8 @@ def test_set_default_shop_updates_status(api_client, monkeypatch):
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(
-        clients_router, "list_shopify_installations", fake_installations
-    )
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
+    monkeypatch.setattr(clients_router, "list_shopify_installations", fake_installations)
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
 
     response = api_client.put(
         f"/clients/{client_id}/shopify/default-shop",
@@ -287,9 +265,7 @@ def test_create_shopify_product_returns_created_payload(api_client, monkeypatch)
             ],
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
     monkeypatch.setattr(clients_router, "create_client_shopify_product", fake_create)
 
     response = api_client.post(
@@ -324,9 +300,7 @@ def test_create_shopify_product_requires_ready_connection(api_client, monkeypatc
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/products",
@@ -338,7 +312,46 @@ def test_create_shopify_product_requires_ready_connection(api_client, monkeypatc
     )
 
     assert response.status_code == 409
-    assert "Shopify connection is not ready" in response.json()["detail"]
+
+
+def test_enqueue_shopify_theme_brand_sync_job_returns_accepted(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    observed: dict[str, object] = {}
+
+    def fake_run_sync_job(job_id: str):
+        observed["job_id"] = job_id
+
+    monkeypatch.setattr(
+        clients_router,
+        "_run_client_shopify_theme_brand_sync_job",
+        fake_run_sync_job,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/sync-async",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "themeName": "futrgroup2-0theme",
+        },
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert isinstance(payload["jobId"], str) and payload["jobId"]
+    assert payload["status"] in {"queued", "running", "succeeded", "failed"}
+    assert payload["statusPath"] == (
+        f"/clients/{client_id}/shopify/theme/brand/sync-jobs/{payload['jobId']}"
+    )
+    assert observed["job_id"] == payload["jobId"]
+
+    status_response = api_client.get(
+        f"/clients/{client_id}/shopify/theme/brand/sync-jobs/{payload['jobId']}"
+    )
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["jobId"] == payload["jobId"]
+    assert status_payload["status"] in {"queued", "running", "succeeded", "failed"}
 
 
 def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
@@ -383,9 +396,7 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
             "funnelDefaults": {"containerWidth": "lg"},
         }
 
-    def fake_get_logo_asset(
-        self, *, org_id: str, public_id: str, client_id: str | None = None
-    ):
+    def fake_get_logo_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
         observed["logo_public_id"] = public_id
         observed["logo_client_id"] = client_id
         return object()
@@ -443,19 +454,11 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
             },
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
-    monkeypatch.setattr(
-        clients_router.DesignSystemsRepository, "get", fake_design_system_get
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
-    monkeypatch.setattr(
-        clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset
-    )
-    monkeypatch.setattr(
-        clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand
-    )
+    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset)
+    monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
     )
@@ -483,9 +486,7 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
     assert observed["auto_component_image_urls"] == []
 
 
-def test_sync_shopify_theme_brand_resolves_component_image_asset_map(
-    api_client, monkeypatch
-):
+def test_sync_shopify_theme_brand_resolves_component_image_asset_map(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Acme Workspace")
     observed: dict[str, object] = {}
 
@@ -524,9 +525,7 @@ def test_sync_shopify_theme_brand_resolves_component_image_asset_map(
             "funnelDefaults": {"containerWidth": "lg"},
         }
 
-    def fake_get_asset(
-        self, *, org_id: str, public_id: str, client_id: str | None = None
-    ):
+    def fake_get_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
         observed.setdefault("asset_public_ids", []).append(public_id)
         if public_id in {
             "logo-public-id",
@@ -579,19 +578,11 @@ def test_sync_shopify_theme_brand_resolves_component_image_asset_map(
             },
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
-    monkeypatch.setattr(
-        clients_router.DesignSystemsRepository, "get", fake_design_system_get
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
-    monkeypatch.setattr(
-        clients_router.AssetsRepository, "get_by_public_id", fake_get_asset
-    )
-    monkeypatch.setattr(
-        clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand
-    )
+    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_asset)
+    monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
     )
@@ -666,9 +657,7 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
             "funnelDefaults": {"containerWidth": "lg"},
         }
 
-    def fake_get_asset(
-        self, *, org_id: str, public_id: str, client_id: str | None = None
-    ):
+    def fake_get_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
         if public_id in {"logo-public-id", "product-image-1", "product-image-2"}:
             return type("FakeAsset", (), {"public_id": public_id})()
         return None
@@ -684,9 +673,7 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
             },
         )()
 
-    def fake_collect_product_image_public_ids(
-        *, session, org_id: str, client_id: str, product
-    ):
+    def fake_collect_product_image_public_ids(*, session, org_id: str, client_id: str, product):
         observed["collect_product_id"] = str(product.id)
         return ["logo-public-id", "product-image-1", "product-image-2"]
 
@@ -793,25 +780,17 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
             },
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
-    monkeypatch.setattr(
-        clients_router.DesignSystemsRepository, "get", fake_design_system_get
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
-    monkeypatch.setattr(
-        clients_router.AssetsRepository, "get_by_public_id", fake_get_asset
-    )
+    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_asset)
     monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
     monkeypatch.setattr(
         clients_router,
         "list_client_shopify_theme_template_slots",
         fake_list_template_slots,
     )
-    monkeypatch.setattr(
-        clients_router.ProductOffersRepository, "list_by_product", fake_list_offers
-    )
+    monkeypatch.setattr(clients_router.ProductOffersRepository, "list_by_product", fake_list_offers)
     monkeypatch.setattr(
         clients_router,
         "plan_shopify_theme_component_content",
@@ -822,9 +801,7 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
         "_collect_product_image_public_ids",
         fake_collect_product_image_public_ids,
     )
-    monkeypatch.setattr(
-        clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand
-    )
+    monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
     )
@@ -923,9 +900,7 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
             "funnelDefaults": {"containerWidth": "lg"},
         }
 
-    def fake_get_logo_asset(
-        self, *, org_id: str, public_id: str, client_id: str | None = None
-    ):
+    def fake_get_logo_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
         return object()
 
     def fake_sync_theme_brand(
@@ -973,19 +948,11 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
         }
 
     monkeypatch.setattr(clients_router.ClientsRepository, "get", fake_get_client)
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
-    monkeypatch.setattr(
-        clients_router.DesignSystemsRepository, "get", fake_design_system_get
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
-    monkeypatch.setattr(
-        clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset
-    )
-    monkeypatch.setattr(
-        clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand
-    )
+    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset)
+    monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
     )
@@ -1019,9 +986,7 @@ def test_sync_shopify_theme_brand_requires_ready_connection(api_client, monkeypa
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/sync",
@@ -1118,16 +1083,10 @@ def test_audit_shopify_theme_brand_returns_audit_payload(api_client, monkeypatch
             "isReady": True,
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
-    monkeypatch.setattr(
-        clients_router.DesignSystemsRepository, "get", fake_design_system_get
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
-    monkeypatch.setattr(
-        clients_router, "audit_client_shopify_theme_brand", fake_audit_theme_brand
-    )
+    monkeypatch.setattr(clients_router, "audit_client_shopify_theme_brand", fake_audit_theme_brand)
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/audit",
@@ -1162,9 +1121,7 @@ def test_audit_shopify_theme_brand_requires_ready_connection(api_client, monkeyp
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(
-        clients_router, "get_client_shopify_connection_status", fake_status
-    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/audit",

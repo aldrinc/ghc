@@ -123,6 +123,25 @@ export type ClientShopifyThemeBrandSyncResponse = {
   settingsSync: ClientShopifyThemeSettingsSyncSummary;
 };
 
+type ClientShopifyThemeBrandSyncJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+type ClientShopifyThemeBrandSyncJobStartResponse = {
+  jobId: string;
+  status: ClientShopifyThemeBrandSyncJobStatus;
+  statusPath: string;
+};
+
+type ClientShopifyThemeBrandSyncJobStatusResponse = {
+  jobId: string;
+  status: ClientShopifyThemeBrandSyncJobStatus;
+  error?: string | null;
+  result?: ClientShopifyThemeBrandSyncResponse | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+};
+
 export type ClientShopifyThemeBrandAuditResponse = {
   shopDomain: string;
   workspaceName: string;
@@ -290,15 +309,41 @@ export function useCreateClientShopifyProduct(clientId: string) {
 }
 
 export function useSyncClientShopifyThemeBrand(clientId?: string) {
-  const { post } = useApiClient();
+  const { get, post } = useApiClient();
 
   return useMutation({
-    mutationFn: (payload: ClientShopifyThemeBrandSyncPayload) => {
+    mutationFn: async (payload: ClientShopifyThemeBrandSyncPayload) => {
       if (!clientId) throw new Error("Client ID is required.");
-      return post<ClientShopifyThemeBrandSyncResponse>(
-        `/clients/${clientId}/shopify/theme/brand/sync`,
+      const startResponse = await post<ClientShopifyThemeBrandSyncJobStartResponse>(
+        `/clients/${clientId}/shopify/theme/brand/sync-async`,
         payload,
       );
+      const syncJobId = startResponse.jobId;
+      if (!syncJobId || !syncJobId.trim()) {
+        throw new Error("Shopify theme sync job was not started.");
+      }
+
+      const pollTimeoutMs = 1000 * 60 * 20;
+      const pollIntervalMs = 2000;
+      const startedAt = Date.now();
+
+      while (true) {
+        const statusResponse = await get<ClientShopifyThemeBrandSyncJobStatusResponse>(
+          `/clients/${clientId}/shopify/theme/brand/sync-jobs/${syncJobId}`,
+        );
+        if (statusResponse.status === "succeeded") {
+          if (statusResponse.result) return statusResponse.result;
+          throw new Error("Shopify theme sync completed but no result payload was returned.");
+        }
+        if (statusResponse.status === "failed") {
+          const errorMessage = statusResponse.error?.trim();
+          throw new Error(errorMessage || "Shopify theme sync failed.");
+        }
+        if (Date.now() - startedAt > pollTimeoutMs) {
+          throw new Error("Timed out waiting for Shopify theme sync to complete.");
+        }
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      }
     },
     onSuccess: (response) => {
       toast.success(`Synced Shopify theme brand for ${response.shopDomain}`);
