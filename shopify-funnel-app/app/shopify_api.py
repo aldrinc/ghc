@@ -1919,6 +1919,24 @@ class ShopifyApiClient:
         return None
 
     @classmethod
+    def _find_first_color_schemes_collection(cls, node: Any) -> Any | None:
+        if isinstance(node, dict):
+            direct = node.get("color_schemes")
+            if cls._is_non_empty_collection_node(direct):
+                return deepcopy(direct)
+            for value in node.values():
+                nested = cls._find_first_color_schemes_collection(value)
+                if nested is not None:
+                    return nested
+            return None
+        if isinstance(node, list):
+            for item in node:
+                nested = cls._find_first_color_schemes_collection(item)
+                if nested is not None:
+                    return nested
+        return None
+
+    @classmethod
     def _ensure_current_color_schemes(cls, *, settings_data: dict[str, Any]) -> None:
         current = settings_data.get("current")
         if not isinstance(current, dict):
@@ -1938,6 +1956,22 @@ class ShopifyApiClient:
                 if candidate is not None:
                     current["color_schemes"] = candidate
                     return
+
+        discovered = cls._find_first_color_schemes_collection(settings_data)
+        if discovered is not None:
+            current["color_schemes"] = discovered
+
+    @classmethod
+    def _has_current_color_schemes_target(cls, *, settings_data: dict[str, Any]) -> bool:
+        current = settings_data.get("current")
+        if not isinstance(current, dict):
+            return False
+        if cls._is_non_empty_collection_node(current.get("color_schemes")):
+            return True
+        nested_settings = current.get("settings")
+        if isinstance(nested_settings, dict):
+            return cls._is_non_empty_collection_node(nested_settings.get("color_schemes"))
+        return False
 
     @staticmethod
     def _parse_theme_settings_json(*, settings_content: str) -> dict[str, Any]:
@@ -2003,10 +2037,18 @@ class ShopifyApiClient:
 
         settings_data = cls._parse_theme_settings_json(settings_content=settings_content)
         cls._ensure_current_color_schemes(settings_data=settings_data)
+        has_color_schemes_target = cls._has_current_color_schemes_target(settings_data=settings_data)
+        expected_paths = sorted(
+            path
+            for path in profile.settings_value_paths.keys()
+            if has_color_schemes_target or ".color_schemes[*]." not in path
+        )
+        report["expectedPaths"] = expected_paths
 
         updated_paths: list[str] = []
         missing_paths: list[str] = []
-        for path, source_var in sorted(profile.settings_value_paths.items()):
+        for path in expected_paths:
+            source_var = profile.settings_value_paths[path]
             expected_value = effective_css_vars.get(source_var)
             if expected_value is None:
                 raise ShopifyApiError(
@@ -2076,11 +2118,20 @@ class ShopifyApiClient:
             return report
 
         settings_data = cls._parse_theme_settings_json(settings_content=settings_content)
+        cls._ensure_current_color_schemes(settings_data=settings_data)
+        has_color_schemes_target = cls._has_current_color_schemes_target(settings_data=settings_data)
+        expected_paths = sorted(
+            path
+            for path in profile.settings_value_paths.keys()
+            if has_color_schemes_target or ".color_schemes[*]." not in path
+        )
+        report["expectedPaths"] = expected_paths
 
         synced_paths: list[str] = []
         mismatched_paths: list[str] = []
         missing_paths: list[str] = []
-        for path, source_var in sorted(profile.settings_value_paths.items()):
+        for path in expected_paths:
+            source_var = profile.settings_value_paths[path]
             expected_value = effective_css_vars.get(source_var)
             if expected_value is None:
                 mismatched_paths.append(path)

@@ -1010,12 +1010,6 @@ def test_sync_theme_brand_allows_upsert_without_job():
                 "current.color_button_text",
                 "current.color_foreground",
                 "current.color_link",
-                "current.color_schemes[*].settings.background",
-                "current.color_schemes[*].settings.button",
-                "current.color_schemes[*].settings.button_label",
-                "current.color_schemes[*].settings.secondary_button",
-                "current.color_schemes[*].settings.secondary_button_label",
-                "current.color_schemes[*].settings.text",
                 "current.footer_background",
                 "current.footer_text",
             ],
@@ -1029,14 +1023,7 @@ def test_sync_theme_brand_allows_upsert_without_job():
                 "current.footer_background",
                 "current.footer_text",
             ],
-            "missingPaths": [
-                "current.color_schemes[*].settings.background",
-                "current.color_schemes[*].settings.button",
-                "current.color_schemes[*].settings.button_label",
-                "current.color_schemes[*].settings.secondary_button",
-                "current.color_schemes[*].settings.secondary_button_label",
-                "current.color_schemes[*].settings.text",
-            ],
+            "missingPaths": [],
             "requiredMissingPaths": [],
         },
     }
@@ -1159,6 +1146,110 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_presets():
         "current.footer_background",
         "current.footer_text",
     ]
+    assert result["settingsSync"]["missingPaths"] == []
+
+
+def test_sync_theme_brand_bootstraps_current_color_schemes_from_nested_root_node():
+    client = ShopifyApiClient()
+    settings_json = (
+        '{"current":{"color_background":"#ffffff"},'
+        '"meta":{"theme":{"color_schemes":[{"settings":{"background":"#ffffff","text":"#111111","button":"#000000",'
+        '"button_label":"#ffffff","secondary_button":"#eeeeee","secondary_button_label":"#111111"}}]}}}\n'
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "mutation themeFilesUpsert" in query:
+            files = ((payload.get("variables") or {}).get("files") or [])
+            settings_file = next(item for item in files if item["filename"] == "config/settings_data.json")
+            settings_content = settings_file["body"]["value"]
+            assert '"color_schemes": [' in settings_content
+            assert '"background": "#f5f5f5"' in settings_content
+            assert '"button": "#0a8f3c"' in settings_content
+            return {
+                "themeFilesUpsert": {
+                    "upsertedThemeFiles": [
+                        {"filename": "layout/theme.liquid"},
+                        {"filename": "assets/acme-workspace-workspace-brand.css"},
+                        {"filename": "config/settings_data.json"},
+                    ],
+                    "job": None,
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            font_urls=[],
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert len(result["settingsSync"]["updatedPaths"]) == 14
     assert result["settingsSync"]["missingPaths"] == []
 
 
