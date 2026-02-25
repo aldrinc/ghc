@@ -829,6 +829,8 @@ def test_sync_theme_brand_updates_layout_and_css():
             settings_content = settings_file["body"]["value"]
             assert '"color_background": "#f5f5f5"' in settings_content
             assert '"footer_background": "#f4ede6"' in settings_content
+            assert '"logo": "https://assets.example.com/public/assets/logo-1"' in settings_content
+            assert '"logo_mobile": "https://assets.example.com/public/assets/logo-1"' in settings_content
             return {
                 "themeFilesUpsert": {
                     "upsertedThemeFiles": [
@@ -1144,6 +1146,21 @@ def test_sync_theme_brand_upserts_template_component_settings():
             }
         }
     )
+    section_group_json = json.dumps(
+        {
+            "type": "footer",
+            "sections": {
+                "ss_footer_4_9rJacA": {
+                    "type": "ss-footer-4",
+                    "settings": {
+                        "background_color": "#000000",
+                        "newsletter_color": "#000000",
+                    },
+                }
+            },
+            "order": ["ss_footer_4_9rJacA"],
+        }
+    )
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         query = payload.get("query", "")
@@ -1166,6 +1183,12 @@ def test_sync_theme_brand_upserts_template_component_settings():
                         "nodes": [
                             {
                                 "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                },
+                            },
+                            {
+                                "filename": "sections/footer-group.json",
                                 "body": {
                                     "__typename": "OnlineStoreThemeFileBodyText",
                                 },
@@ -1213,6 +1236,23 @@ def test_sync_theme_brand_upserts_template_component_settings():
                         }
                     }
                 }
+            if requested_filename == "sections/footer-group.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "sections/footer-group.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": section_group_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
             return {
                 "theme": {
                     "files": {
@@ -1243,11 +1283,16 @@ def test_sync_theme_brand_upserts_template_component_settings():
                 "assets/acme-workspace-workspace-brand.css",
                 "config/settings_data.json",
                 "templates/index.json",
+                "sections/footer-group.json",
             }
             template_file = next(item for item in files if item["filename"] == "templates/index.json")
             template_content = template_file["body"]["value"]
             assert '"heading_color":"#222222"' in template_content
             assert '"color_overlay":"rgba(0, 0, 0, 0.08)"' in template_content
+            section_group_file = next(item for item in files if item["filename"] == "sections/footer-group.json")
+            section_group_content = section_group_file["body"]["value"]
+            assert '"background_color":"#f4ede6"' in section_group_content
+            assert '"newsletter_color":"#222222"' in section_group_content
             return {
                 "themeFilesUpsert": {
                     "upsertedThemeFiles": [
@@ -1255,6 +1300,7 @@ def test_sync_theme_brand_upserts_template_component_settings():
                         {"filename": "assets/acme-workspace-workspace-brand.css"},
                         {"filename": "config/settings_data.json"},
                         {"filename": "templates/index.json"},
+                        {"filename": "sections/footer-group.json"},
                     ],
                     "job": None,
                     "userErrors": [],
@@ -1280,6 +1326,14 @@ def test_sync_theme_brand_upserts_template_component_settings():
 
     assert "templates/index.json.sections.hero.settings.heading_color" in result["settingsSync"]["semanticUpdatedPaths"]
     assert "templates/index.json.sections.hero.settings.color_overlay" in result["settingsSync"]["semanticUpdatedPaths"]
+    assert (
+        "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.background_color"
+        in result["settingsSync"]["semanticUpdatedPaths"]
+    )
+    assert (
+        "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.newsletter_color"
+        in result["settingsSync"]["semanticUpdatedPaths"]
+    )
     assert result["settingsSync"]["unmappedColorPaths"] == []
 
 
@@ -1991,6 +2045,31 @@ def test_sync_theme_settings_data_updates_typography_semantic_paths():
     assert synced_current["type_product_grid_base_size"] == 15
     assert "current.type_header_spacing" in report["semanticTypographyUpdatedPaths"]
     assert report["unmappedTypographyPaths"] == []
+
+
+def test_sync_theme_settings_data_updates_logo_fields_from_logo_url():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "logo": "https://old.example.com/logo-old.png",
+        }
+    )
+
+    next_settings_content, _ = ShopifyApiClient._sync_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+        logo_url="https://assets.example.com/public/assets/logo-1",
+    )
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    synced_current = synced_settings["current"]
+
+    assert synced_current["logo"] == "https://assets.example.com/public/assets/logo-1"
+    assert synced_current["logo_mobile"] == "https://assets.example.com/public/assets/logo-1"
 
 
 def test_sync_theme_settings_data_errors_for_unmapped_typography_paths():

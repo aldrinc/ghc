@@ -17,7 +17,7 @@ _THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
 _THEME_BRAND_SETTINGS_FILENAME = "config/settings_data.json"
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
-_THEME_TEMPLATE_JSON_FILENAME_RE = re.compile(r"^templates/.+\.json$")
+_THEME_TEMPLATE_JSON_FILENAME_RE = re.compile(r"^(?:templates|sections)/.+\.json$")
 _THEME_COMPONENT_SETTINGS_SYNC_THEME_NAMES = frozenset({"futrgroup2-0theme"})
 _DEFAULT_THEME_VAR_SCOPE_SELECTORS: tuple[str, ...] = (":root",)
 _THEME_VAR_SCOPE_SELECTORS_BY_NAME: dict[str, tuple[str, ...]] = {
@@ -3145,6 +3145,7 @@ class ShopifyApiClient:
         profile: ThemeBrandProfile,
         settings_content: str,
         effective_css_vars: dict[str, str],
+        logo_url: str | None = None,
     ) -> tuple[str, dict[str, Any]]:
         report = {
             "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME,
@@ -3161,6 +3162,8 @@ class ShopifyApiClient:
             return settings_content, report
 
         settings_data = cls._parse_theme_settings_json(settings_content=settings_content)
+        if logo_url is not None:
+            cls._sync_theme_logo_settings_data(settings_data=settings_data, logo_url=logo_url)
         cls._ensure_current_color_schemes(settings_data=settings_data)
         has_color_schemes_target = cls._has_current_color_schemes_target(settings_data=settings_data)
         expected_paths = sorted(
@@ -3263,6 +3266,35 @@ class ShopifyApiClient:
         report["semanticTypographyUpdatedPaths"] = semantic_typography_updated_paths
         report["unmappedTypographyPaths"] = unmapped_typography_paths
         return json.dumps(settings_data, indent=2, ensure_ascii=False) + "\n", report
+
+    @classmethod
+    def _sync_theme_logo_settings_data(
+        cls,
+        *,
+        settings_data: dict[str, Any],
+        logo_url: str,
+    ) -> list[str]:
+        current = settings_data.get("current")
+        if current is None:
+            current = {}
+            settings_data["current"] = current
+        if not isinstance(current, dict):
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings file {_THEME_BRAND_SETTINGS_FILENAME} must contain a JSON object at current "
+                    "to sync logo fields."
+                ),
+                status_code=409,
+            )
+
+        updated_paths: list[str] = []
+        for key in ("logo", "logo_mobile"):
+            existing_value = current.get(key)
+            if isinstance(existing_value, str) and existing_value.strip() == logo_url:
+                continue
+            current[key] = logo_url
+            updated_paths.append(f"current.{key}")
+        return updated_paths
 
     @classmethod
     def _audit_theme_settings_data(
@@ -4115,6 +4147,7 @@ class ShopifyApiClient:
                 profile=profile,
                 settings_content=settings_content,
                 effective_css_vars=effective_css_vars,
+                logo_url=cleaned_logo_url,
             )
 
         template_files_to_upsert: list[dict[str, str]] = []
