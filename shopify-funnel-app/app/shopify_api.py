@@ -242,7 +242,9 @@ _THEME_REQUIRED_SETTINGS_PATHS_BY_NAME: dict[str, tuple[str, ...]] = {
         "current.color_schemes[*].settings.image_background",
     ),
 }
-_THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[str, tuple[tuple[str, tuple[tuple[str, str], ...]], ...]] = {
+_THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
+    str, tuple[tuple[str, tuple[tuple[str, str], ...]], ...]
+] = {
     "futrgroup2-0theme": (
         (
             "body",
@@ -380,19 +382,29 @@ _THEME_SETTINGS_TYPOGRAPHY_PROPERTY_MARKERS = frozenset(
 )
 _THEME_SETTINGS_SEMANTIC_KEY_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
 _THEME_SETTINGS_SEMANTIC_KEY_COLLAPSE_RE = re.compile(r"_+")
-_THEME_SETTINGS_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE)
-_THEME_SETTINGS_CSS_COLOR_FUNCTION_RE = re.compile(r"^(?:rgb|rgba|hsl|hsla)\s*\(", re.IGNORECASE)
+_THEME_SETTINGS_HEX_COLOR_RE = re.compile(
+    r"^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE
+)
+_THEME_SETTINGS_CSS_COLOR_FUNCTION_RE = re.compile(
+    r"^(?:rgb|rgba|hsl|hsla)\s*\(", re.IGNORECASE
+)
 _THEME_SETTINGS_CSS_GRADIENT_FUNCTION_RE = re.compile(
     r"^(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(",
     re.IGNORECASE,
 )
-_THEME_SETTINGS_CSS_VAR_RE = re.compile(r"^var\(\s*--[A-Za-z0-9_-]+(?:\s*,\s*[^)]+)?\s*\)$")
-_THEME_SETTINGS_SIMPLE_NUMBER_RE = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*(px|em|rem|%)?\s*$", re.IGNORECASE)
+_THEME_SETTINGS_CSS_VAR_RE = re.compile(
+    r"^var\(\s*--[A-Za-z0-9_-]+(?:\s*,\s*[^)]+)?\s*\)$"
+)
+_THEME_SETTINGS_SIMPLE_NUMBER_RE = re.compile(
+    r"^\s*([+-]?\d+(?:\.\d+)?)\s*(px|em|rem|%)?\s*$", re.IGNORECASE
+)
 _THEME_SETTINGS_FONT_HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9_]*_(?:n|i)\d{1,3}$")
 _THEME_SETTINGS_FONT_HANDLE_SUFFIX_RE = re.compile(r"_(?:n|i)\d{1,3}$")
 _THEME_SETTINGS_FONT_HANDLE_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
 _THEME_SETTINGS_FONT_FAMILY_ALIAS_RE = re.compile(r"[\s_-]+")
-_THEME_SETTINGS_COLOR_VALUE_KEYWORDS = frozenset({"transparent", "currentcolor", "inherit", "initial", "unset"})
+_THEME_SETTINGS_COLOR_VALUE_KEYWORDS = frozenset(
+    {"transparent", "currentcolor", "inherit", "initial", "unset"}
+)
 _THEME_SETTINGS_GENERIC_FONT_FAMILIES = frozenset(
     {
         "serif",
@@ -410,6 +422,54 @@ _THEME_SETTINGS_GENERIC_FONT_FAMILIES = frozenset(
 _THEME_SETTINGS_FONT_FAMILY_HANDLE_ALIASES = {
     "cormorant garamond": "cormorant",
 }
+_THEME_COMPONENT_IMAGE_KEY_MARKERS = frozenset(
+    {
+        "image",
+        "img",
+        "photo",
+        "picture",
+        "media",
+        "banner",
+        "hero",
+    }
+)
+_THEME_COMPONENT_IMAGE_KEY_SKIP_MARKERS = frozenset(
+    {
+        "color",
+        "colour",
+        "gradient",
+        "opacity",
+        "overlay",
+        "position",
+        "focal",
+        "point",
+        "aspect",
+        "ratio",
+        "fit",
+        "size",
+        "width",
+        "height",
+        "radius",
+        "padding",
+        "margin",
+        "text",
+        "caption",
+        "heading",
+        "title",
+        "alt",
+        "video",
+        "youtube",
+        "vimeo",
+        "mp4",
+        "poster",
+        "parallax",
+        "icon",
+        "logo",
+    }
+)
+_THEME_COMPONENT_IMAGE_FILENAME_RE = re.compile(
+    r"\.(?:png|jpe?g|webp|gif|avif|svg)(?:[?#].*)?$", re.IGNORECASE
+)
 _THEME_SETTINGS_SEMANTIC_TOKEN_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("secondary", "button", "label"), "secondary_button_label"),
     (("secondary", "button"), "secondary_button"),
@@ -490,7 +550,9 @@ def _build_theme_profile_lookup_by_canonical_name() -> dict[str, str]:
 
 
 _THEME_PROFILE_BY_CANONICAL_NAME = _build_theme_profile_lookup_by_canonical_name()
-_SUPPORTED_THEME_PROFILE_NAMES = tuple(sorted(set(_THEME_PROFILE_BY_CANONICAL_NAME.values())))
+_SUPPORTED_THEME_PROFILE_NAMES = tuple(
+    sorted(set(_THEME_PROFILE_BY_CANONICAL_NAME.values()))
+)
 
 
 @dataclass(frozen=True)
@@ -514,7 +576,9 @@ class ShopifyApiClient:
     def __init__(self) -> None:
         self._timeout = settings.SHOPIFY_REQUEST_TIMEOUT_SECONDS
 
-    async def exchange_code_for_access_token(self, *, shop_domain: str, code: str) -> tuple[str, str]:
+    async def exchange_code_for_access_token(
+        self, *, shop_domain: str, code: str
+    ) -> tuple[str, str]:
         url = f"https://{shop_domain}/admin/oauth/access_token"
         payload = {
             "client_id": settings.SHOPIFY_APP_API_KEY,
@@ -525,9 +589,13 @@ class ShopifyApiClient:
         access_token = response.get("access_token")
         scopes = response.get("scope")
         if not isinstance(access_token, str) or not access_token:
-            raise ShopifyApiError(message="OAuth token exchange response is missing access_token")
+            raise ShopifyApiError(
+                message="OAuth token exchange response is missing access_token"
+            )
         if not isinstance(scopes, str):
-            raise ShopifyApiError(message="OAuth token exchange response is missing scope")
+            raise ShopifyApiError(
+                message="OAuth token exchange response is missing scope"
+            )
         return access_token, scopes
 
     async def register_webhook(
@@ -582,11 +650,15 @@ class ShopifyApiClient:
                 if existing_id:
                     return existing_id
             messages = "; ".join(str(error.get("message")) for error in user_errors)
-            raise ShopifyApiError(message=f"Webhook registration failed for {topic}: {messages}")
+            raise ShopifyApiError(
+                message=f"Webhook registration failed for {topic}: {messages}"
+            )
         webhook = create_data.get("webhookSubscription") or {}
         webhook_id = webhook.get("id")
         if not isinstance(webhook_id, str) or not webhook_id:
-            raise ShopifyApiError(message=f"Webhook registration for {topic} returned no id")
+            raise ShopifyApiError(
+                message=f"Webhook registration for {topic} returned no id"
+            )
         return webhook_id
 
     @staticmethod
@@ -636,7 +708,10 @@ class ShopifyApiClient:
             if endpoint.get("__typename") != "WebhookHttpEndpoint":
                 continue
             endpoint_callback = endpoint.get("callbackUrl")
-            if isinstance(endpoint_callback, str) and endpoint_callback.rstrip("/") == target_url:
+            if (
+                isinstance(endpoint_callback, str)
+                and endpoint_callback.rstrip("/") == target_url
+            ):
                 webhook_id = node.get("id")
                 if isinstance(webhook_id, str) and webhook_id:
                     return webhook_id
@@ -673,7 +748,9 @@ class ShopifyApiClient:
         user_errors = create_data.get("userErrors") or []
         if user_errors:
             messages = "; ".join(str(error.get("message")) for error in user_errors)
-            raise ShopifyApiError(message=f"cartCreate failed: {messages}", status_code=409)
+            raise ShopifyApiError(
+                message=f"cartCreate failed: {messages}", status_code=409
+            )
 
         cart = create_data.get("cart") or {}
         cart_id = cart.get("id")
@@ -681,7 +758,9 @@ class ShopifyApiClient:
         if not isinstance(cart_id, str) or not cart_id:
             raise ShopifyApiError(message="cartCreate response is missing cart.id")
         if not isinstance(checkout_url, str) or not checkout_url:
-            raise ShopifyApiError(message="cartCreate response is missing cart.checkoutUrl")
+            raise ShopifyApiError(
+                message="cartCreate response is missing cart.checkoutUrl"
+            )
         return cart_id, checkout_url
 
     async def verify_product_exists(
@@ -708,17 +787,25 @@ class ShopifyApiClient:
         )
         product = response.get("product")
         if not isinstance(product, dict):
-            raise ShopifyApiError(message=f"Product not found for GID: {product_gid}", status_code=404)
+            raise ShopifyApiError(
+                message=f"Product not found for GID: {product_gid}", status_code=404
+            )
 
         found_id = product.get("id")
         title = product.get("title")
         handle = product.get("handle")
         if not isinstance(found_id, str) or not found_id:
-            raise ShopifyApiError(message="Product verification response is missing product.id")
+            raise ShopifyApiError(
+                message="Product verification response is missing product.id"
+            )
         if not isinstance(title, str) or not title:
-            raise ShopifyApiError(message="Product verification response is missing product.title")
+            raise ShopifyApiError(
+                message="Product verification response is missing product.title"
+            )
         if not isinstance(handle, str) or not handle:
-            raise ShopifyApiError(message="Product verification response is missing product.handle")
+            raise ShopifyApiError(
+                message="Product verification response is missing product.handle"
+            )
         return {"id": found_id, "title": title, "handle": handle}
 
     async def list_products(
@@ -773,13 +860,21 @@ class ShopifyApiClient:
             product_status = node.get("status")
 
             if not isinstance(product_id, str) or not product_id:
-                raise ShopifyApiError(message="Product list response is missing product.id")
+                raise ShopifyApiError(
+                    message="Product list response is missing product.id"
+                )
             if not isinstance(title, str) or not title:
-                raise ShopifyApiError(message="Product list response is missing product.title")
+                raise ShopifyApiError(
+                    message="Product list response is missing product.title"
+                )
             if not isinstance(handle, str) or not handle:
-                raise ShopifyApiError(message="Product list response is missing product.handle")
+                raise ShopifyApiError(
+                    message="Product list response is missing product.handle"
+                )
             if not isinstance(product_status, str) or not product_status:
-                raise ShopifyApiError(message="Product list response is missing product.status")
+                raise ShopifyApiError(
+                    message="Product list response is missing product.status"
+                )
 
             products.append(
                 {
@@ -794,17 +889,29 @@ class ShopifyApiClient:
 
     @staticmethod
     def _price_cents_to_decimal_string(price_cents: int) -> str:
-        return str((Decimal(price_cents) / Decimal(100)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+        return str(
+            (Decimal(price_cents) / Decimal(100)).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
+        )
 
     @staticmethod
     def _decimal_price_to_cents(price: Any) -> int:
         try:
             decimal_value = Decimal(str(price).strip())
         except (InvalidOperation, ValueError, AttributeError) as exc:
-            raise ShopifyApiError(message=f"Invalid variant price from Shopify: {price!r}") from exc
-        cents = int((decimal_value * Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+            raise ShopifyApiError(
+                message=f"Invalid variant price from Shopify: {price!r}"
+            ) from exc
+        cents = int(
+            (decimal_value * Decimal(100)).quantize(
+                Decimal("1"), rounding=ROUND_HALF_UP
+            )
+        )
         if cents < 0:
-            raise ShopifyApiError(message=f"Shopify returned a negative variant price: {price!r}")
+            raise ShopifyApiError(
+                message=f"Shopify returned a negative variant price: {price!r}"
+            )
         return cents
 
     async def get_product(
@@ -886,57 +993,86 @@ class ShopifyApiClient:
 
             shop = response.get("shop")
             if not isinstance(shop, dict):
-                raise ShopifyApiError(message="Product response is missing shop metadata.")
+                raise ShopifyApiError(
+                    message="Product response is missing shop metadata."
+                )
             raw_currency = shop.get("currencyCode")
             if not isinstance(raw_currency, str) or len(raw_currency.strip()) != 3:
-                raise ShopifyApiError(message="Product response is missing shop currencyCode.")
+                raise ShopifyApiError(
+                    message="Product response is missing shop currencyCode."
+                )
             normalized_currency = raw_currency.strip().upper()
             if currency is None:
                 currency = normalized_currency
             elif normalized_currency != currency:
-                raise ShopifyApiError(message="Shop currency changed while paginating product variants.")
+                raise ShopifyApiError(
+                    message="Shop currency changed while paginating product variants."
+                )
 
             product = response.get("product")
             if not isinstance(product, dict):
-                raise ShopifyApiError(message=f"Product not found for GID: {cleaned_product_gid}", status_code=404)
+                raise ShopifyApiError(
+                    message=f"Product not found for GID: {cleaned_product_gid}",
+                    status_code=404,
+                )
 
             product_id = product.get("id")
             if not isinstance(product_id, str) or not product_id:
                 raise ShopifyApiError(message="Product response is missing product.id")
             if product_id != cleaned_product_gid:
-                raise ShopifyApiError(message="Product response returned unexpected product.id")
+                raise ShopifyApiError(
+                    message="Product response returned unexpected product.id"
+                )
 
             raw_title = product.get("title")
             if not isinstance(raw_title, str) or not raw_title:
-                raise ShopifyApiError(message="Product response is missing product.title")
+                raise ShopifyApiError(
+                    message="Product response is missing product.title"
+                )
             raw_handle = product.get("handle")
             if not isinstance(raw_handle, str) or not raw_handle:
-                raise ShopifyApiError(message="Product response is missing product.handle")
+                raise ShopifyApiError(
+                    message="Product response is missing product.handle"
+                )
             raw_status = product.get("status")
             if not isinstance(raw_status, str) or not raw_status:
-                raise ShopifyApiError(message="Product response is missing product.status")
+                raise ShopifyApiError(
+                    message="Product response is missing product.status"
+                )
 
             if product_title is None:
                 product_title = raw_title
                 product_handle = raw_handle
                 product_status = raw_status
             else:
-                if raw_title != product_title or raw_handle != product_handle or raw_status != product_status:
-                    raise ShopifyApiError(message="Product metadata changed while paginating variants.")
+                if (
+                    raw_title != product_title
+                    or raw_handle != product_handle
+                    or raw_status != product_status
+                ):
+                    raise ShopifyApiError(
+                        message="Product metadata changed while paginating variants."
+                    )
 
             variants_connection = product.get("variants")
             if not isinstance(variants_connection, dict):
-                raise ShopifyApiError(message="Product response is missing variants connection.")
+                raise ShopifyApiError(
+                    message="Product response is missing variants connection."
+                )
             edges = variants_connection.get("edges")
             if not isinstance(edges, list):
                 raise ShopifyApiError(message="Product variants response is invalid.")
 
             for edge in edges:
                 if not isinstance(edge, dict):
-                    raise ShopifyApiError(message="Product variants response contains invalid edge.")
+                    raise ShopifyApiError(
+                        message="Product variants response contains invalid edge."
+                    )
                 node = edge.get("node")
                 if not isinstance(node, dict):
-                    raise ShopifyApiError(message="Product variants response contains invalid node.")
+                    raise ShopifyApiError(
+                        message="Product variants response contains invalid node."
+                    )
 
                 variant_gid = node.get("id")
                 title = node.get("title")
@@ -950,36 +1086,68 @@ class ShopifyApiClient:
                 inventory_item = node.get("inventoryItem")
 
                 if not isinstance(variant_gid, str) or not variant_gid:
-                    raise ShopifyApiError(message="Product variant response is missing variant.id.")
+                    raise ShopifyApiError(
+                        message="Product variant response is missing variant.id."
+                    )
                 if not isinstance(title, str) or not title:
-                    raise ShopifyApiError(message="Product variant response is missing variant.title.")
+                    raise ShopifyApiError(
+                        message="Product variant response is missing variant.title."
+                    )
                 if not isinstance(price, str) or not price:
-                    raise ShopifyApiError(message="Product variant response is missing variant.price.")
-                if compare_at_price is not None and not isinstance(compare_at_price, str):
-                    raise ShopifyApiError(message="Product variant response has invalid compareAtPrice.")
+                    raise ShopifyApiError(
+                        message="Product variant response is missing variant.price."
+                    )
+                if compare_at_price is not None and not isinstance(
+                    compare_at_price, str
+                ):
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid compareAtPrice."
+                    )
                 if barcode is not None and not isinstance(barcode, str):
-                    raise ShopifyApiError(message="Product variant response has invalid barcode.")
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid barcode."
+                    )
                 if not isinstance(taxable, bool):
-                    raise ShopifyApiError(message="Product variant response has invalid taxable value.")
-                if inventory_policy is not None and not isinstance(inventory_policy, str):
-                    raise ShopifyApiError(message="Product variant response has invalid inventoryPolicy value.")
-                if inventory_quantity is not None and not isinstance(inventory_quantity, int):
-                    raise ShopifyApiError(message="Product variant response has invalid inventoryQuantity value.")
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid taxable value."
+                    )
+                if inventory_policy is not None and not isinstance(
+                    inventory_policy, str
+                ):
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid inventoryPolicy value."
+                    )
+                if inventory_quantity is not None and not isinstance(
+                    inventory_quantity, int
+                ):
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid inventoryQuantity value."
+                    )
                 if not isinstance(selected_options, list):
-                    raise ShopifyApiError(message="Product variant response has invalid selectedOptions value.")
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid selectedOptions value."
+                    )
                 if not isinstance(inventory_item, dict):
-                    raise ShopifyApiError(message="Product variant response has invalid inventoryItem value.")
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid inventoryItem value."
+                    )
 
                 option_values: dict[str, str] = {}
                 for selected_option in selected_options:
                     if not isinstance(selected_option, dict):
-                        raise ShopifyApiError(message="Product variant response has invalid selected option.")
+                        raise ShopifyApiError(
+                            message="Product variant response has invalid selected option."
+                        )
                     option_name = selected_option.get("name")
                     option_value = selected_option.get("value")
                     if not isinstance(option_name, str) or not option_name.strip():
-                        raise ShopifyApiError(message="Product variant response has selected option without name.")
+                        raise ShopifyApiError(
+                            message="Product variant response has selected option without name."
+                        )
                     if not isinstance(option_value, str):
-                        raise ShopifyApiError(message="Product variant response has selected option without value.")
+                        raise ShopifyApiError(
+                            message="Product variant response has selected option without value."
+                        )
                     option_values[option_name.strip()] = option_value
 
                 sku: str | None = None
@@ -988,9 +1156,13 @@ class ShopifyApiClient:
                 raw_tracked = inventory_item.get("tracked")
                 raw_requires_shipping = inventory_item.get("requiresShipping")
                 if raw_sku is not None and not isinstance(raw_sku, str):
-                    raise ShopifyApiError(message="Product variant response has invalid inventoryItem.sku.")
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid inventoryItem.sku."
+                    )
                 if not isinstance(raw_tracked, bool):
-                    raise ShopifyApiError(message="Product variant response has invalid inventoryItem.tracked.")
+                    raise ShopifyApiError(
+                        message="Product variant response has invalid inventoryItem.tracked."
+                    )
                 if not isinstance(raw_requires_shipping, bool):
                     raise ShopifyApiError(
                         message="Product variant response has invalid inventoryItem.requiresShipping."
@@ -1006,13 +1178,19 @@ class ShopifyApiClient:
                         "priceCents": self._decimal_price_to_cents(price),
                         "currency": currency,
                         "compareAtPriceCents": (
-                            self._decimal_price_to_cents(compare_at_price) if compare_at_price is not None else None
+                            self._decimal_price_to_cents(compare_at_price)
+                            if compare_at_price is not None
+                            else None
                         ),
                         "sku": sku,
                         "barcode": barcode,
                         "taxable": taxable,
                         "requiresShipping": requires_shipping,
-                        "inventoryPolicy": inventory_policy.strip().lower() if inventory_policy else None,
+                        "inventoryPolicy": (
+                            inventory_policy.strip().lower()
+                            if inventory_policy
+                            else None
+                        ),
                         "inventoryManagement": inventory_management,
                         "inventoryQuantity": inventory_quantity,
                         "optionValues": option_values,
@@ -1021,20 +1199,28 @@ class ShopifyApiClient:
 
             page_info = variants_connection.get("pageInfo")
             if not isinstance(page_info, dict):
-                raise ShopifyApiError(message="Product variants response is missing pageInfo.")
+                raise ShopifyApiError(
+                    message="Product variants response is missing pageInfo."
+                )
             has_next_page = page_info.get("hasNextPage")
             end_cursor = page_info.get("endCursor")
             if not isinstance(has_next_page, bool):
-                raise ShopifyApiError(message="Product variants response has invalid pageInfo.hasNextPage.")
+                raise ShopifyApiError(
+                    message="Product variants response has invalid pageInfo.hasNextPage."
+                )
             if has_next_page:
                 if not isinstance(end_cursor, str) or not end_cursor:
-                    raise ShopifyApiError(message="Product variants response has invalid pageInfo.endCursor.")
+                    raise ShopifyApiError(
+                        message="Product variants response has invalid pageInfo.endCursor."
+                    )
                 cursor = end_cursor
                 continue
             break
 
         if currency is None:
-            raise ShopifyApiError(message="Product response is missing currency metadata.")
+            raise ShopifyApiError(
+                message="Product response is missing currency metadata."
+            )
         if product_title is None or product_handle is None or product_status is None:
             raise ShopifyApiError(message="Product response is missing metadata.")
 
@@ -1061,30 +1247,45 @@ class ShopifyApiClient:
         status: str = "DRAFT",
     ) -> dict[str, Any]:
         if not variants:
-            raise ShopifyApiError(message="At least one variant is required for product creation.", status_code=400)
+            raise ShopifyApiError(
+                message="At least one variant is required for product creation.",
+                status_code=400,
+            )
 
         cleaned_variants: list[dict[str, Any]] = []
         seen_titles: set[str] = set()
         normalized_currency: str | None = None
         for raw_variant in variants:
             if not isinstance(raw_variant, dict):
-                raise ShopifyApiError(message="Each variant must be an object.", status_code=400)
+                raise ShopifyApiError(
+                    message="Each variant must be an object.", status_code=400
+                )
             raw_title = raw_variant.get("title")
             if not isinstance(raw_title, str) or not raw_title.strip():
-                raise ShopifyApiError(message="Each variant requires a non-empty title.", status_code=400)
+                raise ShopifyApiError(
+                    message="Each variant requires a non-empty title.", status_code=400
+                )
             variant_title = raw_title.strip()
             lower_title = variant_title.lower()
             if lower_title in seen_titles:
-                raise ShopifyApiError(message="Variant titles must be unique.", status_code=400)
+                raise ShopifyApiError(
+                    message="Variant titles must be unique.", status_code=400
+                )
             seen_titles.add(lower_title)
 
             raw_price_cents = raw_variant.get("priceCents")
             if not isinstance(raw_price_cents, int) or raw_price_cents < 0:
-                raise ShopifyApiError(message="Each variant requires a non-negative integer priceCents.", status_code=400)
+                raise ShopifyApiError(
+                    message="Each variant requires a non-negative integer priceCents.",
+                    status_code=400,
+                )
 
             raw_currency = raw_variant.get("currency")
             if not isinstance(raw_currency, str) or len(raw_currency.strip()) != 3:
-                raise ShopifyApiError(message="Each variant requires a 3-letter currency code.", status_code=400)
+                raise ShopifyApiError(
+                    message="Each variant requires a 3-letter currency code.",
+                    status_code=400,
+                )
             currency = raw_currency.strip().upper()
             if normalized_currency is None:
                 normalized_currency = currency
@@ -1109,7 +1310,9 @@ class ShopifyApiClient:
             "productOptions": [
                 {
                     "name": "Title",
-                    "values": [{"name": variant["title"]} for variant in cleaned_variants],
+                    "values": [
+                        {"name": variant["title"]} for variant in cleaned_variants
+                    ],
                 }
             ],
         }
@@ -1158,7 +1361,9 @@ class ShopifyApiClient:
         user_errors = create_data.get("userErrors") or []
         if user_errors:
             messages = "; ".join(str(error.get("message")) for error in user_errors)
-            raise ShopifyApiError(message=f"productCreate failed: {messages}", status_code=409)
+            raise ShopifyApiError(
+                message=f"productCreate failed: {messages}", status_code=409
+            )
 
         product = create_data.get("product")
         if not isinstance(product, dict):
@@ -1169,23 +1374,41 @@ class ShopifyApiClient:
         product_handle = product.get("handle")
         product_status = product.get("status")
         if not isinstance(product_gid, str) or not product_gid:
-            raise ShopifyApiError(message="productCreate response is missing product.id")
+            raise ShopifyApiError(
+                message="productCreate response is missing product.id"
+            )
         if not isinstance(product_title, str) or not product_title:
-            raise ShopifyApiError(message="productCreate response is missing product.title")
+            raise ShopifyApiError(
+                message="productCreate response is missing product.title"
+            )
         if not isinstance(product_handle, str) or not product_handle:
-            raise ShopifyApiError(message="productCreate response is missing product.handle")
+            raise ShopifyApiError(
+                message="productCreate response is missing product.handle"
+            )
         if not isinstance(product_status, str) or not product_status:
-            raise ShopifyApiError(message="productCreate response is missing product.status")
+            raise ShopifyApiError(
+                message="productCreate response is missing product.status"
+            )
 
         initial_variant_edges = ((product.get("variants") or {}).get("edges")) or []
         if not isinstance(initial_variant_edges, list) or not initial_variant_edges:
-            raise ShopifyApiError(message="productCreate response is missing initial product variant.")
-        initial_variant_node = (initial_variant_edges[0] or {}).get("node") if isinstance(initial_variant_edges[0], dict) else None
+            raise ShopifyApiError(
+                message="productCreate response is missing initial product variant."
+            )
+        initial_variant_node = (
+            (initial_variant_edges[0] or {}).get("node")
+            if isinstance(initial_variant_edges[0], dict)
+            else None
+        )
         if not isinstance(initial_variant_node, dict):
-            raise ShopifyApiError(message="productCreate response is missing initial variant node.")
+            raise ShopifyApiError(
+                message="productCreate response is missing initial variant node."
+            )
         initial_variant_id = initial_variant_node.get("id")
         if not isinstance(initial_variant_id, str) or not initial_variant_id:
-            raise ShopifyApiError(message="productCreate response is missing initial variant id.")
+            raise ShopifyApiError(
+                message="productCreate response is missing initial variant id."
+            )
 
         update_query = """
         mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
@@ -1210,7 +1433,9 @@ class ShopifyApiClient:
                 "query": update_query,
                 "variables": {
                     "productId": product_gid,
-                    "variants": [{"id": initial_variant_id, "price": first_variant["price"]}],
+                    "variants": [
+                        {"id": initial_variant_id, "price": first_variant["price"]}
+                    ],
                 },
             },
         )
@@ -1218,13 +1443,19 @@ class ShopifyApiClient:
         update_errors = update_data.get("userErrors") or []
         if update_errors:
             messages = "; ".join(str(error.get("message")) for error in update_errors)
-            raise ShopifyApiError(message=f"productVariantsBulkUpdate failed: {messages}", status_code=409)
+            raise ShopifyApiError(
+                message=f"productVariantsBulkUpdate failed: {messages}", status_code=409
+            )
         updated_variants = update_data.get("productVariants") or []
         if not isinstance(updated_variants, list) or not updated_variants:
-            raise ShopifyApiError(message="productVariantsBulkUpdate response is missing variants.")
+            raise ShopifyApiError(
+                message="productVariantsBulkUpdate response is missing variants."
+            )
         updated_first_variant = updated_variants[0]
         if not isinstance(updated_first_variant, dict):
-            raise ShopifyApiError(message="productVariantsBulkUpdate response is invalid.")
+            raise ShopifyApiError(
+                message="productVariantsBulkUpdate response is invalid."
+            )
 
         created_variants: list[dict[str, Any]] = []
         if len(cleaned_variants) > 1:
@@ -1253,21 +1484,32 @@ class ShopifyApiClient:
                         "variants": [
                             {
                                 "price": variant["price"],
-                                "optionValues": [{"optionName": "Title", "name": variant["title"]}],
+                                "optionValues": [
+                                    {"optionName": "Title", "name": variant["title"]}
+                                ],
                             }
                             for variant in cleaned_variants[1:]
                         ],
                     },
                 },
             )
-            bulk_create_data = bulk_create_response.get("productVariantsBulkCreate") or {}
+            bulk_create_data = (
+                bulk_create_response.get("productVariantsBulkCreate") or {}
+            )
             bulk_create_errors = bulk_create_data.get("userErrors") or []
             if bulk_create_errors:
-                messages = "; ".join(str(error.get("message")) for error in bulk_create_errors)
-                raise ShopifyApiError(message=f"productVariantsBulkCreate failed: {messages}", status_code=409)
+                messages = "; ".join(
+                    str(error.get("message")) for error in bulk_create_errors
+                )
+                raise ShopifyApiError(
+                    message=f"productVariantsBulkCreate failed: {messages}",
+                    status_code=409,
+                )
             raw_created_variants = bulk_create_data.get("productVariants") or []
             if not isinstance(raw_created_variants, list):
-                raise ShopifyApiError(message="productVariantsBulkCreate response is invalid.")
+                raise ShopifyApiError(
+                    message="productVariantsBulkCreate response is invalid."
+                )
             for raw_variant in raw_created_variants:
                 if not isinstance(raw_variant, dict):
                     continue
@@ -1280,9 +1522,13 @@ class ShopifyApiClient:
             variant_title = variant_node.get("title")
             variant_price = variant_node.get("price")
             if not isinstance(variant_gid, str) or not variant_gid:
-                raise ShopifyApiError(message="Variant creation response is missing variant id.")
+                raise ShopifyApiError(
+                    message="Variant creation response is missing variant id."
+                )
             if not isinstance(variant_title, str) or not variant_title:
-                raise ShopifyApiError(message="Variant creation response is missing variant title.")
+                raise ShopifyApiError(
+                    message="Variant creation response is missing variant title."
+                )
             variant_rows.append(
                 {
                     "variantGid": variant_gid,
@@ -1368,7 +1614,10 @@ class ShopifyApiClient:
                 status_code=400,
             )
         if not fields:
-            raise ShopifyApiError(message="At least one variant update field is required.", status_code=400)
+            raise ShopifyApiError(
+                message="At least one variant update field is required.",
+                status_code=400,
+            )
 
         supported_fields = {
             "title",
@@ -1379,7 +1628,9 @@ class ShopifyApiClient:
             "inventoryPolicy",
             "inventoryManagement",
         }
-        unsupported_fields = sorted(name for name in fields.keys() if name not in supported_fields)
+        unsupported_fields = sorted(
+            name for name in fields.keys() if name not in supported_fields
+        )
         if unsupported_fields:
             raise ShopifyApiError(
                 message=f"Unsupported variant update fields: {', '.join(unsupported_fields)}",
@@ -1391,8 +1642,12 @@ class ShopifyApiClient:
         if "title" in fields:
             raw_title = fields.get("title")
             if not isinstance(raw_title, str) or not raw_title.strip():
-                raise ShopifyApiError(message="title must be a non-empty string.", status_code=400)
-            variant_input["optionValues"] = [{"optionName": "Title", "name": raw_title.strip()}]
+                raise ShopifyApiError(
+                    message="title must be a non-empty string.", status_code=400
+                )
+            variant_input["optionValues"] = [
+                {"optionName": "Title", "name": raw_title.strip()}
+            ]
 
         if "priceCents" in fields:
             raw_price_cents = fields.get("priceCents")
@@ -1401,19 +1656,26 @@ class ShopifyApiClient:
                     message="priceCents must be a non-negative integer.",
                     status_code=400,
                 )
-            variant_input["price"] = self._price_cents_to_decimal_string(raw_price_cents)
+            variant_input["price"] = self._price_cents_to_decimal_string(
+                raw_price_cents
+            )
 
         if "compareAtPriceCents" in fields:
             raw_compare_at_price_cents = fields.get("compareAtPriceCents")
             if raw_compare_at_price_cents is None:
                 variant_input["compareAtPrice"] = None
             else:
-                if not isinstance(raw_compare_at_price_cents, int) or raw_compare_at_price_cents < 0:
+                if (
+                    not isinstance(raw_compare_at_price_cents, int)
+                    or raw_compare_at_price_cents < 0
+                ):
                     raise ShopifyApiError(
                         message="compareAtPriceCents must be null or a non-negative integer.",
                         status_code=400,
                     )
-                variant_input["compareAtPrice"] = self._price_cents_to_decimal_string(raw_compare_at_price_cents)
+                variant_input["compareAtPrice"] = self._price_cents_to_decimal_string(
+                    raw_compare_at_price_cents
+                )
 
         if "sku" in fields:
             raw_sku = fields.get("sku")
@@ -1441,7 +1703,10 @@ class ShopifyApiClient:
 
         if "inventoryPolicy" in fields:
             raw_inventory_policy = fields.get("inventoryPolicy")
-            if not isinstance(raw_inventory_policy, str) or not raw_inventory_policy.strip():
+            if (
+                not isinstance(raw_inventory_policy, str)
+                or not raw_inventory_policy.strip()
+            ):
                 raise ShopifyApiError(
                     message="inventoryPolicy must be one of: deny, continue.",
                     status_code=400,
@@ -1459,12 +1724,17 @@ class ShopifyApiClient:
             if raw_inventory_management is None:
                 inventory_item_input["tracked"] = False
             else:
-                if not isinstance(raw_inventory_management, str) or not raw_inventory_management.strip():
+                if (
+                    not isinstance(raw_inventory_management, str)
+                    or not raw_inventory_management.strip()
+                ):
                     raise ShopifyApiError(
                         message="inventoryManagement must be null or 'shopify'.",
                         status_code=400,
                     )
-                normalized_inventory_management = raw_inventory_management.strip().lower()
+                normalized_inventory_management = (
+                    raw_inventory_management.strip().lower()
+                )
                 if normalized_inventory_management != "shopify":
                     raise ShopifyApiError(
                         message="inventoryManagement must be null or 'shopify'.",
@@ -1510,11 +1780,15 @@ class ShopifyApiClient:
         user_errors = update_data.get("userErrors") or []
         if user_errors:
             messages = "; ".join(str(error.get("message")) for error in user_errors)
-            raise ShopifyApiError(message=f"productVariantsBulkUpdate failed: {messages}", status_code=409)
+            raise ShopifyApiError(
+                message=f"productVariantsBulkUpdate failed: {messages}", status_code=409
+            )
 
         updated_variants = update_data.get("productVariants") or []
         if not isinstance(updated_variants, list) or not updated_variants:
-            raise ShopifyApiError(message="productVariantsBulkUpdate response is missing variants.")
+            raise ShopifyApiError(
+                message="productVariantsBulkUpdate response is missing variants."
+            )
 
         updated_variant_ids = {
             item.get("id")
@@ -1535,7 +1809,9 @@ class ShopifyApiClient:
     def _normalize_policy_page_handle(handle: str) -> str:
         cleaned = handle.strip().lower()
         if not cleaned:
-            raise ShopifyApiError(message="Policy page handle cannot be empty.", status_code=400)
+            raise ShopifyApiError(
+                message="Policy page handle cannot be empty.", status_code=400
+            )
         if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", cleaned):
             raise ShopifyApiError(
                 message=(
@@ -1551,36 +1827,38 @@ class ShopifyApiClient:
         *,
         node: Any,
         mutation_name: str,
-        require_online_store_url: bool,
     ) -> dict[str, str]:
         if not isinstance(node, dict):
-            raise ShopifyApiError(message=f"{mutation_name} response is missing page object.")
+            raise ShopifyApiError(
+                message=f"{mutation_name} response is missing page object."
+            )
 
         page_id = node.get("id")
         title = node.get("title")
         handle = node.get("handle")
-        online_store_url = node.get("onlineStoreUrl")
 
         if not isinstance(page_id, str) or not page_id:
-            raise ShopifyApiError(message=f"{mutation_name} response is missing page.id.")
-        if not isinstance(title, str) or not title:
-            raise ShopifyApiError(message=f"{mutation_name} response is missing page.title.")
-        if not isinstance(handle, str) or not handle:
-            raise ShopifyApiError(message=f"{mutation_name} response is missing page.handle.")
-        if require_online_store_url and (not isinstance(online_store_url, str) or not online_store_url):
             raise ShopifyApiError(
-                message=(
-                    f"{mutation_name} response is missing page.onlineStoreUrl. "
-                    "Confirm the page is published to Online Store."
-                )
+                message=f"{mutation_name} response is missing page.id."
             )
-
+        if not isinstance(title, str) or not title:
+            raise ShopifyApiError(
+                message=f"{mutation_name} response is missing page.title."
+            )
+        if not isinstance(handle, str) or not handle:
+            raise ShopifyApiError(
+                message=f"{mutation_name} response is missing page.handle."
+            )
         return {
             "id": page_id,
             "title": title,
             "handle": handle,
-            "onlineStoreUrl": online_store_url if isinstance(online_store_url, str) else "",
         }
+
+    @classmethod
+    def _build_policy_page_url(cls, *, shop_domain: str, handle: str) -> str:
+        normalized_handle = cls._normalize_policy_page_handle(handle)
+        return f"https://{shop_domain.strip().lower()}/pages/{normalized_handle}"
 
     async def _find_page_by_handle(
         self,
@@ -1603,7 +1881,10 @@ class ShopifyApiClient:
             }
         }
         """
-        payload = {"query": query, "variables": {"query": f"handle:{normalized_handle}"}}
+        payload = {
+            "query": query,
+            "variables": {"query": f"handle:{normalized_handle}"},
+        }
         response = await self._admin_graphql(
             shop_domain=shop_domain,
             access_token=access_token,
@@ -1620,18 +1901,21 @@ class ShopifyApiClient:
             parsed = self._coerce_page_node(
                 node=node,
                 mutation_name="pages query",
-                require_online_store_url=False,
             )
             if parsed["handle"].strip().lower() == normalized_handle:
                 return parsed
         return None
 
     @staticmethod
-    def _assert_no_user_errors(*, user_errors: list[dict[str, Any]], mutation_name: str) -> None:
+    def _assert_no_user_errors(
+        *, user_errors: list[dict[str, Any]], mutation_name: str
+    ) -> None:
         if not user_errors:
             return
         messages = "; ".join(str(error.get("message")) for error in user_errors)
-        raise ShopifyApiError(message=f"{mutation_name} failed: {messages}", status_code=409)
+        raise ShopifyApiError(
+            message=f"{mutation_name} failed: {messages}", status_code=409
+        )
 
     async def _create_policy_page(
         self,
@@ -1644,12 +1928,11 @@ class ShopifyApiClient:
     ) -> dict[str, str]:
         mutation = """
         mutation pageCreate($page: PageCreateInput!) {
-            pageCreate(page: $page) {
+                pageCreate(page: $page) {
                 page {
                     id
                     title
                     handle
-                    onlineStoreUrl
                 }
                 userErrors {
                     field
@@ -1679,7 +1962,6 @@ class ShopifyApiClient:
         return self._coerce_page_node(
             node=create_data.get("page"),
             mutation_name="pageCreate",
-            require_online_store_url=True,
         )
 
     async def _update_policy_page(
@@ -1694,12 +1976,11 @@ class ShopifyApiClient:
     ) -> dict[str, str]:
         mutation = """
         mutation pageUpdate($id: ID!, $page: PageUpdateInput!) {
-            pageUpdate(id: $id, page: $page) {
+                pageUpdate(id: $id, page: $page) {
                 page {
                     id
                     title
                     handle
-                    onlineStoreUrl
                 }
                 userErrors {
                     field
@@ -1730,7 +2011,6 @@ class ShopifyApiClient:
         return self._coerce_page_node(
             node=update_data.get("page"),
             mutation_name="pageUpdate",
-            require_online_store_url=True,
         )
 
     async def upsert_policy_pages(
@@ -1741,31 +2021,47 @@ class ShopifyApiClient:
         pages: list[dict[str, Any]],
     ) -> list[dict[str, str]]:
         if not pages:
-            raise ShopifyApiError(message="At least one policy page is required for sync.", status_code=400)
+            raise ShopifyApiError(
+                message="At least one policy page is required for sync.",
+                status_code=400,
+            )
 
         seen_page_keys: set[str] = set()
         seen_handles: set[str] = set()
         normalized_pages: list[dict[str, str]] = []
         for item in pages:
             if not isinstance(item, dict):
-                raise ShopifyApiError(message="Each policy page payload must be an object.", status_code=400)
+                raise ShopifyApiError(
+                    message="Each policy page payload must be an object.",
+                    status_code=400,
+                )
 
             raw_page_key = item.get("pageKey")
             if not isinstance(raw_page_key, str) or not raw_page_key.strip():
-                raise ShopifyApiError(message="Each policy page requires pageKey.", status_code=400)
+                raise ShopifyApiError(
+                    message="Each policy page requires pageKey.", status_code=400
+                )
             page_key = raw_page_key.strip()
             if page_key in seen_page_keys:
-                raise ShopifyApiError(message=f"Duplicate pageKey in payload: {page_key}", status_code=400)
+                raise ShopifyApiError(
+                    message=f"Duplicate pageKey in payload: {page_key}", status_code=400
+                )
             seen_page_keys.add(page_key)
 
             raw_title = item.get("title")
             if not isinstance(raw_title, str) or not raw_title.strip():
-                raise ShopifyApiError(message=f"Policy page '{page_key}' requires a non-empty title.", status_code=400)
+                raise ShopifyApiError(
+                    message=f"Policy page '{page_key}' requires a non-empty title.",
+                    status_code=400,
+                )
             title = raw_title.strip()
 
             raw_handle = item.get("handle")
             if not isinstance(raw_handle, str):
-                raise ShopifyApiError(message=f"Policy page '{page_key}' requires handle.", status_code=400)
+                raise ShopifyApiError(
+                    message=f"Policy page '{page_key}' requires handle.",
+                    status_code=400,
+                )
             handle = self._normalize_policy_page_handle(raw_handle)
             if handle in seen_handles:
                 raise ShopifyApiError(
@@ -1825,7 +2121,10 @@ class ShopifyApiClient:
                     "pageId": synced_page["id"],
                     "title": synced_page["title"],
                     "handle": synced_page["handle"],
-                    "url": synced_page["onlineStoreUrl"],
+                    "url": self._build_policy_page_url(
+                        shop_domain=shop_domain,
+                        handle=synced_page["handle"],
+                    ),
                     "operation": operation,
                 }
             )
@@ -1835,7 +2134,9 @@ class ShopifyApiClient:
     def _normalize_workspace_slug(workspace_name: str) -> str:
         cleaned_workspace = workspace_name.strip().lower()
         if not cleaned_workspace:
-            raise ShopifyApiError(message="workspaceName must be a non-empty string.", status_code=400)
+            raise ShopifyApiError(
+                message="workspaceName must be a non-empty string.", status_code=400
+            )
         slug = re.sub(r"[^a-z0-9]+", "-", cleaned_workspace)
         slug = re.sub(r"-{2,}", "-", slug).strip("-")
         if not slug:
@@ -1862,7 +2163,9 @@ class ShopifyApiClient:
     def _normalize_css_var_value(raw_value: str) -> str:
         value = raw_value.strip()
         if not value:
-            raise ShopifyApiError(message="cssVars values cannot be empty.", status_code=400)
+            raise ShopifyApiError(
+                message="cssVars values cannot be empty.", status_code=400
+            )
         if any(char in value for char in ("\n", "\r", "{", "}", ";")):
             raise ShopifyApiError(
                 message="cssVars values cannot contain newlines, braces, or semicolons.",
@@ -1871,16 +2174,24 @@ class ShopifyApiClient:
         return value
 
     @classmethod
-    def _normalize_theme_brand_css_vars(cls, css_vars: dict[str, str]) -> dict[str, str]:
+    def _normalize_theme_brand_css_vars(
+        cls, css_vars: dict[str, str]
+    ) -> dict[str, str]:
         if not isinstance(css_vars, dict) or not css_vars:
-            raise ShopifyApiError(message="cssVars must be a non-empty object.", status_code=400)
+            raise ShopifyApiError(
+                message="cssVars must be a non-empty object.", status_code=400
+            )
 
         normalized: dict[str, str] = {}
         for raw_key, raw_value in css_vars.items():
             if not isinstance(raw_key, str):
-                raise ShopifyApiError(message="cssVars keys must be strings.", status_code=400)
+                raise ShopifyApiError(
+                    message="cssVars keys must be strings.", status_code=400
+                )
             if not isinstance(raw_value, str):
-                raise ShopifyApiError(message="cssVars values must be strings.", status_code=400)
+                raise ShopifyApiError(
+                    message="cssVars values must be strings.", status_code=400
+                )
             key = cls._normalize_css_var_key(raw_key)
             if key in normalized:
                 raise ShopifyApiError(
@@ -1896,10 +2207,14 @@ class ShopifyApiClient:
         seen: set[str] = set()
         for raw_url in font_urls:
             if not isinstance(raw_url, str):
-                raise ShopifyApiError(message="fontUrls entries must be strings.", status_code=400)
+                raise ShopifyApiError(
+                    message="fontUrls entries must be strings.", status_code=400
+                )
             url = raw_url.strip()
             if not url:
-                raise ShopifyApiError(message="fontUrls entries cannot be empty.", status_code=400)
+                raise ShopifyApiError(
+                    message="fontUrls entries cannot be empty.", status_code=400
+                )
             if not (url.startswith("https://") or url.startswith("http://")):
                 raise ShopifyApiError(
                     message=f"fontUrls entry must be an absolute http(s) URL: {url}",
@@ -1934,14 +2249,22 @@ class ShopifyApiClient:
                 _DEFAULT_THEME_VAR_SCOPE_SELECTORS,
             ),
             compat_aliases=_THEME_COMPAT_ALIASES_BY_NAME.get(profile_key, {}),
-            required_source_vars=_THEME_REQUIRED_SOURCE_VARS_BY_NAME.get(profile_key, ()),
+            required_source_vars=_THEME_REQUIRED_SOURCE_VARS_BY_NAME.get(
+                profile_key, ()
+            ),
             required_theme_vars=_THEME_REQUIRED_THEME_VARS_BY_NAME.get(profile_key, ()),
-            settings_value_paths=_THEME_SETTINGS_VALUE_PATHS_BY_NAME.get(profile_key, {}),
-            required_settings_paths=_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME.get(profile_key, ()),
+            settings_value_paths=_THEME_SETTINGS_VALUE_PATHS_BY_NAME.get(
+                profile_key, {}
+            ),
+            required_settings_paths=_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME.get(
+                profile_key, ()
+            ),
         )
 
     @staticmethod
-    def _assert_theme_brand_profile_supported(*, theme_name: str, profile: ThemeBrandProfile) -> None:
+    def _assert_theme_brand_profile_supported(
+        *, theme_name: str, profile: ThemeBrandProfile
+    ) -> None:
         if profile.theme_name in _SUPPORTED_THEME_PROFILE_NAMES:
             return
         supported = ", ".join(_SUPPORTED_THEME_PROFILE_NAMES)
@@ -1981,8 +2304,12 @@ class ShopifyApiClient:
         source_css_vars: dict[str, str],
         effective_css_vars: dict[str, str],
     ) -> dict[str, list[str]]:
-        missing_source_vars = sorted(key for key in profile.required_source_vars if key not in source_css_vars)
-        missing_theme_vars = sorted(key for key in profile.required_theme_vars if key not in effective_css_vars)
+        missing_source_vars = sorted(
+            key for key in profile.required_source_vars if key not in source_css_vars
+        )
+        missing_theme_vars = sorted(
+            key for key in profile.required_theme_vars if key not in effective_css_vars
+        )
         return {
             "requiredSourceVars": sorted(profile.required_source_vars),
             "requiredThemeVars": sorted(profile.required_theme_vars),
@@ -1991,28 +2318,43 @@ class ShopifyApiClient:
         }
 
     @staticmethod
-    def _assert_theme_brand_coverage_complete(*, theme_name: str, coverage: dict[str, list[str]]) -> None:
+    def _assert_theme_brand_coverage_complete(
+        *, theme_name: str, coverage: dict[str, list[str]]
+    ) -> None:
         missing_source_vars = coverage.get("missingSourceVars") or []
         missing_theme_vars = coverage.get("missingThemeVars") or []
         if not missing_source_vars and not missing_theme_vars:
             return
-        detail_parts: list[str] = [f"Theme profile coverage failed for themeName={theme_name}."]
+        detail_parts: list[str] = [
+            f"Theme profile coverage failed for themeName={theme_name}."
+        ]
         if missing_source_vars:
-            detail_parts.append(f"Missing source cssVars: {', '.join(missing_source_vars)}.")
+            detail_parts.append(
+                f"Missing source cssVars: {', '.join(missing_source_vars)}."
+            )
         if missing_theme_vars:
-            detail_parts.append(f"Missing mapped theme vars: {', '.join(missing_theme_vars)}.")
+            detail_parts.append(
+                f"Missing mapped theme vars: {', '.join(missing_theme_vars)}."
+            )
         raise ShopifyApiError(message=" ".join(detail_parts), status_code=422)
 
     @staticmethod
     def _parse_settings_path_tokens(path: str) -> list[tuple[str, str | None]]:
-        raw_segments = [segment.strip() for segment in path.split(".") if segment.strip()]
+        raw_segments = [
+            segment.strip() for segment in path.split(".") if segment.strip()
+        ]
         if not raw_segments:
-            raise ShopifyApiError(message=f"Invalid theme settings path: {path}", status_code=500)
+            raise ShopifyApiError(
+                message=f"Invalid theme settings path: {path}", status_code=500
+            )
         tokens: list[tuple[str, str | None]] = []
         for raw_segment in raw_segments:
             match = _SETTINGS_PATH_SEGMENT_RE.fullmatch(raw_segment)
             if not match:
-                raise ShopifyApiError(message=f"Invalid theme settings path segment: {raw_segment}", status_code=500)
+                raise ShopifyApiError(
+                    message=f"Invalid theme settings path segment: {raw_segment}",
+                    status_code=500,
+                )
             tokens.append((match.group(1), match.group(2)))
         return tokens
 
@@ -2159,14 +2501,22 @@ class ShopifyApiClient:
                     if len(tokens) == 1:
                         values.append(item)
                     else:
-                        values.extend(cls._read_json_path_values_tokens(node=item, tokens=tokens[1:]))
+                        values.extend(
+                            cls._read_json_path_values_tokens(
+                                node=item, tokens=tokens[1:]
+                            )
+                        )
                 return values
             if isinstance(current, dict):
                 for item in current.values():
                     if len(tokens) == 1:
                         values.append(item)
                     else:
-                        values.extend(cls._read_json_path_values_tokens(node=item, tokens=tokens[1:]))
+                        values.extend(
+                            cls._read_json_path_values_tokens(
+                                node=item, tokens=tokens[1:]
+                            )
+                        )
                 return values
             return values
 
@@ -2252,7 +2602,9 @@ class ShopifyApiClient:
         if cls._is_non_empty_collection_node(current.get("color_schemes")):
             return
 
-        from_current_settings = cls._extract_color_schemes_from_node({"settings": current.get("settings")})
+        from_current_settings = cls._extract_color_schemes_from_node(
+            {"settings": current.get("settings")}
+        )
         if from_current_settings is not None:
             current["color_schemes"] = from_current_settings
             return
@@ -2270,7 +2622,9 @@ class ShopifyApiClient:
             current["color_schemes"] = discovered
 
     @classmethod
-    def _has_current_color_schemes_target(cls, *, settings_data: dict[str, Any]) -> bool:
+    def _has_current_color_schemes_target(
+        cls, *, settings_data: dict[str, Any]
+    ) -> bool:
         current = settings_data.get("current")
         if not isinstance(current, dict):
             return False
@@ -2278,12 +2632,16 @@ class ShopifyApiClient:
             return True
         nested_settings = current.get("settings")
         if isinstance(nested_settings, dict):
-            return cls._is_non_empty_collection_node(nested_settings.get("color_schemes"))
+            return cls._is_non_empty_collection_node(
+                nested_settings.get("color_schemes")
+            )
         return False
 
     @staticmethod
     def _normalize_theme_settings_semantic_key(*, raw_key: str) -> str:
-        sanitized = _THEME_SETTINGS_SEMANTIC_KEY_SANITIZE_RE.sub("_", raw_key.strip().lower())
+        sanitized = _THEME_SETTINGS_SEMANTIC_KEY_SANITIZE_RE.sub(
+            "_", raw_key.strip().lower()
+        )
         collapsed = _THEME_SETTINGS_SEMANTIC_KEY_COLLAPSE_RE.sub("_", sanitized)
         return collapsed.strip("_")
 
@@ -2329,7 +2687,9 @@ class ShopifyApiClient:
         key_tokens = {token for token in normalized_key.split("_") if token}
         if not key_tokens:
             return None
-        path_tokens = cls._tokenize_theme_settings_path(path=raw_path) if raw_path else set()
+        path_tokens = (
+            cls._tokenize_theme_settings_path(path=raw_path) if raw_path else set()
+        )
 
         # Section-level footer components should map generic background keys to
         # the footer background semantic token, not the global page background.
@@ -2428,13 +2788,17 @@ class ShopifyApiClient:
         settings_data: dict[str, Any],
         effective_css_vars: dict[str, str],
     ) -> tuple[list[str], list[str]]:
-        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(
+            profile.theme_name, {}
+        )
         if not semantic_source_vars:
             return [], []
 
         updated_paths: list[str] = []
         unmapped_paths: list[str] = []
-        for parent, key, path in cls._collect_theme_current_color_setting_leaves(settings_data=settings_data):
+        for parent, key, path in cls._collect_theme_current_color_setting_leaves(
+            settings_data=settings_data
+        ):
             semantic_key = cls._resolve_theme_settings_semantic_key(
                 semantic_source_vars=semantic_source_vars,
                 raw_key=key,
@@ -2454,7 +2818,10 @@ class ShopifyApiClient:
                     status_code=422,
                 )
             existing_value = parent.get(key)
-            if isinstance(existing_value, str) and existing_value.strip() == expected_value:
+            if (
+                isinstance(existing_value, str)
+                and existing_value.strip() == expected_value
+            ):
                 continue
             parent[key] = expected_value
             updated_paths.append(path)
@@ -2469,14 +2836,18 @@ class ShopifyApiClient:
         settings_data: dict[str, Any],
         effective_css_vars: dict[str, str],
     ) -> tuple[list[str], list[str], list[str]]:
-        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(
+            profile.theme_name, {}
+        )
         if not semantic_source_vars:
             return [], [], []
 
         synced_paths: list[str] = []
         mismatched_paths: list[str] = []
         unmapped_paths: list[str] = []
-        for parent, key, path in cls._collect_theme_current_color_setting_leaves(settings_data=settings_data):
+        for parent, key, path in cls._collect_theme_current_color_setting_leaves(
+            settings_data=settings_data
+        ):
             semantic_key = cls._resolve_theme_settings_semantic_key(
                 semantic_source_vars=semantic_source_vars,
                 raw_key=key,
@@ -2491,12 +2862,19 @@ class ShopifyApiClient:
                 mismatched_paths.append(path)
                 continue
             existing_value = parent.get(key)
-            if isinstance(existing_value, str) and existing_value.strip() == expected_value:
+            if (
+                isinstance(existing_value, str)
+                and existing_value.strip() == expected_value
+            ):
                 synced_paths.append(path)
             else:
                 mismatched_paths.append(path)
 
-        return sorted(set(synced_paths)), sorted(set(mismatched_paths)), sorted(set(unmapped_paths))
+        return (
+            sorted(set(synced_paths)),
+            sorted(set(mismatched_paths)),
+            sorted(set(unmapped_paths)),
+        )
 
     @classmethod
     def _tokenize_theme_settings_path(cls, *, path: str) -> set[str]:
@@ -2505,7 +2883,9 @@ class ShopifyApiClient:
         )
         if not normalized:
             return set()
-        return {token for token in normalized.split("_") if token and not token.isdigit()}
+        return {
+            token for token in normalized.split("_") if token and not token.isdigit()
+        }
 
     @classmethod
     def _is_theme_settings_typography_leaf_candidate(
@@ -2526,7 +2906,9 @@ class ShopifyApiClient:
         tokens = key_tokens | path_tokens
         if not (tokens & _THEME_SETTINGS_TYPOGRAPHY_PROPERTY_MARKERS):
             return False
-        has_typography_context = bool(tokens & _THEME_SETTINGS_TYPOGRAPHY_CONTEXT_MARKERS)
+        has_typography_context = bool(
+            tokens & _THEME_SETTINGS_TYPOGRAPHY_CONTEXT_MARKERS
+        )
         has_type_prefix = "type" in tokens or "typography" in tokens
         return has_typography_context or has_type_prefix
 
@@ -2538,7 +2920,9 @@ class ShopifyApiClient:
         key: str,
         path: str,
     ) -> str | None:
-        tokens = cls._tokenize_theme_settings_path(path=key) | cls._tokenize_theme_settings_path(path=path)
+        tokens = cls._tokenize_theme_settings_path(
+            path=key
+        ) | cls._tokenize_theme_settings_path(path=path)
         is_heading = bool(tokens & {"heading", "header"})
         is_body = "body" in tokens
         is_navigation = bool(tokens & {"nav", "navigation"})
@@ -2602,7 +2986,11 @@ class ShopifyApiClient:
         if cleaned.lower().startswith("var("):
             return cleaned
         first_family = cleaned.split(",", 1)[0].strip()
-        if len(first_family) >= 2 and first_family[0] == first_family[-1] and first_family[0] in {"'", '"'}:
+        if (
+            len(first_family) >= 2
+            and first_family[0] == first_family[-1]
+            and first_family[0] in {"'", '"'}
+        ):
             first_family = first_family[1:-1].strip()
         return first_family or cleaned
 
@@ -2614,10 +3002,16 @@ class ShopifyApiClient:
         current_value: str,
         path: str,
     ) -> str:
-        primary_family = cls._extract_primary_font_family_from_css_value(raw_value=source_value).strip()
+        primary_family = cls._extract_primary_font_family_from_css_value(
+            raw_value=source_value
+        ).strip()
         normalized_family = primary_family.strip("'\" ").lower()
-        alias_lookup_family = _THEME_SETTINGS_FONT_FAMILY_ALIAS_RE.sub(" ", normalized_family).strip()
-        aliased_family = _THEME_SETTINGS_FONT_FAMILY_HANDLE_ALIASES.get(alias_lookup_family)
+        alias_lookup_family = _THEME_SETTINGS_FONT_FAMILY_ALIAS_RE.sub(
+            " ", normalized_family
+        ).strip()
+        aliased_family = _THEME_SETTINGS_FONT_FAMILY_HANDLE_ALIASES.get(
+            alias_lookup_family
+        )
         if aliased_family is not None:
             normalized_family = aliased_family
         if not normalized_family:
@@ -2666,7 +3060,9 @@ class ShopifyApiClient:
                 ),
                 status_code=422,
             )
-        base_handle = _THEME_SETTINGS_FONT_HANDLE_SANITIZE_RE.sub("_", normalized_family)
+        base_handle = _THEME_SETTINGS_FONT_HANDLE_SANITIZE_RE.sub(
+            "_", normalized_family
+        )
         base_handle = base_handle.strip("_")
         if not base_handle:
             raise ShopifyApiError(
@@ -2693,7 +3089,9 @@ class ShopifyApiClient:
         return current_handle
 
     @staticmethod
-    def _parse_simple_numeric_css_value(*, raw_value: str) -> tuple[float, str | None] | None:
+    def _parse_simple_numeric_css_value(
+        *, raw_value: str
+    ) -> tuple[float, str | None] | None:
         match = _THEME_SETTINGS_SIMPLE_NUMBER_RE.fullmatch(raw_value.strip())
         if match is None:
             return None
@@ -2780,7 +3178,9 @@ class ShopifyApiClient:
         settings_data: dict[str, Any],
         effective_css_vars: dict[str, str],
     ) -> tuple[list[str], list[str]]:
-        semantic_source_vars = _THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        semantic_source_vars = _THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME.get(
+            profile.theme_name, {}
+        )
         if not semantic_source_vars:
             return [], []
 
@@ -2798,7 +3198,9 @@ class ShopifyApiClient:
                     if isinstance(value, (dict, list)):
                         walk(value, child_path)
                         continue
-                    if not cls._is_theme_settings_typography_leaf_candidate(key=key, path=child_path, value=value):
+                    if not cls._is_theme_settings_typography_leaf_candidate(
+                        key=key, path=child_path, value=value
+                    ):
                         continue
                     semantic_key = cls._resolve_theme_settings_typography_semantic_key(
                         semantic_source_vars=semantic_source_vars,
@@ -2844,7 +3246,9 @@ class ShopifyApiClient:
         settings_data: dict[str, Any],
         effective_css_vars: dict[str, str],
     ) -> tuple[list[str], list[str], list[str]]:
-        semantic_source_vars = _THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        semantic_source_vars = _THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME.get(
+            profile.theme_name, {}
+        )
         if not semantic_source_vars:
             return [], [], []
 
@@ -2863,7 +3267,9 @@ class ShopifyApiClient:
                     if isinstance(value, (dict, list)):
                         walk(value, child_path)
                         continue
-                    if not cls._is_theme_settings_typography_leaf_candidate(key=key, path=child_path, value=value):
+                    if not cls._is_theme_settings_typography_leaf_candidate(
+                        key=key, path=child_path, value=value
+                    ):
                         continue
                     semantic_key = cls._resolve_theme_settings_typography_semantic_key(
                         semantic_source_vars=semantic_source_vars,
@@ -2894,17 +3300,29 @@ class ShopifyApiClient:
                     walk(item, f"{path}[{idx}]")
 
         walk(current, "current")
-        return sorted(set(synced_paths)), sorted(set(mismatched_paths)), sorted(set(unmapped_paths))
+        return (
+            sorted(set(synced_paths)),
+            sorted(set(mismatched_paths)),
+            sorted(set(unmapped_paths)),
+        )
 
     @staticmethod
-    def _is_theme_component_settings_sync_enabled_for_profile(*, profile: ThemeBrandProfile) -> bool:
+    def _is_theme_component_settings_sync_enabled_for_profile(
+        *, profile: ThemeBrandProfile
+    ) -> bool:
         return profile.theme_name in _THEME_COMPONENT_SETTINGS_SYNC_THEME_NAMES
 
     @staticmethod
-    def _parse_theme_template_json(*, filename: str, template_content: str) -> dict[str, Any]:
+    def _parse_theme_template_json(
+        *, filename: str, template_content: str
+    ) -> dict[str, Any]:
         # Shopify template JSON files may include a UTF-8 BOM and a leading
         # autogenerated comment block before the JSON object.
-        normalized_content = template_content[1:] if template_content.startswith("\ufeff") else template_content
+        normalized_content = (
+            template_content[1:]
+            if template_content.startswith("\ufeff")
+            else template_content
+        )
         parse_content = normalized_content.lstrip()
         if parse_content.startswith("/*"):
             comment_end = parse_content.find("*/")
@@ -2978,7 +3396,10 @@ class ShopifyApiClient:
                 continue
             section_settings = section.get("settings")
             if isinstance(section_settings, dict):
-                collect(section_settings, f"{template_filename}.sections.{section_id}.settings")
+                collect(
+                    section_settings,
+                    f"{template_filename}.sections.{section_id}.settings",
+                )
 
             section_blocks = section.get("blocks")
             if not isinstance(section_blocks, dict):
@@ -2988,7 +3409,10 @@ class ShopifyApiClient:
                     continue
                 block_settings = block.get("settings")
                 if isinstance(block_settings, dict):
-                    collect(block_settings, f"{template_filename}.sections.{section_id}.blocks.{block_id}.settings")
+                    collect(
+                        block_settings,
+                        f"{template_filename}.sections.{section_id}.blocks.{block_id}.settings",
+                    )
 
         return leaves
 
@@ -3006,7 +3430,9 @@ class ShopifyApiClient:
             "updatedPaths": [],
             "unmappedColorPaths": [],
         }
-        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(
+            profile.theme_name, {}
+        )
         if not semantic_source_vars:
             return template_content, report
 
@@ -3041,7 +3467,10 @@ class ShopifyApiClient:
                     status_code=422,
                 )
             existing_value = parent.get(key)
-            if isinstance(existing_value, str) and existing_value.strip() == expected_value:
+            if (
+                isinstance(existing_value, str)
+                and existing_value.strip() == expected_value
+            ):
                 continue
             parent[key] = expected_value
             updated_paths.append(path)
@@ -3050,7 +3479,10 @@ class ShopifyApiClient:
         report["unmappedColorPaths"] = sorted(set(unmapped_paths))
         if not updated_paths:
             return template_content, report
-        return json.dumps(template_data, ensure_ascii=False, separators=(",", ":")) + "\n", report
+        return (
+            json.dumps(template_data, ensure_ascii=False, separators=(",", ":")) + "\n",
+            report,
+        )
 
     @classmethod
     def _audit_theme_template_color_settings_data(
@@ -3067,7 +3499,9 @@ class ShopifyApiClient:
             "mismatchedPaths": [],
             "unmappedColorPaths": [],
         }
-        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(
+            profile.theme_name, {}
+        )
         if not semantic_source_vars:
             return report
 
@@ -3098,7 +3532,10 @@ class ShopifyApiClient:
                 mismatched_paths.append(path)
                 continue
             existing_value = parent.get(key)
-            if isinstance(existing_value, str) and existing_value.strip() == expected_value:
+            if (
+                isinstance(existing_value, str)
+                and existing_value.strip() == expected_value
+            ):
                 synced_paths.append(path)
             else:
                 mismatched_paths.append(path)
@@ -3108,11 +3545,407 @@ class ShopifyApiClient:
         report["unmappedColorPaths"] = sorted(set(unmapped_paths))
         return report
 
+    @classmethod
+    def _split_theme_template_setting_path(
+        cls, *, setting_path: str
+    ) -> tuple[str, str]:
+        delimiter_index = setting_path.find(".json.")
+        if delimiter_index < 0:
+            raise ShopifyApiError(
+                message=(
+                    "componentImageUrls keys must include a template filename and JSON path "
+                    "(for example: templates/index.json.sections.hero.settings.image)."
+                ),
+                status_code=400,
+            )
+        template_filename = setting_path[: delimiter_index + len(".json")]
+        json_path = setting_path[delimiter_index + len(".json.") :]
+        if not _THEME_TEMPLATE_JSON_FILENAME_RE.fullmatch(template_filename):
+            raise ShopifyApiError(
+                message=(
+                    "componentImageUrls keys must target template/section JSON files "
+                    "(for example: templates/index.json.sections.hero.settings.image)."
+                ),
+                status_code=400,
+            )
+        if not json_path:
+            raise ShopifyApiError(
+                message=(
+                    "componentImageUrls keys must include a JSON path after the template filename "
+                    "(for example: templates/index.json.sections.hero.settings.image)."
+                ),
+                status_code=400,
+            )
+        try:
+            cls._parse_settings_path_tokens(json_path)
+        except ShopifyApiError as exc:
+            raise ShopifyApiError(
+                message=f"componentImageUrls key has an invalid JSON path: {setting_path}",
+                status_code=400,
+            ) from exc
+        return template_filename, json_path
+
+    @classmethod
+    def _normalize_theme_component_image_urls(
+        cls,
+        *,
+        component_image_urls: dict[str, str] | None,
+    ) -> dict[str, str]:
+        normalized: dict[str, str] = {}
+        for raw_setting_path, raw_url in (component_image_urls or {}).items():
+            if not isinstance(raw_setting_path, str):
+                raise ShopifyApiError(
+                    message="componentImageUrls keys must be strings.",
+                    status_code=400,
+                )
+            setting_path = raw_setting_path.strip()
+            if not setting_path:
+                raise ShopifyApiError(
+                    message="componentImageUrls keys must be non-empty strings.",
+                    status_code=400,
+                )
+            if any(char in setting_path for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message=f"componentImageUrls key contains unsupported characters: {setting_path!r}.",
+                    status_code=400,
+                )
+            if any(char.isspace() for char in setting_path):
+                raise ShopifyApiError(
+                    message=f"componentImageUrls key must not include whitespace characters: {setting_path!r}.",
+                    status_code=400,
+                )
+            if setting_path in normalized:
+                raise ShopifyApiError(
+                    message=f"Duplicate componentImageUrls key after normalization: {setting_path}.",
+                    status_code=400,
+                )
+            cls._split_theme_template_setting_path(setting_path=setting_path)
+
+            if not isinstance(raw_url, str):
+                raise ShopifyApiError(
+                    message=f"componentImageUrls[{setting_path}] must be a string URL.",
+                    status_code=400,
+                )
+            image_url = raw_url.strip()
+            if not image_url:
+                raise ShopifyApiError(
+                    message=f"componentImageUrls[{setting_path}] cannot be empty.",
+                    status_code=400,
+                )
+            if any(char in image_url for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message=f"componentImageUrls[{setting_path}] contains unsupported characters.",
+                    status_code=400,
+                )
+            if any(char.isspace() for char in image_url):
+                raise ShopifyApiError(
+                    message=f"componentImageUrls[{setting_path}] must not include whitespace characters.",
+                    status_code=400,
+                )
+            if not (
+                cls._is_shopify_file_url(value=image_url)
+                or image_url.startswith("https://")
+                or image_url.startswith("http://")
+            ):
+                raise ShopifyApiError(
+                    message=(
+                        f"componentImageUrls[{setting_path}] must be an absolute http(s) URL "
+                        "or a shopify:// URL."
+                    ),
+                    status_code=400,
+                )
+            if not cls._is_shopify_file_url(value=image_url):
+                parsed = urlparse(image_url)
+                if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                    raise ShopifyApiError(
+                        message=f"componentImageUrls[{setting_path}] must be a valid absolute http(s) URL.",
+                        status_code=400,
+                    )
+            normalized[setting_path] = image_url
+
+        return normalized
+
+    @classmethod
+    def _normalize_theme_auto_component_image_urls(
+        cls,
+        *,
+        auto_component_image_urls: list[str] | None,
+    ) -> list[str]:
+        normalized: list[str] = []
+        seen_urls: set[str] = set()
+        for raw_url in auto_component_image_urls or []:
+            if not isinstance(raw_url, str):
+                raise ShopifyApiError(
+                    message="autoComponentImageUrls entries must be strings.",
+                    status_code=400,
+                )
+            image_url = raw_url.strip()
+            if not image_url:
+                raise ShopifyApiError(
+                    message="autoComponentImageUrls entries cannot be empty.",
+                    status_code=400,
+                )
+            if any(char in image_url for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message=f"autoComponentImageUrls entry contains unsupported characters: {image_url}",
+                    status_code=400,
+                )
+            if any(char.isspace() for char in image_url):
+                raise ShopifyApiError(
+                    message=f"autoComponentImageUrls entry must not include whitespace characters: {image_url}",
+                    status_code=400,
+                )
+            if not (
+                cls._is_shopify_file_url(value=image_url)
+                or image_url.startswith("https://")
+                or image_url.startswith("http://")
+            ):
+                raise ShopifyApiError(
+                    message=(
+                        "autoComponentImageUrls entries must be absolute http(s) URLs "
+                        "or a shopify:// URL."
+                    ),
+                    status_code=400,
+                )
+            if not cls._is_shopify_file_url(value=image_url):
+                parsed = urlparse(image_url)
+                if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+                    raise ShopifyApiError(
+                        message=f"autoComponentImageUrls entry must be a valid absolute http(s) URL: {image_url}",
+                        status_code=400,
+                    )
+            if image_url in seen_urls:
+                continue
+            seen_urls.add(image_url)
+            normalized.append(image_url)
+        return normalized
+
+    @classmethod
+    def _is_theme_template_component_image_setting_key(cls, *, key: str) -> bool:
+        normalized_key = cls._normalize_theme_settings_semantic_key(raw_key=key)
+        if not normalized_key:
+            return False
+        key_tokens = {token for token in normalized_key.split("_") if token}
+        if not key_tokens:
+            return False
+        if not (key_tokens & _THEME_COMPONENT_IMAGE_KEY_MARKERS):
+            return False
+        if key_tokens & _THEME_COMPONENT_IMAGE_KEY_SKIP_MARKERS:
+            return False
+        return True
+
+    @classmethod
+    def _is_theme_template_component_image_setting_value(cls, *, value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        normalized_value = value.strip()
+        if not normalized_value:
+            return False
+        lowered_value = normalized_value.lower()
+        if cls._is_shopify_file_url(value=normalized_value):
+            return True
+        if _THEME_SETTINGS_HEX_COLOR_RE.fullmatch(normalized_value):
+            return False
+        if _THEME_SETTINGS_CSS_COLOR_FUNCTION_RE.match(normalized_value):
+            return False
+        if _THEME_SETTINGS_CSS_GRADIENT_FUNCTION_RE.match(normalized_value):
+            return False
+        if lowered_value in _THEME_SETTINGS_COLOR_VALUE_KEYWORDS:
+            return False
+        parsed = urlparse(normalized_value)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return True
+        if _THEME_COMPONENT_IMAGE_FILENAME_RE.search(parsed.path):
+            return True
+        return False
+
+    @classmethod
+    def _collect_theme_template_component_image_setting_paths(
+        cls,
+        *,
+        template_filename: str,
+        template_content: str,
+        excluded_setting_paths: set[str],
+    ) -> list[str]:
+        template_data = cls._parse_theme_template_json(
+            filename=template_filename,
+            template_content=template_content,
+        )
+        sections = template_data.get("sections")
+        if not isinstance(sections, dict):
+            return []
+
+        paths: list[str] = []
+
+        def collect(node: Any, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    child_path = f"{path}.{key}" if path else key
+                    if isinstance(value, (dict, list)):
+                        collect(value, child_path)
+                        continue
+                    if child_path in excluded_setting_paths:
+                        continue
+                    if not cls._is_theme_template_component_image_setting_key(key=key):
+                        continue
+                    if not cls._is_theme_template_component_image_setting_value(
+                        value=value
+                    ):
+                        continue
+                    paths.append(child_path)
+                return
+            if isinstance(node, list):
+                for idx, item in enumerate(node):
+                    collect(item, f"{path}[{idx}]")
+
+        for section_id, section in sections.items():
+            if not isinstance(section_id, str) or not isinstance(section, dict):
+                continue
+            section_settings = section.get("settings")
+            if isinstance(section_settings, dict):
+                collect(
+                    section_settings,
+                    f"{template_filename}.sections.{section_id}.settings",
+                )
+
+            section_blocks = section.get("blocks")
+            if not isinstance(section_blocks, dict):
+                continue
+            for block_id, block in section_blocks.items():
+                if not isinstance(block_id, str) or not isinstance(block, dict):
+                    continue
+                block_settings = block.get("settings")
+                if isinstance(block_settings, dict):
+                    collect(
+                        block_settings,
+                        f"{template_filename}.sections.{section_id}.blocks.{block_id}.settings",
+                    )
+
+        return sorted(set(paths))
+
+    @classmethod
+    def _build_auto_theme_component_image_urls(
+        cls,
+        *,
+        template_filenames: set[str],
+        template_contents_by_filename: dict[str, str],
+        explicit_component_image_urls: dict[str, str],
+        auto_component_image_urls: list[str],
+    ) -> dict[str, str]:
+        if not auto_component_image_urls:
+            return {}
+
+        excluded_setting_paths = set(explicit_component_image_urls.keys())
+        discovered_paths: list[str] = []
+        for template_filename in sorted(template_filenames):
+            template_content = template_contents_by_filename.get(template_filename)
+            if template_content is None:
+                raise ShopifyApiError(
+                    message=f"Theme template file required for auto component image sync was not loaded: {template_filename}",
+                    status_code=404,
+                )
+            discovered_paths.extend(
+                cls._collect_theme_template_component_image_setting_paths(
+                    template_filename=template_filename,
+                    template_content=template_content,
+                    excluded_setting_paths=excluded_setting_paths,
+                )
+            )
+        discovered_paths = sorted(set(discovered_paths))
+        if not discovered_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Theme template settings sync could not discover image setting paths for "
+                    "autoComponentImageUrls. Provide explicit componentImageUrls mappings."
+                ),
+                status_code=422,
+            )
+
+        mapped: dict[str, str] = {}
+        for index, setting_path in enumerate(discovered_paths):
+            mapped[setting_path] = auto_component_image_urls[
+                index % len(auto_component_image_urls)
+            ]
+        return mapped
+
+    @classmethod
+    def _group_theme_component_image_urls_by_template(
+        cls,
+        *,
+        component_image_urls: dict[str, str],
+    ) -> dict[str, dict[str, str]]:
+        grouped: dict[str, dict[str, str]] = {}
+        for setting_path, image_url in component_image_urls.items():
+            template_filename, _ = cls._split_theme_template_setting_path(
+                setting_path=setting_path
+            )
+            grouped.setdefault(template_filename, {})[setting_path] = image_url
+        return grouped
+
+    @classmethod
+    def _sync_theme_template_component_image_settings_data(
+        cls,
+        *,
+        template_filename: str,
+        template_content: str,
+        component_image_urls_by_path: dict[str, str],
+    ) -> tuple[str, dict[str, Any]]:
+        report = {
+            "templateFilename": template_filename,
+            "updatedPaths": [],
+            "missingPaths": [],
+        }
+        if not component_image_urls_by_path:
+            return template_content, report
+
+        template_data = cls._parse_theme_template_json(
+            filename=template_filename,
+            template_content=template_content,
+        )
+
+        updated_paths: list[str] = []
+        missing_paths: list[str] = []
+        for setting_path, image_url in component_image_urls_by_path.items():
+            parsed_template_filename, json_path = (
+                cls._split_theme_template_setting_path(setting_path=setting_path)
+            )
+            if parsed_template_filename != template_filename:
+                raise ShopifyApiError(
+                    message=(
+                        "componentImageUrls keys must match the current template file during sync. "
+                        f"path={setting_path}, templateFilename={template_filename}."
+                    ),
+                    status_code=500,
+                )
+            update_count = cls._set_json_path_value(
+                node=template_data,
+                path=json_path,
+                value=image_url,
+                create_missing_leaf=False,
+            )
+            if update_count > 0:
+                updated_paths.append(setting_path)
+            else:
+                missing_paths.append(setting_path)
+
+        report["updatedPaths"] = sorted(set(updated_paths))
+        report["missingPaths"] = sorted(set(missing_paths))
+        if not updated_paths:
+            return template_content, report
+        return (
+            json.dumps(template_data, ensure_ascii=False, separators=(",", ":")) + "\n",
+            report,
+        )
+
     @staticmethod
     def _parse_theme_settings_json(*, settings_content: str) -> dict[str, Any]:
         # Shopify settings_data.json may include a UTF-8 BOM and a leading
         # autogenerated comment block before the JSON object.
-        normalized_content = settings_content[1:] if settings_content.startswith("\ufeff") else settings_content
+        normalized_content = (
+            settings_content[1:]
+            if settings_content.startswith("\ufeff")
+            else settings_content
+        )
         parse_content = normalized_content.lstrip()
         if parse_content.startswith("/*"):
             comment_end = parse_content.find("*/")
@@ -3175,11 +4008,17 @@ class ShopifyApiClient:
         if not profile.settings_value_paths:
             return settings_content, report
 
-        settings_data = cls._parse_theme_settings_json(settings_content=settings_content)
+        settings_data = cls._parse_theme_settings_json(
+            settings_content=settings_content
+        )
         if logo_url is not None:
-            cls._sync_theme_logo_settings_data(settings_data=settings_data, logo_url=logo_url)
+            cls._sync_theme_logo_settings_data(
+                settings_data=settings_data, logo_url=logo_url
+            )
         cls._ensure_current_color_schemes(settings_data=settings_data)
-        has_color_schemes_target = cls._has_current_color_schemes_target(settings_data=settings_data)
+        has_color_schemes_target = cls._has_current_color_schemes_target(
+            settings_data=settings_data
+        )
         expected_paths = sorted(
             path
             for path in profile.settings_value_paths.keys()
@@ -3224,7 +4063,9 @@ class ShopifyApiClient:
             else:
                 missing_paths.append(path)
 
-        required_missing_paths = sorted(path for path in profile.required_settings_paths if path in missing_paths)
+        required_missing_paths = sorted(
+            path for path in profile.required_settings_paths if path in missing_paths
+        )
         if required_missing_paths:
             raise ShopifyApiError(
                 message=(
@@ -3242,10 +4083,12 @@ class ShopifyApiClient:
                 status_code=409,
             )
 
-        semantic_updated_paths, unmapped_color_paths = cls._sync_theme_semantic_color_settings(
-            profile=profile,
-            settings_data=settings_data,
-            effective_css_vars=effective_css_vars,
+        semantic_updated_paths, unmapped_color_paths = (
+            cls._sync_theme_semantic_color_settings(
+                profile=profile,
+                settings_data=settings_data,
+                effective_css_vars=effective_css_vars,
+            )
         )
         if unmapped_color_paths:
             raise ShopifyApiError(
@@ -3257,10 +4100,12 @@ class ShopifyApiClient:
                 status_code=422,
             )
 
-        semantic_typography_updated_paths, unmapped_typography_paths = cls._sync_theme_semantic_typography_settings(
-            profile=profile,
-            settings_data=settings_data,
-            effective_css_vars=effective_css_vars,
+        semantic_typography_updated_paths, unmapped_typography_paths = (
+            cls._sync_theme_semantic_typography_settings(
+                profile=profile,
+                settings_data=settings_data,
+                effective_css_vars=effective_css_vars,
+            )
         )
         if unmapped_typography_paths:
             raise ShopifyApiError(
@@ -3275,7 +4120,9 @@ class ShopifyApiClient:
         report["updatedPaths"] = sorted(updated_paths)
         report["missingPaths"] = sorted(missing_paths)
         report["requiredMissingPaths"] = required_missing_paths
-        report["semanticUpdatedPaths"] = sorted(set(semantic_updated_paths + semantic_typography_updated_paths))
+        report["semanticUpdatedPaths"] = sorted(
+            set(semantic_updated_paths + semantic_typography_updated_paths)
+        )
         report["unmappedColorPaths"] = unmapped_color_paths
         report["semanticTypographyUpdatedPaths"] = semantic_typography_updated_paths
         report["unmappedTypographyPaths"] = unmapped_typography_paths
@@ -3344,9 +4191,13 @@ class ShopifyApiClient:
         if not profile.settings_value_paths:
             return report
 
-        settings_data = cls._parse_theme_settings_json(settings_content=settings_content)
+        settings_data = cls._parse_theme_settings_json(
+            settings_content=settings_content
+        )
         cls._ensure_current_color_schemes(settings_data=settings_data)
-        has_color_schemes_target = cls._has_current_color_schemes_target(settings_data=settings_data)
+        has_color_schemes_target = cls._has_current_color_schemes_target(
+            settings_data=settings_data
+        )
         expected_paths = sorted(
             path
             for path in profile.settings_value_paths.keys()
@@ -3365,26 +4216,37 @@ class ShopifyApiClient:
                 continue
             candidate_values: list[list[Any]] = []
             for candidate_path in cls._build_settings_path_candidates(path):
-                observed_values = cls._read_json_path_values(node=settings_data, path=candidate_path)
+                observed_values = cls._read_json_path_values(
+                    node=settings_data, path=candidate_path
+                )
                 if observed_values:
                     candidate_values.append(observed_values)
             if not candidate_values:
                 missing_paths.append(path)
                 continue
             if any(
-                all(isinstance(value, str) and value.strip() == expected_value for value in observed_values)
+                all(
+                    isinstance(value, str) and value.strip() == expected_value
+                    for value in observed_values
+                )
                 for observed_values in candidate_values
             ):
                 synced_paths.append(path)
             else:
                 mismatched_paths.append(path)
 
-        required_missing_paths = sorted(path for path in profile.required_settings_paths if path in missing_paths)
-        required_mismatched_paths = sorted(path for path in profile.required_settings_paths if path in mismatched_paths)
-        semantic_synced_paths, semantic_mismatched_paths, unmapped_color_paths = cls._audit_theme_semantic_color_settings(
-            profile=profile,
-            settings_data=settings_data,
-            effective_css_vars=effective_css_vars,
+        required_missing_paths = sorted(
+            path for path in profile.required_settings_paths if path in missing_paths
+        )
+        required_mismatched_paths = sorted(
+            path for path in profile.required_settings_paths if path in mismatched_paths
+        )
+        semantic_synced_paths, semantic_mismatched_paths, unmapped_color_paths = (
+            cls._audit_theme_semantic_color_settings(
+                profile=profile,
+                settings_data=settings_data,
+                effective_css_vars=effective_css_vars,
+            )
         )
         (
             semantic_typography_synced_paths,
@@ -3401,11 +4263,17 @@ class ShopifyApiClient:
         report["missingPaths"] = sorted(missing_paths)
         report["requiredMissingPaths"] = required_missing_paths
         report["requiredMismatchedPaths"] = required_mismatched_paths
-        report["semanticSyncedPaths"] = sorted(set(semantic_synced_paths + semantic_typography_synced_paths))
-        report["semanticMismatchedPaths"] = sorted(set(semantic_mismatched_paths + semantic_typography_mismatched_paths))
+        report["semanticSyncedPaths"] = sorted(
+            set(semantic_synced_paths + semantic_typography_synced_paths)
+        )
+        report["semanticMismatchedPaths"] = sorted(
+            set(semantic_mismatched_paths + semantic_typography_mismatched_paths)
+        )
         report["unmappedColorPaths"] = unmapped_color_paths
         report["semanticTypographySyncedPaths"] = semantic_typography_synced_paths
-        report["semanticTypographyMismatchedPaths"] = semantic_typography_mismatched_paths
+        report["semanticTypographyMismatchedPaths"] = (
+            semantic_typography_mismatched_paths
+        )
         report["unmappedTypographyPaths"] = unmapped_typography_paths
         return report
 
@@ -3423,9 +4291,12 @@ class ShopifyApiClient:
         effective_css_vars: dict[str, str] | None = None,
     ) -> str:
         profile = cls._resolve_theme_brand_profile(theme_name=theme_name)
-        resolved_effective_css_vars = effective_css_vars or cls._build_theme_compat_css_vars(
-            profile=profile,
-            css_vars=css_vars,
+        resolved_effective_css_vars = (
+            effective_css_vars
+            or cls._build_theme_compat_css_vars(
+                profile=profile,
+                css_vars=css_vars,
+            )
         )
         lines: list[str] = [
             "/* Managed by mOS workspace brand sync. */",
@@ -3444,7 +4315,9 @@ class ShopifyApiClient:
         lines.extend(["", ", ".join(profile.var_scope_selectors) + " {"])
         for key in sorted_keys:
             lines.append(f"  {key}: {resolved_effective_css_vars[key]} !important;")
-        lines.append(f'  --mos-workspace-name: "{cls._escape_css_string(workspace_name)}";')
+        lines.append(
+            f'  --mos-workspace-name: "{cls._escape_css_string(workspace_name)}";'
+        )
         lines.append(f'  --mos-brand-name: "{cls._escape_css_string(brand_name)}";')
         lines.append(f'  --mos-brand-logo-url: "{cls._escape_css_string(logo_url)}";')
         if data_theme:
@@ -3457,14 +4330,18 @@ class ShopifyApiClient:
             for selector in profile.var_scope_selectors:
                 if selector == ":root":
                     continue
-                theme_scoped_selectors.append(f'html[data-theme="{escaped_theme}"] {selector}')
+                theme_scoped_selectors.append(
+                    f'html[data-theme="{escaped_theme}"] {selector}'
+                )
             lines.append("")
             lines.append(", ".join(theme_scoped_selectors) + " {")
             for key in sorted_keys:
                 lines.append(f"  {key}: {resolved_effective_css_vars[key]} !important;")
             lines.append("}")
 
-        component_style_overrides = _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME.get(profile.theme_name, ())
+        component_style_overrides = _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME.get(
+            profile.theme_name, ()
+        )
         if component_style_overrides:
             lines.append("")
             lines.append("/* Managed theme component overrides. */")
@@ -3498,7 +4375,9 @@ class ShopifyApiClient:
             f'<meta name="mos-brand-logo-url" content="{escape(logo_url, quote=True)}">',
         ]
         if data_theme:
-            block_lines.append(f'<meta name="mos-data-theme" content="{escape(data_theme, quote=True)}">')
+            block_lines.append(
+                f'<meta name="mos-data-theme" content="{escape(data_theme, quote=True)}">'
+            )
         block_lines.append(_THEME_BRAND_MARKER_END)
         return "\n".join(block_lines)
 
@@ -3529,7 +4408,9 @@ class ShopifyApiClient:
         end_idx += len(_THEME_BRAND_MARKER_END)
 
         layout_without_block = f"{layout_content[:start_idx]}{layout_content[end_idx:]}"
-        head_close_match = re.search(r"</head\s*>", layout_without_block, flags=re.IGNORECASE)
+        head_close_match = re.search(
+            r"</head\s*>", layout_without_block, flags=re.IGNORECASE
+        )
         if head_close_match is None:
             raise ShopifyApiError(
                 message="Theme layout must include a closing </head> tag for managed brand sync.",
@@ -3548,16 +4429,22 @@ class ShopifyApiClient:
     @staticmethod
     def _coerce_theme_data(*, node: Any, query_name: str) -> dict[str, str]:
         if not isinstance(node, dict):
-            raise ShopifyApiError(message=f"{query_name} response is missing theme data.")
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing theme data."
+            )
         theme_id = node.get("id")
         theme_name = node.get("name")
         theme_role = node.get("role")
         if not isinstance(theme_id, str) or not theme_id:
             raise ShopifyApiError(message=f"{query_name} response is missing theme.id.")
         if not isinstance(theme_name, str) or not theme_name:
-            raise ShopifyApiError(message=f"{query_name} response is missing theme.name.")
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing theme.name."
+            )
         if not isinstance(theme_role, str) or not theme_role:
-            raise ShopifyApiError(message=f"{query_name} response is missing theme.role.")
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing theme.role."
+            )
         return {"id": theme_id, "name": theme_name, "role": theme_role}
 
     async def _resolve_theme_for_brand_sync(
@@ -3691,7 +4578,9 @@ class ShopifyApiClient:
         )
         theme = response.get("theme")
         if not isinstance(theme, dict):
-            raise ShopifyApiError(message=f"Theme not found for themeId={theme_id}.", status_code=404)
+            raise ShopifyApiError(
+                message=f"Theme not found for themeId={theme_id}.", status_code=404
+            )
         files = theme.get("files")
         if not isinstance(files, dict):
             raise ShopifyApiError(message="theme files query response is invalid.")
@@ -3710,10 +4599,14 @@ class ShopifyApiClient:
                 elif isinstance(errored_filename, str):
                     details.append(errored_filename)
             detail_text = "; ".join(details) if details else str(user_errors)
-            raise ShopifyApiError(message=f"theme files query failed: {detail_text}", status_code=409)
+            raise ShopifyApiError(
+                message=f"theme files query failed: {detail_text}", status_code=409
+            )
         nodes = files.get("nodes")
         if not isinstance(nodes, list):
-            raise ShopifyApiError(message="theme files query response is missing nodes.")
+            raise ShopifyApiError(
+                message="theme files query response is missing nodes."
+            )
 
         matched_node: dict[str, Any] | None = None
         for node in nodes:
@@ -3743,7 +4636,9 @@ class ShopifyApiClient:
             )
         content = body.get("content")
         if not isinstance(content, str):
-            raise ShopifyApiError(message=f"Theme file body content is missing for {filename}.")
+            raise ShopifyApiError(
+                message=f"Theme file body content is missing for {filename}."
+            )
         return content
 
     async def _list_theme_template_json_filenames(
@@ -3793,10 +4688,14 @@ class ShopifyApiClient:
             )
             theme = response.get("theme")
             if not isinstance(theme, dict):
-                raise ShopifyApiError(message=f"Theme not found for themeId={theme_id}.", status_code=404)
+                raise ShopifyApiError(
+                    message=f"Theme not found for themeId={theme_id}.", status_code=404
+                )
             files = theme.get("files")
             if not isinstance(files, dict):
-                raise ShopifyApiError(message="theme template files query response is invalid.")
+                raise ShopifyApiError(
+                    message="theme template files query response is invalid."
+                )
             user_errors = files.get("userErrors") or []
             if user_errors:
                 details: list[str] = []
@@ -3812,11 +4711,16 @@ class ShopifyApiClient:
                     elif isinstance(errored_filename, str):
                         details.append(errored_filename)
                 detail_text = "; ".join(details) if details else str(user_errors)
-                raise ShopifyApiError(message=f"theme template files query failed: {detail_text}", status_code=409)
+                raise ShopifyApiError(
+                    message=f"theme template files query failed: {detail_text}",
+                    status_code=409,
+                )
 
             nodes = files.get("nodes")
             if not isinstance(nodes, list):
-                raise ShopifyApiError(message="theme template files query response is missing nodes.")
+                raise ShopifyApiError(
+                    message="theme template files query response is missing nodes."
+                )
             for node in nodes:
                 if not isinstance(node, dict):
                     continue
@@ -3833,15 +4737,21 @@ class ShopifyApiClient:
 
             page_info = files.get("pageInfo")
             if not isinstance(page_info, dict):
-                raise ShopifyApiError(message="theme template files query response is missing pageInfo.")
+                raise ShopifyApiError(
+                    message="theme template files query response is missing pageInfo."
+                )
             has_next_page = page_info.get("hasNextPage")
             if not isinstance(has_next_page, bool):
-                raise ShopifyApiError(message="theme template files query response is missing pageInfo.hasNextPage.")
+                raise ShopifyApiError(
+                    message="theme template files query response is missing pageInfo.hasNextPage."
+                )
             if not has_next_page:
                 return sorted(template_filenames)
             end_cursor = page_info.get("endCursor")
             if not isinstance(end_cursor, str) or not end_cursor:
-                raise ShopifyApiError(message="theme template files query response is missing pageInfo.endCursor.")
+                raise ShopifyApiError(
+                    message="theme template files query response is missing pageInfo.endCursor."
+                )
             after = end_cursor
 
         raise ShopifyApiError(
@@ -3901,11 +4811,15 @@ class ShopifyApiClient:
         user_errors = upsert_data.get("userErrors") or []
         if user_errors:
             messages = "; ".join(str(error.get("message")) for error in user_errors)
-            raise ShopifyApiError(message=f"themeFilesUpsert failed: {messages}", status_code=409)
+            raise ShopifyApiError(
+                message=f"themeFilesUpsert failed: {messages}", status_code=409
+            )
 
         upserted = upsert_data.get("upsertedThemeFiles")
         if not isinstance(upserted, list):
-            raise ShopifyApiError(message="themeFilesUpsert response is missing upsertedThemeFiles.")
+            raise ShopifyApiError(
+                message="themeFilesUpsert response is missing upsertedThemeFiles."
+            )
         upserted_filenames = {
             item.get("filename")
             for item in upserted
@@ -3914,16 +4828,22 @@ class ShopifyApiClient:
         expected_filenames = {item["filename"] for item in files}
         if expected_filenames - upserted_filenames:
             missing = ", ".join(sorted(expected_filenames - upserted_filenames))
-            raise ShopifyApiError(message=f"themeFilesUpsert did not report updated files: {missing}")
+            raise ShopifyApiError(
+                message=f"themeFilesUpsert did not report updated files: {missing}"
+            )
 
         job = upsert_data.get("job")
         if job is None:
             return None
         if not isinstance(job, dict):
-            raise ShopifyApiError(message="themeFilesUpsert response returned invalid job metadata.")
+            raise ShopifyApiError(
+                message="themeFilesUpsert response returned invalid job metadata."
+            )
         job_id = job.get("id")
         if not isinstance(job_id, str) or not job_id:
-            raise ShopifyApiError(message="themeFilesUpsert response is missing job.id.")
+            raise ShopifyApiError(
+                message="themeFilesUpsert response is missing job.id."
+            )
         return job_id
 
     async def _wait_for_job_completion(
@@ -3951,10 +4871,14 @@ class ShopifyApiClient:
             )
             job = response.get("job")
             if not isinstance(job, dict):
-                raise ShopifyApiError(message=f"Job not found for id={job_id}.", status_code=404)
+                raise ShopifyApiError(
+                    message=f"Job not found for id={job_id}.", status_code=404
+                )
             done = job.get("done")
             if not isinstance(done, bool):
-                raise ShopifyApiError(message=f"Job response is missing done state for id={job_id}.")
+                raise ShopifyApiError(
+                    message=f"Job response is missing done state for id={job_id}."
+                )
             if done:
                 return
             await asyncio.sleep(poll_interval_seconds)
@@ -3970,8 +4894,14 @@ class ShopifyApiClient:
         theme_id: str | None,
         theme_name: str | None,
     ) -> tuple[str | None, str | None]:
-        normalized_theme_id = theme_id.strip() if isinstance(theme_id, str) and theme_id.strip() else None
-        normalized_theme_name = theme_name.strip() if isinstance(theme_name, str) and theme_name.strip() else None
+        normalized_theme_id = (
+            theme_id.strip() if isinstance(theme_id, str) and theme_id.strip() else None
+        )
+        normalized_theme_name = (
+            theme_name.strip()
+            if isinstance(theme_name, str) and theme_name.strip()
+            else None
+        )
         if bool(normalized_theme_id) == bool(normalized_theme_name):
             raise ShopifyApiError(
                 message="Exactly one of themeId or themeName is required.",
@@ -3985,7 +4915,9 @@ class ShopifyApiClient:
             return None
         cleaned_data_theme = data_theme.strip()
         if not cleaned_data_theme:
-            raise ShopifyApiError(message="dataTheme cannot be empty when provided.", status_code=400)
+            raise ShopifyApiError(
+                message="dataTheme cannot be empty when provided.", status_code=400
+            )
         if any(char in cleaned_data_theme for char in ('"', "'", "<", ">", "\n", "\r")):
             raise ShopifyApiError(
                 message="dataTheme contains unsupported characters.",
@@ -4022,7 +4954,11 @@ class ShopifyApiClient:
         start_count = layout_content.count(_THEME_BRAND_MARKER_START)
         end_count = layout_content.count(_THEME_BRAND_MARKER_END)
         has_marker_block = start_count == 1 and end_count == 1
-        asset_name = css_filename.split("/", 1)[1] if css_filename.startswith("assets/") else css_filename
+        asset_name = (
+            css_filename.split("/", 1)[1]
+            if css_filename.startswith("assets/")
+            else css_filename
+        )
         includes_css_asset = asset_name in layout_content
         return {
             "hasManagedMarkerBlock": has_marker_block,
@@ -4049,7 +4985,9 @@ class ShopifyApiClient:
                 message=f"Unable to determine uploaded logo filename from url={raw_url!r}.",
                 status_code=409,
             )
-        if any(char in filename for char in ('"', "'", "<", ">", "\n", "\r", "/", "\\")):
+        if any(
+            char in filename for char in ('"', "'", "<", ">", "\n", "\r", "/", "\\")
+        ):
             raise ShopifyApiError(
                 message=f"Uploaded logo filename contains unsupported characters: {filename!r}.",
                 status_code=409,
@@ -4078,7 +5016,9 @@ class ShopifyApiClient:
         response_content_type: str | None,
     ) -> tuple[str, str]:
         filename = cls._extract_filename_from_url_path(raw_url=source_url)
-        normalized_content_type = cls._normalize_http_content_type(value=response_content_type)
+        normalized_content_type = cls._normalize_http_content_type(
+            value=response_content_type
+        )
         guessed_content_type, _ = mimetypes.guess_type(filename)
         mime_type = normalized_content_type or guessed_content_type
         if not isinstance(mime_type, str):
@@ -4114,7 +5054,9 @@ class ShopifyApiClient:
         logo_url: str,
     ) -> tuple[bytes, str | None]:
         try:
-            async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
+            async with httpx.AsyncClient(
+                timeout=self._timeout, follow_redirects=True
+            ) as client:
                 response = await client.get(logo_url)
         except httpx.InvalidURL as exc:
             raise ShopifyApiError(
@@ -4122,7 +5064,10 @@ class ShopifyApiClient:
                 status_code=400,
             ) from exc
         except httpx.RequestError as exc:
-            raise ShopifyApiError(message=f"Network error while downloading logo source URL: {exc}", status_code=409) from exc
+            raise ShopifyApiError(
+                message=f"Network error while downloading logo source URL: {exc}",
+                status_code=409,
+            ) from exc
 
         if response.status_code >= 400:
             raise ShopifyApiError(
@@ -4145,7 +5090,9 @@ class ShopifyApiClient:
                 status_code=409,
             )
 
-        content_type = self._normalize_http_content_type(value=response.headers.get("Content-Type"))
+        content_type = self._normalize_http_content_type(
+            value=response.headers.get("Content-Type")
+        )
         return content, content_type
 
     async def _create_logo_staged_upload_target(
@@ -4292,7 +5239,10 @@ class ShopifyApiClient:
                 status_code=409,
             ) from exc
         except httpx.RequestError as exc:
-            raise ShopifyApiError(message=f"Network error while uploading logo to staged target: {exc}", status_code=409) from exc
+            raise ShopifyApiError(
+                message=f"Network error while uploading logo to staged target: {exc}",
+                status_code=409,
+            ) from exc
 
         if response.status_code >= 400:
             error_prefix = response.text[:300]
@@ -4305,7 +5255,9 @@ class ShopifyApiClient:
             )
 
     @staticmethod
-    def _coerce_staged_upload_form_data(*, parameters: list[tuple[str, str]]) -> dict[str, str]:
+    def _coerce_staged_upload_form_data(
+        *, parameters: list[tuple[str, str]]
+    ) -> dict[str, str]:
         form_data: dict[str, str] = {}
         for name, value in parameters:
             if name in form_data:
@@ -4320,12 +5272,16 @@ class ShopifyApiClient:
         return form_data
 
     @staticmethod
-    def _coerce_logo_file_node(*, node: Any) -> tuple[str | None, str | None, str | None, str | None]:
+    def _coerce_logo_file_node(
+        *, node: Any
+    ) -> tuple[str | None, str | None, str | None, str | None]:
         if not isinstance(node, dict):
             return None, None, None, None
         typename = node.get("__typename")
         file_id = node.get("id") if isinstance(node.get("id"), str) else None
-        file_status = node.get("fileStatus") if isinstance(node.get("fileStatus"), str) else None
+        file_status = (
+            node.get("fileStatus") if isinstance(node.get("fileStatus"), str) else None
+        )
 
         file_url: str | None = None
         if typename == "MediaImage":
@@ -4340,7 +5296,12 @@ class ShopifyApiClient:
                 if candidate:
                     file_url = candidate
 
-        return file_id, file_status, file_url, typename if isinstance(typename, str) else None
+        return (
+            file_id,
+            file_status,
+            file_url,
+            typename if isinstance(typename, str) else None,
+        )
 
     async def _wait_for_logo_file_ready_url(
         self,
@@ -4377,7 +5338,9 @@ class ShopifyApiClient:
                 payload={"query": query, "variables": {"id": file_id}},
             )
             node = response.get("node")
-            resolved_id, file_status, file_url, typename = self._coerce_logo_file_node(node=node)
+            resolved_id, file_status, file_url, typename = self._coerce_logo_file_node(
+                node=node
+            )
             if resolved_id is None or resolved_id != file_id:
                 raise ShopifyApiError(
                     message=f"Logo upload status query returned an unexpected file node for id={file_id}.",
@@ -4421,17 +5384,21 @@ class ShopifyApiClient:
         access_token: str,
         logo_url: str,
     ) -> str:
-        logo_content, response_content_type = await self._download_logo_source_file(logo_url=logo_url)
+        logo_content, response_content_type = await self._download_logo_source_file(
+            logo_url=logo_url
+        )
         upload_filename, upload_mime_type = self._resolve_logo_upload_metadata(
             source_url=logo_url,
             response_content_type=response_content_type,
         )
-        upload_url, resource_url, upload_parameters = await self._create_logo_staged_upload_target(
-            shop_domain=shop_domain,
-            access_token=access_token,
-            filename=upload_filename,
-            mime_type=upload_mime_type,
-            file_size=len(logo_content),
+        upload_url, resource_url, upload_parameters = (
+            await self._create_logo_staged_upload_target(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                filename=upload_filename,
+                mime_type=upload_mime_type,
+                file_size=len(logo_content),
+            )
         )
         await self._upload_logo_file_to_staged_target(
             upload_url=upload_url,
@@ -4484,7 +5451,10 @@ class ShopifyApiClient:
         )
         create_data = response.get("fileCreate")
         if not isinstance(create_data, dict):
-            raise ShopifyApiError(message="fileCreate response is missing fileCreate payload.", status_code=409)
+            raise ShopifyApiError(
+                message="fileCreate response is missing fileCreate payload.",
+                status_code=409,
+            )
         user_errors = create_data.get("userErrors") or []
         if user_errors:
             details: list[str] = []
@@ -4500,12 +5470,20 @@ class ShopifyApiClient:
                 elif isinstance(code, str):
                     details.append(code)
             detail_text = "; ".join(details) if details else str(user_errors)
-            raise ShopifyApiError(message=f"fileCreate failed while uploading logo: {detail_text}", status_code=409)
+            raise ShopifyApiError(
+                message=f"fileCreate failed while uploading logo: {detail_text}",
+                status_code=409,
+            )
 
         files = create_data.get("files")
         if not isinstance(files, list) or not files:
-            raise ShopifyApiError(message="fileCreate response did not return uploaded files.", status_code=409)
-        file_id, file_status, file_url, typename = self._coerce_logo_file_node(node=files[0])
+            raise ShopifyApiError(
+                message="fileCreate response did not return uploaded files.",
+                status_code=409,
+            )
+        file_id, file_status, file_url, typename = self._coerce_logo_file_node(
+            node=files[0]
+        )
         if file_id is None:
             raise ShopifyApiError(
                 message="fileCreate response is missing uploaded file id for logo.",
@@ -4519,7 +5497,9 @@ class ShopifyApiClient:
                 ),
                 status_code=409,
             )
-        normalized_status = file_status.strip().upper() if isinstance(file_status, str) else ""
+        normalized_status = (
+            file_status.strip().upper() if isinstance(file_status, str) else ""
+        )
         if normalized_status == "READY" and isinstance(file_url, str):
             return self._build_shopify_logo_reference_from_file_url(file_url=file_url)
         if normalized_status in {"FAILED", "ERROR"}:
@@ -4547,16 +5527,22 @@ class ShopifyApiClient:
         logo_url: str,
         css_vars: dict[str, str],
         font_urls: list[str],
+        component_image_urls: dict[str, str] | None = None,
+        auto_component_image_urls: list[str] | None = None,
         data_theme: str | None = None,
         theme_id: str | None = None,
         theme_name: str | None = None,
     ) -> dict[str, Any]:
         cleaned_workspace_name = workspace_name.strip()
         if not cleaned_workspace_name:
-            raise ShopifyApiError(message="workspaceName must be a non-empty string.", status_code=400)
+            raise ShopifyApiError(
+                message="workspaceName must be a non-empty string.", status_code=400
+            )
         cleaned_brand_name = brand_name.strip()
         if not cleaned_brand_name:
-            raise ShopifyApiError(message="brandName must be a non-empty string.", status_code=400)
+            raise ShopifyApiError(
+                message="brandName must be a non-empty string.", status_code=400
+            )
         cleaned_logo_url = logo_url.strip()
         if not (
             self._is_shopify_file_url(value=cleaned_logo_url)
@@ -4579,7 +5565,10 @@ class ShopifyApiClient:
             )
         if not self._is_shopify_file_url(value=cleaned_logo_url):
             parsed_logo_url = urlparse(cleaned_logo_url)
-            if parsed_logo_url.scheme not in {"http", "https"} or not parsed_logo_url.netloc:
+            if (
+                parsed_logo_url.scheme not in {"http", "https"}
+                or not parsed_logo_url.netloc
+            ):
                 raise ShopifyApiError(
                     message="logoUrl must be a valid absolute http(s) URL.",
                     status_code=400,
@@ -4587,6 +5576,14 @@ class ShopifyApiClient:
 
         normalized_css_vars = self._normalize_theme_brand_css_vars(css_vars)
         normalized_font_urls = self._normalize_theme_brand_font_urls(font_urls)
+        normalized_component_image_urls = self._normalize_theme_component_image_urls(
+            component_image_urls=component_image_urls
+        )
+        normalized_auto_component_image_urls = (
+            self._normalize_theme_auto_component_image_urls(
+                auto_component_image_urls=auto_component_image_urls
+            )
+        )
         cleaned_data_theme = self._normalize_theme_data_theme(data_theme)
         normalized_theme_id, normalized_theme_name = self._normalize_theme_selector(
             theme_id=theme_id,
@@ -4599,7 +5596,9 @@ class ShopifyApiClient:
             theme_name=normalized_theme_name,
         )
         profile = self._resolve_theme_brand_profile(theme_name=theme["name"])
-        self._assert_theme_brand_profile_supported(theme_name=theme["name"], profile=profile)
+        self._assert_theme_brand_profile_supported(
+            theme_name=theme["name"], profile=profile
+        )
         effective_css_vars = self._build_theme_compat_css_vars(
             profile=profile,
             css_vars=normalized_css_vars,
@@ -4633,40 +5632,73 @@ class ShopifyApiClient:
             )
         settings_logo_url: str | None = None
         if settings_content is not None and profile.settings_value_paths:
-            parsed_settings_for_logo = self._parse_theme_settings_json(settings_content=settings_content)
-            if self._theme_settings_has_logo_fields(settings_data=parsed_settings_for_logo):
+            parsed_settings_for_logo = self._parse_theme_settings_json(
+                settings_content=settings_content
+            )
+            if self._theme_settings_has_logo_fields(
+                settings_data=parsed_settings_for_logo
+            ):
                 if self._is_shopify_file_url(value=cleaned_logo_url):
                     settings_logo_url = cleaned_logo_url
                 else:
-                    settings_logo_url = await self._create_shopify_logo_file_reference_from_url(
-                        shop_domain=shop_domain,
-                        access_token=access_token,
-                        logo_url=cleaned_logo_url,
+                    settings_logo_url = (
+                        await self._create_shopify_logo_file_reference_from_url(
+                            shop_domain=shop_domain,
+                            access_token=access_token,
+                            logo_url=cleaned_logo_url,
+                        )
                     )
 
-        template_settings_contents: dict[str, str] = {}
-        if self._is_theme_component_settings_sync_enabled_for_profile(profile=profile):
-            template_filenames = await self._list_theme_template_json_filenames(
+        should_list_theme_templates = bool(normalized_auto_component_image_urls) or (
+            self._is_theme_component_settings_sync_enabled_for_profile(profile=profile)
+        )
+        template_filenames_for_color_sync: set[str] = set()
+        template_filenames_for_auto_component_image_sync: set[str] = set()
+        template_filenames_to_load: set[str] = set()
+        listed_template_filenames: list[str] = []
+        if should_list_theme_templates:
+            listed_template_filenames = await self._list_theme_template_json_filenames(
                 shop_domain=shop_domain,
                 access_token=access_token,
                 theme_id=theme["id"],
             )
-            if template_filenames:
-                template_contents = await asyncio.gather(
-                    *[
-                        self._load_theme_file_text(
-                            shop_domain=shop_domain,
-                            access_token=access_token,
-                            theme_id=theme["id"],
-                            filename=template_filename,
-                        )
-                        for template_filename in template_filenames
-                    ]
+        if self._is_theme_component_settings_sync_enabled_for_profile(profile=profile):
+            template_filenames_for_color_sync = set(listed_template_filenames)
+            template_filenames_to_load.update(template_filenames_for_color_sync)
+        if normalized_auto_component_image_urls:
+            template_filenames_for_auto_component_image_sync = set(
+                listed_template_filenames
+            )
+            template_filenames_to_load.update(
+                template_filenames_for_auto_component_image_sync
+            )
+        component_image_urls_by_template = (
+            self._group_theme_component_image_urls_by_template(
+                component_image_urls=normalized_component_image_urls
+            )
+        )
+        template_filenames_to_load.update(component_image_urls_by_template.keys())
+
+        template_settings_contents: dict[str, str] = {}
+        if template_filenames_to_load:
+            sorted_template_filenames = sorted(template_filenames_to_load)
+            template_contents = await asyncio.gather(
+                *[
+                    self._load_theme_file_text(
+                        shop_domain=shop_domain,
+                        access_token=access_token,
+                        theme_id=theme["id"],
+                        filename=template_filename,
+                    )
+                    for template_filename in sorted_template_filenames
+                ]
+            )
+            template_settings_contents = {
+                template_filename: template_content
+                for template_filename, template_content in zip(
+                    sorted_template_filenames, template_contents, strict=True
                 )
-                template_settings_contents = {
-                    template_filename: template_content
-                    for template_filename, template_content in zip(template_filenames, template_contents, strict=True)
-                }
+            }
 
         workspace_slug = self._normalize_workspace_slug(cleaned_workspace_name)
         css_filename = f"assets/{workspace_slug}-workspace-brand.css"
@@ -4692,7 +5724,9 @@ class ShopifyApiClient:
             effective_css_vars=effective_css_vars,
         )
         settings_sync = {
-            "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None,
+            "settingsFilename": (
+                _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None
+            ),
             "expectedPaths": sorted(profile.settings_value_paths.keys()),
             "updatedPaths": [],
             "missingPaths": [],
@@ -4711,20 +5745,30 @@ class ShopifyApiClient:
                 logo_url=settings_logo_url,
             )
 
-        template_files_to_upsert: list[dict[str, str]] = []
+        next_template_contents: dict[str, str] = dict(template_settings_contents)
         template_semantic_updated_paths: list[str] = []
         template_unmapped_color_paths: list[str] = []
-        for template_filename, template_content in template_settings_contents.items():
-            next_template_content, template_sync = self._sync_theme_template_color_settings_data(
-                profile=profile,
-                template_filename=template_filename,
-                template_content=template_content,
-                effective_css_vars=effective_css_vars,
+        for template_filename in sorted(template_filenames_for_color_sync):
+            template_content = next_template_contents.get(template_filename)
+            if template_content is None:
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template file required for semantic color sync was not loaded. "
+                        f"filename={template_filename}."
+                    ),
+                    status_code=404,
+                )
+            next_template_content, template_sync = (
+                self._sync_theme_template_color_settings_data(
+                    profile=profile,
+                    template_filename=template_filename,
+                    template_content=template_content,
+                    effective_css_vars=effective_css_vars,
+                )
             )
             template_semantic_updated_paths.extend(template_sync["updatedPaths"])
             template_unmapped_color_paths.extend(template_sync["unmappedColorPaths"])
-            if next_template_content != template_content:
-                template_files_to_upsert.append({"filename": template_filename, "content": next_template_content})
+            next_template_contents[template_filename] = next_template_content
 
         template_unmapped_color_paths = sorted(set(template_unmapped_color_paths))
         if template_unmapped_color_paths:
@@ -4735,6 +5779,107 @@ class ShopifyApiClient:
                     "Add semantic mappings in _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME."
                 ),
                 status_code=422,
+            )
+
+        auto_component_image_urls_by_setting_path = (
+            self._build_auto_theme_component_image_urls(
+                template_filenames=template_filenames_for_auto_component_image_sync,
+                template_contents_by_filename=next_template_contents,
+                explicit_component_image_urls=normalized_component_image_urls,
+                auto_component_image_urls=normalized_auto_component_image_urls,
+            )
+        )
+        all_component_image_urls = dict(normalized_component_image_urls)
+        all_component_image_urls.update(auto_component_image_urls_by_setting_path)
+        component_image_urls_by_template = (
+            self._group_theme_component_image_urls_by_template(
+                component_image_urls=all_component_image_urls
+            )
+        )
+
+        template_component_image_missing_paths: list[str] = []
+        for (
+            template_filename,
+            component_image_map,
+        ) in component_image_urls_by_template.items():
+            template_content = next_template_contents.get(template_filename)
+            if template_content is None:
+                raise ShopifyApiError(
+                    message=f"Theme template file not found for component image sync: {template_filename}",
+                    status_code=404,
+                )
+            _, validation_sync = (
+                self._sync_theme_template_component_image_settings_data(
+                    template_filename=template_filename,
+                    template_content=template_content,
+                    component_image_urls_by_path=component_image_map,
+                )
+            )
+            template_component_image_missing_paths.extend(
+                validation_sync["missingPaths"]
+            )
+
+        template_component_image_missing_paths = sorted(
+            set(template_component_image_missing_paths)
+        )
+        if template_component_image_missing_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Theme template component image sync could not update mapped paths: "
+                    f"{', '.join(template_component_image_missing_paths)}."
+                ),
+                status_code=409,
+            )
+
+        if component_image_urls_by_template:
+            uploaded_component_image_url_cache: dict[str, str] = {}
+            for (
+                template_filename,
+                component_image_map,
+            ) in component_image_urls_by_template.items():
+                template_content = next_template_contents[template_filename]
+                resolved_component_image_map: dict[str, str] = {}
+                for setting_path, component_image_url in component_image_map.items():
+                    resolved_component_image_url = (
+                        uploaded_component_image_url_cache.get(component_image_url)
+                    )
+                    if resolved_component_image_url is None:
+                        if self._is_shopify_file_url(value=component_image_url):
+                            resolved_component_image_url = component_image_url
+                        else:
+                            resolved_component_image_url = (
+                                await self._create_shopify_logo_file_reference_from_url(
+                                    shop_domain=shop_domain,
+                                    access_token=access_token,
+                                    logo_url=component_image_url,
+                                )
+                            )
+                        uploaded_component_image_url_cache[component_image_url] = (
+                            resolved_component_image_url
+                        )
+                    resolved_component_image_map[setting_path] = (
+                        resolved_component_image_url
+                    )
+
+                next_template_content, _ = (
+                    self._sync_theme_template_component_image_settings_data(
+                        template_filename=template_filename,
+                        template_content=template_content,
+                        component_image_urls_by_path=resolved_component_image_map,
+                    )
+                )
+                next_template_contents[template_filename] = next_template_content
+
+        template_files_to_upsert: list[dict[str, str]] = []
+        for (
+            template_filename,
+            original_template_content,
+        ) in template_settings_contents.items():
+            next_template_content = next_template_contents[template_filename]
+            if next_template_content == original_template_content:
+                continue
+            template_files_to_upsert.append(
+                {"filename": template_filename, "content": next_template_content}
             )
 
         settings_sync["semanticUpdatedPaths"] = sorted(
@@ -4749,7 +5894,12 @@ class ShopifyApiClient:
             {"filename": css_filename, "content": css_content},
         ]
         if next_settings_content is not None:
-            files_to_upsert.append({"filename": _THEME_BRAND_SETTINGS_FILENAME, "content": next_settings_content})
+            files_to_upsert.append(
+                {
+                    "filename": _THEME_BRAND_SETTINGS_FILENAME,
+                    "content": next_settings_content,
+                }
+            )
         files_to_upsert.extend(template_files_to_upsert)
         job_id = await self._upsert_theme_files(
             shop_domain=shop_domain,
@@ -4770,7 +5920,9 @@ class ShopifyApiClient:
             "themeRole": theme["role"],
             "layoutFilename": _THEME_BRAND_LAYOUT_FILENAME,
             "cssFilename": css_filename,
-            "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None,
+            "settingsFilename": (
+                _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None
+            ),
             "jobId": job_id,
             "coverage": coverage,
             "settingsSync": settings_sync,
@@ -4789,7 +5941,9 @@ class ShopifyApiClient:
     ) -> dict[str, Any]:
         cleaned_workspace_name = workspace_name.strip()
         if not cleaned_workspace_name:
-            raise ShopifyApiError(message="workspaceName must be a non-empty string.", status_code=400)
+            raise ShopifyApiError(
+                message="workspaceName must be a non-empty string.", status_code=400
+            )
         normalized_css_vars = self._normalize_theme_brand_css_vars(css_vars)
         self._normalize_theme_data_theme(data_theme)
         normalized_theme_id, normalized_theme_name = self._normalize_theme_selector(
@@ -4804,7 +5958,9 @@ class ShopifyApiClient:
         )
 
         profile = self._resolve_theme_brand_profile(theme_name=theme["name"])
-        self._assert_theme_brand_profile_supported(theme_name=theme["name"], profile=profile)
+        self._assert_theme_brand_profile_supported(
+            theme_name=theme["name"], profile=profile
+        )
         effective_css_vars = self._build_theme_compat_css_vars(
             profile=profile,
             css_vars=normalized_css_vars,
@@ -4860,10 +6016,14 @@ class ShopifyApiClient:
                 )
                 template_settings_contents = {
                     template_filename: template_content
-                    for template_filename, template_content in zip(template_filenames, template_contents, strict=True)
+                    for template_filename, template_content in zip(
+                        template_filenames, template_contents, strict=True
+                    )
                 }
         settings_audit = {
-            "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None,
+            "settingsFilename": (
+                _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None
+            ),
             "expectedPaths": sorted(profile.settings_value_paths.keys()),
             "syncedPaths": [],
             "mismatchedPaths": [],
@@ -4885,7 +6045,9 @@ class ShopifyApiClient:
             )
         elif settings_content is None and profile.settings_value_paths:
             settings_audit["missingPaths"] = sorted(profile.settings_value_paths.keys())
-            settings_audit["requiredMissingPaths"] = sorted(profile.required_settings_paths)
+            settings_audit["requiredMissingPaths"] = sorted(
+                profile.required_settings_paths
+            )
 
         template_semantic_synced_paths: list[str] = []
         template_semantic_mismatched_paths: list[str] = []
@@ -4905,7 +6067,10 @@ class ShopifyApiClient:
             set(settings_audit["semanticSyncedPaths"] + template_semantic_synced_paths)
         )
         settings_audit["semanticMismatchedPaths"] = sorted(
-            set(settings_audit["semanticMismatchedPaths"] + template_semantic_mismatched_paths)
+            set(
+                settings_audit["semanticMismatchedPaths"]
+                + template_semantic_mismatched_paths
+            )
         )
         settings_audit["unmappedColorPaths"] = sorted(
             set(settings_audit["unmappedColorPaths"] + template_unmapped_color_paths)
@@ -4932,7 +6097,9 @@ class ShopifyApiClient:
             "cssFilename": css_filename,
             "settingsFilename": settings_audit["settingsFilename"],
             "hasManagedMarkerBlock": layout_audit["hasManagedMarkerBlock"],
-            "layoutIncludesManagedCssAsset": layout_audit["layoutIncludesManagedCssAsset"],
+            "layoutIncludesManagedCssAsset": layout_audit[
+                "layoutIncludesManagedCssAsset"
+            ],
             "managedCssAssetExists": css_content is not None,
             "coverage": coverage,
             "settingsAudit": settings_audit,
@@ -4976,9 +6143,13 @@ class ShopifyApiClient:
         data = response.get("data")
         errors = response.get("errors")
         if errors:
-            raise ShopifyApiError(message=f"Storefront GraphQL errors: {errors}", status_code=409)
+            raise ShopifyApiError(
+                message=f"Storefront GraphQL errors: {errors}", status_code=409
+            )
         if not isinstance(data, dict):
-            raise ShopifyApiError(message="Storefront GraphQL response is missing data", status_code=409)
+            raise ShopifyApiError(
+                message="Storefront GraphQL response is missing data", status_code=409
+            )
         return data
 
     async def _post_json(
@@ -4992,7 +6163,9 @@ class ShopifyApiClient:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 response = await client.post(url, json=payload, headers=headers)
         except httpx.RequestError as exc:
-            raise ShopifyApiError(message=f"Network error while calling Shopify: {exc}") from exc
+            raise ShopifyApiError(
+                message=f"Network error while calling Shopify: {exc}"
+            ) from exc
 
         if response.status_code >= 400:
             raise ShopifyApiError(

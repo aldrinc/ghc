@@ -117,6 +117,8 @@ class ShopifyThemeBrandSyncRequest(BaseModel):
 
     shopDomain: str | None = None
     designSystemId: str | None = Field(default=None, min_length=1)
+    productId: str | None = Field(default=None, min_length=1)
+    componentImageAssetMap: dict[str, str] = Field(default_factory=dict)
     themeId: str | None = None
     themeName: str | None = None
 

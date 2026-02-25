@@ -62,6 +62,8 @@ export type ClientShopifyCreateProductResponse = {
 
 export type ClientShopifyThemeBrandSyncPayload = {
   designSystemId?: string;
+  productId?: string;
+  componentImageAssetMap?: Record<string, string>;
   shopDomain?: string;
   themeId?: string;
   themeName?: string;

@@ -6,7 +6,9 @@ from fastapi import HTTPException
 def test_status_not_connected(monkeypatch):
     monkeypatch.setattr(shopify_connection, "list_shopify_installations", lambda: [])
 
-    status = shopify_connection.get_client_shopify_connection_status(client_id="client_1")
+    status = shopify_connection.get_client_shopify_connection_status(
+        client_id="client_1"
+    )
 
     assert status["state"] == "not_connected"
     assert status["shopDomain"] is None
@@ -37,7 +39,9 @@ def test_status_missing_storefront_token(monkeypatch):
         ],
     )
 
-    status = shopify_connection.get_client_shopify_connection_status(client_id="client_1")
+    status = shopify_connection.get_client_shopify_connection_status(
+        client_id="client_1"
+    )
 
     assert status["state"] == "installed_missing_storefront_token"
     assert status["shopDomain"] == "example.myshopify.com"
@@ -67,7 +71,9 @@ def test_status_multiple_installations_conflict(monkeypatch):
         ],
     )
 
-    status = shopify_connection.get_client_shopify_connection_status(client_id="client_1")
+    status = shopify_connection.get_client_shopify_connection_status(
+        client_id="client_1"
+    )
 
     assert status["state"] == "multiple_installations_conflict"
     assert status["shopDomains"] == ["one.myshopify.com", "two.myshopify.com"]
@@ -140,7 +146,9 @@ def test_status_missing_scopes_returns_error(monkeypatch):
         ],
     )
 
-    status = shopify_connection.get_client_shopify_connection_status(client_id="client_1")
+    status = shopify_connection.get_client_shopify_connection_status(
+        client_id="client_1"
+    )
 
     assert status["state"] == "error"
     assert "write_products" in status["missingScopes"]
@@ -171,7 +179,9 @@ def test_status_ready(monkeypatch):
         ],
     )
 
-    status = shopify_connection.get_client_shopify_connection_status(client_id="client_1")
+    status = shopify_connection.get_client_shopify_connection_status(
+        client_id="client_1"
+    )
 
     assert status["state"] == "ready"
     assert status["shopDomain"] == "example.myshopify.com"
@@ -201,7 +211,9 @@ def test_status_write_scopes_imply_read_scopes(monkeypatch):
         ],
     )
 
-    status = shopify_connection.get_client_shopify_connection_status(client_id="client_1")
+    status = shopify_connection.get_client_shopify_connection_status(
+        client_id="client_1"
+    )
 
     assert status["state"] == "ready"
     assert status["missingScopes"] == []
@@ -226,7 +238,9 @@ def test_list_client_shopify_products_parses_response(monkeypatch):
 
     monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
 
-    response = shopify_connection.list_client_shopify_products(client_id="client_1", query="alp", limit=20)
+    response = shopify_connection.list_client_shopify_products(
+        client_id="client_1", query="alp", limit=20
+    )
 
     assert response["shopDomain"] == "example.myshopify.com"
     assert response["products"][0]["productGid"] == "gid://shopify/Product/1"
@@ -239,7 +253,9 @@ def test_list_client_shopify_products_rejects_out_of_range_limit():
         assert exc.status_code == 400
         assert exc.detail == "limit must be between 1 and 50."
     else:
-        raise AssertionError("Expected list_client_shopify_products to reject invalid limit")
+        raise AssertionError(
+            "Expected list_client_shopify_products to reject invalid limit"
+        )
 
 
 def test_get_client_shopify_product_parses_response(monkeypatch):
@@ -297,7 +313,9 @@ def test_get_client_shopify_product_rejects_invalid_product_gid():
         assert exc.status_code == 400
         assert exc.detail == "productGid must be a Shopify product GID."
     else:
-        raise AssertionError("Expected get_client_shopify_product to reject invalid product gid")
+        raise AssertionError(
+            "Expected get_client_shopify_product to reject invalid product gid"
+        )
 
 
 def test_create_client_shopify_product_parses_response(monkeypatch):
@@ -406,7 +424,9 @@ def test_update_client_shopify_variant_rejects_invalid_fields():
         assert exc.status_code == 400
         assert "Unsupported Shopify variant update fields" in exc.detail
     else:
-        raise AssertionError("Expected update_client_shopify_variant to reject unsupported fields")
+        raise AssertionError(
+            "Expected update_client_shopify_variant to reject unsupported fields"
+        )
 
 
 def test_update_client_shopify_variant_rejects_invalid_inventory_management():
@@ -420,7 +440,9 @@ def test_update_client_shopify_variant_rejects_invalid_inventory_management():
         assert exc.status_code == 400
         assert "inventoryManagement must be null or 'shopify'" in exc.detail
     else:
-        raise AssertionError("Expected update_client_shopify_variant to reject invalid inventoryManagement")
+        raise AssertionError(
+            "Expected update_client_shopify_variant to reject invalid inventoryManagement"
+        )
 
 
 def test_disconnect_client_shopify_store_unlinks_workspace(monkeypatch):
@@ -482,9 +504,14 @@ def test_disconnect_client_shopify_store_requires_matching_workspace(monkeypatch
         )
     except HTTPException as exc:
         assert exc.status_code == 409
-        assert exc.detail == "This Shopify store is not connected to this workspace. connectedWorkspaceId=client_other"
+        assert (
+            exc.detail
+            == "This Shopify store is not connected to this workspace. connectedWorkspaceId=client_other"
+        )
     else:
-        raise AssertionError("Expected disconnect_client_shopify_store to reject mismatched workspace")
+        raise AssertionError(
+            "Expected disconnect_client_shopify_store to reject mismatched workspace"
+        )
 
 
 def test_upsert_client_shopify_policy_pages_parses_response(monkeypatch):
@@ -528,12 +555,16 @@ def test_upsert_client_shopify_policy_pages_parses_response(monkeypatch):
 
 def test_upsert_client_shopify_policy_pages_rejects_empty_pages():
     try:
-        shopify_connection.upsert_client_shopify_policy_pages(client_id="client_1", pages=[])
+        shopify_connection.upsert_client_shopify_policy_pages(
+            client_id="client_1", pages=[]
+        )
     except HTTPException as exc:
         assert exc.status_code == 400
         assert exc.detail == "pages must contain at least one policy page."
     else:
-        raise AssertionError("Expected upsert_client_shopify_policy_pages to reject empty pages")
+        raise AssertionError(
+            "Expected upsert_client_shopify_policy_pages to reject empty pages"
+        )
 
 
 def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
@@ -546,6 +577,13 @@ def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
         assert json_body["themeName"] == "futrgroup2-0theme"
         assert json_body["logoUrl"] == "https://assets.example.com/public/assets/logo-1"
         assert json_body["cssVars"]["--color-brand"] == "#123456"
+        assert json_body["componentImageUrls"] == {
+            "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-image-1",
+        }
+        assert json_body["autoComponentImageUrls"] == [
+            "https://assets.example.com/public/assets/product-image-1",
+            "https://assets.example.com/public/assets/product-image-2",
+        ]
         return {
             "shopDomain": "example.myshopify.com",
             "themeId": "gid://shopify/OnlineStoreTheme/1",
@@ -582,8 +620,17 @@ def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
         brand_name="Acme",
         logo_url="https://assets.example.com/public/assets/logo-1",
         css_vars={"--color-brand": "#123456"},
-        font_urls=["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
+        font_urls=[
+            "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+        ],
         data_theme="light",
+        component_image_urls={
+            "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-image-1",
+        },
+        auto_component_image_urls=[
+            "https://assets.example.com/public/assets/product-image-1",
+            "https://assets.example.com/public/assets/product-image-2",
+        ],
         theme_name="futrgroup2-0theme",
     )
 
@@ -630,7 +677,56 @@ def test_sync_client_shopify_theme_brand_rejects_invalid_css_key():
         assert exc.status_code == 400
         assert "cssVars keys must be valid CSS custom properties" in exc.detail
     else:
-        raise AssertionError("Expected sync_client_shopify_theme_brand to reject invalid cssVars keys")
+        raise AssertionError(
+            "Expected sync_client_shopify_theme_brand to reject invalid cssVars keys"
+        )
+
+
+def test_sync_client_shopify_theme_brand_rejects_invalid_component_image_path():
+    try:
+        shopify_connection.sync_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"--color-brand": "#123456"},
+            component_image_urls={
+                "current.sections.hero.settings.image": "https://assets.example.com/public/assets/1"
+            },
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert (
+            "componentImageUrls keys must target template or section JSON files"
+            in exc.detail
+        )
+    else:
+        raise AssertionError(
+            "Expected sync_client_shopify_theme_brand to reject invalid componentImageUrls keys"
+        )
+
+
+def test_sync_client_shopify_theme_brand_rejects_invalid_auto_component_image_url():
+    try:
+        shopify_connection.sync_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"--color-brand": "#123456"},
+            auto_component_image_urls=["/relative/path.png"],
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert (
+            "autoComponentImageUrls entries must be absolute http(s) URLs" in exc.detail
+        )
+    else:
+        raise AssertionError(
+            "Expected sync_client_shopify_theme_brand to reject invalid autoComponentImageUrls"
+        )
 
 
 def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
@@ -820,4 +916,6 @@ def test_audit_client_shopify_theme_brand_rejects_invalid_marker_flag(monkeypatc
         assert exc.status_code == 502
         assert "invalid hasManagedMarkerBlock" in exc.detail
     else:
-        raise AssertionError("Expected audit_client_shopify_theme_brand to reject invalid marker flag")
+        raise AssertionError(
+            "Expected audit_client_shopify_theme_brand to reject invalid marker flag"
+        )

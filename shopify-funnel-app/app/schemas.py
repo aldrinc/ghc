@@ -257,6 +257,8 @@ class SyncThemeBrandRequest(BaseModel):
     logoUrl: str = Field(min_length=1)
     cssVars: dict[str, str] = Field(default_factory=dict, min_length=1)
     fontUrls: list[str] = Field(default_factory=list)
+    componentImageUrls: dict[str, str] = Field(default_factory=dict)
+    autoComponentImageUrls: list[str] = Field(default_factory=list)
     dataTheme: str | None = None
     themeId: str | None = None
     themeName: str | None = None

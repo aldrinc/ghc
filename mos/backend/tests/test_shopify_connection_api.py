@@ -25,7 +25,9 @@ def test_get_shopify_status_returns_service_payload(api_client, monkeypatch):
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
 
     response = api_client.get(f"/clients/{client_id}/shopify/status")
 
@@ -53,15 +55,21 @@ def test_create_shopify_install_url_returns_url(api_client, monkeypatch):
 
     assert response.status_code == 200
     assert observed == {"client_id": client_id, "shop_domain": "example.myshopify.com"}
-    assert response.json()["installUrl"].startswith("https://shopify-bridge.local/auth/install")
+    assert response.json()["installUrl"].startswith(
+        "https://shopify-bridge.local/auth/install"
+    )
 
 
-def test_update_shopify_installation_sets_token_and_returns_status(api_client, monkeypatch):
+def test_update_shopify_installation_sets_token_and_returns_status(
+    api_client, monkeypatch
+):
     client_id = _create_client(api_client)
 
     observed: dict[str, str] = {}
 
-    def fake_set_token(*, client_id: str, shop_domain: str, storefront_access_token: str) -> None:
+    def fake_set_token(
+        *, client_id: str, shop_domain: str, storefront_access_token: str
+    ) -> None:
         observed["client_id"] = client_id
         observed["shop_domain"] = shop_domain
         observed["storefront_access_token"] = storefront_access_token
@@ -77,12 +85,19 @@ def test_update_shopify_installation_sets_token_and_returns_status(api_client, m
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(clients_router, "set_client_shopify_storefront_token", fake_set_token)
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "set_client_shopify_storefront_token", fake_set_token
+    )
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
 
     response = api_client.patch(
         f"/clients/{client_id}/shopify/installation",
-        json={"shopDomain": "example.myshopify.com", "storefrontAccessToken": "shptka_123"},
+        json={
+            "shopDomain": "example.myshopify.com",
+            "storefrontAccessToken": "shptka_123",
+        },
     )
 
     assert response.status_code == 200
@@ -94,7 +109,9 @@ def test_update_shopify_installation_sets_token_and_returns_status(api_client, m
     assert response.json()["state"] == "installed_missing_storefront_token"
 
 
-def test_disconnect_shopify_installation_unlinks_workspace_and_returns_status(api_client, monkeypatch):
+def test_disconnect_shopify_installation_unlinks_workspace_and_returns_status(
+    api_client, monkeypatch
+):
     client_id = _create_client(api_client)
 
     observed: dict[str, str] = {}
@@ -114,8 +131,12 @@ def test_disconnect_shopify_installation_unlinks_workspace_and_returns_status(ap
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(clients_router, "disconnect_client_shopify_store", fake_disconnect)
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "disconnect_client_shopify_store", fake_disconnect
+    )
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
 
     response = api_client.request(
         method="DELETE",
@@ -136,7 +157,9 @@ def test_list_shopify_products_returns_products(api_client, monkeypatch):
 
     observed: dict[str, object] = {}
 
-    def fake_list(*, client_id: str, query: str | None, limit: int, shop_domain: str | None):
+    def fake_list(
+        *, client_id: str, query: str | None, limit: int, shop_domain: str | None
+    ):
         observed["client_id"] = client_id
         observed["query"] = query
         observed["limit"] = limit
@@ -198,8 +221,12 @@ def test_set_default_shop_updates_status(api_client, monkeypatch):
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(clients_router, "list_shopify_installations", fake_installations)
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "list_shopify_installations", fake_installations
+    )
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
 
     response = api_client.put(
         f"/clients/{client_id}/shopify/default-shop",
@@ -260,7 +287,9 @@ def test_create_shopify_product_returns_created_payload(api_client, monkeypatch)
             ],
         }
 
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
     monkeypatch.setattr(clients_router, "create_client_shopify_product", fake_create)
 
     response = api_client.post(
@@ -295,7 +324,9 @@ def test_create_shopify_product_requires_ready_connection(api_client, monkeypatc
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/products",
@@ -344,13 +375,17 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
         assert tokens == {"placeholder": True}
         return {
             "dataTheme": "light",
-            "fontUrls": ["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
+            "fontUrls": [
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
             "cssVars": {"--color-brand": "#123456"},
             "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
             "funnelDefaults": {"containerWidth": "lg"},
         }
 
-    def fake_get_logo_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
+    def fake_get_logo_asset(
+        self, *, org_id: str, public_id: str, client_id: str | None = None
+    ):
         observed["logo_public_id"] = public_id
         observed["logo_client_id"] = client_id
         return object()
@@ -364,6 +399,8 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
         css_vars: dict[str, str],
         font_urls: list[str] | None,
         data_theme: str | None,
+        component_image_urls: dict[str, str] | None,
+        auto_component_image_urls: list[str] | None,
         theme_id: str | None,
         theme_name: str | None,
         shop_domain: str | None,
@@ -375,6 +412,8 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
         observed["css_vars"] = css_vars
         observed["font_urls"] = font_urls
         observed["data_theme"] = data_theme
+        observed["component_image_urls"] = component_image_urls
+        observed["auto_component_image_urls"] = auto_component_image_urls
         observed["theme_id"] = theme_id
         observed["theme_name"] = theme_name
         observed["shop_domain"] = shop_domain
@@ -402,12 +441,22 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
             },
         }
 
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
+    monkeypatch.setattr(
+        clients_router.DesignSystemsRepository, "get", fake_design_system_get
+    )
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
-    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset)
-    monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
-    monkeypatch.setattr(clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com")
+    monkeypatch.setattr(
+        clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset
+    )
+    monkeypatch.setattr(
+        clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand
+    )
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/sync",
@@ -427,9 +476,301 @@ def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
     assert observed["brand_name"] == "Acme"
     assert observed["shop_domain"] == "example.myshopify.com"
     assert observed["theme_name"] == "futrgroup2-0theme"
+    assert observed["component_image_urls"] == {}
+    assert observed["auto_component_image_urls"] == []
 
 
-def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omitted(api_client, monkeypatch):
+def test_sync_shopify_theme_brand_resolves_component_image_asset_map(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    observed: dict[str, object] = {}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_design_system_get(self, *, org_id: str, design_system_id: str):
+        return type(
+            "FakeDesignSystem",
+            (),
+            {
+                "id": design_system_id,
+                "name": "Acme Design System",
+                "client_id": client_id,
+                "tokens": {"placeholder": True},
+            },
+        )()
+
+    def fake_validate(tokens):
+        assert tokens == {"placeholder": True}
+        return {
+            "dataTheme": "light",
+            "fontUrls": [
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
+            "cssVars": {"--color-brand": "#123456"},
+            "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
+            "funnelDefaults": {"containerWidth": "lg"},
+        }
+
+    def fake_get_asset(
+        self, *, org_id: str, public_id: str, client_id: str | None = None
+    ):
+        observed.setdefault("asset_public_ids", []).append(public_id)
+        if public_id in {
+            "logo-public-id",
+            "hero-image-public-id",
+            "footer-image-public-id",
+        }:
+            return object()
+        return None
+
+    def fake_sync_theme_brand(
+        *,
+        client_id: str,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        css_vars: dict[str, str],
+        font_urls: list[str] | None,
+        data_theme: str | None,
+        component_image_urls: dict[str, str] | None,
+        auto_component_image_urls: list[str] | None,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        observed["component_image_urls"] = component_image_urls
+        observed["auto_component_image_urls"] = auto_component_image_urls
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+            },
+        }
+
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
+    monkeypatch.setattr(
+        clients_router.DesignSystemsRepository, "get", fake_design_system_get
+    )
+    monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
+    monkeypatch.setattr(
+        clients_router.AssetsRepository, "get_by_public_id", fake_get_asset
+    )
+    monkeypatch.setattr(
+        clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand
+    )
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/sync",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "themeName": "futrgroup2-0theme",
+            "componentImageAssetMap": {
+                "templates/index.json.sections.hero.settings.image": "hero-image-public-id",
+                "sections/footer-group.json.sections.ss_footer_4_abc123.settings.image": "footer-image-public-id",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    assert observed["asset_public_ids"] == [
+        "logo-public-id",
+        "hero-image-public-id",
+        "footer-image-public-id",
+    ]
+    assert observed["component_image_urls"] == {
+        "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-image-public-id",
+        "sections/footer-group.json.sections.ss_footer_4_abc123.settings.image": (
+            "https://assets.example.com/public/assets/footer-image-public-id"
+        ),
+    }
+    assert observed["auto_component_image_urls"] == []
+
+
+def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_sync(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    observed: dict[str, object] = {}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_design_system_get(self, *, org_id: str, design_system_id: str):
+        return type(
+            "FakeDesignSystem",
+            (),
+            {
+                "id": design_system_id,
+                "name": "Acme Design System",
+                "client_id": client_id,
+                "tokens": {"placeholder": True},
+            },
+        )()
+
+    def fake_validate(tokens):
+        assert tokens == {"placeholder": True}
+        return {
+            "dataTheme": "light",
+            "fontUrls": [
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
+            "cssVars": {"--color-brand": "#123456"},
+            "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
+            "funnelDefaults": {"containerWidth": "lg"},
+        }
+
+    def fake_get_logo_asset(
+        self, *, org_id: str, public_id: str, client_id: str | None = None
+    ):
+        if public_id == "logo-public-id":
+            return object()
+        return None
+
+    def fake_get_product(self, *, org_id: str, product_id: str):
+        observed["product_id"] = product_id
+        return type(
+            "FakeProduct",
+            (),
+            {
+                "id": product_id,
+                "client_id": client_id,
+            },
+        )()
+
+    def fake_collect_product_image_public_ids(
+        *, session, org_id: str, client_id: str, product
+    ):
+        observed["collect_product_id"] = str(product.id)
+        return ["logo-public-id", "product-image-1", "product-image-2"]
+
+    def fake_sync_theme_brand(
+        *,
+        client_id: str,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        css_vars: dict[str, str],
+        font_urls: list[str] | None,
+        data_theme: str | None,
+        component_image_urls: dict[str, str] | None,
+        auto_component_image_urls: list[str] | None,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        observed["component_image_urls"] = component_image_urls
+        observed["auto_component_image_urls"] = auto_component_image_urls
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+            },
+        }
+
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
+    monkeypatch.setattr(
+        clients_router.DesignSystemsRepository, "get", fake_design_system_get
+    )
+    monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
+    monkeypatch.setattr(
+        clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset
+    )
+    monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
+    monkeypatch.setattr(
+        clients_router.funnel_ai,
+        "_collect_product_image_public_ids",
+        fake_collect_product_image_public_ids,
+    )
+    monkeypatch.setattr(
+        clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand
+    )
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/sync",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "productId": "product-123",
+            "themeName": "futrgroup2-0theme",
+        },
+    )
+
+    assert response.status_code == 200
+    assert observed["product_id"] == "product-123"
+    assert observed["collect_product_id"] == "product-123"
+    assert observed["component_image_urls"] == {}
+    assert observed["auto_component_image_urls"] == [
+        "https://assets.example.com/public/assets/product-image-1",
+        "https://assets.example.com/public/assets/product-image-2",
+    ]
+
+
+def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omitted(
+    api_client, monkeypatch
+):
     client_id = _create_client(api_client, name="Acme Workspace")
     observed: dict[str, object] = {}
 
@@ -473,13 +814,17 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
         assert tokens == {"placeholder": True}
         return {
             "dataTheme": "light",
-            "fontUrls": ["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
+            "fontUrls": [
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
             "cssVars": {"--color-brand": "#123456"},
             "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
             "funnelDefaults": {"containerWidth": "lg"},
         }
 
-    def fake_get_logo_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
+    def fake_get_logo_asset(
+        self, *, org_id: str, public_id: str, client_id: str | None = None
+    ):
         return object()
 
     def fake_sync_theme_brand(
@@ -491,11 +836,15 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
         css_vars: dict[str, str],
         font_urls: list[str] | None,
         data_theme: str | None,
+        component_image_urls: dict[str, str] | None,
+        auto_component_image_urls: list[str] | None,
         theme_id: str | None,
         theme_name: str | None,
         shop_domain: str | None,
     ):
         observed["sync_theme_name"] = theme_name
+        observed["component_image_urls"] = component_image_urls
+        observed["auto_component_image_urls"] = auto_component_image_urls
         return {
             "shopDomain": "example.myshopify.com",
             "themeId": "gid://shopify/OnlineStoreTheme/1",
@@ -521,12 +870,22 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
         }
 
     monkeypatch.setattr(clients_router.ClientsRepository, "get", fake_get_client)
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
+    monkeypatch.setattr(
+        clients_router.DesignSystemsRepository, "get", fake_design_system_get
+    )
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
-    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset)
-    monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
-    monkeypatch.setattr(clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com")
+    monkeypatch.setattr(
+        clients_router.AssetsRepository, "get_by_public_id", fake_get_logo_asset
+    )
+    monkeypatch.setattr(
+        clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand
+    )
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/sync",
@@ -538,6 +897,8 @@ def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omit
     assert payload["designSystemId"] == "workspace-default-design-system"
     assert observed["design_system_id"] == "workspace-default-design-system"
     assert observed["sync_theme_name"] == "futrgroup2-0theme"
+    assert observed["component_image_urls"] == {}
+    assert observed["auto_component_image_urls"] == []
 
 
 def test_sync_shopify_theme_brand_requires_ready_connection(api_client, monkeypatch):
@@ -554,7 +915,9 @@ def test_sync_shopify_theme_brand_requires_ready_connection(api_client, monkeypa
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/sync",
@@ -651,10 +1014,16 @@ def test_audit_shopify_theme_brand_returns_audit_payload(api_client, monkeypatch
             "isReady": True,
         }
 
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
-    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
+    monkeypatch.setattr(
+        clients_router.DesignSystemsRepository, "get", fake_design_system_get
+    )
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
-    monkeypatch.setattr(clients_router, "audit_client_shopify_theme_brand", fake_audit_theme_brand)
+    monkeypatch.setattr(
+        clients_router, "audit_client_shopify_theme_brand", fake_audit_theme_brand
+    )
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/audit",
@@ -689,7 +1058,9 @@ def test_audit_shopify_theme_brand_requires_ready_connection(api_client, monkeyp
             "missingScopes": [],
         }
 
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "get_client_shopify_connection_status", fake_status
+    )
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/audit",

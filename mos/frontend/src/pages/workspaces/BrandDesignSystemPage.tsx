@@ -527,6 +527,7 @@ export function BrandDesignSystemPage() {
   const [shopifySyncShopDomain, setShopifySyncShopDomain] = useState("");
   const [themeSyncDesignSystemId, setThemeSyncDesignSystemId] = useState("");
   const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
+  const [themeSyncProductId, setThemeSyncProductId] = useState("");
   const [themeSyncResult, setThemeSyncResult] = useState<ClientShopifyThemeBrandSyncResponse | null>(null);
   const [themeAuditResult, setThemeAuditResult] = useState<ClientShopifyThemeBrandAuditResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
@@ -566,6 +567,7 @@ export function BrandDesignSystemPage() {
     setShopifySyncShopDomain("");
     setThemeSyncDesignSystemId("");
     setThemeSyncThemeName("futrgroup2-0theme");
+    setThemeSyncProductId("");
     setThemeSyncResult(null);
     setThemeAuditResult(null);
     setPolicySyncResult(null);
@@ -694,15 +696,17 @@ export function BrandDesignSystemPage() {
   const handleSyncShopifyThemeBrand = async () => {
     if (!workspace?.id) return;
     const cleanedThemeName = themeSyncThemeName.trim();
+    const cleanedProductId = themeSyncProductId.trim();
     if (!cleanedThemeName) {
       toast.error("Enter a Shopify theme name.");
       return;
     }
-    const payload: { designSystemId?: string; shopDomain?: string; themeName: string } = {
+    const payload: { designSystemId?: string; shopDomain?: string; productId?: string; themeName: string } = {
       themeName: cleanedThemeName,
     };
     if (themeSyncDesignSystemId) payload.designSystemId = themeSyncDesignSystemId;
     if (shopifySyncShopDomain) payload.shopDomain = shopifySyncShopDomain;
+    if (cleanedProductId) payload.productId = cleanedProductId;
     try {
       const response = await syncShopifyThemeBrand.mutateAsync(payload);
       setThemeSyncResult(response);
@@ -978,6 +982,17 @@ export function BrandDesignSystemPage() {
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
               Target Shopify theme name. Default is set to <span className="font-semibold text-content">futrgroup2-0theme</span>.
+            </div>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
+            <Input
+              value={themeSyncProductId}
+              onChange={(event) => setThemeSyncProductId(event.target.value)}
+              placeholder="Optional product ID"
+            />
+            <div className="text-xs text-content-muted md:flex md:items-center">
+              Optional product ID for product-specific asset mapping before theme sync.
             </div>
           </div>
 

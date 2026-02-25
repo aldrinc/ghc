@@ -37,7 +37,11 @@ from app.schemas.shopify_connection import (
     ShopifyThemeBrandSyncRequest,
     ShopifyThemeBrandSyncResponse,
 )
-from app.services.design_system_generation import DesignSystemGenerationError, validate_design_system_tokens
+from app.services.design_system_generation import (
+    DesignSystemGenerationError,
+    validate_design_system_tokens,
+)
+from app.services import funnel_ai
 from app.services.shopify_connection import (
     build_client_shopify_install_url,
     create_client_shopify_product,
@@ -51,8 +55,14 @@ from app.services.shopify_connection import (
     sync_client_shopify_theme_brand,
 )
 from app.temporal.client import get_temporal_client
-from app.temporal.workflows.client_onboarding import ClientOnboardingInput, ClientOnboardingWorkflow
-from app.temporal.workflows.campaign_intent import CampaignIntentInput, CampaignIntentWorkflow
+from app.temporal.workflows.client_onboarding import (
+    ClientOnboardingInput,
+    ClientOnboardingWorkflow,
+)
+from app.temporal.workflows.campaign_intent import (
+    CampaignIntentInput,
+    CampaignIntentWorkflow,
+)
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -73,7 +83,9 @@ def create_client(
     session: Session = Depends(get_session),
 ):
     repo = ClientsRepository(session)
-    client = repo.create(org_id=auth.org_id, name=payload.name, industry=payload.industry)
+    client = repo.create(
+        org_id=auth.org_id, name=payload.name, industry=payload.industry
+    )
     return jsonable_encoder(client)
 
 
@@ -86,7 +98,9 @@ def get_client(
     repo = ClientsRepository(session)
     client = repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
     return jsonable_encoder(client)
 
 
@@ -102,7 +116,9 @@ def _serialize_active_product(product: Product) -> dict:
 def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
     client = ClientsRepository(session).get(org_id=org_id, client_id=client_id)
     if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
     return client
 
 
@@ -123,7 +139,9 @@ def _require_public_asset_base_url() -> str:
     return base_url.rstrip("/")
 
 
-def _get_client_user_pref(*, session: Session, org_id: str, client_id: str, user_external_id: str) -> ClientUserPreference | None:
+def _get_client_user_pref(
+    *, session: Session, org_id: str, client_id: str, user_external_id: str
+) -> ClientUserPreference | None:
     return session.scalar(
         select(ClientUserPreference).where(
             ClientUserPreference.org_id == org_id,
@@ -133,7 +151,9 @@ def _get_client_user_pref(*, session: Session, org_id: str, client_id: str, user
     )
 
 
-def _get_selected_shop_domain(*, session: Session, org_id: str, client_id: str, user_external_id: str) -> str | None:
+def _get_selected_shop_domain(
+    *, session: Session, org_id: str, client_id: str, user_external_id: str
+) -> str | None:
     pref = _get_client_user_pref(
         session=session,
         org_id=org_id,
@@ -148,7 +168,9 @@ def _get_selected_shop_domain(*, session: Session, org_id: str, client_id: str, 
     return selected.strip().lower()
 
 
-@router.get("/{client_id}/shopify/status", response_model=ShopifyConnectionStatusResponse)
+@router.get(
+    "/{client_id}/shopify/status", response_model=ShopifyConnectionStatusResponse
+)
 def get_client_shopify_status(
     client_id: str,
     auth: AuthContext = Depends(get_current_user),
@@ -168,7 +190,9 @@ def get_client_shopify_status(
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
-@router.post("/{client_id}/shopify/install-url", response_model=ShopifyInstallUrlResponse)
+@router.post(
+    "/{client_id}/shopify/install-url", response_model=ShopifyInstallUrlResponse
+)
 def create_client_shopify_install_url(
     client_id: str,
     payload: ShopifyInstallUrlRequest,
@@ -176,11 +200,15 @@ def create_client_shopify_install_url(
     session: Session = Depends(get_session),
 ):
     _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
-    install_url = build_client_shopify_install_url(client_id=client_id, shop_domain=payload.shopDomain)
+    install_url = build_client_shopify_install_url(
+        client_id=client_id, shop_domain=payload.shopDomain
+    )
     return ShopifyInstallUrlResponse(installUrl=install_url)
 
 
-@router.patch("/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse)
+@router.patch(
+    "/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse
+)
 def update_client_shopify_installation(
     client_id: str,
     payload: ShopifyInstallationUpdateRequest,
@@ -206,7 +234,9 @@ def update_client_shopify_installation(
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
-@router.delete("/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse)
+@router.delete(
+    "/{client_id}/shopify/installation", response_model=ShopifyConnectionStatusResponse
+)
 def disconnect_client_shopify_installation(
     client_id: str,
     payload: ShopifyInstallationDisconnectRequest,
@@ -243,7 +273,9 @@ def disconnect_client_shopify_installation(
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
-@router.put("/{client_id}/shopify/default-shop", response_model=ShopifyConnectionStatusResponse)
+@router.put(
+    "/{client_id}/shopify/default-shop", response_model=ShopifyConnectionStatusResponse
+)
 def set_client_shopify_default_shop(
     client_id: str,
     payload: ShopifyDefaultShopRequest,
@@ -323,7 +355,9 @@ def list_client_shopify_products_route(
     return ShopifyProductListResponse(**payload)
 
 
-@router.post("/{client_id}/shopify/products", response_model=ShopifyProductCreateResponse)
+@router.post(
+    "/{client_id}/shopify/products", response_model=ShopifyProductCreateResponse
+)
 def create_client_shopify_product_route(
     client_id: str,
     payload: ShopifyCreateProductRequest,
@@ -362,14 +396,19 @@ def create_client_shopify_product_route(
     return ShopifyProductCreateResponse(**created)
 
 
-@router.post("/{client_id}/shopify/theme/brand/sync", response_model=ShopifyThemeBrandSyncResponse)
+@router.post(
+    "/{client_id}/shopify/theme/brand/sync",
+    response_model=ShopifyThemeBrandSyncResponse,
+)
 def sync_client_shopify_theme_brand_route(
     client_id: str,
     payload: ShopifyThemeBrandSyncRequest,
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    client = _get_client_or_404(
+        session=session, org_id=auth.org_id, client_id=client_id
+    )
     selected_shop_domain = _get_selected_shop_domain(
         session=session,
         org_id=auth.org_id,
@@ -387,7 +426,9 @@ def sync_client_shopify_theme_brand_route(
             detail=f"Shopify connection is not ready: {status_payload['message']}",
         )
 
-    requested_design_system_id = payload.designSystemId.strip() if payload.designSystemId else None
+    requested_design_system_id = (
+        payload.designSystemId.strip() if payload.designSystemId else None
+    )
     resolved_design_system_id = requested_design_system_id or (
         str(client.design_system_id) if client.design_system_id else None
     )
@@ -407,13 +448,17 @@ def sync_client_shopify_theme_brand_route(
     )
     if not design_system:
         if requested_design_system_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Design system not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Design system not found"
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Workspace default design system was not found.",
         )
 
-    design_system_client_id = str(design_system.client_id) if design_system.client_id else None
+    design_system_client_id = (
+        str(design_system.client_id) if design_system.client_id else None
+    )
     if design_system_client_id and design_system_client_id != client_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -423,7 +468,9 @@ def sync_client_shopify_theme_brand_route(
     try:
         validated_tokens = validate_design_system_tokens(design_system.tokens)
     except DesignSystemGenerationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
 
     brand_obj = validated_tokens.get("brand")
     if not isinstance(brand_obj, dict):
@@ -512,6 +559,75 @@ def sync_client_shopify_theme_brand_route(
             ),
         )
 
+    component_image_asset_map_raw = payload.componentImageAssetMap or {}
+    normalized_component_image_asset_map: dict[str, str] = {}
+    for raw_setting_path, raw_asset_public_id in component_image_asset_map_raw.items():
+        if not isinstance(raw_setting_path, str) or not raw_setting_path.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="componentImageAssetMap keys must be non-empty strings.",
+            )
+        setting_path = raw_setting_path.strip()
+        if setting_path in normalized_component_image_asset_map:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"componentImageAssetMap contains duplicate path after normalization: {setting_path}",
+            )
+        if not isinstance(raw_asset_public_id, str) or not raw_asset_public_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    "componentImageAssetMap values must be non-empty asset public ids. "
+                    f"Invalid value at path {setting_path}."
+                ),
+            )
+        normalized_component_image_asset_map[setting_path] = raw_asset_public_id.strip()
+
+    requested_product_id = payload.productId.strip() if payload.productId else None
+    product_image_asset_public_ids: list[str] = []
+    if requested_product_id:
+        product = ProductsRepository(session).get(
+            org_id=auth.org_id, product_id=requested_product_id
+        )
+        if not product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Product not found for productId={requested_product_id}.",
+            )
+        product_client_id = str(product.client_id).strip()
+        if product_client_id != client_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Product must belong to this workspace.",
+            )
+        try:
+            product_image_asset_public_ids = (
+                funnel_ai._collect_product_image_public_ids(
+                    session=session,
+                    org_id=auth.org_id,
+                    client_id=client_id,
+                    product=product,
+                )
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Unable to resolve product image assets for productId={requested_product_id}: {exc}",
+            ) from exc
+        product_image_asset_public_ids = [
+            public_id
+            for public_id in product_image_asset_public_ids
+            if public_id != logo_public_id
+        ]
+        if not product_image_asset_public_ids:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    "No product image assets available for theme sync after excluding the brand logo. "
+                    f"productId={requested_product_id}."
+                ),
+            )
+
     workspace_name = str(client.name).strip()
     if not workspace_name:
         raise HTTPException(
@@ -519,7 +635,36 @@ def sync_client_shopify_theme_brand_route(
             detail="Workspace name is required to sync Shopify theme brand assets.",
         )
 
-    logo_url = f"{_require_public_asset_base_url()}/public/assets/{logo_public_id}"
+    public_asset_base_url = _require_public_asset_base_url()
+    logo_url = f"{public_asset_base_url}/public/assets/{logo_public_id}"
+    component_image_urls: dict[str, str] = {}
+    if normalized_component_image_asset_map:
+        assets_repo = AssetsRepository(session)
+        for (
+            setting_path,
+            asset_public_id,
+        ) in normalized_component_image_asset_map.items():
+            mapped_asset = assets_repo.get_by_public_id(
+                org_id=auth.org_id,
+                public_id=asset_public_id,
+                client_id=client_id,
+            )
+            if not mapped_asset:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=(
+                        "componentImageAssetMap references an asset that does not exist for this workspace. "
+                        f"path={setting_path}, assetPublicId={asset_public_id}."
+                    ),
+                )
+            component_image_urls[setting_path] = (
+                f"{public_asset_base_url}/public/assets/{asset_public_id}"
+            )
+    auto_component_image_urls = [
+        f"{public_asset_base_url}/public/assets/{asset_public_id}"
+        for asset_public_id in product_image_asset_public_ids
+    ]
+
     synced = sync_client_shopify_theme_brand(
         client_id=client_id,
         workspace_name=workspace_name,
@@ -528,6 +673,8 @@ def sync_client_shopify_theme_brand_route(
         css_vars=css_vars,
         font_urls=font_urls,
         data_theme=data_theme,
+        component_image_urls=component_image_urls,
+        auto_component_image_urls=auto_component_image_urls,
         theme_id=payload.themeId,
         theme_name=payload.themeName,
         shop_domain=effective_shop_domain,
@@ -553,14 +700,19 @@ def sync_client_shopify_theme_brand_route(
     )
 
 
-@router.post("/{client_id}/shopify/theme/brand/audit", response_model=ShopifyThemeBrandAuditResponse)
+@router.post(
+    "/{client_id}/shopify/theme/brand/audit",
+    response_model=ShopifyThemeBrandAuditResponse,
+)
 def audit_client_shopify_theme_brand_route(
     client_id: str,
     payload: ShopifyThemeBrandAuditRequest,
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    client = _get_client_or_404(
+        session=session, org_id=auth.org_id, client_id=client_id
+    )
     selected_shop_domain = _get_selected_shop_domain(
         session=session,
         org_id=auth.org_id,
@@ -578,7 +730,9 @@ def audit_client_shopify_theme_brand_route(
             detail=f"Shopify connection is not ready: {status_payload['message']}",
         )
 
-    requested_design_system_id = payload.designSystemId.strip() if payload.designSystemId else None
+    requested_design_system_id = (
+        payload.designSystemId.strip() if payload.designSystemId else None
+    )
     resolved_design_system_id = requested_design_system_id or (
         str(client.design_system_id) if client.design_system_id else None
     )
@@ -598,13 +752,17 @@ def audit_client_shopify_theme_brand_route(
     )
     if not design_system:
         if requested_design_system_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Design system not found")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Design system not found"
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Workspace default design system was not found.",
         )
 
-    design_system_client_id = str(design_system.client_id) if design_system.client_id else None
+    design_system_client_id = (
+        str(design_system.client_id) if design_system.client_id else None
+    )
     if design_system_client_id and design_system_client_id != client_id:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -614,7 +772,9 @@ def audit_client_shopify_theme_brand_route(
     try:
         validated_tokens = validate_design_system_tokens(design_system.tokens)
     except DesignSystemGenerationError as exc:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)
+        ) from exc
 
     css_vars_raw = validated_tokens.get("cssVars")
     if not isinstance(css_vars_raw, dict) or not css_vars_raw:
@@ -699,7 +859,9 @@ def get_active_product(
     clients_repo = ClientsRepository(session)
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
 
     pref = session.scalar(
         select(ClientUserPreference).where(
@@ -763,7 +925,9 @@ def set_active_product(
     clients_repo = ClientsRepository(session)
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
 
     product = session.scalar(
         select(Product).where(
@@ -772,7 +936,9 @@ def set_active_product(
         )
     )
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     if str(product.client_id) != str(client_id):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -816,7 +982,9 @@ def update_client(
     repo = ClientsRepository(session)
     client = repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
 
     fields: dict[str, object] = {}
     if payload.name is not None:
@@ -827,10 +995,17 @@ def update_client(
         design_system_id = payload.designSystemId or None
         if design_system_id:
             design_system_repo = DesignSystemsRepository(session)
-            design_system = design_system_repo.get(org_id=auth.org_id, design_system_id=design_system_id)
+            design_system = design_system_repo.get(
+                org_id=auth.org_id, design_system_id=design_system_id
+            )
             if not design_system:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Design system not found")
-            if design_system.client_id and str(design_system.client_id) != str(client_id):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Design system not found",
+                )
+            if design_system.client_id and str(design_system.client_id) != str(
+                client_id
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Design system must belong to the same client",
@@ -851,10 +1026,14 @@ def delete_client(
     repo = ClientsRepository(session)
     client = repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
 
     if not payload.confirm:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Deletion not confirmed")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Deletion not confirmed"
+        )
 
     if payload.confirm_name != client.name:
         raise HTTPException(
@@ -864,7 +1043,10 @@ def delete_client(
 
     deleted = repo.delete(org_id=auth.org_id, client_id=client_id)
     if not deleted:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete client")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete client",
+        )
 
     return {"ok": True}
 
@@ -888,7 +1070,9 @@ async def start_client_onboarding(
 
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
 
     product_fields: dict[str, object] = {"title": payload.product_name}
     if payload.product_description is not None:
@@ -992,18 +1176,24 @@ async def start_campaign_intent(
     clients_repo = ClientsRepository(session)
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
     product_id = payload.productId
     products_repo = ProductsRepository(session)
     product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Product not found"
+        )
     if str(product.client_id) != client_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="productId does not belong to the selected workspace.",
         )
-    if not payload.channels or not all(isinstance(ch, str) and ch.strip() for ch in payload.channels):
+    if not payload.channels or not all(
+        isinstance(ch, str) and ch.strip() for ch in payload.channels
+    ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="channels must include at least one non-empty value.",
@@ -1071,7 +1261,11 @@ async def start_campaign_intent(
         workflow_run_id=str(run.id),
         step="campaign_intent",
         status="started",
-        payload_in={"client_id": client_id, "product_id": product_id, "campaign_name": payload.campaignName},
+        payload_in={
+            "client_id": client_id,
+            "product_id": product_id,
+            "campaign_name": payload.campaignName,
+        },
     )
 
     return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}

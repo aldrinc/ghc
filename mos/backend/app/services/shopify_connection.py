@@ -65,7 +65,10 @@ def _require_checkout_service_config() -> tuple[str, str]:
                 "in shopify-funnel-app) and restart backend."
             ),
         )
-    return settings.SHOPIFY_APP_BASE_URL.rstrip("/"), settings.SHOPIFY_INTERNAL_API_TOKEN
+    return (
+        settings.SHOPIFY_APP_BASE_URL.rstrip("/"),
+        settings.SHOPIFY_INTERNAL_API_TOKEN,
+    )
 
 
 def _error_detail_from_response(response: httpx.Response) -> str:
@@ -82,7 +85,9 @@ def _error_detail_from_response(response: httpx.Response) -> str:
     return str(body)
 
 
-def _bridge_request(*, method: str, path: str, json_body: dict[str, Any] | None = None) -> Any:
+def _bridge_request(
+    *, method: str, path: str, json_body: dict[str, Any] | None = None
+) -> Any:
     base_url, internal_token = _require_checkout_service_config()
     headers = {
         "Authorization": f"Bearer {internal_token}",
@@ -91,7 +96,9 @@ def _bridge_request(*, method: str, path: str, json_body: dict[str, Any] | None 
 
     try:
         with httpx.Client(timeout=20.0) as client:
-            response = client.request(method, f"{base_url}{path}", headers=headers, json=json_body)
+            response = client.request(
+                method, f"{base_url}{path}", headers=headers, json=json_body
+            )
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -100,7 +107,11 @@ def _bridge_request(*, method: str, path: str, json_body: dict[str, Any] | None 
 
     if response.status_code >= 400:
         detail = _error_detail_from_response(response)
-        status_code = response.status_code if response.status_code < 500 else status.HTTP_502_BAD_GATEWAY
+        status_code = (
+            response.status_code
+            if response.status_code < 500
+            else status.HTTP_502_BAD_GATEWAY
+        )
         raise HTTPException(
             status_code=status_code,
             detail=f"Shopify checkout app error: {detail}",
@@ -163,7 +174,9 @@ def update_client_shopify_variant(
         "inventoryPolicy",
         "inventoryManagement",
     }
-    unsupported_fields = sorted(name for name in fields.keys() if name not in supported_fields)
+    unsupported_fields = sorted(
+        name for name in fields.keys() if name not in supported_fields
+    )
     if unsupported_fields:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -192,7 +205,8 @@ def update_client_shopify_variant(
     if "compareAtPriceCents" in fields:
         raw_compare_at_price_cents = fields["compareAtPriceCents"]
         if raw_compare_at_price_cents is not None and (
-            not isinstance(raw_compare_at_price_cents, int) or raw_compare_at_price_cents < 0
+            not isinstance(raw_compare_at_price_cents, int)
+            or raw_compare_at_price_cents < 0
         ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -202,7 +216,9 @@ def update_client_shopify_variant(
 
     if "sku" in fields:
         raw_sku = fields["sku"]
-        if raw_sku is not None and (not isinstance(raw_sku, str) or not raw_sku.strip()):
+        if raw_sku is not None and (
+            not isinstance(raw_sku, str) or not raw_sku.strip()
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="sku must be null or a non-empty string.",
@@ -211,16 +227,23 @@ def update_client_shopify_variant(
 
     if "barcode" in fields:
         raw_barcode = fields["barcode"]
-        if raw_barcode is not None and (not isinstance(raw_barcode, str) or not raw_barcode.strip()):
+        if raw_barcode is not None and (
+            not isinstance(raw_barcode, str) or not raw_barcode.strip()
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="barcode must be null or a non-empty string.",
             )
-        request_payload["barcode"] = raw_barcode.strip() if isinstance(raw_barcode, str) else None
+        request_payload["barcode"] = (
+            raw_barcode.strip() if isinstance(raw_barcode, str) else None
+        )
 
     if "inventoryPolicy" in fields:
         raw_inventory_policy = fields["inventoryPolicy"]
-        if not isinstance(raw_inventory_policy, str) or not raw_inventory_policy.strip():
+        if (
+            not isinstance(raw_inventory_policy, str)
+            or not raw_inventory_policy.strip()
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="inventoryPolicy must be one of: deny, continue.",
@@ -236,7 +259,10 @@ def update_client_shopify_variant(
     if "inventoryManagement" in fields:
         raw_inventory_management = fields["inventoryManagement"]
         if raw_inventory_management is not None:
-            if not isinstance(raw_inventory_management, str) or not raw_inventory_management.strip():
+            if (
+                not isinstance(raw_inventory_management, str)
+                or not raw_inventory_management.strip()
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="inventoryManagement must be null or 'shopify'.",
@@ -327,7 +353,9 @@ def list_shopify_installations() -> list[ShopifyInstallation]:
             )
 
         scopes = item.get("scopes")
-        if not isinstance(scopes, list) or any(not isinstance(scope, str) for scope in scopes):
+        if not isinstance(scopes, list) or any(
+            not isinstance(scope, str) for scope in scopes
+        ):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Shopify checkout app returned invalid installation scopes.",
@@ -353,14 +381,18 @@ def list_shopify_installations() -> list[ShopifyInstallation]:
     return installations
 
 
-def get_client_shopify_connection_status(*, client_id: str, selected_shop_domain: str | None = None) -> dict[str, Any]:
+def get_client_shopify_connection_status(
+    *, client_id: str, selected_shop_domain: str | None = None
+) -> dict[str, Any]:
     installations = list_shopify_installations()
     active_for_client = [
         installation
         for installation in installations
         if installation.client_id == client_id and installation.uninstalled_at is None
     ]
-    active_shop_domains = sorted({installation.shop_domain for installation in active_for_client})
+    active_shop_domains = sorted(
+        {installation.shop_domain for installation in active_for_client}
+    )
     normalized_selected_shop: str | None = None
     if selected_shop_domain is not None:
         normalized_selected_shop = normalize_shop_domain(selected_shop_domain)
@@ -379,7 +411,11 @@ def get_client_shopify_connection_status(*, client_id: str, selected_shop_domain
     selected_installation = None
     if normalized_selected_shop is not None:
         selected_installation = next(
-            (installation for installation in active_for_client if installation.shop_domain == normalized_selected_shop),
+            (
+                installation
+                for installation in active_for_client
+                if installation.shop_domain == normalized_selected_shop
+            ),
             None,
         )
 
@@ -676,7 +712,9 @@ def get_client_shopify_product(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Shopify checkout app returned invalid inventoryPolicy in product payload.",
             )
-        if inventory_management is not None and not isinstance(inventory_management, str):
+        if inventory_management is not None and not isinstance(
+            inventory_management, str
+        ):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Shopify checkout app returned invalid inventoryManagement in product payload.",
@@ -692,7 +730,11 @@ def get_client_shopify_product(
                 detail="Shopify checkout app returned invalid optionValues in product payload.",
             )
         for option_key, option_value in option_values.items():
-            if not isinstance(option_key, str) or not option_key.strip() or not isinstance(option_value, str):
+            if (
+                not isinstance(option_key, str)
+                or not option_key.strip()
+                or not isinstance(option_value, str)
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="Shopify checkout app returned non-string optionValues in product payload.",
@@ -709,12 +751,20 @@ def get_client_shopify_product(
                 "barcode": barcode.strip() if isinstance(barcode, str) else None,
                 "taxable": taxable,
                 "requiresShipping": requires_shipping,
-                "inventoryPolicy": inventory_policy.strip().lower() if isinstance(inventory_policy, str) else None,
+                "inventoryPolicy": (
+                    inventory_policy.strip().lower()
+                    if isinstance(inventory_policy, str)
+                    else None
+                ),
                 "inventoryManagement": (
-                    inventory_management.strip().lower() if isinstance(inventory_management, str) else None
+                    inventory_management.strip().lower()
+                    if isinstance(inventory_management, str)
+                    else None
                 ),
                 "inventoryQuantity": inventory_quantity,
-                "optionValues": {key.strip(): value for key, value in option_values.items()},
+                "optionValues": {
+                    key.strip(): value for key, value in option_values.items()
+                },
             }
         )
 
@@ -743,27 +793,44 @@ def create_client_shopify_product(
 ) -> dict[str, Any]:
     cleaned_title = title.strip()
     if not cleaned_title:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="title is required.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="title is required."
+        )
 
     cleaned_status = status_text.strip().upper()
     if cleaned_status not in {"ACTIVE", "DRAFT"}:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='status must be "ACTIVE" or "DRAFT".')
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='status must be "ACTIVE" or "DRAFT".',
+        )
 
     if not variants:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="variants must contain at least one item.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="variants must contain at least one item.",
+        )
 
     cleaned_variants: list[dict[str, Any]] = []
     seen_variant_titles: set[str] = set()
     for raw_variant in variants:
         if not isinstance(raw_variant, dict):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Each variant must be an object.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each variant must be an object.",
+            )
         raw_title = raw_variant.get("title")
         if not isinstance(raw_title, str) or not raw_title.strip():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Each variant requires a non-empty title.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each variant requires a non-empty title.",
+            )
         normalized_title = raw_title.strip()
         lower_title = normalized_title.lower()
         if lower_title in seen_variant_titles:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Variant titles must be unique.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Variant titles must be unique.",
+            )
         seen_variant_titles.add(lower_title)
 
         raw_price = raw_variant.get("priceCents")
@@ -775,7 +842,10 @@ def create_client_shopify_product(
 
         raw_currency = raw_variant.get("currency")
         if not isinstance(raw_currency, str):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Each variant requires currency.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each variant requires currency.",
+            )
         cleaned_currency = _normalize_currency_code(raw_currency)
 
         cleaned_variants.append(
@@ -796,18 +866,36 @@ def create_client_shopify_product(
     cleaned_tags: list[str] = []
     for raw_tag in tags or []:
         if not isinstance(raw_tag, str):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="tags must contain only strings.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="tags must contain only strings.",
+            )
         cleaned_tag = raw_tag.strip()
         if not cleaned_tag:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="tags cannot contain empty values.")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="tags cannot contain empty values.",
+            )
         cleaned_tags.append(cleaned_tag)
 
     request_payload: dict[str, Any] = {
         "title": cleaned_title,
-        "description": description.strip() if isinstance(description, str) and description.strip() else None,
-        "handle": handle.strip() if isinstance(handle, str) and handle.strip() else None,
-        "vendor": vendor.strip() if isinstance(vendor, str) and vendor.strip() else None,
-        "productType": product_type.strip() if isinstance(product_type, str) and product_type.strip() else None,
+        "description": (
+            description.strip()
+            if isinstance(description, str) and description.strip()
+            else None
+        ),
+        "handle": (
+            handle.strip() if isinstance(handle, str) and handle.strip() else None
+        ),
+        "vendor": (
+            vendor.strip() if isinstance(vendor, str) and vendor.strip() else None
+        ),
+        "productType": (
+            product_type.strip()
+            if isinstance(product_type, str) and product_type.strip()
+            else None
+        ),
         "tags": cleaned_tags,
         "status": cleaned_status,
         "variants": cleaned_variants,
@@ -1092,6 +1180,8 @@ def sync_client_shopify_theme_brand(
     css_vars: dict[str, str],
     font_urls: list[str] | None = None,
     data_theme: str | None = None,
+    component_image_urls: dict[str, str] | None = None,
+    auto_component_image_urls: list[str] | None = None,
     theme_id: str | None = None,
     theme_name: str | None = None,
     shop_domain: str | None = None,
@@ -1112,7 +1202,8 @@ def sync_client_shopify_theme_brand(
 
     cleaned_logo_url = logo_url.strip()
     if not cleaned_logo_url or not (
-        cleaned_logo_url.startswith("https://") or cleaned_logo_url.startswith("http://")
+        cleaned_logo_url.startswith("https://")
+        or cleaned_logo_url.startswith("http://")
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1196,6 +1287,125 @@ def sync_client_shopify_theme_brand(
         seen_font_urls.add(url)
         normalized_font_urls.append(url)
 
+    normalized_component_image_urls: dict[str, str] = {}
+    for raw_setting_path, raw_url in (component_image_urls or {}).items():
+        if not isinstance(raw_setting_path, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="componentImageUrls keys must be strings.",
+            )
+        setting_path = raw_setting_path.strip()
+        if not setting_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="componentImageUrls keys must be non-empty setting paths.",
+            )
+        if not (
+            setting_path.startswith("templates/")
+            or setting_path.startswith("sections/")
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "componentImageUrls keys must target template or section JSON files "
+                    "(for example: templates/index.json.sections.hero.settings.image)."
+                ),
+            )
+        if ".json." not in setting_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "componentImageUrls keys must include a JSON path suffix after filename "
+                    "(for example: templates/index.json.sections.hero.settings.image)."
+                ),
+            )
+        if any(char in setting_path for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"componentImageUrls path contains unsupported characters: {setting_path}",
+            )
+        if setting_path in normalized_component_image_urls:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate componentImageUrls path after normalization: {setting_path}",
+            )
+
+        if not isinstance(raw_url, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"componentImageUrls[{setting_path}] must be a string URL.",
+            )
+        image_url = raw_url.strip()
+        if not image_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"componentImageUrls[{setting_path}] cannot be empty.",
+            )
+        if not (
+            image_url.startswith("https://")
+            or image_url.startswith("http://")
+            or image_url.startswith("shopify://")
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"componentImageUrls[{setting_path}] must be an absolute http(s) URL "
+                    "or a shopify:// URL."
+                ),
+            )
+        if any(char in image_url for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"componentImageUrls[{setting_path}] contains unsupported characters.",
+            )
+        if any(char.isspace() for char in image_url):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"componentImageUrls[{setting_path}] must not include whitespace characters.",
+            )
+        normalized_component_image_urls[setting_path] = image_url
+
+    normalized_auto_component_image_urls: list[str] = []
+    seen_auto_component_image_urls: set[str] = set()
+    for raw_url in auto_component_image_urls or []:
+        if not isinstance(raw_url, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="autoComponentImageUrls entries must be strings.",
+            )
+        image_url = raw_url.strip()
+        if not image_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="autoComponentImageUrls entries cannot be empty.",
+            )
+        if not (
+            image_url.startswith("https://")
+            or image_url.startswith("http://")
+            or image_url.startswith("shopify://")
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "autoComponentImageUrls entries must be absolute http(s) URLs "
+                    "or shopify:// URLs."
+                ),
+            )
+        if any(char in image_url for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"autoComponentImageUrls entry contains unsupported characters: {image_url}",
+            )
+        if any(char.isspace() for char in image_url):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"autoComponentImageUrls entry must not include whitespace characters: {image_url}",
+            )
+        if image_url in seen_auto_component_image_urls:
+            continue
+        seen_auto_component_image_urls.add(image_url)
+        normalized_auto_component_image_urls.append(image_url)
+
     cleaned_data_theme: str | None = None
     if data_theme is not None:
         cleaned_data_theme = data_theme.strip()
@@ -1244,6 +1454,10 @@ def sync_client_shopify_theme_brand(
         "cssVars": normalized_css_vars,
         "fontUrls": normalized_font_urls,
     }
+    if normalized_component_image_urls:
+        request_payload["componentImageUrls"] = normalized_component_image_urls
+    if normalized_auto_component_image_urls:
+        request_payload["autoComponentImageUrls"] = normalized_auto_component_image_urls
     if cleaned_data_theme is not None:
         request_payload["dataTheme"] = cleaned_data_theme
     if cleaned_theme_id is not None:
@@ -1291,7 +1505,10 @@ def sync_client_shopify_theme_brand(
             detail="Shopify checkout app returned invalid themeRole for theme brand sync.",
         )
     response_layout_filename = payload.get("layoutFilename")
-    if not isinstance(response_layout_filename, str) or not response_layout_filename.strip():
+    if (
+        not isinstance(response_layout_filename, str)
+        or not response_layout_filename.strip()
+    ):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Shopify checkout app returned invalid layoutFilename for theme brand sync.",
@@ -1307,7 +1524,10 @@ def sync_client_shopify_theme_brand(
     if response_settings_filename is None:
         normalized_settings_filename = None
     else:
-        if not isinstance(response_settings_filename, str) or not response_settings_filename.strip():
+        if (
+            not isinstance(response_settings_filename, str)
+            or not response_settings_filename.strip()
+        ):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Shopify checkout app returned invalid settingsFilename for theme brand sync.",
@@ -1330,7 +1550,9 @@ def sync_client_shopify_theme_brand(
         ("missingSourceVars", missing_source_vars),
         ("missingThemeVars", missing_theme_vars),
     ):
-        if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) for item in value
+        ):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Shopify checkout app returned invalid coverage.{list_name} for theme brand sync.",
@@ -1344,7 +1566,8 @@ def sync_client_shopify_theme_brand(
         )
     settings_sync_filename = settings_sync.get("settingsFilename")
     if settings_sync_filename is not None and (
-        not isinstance(settings_sync_filename, str) or not settings_sync_filename.strip()
+        not isinstance(settings_sync_filename, str)
+        or not settings_sync_filename.strip()
     ):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -1356,7 +1579,9 @@ def sync_client_shopify_theme_brand(
     required_missing_paths = settings_sync.get("requiredMissingPaths")
     semantic_updated_paths = settings_sync.get("semanticUpdatedPaths")
     unmapped_color_paths = settings_sync.get("unmappedColorPaths")
-    semantic_typography_updated_paths = settings_sync.get("semanticTypographyUpdatedPaths")
+    semantic_typography_updated_paths = settings_sync.get(
+        "semanticTypographyUpdatedPaths"
+    )
     unmapped_typography_paths = settings_sync.get("unmappedTypographyPaths")
     for list_name, value in (
         ("expectedPaths", expected_paths),
@@ -1368,7 +1593,9 @@ def sync_client_shopify_theme_brand(
         ("semanticTypographyUpdatedPaths", semantic_typography_updated_paths),
         ("unmappedTypographyPaths", unmapped_typography_paths),
     ):
-        if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) for item in value
+        ):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Shopify checkout app returned invalid settingsSync.{list_name} for theme brand sync.",
@@ -1401,7 +1628,11 @@ def sync_client_shopify_theme_brand(
             "missingThemeVars": missing_theme_vars,
         },
         "settingsSync": {
-            "settingsFilename": settings_sync_filename.strip() if isinstance(settings_sync_filename, str) else None,
+            "settingsFilename": (
+                settings_sync_filename.strip()
+                if isinstance(settings_sync_filename, str)
+                else None
+            ),
             "expectedPaths": expected_paths,
             "updatedPaths": updated_paths,
             "missingPaths": missing_paths,
@@ -1565,7 +1796,10 @@ def audit_client_shopify_theme_brand(
             detail="Shopify checkout app returned invalid themeRole for theme brand audit.",
         )
     response_layout_filename = payload.get("layoutFilename")
-    if not isinstance(response_layout_filename, str) or not response_layout_filename.strip():
+    if (
+        not isinstance(response_layout_filename, str)
+        or not response_layout_filename.strip()
+    ):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Shopify checkout app returned invalid layoutFilename for theme brand audit.",
@@ -1578,7 +1812,8 @@ def audit_client_shopify_theme_brand(
         )
     response_settings_filename = payload.get("settingsFilename")
     if response_settings_filename is not None and (
-        not isinstance(response_settings_filename, str) or not response_settings_filename.strip()
+        not isinstance(response_settings_filename, str)
+        or not response_settings_filename.strip()
     ):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -1613,9 +1848,13 @@ def audit_client_shopify_theme_brand(
             detail="Shopify checkout app returned invalid isReady for theme brand audit.",
         )
 
-    def _require_string_list(obj: dict[str, Any], key: str, container_name: str) -> list[str]:
+    def _require_string_list(
+        obj: dict[str, Any], key: str, container_name: str
+    ) -> list[str]:
         value = obj.get(key)
-        if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
+        if not isinstance(value, list) or any(
+            not isinstance(item, str) for item in value
+        ):
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail=f"Shopify checkout app returned invalid {container_name}.{key} for theme brand audit.",
@@ -1623,30 +1862,61 @@ def audit_client_shopify_theme_brand(
         return value
 
     parsed_coverage = {
-        "requiredSourceVars": _require_string_list(coverage, "requiredSourceVars", "coverage"),
-        "requiredThemeVars": _require_string_list(coverage, "requiredThemeVars", "coverage"),
-        "missingSourceVars": _require_string_list(coverage, "missingSourceVars", "coverage"),
-        "missingThemeVars": _require_string_list(coverage, "missingThemeVars", "coverage"),
+        "requiredSourceVars": _require_string_list(
+            coverage, "requiredSourceVars", "coverage"
+        ),
+        "requiredThemeVars": _require_string_list(
+            coverage, "requiredThemeVars", "coverage"
+        ),
+        "missingSourceVars": _require_string_list(
+            coverage, "missingSourceVars", "coverage"
+        ),
+        "missingThemeVars": _require_string_list(
+            coverage, "missingThemeVars", "coverage"
+        ),
     }
     settings_audit_filename = settings_audit.get("settingsFilename")
     if settings_audit_filename is not None and (
-        not isinstance(settings_audit_filename, str) or not settings_audit_filename.strip()
+        not isinstance(settings_audit_filename, str)
+        or not settings_audit_filename.strip()
     ):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Shopify checkout app returned invalid settingsAudit.settingsFilename for theme brand audit.",
         )
     parsed_settings_audit = {
-        "settingsFilename": settings_audit_filename.strip() if isinstance(settings_audit_filename, str) else None,
-        "expectedPaths": _require_string_list(settings_audit, "expectedPaths", "settingsAudit"),
-        "syncedPaths": _require_string_list(settings_audit, "syncedPaths", "settingsAudit"),
-        "mismatchedPaths": _require_string_list(settings_audit, "mismatchedPaths", "settingsAudit"),
-        "missingPaths": _require_string_list(settings_audit, "missingPaths", "settingsAudit"),
-        "requiredMissingPaths": _require_string_list(settings_audit, "requiredMissingPaths", "settingsAudit"),
-        "requiredMismatchedPaths": _require_string_list(settings_audit, "requiredMismatchedPaths", "settingsAudit"),
-        "semanticSyncedPaths": _require_string_list(settings_audit, "semanticSyncedPaths", "settingsAudit"),
-        "semanticMismatchedPaths": _require_string_list(settings_audit, "semanticMismatchedPaths", "settingsAudit"),
-        "unmappedColorPaths": _require_string_list(settings_audit, "unmappedColorPaths", "settingsAudit"),
+        "settingsFilename": (
+            settings_audit_filename.strip()
+            if isinstance(settings_audit_filename, str)
+            else None
+        ),
+        "expectedPaths": _require_string_list(
+            settings_audit, "expectedPaths", "settingsAudit"
+        ),
+        "syncedPaths": _require_string_list(
+            settings_audit, "syncedPaths", "settingsAudit"
+        ),
+        "mismatchedPaths": _require_string_list(
+            settings_audit, "mismatchedPaths", "settingsAudit"
+        ),
+        "missingPaths": _require_string_list(
+            settings_audit, "missingPaths", "settingsAudit"
+        ),
+        "requiredMissingPaths": _require_string_list(
+            settings_audit, "requiredMissingPaths", "settingsAudit"
+        ),
+        "requiredMismatchedPaths": _require_string_list(
+            settings_audit, "requiredMismatchedPaths", "settingsAudit"
+        ),
+        "semanticSyncedPaths": _require_string_list(
+            settings_audit, "semanticSyncedPaths", "settingsAudit"
+        ),
+        "semanticMismatchedPaths": _require_string_list(
+            settings_audit, "semanticMismatchedPaths", "settingsAudit"
+        ),
+        "unmappedColorPaths": _require_string_list(
+            settings_audit, "unmappedColorPaths", "settingsAudit"
+        ),
         "semanticTypographySyncedPaths": _require_string_list(
             settings_audit,
             "semanticTypographySyncedPaths",
@@ -1657,7 +1927,9 @@ def audit_client_shopify_theme_brand(
             "semanticTypographyMismatchedPaths",
             "settingsAudit",
         ),
-        "unmappedTypographyPaths": _require_string_list(settings_audit, "unmappedTypographyPaths", "settingsAudit"),
+        "unmappedTypographyPaths": _require_string_list(
+            settings_audit, "unmappedTypographyPaths", "settingsAudit"
+        ),
     }
 
     return {
@@ -1667,7 +1939,11 @@ def audit_client_shopify_theme_brand(
         "themeRole": response_theme_role.strip(),
         "layoutFilename": response_layout_filename.strip(),
         "cssFilename": response_css_filename.strip(),
-        "settingsFilename": response_settings_filename.strip() if isinstance(response_settings_filename, str) else None,
+        "settingsFilename": (
+            response_settings_filename.strip()
+            if isinstance(response_settings_filename, str)
+            else None
+        ),
         "hasManagedMarkerBlock": _require_bool("hasManagedMarkerBlock"),
         "layoutIncludesManagedCssAsset": _require_bool("layoutIncludesManagedCssAsset"),
         "managedCssAssetExists": _require_bool("managedCssAssetExists"),
@@ -1719,7 +1995,8 @@ def set_client_shopify_storefront_token(
         (
             installation
             for installation in installations
-            if installation.shop_domain == normalized_shop and installation.uninstalled_at is None
+            if installation.shop_domain == normalized_shop
+            and installation.uninstalled_at is None
         ),
         None,
     )
@@ -1757,7 +2034,8 @@ def disconnect_client_shopify_store(
         (
             installation
             for installation in installations
-            if installation.shop_domain == normalized_shop and installation.uninstalled_at is None
+            if installation.shop_domain == normalized_shop
+            and installation.uninstalled_at is None
         ),
         None,
     )

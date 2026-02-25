@@ -34,7 +34,9 @@ _THEME_SYNC_REQUIRED_CSS_VARS = {
 }
 
 
-def _build_minimal_theme_settings_json(*, extra_current: dict[str, object] | None = None) -> str:
+def _build_minimal_theme_settings_json(
+    *, extra_current: dict[str, object] | None = None
+) -> str:
     current: dict[str, object] = {
         "color_background": "#ffffff",
         "color_foreground": "#111111",
@@ -77,7 +79,9 @@ def test_register_webhook_reuses_existing_subscription_when_address_taken():
             return {
                 "webhookSubscriptionCreate": {
                     "webhookSubscription": None,
-                    "userErrors": [{"message": "Address for this topic has already been taken"}],
+                    "userErrors": [
+                        {"message": "Address for this topic has already been taken"}
+                    ],
                 }
             }
         return {
@@ -119,14 +123,18 @@ def test_register_webhook_duplicate_error_without_existing_subscription_raises()
             return {
                 "webhookSubscriptionCreate": {
                     "webhookSubscription": None,
-                    "userErrors": [{"message": "Address for this topic has already been taken"}],
+                    "userErrors": [
+                        {"message": "Address for this topic has already been taken"}
+                    ],
                 }
             }
         return {"webhookSubscriptions": {"edges": []}}
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
 
-    with pytest.raises(ShopifyApiError, match="Webhook registration failed for APP_UNINSTALLED"):
+    with pytest.raises(
+        ShopifyApiError, match="Webhook registration failed for APP_UNINSTALLED"
+    ):
         asyncio.run(
             client.register_webhook(
                 shop_domain="example.myshopify.com",
@@ -470,7 +478,9 @@ def test_update_variant_updates_price_and_compare_at_price():
 def test_update_variant_rejects_missing_fields():
     client = ShopifyApiClient()
 
-    with pytest.raises(ShopifyApiError, match="At least one variant update field is required"):
+    with pytest.raises(
+        ShopifyApiError, match="At least one variant update field is required"
+    ):
         asyncio.run(
             client.update_variant(
                 shop_domain="example.myshopify.com",
@@ -484,7 +494,9 @@ def test_update_variant_rejects_missing_fields():
 def test_update_variant_rejects_invalid_variant_gid():
     client = ShopifyApiClient()
 
-    with pytest.raises(ShopifyApiError, match="variantGid must be a valid Shopify ProductVariant GID"):
+    with pytest.raises(
+        ShopifyApiError, match="variantGid must be a valid Shopify ProductVariant GID"
+    ):
         asyncio.run(
             client.update_variant(
                 shop_domain="example.myshopify.com",
@@ -581,7 +593,9 @@ def test_update_variant_updates_inventory_related_fields():
 def test_update_variant_rejects_invalid_inventory_management():
     client = ShopifyApiClient()
 
-    with pytest.raises(ShopifyApiError, match="inventoryManagement must be null or 'shopify'"):
+    with pytest.raises(
+        ShopifyApiError, match="inventoryManagement must be null or 'shopify'"
+    ):
         asyncio.run(
             client.update_variant(
                 shop_domain="example.myshopify.com",
@@ -764,7 +778,9 @@ def test_sync_theme_brand_updates_layout_and_css():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "config/settings_data.json":
                 return {
@@ -803,8 +819,8 @@ def test_sync_theme_brand_updates_layout_and_css():
                         ],
                         "userErrors": [],
                     }
-                    }
                 }
+            }
         if "mutation createThemeLogoStagedUpload" in query:
             variables = payload.get("variables") or {}
             input_value = (variables.get("input") or [])[0]
@@ -863,7 +879,9 @@ def test_sync_theme_brand_updates_layout_and_css():
                 "assets/acme-workspace-workspace-brand.css",
                 "config/settings_data.json",
             }
-            layout_file = next(item for item in files if item["filename"] == "layout/theme.liquid")
+            layout_file = next(
+                item for item in files if item["filename"] == "layout/theme.liquid"
+            )
             layout_content = layout_file["body"]["value"]
             assert "acme-workspace-workspace-brand.css" in layout_content
             assert 'meta name="mos-brand-name" content="Acme"' in layout_content
@@ -872,36 +890,65 @@ def test_sync_theme_brand_updates_layout_and_css():
             assert marker_start >= 0
             assert head_close >= 0
             assert marker_start < head_close
-            css_file = next(item for item in files if item["filename"] == "assets/acme-workspace-workspace-brand.css")
+            css_file = next(
+                item
+                for item in files
+                if item["filename"] == "assets/acme-workspace-workspace-brand.css"
+            )
             css_content = css_file["body"]["value"]
             assert "--color-brand: #123456 !important;" in css_content
             assert "--color-highlight: var(--color-brand) !important;" in css_content
             assert '[class*="color-"]' in css_content
             assert '[class*="footer"]' in css_content
             assert "--color-base-button: var(--color-cta) !important;" in css_content
-            assert "--color-button-text: var(--color-cta-text) !important;" in css_content
+            assert (
+                "--color-button-text: var(--color-cta-text) !important;" in css_content
+            )
             assert "--color-price: var(--color-brand) !important;" in css_content
-            assert "--color-info-background: var(--color-soft) !important;" in css_content
-            assert "--color-keyboard-focus: var(--focus-outline-color) !important;" in css_content
+            assert (
+                "--color-info-background: var(--color-soft) !important;" in css_content
+            )
+            assert (
+                "--color-keyboard-focus: var(--focus-outline-color) !important;"
+                in css_content
+            )
             assert "--color-placeholder: var(--color-muted) !important;" in css_content
             assert "--font-body-family: var(--font-sans) !important;" in css_content
             assert "--border-radius-medium: var(--radius-md) !important;" in css_content
             assert "--page-width: var(--container-max) !important;" in css_content
             assert "--page-padding: var(--container-pad) !important;" in css_content
             assert "--footer-pad-y: var(--section-pad-y) !important;" in css_content
-            assert "--mos-brand-logo-url: \"https://assets.example.com/public/assets/logo-1\";" in css_content
+            assert (
+                '--mos-brand-logo-url: "https://assets.example.com/public/assets/logo-1";'
+                in css_content
+            )
             assert "/* Managed theme component overrides. */" in css_content
             assert "body {" in css_content
             assert "background-color: var(--color-page-bg) !important;" in css_content
-            assert 'a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]) {' in css_content
-            assert 'button, .button, .btn, input[type="button"], input[type="submit"], input[type="reset"], [role="button"] {' in css_content
-            assert 'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"] {' in css_content
-            settings_file = next(item for item in files if item["filename"] == "config/settings_data.json")
+            assert (
+                'a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]) {'
+                in css_content
+            )
+            assert (
+                'button, .button, .btn, input[type="button"], input[type="submit"], input[type="reset"], [role="button"] {'
+                in css_content
+            )
+            assert (
+                'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"] {'
+                in css_content
+            )
+            settings_file = next(
+                item
+                for item in files
+                if item["filename"] == "config/settings_data.json"
+            )
             settings_content = settings_file["body"]["value"]
             assert '"color_background": "#f5f5f5"' in settings_content
             assert '"footer_background": "#f4ede6"' in settings_content
             assert '"logo": "shopify://shop_images/logo-1.png"' in settings_content
-            assert '"logo_mobile": "shopify://shop_images/logo-1.png"' in settings_content
+            assert (
+                '"logo_mobile": "shopify://shop_images/logo-1.png"' in settings_content
+            )
             return {
                 "themeFilesUpsert": {
                     "upsertedThemeFiles": [
@@ -929,7 +976,9 @@ def test_sync_theme_brand_updates_layout_and_css():
             brand_name="Acme",
             logo_url="https://assets.example.com/public/assets/logo-1",
             css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
-            font_urls=["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
+            font_urls=[
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
             data_theme="light",
             theme_name="futrgroup2-0theme",
         )
@@ -1070,7 +1119,9 @@ def test_sync_theme_brand_allows_upsert_without_job():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "config/settings_data.json":
                 return {
@@ -1112,7 +1163,7 @@ def test_sync_theme_brand_allows_upsert_without_job():
                 }
             }
         if "mutation themeFilesUpsert" in query:
-            files = ((payload.get("variables") or {}).get("files") or [])
+            files = (payload.get("variables") or {}).get("files") or []
             filenames = {item["filename"] for item in files}
             assert "config/settings_data.json" in filenames
             return {
@@ -1274,7 +1325,7 @@ def test_sync_theme_brand_upserts_template_component_settings():
                                 "body": {
                                     "__typename": "OnlineStoreThemeFileBodyText",
                                 },
-                            }
+                            },
                         ],
                         "pageInfo": {"hasNextPage": False, "endCursor": None},
                         "userErrors": [],
@@ -1282,7 +1333,9 @@ def test_sync_theme_brand_upserts_template_component_settings():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "config/settings_data.json":
                 return {
@@ -1358,7 +1411,7 @@ def test_sync_theme_brand_upserts_template_component_settings():
                 }
             }
         if "mutation themeFilesUpsert" in query:
-            files = ((payload.get("variables") or {}).get("files") or [])
+            files = (payload.get("variables") or {}).get("files") or []
             filenames = {item["filename"] for item in files}
             assert filenames == {
                 "layout/theme.liquid",
@@ -1367,11 +1420,17 @@ def test_sync_theme_brand_upserts_template_component_settings():
                 "templates/index.json",
                 "sections/footer-group.json",
             }
-            template_file = next(item for item in files if item["filename"] == "templates/index.json")
+            template_file = next(
+                item for item in files if item["filename"] == "templates/index.json"
+            )
             template_content = template_file["body"]["value"]
             assert '"heading_color":"#222222"' in template_content
             assert '"color_overlay":"rgba(0, 0, 0, 0.08)"' in template_content
-            section_group_file = next(item for item in files if item["filename"] == "sections/footer-group.json")
+            section_group_file = next(
+                item
+                for item in files
+                if item["filename"] == "sections/footer-group.json"
+            )
             section_group_content = section_group_file["body"]["value"]
             assert '"background_color":"#f4ede6"' in section_group_content
             assert '"newsletter_color":"#222222"' in section_group_content
@@ -1406,8 +1465,14 @@ def test_sync_theme_brand_upserts_template_component_settings():
         )
     )
 
-    assert "templates/index.json.sections.hero.settings.heading_color" in result["settingsSync"]["semanticUpdatedPaths"]
-    assert "templates/index.json.sections.hero.settings.color_overlay" in result["settingsSync"]["semanticUpdatedPaths"]
+    assert (
+        "templates/index.json.sections.hero.settings.heading_color"
+        in result["settingsSync"]["semanticUpdatedPaths"]
+    )
+    assert (
+        "templates/index.json.sections.hero.settings.color_overlay"
+        in result["settingsSync"]["semanticUpdatedPaths"]
+    )
     assert (
         "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.background_color"
         in result["settingsSync"]["semanticUpdatedPaths"]
@@ -1417,6 +1482,642 @@ def test_sync_theme_brand_upserts_template_component_settings():
         in result["settingsSync"]["semanticUpdatedPaths"]
     )
     assert result["settingsSync"]["unmappedColorPaths"] == []
+
+
+def test_sync_theme_brand_upserts_template_component_image_settings():
+    client = ShopifyApiClient()
+    settings_json = _build_minimal_theme_settings_json()
+    template_json = json.dumps(
+        {
+            "sections": {
+                "hero": {
+                    "type": "image-with-text-overlay",
+                    "settings": {
+                        "hero_image": "shopify://shop_images/old-hero.png",
+                        "secondary_image": "shopify://shop_images/old-secondary.png",
+                    },
+                }
+            }
+        }
+    )
+    observed_upload_urls: list[str] = []
+
+    async def fake_create_shopify_logo_file_reference_from_url(
+        *, shop_domain: str, access_token: str, logo_url: str
+    ):
+        observed_upload_urls.append(logo_url)
+        return "shopify://shop_images/hero-uploaded.png"
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "templates/index.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "templates/index.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": template_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "mutation themeFilesUpsert" in query:
+            files = (payload.get("variables") or {}).get("files") or []
+            filenames = {item["filename"] for item in files}
+            assert filenames == {
+                "layout/theme.liquid",
+                "assets/acme-workspace-workspace-brand.css",
+                "config/settings_data.json",
+                "templates/index.json",
+            }
+            template_file = next(
+                item for item in files if item["filename"] == "templates/index.json"
+            )
+            template_content = template_file["body"]["value"]
+            assert (
+                '"hero_image":"shopify://shop_images/hero-uploaded.png"'
+                in template_content
+            )
+            assert (
+                '"secondary_image":"shopify://shop_images/hero-uploaded.png"'
+                in template_content
+            )
+            return {
+                "themeFilesUpsert": {
+                    "upsertedThemeFiles": [
+                        {"filename": "layout/theme.liquid"},
+                        {"filename": "assets/acme-workspace-workspace-brand.css"},
+                        {"filename": "config/settings_data.json"},
+                        {"filename": "templates/index.json"},
+                    ],
+                    "job": None,
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._create_shopify_logo_file_reference_from_url = fake_create_shopify_logo_file_reference_from_url  # type: ignore[method-assign]
+
+    asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            font_urls=[],
+            component_image_urls={
+                "templates/index.json.sections.hero.settings.hero_image": (
+                    "https://assets.example.com/public/assets/hero-image-1"
+                ),
+                "templates/index.json.sections.hero.settings.secondary_image": (
+                    "https://assets.example.com/public/assets/hero-image-1"
+                ),
+            },
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert observed_upload_urls == [
+        "https://assets.example.com/public/assets/hero-image-1"
+    ]
+
+
+def test_sync_theme_brand_errors_for_missing_component_image_path():
+    client = ShopifyApiClient()
+    settings_json = _build_minimal_theme_settings_json()
+    template_json = json.dumps(
+        {
+            "sections": {
+                "hero": {
+                    "type": "image-with-text-overlay",
+                    "settings": {
+                        "hero_image": "shopify://shop_images/old-hero.png",
+                    },
+                }
+            }
+        }
+    )
+
+    async def fake_create_shopify_logo_file_reference_from_url(
+        *, shop_domain: str, access_token: str, logo_url: str
+    ):
+        raise AssertionError(
+            "Component image upload should not run when mapped paths are missing"
+        )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "templates/index.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "templates/index.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": template_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._create_shopify_logo_file_reference_from_url = fake_create_shopify_logo_file_reference_from_url  # type: ignore[method-assign]
+
+    with pytest.raises(
+        ShopifyApiError,
+        match=(
+            "Theme template component image sync could not update mapped paths: "
+            "templates/index.json.sections.hero.settings.missing_image."
+        ),
+    ):
+        asyncio.run(
+            client.sync_theme_brand(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                workspace_name="Acme Workspace",
+                brand_name="Acme",
+                logo_url="https://assets.example.com/public/assets/logo-1",
+                css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+                font_urls=[],
+                component_image_urls={
+                    "templates/index.json.sections.hero.settings.missing_image": (
+                        "https://assets.example.com/public/assets/hero-image-1"
+                    ),
+                },
+                data_theme="light",
+                theme_name="futrgroup2-0theme",
+            )
+        )
+
+
+def test_sync_theme_brand_auto_component_images_map_to_template_settings():
+    client = ShopifyApiClient()
+    settings_json = _build_minimal_theme_settings_json()
+    template_json = json.dumps(
+        {
+            "sections": {
+                "hero": {
+                    "type": "image-with-text-overlay",
+                    "settings": {
+                        "hero_image": "shopify://shop_images/old-hero.png",
+                        "secondary_image": "shopify://shop_images/old-secondary.png",
+                    },
+                }
+            }
+        }
+    )
+    observed_upload_urls: list[str] = []
+    auto_image_urls = [
+        "https://assets.example.com/public/assets/product-image-1",
+        "https://assets.example.com/public/assets/product-image-2",
+    ]
+
+    async def fake_create_shopify_logo_file_reference_from_url(
+        *, shop_domain: str, access_token: str, logo_url: str
+    ):
+        observed_upload_urls.append(logo_url)
+        if logo_url == auto_image_urls[0]:
+            return "shopify://shop_images/product-image-1.png"
+        if logo_url == auto_image_urls[1]:
+            return "shopify://shop_images/product-image-2.png"
+        raise AssertionError(f"Unexpected upload URL: {logo_url}")
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {"__typename": "OnlineStoreThemeFileBodyText"},
+                            },
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "templates/index.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "templates/index.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": template_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "mutation themeFilesUpsert" in query:
+            files = (payload.get("variables") or {}).get("files") or []
+            filenames = {item["filename"] for item in files}
+            assert filenames == {
+                "layout/theme.liquid",
+                "assets/acme-workspace-workspace-brand.css",
+                "config/settings_data.json",
+                "templates/index.json",
+            }
+            template_file = next(
+                item for item in files if item["filename"] == "templates/index.json"
+            )
+            template_content = template_file["body"]["value"]
+            assert (
+                '"hero_image":"shopify://shop_images/product-image-1.png"'
+                in template_content
+            )
+            assert (
+                '"secondary_image":"shopify://shop_images/product-image-2.png"'
+                in template_content
+            )
+            return {
+                "themeFilesUpsert": {
+                    "upsertedThemeFiles": [
+                        {"filename": "layout/theme.liquid"},
+                        {"filename": "assets/acme-workspace-workspace-brand.css"},
+                        {"filename": "config/settings_data.json"},
+                        {"filename": "templates/index.json"},
+                    ],
+                    "job": None,
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._create_shopify_logo_file_reference_from_url = fake_create_shopify_logo_file_reference_from_url  # type: ignore[method-assign]
+
+    asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            font_urls=[],
+            auto_component_image_urls=auto_image_urls,
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert observed_upload_urls == auto_image_urls
+
+
+def test_sync_theme_brand_auto_component_images_error_when_no_paths_found():
+    client = ShopifyApiClient()
+    settings_json = _build_minimal_theme_settings_json()
+    template_json = json.dumps(
+        {
+            "sections": {
+                "hero": {
+                    "type": "image-with-text-overlay",
+                    "settings": {
+                        "heading": "Welcome",
+                        "content": "Body copy",
+                    },
+                }
+            }
+        }
+    )
+
+    async def fake_create_shopify_logo_file_reference_from_url(
+        *, shop_domain: str, access_token: str, logo_url: str
+    ):
+        raise AssertionError(
+            "Component image upload should not run when no auto-mappable paths are found"
+        )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {"__typename": "OnlineStoreThemeFileBodyText"},
+                            },
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "templates/index.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "templates/index.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": template_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._create_shopify_logo_file_reference_from_url = fake_create_shopify_logo_file_reference_from_url  # type: ignore[method-assign]
+
+    with pytest.raises(
+        ShopifyApiError,
+        match=(
+            "Theme template settings sync could not discover image setting paths for autoComponentImageUrls. "
+            "Provide explicit componentImageUrls mappings."
+        ),
+    ):
+        asyncio.run(
+            client.sync_theme_brand(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                workspace_name="Acme Workspace",
+                brand_name="Acme",
+                logo_url="https://assets.example.com/public/assets/logo-1",
+                css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+                font_urls=[],
+                auto_component_image_urls=[
+                    "https://assets.example.com/public/assets/product-image-1"
+                ],
+                data_theme="light",
+                theme_name="futrgroup2-0theme",
+            )
+        )
 
 
 def test_sync_theme_brand_bootstraps_current_color_schemes_from_presets():
@@ -1452,7 +2153,9 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_presets():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "config/settings_data.json":
                 return {
@@ -1494,8 +2197,12 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_presets():
                 }
             }
         if "mutation themeFilesUpsert" in query:
-            files = ((payload.get("variables") or {}).get("files") or [])
-            settings_file = next(item for item in files if item["filename"] == "config/settings_data.json")
+            files = (payload.get("variables") or {}).get("files") or []
+            settings_file = next(
+                item
+                for item in files
+                if item["filename"] == "config/settings_data.json"
+            )
             settings_content = settings_file["body"]["value"]
             assert '"color_schemes": [' in settings_content
             assert '"background": "#f5f5f5"' in settings_content
@@ -1585,7 +2292,9 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_nested_root_node
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "config/settings_data.json":
                 return {
@@ -1627,8 +2336,12 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_nested_root_node
                 }
             }
         if "mutation themeFilesUpsert" in query:
-            files = ((payload.get("variables") or {}).get("files") or [])
-            settings_file = next(item for item in files if item["filename"] == "config/settings_data.json")
+            files = (payload.get("variables") or {}).get("files") or []
+            settings_file = next(
+                item
+                for item in files
+                if item["filename"] == "config/settings_data.json"
+            )
             settings_content = settings_file["body"]["value"]
             assert '"color_schemes": [' in settings_content
             assert '"background": "#f5f5f5"' in settings_content
@@ -1695,7 +2408,9 @@ def test_sync_theme_brand_requires_managed_layout_markers():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "config/settings_data.json":
                 return {
@@ -1734,7 +2449,10 @@ def test_sync_theme_brand_requires_managed_layout_markers():
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
 
-    with pytest.raises(ShopifyApiError, match="Theme layout must include exactly one managed brand marker block"):
+    with pytest.raises(
+        ShopifyApiError,
+        match="Theme layout must include exactly one managed brand marker block",
+    ):
         asyncio.run(
             client.sync_theme_brand(
                 shop_domain="example.myshopify.com",
@@ -1779,7 +2497,9 @@ def test_sync_theme_brand_requires_closing_head_tag():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "config/settings_data.json":
                 return {
@@ -1824,7 +2544,9 @@ def test_sync_theme_brand_requires_closing_head_tag():
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
 
-    with pytest.raises(ShopifyApiError, match="Theme layout must include a closing </head> tag"):
+    with pytest.raises(
+        ShopifyApiError, match="Theme layout must include a closing </head> tag"
+    ):
         asyncio.run(
             client.sync_theme_brand(
                 shop_domain="example.myshopify.com",
@@ -1916,7 +2638,9 @@ def test_sync_theme_brand_errors_for_unsupported_theme_profile():
 def test_sync_theme_brand_errors_for_logo_url_with_whitespace():
     client = ShopifyApiClient()
 
-    with pytest.raises(ShopifyApiError, match="logoUrl must not include whitespace characters"):
+    with pytest.raises(
+        ShopifyApiError, match="logoUrl must not include whitespace characters"
+    ):
         asyncio.run(
             client.sync_theme_brand(
                 shop_domain="example.myshopify.com",
@@ -1961,15 +2685,23 @@ def test_render_theme_brand_css_includes_theme_scope_selectors():
         font_urls=[],
     )
 
-    assert ':root, html, body, .color-scheme, .gradient, footer, #shopify-section-footer, [role="contentinfo"], .footer, [data-color-scheme], [id*="footer"], [class*="color-scheme"], [class*="scheme-"], [class*="color-"], [class*="footer"] {' in css
+    assert (
+        ':root, html, body, .color-scheme, .gradient, footer, #shopify-section-footer, [role="contentinfo"], .footer, [data-color-scheme], [id*="footer"], [class*="color-scheme"], [class*="scheme-"], [class*="color-"], [class*="footer"] {'
+        in css
+    )
     assert 'html[data-theme="light"] .footer {' not in css
-    assert 'html[data-theme="light"], html[data-theme="light"] html, html[data-theme="light"] body, html[data-theme="light"] .color-scheme' in css
+    assert (
+        'html[data-theme="light"], html[data-theme="light"] html, html[data-theme="light"] body, html[data-theme="light"] .color-scheme'
+        in css
+    )
     assert 'html[data-theme="light"] [class*="footer"] {' in css
-    assert '--footer-bg: #f4ede6 !important;' in css
+    assert "--footer-bg: #f4ede6 !important;" in css
 
 
 def test_resolve_theme_brand_profile_supports_canonicalized_theme_aliases():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="Futr Group 2.0 Theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="Futr Group 2.0 Theme"
+    )
 
     assert profile.theme_name == "futrgroup2-0theme"
     assert profile.settings_value_paths["current.footer_background"] == "--footer-bg"
@@ -1978,7 +2710,9 @@ def test_resolve_theme_brand_profile_supports_canonicalized_theme_aliases():
 
 
 def test_sync_theme_settings_data_updates_semantic_color_paths():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2000,17 +2734,22 @@ def test_sync_theme_settings_data_updates_semantic_color_paths():
         settings_content=settings_content,
         effective_css_vars=effective_css_vars,
     )
-    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
+    )
 
-    assert synced_settings["current"]["sections"]["announcement"]["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS[
-        "--color-cta"
-    ]
-    assert synced_settings["current"]["sections"]["announcement"]["text_color"] == _THEME_SYNC_REQUIRED_CSS_VARS[
-        "--color-text"
-    ]
-    assert synced_settings["current"]["sections"]["announcement"]["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS[
-        "--color-border"
-    ]
+    assert (
+        synced_settings["current"]["sections"]["announcement"]["background_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    )
+    assert (
+        synced_settings["current"]["sections"]["announcement"]["text_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        synced_settings["current"]["sections"]["announcement"]["border_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    )
     assert report["semanticUpdatedPaths"] == [
         "current.sections.announcement.background_color",
         "current.sections.announcement.border_color",
@@ -2020,7 +2759,9 @@ def test_sync_theme_settings_data_updates_semantic_color_paths():
 
 
 def test_sync_theme_settings_data_maps_footer_section_background_to_footer_bg():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2045,20 +2786,44 @@ def test_sync_theme_settings_data_maps_footer_section_background_to_footer_bg():
         settings_content=settings_content,
         effective_css_vars=effective_css_vars,
     )
-    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
-    footer_settings = synced_settings["current"]["sections"]["ss_footer_4_abc123"]["settings"]
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
+    )
+    footer_settings = synced_settings["current"]["sections"]["ss_footer_4_abc123"][
+        "settings"
+    ]
 
-    assert footer_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
-    assert footer_settings["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
-    assert footer_settings["newsletter_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
-    assert "current.sections.ss_footer_4_abc123.settings.background_color" in report["semanticUpdatedPaths"]
-    assert "current.sections.ss_footer_4_abc123.settings.border_color" in report["semanticUpdatedPaths"]
-    assert "current.sections.ss_footer_4_abc123.settings.newsletter_color" in report["semanticUpdatedPaths"]
+    assert (
+        footer_settings["background_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
+    )
+    assert (
+        footer_settings["border_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    )
+    assert (
+        footer_settings["newsletter_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        "current.sections.ss_footer_4_abc123.settings.background_color"
+        in report["semanticUpdatedPaths"]
+    )
+    assert (
+        "current.sections.ss_footer_4_abc123.settings.border_color"
+        in report["semanticUpdatedPaths"]
+    )
+    assert (
+        "current.sections.ss_footer_4_abc123.settings.newsletter_color"
+        in report["semanticUpdatedPaths"]
+    )
     assert report["unmappedColorPaths"] == []
 
 
 def test_sync_theme_settings_data_maps_footer_section_background_gradient_to_footer_bg():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2082,18 +2847,36 @@ def test_sync_theme_settings_data_maps_footer_section_background_gradient_to_foo
         settings_content=settings_content,
         effective_css_vars=effective_css_vars,
     )
-    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
-    footer_settings = synced_settings["current"]["sections"]["ss_footer_4_abc123"]["settings"]
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
+    )
+    footer_settings = synced_settings["current"]["sections"]["ss_footer_4_abc123"][
+        "settings"
+    ]
 
-    assert footer_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
-    assert footer_settings["background_gradient"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
-    assert "current.sections.ss_footer_4_abc123.settings.background_color" in report["semanticUpdatedPaths"]
-    assert "current.sections.ss_footer_4_abc123.settings.background_gradient" in report["semanticUpdatedPaths"]
+    assert (
+        footer_settings["background_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
+    )
+    assert (
+        footer_settings["background_gradient"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
+    )
+    assert (
+        "current.sections.ss_footer_4_abc123.settings.background_color"
+        in report["semanticUpdatedPaths"]
+    )
+    assert (
+        "current.sections.ss_footer_4_abc123.settings.background_gradient"
+        in report["semanticUpdatedPaths"]
+    )
     assert report["unmappedColorPaths"] == []
 
 
 def test_sync_theme_settings_data_updates_checkout_and_sale_semantic_color_paths():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2119,20 +2902,36 @@ def test_sync_theme_settings_data_updates_checkout_and_sale_semantic_color_paths
         settings_content=settings_content,
         effective_css_vars=effective_css_vars,
     )
-    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
-
-    assert synced_settings["current"]["checkout_error_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
-    assert synced_settings["current"]["color_price"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
-    assert synced_settings["current"]["color_sale_price"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
-    assert synced_settings["current"]["color_sale_tag"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
-    assert synced_settings["current"]["sections"]["main-password-header"]["settings"]["color_drawer_overlay"] == (
-        _THEME_SYNC_REQUIRED_CSS_VARS["--color-soft"]
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
     )
+
+    assert (
+        synced_settings["current"]["checkout_error_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        synced_settings["current"]["color_price"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
+    )
+    assert (
+        synced_settings["current"]["color_sale_price"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    )
+    assert (
+        synced_settings["current"]["color_sale_tag"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    )
+    assert synced_settings["current"]["sections"]["main-password-header"]["settings"][
+        "color_drawer_overlay"
+    ] == (_THEME_SYNC_REQUIRED_CSS_VARS["--color-soft"])
     assert report["unmappedColorPaths"] == []
 
 
 def test_sync_theme_settings_data_updates_typography_semantic_paths():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars={
@@ -2163,7 +2962,9 @@ def test_sync_theme_settings_data_updates_typography_semantic_paths():
         settings_content=settings_content,
         effective_css_vars=effective_css_vars,
     )
-    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
+    )
     synced_current = synced_settings["current"]
 
     assert synced_current["type_header_font"] == "inter_n7"
@@ -2184,7 +2985,9 @@ def test_sync_theme_settings_data_updates_typography_semantic_paths():
 
 
 def test_sync_theme_settings_data_updates_logo_fields_from_shopify_logo_url():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2201,7 +3004,9 @@ def test_sync_theme_settings_data_updates_logo_fields_from_shopify_logo_url():
         effective_css_vars=effective_css_vars,
         logo_url="shopify://shop_images/logo-1.png",
     )
-    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
+    )
     synced_current = synced_settings["current"]
 
     assert synced_current["logo"] == "shopify://shop_images/logo-1.png"
@@ -2209,7 +3014,9 @@ def test_sync_theme_settings_data_updates_logo_fields_from_shopify_logo_url():
 
 
 def test_sync_theme_settings_data_errors_for_non_shopify_logo_url():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2235,7 +3042,9 @@ def test_sync_theme_settings_data_errors_for_non_shopify_logo_url():
 def test_download_logo_source_file_errors_for_invalid_url():
     client = ShopifyApiClient()
 
-    with pytest.raises(ShopifyApiError, match="logoUrl is not a valid URL for logo download"):
+    with pytest.raises(
+        ShopifyApiError, match="logoUrl is not a valid URL for logo download"
+    ):
         asyncio.run(client._download_logo_source_file(logo_url="https://example.com/\x00"))  # type: ignore[arg-type]
 
 
@@ -2305,7 +3114,9 @@ def test_resolve_logo_upload_metadata_appends_missing_extension():
 
 
 def test_resolve_logo_upload_metadata_errors_for_non_image_content_type():
-    with pytest.raises(ShopifyApiError, match="Logo source must be an image content type"):
+    with pytest.raises(
+        ShopifyApiError, match="Logo source must be an image content type"
+    ):
         ShopifyApiClient._resolve_logo_upload_metadata(
             source_url="https://assets.example.com/public/assets/logo-1",
             response_content_type="application/json",
@@ -2313,7 +3124,9 @@ def test_resolve_logo_upload_metadata_errors_for_non_image_content_type():
 
 
 def test_sync_theme_settings_data_errors_for_unmapped_typography_paths():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2336,7 +3149,9 @@ def test_sync_theme_settings_data_errors_for_unmapped_typography_paths():
 
 
 def test_sync_theme_settings_data_errors_for_invalid_font_picker_handle_source():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars={
@@ -2362,7 +3177,9 @@ def test_sync_theme_settings_data_errors_for_invalid_font_picker_handle_source()
 
 
 def test_sync_theme_settings_data_aliases_cormorant_garamond_to_cormorant_handle():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars={
@@ -2381,13 +3198,17 @@ def test_sync_theme_settings_data_aliases_cormorant_garamond_to_cormorant_handle
         settings_content=settings_content,
         effective_css_vars=effective_css_vars,
     )
-    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
+    )
 
     assert synced_settings["current"]["type_header_font"] == "cormorant_n7"
 
 
 def test_sync_theme_settings_data_errors_for_unknown_shopify_font_family():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars={
@@ -2413,7 +3234,9 @@ def test_sync_theme_settings_data_errors_for_unknown_shopify_font_family():
 
 
 def test_sync_theme_settings_data_accepts_explicit_shopify_font_handle_source():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars={
@@ -2432,13 +3255,17 @@ def test_sync_theme_settings_data_accepts_explicit_shopify_font_handle_source():
         settings_content=settings_content,
         effective_css_vars=effective_css_vars,
     )
-    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
+    )
 
     assert synced_settings["current"]["type_header_font"] == "inter_i7"
 
 
 def test_sync_theme_template_color_settings_data_updates_component_paths():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2471,34 +3298,65 @@ def test_sync_theme_template_color_settings_data_updates_component_paths():
         }
     )
 
-    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
-        profile=profile,
-        template_filename="templates/index.json",
-        template_content=template_content,
-        effective_css_vars=effective_css_vars,
+    next_template_content, report = (
+        ShopifyApiClient._sync_theme_template_color_settings_data(
+            profile=profile,
+            template_filename="templates/index.json",
+            template_content=template_content,
+            effective_css_vars=effective_css_vars,
+        )
     )
     synced_template = ShopifyApiClient._parse_theme_template_json(
         filename="templates/index.json",
         template_content=next_template_content,
     )
     hero_settings = synced_template["sections"]["hero"]["settings"]
-    heading_block_settings = synced_template["sections"]["hero"]["blocks"]["heading"]["settings"]
+    heading_block_settings = synced_template["sections"]["hero"]["blocks"]["heading"][
+        "settings"
+    ]
 
-    assert hero_settings["color_overlay"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-soft"]
-    assert hero_settings["heading_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
-    assert hero_settings["button_bg_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
-    assert hero_settings["button_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
-    assert hero_settings["item_bg_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-page-bg"]
-    assert hero_settings["arrow_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
-    assert hero_settings["line_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
-    assert heading_block_settings["title_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
-    assert heading_block_settings["icon_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
+    assert (
+        hero_settings["color_overlay"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-soft"]
+    )
+    assert (
+        hero_settings["heading_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        hero_settings["button_bg_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    )
+    assert (
+        hero_settings["button_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
+    )
+    assert (
+        hero_settings["item_bg_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-page-bg"]
+    )
+    assert (
+        hero_settings["arrow_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
+    )
+    assert (
+        hero_settings["line_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    )
+    assert (
+        heading_block_settings["title_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        heading_block_settings["icon_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
+    )
     assert report["unmappedColorPaths"] == []
-    assert "templates/index.json.sections.hero.settings.heading_color" in report["updatedPaths"]
+    assert (
+        "templates/index.json.sections.hero.settings.heading_color"
+        in report["updatedPaths"]
+    )
 
 
 def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_footer_bg():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2523,11 +3381,13 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
         }
     )
 
-    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
-        profile=profile,
-        template_filename="templates/footer-group.json",
-        template_content=template_content,
-        effective_css_vars=effective_css_vars,
+    next_template_content, report = (
+        ShopifyApiClient._sync_theme_template_color_settings_data(
+            profile=profile,
+            template_filename="templates/footer-group.json",
+            template_content=template_content,
+            effective_css_vars=effective_css_vars,
+        )
     )
     synced_template = ShopifyApiClient._parse_theme_template_json(
         filename="templates/footer-group.json",
@@ -2535,27 +3395,60 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
     )
     footer_settings = synced_template["sections"]["ss_footer_4_9rJacA"]["settings"]
 
-    assert footer_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
-    assert footer_settings["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
-    assert footer_settings["newsletter_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
-    assert footer_settings["copy_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
-    assert footer_settings["input_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
-    assert footer_settings["input_placeholder_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-muted"]
-    assert footer_settings["submit_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
-    assert footer_settings["submit_hover_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
-    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.background_color" in report[
-        "updatedPaths"
-    ]
-    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.newsletter_color" in report[
-        "updatedPaths"
-    ]
-    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.copy_color" in report["updatedPaths"]
-    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_color" in report["updatedPaths"]
+    assert (
+        footer_settings["background_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
+    )
+    assert (
+        footer_settings["border_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    )
+    assert (
+        footer_settings["newsletter_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        footer_settings["copy_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        footer_settings["input_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        footer_settings["input_placeholder_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-muted"]
+    )
+    assert (
+        footer_settings["submit_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
+    )
+    assert (
+        footer_settings["submit_hover_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.background_color"
+        in report["updatedPaths"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.newsletter_color"
+        in report["updatedPaths"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.copy_color"
+        in report["updatedPaths"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_color"
+        in report["updatedPaths"]
+    )
     assert (
         "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_placeholder_color"
         in report["updatedPaths"]
     )
-    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_color" in report["updatedPaths"]
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_color"
+        in report["updatedPaths"]
+    )
     assert (
         "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_hover_color"
         in report["updatedPaths"]
@@ -2564,7 +3457,9 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
 
 
 def test_sync_theme_template_color_settings_data_maps_announcement_background_to_cta_bg():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2584,22 +3479,38 @@ def test_sync_theme_template_color_settings_data_maps_announcement_background_to
         }
     )
 
-    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
-        profile=profile,
-        template_filename="templates/index.json",
-        template_content=template_content,
-        effective_css_vars=effective_css_vars,
+    next_template_content, report = (
+        ShopifyApiClient._sync_theme_template_color_settings_data(
+            profile=profile,
+            template_filename="templates/index.json",
+            template_content=template_content,
+            effective_css_vars=effective_css_vars,
+        )
     )
     synced_template = ShopifyApiClient._parse_theme_template_json(
         filename="templates/index.json",
         template_content=next_template_content,
     )
-    announcement_settings = synced_template["sections"]["announcement_bar_main"]["settings"]
+    announcement_settings = synced_template["sections"]["announcement_bar_main"][
+        "settings"
+    ]
 
-    assert announcement_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
-    assert announcement_settings["text_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
-    assert announcement_settings["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
-    assert "templates/index.json.sections.announcement_bar_main.settings.background_color" in report["updatedPaths"]
+    assert (
+        announcement_settings["background_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    )
+    assert (
+        announcement_settings["text_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    )
+    assert (
+        announcement_settings["border_color"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    )
+    assert (
+        "templates/index.json.sections.announcement_bar_main.settings.background_color"
+        in report["updatedPaths"]
+    )
     assert report["unmappedColorPaths"] == []
 
 
@@ -2612,7 +3523,7 @@ def test_parse_theme_template_json_supports_leading_comment_block():
             " * IMPORTANT: This file is auto-generated.\n"
             " * ------------------------------------------------------------\n"
             " */\n"
-            "{\"sections\":{\"main\":{\"type\":\"main-404\",\"settings\":{}}},\"order\":[\"main\"]}\n"
+            '{"sections":{"main":{"type":"main-404","settings":{}}},"order":["main"]}\n'
         ),
     )
 
@@ -2632,7 +3543,9 @@ def test_parse_theme_template_json_errors_for_unterminated_leading_comment_block
 
 
 def test_sync_theme_settings_data_errors_for_unmapped_color_paths():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2655,7 +3568,9 @@ def test_sync_theme_settings_data_errors_for_unmapped_color_paths():
 
 
 def test_audit_theme_settings_data_reports_semantic_mismatch():
-    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
@@ -2676,14 +3591,18 @@ def test_audit_theme_settings_data_reports_semantic_mismatch():
         effective_css_vars=effective_css_vars,
     )
 
-    assert "current.sections.announcement.text_color" in report["semanticMismatchedPaths"]
+    assert (
+        "current.sections.announcement.text_color" in report["semanticMismatchedPaths"]
+    )
     assert report["unmappedColorPaths"] == []
 
 
 def test_sync_theme_brand_requires_one_theme_selector():
     client = ShopifyApiClient()
 
-    with pytest.raises(ShopifyApiError, match="Exactly one of themeId or themeName is required"):
+    with pytest.raises(
+        ShopifyApiError, match="Exactly one of themeId or themeName is required"
+    ):
         asyncio.run(
             client.sync_theme_brand(
                 shop_domain="example.myshopify.com",
@@ -2756,7 +3675,9 @@ def test_audit_theme_brand_reports_ready_when_layout_css_and_settings_are_synced
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "layout/theme.liquid":
                 return {
@@ -2902,7 +3823,9 @@ def test_audit_theme_brand_reports_template_component_mismatch():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "layout/theme.liquid":
                 return {
@@ -2994,7 +3917,10 @@ def test_audit_theme_brand_reports_template_component_mismatch():
     )
 
     assert result["isReady"] is False
-    assert "templates/index.json.sections.hero.settings.heading_color" in result["settingsAudit"]["semanticMismatchedPaths"]
+    assert (
+        "templates/index.json.sections.hero.settings.heading_color"
+        in result["settingsAudit"]["semanticMismatchedPaths"]
+    )
 
 
 def test_audit_theme_brand_reports_gaps_for_missing_marker_and_css_asset():
@@ -3026,7 +3952,9 @@ def test_audit_theme_brand_reports_gaps_for_missing_marker_and_css_asset():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "layout/theme.liquid":
                 return {
@@ -3114,7 +4042,9 @@ def test_sync_theme_brand_errors_when_settings_data_is_empty():
                 }
             }
         if "query themeFileByName" in query:
-            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
             requested_filename = requested_filenames[0] if requested_filenames else None
             if requested_filename == "layout/theme.liquid":
                 return {

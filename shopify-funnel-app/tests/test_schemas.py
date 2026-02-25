@@ -256,7 +256,9 @@ def test_sync_theme_brand_request_accepts_shop_target():
         brandName="Acme",
         logoUrl="https://assets.example.com/public/assets/logo-1",
         cssVars={"--color-brand": "#123456"},
-        fontUrls=["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
+        fontUrls=[
+            "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+        ],
         dataTheme="light",
         themeName="futrgroup2-0theme",
     )
@@ -265,6 +267,44 @@ def test_sync_theme_brand_request_accepts_shop_target():
     assert payload.shopDomain == "example.myshopify.com"
     assert payload.workspaceName == "Acme Workspace"
     assert payload.brandName == "Acme"
+
+
+def test_sync_theme_brand_request_accepts_component_image_urls():
+    payload = SyncThemeBrandRequest(
+        clientId="client_1",
+        workspaceName="Acme Workspace",
+        brandName="Acme",
+        logoUrl="https://assets.example.com/public/assets/logo-1",
+        cssVars={"--color-brand": "#123456"},
+        componentImageUrls={
+            "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-1",
+        },
+        themeName="futrgroup2-0theme",
+    )
+
+    assert payload.componentImageUrls == {
+        "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-1",
+    }
+
+
+def test_sync_theme_brand_request_accepts_auto_component_image_urls():
+    payload = SyncThemeBrandRequest(
+        clientId="client_1",
+        workspaceName="Acme Workspace",
+        brandName="Acme",
+        logoUrl="https://assets.example.com/public/assets/logo-1",
+        cssVars={"--color-brand": "#123456"},
+        autoComponentImageUrls=[
+            "https://assets.example.com/public/assets/product-hero-1",
+            "https://assets.example.com/public/assets/product-hero-2",
+        ],
+        themeName="futrgroup2-0theme",
+    )
+
+    assert payload.autoComponentImageUrls == [
+        "https://assets.example.com/public/assets/product-hero-1",
+        "https://assets.example.com/public/assets/product-hero-2",
+    ]
 
 
 def test_sync_theme_brand_request_requires_exactly_one_theme_selector():
