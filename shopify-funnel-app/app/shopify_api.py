@@ -379,6 +379,7 @@ _THEME_SETTINGS_SIMPLE_NUMBER_RE = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*(px|e
 _THEME_SETTINGS_FONT_HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9_]*_(?:n|i)\d{1,3}$")
 _THEME_SETTINGS_FONT_HANDLE_SUFFIX_RE = re.compile(r"_(?:n|i)\d{1,3}$")
 _THEME_SETTINGS_FONT_HANDLE_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
+_THEME_SETTINGS_FONT_FAMILY_ALIAS_RE = re.compile(r"[\s_-]+")
 _THEME_SETTINGS_COLOR_VALUE_KEYWORDS = frozenset({"transparent", "currentcolor", "inherit", "initial", "unset"})
 _THEME_SETTINGS_GENERIC_FONT_FAMILIES = frozenset(
     {
@@ -394,6 +395,9 @@ _THEME_SETTINGS_GENERIC_FONT_FAMILIES = frozenset(
         "ui-rounded",
     }
 )
+_THEME_SETTINGS_FONT_FAMILY_HANDLE_ALIASES = {
+    "cormorant garamond": "cormorant",
+}
 _THEME_SETTINGS_SEMANTIC_TOKEN_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("secondary", "button", "label"), "secondary_button_label"),
     (("secondary", "button"), "secondary_button"),
@@ -2563,6 +2567,10 @@ class ShopifyApiClient:
     ) -> str:
         primary_family = cls._extract_primary_font_family_from_css_value(raw_value=source_value).strip()
         normalized_family = primary_family.strip("'\" ").lower()
+        alias_lookup_family = _THEME_SETTINGS_FONT_FAMILY_ALIAS_RE.sub(" ", normalized_family).strip()
+        aliased_family = _THEME_SETTINGS_FONT_FAMILY_HANDLE_ALIASES.get(alias_lookup_family)
+        if aliased_family is not None:
+            normalized_family = aliased_family
         if not normalized_family:
             raise ShopifyApiError(
                 message=(
@@ -2592,17 +2600,23 @@ class ShopifyApiClient:
             return normalized_family
 
         current_handle = current_value.strip().lower()
+        if not _THEME_SETTINGS_FONT_HANDLE_RE.fullmatch(current_handle):
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings typography mapping for path {path} requires current value {current_value!r} "
+                    "to be a Shopify font handle."
+                ),
+                status_code=422,
+            )
         suffix_match = _THEME_SETTINGS_FONT_HANDLE_SUFFIX_RE.search(current_handle)
         if suffix_match is None:
             raise ShopifyApiError(
                 message=(
                     f"Theme settings typography mapping for path {path} requires current value {current_value!r} "
-                    "to be a Shopify font handle so a compatible variant can be derived."
+                    "to be a Shopify font handle."
                 ),
                 status_code=422,
             )
-        suffix = suffix_match.group(0)
-
         base_handle = _THEME_SETTINGS_FONT_HANDLE_SANITIZE_RE.sub("_", normalized_family)
         base_handle = base_handle.strip("_")
         if not base_handle:
@@ -2613,16 +2627,21 @@ class ShopifyApiClient:
                 ),
                 status_code=422,
             )
-        candidate_handle = f"{base_handle}{suffix}"
-        if not _THEME_SETTINGS_FONT_HANDLE_RE.fullmatch(candidate_handle):
+        current_base_handle = current_handle[: suffix_match.start()].strip("_")
+        if base_handle == current_base_handle:
+            return current_handle
+        if aliased_family is not None:
+            return f"{base_handle}{suffix_match.group(0)}"
+        if base_handle != current_base_handle:
             raise ShopifyApiError(
                 message=(
-                    f"Theme settings typography mapping produced invalid Shopify font handle "
-                    f"{candidate_handle!r} for path {path}."
+                    f"Theme settings typography mapping for path {path} cannot map family {primary_family!r} "
+                    f"to a known Shopify font handle. Current Shopify handle is {current_value!r}. "
+                    "Provide a valid Shopify font handle in the design token (for example, inter_n4)."
                 ),
                 status_code=422,
             )
-        return candidate_handle
+        return current_handle
 
     @staticmethod
     def _parse_simple_numeric_css_value(*, raw_value: str) -> tuple[float, str | None] | None:
