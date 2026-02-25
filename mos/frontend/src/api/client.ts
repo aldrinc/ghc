@@ -45,7 +45,20 @@ export function useApiClient(baseUrl: string = defaultBaseUrl) {
       }
       headers.set("Content-Type", "application/json");
 
-      const resp = await fetch(`${baseUrl}${path}`, { ...init, headers });
+      const url = `${baseUrl}${path}`;
+      let resp: Response;
+      try {
+        resp = await fetch(url, { ...init, headers });
+      } catch (error) {
+        const networkMessage = error instanceof Error && error.message ? error.message : "Request failed";
+        throw {
+          message:
+            `Network error while calling ${url}: ${networkMessage}. ` +
+            "Check VITE_API_BASE_URL, backend availability, and CORS.",
+          status: 0,
+          raw: error,
+        } as ApiError;
+      }
       if (!resp.ok) {
         throw await parseError(resp);
       }
