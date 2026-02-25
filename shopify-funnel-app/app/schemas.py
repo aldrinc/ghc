@@ -289,6 +289,8 @@ class ThemeBrandSettingsSyncSummary(BaseModel):
     requiredMissingPaths: list[str] = Field(default_factory=list)
     semanticUpdatedPaths: list[str] = Field(default_factory=list)
     unmappedColorPaths: list[str] = Field(default_factory=list)
+    semanticTypographyUpdatedPaths: list[str] = Field(default_factory=list)
+    unmappedTypographyPaths: list[str] = Field(default_factory=list)
 
 
 class ThemeBrandSettingsAuditSummary(BaseModel):
@@ -302,6 +304,9 @@ class ThemeBrandSettingsAuditSummary(BaseModel):
     semanticSyncedPaths: list[str] = Field(default_factory=list)
     semanticMismatchedPaths: list[str] = Field(default_factory=list)
     unmappedColorPaths: list[str] = Field(default_factory=list)
+    semanticTypographySyncedPaths: list[str] = Field(default_factory=list)
+    semanticTypographyMismatchedPaths: list[str] = Field(default_factory=list)
+    unmappedTypographyPaths: list[str] = Field(default_factory=list)
 
 
 class SyncThemeBrandResponse(BaseModel):

@@ -17,6 +17,8 @@ _THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
 _THEME_BRAND_SETTINGS_FILENAME = "config/settings_data.json"
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
+_THEME_TEMPLATE_JSON_FILENAME_RE = re.compile(r"^templates/.+\.json$")
+_THEME_COMPONENT_SETTINGS_SYNC_THEME_NAMES = frozenset({"futrgroup2-0theme"})
 _DEFAULT_THEME_VAR_SCOPE_SELECTORS: tuple[str, ...] = (":root",)
 _THEME_VAR_SCOPE_SELECTORS_BY_NAME: dict[str, tuple[str, ...]] = {
     "futrgroup2-0theme": (
@@ -155,6 +157,13 @@ _THEME_REQUIRED_SOURCE_VARS_BY_NAME: dict[str, tuple[str, ...]] = {
         "--color-soft",
         "--focus-outline-color",
         "--font-sans",
+        "--font-heading",
+        "--line",
+        "--heading-line",
+        "--hero-title-letter-spacing",
+        "--text-sm",
+        "--text-base",
+        "--cta-font-size-md",
         "--radius-md",
         "--container-max",
         "--container-pad",
@@ -172,6 +181,13 @@ _THEME_REQUIRED_THEME_VARS_BY_NAME: dict[str, tuple[str, ...]] = {
         "--color-button-border",
         "--color-keyboard-focus",
         "--font-body-family",
+        "--font-heading-family",
+        "--font-body-line-height",
+        "--font-heading-line-height",
+        "--font-heading-letter-spacing",
+        "--font-navigation-size",
+        "--font-button-size",
+        "--font-product-size",
         "--border-radius-medium",
         "--page-width",
         "--page-padding",
@@ -288,6 +304,22 @@ _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
         "checkout_error": "--color-text",
     }
 }
+_THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
+    "futrgroup2-0theme": {
+        "heading_font": "--font-heading",
+        "body_font": "--font-sans",
+        "navigation_font": "--font-sans",
+        "button_font": "--font-sans",
+        "product_font": "--font-sans",
+        "heading_line_height": "--heading-line",
+        "body_line_height": "--line",
+        "heading_letter_spacing": "--hero-title-letter-spacing",
+        "body_base_size": "--text-base",
+        "navigation_base_size": "--text-sm",
+        "button_base_size": "--cta-font-size-md",
+        "product_base_size": "--text-base",
+    }
+}
 _THEME_SETTINGS_COLOR_KEY_MARKERS = frozenset(
     {
         "background",
@@ -305,18 +337,80 @@ _THEME_SETTINGS_COLOR_KEY_MARKERS = frozenset(
         "color",
     }
 )
+_THEME_SETTINGS_TYPOGRAPHY_KEY_SKIP_MARKERS = frozenset(
+    {
+        "capitalize",
+        "capitalise",
+        "uppercase",
+        "lowercase",
+    }
+)
+_THEME_SETTINGS_TYPOGRAPHY_CONTEXT_MARKERS = frozenset(
+    {
+        "header",
+        "heading",
+        "body",
+        "nav",
+        "navigation",
+        "button",
+        "buttons",
+        "product",
+        "grid",
+    }
+)
+_THEME_SETTINGS_TYPOGRAPHY_PROPERTY_MARKERS = frozenset(
+    {
+        "font",
+        "line",
+        "height",
+        "letter",
+        "spacing",
+        "size",
+        "weight",
+    }
+)
 _THEME_SETTINGS_SEMANTIC_KEY_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
 _THEME_SETTINGS_SEMANTIC_KEY_COLLAPSE_RE = re.compile(r"_+")
 _THEME_SETTINGS_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE)
 _THEME_SETTINGS_CSS_COLOR_FUNCTION_RE = re.compile(r"^(?:rgb|rgba|hsl|hsla)\s*\(", re.IGNORECASE)
 _THEME_SETTINGS_CSS_VAR_RE = re.compile(r"^var\(\s*--[A-Za-z0-9_-]+(?:\s*,\s*[^)]+)?\s*\)$")
+_THEME_SETTINGS_SIMPLE_NUMBER_RE = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*(px|em|rem|%)?\s*$", re.IGNORECASE)
 _THEME_SETTINGS_COLOR_VALUE_KEYWORDS = frozenset({"transparent", "currentcolor", "inherit", "initial", "unset"})
 _THEME_SETTINGS_SEMANTIC_TOKEN_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("secondary", "button", "label"), "secondary_button_label"),
     (("secondary", "button"), "secondary_button"),
+    (("button", "background"), "button"),
+    (("button", "bg"), "button"),
+    (("button", "gradient"), "button"),
+    (("button", "border"), "border"),
+    (("button", "color"), "button_text"),
     (("button", "label"), "button_label"),
     (("button", "text"), "button_text"),
     (("keyboard", "focus"), "keyboard_focus"),
+    (("overlay",), "drawer_overlay"),
+    (("toggles", "bg"), "background"),
+    (("toggle", "bg"), "background"),
+    (("arrow", "bg"), "background"),
+    (("item", "bg"), "background"),
+    (("card", "bg"), "background"),
+    (("body", "bg"), "background"),
+    (("image", "bg"), "background"),
+    (("line",), "border"),
+    (("icon",), "accent"),
+    (("stars",), "accent"),
+    (("pagination",), "accent"),
+    (("dots",), "accent"),
+    (("dot",), "accent"),
+    (("circle",), "accent"),
+    (("arrow",), "accent"),
+    (("title",), "text"),
+    (("heading",), "text"),
+    (("question",), "text"),
+    (("answer",), "text"),
+    (("date",), "text"),
+    (("number",), "text"),
+    (("rating",), "text"),
+    (("item",), "text"),
     (("image", "background"), "image_background"),
     (("footer", "background"), "footer_background"),
     (("footer", "text"), "footer_text"),
@@ -352,6 +446,7 @@ def _build_theme_profile_lookup_by_canonical_name() -> dict[str, str]:
         + list(_THEME_SETTINGS_VALUE_PATHS_BY_NAME.keys())
         + list(_THEME_REQUIRED_SETTINGS_PATHS_BY_NAME.keys())
         + list(_THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.keys())
+        + list(_THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME.keys())
     )
     for profile_name in profile_names:
         lookup[_canonicalize_theme_profile_lookup_key(profile_name)] = profile_name
@@ -2194,6 +2289,20 @@ class ShopifyApiClient:
             return None
         if normalized_key in semantic_source_vars:
             return normalized_key
+        key_tokens = {token for token in normalized_key.split("_") if token}
+        if not key_tokens:
+            return None
+
+        # `button_color` should map to button text before generic variant matching
+        # (`button`) so component text colors do not become button backgrounds.
+        if (
+            not normalized_key.startswith("color_")
+            and "button" in key_tokens
+            and "color" in key_tokens
+            and not ({"bg", "background", "gradient", "border"} & key_tokens)
+            and "button_text" in semantic_source_vars
+        ):
+            return "button_text"
 
         variant_candidates = (
             normalized_key.removeprefix("color_"),
@@ -2204,9 +2313,6 @@ class ShopifyApiClient:
             if candidate and candidate in semantic_source_vars:
                 return candidate
 
-        key_tokens = {token for token in normalized_key.split("_") if token}
-        if not key_tokens:
-            return None
         for required_tokens, semantic_key in _THEME_SETTINGS_SEMANTIC_TOKEN_RULES:
             if semantic_key not in semantic_source_vars:
                 continue
@@ -2321,6 +2427,499 @@ class ShopifyApiClient:
 
         return sorted(set(synced_paths)), sorted(set(mismatched_paths)), sorted(set(unmapped_paths))
 
+    @classmethod
+    def _tokenize_theme_settings_path(cls, *, path: str) -> set[str]:
+        normalized = cls._normalize_theme_settings_semantic_key(
+            raw_key=path.replace(".", "_").replace("[", "_").replace("]", "_")
+        )
+        if not normalized:
+            return set()
+        return {token for token in normalized.split("_") if token and not token.isdigit()}
+
+    @classmethod
+    def _is_theme_settings_typography_leaf_candidate(
+        cls,
+        *,
+        key: str,
+        path: str,
+        value: Any,
+    ) -> bool:
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            return False
+        key_tokens = cls._tokenize_theme_settings_path(path=key)
+        if not key_tokens:
+            return False
+        if key_tokens & _THEME_SETTINGS_TYPOGRAPHY_KEY_SKIP_MARKERS:
+            return False
+        path_tokens = cls._tokenize_theme_settings_path(path=path)
+        tokens = key_tokens | path_tokens
+        if not (tokens & _THEME_SETTINGS_TYPOGRAPHY_PROPERTY_MARKERS):
+            return False
+        has_typography_context = bool(tokens & _THEME_SETTINGS_TYPOGRAPHY_CONTEXT_MARKERS)
+        has_type_prefix = "type" in tokens or "typography" in tokens
+        return has_typography_context or has_type_prefix
+
+    @classmethod
+    def _resolve_theme_settings_typography_semantic_key(
+        cls,
+        *,
+        semantic_source_vars: dict[str, str],
+        key: str,
+        path: str,
+    ) -> str | None:
+        tokens = cls._tokenize_theme_settings_path(path=key) | cls._tokenize_theme_settings_path(path=path)
+        is_heading = bool(tokens & {"heading", "header"})
+        is_body = "body" in tokens
+        is_navigation = bool(tokens & {"nav", "navigation"})
+        is_button = bool(tokens & {"button", "buttons"})
+        is_product = bool(tokens & {"product", "grid"})
+
+        has_font = "font" in tokens
+        has_line_height = "line" in tokens and "height" in tokens
+        has_letter_spacing = "letter" in tokens and "spacing" in tokens
+        has_size = "size" in tokens
+
+        semantic_key: str | None = None
+        if has_font:
+            if is_heading:
+                semantic_key = "heading_font"
+            elif is_navigation:
+                semantic_key = "navigation_font"
+            elif is_button:
+                semantic_key = "button_font"
+            elif is_product:
+                semantic_key = "product_font"
+            elif is_body:
+                semantic_key = "body_font"
+        elif has_line_height:
+            if is_heading:
+                semantic_key = "heading_line_height"
+            elif is_body or is_navigation or is_button or is_product:
+                semantic_key = "body_line_height"
+        elif has_letter_spacing:
+            if is_heading:
+                semantic_key = "heading_letter_spacing"
+        elif has_size:
+            if is_navigation:
+                semantic_key = "navigation_base_size"
+            elif is_button:
+                semantic_key = "button_base_size"
+            elif is_product:
+                semantic_key = "product_base_size"
+            elif is_body:
+                semantic_key = "body_base_size"
+
+        if semantic_key is None:
+            return None
+        if semantic_key not in semantic_source_vars:
+            return None
+        return semantic_key
+
+    @staticmethod
+    def _extract_primary_font_family_from_css_value(*, raw_value: str) -> str:
+        cleaned = raw_value.strip()
+        if not cleaned:
+            return cleaned
+        if cleaned.lower().startswith("var("):
+            return cleaned
+        first_family = cleaned.split(",", 1)[0].strip()
+        if len(first_family) >= 2 and first_family[0] == first_family[-1] and first_family[0] in {"'", '"'}:
+            first_family = first_family[1:-1].strip()
+        return first_family or cleaned
+
+    @staticmethod
+    def _parse_simple_numeric_css_value(*, raw_value: str) -> tuple[float, str | None] | None:
+        match = _THEME_SETTINGS_SIMPLE_NUMBER_RE.fullmatch(raw_value.strip())
+        if match is None:
+            return None
+        unit = match.group(2)
+        return float(match.group(1)), unit.lower() if unit else None
+
+    @classmethod
+    def _coerce_theme_settings_typography_value(
+        cls,
+        *,
+        semantic_key: str,
+        source_value: str,
+        current_value: Any,
+        path: str,
+    ) -> Any:
+        if semantic_key.endswith("_font"):
+            if isinstance(current_value, str):
+                normalized_current = current_value.strip().lower()
+                if normalized_current in {"body", "heading"}:
+                    return "heading" if semantic_key == "heading_font" else "body"
+            return cls._extract_primary_font_family_from_css_value(raw_value=source_value)
+
+        parsed_numeric = cls._parse_simple_numeric_css_value(raw_value=source_value)
+        if parsed_numeric is None:
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings typography mapping for path {path} requires a simple numeric source value, "
+                    f"received {source_value!r}."
+                ),
+                status_code=422,
+            )
+        numeric_value, numeric_unit = parsed_numeric
+
+        if semantic_key.endswith("letter_spacing"):
+            converted_value = numeric_value
+            if numeric_unit in {"em", "rem"}:
+                converted_value = numeric_value * 1000
+            coerced_int = int(round(converted_value))
+            if isinstance(current_value, str):
+                return str(coerced_int)
+            return coerced_int
+
+        if semantic_key.endswith("line_height"):
+            if isinstance(current_value, str):
+                return f"{numeric_value:g}"
+            return float(numeric_value)
+
+        if semantic_key.endswith("base_size"):
+            coerced_size = int(round(numeric_value))
+            if isinstance(current_value, str):
+                cleaned_current = current_value.strip().lower()
+                if cleaned_current.endswith("px"):
+                    return f"{coerced_size}px"
+                return str(coerced_size)
+            return coerced_size
+
+        if isinstance(current_value, str):
+            return f"{numeric_value:g}"
+        if isinstance(current_value, int):
+            return int(round(numeric_value))
+        if isinstance(current_value, float):
+            return float(numeric_value)
+        raise ShopifyApiError(
+            message=f"Theme settings typography path {path} has unsupported value type {type(current_value).__name__}.",
+            status_code=422,
+        )
+
+    @classmethod
+    def _sync_theme_semantic_typography_settings(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        settings_data: dict[str, Any],
+        effective_css_vars: dict[str, str],
+    ) -> tuple[list[str], list[str]]:
+        semantic_source_vars = _THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        if not semantic_source_vars:
+            return [], []
+
+        current = settings_data.get("current")
+        if not isinstance(current, dict):
+            return [], []
+
+        updated_paths: list[str] = []
+        unmapped_paths: list[str] = []
+
+        def walk(node: Any, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    child_path = f"{path}.{key}" if path else key
+                    if isinstance(value, (dict, list)):
+                        walk(value, child_path)
+                        continue
+                    if not cls._is_theme_settings_typography_leaf_candidate(key=key, path=child_path, value=value):
+                        continue
+                    semantic_key = cls._resolve_theme_settings_typography_semantic_key(
+                        semantic_source_vars=semantic_source_vars,
+                        key=key,
+                        path=child_path,
+                    )
+                    if semantic_key is None:
+                        unmapped_paths.append(child_path)
+                        continue
+                    source_var = semantic_source_vars[semantic_key]
+                    source_value = effective_css_vars.get(source_var)
+                    if source_value is None:
+                        raise ShopifyApiError(
+                            message=(
+                                f"Theme settings typography mapping requires css var {source_var} for path {child_path}. "
+                                "Add the missing token to the design system."
+                            ),
+                            status_code=422,
+                        )
+                    expected_value = cls._coerce_theme_settings_typography_value(
+                        semantic_key=semantic_key,
+                        source_value=source_value,
+                        current_value=value,
+                        path=child_path,
+                    )
+                    if value == expected_value:
+                        continue
+                    node[key] = expected_value
+                    updated_paths.append(child_path)
+                return
+            if isinstance(node, list):
+                for idx, item in enumerate(node):
+                    walk(item, f"{path}[{idx}]")
+
+        walk(current, "current")
+        return sorted(set(updated_paths)), sorted(set(unmapped_paths))
+
+    @classmethod
+    def _audit_theme_semantic_typography_settings(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        settings_data: dict[str, Any],
+        effective_css_vars: dict[str, str],
+    ) -> tuple[list[str], list[str], list[str]]:
+        semantic_source_vars = _THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        if not semantic_source_vars:
+            return [], [], []
+
+        current = settings_data.get("current")
+        if not isinstance(current, dict):
+            return [], [], []
+
+        synced_paths: list[str] = []
+        mismatched_paths: list[str] = []
+        unmapped_paths: list[str] = []
+
+        def walk(node: Any, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    child_path = f"{path}.{key}" if path else key
+                    if isinstance(value, (dict, list)):
+                        walk(value, child_path)
+                        continue
+                    if not cls._is_theme_settings_typography_leaf_candidate(key=key, path=child_path, value=value):
+                        continue
+                    semantic_key = cls._resolve_theme_settings_typography_semantic_key(
+                        semantic_source_vars=semantic_source_vars,
+                        key=key,
+                        path=child_path,
+                    )
+                    if semantic_key is None:
+                        unmapped_paths.append(child_path)
+                        continue
+                    source_var = semantic_source_vars[semantic_key]
+                    source_value = effective_css_vars.get(source_var)
+                    if source_value is None:
+                        mismatched_paths.append(child_path)
+                        continue
+                    expected_value = cls._coerce_theme_settings_typography_value(
+                        semantic_key=semantic_key,
+                        source_value=source_value,
+                        current_value=value,
+                        path=child_path,
+                    )
+                    if value == expected_value:
+                        synced_paths.append(child_path)
+                    else:
+                        mismatched_paths.append(child_path)
+                return
+            if isinstance(node, list):
+                for idx, item in enumerate(node):
+                    walk(item, f"{path}[{idx}]")
+
+        walk(current, "current")
+        return sorted(set(synced_paths)), sorted(set(mismatched_paths)), sorted(set(unmapped_paths))
+
+    @staticmethod
+    def _is_theme_component_settings_sync_enabled_for_profile(*, profile: ThemeBrandProfile) -> bool:
+        return profile.theme_name in _THEME_COMPONENT_SETTINGS_SYNC_THEME_NAMES
+
+    @staticmethod
+    def _parse_theme_template_json(*, filename: str, template_content: str) -> dict[str, Any]:
+        normalized_content = template_content[1:] if template_content.startswith("\ufeff") else template_content
+        parse_content = normalized_content.strip()
+        if not parse_content:
+            raise ShopifyApiError(
+                message=f"Theme template file {filename} is empty or whitespace-only.",
+                status_code=409,
+            )
+        try:
+            parsed = json.loads(parse_content)
+        except ValueError as exc:
+            prefix = parse_content[:80].encode("unicode_escape").decode("ascii")
+            raise ShopifyApiError(
+                message=(
+                    f"Theme template file {filename} is not valid JSON. "
+                    f"parserError={exc}. contentLength={len(parse_content)}. contentPrefix={prefix}"
+                ),
+                status_code=409,
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise ShopifyApiError(
+                message=f"Theme template file {filename} must contain a JSON object.",
+                status_code=409,
+            )
+        sections = parsed.get("sections")
+        if sections is not None and not isinstance(sections, dict):
+            raise ShopifyApiError(
+                message=f"Theme template file {filename} has an invalid sections payload; expected an object.",
+                status_code=409,
+            )
+        return parsed
+
+    @classmethod
+    def _collect_theme_template_color_setting_leaves(
+        cls,
+        *,
+        template_filename: str,
+        template_data: dict[str, Any],
+    ) -> list[tuple[dict[str, Any], str, str]]:
+        sections = template_data.get("sections")
+        if not isinstance(sections, dict):
+            return []
+
+        leaves: list[tuple[dict[str, Any], str, str]] = []
+
+        def collect(node: Any, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    child_path = f"{path}.{key}" if path else key
+                    if isinstance(value, (dict, list)):
+                        collect(value, child_path)
+                        continue
+                    if not cls._is_theme_settings_color_key(key=key):
+                        continue
+                    if not cls._is_theme_settings_color_like_value(value=value):
+                        continue
+                    leaves.append((node, key, child_path))
+                return
+            if isinstance(node, list):
+                for idx, item in enumerate(node):
+                    collect(item, f"{path}[{idx}]")
+
+        for section_id, section in sections.items():
+            if not isinstance(section_id, str) or not isinstance(section, dict):
+                continue
+            section_settings = section.get("settings")
+            if isinstance(section_settings, dict):
+                collect(section_settings, f"{template_filename}.sections.{section_id}.settings")
+
+            section_blocks = section.get("blocks")
+            if not isinstance(section_blocks, dict):
+                continue
+            for block_id, block in section_blocks.items():
+                if not isinstance(block_id, str) or not isinstance(block, dict):
+                    continue
+                block_settings = block.get("settings")
+                if isinstance(block_settings, dict):
+                    collect(block_settings, f"{template_filename}.sections.{section_id}.blocks.{block_id}.settings")
+
+        return leaves
+
+    @classmethod
+    def _sync_theme_template_color_settings_data(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        template_filename: str,
+        template_content: str,
+        effective_css_vars: dict[str, str],
+    ) -> tuple[str, dict[str, Any]]:
+        report = {
+            "templateFilename": template_filename,
+            "updatedPaths": [],
+            "unmappedColorPaths": [],
+        }
+        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        if not semantic_source_vars:
+            return template_content, report
+
+        template_data = cls._parse_theme_template_json(
+            filename=template_filename,
+            template_content=template_content,
+        )
+
+        updated_paths: list[str] = []
+        unmapped_paths: list[str] = []
+        leaves = cls._collect_theme_template_color_setting_leaves(
+            template_filename=template_filename,
+            template_data=template_data,
+        )
+        for parent, key, path in leaves:
+            semantic_key = cls._resolve_theme_settings_semantic_key(
+                semantic_source_vars=semantic_source_vars,
+                raw_key=key,
+            )
+            if semantic_key is None:
+                unmapped_paths.append(path)
+                continue
+            source_var = semantic_source_vars[semantic_key]
+            expected_value = effective_css_vars.get(source_var)
+            if expected_value is None:
+                raise ShopifyApiError(
+                    message=(
+                        f"Theme template settings mapping requires css var {source_var} for path {path}. "
+                        "Add the missing token to the design system."
+                    ),
+                    status_code=422,
+                )
+            existing_value = parent.get(key)
+            if isinstance(existing_value, str) and existing_value.strip() == expected_value:
+                continue
+            parent[key] = expected_value
+            updated_paths.append(path)
+
+        report["updatedPaths"] = sorted(set(updated_paths))
+        report["unmappedColorPaths"] = sorted(set(unmapped_paths))
+        if not updated_paths:
+            return template_content, report
+        return json.dumps(template_data, ensure_ascii=False, separators=(",", ":")) + "\n", report
+
+    @classmethod
+    def _audit_theme_template_color_settings_data(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        template_filename: str,
+        template_content: str,
+        effective_css_vars: dict[str, str],
+    ) -> dict[str, Any]:
+        report = {
+            "templateFilename": template_filename,
+            "syncedPaths": [],
+            "mismatchedPaths": [],
+            "unmappedColorPaths": [],
+        }
+        semantic_source_vars = _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME.get(profile.theme_name, {})
+        if not semantic_source_vars:
+            return report
+
+        template_data = cls._parse_theme_template_json(
+            filename=template_filename,
+            template_content=template_content,
+        )
+
+        synced_paths: list[str] = []
+        mismatched_paths: list[str] = []
+        unmapped_paths: list[str] = []
+        leaves = cls._collect_theme_template_color_setting_leaves(
+            template_filename=template_filename,
+            template_data=template_data,
+        )
+        for parent, key, path in leaves:
+            semantic_key = cls._resolve_theme_settings_semantic_key(
+                semantic_source_vars=semantic_source_vars,
+                raw_key=key,
+            )
+            if semantic_key is None:
+                unmapped_paths.append(path)
+                continue
+            source_var = semantic_source_vars[semantic_key]
+            expected_value = effective_css_vars.get(source_var)
+            if expected_value is None:
+                mismatched_paths.append(path)
+                continue
+            existing_value = parent.get(key)
+            if isinstance(existing_value, str) and existing_value.strip() == expected_value:
+                synced_paths.append(path)
+            else:
+                mismatched_paths.append(path)
+
+        report["syncedPaths"] = sorted(set(synced_paths))
+        report["mismatchedPaths"] = sorted(set(mismatched_paths))
+        report["unmappedColorPaths"] = sorted(set(unmapped_paths))
+        return report
+
     @staticmethod
     def _parse_theme_settings_json(*, settings_content: str) -> dict[str, Any]:
         # Shopify settings_data.json may include a UTF-8 BOM and a leading
@@ -2381,6 +2980,8 @@ class ShopifyApiClient:
             "requiredMissingPaths": [],
             "semanticUpdatedPaths": [],
             "unmappedColorPaths": [],
+            "semanticTypographyUpdatedPaths": [],
+            "unmappedTypographyPaths": [],
         }
         if not profile.settings_value_paths:
             return settings_content, report
@@ -2465,11 +3066,28 @@ class ShopifyApiClient:
                 status_code=422,
             )
 
+        semantic_typography_updated_paths, unmapped_typography_paths = cls._sync_theme_semantic_typography_settings(
+            profile=profile,
+            settings_data=settings_data,
+            effective_css_vars=effective_css_vars,
+        )
+        if unmapped_typography_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Theme settings sync discovered unmapped typography setting paths: "
+                    f"{', '.join(unmapped_typography_paths)}. "
+                    "Add semantic mappings in _THEME_SETTINGS_TYPOGRAPHY_SOURCE_VARS_BY_NAME."
+                ),
+                status_code=422,
+            )
+
         report["updatedPaths"] = sorted(updated_paths)
         report["missingPaths"] = sorted(missing_paths)
         report["requiredMissingPaths"] = required_missing_paths
-        report["semanticUpdatedPaths"] = semantic_updated_paths
+        report["semanticUpdatedPaths"] = sorted(set(semantic_updated_paths + semantic_typography_updated_paths))
         report["unmappedColorPaths"] = unmapped_color_paths
+        report["semanticTypographyUpdatedPaths"] = semantic_typography_updated_paths
+        report["unmappedTypographyPaths"] = unmapped_typography_paths
         return json.dumps(settings_data, indent=2, ensure_ascii=False) + "\n", report
 
     @classmethod
@@ -2491,6 +3109,9 @@ class ShopifyApiClient:
             "semanticSyncedPaths": [],
             "semanticMismatchedPaths": [],
             "unmappedColorPaths": [],
+            "semanticTypographySyncedPaths": [],
+            "semanticTypographyMismatchedPaths": [],
+            "unmappedTypographyPaths": [],
         }
         if not profile.settings_value_paths:
             return report
@@ -2537,15 +3158,27 @@ class ShopifyApiClient:
             settings_data=settings_data,
             effective_css_vars=effective_css_vars,
         )
+        (
+            semantic_typography_synced_paths,
+            semantic_typography_mismatched_paths,
+            unmapped_typography_paths,
+        ) = cls._audit_theme_semantic_typography_settings(
+            profile=profile,
+            settings_data=settings_data,
+            effective_css_vars=effective_css_vars,
+        )
 
         report["syncedPaths"] = sorted(synced_paths)
         report["mismatchedPaths"] = sorted(mismatched_paths)
         report["missingPaths"] = sorted(missing_paths)
         report["requiredMissingPaths"] = required_missing_paths
         report["requiredMismatchedPaths"] = required_mismatched_paths
-        report["semanticSyncedPaths"] = semantic_synced_paths
-        report["semanticMismatchedPaths"] = semantic_mismatched_paths
+        report["semanticSyncedPaths"] = sorted(set(semantic_synced_paths + semantic_typography_synced_paths))
+        report["semanticMismatchedPaths"] = sorted(set(semantic_mismatched_paths + semantic_typography_mismatched_paths))
         report["unmappedColorPaths"] = unmapped_color_paths
+        report["semanticTypographySyncedPaths"] = semantic_typography_synced_paths
+        report["semanticTypographyMismatchedPaths"] = semantic_typography_mismatched_paths
+        report["unmappedTypographyPaths"] = unmapped_typography_paths
         return report
 
     @classmethod
@@ -2885,6 +3518,112 @@ class ShopifyApiClient:
             raise ShopifyApiError(message=f"Theme file body content is missing for {filename}.")
         return content
 
+    async def _list_theme_template_json_filenames(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        theme_id: str,
+    ) -> list[str]:
+        query = """
+        query themeTemplateFilesForBrandSync($id: ID!, $first: Int!, $after: String) {
+            theme(id: $id) {
+                files(first: $first, after: $after) {
+                    nodes {
+                        filename
+                        body {
+                            __typename
+                        }
+                    }
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    userErrors {
+                        code
+                        filename
+                    }
+                }
+            }
+        }
+        """
+        template_filenames: set[str] = set()
+        after: str | None = None
+
+        for _ in range(20):
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={
+                    "query": query,
+                    "variables": {
+                        "id": theme_id,
+                        "first": 250,
+                        "after": after,
+                    },
+                },
+            )
+            theme = response.get("theme")
+            if not isinstance(theme, dict):
+                raise ShopifyApiError(message=f"Theme not found for themeId={theme_id}.", status_code=404)
+            files = theme.get("files")
+            if not isinstance(files, dict):
+                raise ShopifyApiError(message="theme template files query response is invalid.")
+            user_errors = files.get("userErrors") or []
+            if user_errors:
+                details: list[str] = []
+                for error in user_errors:
+                    if not isinstance(error, dict):
+                        continue
+                    code = error.get("code")
+                    errored_filename = error.get("filename")
+                    if isinstance(code, str) and isinstance(errored_filename, str):
+                        details.append(f"{code} ({errored_filename})")
+                    elif isinstance(code, str):
+                        details.append(code)
+                    elif isinstance(errored_filename, str):
+                        details.append(errored_filename)
+                detail_text = "; ".join(details) if details else str(user_errors)
+                raise ShopifyApiError(message=f"theme template files query failed: {detail_text}", status_code=409)
+
+            nodes = files.get("nodes")
+            if not isinstance(nodes, list):
+                raise ShopifyApiError(message="theme template files query response is missing nodes.")
+            for node in nodes:
+                if not isinstance(node, dict):
+                    continue
+                filename = node.get("filename")
+                if not isinstance(filename, str):
+                    continue
+                if _THEME_TEMPLATE_JSON_FILENAME_RE.fullmatch(filename) is None:
+                    continue
+                body = node.get("body")
+                typename = body.get("__typename") if isinstance(body, dict) else None
+                if typename != "OnlineStoreThemeFileBodyText":
+                    continue
+                template_filenames.add(filename)
+
+            page_info = files.get("pageInfo")
+            if not isinstance(page_info, dict):
+                raise ShopifyApiError(message="theme template files query response is missing pageInfo.")
+            has_next_page = page_info.get("hasNextPage")
+            if not isinstance(has_next_page, bool):
+                raise ShopifyApiError(message="theme template files query response is missing pageInfo.hasNextPage.")
+            if not has_next_page:
+                return sorted(template_filenames)
+            end_cursor = page_info.get("endCursor")
+            if not isinstance(end_cursor, str) or not end_cursor:
+                raise ShopifyApiError(message="theme template files query response is missing pageInfo.endCursor.")
+            after = end_cursor
+
+        raise ShopifyApiError(
+            message=(
+                "Theme template files query exceeded pagination limit while loading template settings. "
+                "Reduce template file count or adjust the query pagination strategy."
+            ),
+            status_code=409,
+        )
+
     async def _upsert_theme_files(
         self,
         *,
@@ -3138,6 +3877,30 @@ class ShopifyApiClient:
                 status_code=404,
             )
 
+        template_settings_contents: dict[str, str] = {}
+        if self._is_theme_component_settings_sync_enabled_for_profile(profile=profile):
+            template_filenames = await self._list_theme_template_json_filenames(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                theme_id=theme["id"],
+            )
+            if template_filenames:
+                template_contents = await asyncio.gather(
+                    *[
+                        self._load_theme_file_text(
+                            shop_domain=shop_domain,
+                            access_token=access_token,
+                            theme_id=theme["id"],
+                            filename=template_filename,
+                        )
+                        for template_filename in template_filenames
+                    ]
+                )
+                template_settings_contents = {
+                    template_filename: template_content
+                    for template_filename, template_content in zip(template_filenames, template_contents, strict=True)
+                }
+
         workspace_slug = self._normalize_workspace_slug(cleaned_workspace_name)
         css_filename = f"assets/{workspace_slug}-workspace-brand.css"
         replacement_block = self._render_theme_brand_liquid_block(
@@ -3169,6 +3932,8 @@ class ShopifyApiClient:
             "requiredMissingPaths": [],
             "semanticUpdatedPaths": [],
             "unmappedColorPaths": [],
+            "semanticTypographyUpdatedPaths": [],
+            "unmappedTypographyPaths": [],
         }
         next_settings_content: str | None = None
         if settings_content is not None and profile.settings_value_paths:
@@ -3178,12 +3943,46 @@ class ShopifyApiClient:
                 effective_css_vars=effective_css_vars,
             )
 
+        template_files_to_upsert: list[dict[str, str]] = []
+        template_semantic_updated_paths: list[str] = []
+        template_unmapped_color_paths: list[str] = []
+        for template_filename, template_content in template_settings_contents.items():
+            next_template_content, template_sync = self._sync_theme_template_color_settings_data(
+                profile=profile,
+                template_filename=template_filename,
+                template_content=template_content,
+                effective_css_vars=effective_css_vars,
+            )
+            template_semantic_updated_paths.extend(template_sync["updatedPaths"])
+            template_unmapped_color_paths.extend(template_sync["unmappedColorPaths"])
+            if next_template_content != template_content:
+                template_files_to_upsert.append({"filename": template_filename, "content": next_template_content})
+
+        template_unmapped_color_paths = sorted(set(template_unmapped_color_paths))
+        if template_unmapped_color_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Theme template settings sync discovered unmapped color setting paths: "
+                    f"{', '.join(template_unmapped_color_paths)}. "
+                    "Add semantic mappings in _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME."
+                ),
+                status_code=422,
+            )
+
+        settings_sync["semanticUpdatedPaths"] = sorted(
+            set(settings_sync["semanticUpdatedPaths"] + template_semantic_updated_paths)
+        )
+        settings_sync["unmappedColorPaths"] = sorted(
+            set(settings_sync["unmappedColorPaths"] + template_unmapped_color_paths)
+        )
+
         files_to_upsert = [
             {"filename": _THEME_BRAND_LAYOUT_FILENAME, "content": next_layout},
             {"filename": css_filename, "content": css_content},
         ]
         if next_settings_content is not None:
             files_to_upsert.append({"filename": _THEME_BRAND_SETTINGS_FILENAME, "content": next_settings_content})
+        files_to_upsert.extend(template_files_to_upsert)
         job_id = await self._upsert_theme_files(
             shop_domain=shop_domain,
             access_token=access_token,
@@ -3272,6 +4071,29 @@ class ShopifyApiClient:
             theme_id=theme["id"],
             filename=_THEME_BRAND_SETTINGS_FILENAME,
         )
+        template_settings_contents: dict[str, str] = {}
+        if self._is_theme_component_settings_sync_enabled_for_profile(profile=profile):
+            template_filenames = await self._list_theme_template_json_filenames(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                theme_id=theme["id"],
+            )
+            if template_filenames:
+                template_contents = await asyncio.gather(
+                    *[
+                        self._load_theme_file_text(
+                            shop_domain=shop_domain,
+                            access_token=access_token,
+                            theme_id=theme["id"],
+                            filename=template_filename,
+                        )
+                        for template_filename in template_filenames
+                    ]
+                )
+                template_settings_contents = {
+                    template_filename: template_content
+                    for template_filename, template_content in zip(template_filenames, template_contents, strict=True)
+                }
         settings_audit = {
             "settingsFilename": _THEME_BRAND_SETTINGS_FILENAME if profile.settings_value_paths else None,
             "expectedPaths": sorted(profile.settings_value_paths.keys()),
@@ -3283,6 +4105,9 @@ class ShopifyApiClient:
             "semanticSyncedPaths": [],
             "semanticMismatchedPaths": [],
             "unmappedColorPaths": [],
+            "semanticTypographySyncedPaths": [],
+            "semanticTypographyMismatchedPaths": [],
+            "unmappedTypographyPaths": [],
         }
         if settings_content is not None and profile.settings_value_paths:
             settings_audit = self._audit_theme_settings_data(
@@ -3294,6 +4119,30 @@ class ShopifyApiClient:
             settings_audit["missingPaths"] = sorted(profile.settings_value_paths.keys())
             settings_audit["requiredMissingPaths"] = sorted(profile.required_settings_paths)
 
+        template_semantic_synced_paths: list[str] = []
+        template_semantic_mismatched_paths: list[str] = []
+        template_unmapped_color_paths: list[str] = []
+        for template_filename, template_content in template_settings_contents.items():
+            template_audit = self._audit_theme_template_color_settings_data(
+                profile=profile,
+                template_filename=template_filename,
+                template_content=template_content,
+                effective_css_vars=effective_css_vars,
+            )
+            template_semantic_synced_paths.extend(template_audit["syncedPaths"])
+            template_semantic_mismatched_paths.extend(template_audit["mismatchedPaths"])
+            template_unmapped_color_paths.extend(template_audit["unmappedColorPaths"])
+
+        settings_audit["semanticSyncedPaths"] = sorted(
+            set(settings_audit["semanticSyncedPaths"] + template_semantic_synced_paths)
+        )
+        settings_audit["semanticMismatchedPaths"] = sorted(
+            set(settings_audit["semanticMismatchedPaths"] + template_semantic_mismatched_paths)
+        )
+        settings_audit["unmappedColorPaths"] = sorted(
+            set(settings_audit["unmappedColorPaths"] + template_unmapped_color_paths)
+        )
+
         is_ready = (
             not coverage["missingSourceVars"]
             and not coverage["missingThemeVars"]
@@ -3304,6 +4153,7 @@ class ShopifyApiClient:
             and not settings_audit["requiredMismatchedPaths"]
             and not settings_audit["semanticMismatchedPaths"]
             and not settings_audit["unmappedColorPaths"]
+            and not settings_audit["unmappedTypographyPaths"]
         )
 
         return {

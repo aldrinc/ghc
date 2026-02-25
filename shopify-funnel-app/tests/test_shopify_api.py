@@ -19,6 +19,13 @@ _THEME_SYNC_REQUIRED_CSS_VARS = {
     "--color-soft": "rgba(0, 0, 0, 0.08)",
     "--focus-outline-color": "rgba(6, 26, 112, 0.35)",
     "--font-sans": "Inter, sans-serif",
+    "--font-heading": "Merriweather, serif",
+    "--line": "1.2",
+    "--heading-line": "1.0",
+    "--hero-title-letter-spacing": "-0.03em",
+    "--text-sm": "16px",
+    "--text-base": "15px",
+    "--cta-font-size-md": "18px",
     "--radius-md": "14px",
     "--container-max": "1380px",
     "--container-pad": "24px",
@@ -722,6 +729,16 @@ def test_sync_theme_brand_updates_layout_and_css():
                     ]
                 }
             }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
         if "query themeFileByName" in query:
             requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
             requested_filename = requested_filenames[0] if requested_filenames else None
@@ -863,6 +880,13 @@ def test_sync_theme_brand_updates_layout_and_css():
                 "--color-button-border",
                 "--color-keyboard-focus",
                 "--font-body-family",
+                "--font-body-line-height",
+                "--font-button-size",
+                "--font-heading-family",
+                "--font-heading-letter-spacing",
+                "--font-heading-line-height",
+                "--font-navigation-size",
+                "--font-product-size",
                 "--footer-bg",
                 "--footer-pad-y",
                 "--page-padding",
@@ -917,9 +941,11 @@ def test_sync_theme_brand_updates_layout_and_css():
             "requiredMissingPaths": [],
             "semanticUpdatedPaths": [],
             "unmappedColorPaths": [],
+            "semanticTypographyUpdatedPaths": [],
+            "unmappedTypographyPaths": [],
         },
     }
-    assert len(observed_payloads) == 5
+    assert len(observed_payloads) == 6
 
 
 def test_sync_theme_brand_allows_upsert_without_job():
@@ -947,6 +973,16 @@ def test_sync_theme_brand_allows_upsert_without_job():
                             "role": "MAIN",
                         }
                     ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
                 }
             }
         if "query themeFileByName" in query:
@@ -1044,6 +1080,13 @@ def test_sync_theme_brand_allows_upsert_without_job():
                 "--color-button-border",
                 "--color-keyboard-focus",
                 "--font-body-family",
+                "--font-body-line-height",
+                "--font-button-size",
+                "--font-heading-family",
+                "--font-heading-letter-spacing",
+                "--font-heading-line-height",
+                "--font-navigation-size",
+                "--font-product-size",
                 "--footer-bg",
                 "--footer-pad-y",
                 "--page-padding",
@@ -1078,9 +1121,166 @@ def test_sync_theme_brand_allows_upsert_without_job():
             "requiredMissingPaths": [],
             "semanticUpdatedPaths": [],
             "unmappedColorPaths": [],
+            "semanticTypographyUpdatedPaths": [],
+            "unmappedTypographyPaths": [],
         },
     }
-    assert len(observed_payloads) == 4
+    assert len(observed_payloads) == 5
+
+
+def test_sync_theme_brand_upserts_template_component_settings():
+    client = ShopifyApiClient()
+    settings_json = '{"current":{"color_background":"#ffffff"}}\n'
+    template_json = json.dumps(
+        {
+            "sections": {
+                "hero": {
+                    "type": "image-with-text-overlay",
+                    "settings": {
+                        "heading_color": "#ffffff",
+                        "color_overlay": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                },
+                            }
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "templates/index.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "templates/index.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": template_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "mutation themeFilesUpsert" in query:
+            files = ((payload.get("variables") or {}).get("files") or [])
+            filenames = {item["filename"] for item in files}
+            assert filenames == {
+                "layout/theme.liquid",
+                "assets/acme-workspace-workspace-brand.css",
+                "config/settings_data.json",
+                "templates/index.json",
+            }
+            template_file = next(item for item in files if item["filename"] == "templates/index.json")
+            template_content = template_file["body"]["value"]
+            assert '"heading_color":"#222222"' in template_content
+            assert '"color_overlay":"rgba(0, 0, 0, 0.08)"' in template_content
+            return {
+                "themeFilesUpsert": {
+                    "upsertedThemeFiles": [
+                        {"filename": "layout/theme.liquid"},
+                        {"filename": "assets/acme-workspace-workspace-brand.css"},
+                        {"filename": "config/settings_data.json"},
+                        {"filename": "templates/index.json"},
+                    ],
+                    "job": None,
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            font_urls=[],
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert "templates/index.json.sections.hero.settings.heading_color" in result["settingsSync"]["semanticUpdatedPaths"]
+    assert "templates/index.json.sections.hero.settings.color_overlay" in result["settingsSync"]["semanticUpdatedPaths"]
+    assert result["settingsSync"]["unmappedColorPaths"] == []
 
 
 def test_sync_theme_brand_bootstraps_current_color_schemes_from_presets():
@@ -1103,6 +1303,16 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_presets():
                             "role": "MAIN",
                         }
                     ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
                 }
             }
         if "query themeFileByName" in query:
@@ -1228,6 +1438,16 @@ def test_sync_theme_brand_bootstraps_current_color_schemes_from_nested_root_node
                     ]
                 }
             }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
         if "query themeFileByName" in query:
             requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
             requested_filename = requested_filenames[0] if requested_filenames else None
@@ -1328,6 +1548,16 @@ def test_sync_theme_brand_requires_managed_layout_markers():
                     ]
                 }
             }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
         if "query themeFileByName" in query:
             requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
             requested_filename = requested_filenames[0] if requested_filenames else None
@@ -1400,6 +1630,16 @@ def test_sync_theme_brand_requires_closing_head_tag():
                             "role": "MAIN",
                         }
                     ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
                 }
             }
         if "query themeFileByName" in query:
@@ -1479,6 +1719,16 @@ def test_sync_theme_brand_errors_for_unsupported_theme_profile():
                             "role": "MAIN",
                         }
                     ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
                 }
             }
         if "query themeFileByName" in query:
@@ -1648,6 +1898,136 @@ def test_sync_theme_settings_data_updates_checkout_and_sale_semantic_color_paths
     assert report["unmappedColorPaths"] == []
 
 
+def test_sync_theme_settings_data_updates_typography_semantic_paths():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "type_header_font": "Inter",
+            "type_header_line_height": 0.9,
+            "type_header_letter_spacing": 0,
+            "type_body_font": "Inter",
+            "type_body_base_size": 12,
+            "type_body_line_height": 1.0,
+            "type_nav_font": "heading",
+            "type_nav_base_size": 14,
+            "type_buttons_font": "heading",
+            "type_buttons_base_size": 14,
+            "type_product_grid_font": "heading",
+            "type_product_grid_base_size": 14,
+        }
+    )
+
+    next_settings_content, report = ShopifyApiClient._sync_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    synced_current = synced_settings["current"]
+
+    assert synced_current["type_header_font"] == "Merriweather"
+    assert synced_current["type_header_line_height"] == 1.0
+    assert synced_current["type_header_letter_spacing"] == -30
+    assert synced_current["type_body_font"] == "Inter"
+    assert synced_current["type_body_base_size"] == 15
+    assert synced_current["type_body_line_height"] == 1.2
+    assert synced_current["type_nav_font"] == "body"
+    assert synced_current["type_nav_base_size"] == 16
+    assert synced_current["type_buttons_font"] == "body"
+    assert synced_current["type_buttons_base_size"] == 18
+    assert synced_current["type_product_grid_font"] == "body"
+    assert synced_current["type_product_grid_base_size"] == 15
+    assert "current.type_header_font" in report["semanticTypographyUpdatedPaths"]
+    assert report["unmappedTypographyPaths"] == []
+
+
+def test_sync_theme_settings_data_errors_for_unmapped_typography_paths():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "type_header_weight": 600,
+        }
+    )
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="unmapped typography setting paths: current.type_header_weight",
+    ):
+        ShopifyApiClient._sync_theme_settings_data(
+            profile=profile,
+            settings_content=settings_content,
+            effective_css_vars=effective_css_vars,
+        )
+
+
+def test_sync_theme_template_color_settings_data_updates_component_paths():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "hero": {
+                    "type": "image-with-text-overlay",
+                    "settings": {
+                        "color_overlay": "#000000",
+                        "heading_color": "#111111",
+                        "button_bg_color": "#c0c0c0",
+                        "button_color": "#111111",
+                        "item_bg_color": "#ffffff",
+                        "arrow_color": "#000000",
+                        "line_color": "#000000",
+                    },
+                    "blocks": {
+                        "heading": {
+                            "type": "heading",
+                            "settings": {
+                                "title_color": "#222222",
+                                "icon_color": "#333333",
+                            },
+                        }
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/index.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/index.json",
+        template_content=next_template_content,
+    )
+    hero_settings = synced_template["sections"]["hero"]["settings"]
+    heading_block_settings = synced_template["sections"]["hero"]["blocks"]["heading"]["settings"]
+
+    assert hero_settings["color_overlay"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-soft"]
+    assert hero_settings["heading_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert hero_settings["button_bg_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta"]
+    assert hero_settings["button_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
+    assert hero_settings["item_bg_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-page-bg"]
+    assert hero_settings["arrow_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
+    assert hero_settings["line_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    assert heading_block_settings["title_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert heading_block_settings["icon_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
+    assert report["unmappedColorPaths"] == []
+    assert "templates/index.json.sections.hero.settings.heading_color" in report["updatedPaths"]
+
+
 def test_sync_theme_settings_data_errors_for_unmapped_color_paths():
     profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
@@ -1762,6 +2142,16 @@ def test_audit_theme_brand_reports_ready_when_layout_css_and_settings_are_synced
                     ]
                 }
             }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
         if "query themeFileByName" in query:
             requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
             requested_filename = requested_filenames[0] if requested_filenames else None
@@ -1848,6 +2238,160 @@ def test_audit_theme_brand_reports_ready_when_layout_css_and_settings_are_synced
     assert result["settingsAudit"]["mismatchedPaths"] == []
     assert result["settingsAudit"]["semanticMismatchedPaths"] == []
     assert result["settingsAudit"]["unmappedColorPaths"] == []
+    assert result["settingsAudit"]["semanticTypographyMismatchedPaths"] == []
+    assert result["settingsAudit"]["unmappedTypographyPaths"] == []
+
+
+def test_audit_theme_brand_reports_template_component_mismatch():
+    client = ShopifyApiClient()
+    settings_json = """
+{
+  "current": {
+    "color_background": "#f5f5f5",
+    "color_foreground": "#222222",
+    "color_button": "#0a8f3c",
+    "color_button_text": "#ffffff",
+    "color_link": "#123456",
+    "color_accent": "#123456",
+    "footer_background": "#f4ede6",
+    "footer_text": "#222222"
+  }
+}
+""".strip() + "\n"
+    template_json = json.dumps(
+        {
+            "sections": {
+                "hero": {
+                    "type": "image-with-text-overlay",
+                    "settings": {"heading_color": "#ffffff"},
+                }
+            }
+        }
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {"__typename": "OnlineStoreThemeFileBodyText"},
+                            }
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = ((payload.get("variables") or {}).get("filenames") or [])
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "layout/theme.liquid":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "layout/theme.liquid",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": (
+                                            "<html><head>\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                            "{{ 'acme-workspace-workspace-brand.css' | asset_url | stylesheet_tag }}\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                            "</head><body></body></html>"
+                                        ),
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "assets/acme-workspace-workspace-brand.css":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "assets/acme-workspace-workspace-brand.css",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": ":root { --color-brand: #123456; }\n",
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "templates/index.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "templates/index.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": template_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.audit_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert result["isReady"] is False
+    assert "templates/index.json.sections.hero.settings.heading_color" in result["settingsAudit"]["semanticMismatchedPaths"]
 
 
 def test_audit_theme_brand_reports_gaps_for_missing_marker_and_css_asset():
@@ -1866,6 +2410,16 @@ def test_audit_theme_brand_reports_gaps_for_missing_marker_and_css_asset():
                             "role": "MAIN",
                         }
                     ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
                 }
             }
         if "query themeFileByName" in query:
@@ -1944,6 +2498,16 @@ def test_sync_theme_brand_errors_when_settings_data_is_empty():
                             "role": "MAIN",
                         }
                     ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
                 }
             }
         if "query themeFileByName" in query:

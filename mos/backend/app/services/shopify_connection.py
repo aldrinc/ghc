@@ -1354,11 +1354,19 @@ def sync_client_shopify_theme_brand(
     updated_paths = settings_sync.get("updatedPaths")
     missing_paths = settings_sync.get("missingPaths")
     required_missing_paths = settings_sync.get("requiredMissingPaths")
+    semantic_updated_paths = settings_sync.get("semanticUpdatedPaths")
+    unmapped_color_paths = settings_sync.get("unmappedColorPaths")
+    semantic_typography_updated_paths = settings_sync.get("semanticTypographyUpdatedPaths")
+    unmapped_typography_paths = settings_sync.get("unmappedTypographyPaths")
     for list_name, value in (
         ("expectedPaths", expected_paths),
         ("updatedPaths", updated_paths),
         ("missingPaths", missing_paths),
         ("requiredMissingPaths", required_missing_paths),
+        ("semanticUpdatedPaths", semantic_updated_paths),
+        ("unmappedColorPaths", unmapped_color_paths),
+        ("semanticTypographyUpdatedPaths", semantic_typography_updated_paths),
+        ("unmappedTypographyPaths", unmapped_typography_paths),
     ):
         if not isinstance(value, list) or any(not isinstance(item, str) for item in value):
             raise HTTPException(
@@ -1398,6 +1406,10 @@ def sync_client_shopify_theme_brand(
             "updatedPaths": updated_paths,
             "missingPaths": missing_paths,
             "requiredMissingPaths": required_missing_paths,
+            "semanticUpdatedPaths": semantic_updated_paths,
+            "unmappedColorPaths": unmapped_color_paths,
+            "semanticTypographyUpdatedPaths": semantic_typography_updated_paths,
+            "unmappedTypographyPaths": unmapped_typography_paths,
         },
     }
 
@@ -1632,6 +1644,20 @@ def audit_client_shopify_theme_brand(
         "missingPaths": _require_string_list(settings_audit, "missingPaths", "settingsAudit"),
         "requiredMissingPaths": _require_string_list(settings_audit, "requiredMissingPaths", "settingsAudit"),
         "requiredMismatchedPaths": _require_string_list(settings_audit, "requiredMismatchedPaths", "settingsAudit"),
+        "semanticSyncedPaths": _require_string_list(settings_audit, "semanticSyncedPaths", "settingsAudit"),
+        "semanticMismatchedPaths": _require_string_list(settings_audit, "semanticMismatchedPaths", "settingsAudit"),
+        "unmappedColorPaths": _require_string_list(settings_audit, "unmappedColorPaths", "settingsAudit"),
+        "semanticTypographySyncedPaths": _require_string_list(
+            settings_audit,
+            "semanticTypographySyncedPaths",
+            "settingsAudit",
+        ),
+        "semanticTypographyMismatchedPaths": _require_string_list(
+            settings_audit,
+            "semanticTypographyMismatchedPaths",
+            "settingsAudit",
+        ),
+        "unmappedTypographyPaths": _require_string_list(settings_audit, "unmappedTypographyPaths", "settingsAudit"),
     }
 
     return {

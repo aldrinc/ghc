@@ -567,6 +567,10 @@ def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
                 "updatedPaths": [],
                 "missingPaths": [],
                 "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
             },
         }
 
@@ -604,6 +608,10 @@ def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
             "updatedPaths": [],
             "missingPaths": [],
             "requiredMissingPaths": [],
+            "semanticUpdatedPaths": [],
+            "unmappedColorPaths": [],
+            "semanticTypographyUpdatedPaths": [],
+            "unmappedTypographyPaths": [],
         },
     }
 
@@ -650,6 +658,10 @@ def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
                 "updatedPaths": [],
                 "missingPaths": [],
                 "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
             },
         }
 
@@ -700,6 +712,12 @@ def test_audit_client_shopify_theme_brand_parses_response(monkeypatch):
                 "missingPaths": [],
                 "requiredMissingPaths": [],
                 "requiredMismatchedPaths": [],
+                "semanticSyncedPaths": [],
+                "semanticMismatchedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographySyncedPaths": [],
+                "semanticTypographyMismatchedPaths": [],
+                "unmappedTypographyPaths": [],
             },
             "isReady": True,
         }
@@ -739,6 +757,12 @@ def test_audit_client_shopify_theme_brand_parses_response(monkeypatch):
             "missingPaths": [],
             "requiredMissingPaths": [],
             "requiredMismatchedPaths": [],
+            "semanticSyncedPaths": [],
+            "semanticMismatchedPaths": [],
+            "unmappedColorPaths": [],
+            "semanticTypographySyncedPaths": [],
+            "semanticTypographyMismatchedPaths": [],
+            "unmappedTypographyPaths": [],
         },
         "isReady": True,
     }
@@ -773,6 +797,12 @@ def test_audit_client_shopify_theme_brand_rejects_invalid_marker_flag(monkeypatc
                 "missingPaths": [],
                 "requiredMissingPaths": [],
                 "requiredMismatchedPaths": [],
+                "semanticSyncedPaths": [],
+                "semanticMismatchedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographySyncedPaths": [],
+                "semanticTypographyMismatchedPaths": [],
+                "unmappedTypographyPaths": [],
             },
             "isReady": True,
         }

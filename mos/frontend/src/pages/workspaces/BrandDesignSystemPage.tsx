@@ -1043,6 +1043,13 @@ export function BrandDesignSystemPage() {
                     </TableCell>
                   </TableRow>
                   <TableRow>
+                    <TableCell className="text-xs text-content-muted">Component styles</TableCell>
+                    <TableCell className="text-xs text-content">
+                      {themeSyncResult.settingsSync.semanticUpdatedPaths.length} synced ·{" "}
+                      {themeSyncResult.settingsSync.unmappedColorPaths.length + themeSyncResult.settingsSync.unmappedTypographyPaths.length} unmapped
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
                     <TableCell className="text-xs text-content-muted">Job ID</TableCell>
                     <TableCell className="text-xs text-content break-all">{themeSyncResult.jobId || "n/a (completed without async job)"}</TableCell>
                   </TableRow>
@@ -1086,6 +1093,14 @@ export function BrandDesignSystemPage() {
                     <TableCell className="text-xs text-content-muted">Settings gaps</TableCell>
                     <TableCell className="text-xs text-content">
                       {themeAuditResult.settingsAudit.missingPaths.length + themeAuditResult.settingsAudit.mismatchedPaths.length}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-content-muted">Component style gaps</TableCell>
+                    <TableCell className="text-xs text-content">
+                      {themeAuditResult.settingsAudit.semanticMismatchedPaths.length +
+                        themeAuditResult.settingsAudit.unmappedColorPaths.length +
+                        themeAuditResult.settingsAudit.unmappedTypographyPaths.length}
                     </TableCell>
                   </TableRow>
                 </TableBody>

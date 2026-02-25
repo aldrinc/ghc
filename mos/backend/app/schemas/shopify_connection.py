@@ -146,6 +146,10 @@ class ShopifyThemeSettingsSyncSummary(BaseModel):
     updatedPaths: list[str] = Field(default_factory=list)
     missingPaths: list[str] = Field(default_factory=list)
     requiredMissingPaths: list[str] = Field(default_factory=list)
+    semanticUpdatedPaths: list[str] = Field(default_factory=list)
+    unmappedColorPaths: list[str] = Field(default_factory=list)
+    semanticTypographyUpdatedPaths: list[str] = Field(default_factory=list)
+    unmappedTypographyPaths: list[str] = Field(default_factory=list)
 
 
 class ShopifyThemeSettingsAuditSummary(BaseModel):
@@ -158,6 +162,12 @@ class ShopifyThemeSettingsAuditSummary(BaseModel):
     missingPaths: list[str] = Field(default_factory=list)
     requiredMissingPaths: list[str] = Field(default_factory=list)
     requiredMismatchedPaths: list[str] = Field(default_factory=list)
+    semanticSyncedPaths: list[str] = Field(default_factory=list)
+    semanticMismatchedPaths: list[str] = Field(default_factory=list)
+    unmappedColorPaths: list[str] = Field(default_factory=list)
+    semanticTypographySyncedPaths: list[str] = Field(default_factory=list)
+    semanticTypographyMismatchedPaths: list[str] = Field(default_factory=list)
+    unmappedTypographyPaths: list[str] = Field(default_factory=list)
 
 
 class ShopifyThemeBrandSyncResponse(BaseModel):

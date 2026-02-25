@@ -80,6 +80,10 @@ export type ClientShopifyThemeSettingsSyncSummary = {
   updatedPaths: string[];
   missingPaths: string[];
   requiredMissingPaths: string[];
+  semanticUpdatedPaths: string[];
+  unmappedColorPaths: string[];
+  semanticTypographyUpdatedPaths: string[];
+  unmappedTypographyPaths: string[];
 };
 
 export type ClientShopifyThemeSettingsAuditSummary = {
@@ -90,6 +94,12 @@ export type ClientShopifyThemeSettingsAuditSummary = {
   missingPaths: string[];
   requiredMissingPaths: string[];
   requiredMismatchedPaths: string[];
+  semanticSyncedPaths: string[];
+  semanticMismatchedPaths: string[];
+  unmappedColorPaths: string[];
+  semanticTypographySyncedPaths: string[];
+  semanticTypographyMismatchedPaths: string[];
+  unmappedTypographyPaths: string[];
 };
 
 export type ClientShopifyThemeBrandSyncResponse = {
