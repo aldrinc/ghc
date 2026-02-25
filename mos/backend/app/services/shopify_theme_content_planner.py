@@ -12,13 +12,19 @@ _MAX_TEXT_SLOTS = 120
 _MAX_IMAGE_ASSETS = 40
 
 
+def _clip_text_to_max_length(*, value: str, max_length: int | None) -> str:
+    if not isinstance(max_length, int) or max_length <= 0:
+        return value
+    if len(value) <= max_length:
+        return value
+    clipped = value[:max_length].rstrip()
+    if clipped:
+        return clipped
+    return value[:max_length]
+
+
 def _asset_orientation(*, width: int | None, height: int | None) -> str:
-    if (
-        not isinstance(width, int)
-        or not isinstance(height, int)
-        or width <= 0
-        or height <= 0
-    ):
+    if not isinstance(width, int) or not isinstance(height, int) or width <= 0 or height <= 0:
         return "unknown"
     ratio = width / height
     if ratio >= 1.25:
@@ -140,22 +146,16 @@ def _parse_and_validate_planner_output(
 
     raw_image_assignments = parsed.get("imageAssignments")
     raw_text_assignments = parsed.get("textAssignments")
-    if not isinstance(raw_image_assignments, list) or not isinstance(
-        raw_text_assignments, list
-    ):
+    if not isinstance(raw_image_assignments, list) or not isinstance(raw_text_assignments, list):
         raise ValueError("Theme content planner returned invalid assignments payload.")
 
     image_slot_paths = {str(slot["path"]) for slot in image_slots}
-    text_slots_by_path: dict[str, dict[str, Any]] = {
-        str(slot["path"]): slot for slot in text_slots
-    }
+    text_slots_by_path: dict[str, dict[str, Any]] = {str(slot["path"]): slot for slot in text_slots}
 
     component_image_asset_map: dict[str, str] = {}
     for assignment in raw_image_assignments:
         if not isinstance(assignment, dict):
-            raise ValueError(
-                "Theme content planner returned an invalid image assignment entry."
-            )
+            raise ValueError("Theme content planner returned an invalid image assignment entry.")
         path = assignment.get("path")
         asset_public_id = assignment.get("assetPublicId")
         if not isinstance(path, str) or not path.strip():
@@ -200,19 +200,13 @@ def _parse_and_validate_planner_output(
     component_text_values: dict[str, str] = {}
     for assignment in raw_text_assignments:
         if not isinstance(assignment, dict):
-            raise ValueError(
-                "Theme content planner returned an invalid text assignment entry."
-            )
+            raise ValueError("Theme content planner returned an invalid text assignment entry.")
         path = assignment.get("path")
         value = assignment.get("value")
         if not isinstance(path, str) or not path.strip():
-            raise ValueError(
-                "Theme content planner returned a text assignment with invalid path."
-            )
+            raise ValueError("Theme content planner returned a text assignment with invalid path.")
         if not isinstance(value, str) or not value.strip():
-            raise ValueError(
-                f"Theme content planner returned an empty text value at path {path}."
-            )
+            raise ValueError(f"Theme content planner returned an empty text value at path {path}.")
         normalized_path = path.strip()
         normalized_value = value.strip()
         slot = text_slots_by_path.get(normalized_path)
@@ -221,15 +215,10 @@ def _parse_and_validate_planner_output(
                 f"Theme content planner returned an unknown text slot path: {normalized_path}."
             )
         max_length = slot.get("maxLength")
-        if (
-            isinstance(max_length, int)
-            and max_length > 0
-            and len(normalized_value) > max_length
-        ):
-            raise ValueError(
-                f"Theme content planner exceeded maxLength for path {normalized_path}. "
-                f"maxLength={max_length}, received={len(normalized_value)}."
-            )
+        normalized_value = _clip_text_to_max_length(
+            value=normalized_value,
+            max_length=max_length,
+        )
         if normalized_path in component_text_values:
             raise ValueError(
                 f"Theme content planner returned duplicate text assignment for path {normalized_path}."
@@ -262,9 +251,7 @@ def plan_shopify_theme_component_content(
             "No candidate image or text slots were discovered in the Shopify theme templates."
         )
     if not product_image_assets and image_slots:
-        raise ValueError(
-            "No product image assets were provided for image slot planning."
-        )
+        raise ValueError("No product image assets were provided for image slot planning.")
 
     truncated_image_slots = image_slots[:_MAX_IMAGE_SLOTS]
     truncated_text_slots = text_slots[:_MAX_TEXT_SLOTS]
@@ -277,22 +264,16 @@ def plan_shopify_theme_component_content(
             "height": asset.height,
             "orientation": _asset_orientation(width=asset.width, height=asset.height),
             "alt": str(asset.alt or "").strip() or None,
-            "tags": [
-                tag
-                for tag in (asset.tags or [])
-                if isinstance(tag, str) and tag.strip()
-            ][:20],
-            "aiMetadata": (
-                asset.ai_metadata if isinstance(asset.ai_metadata, dict) else None
-            ),
+            "tags": [tag for tag in (asset.tags or []) if isinstance(tag, str) and tag.strip()][
+                :20
+            ],
+            "aiMetadata": (asset.ai_metadata if isinstance(asset.ai_metadata, dict) else None),
         }
         for asset in truncated_assets
         if asset.public_id
     ]
     if not image_assets_payload and truncated_image_slots:
-        raise ValueError(
-            "No valid product image assets were available after normalization."
-        )
+        raise ValueError("No valid product image assets were available after normalization.")
 
     prompt = _build_planner_prompt(
         product=product,
