@@ -2272,6 +2272,11 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
                         "background_color": "#000000",
                         "border_color": "#000000",
                         "newsletter_color": "#000000",
+                        "copy_color": "#000000",
+                        "input_color": "#000000",
+                        "input_placeholder_color": "#000000",
+                        "submit_color": "#000000",
+                        "submit_hover_color": "#000000",
                     },
                 }
             }
@@ -2293,12 +2298,28 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
     assert footer_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
     assert footer_settings["border_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
     assert footer_settings["newsletter_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert footer_settings["copy_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert footer_settings["input_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
+    assert footer_settings["input_placeholder_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-muted"]
+    assert footer_settings["submit_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
+    assert footer_settings["submit_hover_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-cta-text"]
     assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.background_color" in report[
         "updatedPaths"
     ]
     assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.newsletter_color" in report[
         "updatedPaths"
     ]
+    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.copy_color" in report["updatedPaths"]
+    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_color" in report["updatedPaths"]
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_placeholder_color"
+        in report["updatedPaths"]
+    )
+    assert "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_color" in report["updatedPaths"]
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_hover_color"
+        in report["updatedPaths"]
+    )
     assert report["unmappedColorPaths"] == []
 
 
