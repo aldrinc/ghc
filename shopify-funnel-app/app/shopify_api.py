@@ -1714,9 +1714,15 @@ class ShopifyApiClient:
         node: Any,
         path: str,
         value: str,
+        create_missing_leaf: bool = False,
     ) -> int:
         tokens = cls._parse_settings_path_tokens(path)
-        return cls._set_json_path_value_tokens(node=node, tokens=tokens, value=value)
+        return cls._set_json_path_value_tokens(
+            node=node,
+            tokens=tokens,
+            value=value,
+            create_missing_leaf=create_missing_leaf,
+        )
 
     @classmethod
     def _set_json_path_value_tokens(
@@ -1725,10 +1731,25 @@ class ShopifyApiClient:
         node: Any,
         tokens: list[tuple[str, str | None]],
         value: str,
+        create_missing_leaf: bool = False,
     ) -> int:
         if not tokens or not isinstance(node, dict):
             return 0
         key, index_selector = tokens[0]
+        if key not in node:
+            if not create_missing_leaf:
+                return 0
+            if index_selector is not None:
+                return 0
+            if len(tokens) == 1:
+                node[key] = value
+                return 1
+            next_index_selector = tokens[1][1]
+            if next_index_selector is None:
+                node[key] = {}
+            else:
+                return 0
+
         if key not in node:
             return 0
 
@@ -1737,7 +1758,12 @@ class ShopifyApiClient:
             if len(tokens) == 1:
                 node[key] = value
                 return 1
-            return cls._set_json_path_value_tokens(node=current, tokens=tokens[1:], value=value)
+            return cls._set_json_path_value_tokens(
+                node=current,
+                tokens=tokens[1:],
+                value=value,
+                create_missing_leaf=create_missing_leaf,
+            )
 
         if index_selector == "*":
             update_count = 0
@@ -1749,7 +1775,12 @@ class ShopifyApiClient:
                         current[idx] = value
                         update_count += 1
                     else:
-                        update_count += cls._set_json_path_value_tokens(node=item, tokens=tokens[1:], value=value)
+                        update_count += cls._set_json_path_value_tokens(
+                            node=item,
+                            tokens=tokens[1:],
+                            value=value,
+                            create_missing_leaf=create_missing_leaf,
+                        )
                 return update_count
             if isinstance(current, dict):
                 if not current:
@@ -1759,7 +1790,12 @@ class ShopifyApiClient:
                         current[nested_key] = value
                         update_count += 1
                     else:
-                        update_count += cls._set_json_path_value_tokens(node=item, tokens=tokens[1:], value=value)
+                        update_count += cls._set_json_path_value_tokens(
+                            node=item,
+                            tokens=tokens[1:],
+                            value=value,
+                            create_missing_leaf=create_missing_leaf,
+                        )
                 return update_count
             return 0
 
@@ -1772,7 +1808,12 @@ class ShopifyApiClient:
         if len(tokens) == 1:
             current[index] = value
             return 1
-        return cls._set_json_path_value_tokens(node=current[index], tokens=tokens[1:], value=value)
+        return cls._set_json_path_value_tokens(
+            node=current[index],
+            tokens=tokens[1:],
+            value=value,
+            create_missing_leaf=create_missing_leaf,
+        )
 
     @classmethod
     def _read_json_path_values(
@@ -1931,8 +1972,24 @@ class ShopifyApiClient:
                     status_code=422,
                 )
             update_count = 0
-            for candidate_path in cls._build_settings_path_candidates(path):
-                update_count += cls._set_json_path_value(node=settings_data, path=candidate_path, value=expected_value)
+            candidate_paths = cls._build_settings_path_candidates(path)
+            for candidate_path in candidate_paths:
+                candidate_update_count = cls._set_json_path_value(
+                    node=settings_data,
+                    path=candidate_path,
+                    value=expected_value,
+                    create_missing_leaf=False,
+                )
+                if candidate_update_count > 0:
+                    update_count = candidate_update_count
+                    break
+            if update_count == 0:
+                update_count = cls._set_json_path_value(
+                    node=settings_data,
+                    path=path,
+                    value=expected_value,
+                    create_missing_leaf=True,
+                )
             if update_count:
                 updated_paths.append(path)
             else:
