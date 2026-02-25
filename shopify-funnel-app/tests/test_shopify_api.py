@@ -708,7 +708,8 @@ def test_sync_theme_brand_updates_layout_and_css():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []
     settings_json = (
-        '{"current":{"color_background":"#ffffff","color_foreground":"#111111","color_button":"#000000",'
+        '{"current":{"logo":"shopify://shop_images/current-logo.png","logo_mobile":"shopify://shop_images/current-logo.png",'
+        '"color_background":"#ffffff","color_foreground":"#111111","color_button":"#000000",'
         '"color_button_text":"#ffffff","color_link":"#000000","color_accent":"#000000","footer_background":"#ffffff",'
         '"footer_text":"#111111","color_schemes":[{"settings":{"background":"#ffffff","text":"#111111","button":"#000000",'
         '"button_label":"#ffffff","secondary_button":"#eeeeee","secondary_button_label":"#111111"}}]}}\n'
@@ -779,6 +780,22 @@ def test_sync_theme_brand_updates_layout_and_css():
                         ],
                         "userErrors": [],
                     }
+                    }
+                }
+        if "mutation createThemeLogoFileFromUrl" in query:
+            return {
+                "fileCreate": {
+                    "files": [
+                        {
+                            "__typename": "MediaImage",
+                            "id": "gid://shopify/MediaImage/123",
+                            "fileStatus": "READY",
+                            "image": {
+                                "url": "https://cdn.shopify.com/s/files/1/0000/0001/files/logo-1.png?v=12345"
+                            },
+                        }
+                    ],
+                    "userErrors": [],
                 }
             }
         if "mutation themeFilesUpsert" in query:
@@ -829,8 +846,8 @@ def test_sync_theme_brand_updates_layout_and_css():
             settings_content = settings_file["body"]["value"]
             assert '"color_background": "#f5f5f5"' in settings_content
             assert '"footer_background": "#f4ede6"' in settings_content
-            assert '"logo": "https://assets.example.com/public/assets/logo-1"' in settings_content
-            assert '"logo_mobile": "https://assets.example.com/public/assets/logo-1"' in settings_content
+            assert '"logo": "shopify://shop_images/logo-1.png"' in settings_content
+            assert '"logo_mobile": "shopify://shop_images/logo-1.png"' in settings_content
             return {
                 "themeFilesUpsert": {
                     "upsertedThemeFiles": [
@@ -947,7 +964,7 @@ def test_sync_theme_brand_updates_layout_and_css():
             "unmappedTypographyPaths": [],
         },
     }
-    assert len(observed_payloads) == 6
+    assert len(observed_payloads) == 7
 
 
 def test_sync_theme_brand_allows_upsert_without_job():
@@ -2047,7 +2064,7 @@ def test_sync_theme_settings_data_updates_typography_semantic_paths():
     assert report["unmappedTypographyPaths"] == []
 
 
-def test_sync_theme_settings_data_updates_logo_fields_from_logo_url():
+def test_sync_theme_settings_data_updates_logo_fields_from_shopify_logo_url():
     profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
@@ -2055,7 +2072,7 @@ def test_sync_theme_settings_data_updates_logo_fields_from_logo_url():
     )
     settings_content = _build_minimal_theme_settings_json(
         extra_current={
-            "logo": "https://old.example.com/logo-old.png",
+            "logo": "shopify://shop_images/logo-old.png",
         }
     )
 
@@ -2063,13 +2080,37 @@ def test_sync_theme_settings_data_updates_logo_fields_from_logo_url():
         profile=profile,
         settings_content=settings_content,
         effective_css_vars=effective_css_vars,
-        logo_url="https://assets.example.com/public/assets/logo-1",
+        logo_url="shopify://shop_images/logo-1.png",
     )
     synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
     synced_current = synced_settings["current"]
 
-    assert synced_current["logo"] == "https://assets.example.com/public/assets/logo-1"
-    assert synced_current["logo_mobile"] == "https://assets.example.com/public/assets/logo-1"
+    assert synced_current["logo"] == "shopify://shop_images/logo-1.png"
+    assert synced_current["logo_mobile"] == "shopify://shop_images/logo-1.png"
+
+
+def test_sync_theme_settings_data_errors_for_non_shopify_logo_url():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "logo": "shopify://shop_images/logo-old.png",
+        }
+    )
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="Theme settings logo sync requires a Shopify file URL",
+    ):
+        ShopifyApiClient._sync_theme_settings_data(
+            profile=profile,
+            settings_content=settings_content,
+            effective_css_vars=effective_css_vars,
+            logo_url="https://assets.example.com/public/assets/logo-1",
+        )
 
 
 def test_sync_theme_settings_data_errors_for_unmapped_typography_paths():

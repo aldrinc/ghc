@@ -8,6 +8,7 @@ import json
 from html import escape
 import re
 from typing import Any, Literal
+from urllib.parse import urlparse
 
 import httpx
 
@@ -3279,6 +3280,14 @@ class ShopifyApiClient:
         settings_data: dict[str, Any],
         logo_url: str,
     ) -> list[str]:
+        if not cls._is_shopify_file_url(value=logo_url):
+            raise ShopifyApiError(
+                message=(
+                    "Theme settings logo sync requires a Shopify file URL (shopify://...) "
+                    f"for logo fields, received {logo_url!r}."
+                ),
+                status_code=422,
+            )
         current = settings_data.get("current")
         if current is None:
             current = {}
@@ -4012,6 +4021,236 @@ class ShopifyApiClient:
             "layoutIncludesManagedCssAsset": includes_css_asset,
         }
 
+    @staticmethod
+    def _is_shopify_file_url(*, value: str) -> bool:
+        return value.strip().startswith("shopify://")
+
+    @staticmethod
+    def _theme_settings_has_logo_fields(*, settings_data: dict[str, Any]) -> bool:
+        current = settings_data.get("current")
+        if not isinstance(current, dict):
+            return False
+        return "logo" in current or "logo_mobile" in current
+
+    @staticmethod
+    def _extract_filename_from_url_path(*, raw_url: str) -> str:
+        parsed = urlparse(raw_url.strip())
+        filename = parsed.path.rsplit("/", 1)[-1].strip()
+        if not filename:
+            raise ShopifyApiError(
+                message=f"Unable to determine uploaded logo filename from url={raw_url!r}.",
+                status_code=409,
+            )
+        if any(char in filename for char in ('"', "'", "<", ">", "\n", "\r", "/", "\\")):
+            raise ShopifyApiError(
+                message=f"Uploaded logo filename contains unsupported characters: {filename!r}.",
+                status_code=409,
+            )
+        return filename
+
+    @classmethod
+    def _build_shopify_logo_reference_from_file_url(cls, *, file_url: str) -> str:
+        filename = cls._extract_filename_from_url_path(raw_url=file_url)
+        return f"shopify://shop_images/{filename}"
+
+    @staticmethod
+    def _coerce_logo_file_node(*, node: Any) -> tuple[str | None, str | None, str | None, str | None]:
+        if not isinstance(node, dict):
+            return None, None, None, None
+        typename = node.get("__typename")
+        file_id = node.get("id") if isinstance(node.get("id"), str) else None
+        file_status = node.get("fileStatus") if isinstance(node.get("fileStatus"), str) else None
+
+        file_url: str | None = None
+        if typename == "MediaImage":
+            image = node.get("image")
+            if isinstance(image, dict) and isinstance(image.get("url"), str):
+                candidate = image["url"].strip()
+                if candidate:
+                    file_url = candidate
+        elif typename == "GenericFile":
+            if isinstance(node.get("url"), str):
+                candidate = node["url"].strip()
+                if candidate:
+                    file_url = candidate
+
+        return file_id, file_status, file_url, typename if isinstance(typename, str) else None
+
+    async def _wait_for_logo_file_ready_url(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        file_id: str,
+        poll_interval_seconds: float = 1.0,
+        max_attempts: int = 30,
+    ) -> str:
+        query = """
+        query themeLogoFileStatus($id: ID!) {
+            node(id: $id) {
+                __typename
+                ... on MediaImage {
+                    id
+                    fileStatus
+                    image {
+                        url
+                    }
+                }
+                ... on GenericFile {
+                    id
+                    fileStatus
+                    url
+                }
+            }
+        }
+        """
+        for _ in range(max_attempts):
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={"query": query, "variables": {"id": file_id}},
+            )
+            node = response.get("node")
+            resolved_id, file_status, file_url, typename = self._coerce_logo_file_node(node=node)
+            if resolved_id is None or resolved_id != file_id:
+                raise ShopifyApiError(
+                    message=f"Logo upload status query returned an unexpected file node for id={file_id}.",
+                    status_code=409,
+                )
+            if file_status is None:
+                raise ShopifyApiError(
+                    message=f"Logo upload status query is missing fileStatus for id={file_id}.",
+                    status_code=409,
+                )
+            normalized_status = file_status.strip().upper()
+            if normalized_status == "READY":
+                if file_url is None:
+                    raise ShopifyApiError(
+                        message=f"Logo upload completed but no file URL was returned for id={file_id}.",
+                        status_code=409,
+                    )
+                return file_url
+            if normalized_status in {"FAILED", "ERROR"}:
+                raise ShopifyApiError(
+                    message=(
+                        "Logo upload failed while creating Shopify file reference for theme settings. "
+                        f"id={file_id}, typename={typename}, fileStatus={file_status}."
+                    ),
+                    status_code=409,
+                )
+            await asyncio.sleep(poll_interval_seconds)
+
+        raise ShopifyApiError(
+            message=(
+                "Timed out waiting for logo upload file to become READY. "
+                f"id={file_id}, maxAttempts={max_attempts}."
+            ),
+            status_code=409,
+        )
+
+    async def _create_shopify_logo_file_reference_from_url(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        logo_url: str,
+    ) -> str:
+        mutation = """
+        mutation createThemeLogoFileFromUrl($files: [FileCreateInput!]!) {
+            fileCreate(files: $files) {
+                files {
+                    __typename
+                    ... on MediaImage {
+                        id
+                        fileStatus
+                        image {
+                            url
+                        }
+                    }
+                    ... on GenericFile {
+                        id
+                        fileStatus
+                        url
+                    }
+                }
+                userErrors {
+                    field
+                    message
+                    code
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "files": [
+                        {
+                            "contentType": "IMAGE",
+                            "originalSource": logo_url,
+                        }
+                    ]
+                },
+            },
+        )
+        create_data = response.get("fileCreate")
+        if not isinstance(create_data, dict):
+            raise ShopifyApiError(message="fileCreate response is missing fileCreate payload.", status_code=409)
+        user_errors = create_data.get("userErrors") or []
+        if user_errors:
+            details: list[str] = []
+            for error in user_errors:
+                if not isinstance(error, dict):
+                    continue
+                code = error.get("code")
+                message = error.get("message")
+                if isinstance(code, str) and isinstance(message, str):
+                    details.append(f"{code}: {message}")
+                elif isinstance(message, str):
+                    details.append(message)
+                elif isinstance(code, str):
+                    details.append(code)
+            detail_text = "; ".join(details) if details else str(user_errors)
+            raise ShopifyApiError(message=f"fileCreate failed while uploading logo: {detail_text}", status_code=409)
+
+        files = create_data.get("files")
+        if not isinstance(files, list) or not files:
+            raise ShopifyApiError(message="fileCreate response did not return uploaded files.", status_code=409)
+        file_id, file_status, file_url, typename = self._coerce_logo_file_node(node=files[0])
+        if file_id is None:
+            raise ShopifyApiError(
+                message="fileCreate response is missing uploaded file id for logo.",
+                status_code=409,
+            )
+        if typename not in {"MediaImage", "GenericFile"}:
+            raise ShopifyApiError(
+                message=(
+                    "fileCreate uploaded logo to an unsupported file type for theme settings. "
+                    f"typename={typename}."
+                ),
+                status_code=409,
+            )
+        normalized_status = file_status.strip().upper() if isinstance(file_status, str) else ""
+        if normalized_status == "READY" and isinstance(file_url, str):
+            return self._build_shopify_logo_reference_from_file_url(file_url=file_url)
+        if normalized_status in {"FAILED", "ERROR"}:
+            raise ShopifyApiError(
+                message=(
+                    "fileCreate returned a failed status while uploading logo. "
+                    f"id={file_id}, typename={typename}, fileStatus={file_status}."
+                ),
+                status_code=409,
+            )
+        ready_file_url = await self._wait_for_logo_file_ready_url(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            file_id=file_id,
+        )
+        return self._build_shopify_logo_reference_from_file_url(file_url=ready_file_url)
+
     async def sync_theme_brand(
         self,
         *,
@@ -4033,8 +4272,15 @@ class ShopifyApiClient:
         if not cleaned_brand_name:
             raise ShopifyApiError(message="brandName must be a non-empty string.", status_code=400)
         cleaned_logo_url = logo_url.strip()
-        if not (cleaned_logo_url.startswith("https://") or cleaned_logo_url.startswith("http://")):
-            raise ShopifyApiError(message="logoUrl must be an absolute http(s) URL.", status_code=400)
+        if not (
+            self._is_shopify_file_url(value=cleaned_logo_url)
+            or cleaned_logo_url.startswith("https://")
+            or cleaned_logo_url.startswith("http://")
+        ):
+            raise ShopifyApiError(
+                message="logoUrl must be an absolute http(s) URL or a shopify:// URL.",
+                status_code=400,
+            )
         if any(char in cleaned_logo_url for char in ('"', "'", "<", ">", "\n", "\r")):
             raise ShopifyApiError(
                 message="logoUrl contains unsupported characters.",
@@ -4087,6 +4333,18 @@ class ShopifyApiClient:
                 message=f"Theme file not found: {_THEME_BRAND_SETTINGS_FILENAME}",
                 status_code=404,
             )
+        settings_logo_url: str | None = None
+        if settings_content is not None and profile.settings_value_paths:
+            parsed_settings_for_logo = self._parse_theme_settings_json(settings_content=settings_content)
+            if self._theme_settings_has_logo_fields(settings_data=parsed_settings_for_logo):
+                if self._is_shopify_file_url(value=cleaned_logo_url):
+                    settings_logo_url = cleaned_logo_url
+                else:
+                    settings_logo_url = await self._create_shopify_logo_file_reference_from_url(
+                        shop_domain=shop_domain,
+                        access_token=access_token,
+                        logo_url=cleaned_logo_url,
+                    )
 
         template_settings_contents: dict[str, str] = {}
         if self._is_theme_component_settings_sync_enabled_for_profile(profile=profile):
@@ -4152,7 +4410,7 @@ class ShopifyApiClient:
                 profile=profile,
                 settings_content=settings_content,
                 effective_css_vars=effective_css_vars,
-                logo_url=cleaned_logo_url,
+                logo_url=settings_logo_url,
             )
 
         template_files_to_upsert: list[dict[str, str]] = []
