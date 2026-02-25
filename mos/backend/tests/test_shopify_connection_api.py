@@ -16,6 +16,14 @@ def test_sanitize_theme_component_text_value_removes_unsupported_characters():
     )
 
 
+def test_sanitize_theme_component_text_value_strips_inline_markup_tags():
+    raw_value = "Boost <strong>energy</strong> and <em>focus</em> daily"
+    assert (
+        clients_router._sanitize_theme_component_text_value(raw_value)
+        == "Boost energy and focus daily"
+    )
+
+
 def test_get_shopify_status_returns_service_payload(api_client, monkeypatch):
     client_id = _create_client(api_client)
 

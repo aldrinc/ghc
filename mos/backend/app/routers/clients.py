@@ -1,4 +1,5 @@
 import logging
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -85,6 +86,10 @@ logger = logging.getLogger(__name__)
 
 _JOB_TYPE_SHOPIFY_THEME_BRAND_SYNC = "shopify_theme_brand_sync"
 _JOB_SUBJECT_TYPE_CLIENT = "client"
+_THEME_COMPONENT_INLINE_MARKUP_TAG_RE = re.compile(
+    r"</?\s*(?:strong|em)\s*>",
+    re.IGNORECASE,
+)
 _UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION = str.maketrans(
     {
         '"': "",
@@ -203,7 +208,8 @@ def _serialize_http_exception_detail(detail: Any) -> dict[str, Any]:
 
 
 def _sanitize_theme_component_text_value(value: str) -> str:
-    sanitized = value.translate(_UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION)
+    without_inline_markup = _THEME_COMPONENT_INLINE_MARKUP_TAG_RE.sub(" ", value)
+    sanitized = without_inline_markup.translate(_UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION)
     return " ".join(sanitized.split()).strip()
 
 

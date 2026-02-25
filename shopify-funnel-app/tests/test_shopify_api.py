@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+import app.shopify_api as shopify_api_module
 from app.shopify_api import ShopifyApiClient, ShopifyApiError
 
 _THEME_SYNC_REQUIRED_CSS_VARS = {
@@ -133,6 +134,187 @@ def test_sync_theme_template_component_text_settings_keeps_plain_text_values():
     assert updated_json["sections"]["footer"]["settings"]["heading"] == "New heading"
     assert report["updatedPaths"] == [setting_path]
     assert report["missingPaths"] == []
+
+
+def test_list_theme_brand_template_slots_uses_deterministic_manifest(monkeypatch):
+    client = ShopifyApiClient()
+    manifest = {
+        "futrgroup2-0theme": {
+            "imageSlots": (
+                {
+                    "path": "templates/index.json.sections.hero.settings.image",
+                    "key": "image",
+                    "role": "hero",
+                    "recommendedAspect": "landscape",
+                },
+            ),
+            "textSlots": (
+                {
+                    "path": "templates/index.json.sections.hero.blocks.heading.settings.heading",
+                    "key": "heading",
+                    "role": "headline",
+                    "maxLength": 120,
+                },
+            ),
+        }
+    }
+    monkeypatch.setattr(
+        shopify_api_module,
+        "_THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME",
+        manifest,
+    )
+    template_json = (
+        json.dumps(
+            {
+                "sections": {
+                    "hero": {
+                        "settings": {"image": "shopify://shop_images/hero.png"},
+                        "blocks": {
+                            "heading": {
+                                "settings": {"heading": "Hero headline"},
+                            }
+                        },
+                    }
+                }
+            }
+        )
+        + "\n"
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": template_json,
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.list_theme_brand_template_slots(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert result["imageSlots"] == [
+        {
+            "path": "templates/index.json.sections.hero.settings.image",
+            "key": "image",
+            "currentValue": "shopify://shop_images/hero.png",
+            "role": "hero",
+            "recommendedAspect": "landscape",
+        }
+    ]
+    assert result["textSlots"] == [
+        {
+            "path": "templates/index.json.sections.hero.blocks.heading.settings.heading",
+            "key": "heading",
+            "currentValue": "Hero headline",
+            "role": "headline",
+            "maxLength": 120,
+        }
+    ]
+
+
+def test_list_theme_brand_template_slots_errors_when_manifest_path_missing(monkeypatch):
+    client = ShopifyApiClient()
+    manifest = {
+        "futrgroup2-0theme": {
+            "imageSlots": (
+                {
+                    "path": "templates/index.json.sections.hero.settings.image",
+                    "key": "image",
+                    "role": "hero",
+                    "recommendedAspect": "landscape",
+                },
+            ),
+            "textSlots": (),
+        }
+    }
+    monkeypatch.setattr(
+        shopify_api_module,
+        "_THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME",
+        manifest,
+    )
+    template_json = json.dumps({"sections": {"hero": {"settings": {}}}}) + "\n"
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": template_json,
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    with pytest.raises(ShopifyApiError) as captured:
+        asyncio.run(
+            client.list_theme_brand_template_slots(
+                shop_domain="example.myshopify.com",
+                access_token="token",
+                theme_name="futrgroup2-0theme",
+            )
+        )
+
+    assert captured.value.status_code == 409
+    assert (
+        "missingPaths=templates/index.json.sections.hero.settings.image"
+        in str(captured.value)
+    )
 
 
 def test_admin_graphql_reports_missing_navigation_scopes_for_menus_access_denied():

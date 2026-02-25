@@ -544,6 +544,514 @@ _THEME_COMPONENT_RICHTEXT_TOP_LEVEL_TAG_RE = re.compile(
     r"^\s*<(?:p|ul|ol|h[1-6])(?:\s[^>]*)?>",
     re.IGNORECASE,
 )
+_THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME: dict[
+    str, dict[str, tuple[dict[str, Any], ...]]
+] = {
+    "futrgroup2-0theme": {
+        "imageSlots": (
+            {
+                "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_CDPHGa.settings.image",
+                "key": "image",
+                "role": "gallery",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_PijDXy.settings.image",
+                "key": "image",
+                "role": "gallery",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_VfHpJg.settings.image",
+                "key": "image",
+                "role": "gallery",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_g4F98H.settings.image",
+                "key": "image",
+                "role": "gallery",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_M6Cfj7.settings.image",
+                "key": "image",
+                "role": "gallery",
+                "recommendedAspect": "portrait",
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_aQPm77.settings.image",
+                "key": "image",
+                "role": "gallery",
+                "recommendedAspect": "portrait",
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.settings.image",
+                "key": "image",
+                "role": "hero",
+                "recommendedAspect": "landscape",
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.settings.image_mobile",
+                "key": "image_mobile",
+                "role": "hero",
+                "recommendedAspect": "landscape",
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.after_image",
+                "key": "after_image",
+                "role": "gallery",
+                "recommendedAspect": "portrait",
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.before_image",
+                "key": "before_image",
+                "role": "gallery",
+                "recommendedAspect": "portrait",
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.after_image",
+                "key": "after_image",
+                "role": "gallery",
+                "recommendedAspect": "portrait",
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.before_image",
+                "key": "before_image",
+                "role": "gallery",
+                "recommendedAspect": "portrait",
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.after_image",
+                "key": "after_image",
+                "role": "gallery",
+                "recommendedAspect": "portrait",
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.before_image",
+                "key": "before_image",
+                "role": "gallery",
+                "recommendedAspect": "portrait",
+            },
+            {
+                "path": "templates/index.json.sections.ss_countdown_timer_4_TxGT4a.settings.image",
+                "key": "image",
+                "role": "hero",
+                "recommendedAspect": "landscape",
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_CieJRi.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_DTL7F7.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_EA4mWi.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_LUTUBp.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_MkDhxG.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_bCk3JY.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_dnta3i.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_mq6JiQ.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            },
+        ),
+        "textSlots": (
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.blocks.tab_AaWBPg.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 220,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.blocks.tab_AaWBPg.settings.title",
+                "key": "title",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.blocks.tab_MTkiMM.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 220,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.blocks.tab_MTkiMM.settings.title",
+                "key": "title",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.blocks.tab_tcYLPr.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 220,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.blocks.tab_tcYLPr.settings.title",
+                "key": "title",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.first_menu_title",
+                "key": "first_menu_title",
+                "role": "headline",
+                "maxLength": 80,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_placeholder",
+                "key": "input_placeholder",
+                "role": "supporting",
+                "maxLength": 80,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.newsletter",
+                "key": "newsletter",
+                "role": "body",
+                "maxLength": 220,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.second_menu_title",
+                "key": "second_menu_title",
+                "role": "headline",
+                "maxLength": 80,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.second_text",
+                "key": "second_text",
+                "role": "body",
+                "maxLength": 480,
+            },
+            {
+                "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit",
+                "key": "submit",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "sections/header-group.json.sections.announcement-bar.blocks.announcement-1.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 90,
+            },
+            {
+                "path": "sections/header-group.json.sections.announcement-bar.blocks.announcement-2.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 90,
+            },
+            {
+                "path": "templates/index.json.sections.blog_posts_BRnRG9.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.collage_EiUYGW.settings.description",
+                "key": "description",
+                "role": "body",
+                "maxLength": 480,
+            },
+            {
+                "path": "templates/index.json.sections.collage_EiUYGW.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_M6Cfj7.blocks.button_paXetD.settings.button_label",
+                "key": "button_label",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_M6Cfj7.blocks.heading_Wn7Ret.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_M6Cfj7.blocks.heading_aYG4iV.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_M6Cfj7.blocks.text_camxJq.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 320,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_aQPm77.blocks.button_AW4qy3.settings.button_label",
+                "key": "button_label",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_aQPm77.blocks.heading_FfzHf9.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_aQPm77.blocks.heading_zAPVtx.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_aQPm77.blocks.text_yXMfzq.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 320,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.blocks.button_gTwRDa.settings.button_label",
+                "key": "button_label",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.blocks.heading_tPmiRD.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.blocks.text_3MeVHE.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 320,
+            },
+            {
+                "path": "templates/index.json.sections.rich_text_U6caVk.blocks.heading_PpFgCk.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.button_label",
+                "key": "button_label",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 420,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.button_label",
+                "key": "button_label",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 420,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.button_label",
+                "key": "button_label",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 420,
+            },
+            {
+                "path": "templates/index.json.sections.ss_countdown_timer_4_TxGT4a.blocks.button_bGGJbk.settings.button",
+                "key": "button",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/index.json.sections.ss_countdown_timer_4_TxGT4a.blocks.heading_Ry3fND.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.ss_countdown_timer_4_TxGT4a.blocks.text_KQyqqd.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 320,
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 140,
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.title",
+                "key": "title",
+                "role": "headline",
+                "maxLength": 90,
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 140,
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp.settings.title",
+                "key": "title",
+                "role": "headline",
+                "maxLength": 90,
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 140,
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN.settings.title",
+                "key": "title",
+                "role": "headline",
+                "maxLength": 90,
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 140,
+            },
+            {
+                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV.settings.title",
+                "key": "title",
+                "role": "headline",
+                "maxLength": 90,
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.testimonial_Epk63H.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 48,
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.testimonial_FEnikR.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 48,
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.testimonial_MHaaUN.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 48,
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.testimonial_iEhB3e.settings.text",
+                "key": "text",
+                "role": "supporting",
+                "maxLength": 48,
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 320,
+            },
+        ),
+    }
+}
 _THEME_SETTINGS_SEMANTIC_TOKEN_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("secondary", "button", "label"), "secondary_button_label"),
     (("secondary", "button"), "secondary_button"),
@@ -5030,6 +5538,186 @@ class ShopifyApiClient:
         return [deduped_by_path[path] for path in sorted(deduped_by_path.keys())]
 
     @classmethod
+    def _get_theme_template_slot_manifest(
+        cls, *, profile: ThemeBrandProfile
+    ) -> dict[str, tuple[dict[str, Any], ...]]:
+        manifest = _THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME.get(profile.theme_name)
+        if manifest is None:
+            raise ShopifyApiError(
+                message=(
+                    "No deterministic template slot manifest is configured for this theme profile. "
+                    f"themeName={profile.theme_name}."
+                ),
+                status_code=409,
+            )
+        return manifest
+
+    @classmethod
+    def _resolve_theme_template_slots_from_manifest(
+        cls,
+        *,
+        profile: ThemeBrandProfile,
+        template_contents_by_filename: dict[str, str],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        manifest = cls._get_theme_template_slot_manifest(profile=profile)
+        raw_image_slots = manifest.get("imageSlots")
+        raw_text_slots = manifest.get("textSlots")
+        if not isinstance(raw_image_slots, tuple) or not isinstance(
+            raw_text_slots, tuple
+        ):
+            raise ShopifyApiError(
+                message=(
+                    "Theme template slot manifest is invalid. "
+                    f"themeName={profile.theme_name}."
+                ),
+                status_code=500,
+            )
+
+        parsed_templates_by_filename: dict[str, dict[str, Any]] = {}
+        missing_paths: list[str] = []
+
+        def resolve_current_value(*, setting_path: str) -> str | None:
+            template_filename, json_path = cls._split_theme_template_setting_path(
+                setting_path=setting_path
+            )
+            template_content = template_contents_by_filename.get(template_filename)
+            if template_content is None:
+                missing_paths.append(setting_path)
+                return None
+            template_data = parsed_templates_by_filename.get(template_filename)
+            if template_data is None:
+                template_data = cls._parse_theme_template_json(
+                    filename=template_filename,
+                    template_content=template_content,
+                )
+                parsed_templates_by_filename[template_filename] = template_data
+            values = cls._read_json_path_values(node=template_data, path=json_path)
+            if not values:
+                missing_paths.append(setting_path)
+                return None
+            current_value = values[0]
+            if not isinstance(current_value, str):
+                return None
+            normalized = current_value.strip()
+            return normalized or None
+
+        image_slots: list[dict[str, Any]] = []
+        image_paths_seen: set[str] = set()
+        for item in raw_image_slots:
+            if not isinstance(item, dict):
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains an invalid image slot entry. "
+                        f"themeName={profile.theme_name}."
+                    ),
+                    status_code=500,
+                )
+            path = item.get("path")
+            key = item.get("key")
+            role = item.get("role")
+            recommended_aspect = item.get("recommendedAspect")
+            if (
+                not isinstance(path, str)
+                or not path.strip()
+                or not isinstance(key, str)
+                or not key.strip()
+                or not isinstance(role, str)
+                or not role.strip()
+                or not isinstance(recommended_aspect, str)
+                or recommended_aspect not in {"landscape", "portrait", "square", "any"}
+            ):
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains an invalid image slot definition. "
+                        f"themeName={profile.theme_name}, slot={item}."
+                    ),
+                    status_code=500,
+                )
+            normalized_path = path.strip()
+            if normalized_path in image_paths_seen:
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains duplicate image slot paths. "
+                        f"themeName={profile.theme_name}, path={normalized_path}."
+                    ),
+                    status_code=500,
+                )
+            image_paths_seen.add(normalized_path)
+            image_slots.append(
+                {
+                    "path": normalized_path,
+                    "key": key.strip(),
+                    "currentValue": resolve_current_value(setting_path=normalized_path),
+                    "role": role.strip(),
+                    "recommendedAspect": recommended_aspect,
+                }
+            )
+
+        text_slots: list[dict[str, Any]] = []
+        text_paths_seen: set[str] = set()
+        for item in raw_text_slots:
+            if not isinstance(item, dict):
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains an invalid text slot entry. "
+                        f"themeName={profile.theme_name}."
+                    ),
+                    status_code=500,
+                )
+            path = item.get("path")
+            key = item.get("key")
+            role = item.get("role")
+            max_length = item.get("maxLength")
+            if (
+                not isinstance(path, str)
+                or not path.strip()
+                or not isinstance(key, str)
+                or not key.strip()
+                or not isinstance(role, str)
+                or not role.strip()
+                or not isinstance(max_length, int)
+                or max_length <= 0
+            ):
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains an invalid text slot definition. "
+                        f"themeName={profile.theme_name}, slot={item}."
+                    ),
+                    status_code=500,
+                )
+            normalized_path = path.strip()
+            if normalized_path in text_paths_seen:
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains duplicate text slot paths. "
+                        f"themeName={profile.theme_name}, path={normalized_path}."
+                    ),
+                    status_code=500,
+                )
+            text_paths_seen.add(normalized_path)
+            text_slots.append(
+                {
+                    "path": normalized_path,
+                    "key": key.strip(),
+                    "currentValue": resolve_current_value(setting_path=normalized_path),
+                    "role": role.strip(),
+                    "maxLength": max_length,
+                }
+            )
+
+        missing_paths = sorted(set(missing_paths))
+        if missing_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Deterministic theme template slot manifest paths are missing from the current theme files. "
+                    f"themeName={profile.theme_name}. missingPaths={', '.join(missing_paths)}."
+                ),
+                status_code=409,
+            )
+
+        return image_slots, text_slots
+
+    @classmethod
     def _build_auto_theme_component_image_urls(
         cls,
         *,
@@ -6846,13 +7534,39 @@ class ShopifyApiClient:
         self._assert_theme_brand_profile_supported(
             theme_name=theme["name"], profile=profile
         )
+        slot_manifest = self._get_theme_template_slot_manifest(profile=profile)
+        manifest_paths: list[str] = []
+        for slot_type in ("imageSlots", "textSlots"):
+            raw_slots = slot_manifest.get(slot_type, ())
+            if not isinstance(raw_slots, tuple):
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest is invalid for deterministic slot discovery. "
+                        f"themeName={profile.theme_name}, slotType={slot_type}."
+                    ),
+                    status_code=500,
+                )
+            for item in raw_slots:
+                if not isinstance(item, dict):
+                    raise ShopifyApiError(
+                        message=(
+                            "Theme template slot manifest contains a non-object entry. "
+                            f"themeName={profile.theme_name}, slotType={slot_type}."
+                        ),
+                        status_code=500,
+                    )
+                path = item.get("path")
+                if not isinstance(path, str) or not path.strip():
+                    raise ShopifyApiError(
+                        message=(
+                            "Theme template slot manifest contains an invalid path entry. "
+                            f"themeName={profile.theme_name}, slotType={slot_type}, slot={item}."
+                        ),
+                        status_code=500,
+                    )
+                manifest_paths.append(path.strip())
 
-        template_filenames = await self._list_theme_template_json_filenames(
-            shop_domain=shop_domain,
-            access_token=access_token,
-            theme_id=theme["id"],
-        )
-        if not template_filenames:
+        if not manifest_paths:
             return {
                 "themeId": theme["id"],
                 "themeName": theme["name"],
@@ -6861,6 +7575,12 @@ class ShopifyApiClient:
                 "textSlots": [],
             }
 
+        template_filenames = sorted(
+            {
+                self._split_theme_template_setting_path(setting_path=path)[0]
+                for path in manifest_paths
+            }
+        )
         template_contents = await asyncio.gather(
             *[
                 self._load_theme_file_text(
@@ -6872,46 +7592,23 @@ class ShopifyApiClient:
                 for template_filename in template_filenames
             ]
         )
-
-        image_slots: list[dict[str, Any]] = []
-        text_slots: list[dict[str, Any]] = []
-        for template_filename, template_content in zip(
-            template_filenames, template_contents, strict=True
-        ):
-            image_slots.extend(
-                self._collect_theme_template_component_image_slots(
-                    template_filename=template_filename,
-                    template_content=template_content,
-                    excluded_setting_paths=set(),
-                )
+        template_contents_by_filename = {
+            template_filename: template_content
+            for template_filename, template_content in zip(
+                template_filenames, template_contents, strict=True
             )
-            text_slots.extend(
-                self._collect_theme_template_component_text_slots(
-                    template_filename=template_filename,
-                    template_content=template_content,
-                    excluded_setting_paths=set(),
-                )
-            )
-
-        deduped_image_slots_by_path: dict[str, dict[str, Any]] = {}
-        for slot in image_slots:
-            deduped_image_slots_by_path[str(slot["path"])] = slot
-        deduped_text_slots_by_path: dict[str, dict[str, Any]] = {}
-        for slot in text_slots:
-            deduped_text_slots_by_path[str(slot["path"])] = slot
+        }
+        image_slots, text_slots = self._resolve_theme_template_slots_from_manifest(
+            profile=profile,
+            template_contents_by_filename=template_contents_by_filename,
+        )
 
         return {
             "themeId": theme["id"],
             "themeName": theme["name"],
             "themeRole": theme["role"],
-            "imageSlots": [
-                deduped_image_slots_by_path[path]
-                for path in sorted(deduped_image_slots_by_path.keys())
-            ],
-            "textSlots": [
-                deduped_text_slots_by_path[path]
-                for path in sorted(deduped_text_slots_by_path.keys())
-            ],
+            "imageSlots": sorted(image_slots, key=lambda item: str(item["path"])),
+            "textSlots": sorted(text_slots, key=lambda item: str(item["path"])),
         }
 
     async def sync_theme_brand(
