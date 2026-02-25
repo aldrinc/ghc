@@ -707,6 +707,7 @@ def test_upsert_policy_pages_updates_existing_page():
 def test_sync_theme_brand_updates_layout_and_css():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []
+    uploaded_logo_payloads: list[dict[str, object]] = []
     settings_json = (
         '{"current":{"logo":"shopify://shop_images/current-logo.png","logo_mobile":"shopify://shop_images/current-logo.png",'
         '"color_background":"#ffffff","color_foreground":"#111111","color_button":"#000000",'
@@ -714,6 +715,28 @@ def test_sync_theme_brand_updates_layout_and_css():
         '"footer_text":"#111111","color_schemes":[{"settings":{"background":"#ffffff","text":"#111111","button":"#000000",'
         '"button_label":"#ffffff","secondary_button":"#eeeeee","secondary_button_label":"#111111"}}]}}\n'
     )
+
+    async def fake_download_logo_source_file(*, logo_url: str):
+        assert logo_url == "https://assets.example.com/public/assets/logo-1"
+        return (b"logo-bytes", "image/png")
+
+    async def fake_upload_logo_file_to_staged_target(
+        *,
+        upload_url: str,
+        parameters: list[tuple[str, str]],
+        filename: str,
+        mime_type: str,
+        content: bytes,
+    ):
+        uploaded_logo_payloads.append(
+            {
+                "upload_url": upload_url,
+                "parameters": parameters,
+                "filename": filename,
+                "mime_type": mime_type,
+                "content": content,
+            }
+        )
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         observed_payloads.append(payload)
@@ -782,7 +805,38 @@ def test_sync_theme_brand_updates_layout_and_css():
                     }
                     }
                 }
-        if "mutation createThemeLogoFileFromUrl" in query:
+        if "mutation createThemeLogoStagedUpload" in query:
+            variables = payload.get("variables") or {}
+            input_value = (variables.get("input") or [])[0]
+            assert input_value["resource"] == "IMAGE"
+            assert input_value["filename"] == "logo-1.png"
+            assert input_value["mimeType"] == "image/png"
+            assert input_value["httpMethod"] == "POST"
+            assert input_value["fileSize"] == str(len(b"logo-bytes"))
+            return {
+                "stagedUploadsCreate": {
+                    "stagedTargets": [
+                        {
+                            "url": "https://shopify-upload.example.com",
+                            "resourceUrl": "https://shopify-staged.example.com/logo-1.png",
+                            "parameters": [
+                                {"name": "key", "value": "logo-key"},
+                                {"name": "acl", "value": "private"},
+                            ],
+                        }
+                    ],
+                    "userErrors": [],
+                }
+            }
+        if "mutation createThemeLogoFileFromStagedUpload" in query:
+            variables = payload.get("variables") or {}
+            files = variables.get("files") or []
+            assert files == [
+                {
+                    "contentType": "IMAGE",
+                    "originalSource": "https://shopify-staged.example.com/logo-1.png",
+                }
+            ]
             return {
                 "fileCreate": {
                     "files": [
@@ -864,6 +918,8 @@ def test_sync_theme_brand_updates_layout_and_css():
         raise AssertionError("Unexpected query payload")
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._download_logo_source_file = fake_download_logo_source_file  # type: ignore[method-assign]
+    client._upload_logo_file_to_staged_target = fake_upload_logo_file_to_staged_target  # type: ignore[method-assign]
 
     result = asyncio.run(
         client.sync_theme_brand(
@@ -964,7 +1020,16 @@ def test_sync_theme_brand_updates_layout_and_css():
             "unmappedTypographyPaths": [],
         },
     }
-    assert len(observed_payloads) == 7
+    assert uploaded_logo_payloads == [
+        {
+            "upload_url": "https://shopify-upload.example.com",
+            "parameters": [("key", "logo-key"), ("acl", "private")],
+            "filename": "logo-1.png",
+            "mime_type": "image/png",
+            "content": b"logo-bytes",
+        }
+    ]
+    assert len(observed_payloads) == 8
 
 
 def test_sync_theme_brand_allows_upsert_without_job():
@@ -2110,6 +2175,24 @@ def test_sync_theme_settings_data_errors_for_non_shopify_logo_url():
             settings_content=settings_content,
             effective_css_vars=effective_css_vars,
             logo_url="https://assets.example.com/public/assets/logo-1",
+        )
+
+
+def test_resolve_logo_upload_metadata_appends_missing_extension():
+    filename, mime_type = ShopifyApiClient._resolve_logo_upload_metadata(
+        source_url="https://assets.example.com/public/assets/logo-1",
+        response_content_type="image/png",
+    )
+
+    assert filename == "logo-1.png"
+    assert mime_type == "image/png"
+
+
+def test_resolve_logo_upload_metadata_errors_for_non_image_content_type():
+    with pytest.raises(ShopifyApiError, match="Logo source must be an image content type"):
+        ShopifyApiClient._resolve_logo_upload_metadata(
+            source_url="https://assets.example.com/public/assets/logo-1",
+            response_content_type="application/json",
         )
 
 

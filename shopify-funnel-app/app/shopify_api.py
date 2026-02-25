@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
 from html import escape
+import mimetypes
 import re
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -20,6 +21,7 @@ _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
 _THEME_TEMPLATE_JSON_FILENAME_RE = re.compile(r"^(?:templates|sections)/.+\.json$")
 _THEME_COMPONENT_SETTINGS_SYNC_THEME_NAMES = frozenset({"futrgroup2-0theme"})
+_THEME_LOGO_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 _DEFAULT_THEME_VAR_SCOPE_SELECTORS: tuple[str, ...] = (":root",)
 _THEME_VAR_SCOPE_SELECTORS_BY_NAME: dict[str, tuple[str, ...]] = {
     "futrgroup2-0theme": (
@@ -4054,6 +4056,219 @@ class ShopifyApiClient:
         return f"shopify://shop_images/{filename}"
 
     @staticmethod
+    def _normalize_http_content_type(*, value: str | None) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = value.split(";", 1)[0].strip().lower()
+        if not normalized:
+            return None
+        return normalized
+
+    @classmethod
+    def _resolve_logo_upload_metadata(
+        cls,
+        *,
+        source_url: str,
+        response_content_type: str | None,
+    ) -> tuple[str, str]:
+        filename = cls._extract_filename_from_url_path(raw_url=source_url)
+        normalized_content_type = cls._normalize_http_content_type(value=response_content_type)
+        guessed_content_type, _ = mimetypes.guess_type(filename)
+        mime_type = normalized_content_type or guessed_content_type
+        if not isinstance(mime_type, str):
+            raise ShopifyApiError(
+                message=(
+                    "Unable to determine logo content type. "
+                    f"sourceUrl={source_url!r}, responseContentType={response_content_type!r}."
+                ),
+                status_code=409,
+            )
+        mime_type = mime_type.lower()
+        if not mime_type.startswith("image/"):
+            raise ShopifyApiError(
+                message=f"Logo source must be an image content type, received {mime_type!r}.",
+                status_code=409,
+            )
+        if "." not in filename:
+            extension = mimetypes.guess_extension(mime_type, strict=False)
+            if not isinstance(extension, str) or not extension.startswith("."):
+                raise ShopifyApiError(
+                    message=(
+                        "Unable to determine file extension for logo upload. "
+                        f"mimeType={mime_type!r}, sourceUrl={source_url!r}."
+                    ),
+                    status_code=409,
+                )
+            filename = f"{filename}{extension}"
+        return filename, mime_type
+
+    async def _download_logo_source_file(
+        self,
+        *,
+        logo_url: str,
+    ) -> tuple[bytes, str | None]:
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout, follow_redirects=True) as client:
+                response = await client.get(logo_url)
+        except httpx.RequestError as exc:
+            raise ShopifyApiError(message=f"Network error while downloading logo source URL: {exc}", status_code=409) from exc
+
+        if response.status_code >= 400:
+            raise ShopifyApiError(
+                message=f"Logo source download failed ({response.status_code}) for url={logo_url!r}.",
+                status_code=409,
+            )
+
+        content = response.content
+        if not content:
+            raise ShopifyApiError(
+                message=f"Logo source download returned empty content for url={logo_url!r}.",
+                status_code=409,
+            )
+        if len(content) > _THEME_LOGO_UPLOAD_MAX_BYTES:
+            raise ShopifyApiError(
+                message=(
+                    "Logo source download exceeded maximum upload size. "
+                    f"size={len(content)}, max={_THEME_LOGO_UPLOAD_MAX_BYTES}, url={logo_url!r}."
+                ),
+                status_code=409,
+            )
+
+        content_type = self._normalize_http_content_type(value=response.headers.get("Content-Type"))
+        return content, content_type
+
+    async def _create_logo_staged_upload_target(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        filename: str,
+        mime_type: str,
+        file_size: int,
+    ) -> tuple[str, str, list[tuple[str, str]]]:
+        mutation = """
+        mutation createThemeLogoStagedUpload($input: [StagedUploadInput!]!) {
+            stagedUploadsCreate(input: $input) {
+                stagedTargets {
+                    url
+                    resourceUrl
+                    parameters {
+                        name
+                        value
+                    }
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "input": [
+                        {
+                            "resource": "IMAGE",
+                            "filename": filename,
+                            "mimeType": mime_type,
+                            "httpMethod": "POST",
+                            "fileSize": str(file_size),
+                        }
+                    ]
+                },
+            },
+        )
+        staged_uploads_data = response.get("stagedUploadsCreate")
+        if not isinstance(staged_uploads_data, dict):
+            raise ShopifyApiError(
+                message="stagedUploadsCreate response is missing stagedUploadsCreate payload.",
+                status_code=409,
+            )
+        user_errors = staged_uploads_data.get("userErrors") or []
+        if user_errors:
+            details: list[str] = []
+            for error in user_errors:
+                if not isinstance(error, dict):
+                    continue
+                message = error.get("message")
+                if isinstance(message, str) and message.strip():
+                    details.append(message.strip())
+            detail_text = "; ".join(details) if details else str(user_errors)
+            raise ShopifyApiError(
+                message=f"stagedUploadsCreate failed while preparing logo upload: {detail_text}",
+                status_code=409,
+            )
+
+        staged_targets = staged_uploads_data.get("stagedTargets")
+        if not isinstance(staged_targets, list) or not staged_targets:
+            raise ShopifyApiError(
+                message="stagedUploadsCreate response did not return stagedTargets for logo upload.",
+                status_code=409,
+            )
+        staged_target = staged_targets[0]
+        if not isinstance(staged_target, dict):
+            raise ShopifyApiError(
+                message="stagedUploadsCreate response returned an invalid stagedTarget entry.",
+                status_code=409,
+            )
+        upload_url = staged_target.get("url")
+        resource_url = staged_target.get("resourceUrl")
+        if not isinstance(upload_url, str) or not upload_url.strip():
+            raise ShopifyApiError(
+                message="stagedUploadsCreate response is missing upload url for logo upload.",
+                status_code=409,
+            )
+        if not isinstance(resource_url, str) or not resource_url.strip():
+            raise ShopifyApiError(
+                message="stagedUploadsCreate response is missing resourceUrl for logo upload.",
+                status_code=409,
+            )
+        raw_parameters = staged_target.get("parameters")
+        parameters: list[tuple[str, str]] = []
+        if isinstance(raw_parameters, list):
+            for raw_parameter in raw_parameters:
+                if not isinstance(raw_parameter, dict):
+                    continue
+                name = raw_parameter.get("name")
+                value = raw_parameter.get("value")
+                if isinstance(name, str) and isinstance(value, str):
+                    parameters.append((name, value))
+        return upload_url.strip(), resource_url.strip(), parameters
+
+    async def _upload_logo_file_to_staged_target(
+        self,
+        *,
+        upload_url: str,
+        parameters: list[tuple[str, str]],
+        filename: str,
+        mime_type: str,
+        content: bytes,
+    ) -> None:
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                response = await client.post(
+                    upload_url,
+                    data=parameters,
+                    files={"file": (filename, content, mime_type)},
+                )
+        except httpx.RequestError as exc:
+            raise ShopifyApiError(message=f"Network error while uploading logo to staged target: {exc}", status_code=409) from exc
+
+        if response.status_code >= 400:
+            error_prefix = response.text[:300]
+            raise ShopifyApiError(
+                message=(
+                    "Logo staged upload request failed. "
+                    f"status={response.status_code}, uploadUrl={upload_url!r}, responsePrefix={error_prefix!r}."
+                ),
+                status_code=409,
+            )
+
+    @staticmethod
     def _coerce_logo_file_node(*, node: Any) -> tuple[str | None, str | None, str | None, str | None]:
         if not isinstance(node, dict):
             return None, None, None, None
@@ -4155,8 +4370,28 @@ class ShopifyApiClient:
         access_token: str,
         logo_url: str,
     ) -> str:
+        logo_content, response_content_type = await self._download_logo_source_file(logo_url=logo_url)
+        upload_filename, upload_mime_type = self._resolve_logo_upload_metadata(
+            source_url=logo_url,
+            response_content_type=response_content_type,
+        )
+        upload_url, resource_url, upload_parameters = await self._create_logo_staged_upload_target(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            filename=upload_filename,
+            mime_type=upload_mime_type,
+            file_size=len(logo_content),
+        )
+        await self._upload_logo_file_to_staged_target(
+            upload_url=upload_url,
+            parameters=upload_parameters,
+            filename=upload_filename,
+            mime_type=upload_mime_type,
+            content=logo_content,
+        )
+
         mutation = """
-        mutation createThemeLogoFileFromUrl($files: [FileCreateInput!]!) {
+        mutation createThemeLogoFileFromStagedUpload($files: [FileCreateInput!]!) {
             fileCreate(files: $files) {
                 files {
                     __typename
@@ -4190,7 +4425,7 @@ class ShopifyApiClient:
                     "files": [
                         {
                             "contentType": "IMAGE",
-                            "originalSource": logo_url,
+                            "originalSource": resource_url,
                         }
                     ]
                 },
