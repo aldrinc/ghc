@@ -17,6 +17,7 @@ from app.config import settings
 
 _THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
 _THEME_BRAND_SETTINGS_FILENAME = "config/settings_data.json"
+_THEME_FOOTER_GROUP_FILENAME = "sections/footer-group.json"
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
 _THEME_TEMPLATE_JSON_FILENAME_RE = re.compile(r"^(?:templates|sections)/.+\.json$")
@@ -469,6 +470,75 @@ _THEME_COMPONENT_IMAGE_KEY_SKIP_MARKERS = frozenset(
 )
 _THEME_COMPONENT_IMAGE_FILENAME_RE = re.compile(
     r"\.(?:png|jpe?g|webp|gif|avif|svg)(?:[?#].*)?$", re.IGNORECASE
+)
+_THEME_COMPONENT_TEXT_KEY_MARKERS = frozenset(
+    {
+        "title",
+        "heading",
+        "headline",
+        "subheading",
+        "subtitle",
+        "description",
+        "copy",
+        "content",
+        "text",
+        "body",
+        "caption",
+        "message",
+        "label",
+        "button",
+        "cta",
+        "benefit",
+        "feature",
+    }
+)
+_THEME_COMPONENT_TEXT_KEY_SKIP_MARKERS = frozenset(
+    {
+        "id",
+        "type",
+        "style",
+        "size",
+        "width",
+        "height",
+        "spacing",
+        "margin",
+        "padding",
+        "align",
+        "alignment",
+        "position",
+        "layout",
+        "font",
+        "family",
+        "weight",
+        "line",
+        "letter",
+        "color",
+        "colour",
+        "gradient",
+        "opacity",
+        "icon",
+        "image",
+        "video",
+        "url",
+        "link",
+        "href",
+        "handle",
+        "schema",
+        "variant",
+        "product",
+        "collection",
+        "currency",
+        "price",
+        "compare",
+        "input",
+        "placeholder",
+        "copyright",
+        "social",
+    }
+)
+_THEME_COMPONENT_TEXT_VALUE_SKIP_RE = re.compile(
+    r"^(?:https?://|shopify://|#[0-9a-f]{3,8}|var\(|rgba?\(|hsla?\(|\d+(?:\.\d+)?(?:px|rem|em|%)?)",
+    re.IGNORECASE,
 )
 _THEME_SETTINGS_SEMANTIC_TOKEN_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("secondary", "button", "label"), "secondary_button_label"),
@@ -1860,6 +1930,835 @@ class ShopifyApiClient:
         normalized_handle = cls._normalize_policy_page_handle(handle)
         return f"https://{shop_domain.strip().lower()}/pages/{normalized_handle}"
 
+    @staticmethod
+    def _normalize_menu_handle(handle: str) -> str:
+        cleaned = handle.strip().lower()
+        if not cleaned:
+            raise ShopifyApiError(
+                message="Footer menu handle cannot be empty.", status_code=409
+            )
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", cleaned):
+            raise ShopifyApiError(
+                message=(
+                    "Footer menu handle must use lowercase letters, numbers, and hyphens. "
+                    f"Received: {handle!r}."
+                ),
+                status_code=409,
+            )
+        return cleaned
+
+    @staticmethod
+    def _derive_menu_title_from_handle(handle: str) -> str:
+        parts = [token for token in handle.split("-") if token]
+        if not parts:
+            return "Footer"
+        return " ".join(token.capitalize() for token in parts)
+
+    @classmethod
+    def _build_policy_page_path(cls, *, handle: str) -> str:
+        normalized_handle = cls._normalize_policy_page_handle(handle)
+        return f"/pages/{normalized_handle}"
+
+    @staticmethod
+    def _normalize_menu_item_path(url: Any) -> str | None:
+        if not isinstance(url, str):
+            return None
+        cleaned_url = url.strip()
+        if not cleaned_url:
+            return None
+        parsed = urlparse(cleaned_url)
+        if parsed.scheme and parsed.netloc:
+            raw_path = parsed.path
+        else:
+            raw_path = cleaned_url
+        if not isinstance(raw_path, str):
+            return None
+        path_without_fragment = raw_path.split("#", 1)[0]
+        path_without_query = path_without_fragment.split("?", 1)[0].strip()
+        if not path_without_query:
+            return "/"
+        if not path_without_query.startswith("/"):
+            path_without_query = f"/{path_without_query}"
+        return f"/{path_without_query.strip('/').lower()}"
+
+    @classmethod
+    def _coerce_menu_summary_node(
+        cls,
+        *,
+        node: Any,
+        query_name: str,
+    ) -> dict[str, str]:
+        if not isinstance(node, dict):
+            raise ShopifyApiError(message=f"{query_name} response is missing menu node.")
+        menu_id = node.get("id")
+        title = node.get("title")
+        handle = node.get("handle")
+        if not isinstance(menu_id, str) or not menu_id:
+            raise ShopifyApiError(message=f"{query_name} response is missing menu.id.")
+        if not isinstance(title, str) or not title:
+            raise ShopifyApiError(message=f"{query_name} response is missing menu.title.")
+        if not isinstance(handle, str) or not handle:
+            raise ShopifyApiError(message=f"{query_name} response is missing menu.handle.")
+        return {
+            "id": menu_id,
+            "title": title,
+            "handle": cls._normalize_menu_handle(handle),
+        }
+
+    @classmethod
+    def _coerce_menu_item_node(
+        cls,
+        *,
+        node: Any,
+        query_name: str,
+    ) -> dict[str, Any]:
+        if not isinstance(node, dict):
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing menu item node."
+            )
+
+        title = node.get("title")
+        item_type = node.get("type")
+        if not isinstance(title, str) or not title:
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing menu item title."
+            )
+        if not isinstance(item_type, str) or not item_type:
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing menu item type."
+            )
+
+        parsed_item: dict[str, Any] = {
+            "title": title,
+            "type": item_type,
+        }
+        item_id = node.get("id")
+        if item_id is not None:
+            if not isinstance(item_id, str) or not item_id:
+                raise ShopifyApiError(
+                    message=f"{query_name} response has an invalid menu item id."
+                )
+            parsed_item["id"] = item_id
+
+        item_url = node.get("url")
+        if item_url is not None:
+            if not isinstance(item_url, str):
+                raise ShopifyApiError(
+                    message=f"{query_name} response has an invalid menu item url."
+                )
+            parsed_item["url"] = item_url
+
+        resource_id = node.get("resourceId")
+        if resource_id is not None:
+            if not isinstance(resource_id, str):
+                raise ShopifyApiError(
+                    message=f"{query_name} response has an invalid menu item resourceId."
+                )
+            parsed_item["resourceId"] = resource_id
+
+        tags = node.get("tags")
+        if tags is not None:
+            if not isinstance(tags, list) or any(
+                not isinstance(tag, str) for tag in tags
+            ):
+                raise ShopifyApiError(
+                    message=f"{query_name} response has invalid menu item tags."
+                )
+            parsed_item["tags"] = tags
+
+        raw_items = node.get("items") or []
+        if not isinstance(raw_items, list):
+            raise ShopifyApiError(
+                message=f"{query_name} response has invalid menu item children."
+            )
+        parsed_item["items"] = [
+            cls._coerce_menu_item_node(node=item, query_name=query_name)
+            for item in raw_items
+        ]
+        return parsed_item
+
+    @classmethod
+    def _coerce_menu_detail_node(
+        cls,
+        *,
+        node: Any,
+        query_name: str,
+    ) -> dict[str, Any]:
+        parsed_summary = cls._coerce_menu_summary_node(node=node, query_name=query_name)
+        raw_items = node.get("items") if isinstance(node, dict) else None
+        if not isinstance(raw_items, list):
+            raise ShopifyApiError(
+                message=f"{query_name} response is missing menu items."
+            )
+        return {
+            **parsed_summary,
+            "items": [
+                cls._coerce_menu_item_node(node=item, query_name=query_name)
+                for item in raw_items
+            ],
+        }
+
+    @classmethod
+    def _collect_footer_menu_handles_from_settings(
+        cls,
+        *,
+        settings: Any,
+        handles: set[str],
+    ) -> None:
+        if not isinstance(settings, dict):
+            return
+        for key, value in settings.items():
+            if not isinstance(key, str) or not isinstance(value, str):
+                continue
+            normalized_key = key.strip().lower()
+            if normalized_key != "menu" and not normalized_key.endswith("_menu"):
+                continue
+            cleaned_handle = value.strip()
+            if not cleaned_handle:
+                continue
+            handles.add(cls._normalize_menu_handle(cleaned_handle))
+
+    @classmethod
+    def _coerce_footer_menu_handles_from_theme_data(
+        cls,
+        *,
+        footer_group_data: dict[str, Any],
+    ) -> list[str]:
+        raw_sections = footer_group_data.get("sections")
+        if not isinstance(raw_sections, dict):
+            raise ShopifyApiError(
+                message=(
+                    f"Theme footer config {_THEME_FOOTER_GROUP_FILENAME} is missing sections."
+                ),
+                status_code=409,
+            )
+
+        handles: set[str] = set()
+        for section in raw_sections.values():
+            if not isinstance(section, dict):
+                continue
+            cls._collect_footer_menu_handles_from_settings(
+                settings=section.get("settings"),
+                handles=handles,
+            )
+            raw_blocks = section.get("blocks")
+            if not isinstance(raw_blocks, dict):
+                continue
+            for block in raw_blocks.values():
+                if not isinstance(block, dict):
+                    continue
+                cls._collect_footer_menu_handles_from_settings(
+                    settings=block.get("settings"),
+                    handles=handles,
+                )
+
+        if not handles:
+            raise ShopifyApiError(
+                message=(
+                    "No footer menu handles were configured in "
+                    f"{_THEME_FOOTER_GROUP_FILENAME}. Configure the footer menu settings first."
+                ),
+                status_code=409,
+            )
+        return sorted(handles)
+
+    @classmethod
+    def _build_policy_menu_items(
+        cls,
+        *,
+        policy_pages: list[dict[str, str]],
+    ) -> list[dict[str, Any]]:
+        items: list[dict[str, Any]] = []
+        for policy_page in policy_pages:
+            raw_title = policy_page.get("title")
+            if not isinstance(raw_title, str) or not raw_title.strip():
+                raise ShopifyApiError(
+                    message="Policy page sync cannot build footer links without title.",
+                    status_code=409,
+                )
+            raw_page_id = policy_page.get("pageId")
+            if not isinstance(raw_page_id, str) or not raw_page_id:
+                raise ShopifyApiError(
+                    message="Policy page sync cannot build footer links without pageId.",
+                    status_code=409,
+                )
+            items.append(
+                {
+                    "title": raw_title.strip(),
+                    "type": "PAGE",
+                    "resourceId": raw_page_id,
+                    "items": [],
+                }
+            )
+        return items
+
+    @classmethod
+    def _menu_items_to_update_input(
+        cls,
+        *,
+        items: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        output: list[dict[str, Any]] = []
+        for item in items:
+            title = item.get("title")
+            item_type = item.get("type")
+            if not isinstance(title, str) or not isinstance(item_type, str):
+                raise ShopifyApiError(
+                    message="Cannot sync footer menu because an existing menu item is invalid.",
+                    status_code=409,
+                )
+            converted: dict[str, Any] = {
+                "title": title,
+                "type": item_type,
+            }
+            item_id = item.get("id")
+            if isinstance(item_id, str) and item_id:
+                converted["id"] = item_id
+            item_url = item.get("url")
+            if isinstance(item_url, str):
+                converted["url"] = item_url
+            resource_id = item.get("resourceId")
+            if isinstance(resource_id, str):
+                converted["resourceId"] = resource_id
+            tags = item.get("tags")
+            if isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
+                converted["tags"] = tags
+            raw_child_items = item.get("items") or []
+            if not isinstance(raw_child_items, list):
+                raise ShopifyApiError(
+                    message=(
+                        "Cannot sync footer menu because an existing menu item has "
+                        "invalid nested items."
+                    ),
+                    status_code=409,
+                )
+            converted["items"] = cls._menu_items_to_update_input(items=raw_child_items)
+            output.append(converted)
+        return output
+
+    @classmethod
+    def _menu_items_to_create_input(
+        cls,
+        *,
+        items: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        output: list[dict[str, Any]] = []
+        for item in items:
+            title = item.get("title")
+            item_type = item.get("type")
+            if not isinstance(title, str) or not isinstance(item_type, str):
+                raise ShopifyApiError(
+                    message="Cannot create footer menu because a policy menu item is invalid.",
+                    status_code=409,
+                )
+            converted: dict[str, Any] = {
+                "title": title,
+                "type": item_type,
+            }
+            item_url = item.get("url")
+            if isinstance(item_url, str):
+                converted["url"] = item_url
+            resource_id = item.get("resourceId")
+            if isinstance(resource_id, str):
+                converted["resourceId"] = resource_id
+            tags = item.get("tags")
+            if isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
+                converted["tags"] = tags
+            raw_child_items = item.get("items") or []
+            if not isinstance(raw_child_items, list):
+                raise ShopifyApiError(
+                    message=(
+                        "Cannot create footer menu because a policy menu item has "
+                        "invalid nested items."
+                    ),
+                    status_code=409,
+                )
+            converted["items"] = cls._menu_items_to_create_input(items=raw_child_items)
+            output.append(converted)
+        return output
+
+    @classmethod
+    def _apply_policy_pages_to_menu_items(
+        cls,
+        *,
+        menu_items: list[dict[str, Any]],
+        policy_pages: list[dict[str, str]],
+    ) -> tuple[list[dict[str, Any]], bool]:
+        next_items = deepcopy(menu_items)
+        existing_by_resource_id: dict[str, dict[str, Any]] = {}
+        existing_by_path: dict[str, dict[str, Any]] = {}
+        for item in next_items:
+            resource_id = item.get("resourceId")
+            if isinstance(resource_id, str) and resource_id:
+                existing_by_resource_id[resource_id] = item
+            normalized_path = cls._normalize_menu_item_path(item.get("url"))
+            if normalized_path is not None:
+                existing_by_path[normalized_path] = item
+
+        changed = False
+        for policy_page in policy_pages:
+            raw_page_id = policy_page.get("pageId")
+            raw_title = policy_page.get("title")
+            raw_handle = policy_page.get("handle")
+            if (
+                not isinstance(raw_page_id, str)
+                or not raw_page_id
+                or not isinstance(raw_title, str)
+                or not raw_title.strip()
+                or not isinstance(raw_handle, str)
+                or not raw_handle.strip()
+            ):
+                raise ShopifyApiError(
+                    message=(
+                        "Policy page sync cannot update footer menu because policy page data "
+                        "is incomplete."
+                    ),
+                    status_code=409,
+                )
+
+            normalized_path = cls._build_policy_page_path(handle=raw_handle)
+            existing_item = existing_by_resource_id.get(raw_page_id)
+            if existing_item is None:
+                existing_item = existing_by_path.get(normalized_path)
+
+            if existing_item is None:
+                next_items.append(
+                    {
+                        "title": raw_title.strip(),
+                        "type": "PAGE",
+                        "resourceId": raw_page_id,
+                        "items": [],
+                    }
+                )
+                changed = True
+                continue
+
+            if existing_item.get("title") != raw_title.strip():
+                existing_item["title"] = raw_title.strip()
+                changed = True
+            if existing_item.get("type") != "PAGE":
+                existing_item["type"] = "PAGE"
+                changed = True
+            if existing_item.get("resourceId") != raw_page_id:
+                existing_item["resourceId"] = raw_page_id
+                changed = True
+
+        return next_items, changed
+
+    async def _resolve_main_theme(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+    ) -> dict[str, str]:
+        query = """
+        query themesForPolicyFooterSync($first: Int!) {
+            themes(first: $first) {
+                nodes {
+                    id
+                    name
+                    role
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={"query": query, "variables": {"first": 100}},
+        )
+        raw_nodes = (response.get("themes") or {}).get("nodes")
+        if not isinstance(raw_nodes, list):
+            raise ShopifyApiError(
+                message="themes query response is invalid while syncing footer policy links."
+            )
+
+        matching_themes: list[dict[str, str]] = []
+        for node in raw_nodes:
+            parsed_theme = self._coerce_theme_data(
+                node=node, query_name="themesForPolicyFooterSync"
+            )
+            if parsed_theme["role"].strip().upper() == "MAIN":
+                matching_themes.append(parsed_theme)
+
+        if not matching_themes:
+            raise ShopifyApiError(
+                message="Main theme not found while syncing footer policy links.",
+                status_code=409,
+            )
+        if len(matching_themes) > 1:
+            theme_ids = ", ".join(theme["id"] for theme in matching_themes)
+            raise ShopifyApiError(
+                message=(
+                    "Multiple main themes were returned while syncing footer policy links. "
+                    f"matchedThemeIds={theme_ids}"
+                ),
+                status_code=409,
+            )
+        return matching_themes[0]
+
+    async def _load_footer_menu_handles(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        theme_id: str,
+    ) -> list[str]:
+        footer_group_content = await self._load_theme_file_text(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme_id,
+            filename=_THEME_FOOTER_GROUP_FILENAME,
+        )
+        footer_group_data = self._parse_theme_template_json(
+            filename=_THEME_FOOTER_GROUP_FILENAME,
+            template_content=footer_group_content,
+        )
+        return self._coerce_footer_menu_handles_from_theme_data(
+            footer_group_data=footer_group_data
+        )
+
+    async def _list_shop_menus(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+    ) -> list[dict[str, str]]:
+        query = """
+        query menusForPolicyFooterSync($first: Int!, $after: String) {
+            menus(first: $first, after: $after) {
+                nodes {
+                    id
+                    title
+                    handle
+                }
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+            }
+        }
+        """
+        menus: list[dict[str, str]] = []
+        after: str | None = None
+        for _ in range(20):
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={
+                    "query": query,
+                    "variables": {
+                        "first": 250,
+                        "after": after,
+                    },
+                },
+            )
+            connection = response.get("menus")
+            if not isinstance(connection, dict):
+                raise ShopifyApiError(
+                    message=(
+                        "menus query response is invalid while syncing footer policy links."
+                    )
+                )
+            raw_nodes = connection.get("nodes")
+            if not isinstance(raw_nodes, list):
+                raise ShopifyApiError(
+                    message=(
+                        "menus query response is missing nodes while syncing footer policy links."
+                    )
+                )
+            for node in raw_nodes:
+                menus.append(
+                    self._coerce_menu_summary_node(
+                        node=node,
+                        query_name="menusForPolicyFooterSync",
+                    )
+                )
+            page_info = connection.get("pageInfo")
+            if not isinstance(page_info, dict):
+                raise ShopifyApiError(
+                    message=(
+                        "menus query response is missing pageInfo while syncing footer policy links."
+                    )
+                )
+            has_next_page = page_info.get("hasNextPage")
+            if not isinstance(has_next_page, bool):
+                raise ShopifyApiError(
+                    message=(
+                        "menus query response is missing pageInfo.hasNextPage while syncing "
+                        "footer policy links."
+                    )
+                )
+            if not has_next_page:
+                return menus
+            end_cursor = page_info.get("endCursor")
+            if not isinstance(end_cursor, str) or not end_cursor:
+                raise ShopifyApiError(
+                    message=(
+                        "menus query response is missing pageInfo.endCursor while syncing "
+                        "footer policy links."
+                    )
+                )
+            after = end_cursor
+
+        raise ShopifyApiError(
+            message=(
+                "menus query exceeded pagination limit while syncing footer policy links. "
+                "Reduce menu count or adjust the pagination strategy."
+            ),
+            status_code=409,
+        )
+
+    async def _load_menu_details(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        menu_id: str,
+    ) -> dict[str, Any]:
+        query = """
+        query menuForPolicyFooterSync($id: ID!) {
+            menu(id: $id) {
+                id
+                title
+                handle
+                items {
+                    id
+                    title
+                    type
+                    url
+                    resourceId
+                    tags
+                    items {
+                        id
+                        title
+                        type
+                        url
+                        resourceId
+                        tags
+                        items {
+                            id
+                            title
+                            type
+                            url
+                            resourceId
+                            tags
+                            items {
+                                id
+                                title
+                                type
+                                url
+                                resourceId
+                                tags
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={"query": query, "variables": {"id": menu_id}},
+        )
+        menu = response.get("menu")
+        if menu is None:
+            raise ShopifyApiError(
+                message=f"Menu not found for menuId={menu_id}.",
+                status_code=404,
+            )
+        return self._coerce_menu_detail_node(
+            node=menu,
+            query_name="menuForPolicyFooterSync",
+        )
+
+    async def _create_menu(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        handle: str,
+        title: str,
+        items: list[dict[str, Any]],
+    ) -> dict[str, str]:
+        mutation = """
+        mutation menuCreateForPolicyFooterSync(
+            $title: String!
+            $handle: String!
+            $items: [MenuItemCreateInput!]!
+        ) {
+            menuCreate(title: $title, handle: $handle, items: $items) {
+                menu {
+                    id
+                    title
+                    handle
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "title": title,
+                    "handle": handle,
+                    "items": self._menu_items_to_create_input(items=items),
+                },
+            },
+        )
+        create_data = response.get("menuCreate")
+        if not isinstance(create_data, dict):
+            raise ShopifyApiError(
+                message="menuCreate response is missing payload.",
+                status_code=409,
+            )
+        user_errors = create_data.get("userErrors") or []
+        self._assert_no_user_errors(
+            user_errors=user_errors, mutation_name="menuCreate"
+        )
+        return self._coerce_menu_summary_node(
+            node=create_data.get("menu"),
+            query_name="menuCreate",
+        )
+
+    async def _update_menu(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        menu_id: str,
+        title: str,
+        handle: str,
+        items: list[dict[str, Any]],
+    ) -> dict[str, str]:
+        mutation = """
+        mutation menuUpdateForPolicyFooterSync(
+            $id: ID!
+            $title: String!
+            $handle: String!
+            $items: [MenuItemUpdateInput!]!
+        ) {
+            menuUpdate(id: $id, title: $title, handle: $handle, items: $items) {
+                menu {
+                    id
+                    title
+                    handle
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "id": menu_id,
+                    "title": title,
+                    "handle": handle,
+                    "items": self._menu_items_to_update_input(items=items),
+                },
+            },
+        )
+        update_data = response.get("menuUpdate")
+        if not isinstance(update_data, dict):
+            raise ShopifyApiError(
+                message="menuUpdate response is missing payload.",
+                status_code=409,
+            )
+        user_errors = update_data.get("userErrors") or []
+        self._assert_no_user_errors(
+            user_errors=user_errors, mutation_name="menuUpdate"
+        )
+        return self._coerce_menu_summary_node(
+            node=update_data.get("menu"),
+            query_name="menuUpdate",
+        )
+
+    async def _sync_policy_pages_to_footer_menus(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        policy_pages: list[dict[str, str]],
+    ) -> None:
+        if not policy_pages:
+            return
+        main_theme = await self._resolve_main_theme(
+            shop_domain=shop_domain,
+            access_token=access_token,
+        )
+        footer_menu_handles = await self._load_footer_menu_handles(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=main_theme["id"],
+        )
+        all_menus = await self._list_shop_menus(
+            shop_domain=shop_domain,
+            access_token=access_token,
+        )
+
+        menu_summaries_by_handle: dict[str, list[dict[str, str]]] = {}
+        for menu in all_menus:
+            menu_summaries_by_handle.setdefault(menu["handle"], []).append(menu)
+
+        policy_menu_items = self._build_policy_menu_items(policy_pages=policy_pages)
+
+        for menu_handle in footer_menu_handles:
+            matching_menus = menu_summaries_by_handle.get(menu_handle, [])
+            if len(matching_menus) > 1:
+                menu_ids = ", ".join(menu["id"] for menu in matching_menus)
+                raise ShopifyApiError(
+                    message=(
+                        "Multiple menus matched a footer menu handle while syncing policy links. "
+                        f"handle={menu_handle}, matchedMenuIds={menu_ids}"
+                    ),
+                    status_code=409,
+                )
+
+            if not matching_menus:
+                created_menu = await self._create_menu(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    handle=menu_handle,
+                    title=self._derive_menu_title_from_handle(menu_handle),
+                    items=policy_menu_items,
+                )
+                menu_summaries_by_handle.setdefault(menu_handle, []).append(created_menu)
+                continue
+
+            matching_menu = matching_menus[0]
+            menu_details = await self._load_menu_details(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                menu_id=matching_menu["id"],
+            )
+            updated_items, changed = self._apply_policy_pages_to_menu_items(
+                menu_items=menu_details["items"],
+                policy_pages=policy_pages,
+            )
+            if not changed:
+                continue
+            await self._update_menu(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                menu_id=menu_details["id"],
+                title=menu_details["title"],
+                handle=menu_details["handle"],
+                items=updated_items,
+            )
+
     async def _find_page_by_handle(
         self,
         *,
@@ -2128,6 +3027,11 @@ class ShopifyApiClient:
                     "operation": operation,
                 }
             )
+        await self._sync_policy_pages_to_footer_menus(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            policy_pages=results,
+        )
         return results
 
     @staticmethod
@@ -3666,6 +4570,61 @@ class ShopifyApiClient:
         return normalized
 
     @classmethod
+    def _normalize_theme_component_text_values(
+        cls,
+        *,
+        component_text_values: dict[str, str] | None,
+    ) -> dict[str, str]:
+        normalized: dict[str, str] = {}
+        for raw_setting_path, raw_value in (component_text_values or {}).items():
+            if not isinstance(raw_setting_path, str):
+                raise ShopifyApiError(
+                    message="componentTextValues keys must be strings.",
+                    status_code=400,
+                )
+            setting_path = raw_setting_path.strip()
+            if not setting_path:
+                raise ShopifyApiError(
+                    message="componentTextValues keys must be non-empty strings.",
+                    status_code=400,
+                )
+            if any(char in setting_path for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message=f"componentTextValues key contains unsupported characters: {setting_path!r}.",
+                    status_code=400,
+                )
+            if any(char.isspace() for char in setting_path):
+                raise ShopifyApiError(
+                    message=f"componentTextValues key must not include whitespace characters: {setting_path!r}.",
+                    status_code=400,
+                )
+            if setting_path in normalized:
+                raise ShopifyApiError(
+                    message=f"Duplicate componentTextValues key after normalization: {setting_path}.",
+                    status_code=400,
+                )
+            cls._split_theme_template_setting_path(setting_path=setting_path)
+
+            if not isinstance(raw_value, str):
+                raise ShopifyApiError(
+                    message=f"componentTextValues[{setting_path}] must be a string value.",
+                    status_code=400,
+                )
+            text_value = raw_value.strip()
+            if not text_value:
+                raise ShopifyApiError(
+                    message=f"componentTextValues[{setting_path}] cannot be empty.",
+                    status_code=400,
+                )
+            if any(char in text_value for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message=f"componentTextValues[{setting_path}] contains unsupported characters.",
+                    status_code=400,
+                )
+            normalized[setting_path] = text_value
+        return normalized
+
+    @classmethod
     def _normalize_theme_auto_component_image_urls(
         cls,
         *,
@@ -3760,13 +4719,126 @@ class ShopifyApiClient:
         return False
 
     @classmethod
-    def _collect_theme_template_component_image_setting_paths(
+    def _infer_theme_template_image_slot_role(
+        cls, *, path: str, key: str
+    ) -> str:
+        path_tokens = cls._tokenize_theme_settings_path(path=path)
+        key_tokens = {
+            token
+            for token in cls._normalize_theme_settings_semantic_key(
+                raw_key=key
+            ).split("_")
+            if token
+        }
+        tokens = path_tokens | key_tokens
+        if {"hero", "banner", "slideshow"} & tokens:
+            return "hero"
+        if {"background", "bg", "overlay"} & tokens:
+            return "background"
+        if {"gallery", "thumb", "thumbnail", "product"} & tokens:
+            return "gallery"
+        if {"feature", "benefit", "card"} & tokens:
+            return "supporting"
+        return "generic"
+
+    @classmethod
+    def _infer_theme_template_image_recommended_aspect(
+        cls, *, path: str, key: str, role: str
+    ) -> Literal["landscape", "portrait", "square", "any"]:
+        path_tokens = cls._tokenize_theme_settings_path(path=path)
+        key_tokens = {
+            token
+            for token in cls._normalize_theme_settings_semantic_key(
+                raw_key=key
+            ).split("_")
+            if token
+        }
+        tokens = path_tokens | key_tokens
+        if role in {"hero", "background"}:
+            return "landscape"
+        if {"portrait", "vertical"} & tokens:
+            return "portrait"
+        if {"icon", "avatar", "logo", "badge"} & tokens:
+            return "square"
+        if role == "gallery":
+            if {"card", "feature", "benefit"} & tokens:
+                return "portrait"
+            return "landscape"
+        return "any"
+
+    @classmethod
+    def _is_theme_template_component_text_setting_key(cls, *, key: str) -> bool:
+        normalized_key = cls._normalize_theme_settings_semantic_key(raw_key=key)
+        if not normalized_key:
+            return False
+        key_tokens = {token for token in normalized_key.split("_") if token}
+        if not key_tokens:
+            return False
+        if not (key_tokens & _THEME_COMPONENT_TEXT_KEY_MARKERS):
+            return False
+        if key_tokens & _THEME_COMPONENT_TEXT_KEY_SKIP_MARKERS:
+            return False
+        return True
+
+    @classmethod
+    def _is_theme_template_component_text_setting_value(cls, *, value: Any) -> bool:
+        if not isinstance(value, str):
+            return False
+        normalized_value = value.strip()
+        if not normalized_value:
+            return False
+        if len(normalized_value) > 280:
+            return False
+        lowered_value = normalized_value.lower()
+        if _THEME_COMPONENT_TEXT_VALUE_SKIP_RE.match(normalized_value):
+            return False
+        if normalized_value.startswith("{{") or "}}" in normalized_value:
+            return False
+        if lowered_value.startswith("t:"):
+            return False
+        return True
+
+    @classmethod
+    def _infer_theme_template_text_slot_role(cls, *, path: str, key: str) -> str:
+        path_tokens = cls._tokenize_theme_settings_path(path=path)
+        key_tokens = {
+            token
+            for token in cls._normalize_theme_settings_semantic_key(
+                raw_key=key
+            ).split("_")
+            if token
+        }
+        tokens = path_tokens | key_tokens
+        if {"button", "cta", "label"} & tokens:
+            return "cta"
+        if {"title", "heading", "headline"} & tokens:
+            return "headline"
+        if {"subtitle", "subheading", "description", "copy", "content", "body"} & tokens:
+            return "body"
+        if {"caption", "message", "benefit", "feature"} & tokens:
+            return "supporting"
+        return "generic"
+
+    @classmethod
+    def _infer_theme_template_text_slot_max_length(cls, *, role: str) -> int:
+        if role == "cta":
+            return 28
+        if role == "headline":
+            return 90
+        if role == "body":
+            return 220
+        if role == "supporting":
+            return 120
+        return 120
+
+    @classmethod
+    def _collect_theme_template_component_image_slots(
         cls,
         *,
         template_filename: str,
         template_content: str,
         excluded_setting_paths: set[str],
-    ) -> list[str]:
+    ) -> list[dict[str, Any]]:
         template_data = cls._parse_theme_template_json(
             filename=template_filename,
             template_content=template_content,
@@ -3775,7 +4847,7 @@ class ShopifyApiClient:
         if not isinstance(sections, dict):
             return []
 
-        paths: list[str] = []
+        slots: list[dict[str, Any]] = []
 
         def collect(node: Any, path: str) -> None:
             if isinstance(node, dict):
@@ -3788,11 +4860,25 @@ class ShopifyApiClient:
                         continue
                     if not cls._is_theme_template_component_image_setting_key(key=key):
                         continue
-                    if not cls._is_theme_template_component_image_setting_value(
-                        value=value
-                    ):
+                    if not cls._is_theme_template_component_image_setting_value(value=value):
                         continue
-                    paths.append(child_path)
+                    role = cls._infer_theme_template_image_slot_role(
+                        path=child_path,
+                        key=key,
+                    )
+                    slots.append(
+                        {
+                            "path": child_path,
+                            "key": key,
+                            "currentValue": value.strip() if isinstance(value, str) else None,
+                            "role": role,
+                            "recommendedAspect": cls._infer_theme_template_image_recommended_aspect(
+                                path=child_path,
+                                key=key,
+                                role=role,
+                            ),
+                        }
+                    )
                 return
             if isinstance(node, list):
                 for idx, item in enumerate(node):
@@ -3821,7 +4907,106 @@ class ShopifyApiClient:
                         f"{template_filename}.sections.{section_id}.blocks.{block_id}.settings",
                     )
 
-        return sorted(set(paths))
+        deduped_by_path: dict[str, dict[str, Any]] = {}
+        for slot in slots:
+            deduped_by_path[str(slot["path"])] = slot
+        return [deduped_by_path[path] for path in sorted(deduped_by_path.keys())]
+
+    @classmethod
+    def _collect_theme_template_component_image_setting_paths(
+        cls,
+        *,
+        template_filename: str,
+        template_content: str,
+        excluded_setting_paths: set[str],
+    ) -> list[str]:
+        return [
+            str(slot["path"])
+            for slot in cls._collect_theme_template_component_image_slots(
+                template_filename=template_filename,
+                template_content=template_content,
+                excluded_setting_paths=excluded_setting_paths,
+            )
+        ]
+
+    @classmethod
+    def _collect_theme_template_component_text_slots(
+        cls,
+        *,
+        template_filename: str,
+        template_content: str,
+        excluded_setting_paths: set[str],
+    ) -> list[dict[str, Any]]:
+        template_data = cls._parse_theme_template_json(
+            filename=template_filename,
+            template_content=template_content,
+        )
+        sections = template_data.get("sections")
+        if not isinstance(sections, dict):
+            return []
+
+        slots: list[dict[str, Any]] = []
+
+        def collect(node: Any, path: str) -> None:
+            if isinstance(node, dict):
+                for key, value in node.items():
+                    child_path = f"{path}.{key}" if path else key
+                    if isinstance(value, (dict, list)):
+                        collect(value, child_path)
+                        continue
+                    if child_path in excluded_setting_paths:
+                        continue
+                    if not cls._is_theme_template_component_text_setting_key(key=key):
+                        continue
+                    if not cls._is_theme_template_component_text_setting_value(value=value):
+                        continue
+                    role = cls._infer_theme_template_text_slot_role(
+                        path=child_path,
+                        key=key,
+                    )
+                    slots.append(
+                        {
+                            "path": child_path,
+                            "key": key,
+                            "currentValue": value.strip() if isinstance(value, str) else None,
+                            "role": role,
+                            "maxLength": cls._infer_theme_template_text_slot_max_length(
+                                role=role,
+                            ),
+                        }
+                    )
+                return
+            if isinstance(node, list):
+                for idx, item in enumerate(node):
+                    collect(item, f"{path}[{idx}]")
+
+        for section_id, section in sections.items():
+            if not isinstance(section_id, str) or not isinstance(section, dict):
+                continue
+            section_settings = section.get("settings")
+            if isinstance(section_settings, dict):
+                collect(
+                    section_settings,
+                    f"{template_filename}.sections.{section_id}.settings",
+                )
+
+            section_blocks = section.get("blocks")
+            if not isinstance(section_blocks, dict):
+                continue
+            for block_id, block in section_blocks.items():
+                if not isinstance(block_id, str) or not isinstance(block, dict):
+                    continue
+                block_settings = block.get("settings")
+                if isinstance(block_settings, dict):
+                    collect(
+                        block_settings,
+                        f"{template_filename}.sections.{section_id}.blocks.{block_id}.settings",
+                    )
+
+        deduped_by_path: dict[str, dict[str, Any]] = {}
+        for slot in slots:
+            deduped_by_path[str(slot["path"])] = slot
+        return [deduped_by_path[path] for path in sorted(deduped_by_path.keys())]
 
     @classmethod
     def _build_auto_theme_component_image_urls(
@@ -3881,6 +5066,75 @@ class ShopifyApiClient:
             )
             grouped.setdefault(template_filename, {})[setting_path] = image_url
         return grouped
+
+    @classmethod
+    def _group_theme_component_text_values_by_template(
+        cls,
+        *,
+        component_text_values: dict[str, str],
+    ) -> dict[str, dict[str, str]]:
+        grouped: dict[str, dict[str, str]] = {}
+        for setting_path, text_value in component_text_values.items():
+            template_filename, _ = cls._split_theme_template_setting_path(
+                setting_path=setting_path
+            )
+            grouped.setdefault(template_filename, {})[setting_path] = text_value
+        return grouped
+
+    @classmethod
+    def _sync_theme_template_component_text_settings_data(
+        cls,
+        *,
+        template_filename: str,
+        template_content: str,
+        component_text_values_by_path: dict[str, str],
+    ) -> tuple[str, dict[str, Any]]:
+        report = {
+            "templateFilename": template_filename,
+            "updatedPaths": [],
+            "missingPaths": [],
+        }
+        if not component_text_values_by_path:
+            return template_content, report
+
+        template_data = cls._parse_theme_template_json(
+            filename=template_filename,
+            template_content=template_content,
+        )
+
+        updated_paths: list[str] = []
+        missing_paths: list[str] = []
+        for setting_path, text_value in component_text_values_by_path.items():
+            parsed_template_filename, json_path = cls._split_theme_template_setting_path(
+                setting_path=setting_path
+            )
+            if parsed_template_filename != template_filename:
+                raise ShopifyApiError(
+                    message=(
+                        "componentTextValues keys must match the current template file during sync. "
+                        f"path={setting_path}, templateFilename={template_filename}."
+                    ),
+                    status_code=500,
+                )
+            update_count = cls._set_json_path_value(
+                node=template_data,
+                path=json_path,
+                value=text_value,
+                create_missing_leaf=False,
+            )
+            if update_count > 0:
+                updated_paths.append(setting_path)
+            else:
+                missing_paths.append(setting_path)
+
+        report["updatedPaths"] = sorted(set(updated_paths))
+        report["missingPaths"] = sorted(set(missing_paths))
+        if not updated_paths:
+            return template_content, report
+        return (
+            json.dumps(template_data, ensure_ascii=False, separators=(",", ":")) + "\n",
+            report,
+        )
 
     @classmethod
     def _sync_theme_template_component_image_settings_data(
@@ -5517,6 +6771,94 @@ class ShopifyApiClient:
         )
         return self._build_shopify_logo_reference_from_file_url(file_url=ready_file_url)
 
+    async def list_theme_brand_template_slots(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        theme_id: str | None = None,
+        theme_name: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_theme_id, normalized_theme_name = self._normalize_theme_selector(
+            theme_id=theme_id,
+            theme_name=theme_name,
+        )
+        theme = await self._resolve_theme_for_brand_sync(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=normalized_theme_id,
+            theme_name=normalized_theme_name,
+        )
+        profile = self._resolve_theme_brand_profile(theme_name=theme["name"])
+        self._assert_theme_brand_profile_supported(theme_name=theme["name"], profile=profile)
+
+        template_filenames = await self._list_theme_template_json_filenames(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme["id"],
+        )
+        if not template_filenames:
+            return {
+                "themeId": theme["id"],
+                "themeName": theme["name"],
+                "themeRole": theme["role"],
+                "imageSlots": [],
+                "textSlots": [],
+            }
+
+        template_contents = await asyncio.gather(
+            *[
+                self._load_theme_file_text(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    theme_id=theme["id"],
+                    filename=template_filename,
+                )
+                for template_filename in template_filenames
+            ]
+        )
+
+        image_slots: list[dict[str, Any]] = []
+        text_slots: list[dict[str, Any]] = []
+        for template_filename, template_content in zip(
+            template_filenames, template_contents, strict=True
+        ):
+            image_slots.extend(
+                self._collect_theme_template_component_image_slots(
+                    template_filename=template_filename,
+                    template_content=template_content,
+                    excluded_setting_paths=set(),
+                )
+            )
+            text_slots.extend(
+                self._collect_theme_template_component_text_slots(
+                    template_filename=template_filename,
+                    template_content=template_content,
+                    excluded_setting_paths=set(),
+                )
+            )
+
+        deduped_image_slots_by_path: dict[str, dict[str, Any]] = {}
+        for slot in image_slots:
+            deduped_image_slots_by_path[str(slot["path"])] = slot
+        deduped_text_slots_by_path: dict[str, dict[str, Any]] = {}
+        for slot in text_slots:
+            deduped_text_slots_by_path[str(slot["path"])] = slot
+
+        return {
+            "themeId": theme["id"],
+            "themeName": theme["name"],
+            "themeRole": theme["role"],
+            "imageSlots": [
+                deduped_image_slots_by_path[path]
+                for path in sorted(deduped_image_slots_by_path.keys())
+            ],
+            "textSlots": [
+                deduped_text_slots_by_path[path]
+                for path in sorted(deduped_text_slots_by_path.keys())
+            ],
+        }
+
     async def sync_theme_brand(
         self,
         *,
@@ -5528,6 +6870,7 @@ class ShopifyApiClient:
         css_vars: dict[str, str],
         font_urls: list[str],
         component_image_urls: dict[str, str] | None = None,
+        component_text_values: dict[str, str] | None = None,
         auto_component_image_urls: list[str] | None = None,
         data_theme: str | None = None,
         theme_id: str | None = None,
@@ -5578,6 +6921,9 @@ class ShopifyApiClient:
         normalized_font_urls = self._normalize_theme_brand_font_urls(font_urls)
         normalized_component_image_urls = self._normalize_theme_component_image_urls(
             component_image_urls=component_image_urls
+        )
+        normalized_component_text_values = self._normalize_theme_component_text_values(
+            component_text_values=component_text_values
         )
         normalized_auto_component_image_urls = (
             self._normalize_theme_auto_component_image_urls(
@@ -5677,7 +7023,13 @@ class ShopifyApiClient:
                 component_image_urls=normalized_component_image_urls
             )
         )
+        component_text_values_by_template = (
+            self._group_theme_component_text_values_by_template(
+                component_text_values=normalized_component_text_values
+            )
+        )
         template_filenames_to_load.update(component_image_urls_by_template.keys())
+        template_filenames_to_load.update(component_text_values_by_template.keys())
 
         template_settings_contents: dict[str, str] = {}
         if template_filenames_to_load:
@@ -5796,6 +7148,41 @@ class ShopifyApiClient:
                 component_image_urls=all_component_image_urls
             )
         )
+
+        template_component_text_missing_paths: list[str] = []
+        for template_filename, component_text_map in component_text_values_by_template.items():
+            template_content = next_template_contents.get(template_filename)
+            if template_content is None:
+                raise ShopifyApiError(
+                    message=f"Theme template file not found for component text sync: {template_filename}",
+                    status_code=404,
+                )
+            _, validation_sync = self._sync_theme_template_component_text_settings_data(
+                template_filename=template_filename,
+                template_content=template_content,
+                component_text_values_by_path=component_text_map,
+            )
+            template_component_text_missing_paths.extend(validation_sync["missingPaths"])
+
+        template_component_text_missing_paths = sorted(set(template_component_text_missing_paths))
+        if template_component_text_missing_paths:
+            raise ShopifyApiError(
+                message=(
+                    "Theme template component text sync could not update mapped paths: "
+                    f"{', '.join(template_component_text_missing_paths)}."
+                ),
+                status_code=409,
+            )
+
+        if component_text_values_by_template:
+            for template_filename, component_text_map in component_text_values_by_template.items():
+                template_content = next_template_contents[template_filename]
+                next_template_content, _ = self._sync_theme_template_component_text_settings_data(
+                    template_filename=template_filename,
+                    template_content=template_content,
+                    component_text_values_by_path=component_text_map,
+                )
+                next_template_contents[template_filename] = next_template_content
 
         template_component_image_missing_paths: list[str] = []
         for (

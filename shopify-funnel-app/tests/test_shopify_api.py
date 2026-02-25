@@ -609,6 +609,16 @@ def test_update_variant_rejects_invalid_inventory_management():
 def test_upsert_policy_pages_creates_missing_page():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []
+    footer_group_json = json.dumps(
+        {
+            "sections": {
+                "ss_footer_4_abc123": {
+                    "type": "ss-footer-4",
+                    "settings": {"second_menu": "footer"},
+                }
+            }
+        }
+    )
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         observed_payloads.append(payload)
@@ -622,7 +632,96 @@ def test_upsert_policy_pages_creates_missing_page():
                         "id": "gid://shopify/Page/101",
                         "title": "Privacy Policy",
                         "handle": "privacy-policy",
-                        "onlineStoreUrl": "https://example.myshopify.com/pages/privacy-policy",
+                    },
+                    "userErrors": [],
+                }
+            }
+        if "query themesForPolicyFooterSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "sections/footer-group.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "sections/footer-group.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": footer_group_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            raise AssertionError("Unexpected theme filename request")
+        if "query menusForPolicyFooterSync" in query:
+            return {
+                "menus": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/Menu/1",
+                            "title": "Footer",
+                            "handle": "footer",
+                        }
+                    ],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        if "query menuForPolicyFooterSync" in query:
+            variables = payload.get("variables") or {}
+            assert variables.get("id") == "gid://shopify/Menu/1"
+            return {
+                "menu": {
+                    "id": "gid://shopify/Menu/1",
+                    "title": "Footer",
+                    "handle": "footer",
+                    "items": [
+                        {
+                            "id": "gid://shopify/MenuItem/10",
+                            "title": "Contact",
+                            "type": "HTTP",
+                            "url": "/pages/contact",
+                            "resourceId": None,
+                            "tags": [],
+                            "items": [],
+                        }
+                    ],
+                }
+            }
+        if "mutation menuUpdateForPolicyFooterSync" in query:
+            items = ((payload.get("variables") or {}).get("items")) or []
+            matched_policy_items = [
+                item
+                for item in items
+                if item.get("resourceId") == "gid://shopify/Page/101"
+            ]
+            assert len(matched_policy_items) == 1
+            policy_item = matched_policy_items[0]
+            assert policy_item["title"] == "Privacy Policy"
+            assert policy_item["type"] == "PAGE"
+            return {
+                "menuUpdate": {
+                    "menu": {
+                        "id": "gid://shopify/Menu/1",
+                        "title": "Footer",
+                        "handle": "footer",
                     },
                     "userErrors": [],
                 }
@@ -646,7 +745,7 @@ def test_upsert_policy_pages_creates_missing_page():
         )
     )
 
-    assert len(observed_payloads) == 2
+    assert len(observed_payloads) == 7
     assert result == [
         {
             "pageKey": "privacy_policy",
@@ -662,6 +761,16 @@ def test_upsert_policy_pages_creates_missing_page():
 def test_upsert_policy_pages_updates_existing_page():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []
+    footer_group_json = json.dumps(
+        {
+            "sections": {
+                "ss_footer_4_abc123": {
+                    "type": "ss-footer-4",
+                    "settings": {"second_menu": "footer"},
+                }
+            }
+        }
+    )
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         observed_payloads.append(payload)
@@ -689,7 +798,93 @@ def test_upsert_policy_pages_updates_existing_page():
                         "id": "gid://shopify/Page/101",
                         "title": "Terms of Service",
                         "handle": "terms-of-service",
-                        "onlineStoreUrl": "https://example.myshopify.com/pages/terms-of-service",
+                    },
+                    "userErrors": [],
+                }
+            }
+        if "query themesForPolicyFooterSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "sections/footer-group.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "sections/footer-group.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": footer_group_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            raise AssertionError("Unexpected theme filename request")
+        if "query menusForPolicyFooterSync" in query:
+            return {
+                "menus": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/Menu/1",
+                            "title": "Footer",
+                            "handle": "footer",
+                        }
+                    ],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        if "query menuForPolicyFooterSync" in query:
+            variables = payload.get("variables") or {}
+            assert variables.get("id") == "gid://shopify/Menu/1"
+            return {
+                "menu": {
+                    "id": "gid://shopify/Menu/1",
+                    "title": "Footer",
+                    "handle": "footer",
+                    "items": [
+                        {
+                            "id": "gid://shopify/MenuItem/10",
+                            "title": "Old Terms",
+                            "type": "HTTP",
+                            "url": "/pages/terms-of-service",
+                            "resourceId": None,
+                            "tags": [],
+                            "items": [],
+                        }
+                    ],
+                }
+            }
+        if "mutation menuUpdateForPolicyFooterSync" in query:
+            variables = payload.get("variables") or {}
+            items = variables.get("items") or []
+            assert len(items) == 1
+            assert items[0]["id"] == "gid://shopify/MenuItem/10"
+            assert items[0]["title"] == "Terms of Service"
+            assert items[0]["type"] == "PAGE"
+            assert items[0]["resourceId"] == "gid://shopify/Page/101"
+            return {
+                "menuUpdate": {
+                    "menu": {
+                        "id": "gid://shopify/Menu/1",
+                        "title": "Footer",
+                        "handle": "footer",
                     },
                     "userErrors": [],
                 }
@@ -713,7 +908,7 @@ def test_upsert_policy_pages_updates_existing_page():
         )
     )
 
-    assert len(observed_payloads) == 2
+    assert len(observed_payloads) == 7
     assert result[0]["operation"] == "updated"
     assert result[0]["pageId"] == "gid://shopify/Page/101"
 

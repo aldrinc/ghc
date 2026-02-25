@@ -1,4 +1,5 @@
 from uuid import uuid4
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
@@ -43,16 +44,20 @@ from app.services.design_system_generation import (
 )
 from app.services import funnel_ai
 from app.services.shopify_connection import (
+    audit_client_shopify_theme_brand,
     build_client_shopify_install_url,
     create_client_shopify_product,
     disconnect_client_shopify_store,
     get_client_shopify_connection_status,
+    list_client_shopify_theme_template_slots,
     list_client_shopify_products,
     list_shopify_installations,
     normalize_shop_domain,
     set_client_shopify_storefront_token,
-    audit_client_shopify_theme_brand,
     sync_client_shopify_theme_brand,
+)
+from app.services.shopify_theme_content_planner import (
+    plan_shopify_theme_component_content,
 )
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.client_onboarding import (
@@ -545,7 +550,8 @@ def sync_client_shopify_theme_brand_route(
         )
     data_theme = data_theme_raw.strip()
 
-    logo_asset = AssetsRepository(session).get_by_public_id(
+    assets_repo = AssetsRepository(session)
+    logo_asset = assets_repo.get_by_public_id(
         org_id=auth.org_id,
         public_id=logo_public_id,
         client_id=client_id,
@@ -584,6 +590,7 @@ def sync_client_shopify_theme_brand_route(
         normalized_component_image_asset_map[setting_path] = raw_asset_public_id.strip()
 
     requested_product_id = payload.productId.strip() if payload.productId else None
+    resolved_product: Product | None = None
     product_image_asset_public_ids: list[str] = []
     if requested_product_id:
         product = ProductsRepository(session).get(
@@ -594,6 +601,7 @@ def sync_client_shopify_theme_brand_route(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Product not found for productId={requested_product_id}.",
             )
+        resolved_product = product
         product_client_id = str(product.client_id).strip()
         if product_client_id != client_id:
             raise HTTPException(
@@ -638,8 +646,8 @@ def sync_client_shopify_theme_brand_route(
     public_asset_base_url = _require_public_asset_base_url()
     logo_url = f"{public_asset_base_url}/public/assets/{logo_public_id}"
     component_image_urls: dict[str, str] = {}
+    component_text_values: dict[str, str] = {}
     if normalized_component_image_asset_map:
-        assets_repo = AssetsRepository(session)
         for (
             setting_path,
             asset_public_id,
@@ -660,10 +668,144 @@ def sync_client_shopify_theme_brand_route(
             component_image_urls[setting_path] = (
                 f"{public_asset_base_url}/public/assets/{asset_public_id}"
             )
-    auto_component_image_urls = [
-        f"{public_asset_base_url}/public/assets/{asset_public_id}"
-        for asset_public_id in product_image_asset_public_ids
-    ]
+    auto_component_image_urls: list[str] = []
+
+    if requested_product_id and resolved_product is not None:
+        discovered_slots = list_client_shopify_theme_template_slots(
+            client_id=client_id,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+            shop_domain=effective_shop_domain,
+        )
+        raw_image_slots = discovered_slots.get("imageSlots")
+        raw_text_slots = discovered_slots.get("textSlots")
+        image_slots = (
+            raw_image_slots
+            if isinstance(raw_image_slots, list)
+            else []
+        )
+        text_slots = (
+            raw_text_slots
+            if isinstance(raw_text_slots, list)
+            else []
+        )
+        explicit_image_paths = set(normalized_component_image_asset_map.keys())
+        planner_image_slots = [
+            slot
+            for slot in image_slots
+            if isinstance(slot, dict)
+            and isinstance(slot.get("path"), str)
+            and slot["path"] not in explicit_image_paths
+        ]
+
+        if not planner_image_slots and not text_slots:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    "No image or text component slots were discovered for AI product content mapping. "
+                    f"productId={requested_product_id}."
+                ),
+            )
+
+        product_image_assets: list[Any] = []
+        product_image_assets_by_public_id: dict[str, Any] = {}
+        for asset_public_id in product_image_asset_public_ids:
+            mapped_asset = assets_repo.get_by_public_id(
+                org_id=auth.org_id,
+                public_id=asset_public_id,
+                client_id=client_id,
+            )
+            if not mapped_asset:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail=(
+                        "Product image asset for theme sync could not be resolved in this workspace. "
+                        f"assetPublicId={asset_public_id}, productId={requested_product_id}."
+                    ),
+                )
+            product_image_assets.append(mapped_asset)
+            product_image_assets_by_public_id[asset_public_id] = mapped_asset
+
+        offers = ProductOffersRepository(session).list_by_product(
+            product_id=str(resolved_product.id)
+        )
+        try:
+            planner_output = plan_shopify_theme_component_content(
+                product=resolved_product,
+                offers=offers,
+                product_image_assets=product_image_assets,
+                image_slots=planner_image_slots,
+                text_slots=text_slots,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    "AI theme component planner failed for Shopify sync. "
+                    f"productId={requested_product_id}. {exc}"
+                ),
+            ) from exc
+
+        planner_image_map = planner_output.get("componentImageAssetMap") or {}
+        if not isinstance(planner_image_map, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AI theme component planner returned an invalid componentImageAssetMap payload.",
+            )
+        for setting_path, asset_public_id in planner_image_map.items():
+            if not isinstance(setting_path, str) or not setting_path.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="AI theme component planner returned an invalid image mapping path.",
+                )
+            if not isinstance(asset_public_id, str) or not asset_public_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned an invalid image mapping asset id "
+                        f"for path {setting_path}."
+                    ),
+                )
+            normalized_path = setting_path.strip()
+            normalized_asset_public_id = asset_public_id.strip()
+            if normalized_asset_public_id not in product_image_assets_by_public_id:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned an image asset id that does not belong to "
+                        f"the product asset set. path={normalized_path}, assetPublicId={normalized_asset_public_id}."
+                    ),
+                )
+            component_image_urls[normalized_path] = (
+                f"{public_asset_base_url}/public/assets/{normalized_asset_public_id}"
+            )
+
+        planner_text_values = planner_output.get("componentTextValues") or {}
+        if not isinstance(planner_text_values, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AI theme component planner returned an invalid componentTextValues payload.",
+            )
+        for setting_path, value in planner_text_values.items():
+            if not isinstance(setting_path, str) or not setting_path.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="AI theme component planner returned an invalid text mapping path.",
+                )
+            if not isinstance(value, str) or not value.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned an invalid text value "
+                        f"for path {setting_path}."
+                    ),
+                )
+            component_text_values[setting_path.strip()] = value.strip()
+
+        for setting_path, asset_public_id in normalized_component_image_asset_map.items():
+            component_image_urls[setting_path] = (
+                f"{public_asset_base_url}/public/assets/{asset_public_id}"
+            )
 
     synced = sync_client_shopify_theme_brand(
         client_id=client_id,
@@ -674,6 +816,7 @@ def sync_client_shopify_theme_brand_route(
         font_urls=font_urls,
         data_theme=data_theme,
         component_image_urls=component_image_urls,
+        component_text_values=component_text_values,
         auto_component_image_urls=auto_component_image_urls,
         theme_id=payload.themeId,
         theme_name=payload.themeName,

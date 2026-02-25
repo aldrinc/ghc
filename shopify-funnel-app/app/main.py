@@ -28,6 +28,10 @@ from app.schemas import (
     GetProductRequest,
     GetProductResponse,
     InstallationResponse,
+    ListThemeBrandTemplateSlotsRequest,
+    ListThemeBrandTemplateSlotsResponse,
+    ThemeTemplateImageSlot,
+    ThemeTemplateTextSlot,
     ListProductsRequest,
     ListProductsResponse,
     SyncThemeBrandRequest,
@@ -603,6 +607,7 @@ async def sync_theme_brand(
             css_vars=payload.cssVars,
             font_urls=payload.fontUrls,
             component_image_urls=payload.componentImageUrls,
+            component_text_values=payload.componentTextValues,
             auto_component_image_urls=payload.autoComponentImageUrls,
             data_theme=payload.dataTheme,
             theme_id=payload.themeId,
@@ -627,6 +632,58 @@ async def sync_theme_brand(
         jobId=synced.get("jobId"),
         coverage=synced["coverage"],
         settingsSync=synced["settingsSync"],
+    )
+
+
+@app.post(
+    "/v1/themes/brand/template-slots",
+    response_model=ListThemeBrandTemplateSlotsResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def list_theme_brand_template_slots(
+    payload: ListThemeBrandTemplateSlotsRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        discovered = await shopify_api.list_theme_brand_template_slots(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return ListThemeBrandTemplateSlotsResponse(
+        shopDomain=installation.shop_domain,
+        themeId=discovered["themeId"],
+        themeName=discovered["themeName"],
+        themeRole=discovered["themeRole"],
+        imageSlots=[
+            ThemeTemplateImageSlot(
+                path=item["path"],
+                key=item["key"],
+                currentValue=item.get("currentValue"),
+                role=item["role"],
+                recommendedAspect=item["recommendedAspect"],
+            )
+            for item in discovered["imageSlots"]
+        ],
+        textSlots=[
+            ThemeTemplateTextSlot(
+                path=item["path"],
+                key=item["key"],
+                currentValue=item.get("currentValue"),
+                role=item["role"],
+                maxLength=item["maxLength"],
+            )
+            for item in discovered["textSlots"]
+        ],
     )
 
 
