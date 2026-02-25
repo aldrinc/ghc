@@ -2030,6 +2030,34 @@ def test_sync_theme_template_color_settings_data_updates_component_paths():
     assert "templates/index.json.sections.hero.settings.heading_color" in report["updatedPaths"]
 
 
+def test_parse_theme_template_json_supports_leading_comment_block():
+    parsed = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/404.json",
+        template_content=(
+            "\ufeff/*\n"
+            " * ------------------------------------------------------------\n"
+            " * IMPORTANT: This file is auto-generated.\n"
+            " * ------------------------------------------------------------\n"
+            " */\n"
+            "{\"sections\":{\"main\":{\"type\":\"main-404\",\"settings\":{}}},\"order\":[\"main\"]}\n"
+        ),
+    )
+
+    assert parsed["sections"]["main"]["type"] == "main-404"
+    assert parsed["order"] == ["main"]
+
+
+def test_parse_theme_template_json_errors_for_unterminated_leading_comment_block():
+    with pytest.raises(
+        ShopifyApiError,
+        match="Theme template file templates/404.json contains an unterminated leading comment block",
+    ):
+        ShopifyApiClient._parse_theme_template_json(
+            filename="templates/404.json",
+            template_content="/*\n * IMPORTANT: auto-generated template header\n",
+        )
+
+
 def test_sync_theme_settings_data_errors_for_unmapped_color_paths():
     profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
