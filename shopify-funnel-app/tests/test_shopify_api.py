@@ -2038,6 +2038,41 @@ def test_sync_theme_settings_data_maps_footer_section_background_to_footer_bg():
     assert report["unmappedColorPaths"] == []
 
 
+def test_sync_theme_settings_data_maps_footer_section_background_gradient_to_footer_bg():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "sections": {
+                "ss_footer_4_abc123": {
+                    "type": "ss-footer-4",
+                    "settings": {
+                        "background_color": "#111111",
+                        "background_gradient": "linear-gradient(180deg, #111111 0%, #222222 100%)",
+                    },
+                }
+            }
+        }
+    )
+
+    next_settings_content, report = ShopifyApiClient._sync_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+    footer_settings = synced_settings["current"]["sections"]["ss_footer_4_abc123"]["settings"]
+
+    assert footer_settings["background_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
+    assert footer_settings["background_gradient"] == _THEME_SYNC_REQUIRED_CSS_VARS["--footer-bg"]
+    assert "current.sections.ss_footer_4_abc123.settings.background_color" in report["semanticUpdatedPaths"]
+    assert "current.sections.ss_footer_4_abc123.settings.background_gradient" in report["semanticUpdatedPaths"]
+    assert report["unmappedColorPaths"] == []
+
+
 def test_sync_theme_settings_data_updates_checkout_and_sale_semantic_color_paths():
     profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(

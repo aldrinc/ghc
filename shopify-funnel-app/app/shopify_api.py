@@ -382,6 +382,10 @@ _THEME_SETTINGS_SEMANTIC_KEY_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
 _THEME_SETTINGS_SEMANTIC_KEY_COLLAPSE_RE = re.compile(r"_+")
 _THEME_SETTINGS_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f]{6}|[0-9a-f]{8})$", re.IGNORECASE)
 _THEME_SETTINGS_CSS_COLOR_FUNCTION_RE = re.compile(r"^(?:rgb|rgba|hsl|hsla)\s*\(", re.IGNORECASE)
+_THEME_SETTINGS_CSS_GRADIENT_FUNCTION_RE = re.compile(
+    r"^(?:repeating-)?(?:linear|radial|conic)-gradient\s*\(",
+    re.IGNORECASE,
+)
 _THEME_SETTINGS_CSS_VAR_RE = re.compile(r"^var\(\s*--[A-Za-z0-9_-]+(?:\s*,\s*[^)]+)?\s*\)$")
 _THEME_SETTINGS_SIMPLE_NUMBER_RE = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*(px|em|rem|%)?\s*$", re.IGNORECASE)
 _THEME_SETTINGS_FONT_HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9_]*_(?:n|i)\d{1,3}$")
@@ -2302,6 +2306,8 @@ class ShopifyApiClient:
         if _THEME_SETTINGS_HEX_COLOR_RE.fullmatch(normalized_value):
             return True
         if _THEME_SETTINGS_CSS_COLOR_FUNCTION_RE.match(normalized_value):
+            return True
+        if _THEME_SETTINGS_CSS_GRADIENT_FUNCTION_RE.match(normalized_value):
             return True
         if _THEME_SETTINGS_CSS_VAR_RE.fullmatch(normalized_value):
             return True
