@@ -1302,7 +1302,7 @@ def test_render_theme_brand_css_includes_theme_scope_selectors():
         font_urls=[],
     )
 
-    assert ':root, html, body, .color-scheme, .gradient, .footer, [data-color-scheme], [class*="color-scheme"], [class*="scheme-"], [class*="color-"], [class*="footer"] {' in css
+    assert ':root, html, body, .color-scheme, .gradient, footer, #shopify-section-footer, [role="contentinfo"], .footer, [data-color-scheme], [id*="footer"], [class*="color-scheme"], [class*="scheme-"], [class*="color-"], [class*="footer"] {' in css
     assert 'html[data-theme="light"] .footer {' not in css
     assert 'html[data-theme="light"], html[data-theme="light"] html, html[data-theme="light"] body, html[data-theme="light"] .color-scheme' in css
     assert 'html[data-theme="light"] [class*="footer"] {' in css
