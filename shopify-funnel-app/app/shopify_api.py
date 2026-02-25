@@ -376,7 +376,24 @@ _THEME_SETTINGS_HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-f]{3}|[0-9a-f]{4}|[0-9a-f
 _THEME_SETTINGS_CSS_COLOR_FUNCTION_RE = re.compile(r"^(?:rgb|rgba|hsl|hsla)\s*\(", re.IGNORECASE)
 _THEME_SETTINGS_CSS_VAR_RE = re.compile(r"^var\(\s*--[A-Za-z0-9_-]+(?:\s*,\s*[^)]+)?\s*\)$")
 _THEME_SETTINGS_SIMPLE_NUMBER_RE = re.compile(r"^\s*([+-]?\d+(?:\.\d+)?)\s*(px|em|rem|%)?\s*$", re.IGNORECASE)
+_THEME_SETTINGS_FONT_HANDLE_RE = re.compile(r"^[a-z0-9][a-z0-9_]*_(?:n|i)\d{1,3}$")
+_THEME_SETTINGS_FONT_HANDLE_SUFFIX_RE = re.compile(r"_(?:n|i)\d{1,3}$")
+_THEME_SETTINGS_FONT_HANDLE_SANITIZE_RE = re.compile(r"[^a-z0-9]+")
 _THEME_SETTINGS_COLOR_VALUE_KEYWORDS = frozenset({"transparent", "currentcolor", "inherit", "initial", "unset"})
+_THEME_SETTINGS_GENERIC_FONT_FAMILIES = frozenset(
+    {
+        "serif",
+        "sans-serif",
+        "monospace",
+        "cursive",
+        "fantasy",
+        "system-ui",
+        "ui-serif",
+        "ui-sans-serif",
+        "ui-monospace",
+        "ui-rounded",
+    }
+)
 _THEME_SETTINGS_SEMANTIC_TOKEN_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("secondary", "button", "label"), "secondary_button_label"),
     (("secondary", "button"), "secondary_button"),
@@ -2536,6 +2553,77 @@ class ShopifyApiClient:
             first_family = first_family[1:-1].strip()
         return first_family or cleaned
 
+    @classmethod
+    def _coerce_theme_settings_font_picker_handle(
+        cls,
+        *,
+        source_value: str,
+        current_value: str,
+        path: str,
+    ) -> str:
+        primary_family = cls._extract_primary_font_family_from_css_value(raw_value=source_value).strip()
+        normalized_family = primary_family.strip("'\" ").lower()
+        if not normalized_family:
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings typography mapping for path {path} requires a non-empty font family, "
+                    f"received {source_value!r}."
+                ),
+                status_code=422,
+            )
+        if normalized_family.startswith("var("):
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings typography mapping for path {path} requires an explicit font family, "
+                    f"received {source_value!r}."
+                ),
+                status_code=422,
+            )
+        if normalized_family in _THEME_SETTINGS_GENERIC_FONT_FAMILIES:
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings typography mapping for path {path} requires a concrete Shopify font family, "
+                    f"received generic family {primary_family!r}."
+                ),
+                status_code=422,
+            )
+
+        if _THEME_SETTINGS_FONT_HANDLE_RE.fullmatch(normalized_family):
+            return normalized_family
+
+        current_handle = current_value.strip().lower()
+        suffix_match = _THEME_SETTINGS_FONT_HANDLE_SUFFIX_RE.search(current_handle)
+        if suffix_match is None:
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings typography mapping for path {path} requires current value {current_value!r} "
+                    "to be a Shopify font handle so a compatible variant can be derived."
+                ),
+                status_code=422,
+            )
+        suffix = suffix_match.group(0)
+
+        base_handle = _THEME_SETTINGS_FONT_HANDLE_SANITIZE_RE.sub("_", normalized_family)
+        base_handle = base_handle.strip("_")
+        if not base_handle:
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings typography mapping for path {path} could not derive a Shopify font handle "
+                    f"from family {primary_family!r}."
+                ),
+                status_code=422,
+            )
+        candidate_handle = f"{base_handle}{suffix}"
+        if not _THEME_SETTINGS_FONT_HANDLE_RE.fullmatch(candidate_handle):
+            raise ShopifyApiError(
+                message=(
+                    f"Theme settings typography mapping produced invalid Shopify font handle "
+                    f"{candidate_handle!r} for path {path}."
+                ),
+                status_code=422,
+            )
+        return candidate_handle
+
     @staticmethod
     def _parse_simple_numeric_css_value(*, raw_value: str) -> tuple[float, str | None] | None:
         match = _THEME_SETTINGS_SIMPLE_NUMBER_RE.fullmatch(raw_value.strip())
@@ -2554,11 +2642,22 @@ class ShopifyApiClient:
         path: str,
     ) -> Any:
         if semantic_key.endswith("_font"):
-            if isinstance(current_value, str):
-                normalized_current = current_value.strip().lower()
-                if normalized_current in {"body", "heading"}:
-                    return "heading" if semantic_key == "heading_font" else "body"
-            return cls._extract_primary_font_family_from_css_value(raw_value=source_value)
+            if not isinstance(current_value, str):
+                raise ShopifyApiError(
+                    message=(
+                        f"Theme settings typography path {path} has unsupported font value type "
+                        f"{type(current_value).__name__}."
+                    ),
+                    status_code=422,
+                )
+            normalized_current = current_value.strip().lower()
+            if normalized_current in {"body", "heading"}:
+                return "heading" if semantic_key == "heading_font" else "body"
+            return cls._coerce_theme_settings_font_picker_handle(
+                source_value=source_value,
+                current_value=current_value,
+                path=path,
+            )
 
         parsed_numeric = cls._parse_simple_numeric_css_value(raw_value=source_value)
         if parsed_numeric is None:

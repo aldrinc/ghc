@@ -1906,10 +1906,10 @@ def test_sync_theme_settings_data_updates_typography_semantic_paths():
     )
     settings_content = _build_minimal_theme_settings_json(
         extra_current={
-            "type_header_font": "Inter",
+            "type_header_font": "inter_n7",
             "type_header_line_height": 0.9,
             "type_header_spacing": 0,
-            "type_body_font": "Inter",
+            "type_body_font": "inter_n4",
             "type_body_base_size": 12,
             "type_body_line_height": 1.0,
             "type_body_spacing": 0,
@@ -1930,10 +1930,10 @@ def test_sync_theme_settings_data_updates_typography_semantic_paths():
     synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
     synced_current = synced_settings["current"]
 
-    assert synced_current["type_header_font"] == "Merriweather"
+    assert synced_current["type_header_font"] == "merriweather_n7"
     assert synced_current["type_header_line_height"] == 1.0
     assert synced_current["type_header_spacing"] == -30
-    assert synced_current["type_body_font"] == "Inter"
+    assert synced_current["type_body_font"] == "inter_n4"
     assert synced_current["type_body_base_size"] == 15
     assert synced_current["type_body_line_height"] == 1.2
     assert synced_current["type_body_spacing"] == -30
@@ -1968,6 +1968,60 @@ def test_sync_theme_settings_data_errors_for_unmapped_typography_paths():
             settings_content=settings_content,
             effective_css_vars=effective_css_vars,
         )
+
+
+def test_sync_theme_settings_data_errors_for_invalid_font_picker_handle_source():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars={
+            **_THEME_SYNC_REQUIRED_CSS_VARS,
+            "--font-heading": "Cormorant Garamond, serif",
+        },
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "type_header_font": "Inter",
+        }
+    )
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="requires current value 'Inter' to be a Shopify font handle",
+    ):
+        ShopifyApiClient._sync_theme_settings_data(
+            profile=profile,
+            settings_content=settings_content,
+            effective_css_vars=effective_css_vars,
+        )
+
+
+def test_sync_theme_settings_data_coerces_font_family_to_shopify_font_handle():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars={
+            **_THEME_SYNC_REQUIRED_CSS_VARS,
+            "--font-heading": "'Cormorant Garamond', serif",
+            "--font-sans": "Inter, sans-serif",
+        },
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "type_header_font": "inter_n7",
+            "type_body_font": "inter_n4",
+        }
+    )
+
+    next_settings_content, _ = ShopifyApiClient._sync_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(settings_content=next_settings_content)
+
+    assert synced_settings["current"]["type_header_font"] == "cormorant_garamond_n7"
+    assert synced_settings["current"]["type_body_font"] == "inter_n4"
 
 
 def test_sync_theme_template_color_settings_data_updates_component_paths():
