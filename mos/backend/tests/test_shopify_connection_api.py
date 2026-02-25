@@ -8,6 +8,14 @@ def _create_client(api_client, *, name: str = "Shopify Workspace") -> str:
     return response.json()["id"]
 
 
+def test_sanitize_theme_component_text_value_removes_unsupported_characters():
+    raw_value = '  "Sleep <better>\n tonight\'s pick"  '
+    assert (
+        clients_router._sanitize_theme_component_text_value(raw_value)
+        == "Sleep better tonight’s pick"
+    )
+
+
 def test_get_shopify_status_returns_service_payload(api_client, monkeypatch):
     client_id = _create_client(api_client)
 
@@ -733,7 +741,9 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
                 "templates/product.json.sections.gallery.settings.image": "product-image-1",
             },
             "componentTextValues": {
-                "templates/index.json.sections.hero.settings.heading": "Sleep better tonight"
+                "templates/index.json.sections.hero.settings.heading": (
+                    '  "Sleep <better>\n tonight\'s pick"  '
+                )
             },
         }
 
@@ -841,7 +851,7 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
         ),
     }
     assert observed["component_text_values"] == {
-        "templates/index.json.sections.hero.settings.heading": "Sleep better tonight"
+        "templates/index.json.sections.hero.settings.heading": ("Sleep better tonight’s pick")
     }
     assert observed["auto_component_image_urls"] == []
 

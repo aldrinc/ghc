@@ -85,6 +85,16 @@ logger = logging.getLogger(__name__)
 
 _JOB_TYPE_SHOPIFY_THEME_BRAND_SYNC = "shopify_theme_brand_sync"
 _JOB_SUBJECT_TYPE_CLIENT = "client"
+_UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION = str.maketrans(
+    {
+        '"': "",
+        "'": "’",
+        "<": "",
+        ">": "",
+        "\n": " ",
+        "\r": " ",
+    }
+)
 
 
 @router.get("")
@@ -190,6 +200,11 @@ def _serialize_http_exception_detail(detail: Any) -> dict[str, Any]:
     if isinstance(detail, str):
         return {"message": detail}
     return {"message": str(detail)}
+
+
+def _sanitize_theme_component_text_value(value: str) -> str:
+    sanitized = value.translate(_UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION)
+    return " ".join(sanitized.split()).strip()
 
 
 def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
@@ -995,7 +1010,17 @@ def sync_client_shopify_theme_brand_route(
                         f"for path {setting_path}."
                     ),
                 )
-            component_text_values[setting_path.strip()] = value.strip()
+            normalized_path = setting_path.strip()
+            sanitized_value = _sanitize_theme_component_text_value(value)
+            if not sanitized_value:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned text that became empty after "
+                        f"sanitization for path {normalized_path}."
+                    ),
+                )
+            component_text_values[normalized_path] = sanitized_value
 
         for (
             setting_path,
