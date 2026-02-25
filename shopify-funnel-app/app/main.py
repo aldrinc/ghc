@@ -589,6 +589,11 @@ async def sync_theme_brand(
         )
     except ShopifyApiError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Unexpected theme sync error ({type(exc).__name__}): {exc}",
+        ) from exc
 
     return SyncThemeBrandResponse(
         shopDomain=installation.shop_domain,
