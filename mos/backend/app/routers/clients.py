@@ -26,7 +26,7 @@ from app.db.repositories.jobs import (
 from app.db.repositories.products import ProductOffersRepository, ProductsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
-from app.db.enums import ArtifactTypeEnum
+from app.db.enums import ArtifactTypeEnum, AssetStatusEnum
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
 from app.schemas.preferences import ActiveProductUpdateRequest
 from app.schemas.common import ClientCreate
@@ -54,7 +54,7 @@ from app.services.design_system_generation import (
     DesignSystemGenerationError,
     validate_design_system_tokens,
 )
-from app.services.funnels import create_funnel_image_asset
+from app.services.funnels import create_funnel_image_asset, create_funnel_unsplash_asset
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
     build_client_shopify_install_url,
@@ -124,6 +124,29 @@ _UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION = str.maketrans(
         "\r": " ",
     }
 )
+
+
+def _is_gemini_quota_or_rate_limit_error(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return (
+        "status=429" in message
+        or "too many requests" in message
+        or "resource_exhausted" in message
+    )
+
+
+def _build_theme_sync_slot_unsplash_query(*, slot_role: str, slot_key: str) -> str:
+    role_query_by_name = {
+        "hero": "beauty tech skincare lifestyle portrait",
+        "gallery": "premium skincare product closeup",
+        "supporting": "clean beauty wellness routine",
+        "background": "minimal neutral skincare background",
+        "generic": "beauty wellness lifestyle",
+    }
+    base_query = role_query_by_name.get(slot_role, role_query_by_name["generic"])
+    if slot_key and slot_key != "image":
+        return f"{base_query} {slot_key}".strip()
+    return base_query
 
 
 @router.get("")
@@ -330,12 +353,13 @@ def _generate_theme_sync_ai_image_assets(
     client_id: str,
     product_id: str | None,
     image_slots: list[dict[str, Any]],
-) -> list[Any]:
+) -> tuple[list[Any], list[str]]:
     selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
     if not selected_slots:
-        return []
+        return [], []
 
     generated_assets: list[Any] = []
+    rate_limited_slot_paths: list[str] = []
     variant_count_by_role_aspect: dict[tuple[str, str], int] = {}
     for slot in selected_slots:
         slot_path = str(slot["path"]).strip()
@@ -377,13 +401,49 @@ def _generate_theme_sync_ai_image_assets(
                 tags=["shopify_theme_sync", "component_image", "ai_generated"],
             )
         except Exception as exc:  # noqa: BLE001
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "AI theme image generation failed for Shopify sync. "
-                    f"slotPath={slot_path}. {exc}"
-                ),
-            ) from exc
+            if _is_gemini_quota_or_rate_limit_error(exc):
+                try:
+                    generated_asset = create_funnel_unsplash_asset(
+                        session=session,
+                        org_id=org_id,
+                        client_id=client_id,
+                        query=_build_theme_sync_slot_unsplash_query(
+                            slot_role=slot_role, slot_key=slot_key
+                        ),
+                        usage_context={
+                            "kind": "shopify_theme_sync_component_image",
+                            "slotPath": slot_path,
+                            "slotRole": slot_role,
+                            "recommendedAspect": slot_recommended_aspect,
+                            "fallbackSource": "unsplash_after_gemini_rate_limit",
+                        },
+                        product_id=product_id,
+                        tags=[
+                            "shopify_theme_sync",
+                            "component_image",
+                            "unsplash",
+                            "fallback_after_rate_limit",
+                        ],
+                    )
+                except Exception as unsplash_exc:  # noqa: BLE001
+                    logger.warning(
+                        "Theme sync image generation failed for slot after Gemini rate limit; skipping slot.",
+                        extra={
+                            "slotPath": slot_path,
+                            "geminiError": str(exc),
+                            "unsplashError": str(unsplash_exc),
+                        },
+                    )
+                    rate_limited_slot_paths.append(slot_path)
+                    continue
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "AI theme image generation failed for Shopify sync. "
+                        f"slotPath={slot_path}. {exc}"
+                    ),
+                ) from exc
 
         public_id = getattr(generated_asset, "public_id", None)
         if not isinstance(public_id, str) or not public_id.strip():
@@ -408,7 +468,7 @@ def _generate_theme_sync_ai_image_assets(
         generated_asset.height = height
         generated_assets.append(generated_asset)
 
-    return generated_assets
+    return generated_assets, rate_limited_slot_paths
 
 
 def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
@@ -1097,24 +1157,28 @@ def sync_client_shopify_theme_brand_route(
                 ),
             )
 
-        product_image_assets: list[Any] = []
+        product_image_assets = assets_repo.list(
+            org_id=auth.org_id,
+            client_id=client_id,
+            product_id=requested_product_id,
+            asset_kind="image",
+            statuses=[AssetStatusEnum.approved, AssetStatusEnum.qa_passed],
+        )
         product_image_assets_by_public_id: dict[str, Any] = {}
+        for existing_asset in product_image_assets:
+            existing_public_id = getattr(existing_asset, "public_id", None)
+            if not isinstance(existing_public_id, str) or not existing_public_id.strip():
+                continue
+            product_image_assets_by_public_id[existing_public_id.strip()] = existing_asset
+        rate_limited_slot_paths: list[str] = []
         if planner_image_slots:
-            generated_theme_assets = _generate_theme_sync_ai_image_assets(
+            generated_theme_assets, rate_limited_slot_paths = _generate_theme_sync_ai_image_assets(
                 session=session,
                 org_id=auth.org_id,
                 client_id=client_id,
                 product_id=requested_product_id,
                 image_slots=planner_image_slots,
             )
-            if not generated_theme_assets:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        "AI theme image generation did not produce any assets for discovered image slots. "
-                        f"productId={requested_product_id}."
-                    ),
-                )
             for generated_asset in generated_theme_assets:
                 public_id = getattr(generated_asset, "public_id", None)
                 if not isinstance(public_id, str) or not public_id.strip():
@@ -1130,6 +1194,25 @@ def sync_client_shopify_theme_brand_route(
                     continue
                 product_image_assets_by_public_id[normalized_public_id] = generated_asset
                 product_image_assets.append(generated_asset)
+        if planner_image_slots and not product_image_assets:
+            if rate_limited_slot_paths:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        "AI theme image generation is rate-limited or out of Gemini quota for Shopify sync, "
+                        "and no existing product images were available. "
+                        f"productId={requested_product_id}. "
+                        "Upload product images or provide componentImageAssetMap for these slots: "
+                        + ", ".join(sorted(rate_limited_slot_paths))
+                    ),
+                )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "No usable product image assets were available for Shopify theme image slot planning. "
+                    f"productId={requested_product_id}."
+                ),
+            )
 
         offers = ProductOffersRepository(session).list_by_product(
             product_id=str(resolved_product.id)

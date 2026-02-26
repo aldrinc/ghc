@@ -888,6 +888,273 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
     assert observed["auto_component_image_urls"] == []
 
 
+def test_sync_shopify_theme_brand_uses_existing_product_images_when_ai_is_rate_limited(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    observed: dict[str, object] = {}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_design_system_get(self, *, org_id: str, design_system_id: str):
+        return type(
+            "FakeDesignSystem",
+            (),
+            {
+                "id": design_system_id,
+                "name": "Acme Design System",
+                "client_id": client_id,
+                "tokens": {"placeholder": True},
+            },
+        )()
+
+    def fake_validate(tokens):
+        assert tokens == {"placeholder": True}
+        return {
+            "dataTheme": "light",
+            "fontUrls": [
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
+            "cssVars": {"--color-brand": "#123456"},
+            "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
+            "funnelDefaults": {"containerWidth": "lg"},
+        }
+
+    def fake_get_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
+        if public_id in {"logo-public-id"}:
+            return type("FakeAsset", (), {"public_id": public_id})()
+        return None
+
+    def fake_list_assets(
+        self,
+        org_id: str,
+        client_id: str | None = None,
+        campaign_id: str | None = None,
+        experiment_id: str | None = None,
+        product_id: str | None = None,
+        funnel_id: str | None = None,
+        asset_kind: str | None = None,
+        tags: list[str] | None = None,
+        statuses: list[object] | None = None,
+    ):
+        assert product_id == "product-123"
+        assert asset_kind == "image"
+        return [
+            type(
+                "FakeExistingAsset",
+                (),
+                {
+                    "public_id": "existing-image-1",
+                    "width": 1600,
+                    "height": 900,
+                    "alt": None,
+                    "tags": ["product"],
+                    "ai_metadata": {"source": "upload"},
+                },
+            )(),
+            type(
+                "FakeExistingAsset",
+                (),
+                {
+                    "public_id": "existing-image-2",
+                    "width": 1000,
+                    "height": 1000,
+                    "alt": None,
+                    "tags": ["product"],
+                    "ai_metadata": {"source": "upload"},
+                },
+            )(),
+        ]
+
+    def fake_get_product(self, *, org_id: str, product_id: str):
+        return type(
+            "FakeProduct",
+            (),
+            {
+                "id": product_id,
+                "client_id": client_id,
+            },
+        )()
+
+    def fake_create_funnel_image_asset(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        prompt: str,
+        aspect_ratio: str | None = None,
+        usage_context: dict[str, object] | None = None,
+        reference_image_bytes=None,
+        reference_image_mime_type=None,
+        reference_asset_public_id: str | None = None,
+        reference_asset_id: str | None = None,
+        funnel_id: str | None = None,
+        product_id: str | None = None,
+        tags: list[str] | None = None,
+    ):
+        observed.setdefault("attempted_aspects", []).append(aspect_ratio)
+        raise RuntimeError(
+            "Gemini image request failed (status=429): "
+            '{"error":{"status":"RESOURCE_EXHAUSTED","message":"You exceeded your current quota."}}'
+        )
+
+    def fake_create_funnel_unsplash_asset(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        query: str,
+        usage_context: dict[str, object] | None = None,
+        funnel_id: str | None = None,
+        product_id: str | None = None,
+        tags: list[str] | None = None,
+    ):
+        raise RuntimeError("UNSPLASH_ACCESS_KEY not configured")
+
+    def fake_list_template_slots(
+        *,
+        client_id: str,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        return {
+            "imageSlots": [
+                {
+                    "path": "templates/index.json.sections.hero.settings.image",
+                    "role": "hero",
+                    "recommendedAspect": "16:9",
+                    "currentValue": None,
+                },
+                {
+                    "path": "templates/product.json.sections.gallery.settings.image",
+                    "role": "gallery",
+                    "recommendedAspect": "1:1",
+                    "currentValue": None,
+                },
+            ],
+            "textSlots": [],
+        }
+
+    def fake_list_offers(self, *, product_id: str):
+        return []
+
+    def fake_plan_component_content(
+        *,
+        product,
+        offers,
+        product_image_assets,
+        image_slots,
+        text_slots,
+    ):
+        observed["planner_asset_public_ids"] = [
+            getattr(asset, "public_id", None) for asset in product_image_assets
+        ]
+        return {
+            "componentImageAssetMap": {
+                "templates/index.json.sections.hero.settings.image": "existing-image-1",
+                "templates/product.json.sections.gallery.settings.image": "existing-image-2",
+            },
+            "componentTextValues": {},
+        }
+
+    def fake_sync_theme_brand(
+        *,
+        client_id: str,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        css_vars: dict[str, str],
+        font_urls: list[str] | None,
+        data_theme: str | None,
+        component_image_urls: dict[str, str] | None,
+        component_text_values: dict[str, str] | None,
+        auto_component_image_urls: list[str] | None,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        observed["component_image_urls"] = component_image_urls
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+            },
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
+    monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
+    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_asset)
+    monkeypatch.setattr(clients_router.AssetsRepository, "list", fake_list_assets)
+    monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
+    monkeypatch.setattr(clients_router, "create_funnel_image_asset", fake_create_funnel_image_asset)
+    monkeypatch.setattr(clients_router, "create_funnel_unsplash_asset", fake_create_funnel_unsplash_asset)
+    monkeypatch.setattr(
+        clients_router,
+        "list_client_shopify_theme_template_slots",
+        fake_list_template_slots,
+    )
+    monkeypatch.setattr(clients_router.ProductOffersRepository, "list_by_product", fake_list_offers)
+    monkeypatch.setattr(
+        clients_router,
+        "plan_shopify_theme_component_content",
+        fake_plan_component_content,
+    )
+    monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/sync",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "productId": "product-123",
+            "themeName": "futrgroup2-0theme",
+        },
+    )
+
+    assert response.status_code == 200
+    assert observed["planner_asset_public_ids"] == ["existing-image-1", "existing-image-2"]
+    assert observed["component_image_urls"] == {
+        "templates/index.json.sections.hero.settings.image": (
+            "https://assets.example.com/public/assets/existing-image-1"
+        ),
+        "templates/product.json.sections.gallery.settings.image": (
+            "https://assets.example.com/public/assets/existing-image-2"
+        ),
+    }
+    assert observed["attempted_aspects"] == ["16:9", "1:1"]
+
+
 def test_sync_shopify_theme_brand_returns_422_when_ai_theme_image_generation_fails(
     api_client, monkeypatch
 ):
@@ -1013,6 +1280,150 @@ def test_sync_shopify_theme_brand_returns_422_when_ai_theme_image_generation_fai
 
     assert response.status_code == 422
     assert "AI theme image generation failed for Shopify sync" in response.json()["detail"]
+
+
+def test_sync_shopify_theme_brand_returns_429_when_ai_theme_image_generation_is_rate_limited(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_design_system_get(self, *, org_id: str, design_system_id: str):
+        return type(
+            "FakeDesignSystem",
+            (),
+            {
+                "id": design_system_id,
+                "name": "Acme Design System",
+                "client_id": client_id,
+                "tokens": {"placeholder": True},
+            },
+        )()
+
+    def fake_validate(tokens):
+        assert tokens == {"placeholder": True}
+        return {
+            "dataTheme": "light",
+            "fontUrls": [
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
+            "cssVars": {"--color-brand": "#123456"},
+            "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
+            "funnelDefaults": {"containerWidth": "lg"},
+        }
+
+    def fake_get_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
+        if public_id in {"logo-public-id"}:
+            return type("FakeAsset", (), {"public_id": public_id})()
+        return None
+
+    def fake_get_product(self, *, org_id: str, product_id: str):
+        return type(
+            "FakeProduct",
+            (),
+            {
+                "id": product_id,
+                "client_id": client_id,
+            },
+        )()
+
+    def fake_create_funnel_image_asset(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        prompt: str,
+        aspect_ratio: str | None = None,
+        usage_context: dict[str, object] | None = None,
+        reference_image_bytes=None,
+        reference_image_mime_type=None,
+        reference_asset_public_id: str | None = None,
+        reference_asset_id: str | None = None,
+        funnel_id: str | None = None,
+        product_id: str | None = None,
+        tags: list[str] | None = None,
+    ):
+        raise RuntimeError(
+            "Gemini image request failed (status=429): "
+            '{"error":{"status":"RESOURCE_EXHAUSTED","message":"You exceeded your current quota."}}'
+        )
+
+    def fake_create_funnel_unsplash_asset(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        query: str,
+        usage_context: dict[str, object] | None = None,
+        funnel_id: str | None = None,
+        product_id: str | None = None,
+        tags: list[str] | None = None,
+    ):
+        raise RuntimeError("UNSPLASH_ACCESS_KEY not configured")
+
+    def fake_list_template_slots(
+        *,
+        client_id: str,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        return {
+            "imageSlots": [
+                {
+                    "path": "templates/index.json.sections.hero.settings.image",
+                    "role": "hero",
+                    "recommendedAspect": "16:9",
+                    "currentValue": None,
+                },
+                {
+                    "path": "templates/product.json.sections.gallery.settings.image",
+                    "role": "gallery",
+                    "recommendedAspect": "1:1",
+                    "currentValue": None,
+                },
+            ],
+            "textSlots": [],
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
+    monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
+    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_asset)
+    monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
+    monkeypatch.setattr(clients_router, "create_funnel_image_asset", fake_create_funnel_image_asset)
+    monkeypatch.setattr(clients_router, "create_funnel_unsplash_asset", fake_create_funnel_unsplash_asset)
+    monkeypatch.setattr(
+        clients_router,
+        "list_client_shopify_theme_template_slots",
+        fake_list_template_slots,
+    )
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/sync",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "productId": "product-123",
+            "themeName": "futrgroup2-0theme",
+        },
+    )
+
+    assert response.status_code == 429
+    assert "AI theme image generation is rate-limited or out of Gemini quota" in response.json()["detail"]
 
 
 def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omitted(
