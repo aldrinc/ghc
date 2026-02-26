@@ -172,12 +172,24 @@ _THEME_SYNC_PROGRESS_CALLBACK: ContextVar[Any | None] = ContextVar(
 )
 
 
+def _is_gemini_hard_quota_exhaustion_error(exc: BaseException) -> bool:
+    message = str(exc).lower()
+    return "resource_exhausted" in message or "exceeded your current quota" in message
+
+
 def _is_gemini_quota_or_rate_limit_error(exc: BaseException) -> bool:
     message = str(exc).lower()
+    if _is_gemini_hard_quota_exhaustion_error(exc):
+        return True
     return (
         "status=429" in message
         or "too many requests" in message
-        or "resource_exhausted" in message
+        or "status=500" in message
+        or "status=502" in message
+        or "status=503" in message
+        or "status=504" in message
+        or "service is currently unavailable" in message
+        or "temporarily unavailable" in message
     )
 
 
@@ -501,10 +513,10 @@ def _generate_theme_sync_ai_image_assets(
     image_slots: list[dict[str, Any]],
     text_slots: list[dict[str, Any]] | None = None,
     max_concurrency: int | None = None,
-) -> tuple[list[Any], list[str], dict[str, Any]]:
+) -> tuple[list[Any], list[str], dict[str, Any], list[str]]:
     selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
     if not selected_slots:
-        return [], [], {}
+        return [], [], {}, []
     slot_text_hints = _build_theme_sync_image_slot_text_hints(
         image_slots=selected_slots,
         text_slots=text_slots or [],
@@ -540,15 +552,26 @@ def _generate_theme_sync_ai_image_assets(
                     "asset": generated_asset,
                     "source": "ai",
                     "rateLimited": False,
+                    "quotaExhausted": False,
                     "error": None,
                 }
             except Exception as exc:  # noqa: BLE001
+                if _is_gemini_hard_quota_exhaustion_error(exc):
+                    return {
+                        "slotPath": slot_path,
+                        "asset": None,
+                        "source": None,
+                        "rateLimited": True,
+                        "quotaExhausted": True,
+                        "error": str(exc),
+                    }
                 if _is_gemini_quota_or_rate_limit_error(exc):
                     return {
                         "slotPath": slot_path,
                         "asset": None,
                         "source": None,
                         "rateLimited": True,
+                        "quotaExhausted": False,
                         "error": str(exc),
                     }
                 return {
@@ -556,12 +579,14 @@ def _generate_theme_sync_ai_image_assets(
                     "asset": None,
                     "source": None,
                     "rateLimited": False,
+                    "quotaExhausted": False,
                     "error": str(exc),
                 }
 
     prepared_slots: list[dict[str, Any]] = []
     generated_assets: list[Any] = []
     rate_limited_slot_paths: list[str] = []
+    quota_exhausted_slot_paths: list[str] = []
     generated_asset_by_slot_path: dict[str, Any] = {}
     variant_count_by_role_aspect: dict[tuple[str, str], int] = {}
     for slot in selected_slots:
@@ -612,7 +637,12 @@ def _generate_theme_sync_ai_image_assets(
     )
 
     if not prepared_slots:
-        return generated_assets, rate_limited_slot_paths, generated_asset_by_slot_path
+        return (
+            generated_assets,
+            rate_limited_slot_paths,
+            generated_asset_by_slot_path,
+            quota_exhausted_slot_paths,
+        )
 
     resolved_max_concurrency = _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY
     if max_concurrency is not None:
@@ -650,6 +680,7 @@ def _generate_theme_sync_ai_image_assets(
                     "asset": None,
                     "source": None,
                     "rateLimited": False,
+                    "quotaExhausted": False,
                     "error": str(exc),
                 }
             outcomes_by_path[slot_path] = outcome
@@ -680,6 +711,17 @@ def _generate_theme_sync_ai_image_assets(
         outcome = outcomes_by_path.get(slot_path) or {}
         generated_asset = outcome.get("asset")
         if generated_asset is None:
+            if outcome.get("quotaExhausted"):
+                logger.warning(
+                    "Theme sync image generation failed for slot due Gemini hard quota exhaustion.",
+                    extra={
+                        "slotPath": slot_path,
+                        "generationError": outcome.get("error"),
+                    },
+                )
+                rate_limited_slot_paths.append(slot_path)
+                quota_exhausted_slot_paths.append(slot_path)
+                continue
             if outcome.get("rateLimited"):
                 logger.warning(
                     "Theme sync image generation failed for slot due Gemini rate limit.",
@@ -725,7 +767,12 @@ def _generate_theme_sync_ai_image_assets(
         generated_assets.append(generated_asset)
         generated_asset_by_slot_path[slot_path] = generated_asset
 
-    return generated_assets, rate_limited_slot_paths, generated_asset_by_slot_path
+    return (
+        generated_assets,
+        rate_limited_slot_paths,
+        generated_asset_by_slot_path,
+        quota_exhausted_slot_paths,
+    )
 
 
 def _normalize_theme_template_component_image_asset_map(
@@ -1057,11 +1104,13 @@ def _prepare_shopify_theme_template_build_data(
     generated_theme_assets: list[Any] = []
     generated_asset_by_slot_path: dict[str, Any] = {}
     rate_limited_slot_paths: list[str] = []
+    quota_exhausted_slot_paths: list[str] = []
     if planner_image_slots:
         (
             generated_theme_assets,
             rate_limited_slot_paths,
             generated_asset_by_slot_path,
+            quota_exhausted_slot_paths,
         ) = _generate_theme_sync_ai_image_assets(
             session=session,
             org_id=auth.org_id,
@@ -1108,6 +1157,18 @@ def _prepare_shopify_theme_template_build_data(
             product_image_assets.append(generated_asset)
         if planner_image_slots and not product_image_assets:
             if rate_limited_slot_paths:
+                if quota_exhausted_slot_paths:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=(
+                            "AI theme image generation exhausted Gemini quota for template build, "
+                            "and no existing product images were available. "
+                            f"productId={requested_product_id}. "
+                            "Retry after quota reset or upload product images / provide componentImageAssetMap "
+                            "for these slots: "
+                            + ", ".join(sorted(quota_exhausted_slot_paths))
+                        ),
+                    )
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=(
@@ -1810,6 +1871,7 @@ def _generate_shopify_theme_template_draft_images(
             imageSourceBySlotPath={},
             rateLimitedSlotPaths=[],
             remainingSlotPaths=[],
+            quotaExhaustedSlotPaths=[],
         )
 
     resolved_product_id = payload.productId.strip() if payload.productId else None
@@ -1854,7 +1916,7 @@ def _generate_shopify_theme_template_draft_images(
             "skippedImageCount": 0,
         }
     )
-    _, rate_limited_slot_paths, generated_asset_by_slot_path = (
+    _, rate_limited_slot_paths, generated_asset_by_slot_path, quota_exhausted_slot_paths = (
         _generate_theme_sync_ai_image_assets(
             session=session,
             org_id=auth.org_id,
@@ -1869,6 +1931,13 @@ def _generate_shopify_theme_template_draft_images(
         {
             slot_path.strip()
             for slot_path in rate_limited_slot_paths
+            if isinstance(slot_path, str) and slot_path.strip()
+        }
+    )
+    quota_exhausted_slot_paths = sorted(
+        {
+            slot_path.strip()
+            for slot_path in quota_exhausted_slot_paths
             if isinstance(slot_path, str) and slot_path.strip()
         }
     )
@@ -1952,6 +2021,7 @@ def _generate_shopify_theme_template_draft_images(
             imageSourceBySlotPath={},
             rateLimitedSlotPaths=rate_limited_slot_paths,
             remainingSlotPaths=remaining_slot_paths,
+            quotaExhaustedSlotPaths=quota_exhausted_slot_paths,
         )
 
     merged_metadata = dict(latest_data.metadata or {})
@@ -1960,6 +2030,7 @@ def _generate_shopify_theme_template_draft_images(
             "generatedImageCount": len(generated_slot_paths),
             "rateLimitedSlotPaths": rate_limited_slot_paths,
             "remainingSlotPaths": remaining_slot_paths,
+            "quotaExhaustedSlotPaths": quota_exhausted_slot_paths,
             "imageGenerationSlotCount": len(generated_slot_paths),
             "imageGenerationGeneratedAt": datetime.now(timezone.utc).isoformat(),
             "imageModels": image_models,
@@ -1999,6 +2070,7 @@ def _generate_shopify_theme_template_draft_images(
         imageSourceBySlotPath=image_source_by_slot_path,
         rateLimitedSlotPaths=rate_limited_slot_paths,
         remainingSlotPaths=remaining_slot_paths,
+        quotaExhaustedSlotPaths=quota_exhausted_slot_paths,
     )
 
 
@@ -2338,6 +2410,24 @@ def _generate_shopify_theme_template_draft_images_with_retry(
         aggregated_slot_paths.update(response.generatedSlotPaths)
         aggregated_model_by_slot_path.update(response.imageModelBySlotPath)
         aggregated_source_by_slot_path.update(response.imageSourceBySlotPath)
+        quota_exhausted_slot_paths = sorted(
+            {
+                slot_path.strip()
+                for slot_path in response.quotaExhaustedSlotPaths
+                if isinstance(slot_path, str) and slot_path.strip()
+            }
+        )
+        if quota_exhausted_slot_paths:
+            generated_so_far = len(aggregated_slot_paths)
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    "Template image generation stopped early because Gemini quota is exhausted. "
+                    f"Generated {generated_so_far} slot(s) before stopping. "
+                    "Retry once quota resets. Slots: "
+                    + ", ".join(quota_exhausted_slot_paths)
+                ),
+            )
 
         remaining_slot_paths = sorted(
             {
@@ -2409,6 +2499,7 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             "imageSourceBySlotPath": merged_source_by_slot_path,
             "rateLimitedSlotPaths": [],
             "remainingSlotPaths": [],
+            "quotaExhaustedSlotPaths": [],
         }
     )
 
@@ -3757,6 +3848,7 @@ def sync_client_shopify_theme_brand_route(
     generated_theme_assets: list[Any] = []
     generated_asset_by_slot_path: dict[str, Any] = {}
     rate_limited_slot_paths: list[str] = []
+    quota_exhausted_slot_paths: list[str] = []
     if should_discover_slots_for_ai:
         _emit_theme_sync_progress(
             {
@@ -3805,6 +3897,7 @@ def sync_client_shopify_theme_brand_route(
                 generated_theme_assets,
                 rate_limited_slot_paths,
                 generated_asset_by_slot_path,
+                quota_exhausted_slot_paths,
             ) = _generate_theme_sync_ai_image_assets(
                 session=session,
                 org_id=auth.org_id,
@@ -3816,6 +3909,15 @@ def sync_client_shopify_theme_brand_route(
 
         if not requested_product_id:
             if rate_limited_slot_paths:
+                if quota_exhausted_slot_paths:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=(
+                            "AI theme image generation exhausted Gemini quota for Shopify sync. "
+                            "Retry after quota reset or provide componentImageAssetMap for these slots: "
+                            + ", ".join(sorted(quota_exhausted_slot_paths))
+                        ),
+                    )
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=(
@@ -3875,6 +3977,17 @@ def sync_client_shopify_theme_brand_route(
             product_image_assets.append(generated_asset)
         if planner_image_slots and not product_image_assets:
             if rate_limited_slot_paths:
+                if quota_exhausted_slot_paths:
+                    raise HTTPException(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        detail=(
+                            "AI theme image generation exhausted Gemini quota for Shopify sync, "
+                            "and no existing product images were available. "
+                            f"productId={requested_product_id}. "
+                            "Upload product images or provide componentImageAssetMap for these slots: "
+                            + ", ".join(sorted(quota_exhausted_slot_paths))
+                        ),
+                    )
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                     detail=(
