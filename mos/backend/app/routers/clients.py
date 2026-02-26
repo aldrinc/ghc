@@ -80,7 +80,10 @@ from app.services.design_system_generation import (
     DesignSystemGenerationError,
     validate_design_system_tokens,
 )
-from app.services.funnels import create_funnel_image_asset
+from app.services.funnels import (
+    create_funnel_image_asset,
+    resolve_funnel_image_model_config,
+)
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
     build_client_shopify_install_url,
@@ -211,6 +214,18 @@ def _normalize_asset_public_id(raw_public_id: Any) -> str | None:
         cleaned = raw_public_id.strip()
         if cleaned:
             return cleaned
+    return None
+
+
+def _coerce_non_negative_int(raw_value: Any) -> int | None:
+    if isinstance(raw_value, bool):
+        return None
+    if isinstance(raw_value, int):
+        return raw_value if raw_value >= 0 else None
+    if isinstance(raw_value, str):
+        cleaned = raw_value.strip()
+        if cleaned and cleaned.isdigit():
+            return int(cleaned)
     return None
 
 
@@ -1830,6 +1845,7 @@ def _generate_shopify_theme_template_draft_images(
             status_code=status.HTTP_409_CONFLICT,
             detail="Template draft has no image slots available for generation.",
         )
+    requested_image_model, requested_image_model_source = resolve_funnel_image_model_config()
 
     all_slot_paths = sorted(
         {
@@ -1866,10 +1882,14 @@ def _generate_shopify_theme_template_draft_images(
             draft=serialized_draft,
             version=serialized_version,
             generatedImageCount=0,
+            requestedImageModel=requested_image_model,
+            requestedImageModelSource=requested_image_model_source,
             generatedSlotPaths=[],
             imageModels=[],
             imageModelBySlotPath={},
             imageSourceBySlotPath={},
+            promptTokenCountBySlotPath={},
+            promptTokenCountTotal=0,
             rateLimitedSlotPaths=[],
             remainingSlotPaths=[],
             quotaExhaustedSlotPaths=[],
@@ -1947,6 +1967,7 @@ def _generate_shopify_theme_template_draft_images(
     generated_slot_paths: list[str] = []
     image_model_by_slot_path: dict[str, str] = {}
     image_source_by_slot_path: dict[str, str] = {}
+    prompt_token_count_by_slot_path: dict[str, int] = {}
     for image_slot in image_slots_pending_generation:
         slot_path = str(image_slot["path"]).strip()
         generated_asset = generated_asset_by_slot_path.get(slot_path)
@@ -1981,6 +2002,11 @@ def _generate_shopify_theme_template_draft_images(
             raw_source = raw_ai_metadata.get("source")
             if isinstance(raw_source, str) and raw_source.strip():
                 image_source_by_slot_path[slot_path] = raw_source.strip()
+            raw_prompt_token_count = _coerce_non_negative_int(
+                raw_ai_metadata.get("promptTokenCount")
+            )
+            if raw_prompt_token_count is not None:
+                prompt_token_count_by_slot_path[slot_path] = raw_prompt_token_count
         if slot_path not in image_source_by_slot_path:
             raw_file_source = getattr(generated_asset, "file_source", None)
             if isinstance(raw_file_source, str) and raw_file_source.strip():
@@ -1996,6 +2022,7 @@ def _generate_shopify_theme_template_draft_images(
             if isinstance(model_name, str) and model_name.strip()
         }
     )
+    prompt_token_count_total = sum(prompt_token_count_by_slot_path.values())
     remaining_slot_paths = sorted(
         {
             slot_path
@@ -2016,10 +2043,14 @@ def _generate_shopify_theme_template_draft_images(
             draft=serialized_draft,
             version=serialized_version,
             generatedImageCount=0,
+            requestedImageModel=requested_image_model,
+            requestedImageModelSource=requested_image_model_source,
             generatedSlotPaths=[],
             imageModels=[],
             imageModelBySlotPath={},
             imageSourceBySlotPath={},
+            promptTokenCountBySlotPath={},
+            promptTokenCountTotal=0,
             rateLimitedSlotPaths=rate_limited_slot_paths,
             remainingSlotPaths=remaining_slot_paths,
             quotaExhaustedSlotPaths=quota_exhausted_slot_paths,
@@ -2037,6 +2068,10 @@ def _generate_shopify_theme_template_draft_images(
             "imageModels": image_models,
             "imageModelBySlotPath": image_model_by_slot_path,
             "imageSourceBySlotPath": image_source_by_slot_path,
+            "requestedImageModel": requested_image_model,
+            "requestedImageModelSource": requested_image_model_source,
+            "promptTokenCountBySlotPath": prompt_token_count_by_slot_path,
+            "promptTokenCountTotal": prompt_token_count_total,
         }
     )
 
@@ -2065,10 +2100,14 @@ def _generate_shopify_theme_template_draft_images(
         draft=serialized_draft,
         version=serialized_version,
         generatedImageCount=len(generated_slot_paths),
+        requestedImageModel=requested_image_model,
+        requestedImageModelSource=requested_image_model_source,
         generatedSlotPaths=sorted(generated_slot_paths),
         imageModels=image_models,
         imageModelBySlotPath=image_model_by_slot_path,
         imageSourceBySlotPath=image_source_by_slot_path,
+        promptTokenCountBySlotPath=prompt_token_count_by_slot_path,
+        promptTokenCountTotal=prompt_token_count_total,
         rateLimitedSlotPaths=rate_limited_slot_paths,
         remainingSlotPaths=remaining_slot_paths,
         quotaExhaustedSlotPaths=quota_exhausted_slot_paths,
@@ -2361,6 +2400,7 @@ def _generate_shopify_theme_template_draft_images_with_retry(
     aggregated_slot_paths: set[str] = set()
     aggregated_model_by_slot_path: dict[str, str] = {}
     aggregated_source_by_slot_path: dict[str, str] = {}
+    aggregated_prompt_token_count_by_slot_path: dict[str, int] = {}
     last_remaining_slot_paths: list[str] = []
     final_response: ShopifyThemeTemplateGenerateImagesResponse | None = None
 
@@ -2415,6 +2455,15 @@ def _generate_shopify_theme_template_draft_images_with_retry(
         aggregated_slot_paths.update(response.generatedSlotPaths)
         aggregated_model_by_slot_path.update(response.imageModelBySlotPath)
         aggregated_source_by_slot_path.update(response.imageSourceBySlotPath)
+        for slot_path, raw_prompt_token_count in response.promptTokenCountBySlotPath.items():
+            if not isinstance(slot_path, str) or not slot_path.strip():
+                continue
+            normalized_prompt_token_count = _coerce_non_negative_int(raw_prompt_token_count)
+            if normalized_prompt_token_count is None:
+                continue
+            aggregated_prompt_token_count_by_slot_path[
+                slot_path.strip()
+            ] = normalized_prompt_token_count
         quota_exhausted_slot_paths = sorted(
             {
                 slot_path.strip()
@@ -2424,11 +2473,17 @@ def _generate_shopify_theme_template_draft_images_with_retry(
         )
         if quota_exhausted_slot_paths:
             generated_so_far = len(aggregated_slot_paths)
+            model_note = (
+                f" model={response.requestedImageModel}, source={response.requestedImageModelSource}."
+                if isinstance(response.requestedImageModel, str)
+                and response.requestedImageModel.strip()
+                else ""
+            )
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=(
                     "Template image generation stopped early because Gemini quota is exhausted. "
-                    f"Generated {generated_so_far} slot(s) before stopping. "
+                    f"Generated {generated_so_far} slot(s) before stopping.{model_note} "
                     "Retry once quota resets. Slots: "
                     + ", ".join(quota_exhausted_slot_paths)
                 ),
@@ -2487,6 +2542,9 @@ def _generate_shopify_theme_template_draft_images_with_retry(
 
     merged_model_by_slot_path = dict(aggregated_model_by_slot_path)
     merged_source_by_slot_path = dict(aggregated_source_by_slot_path)
+    merged_prompt_token_count_by_slot_path = dict(
+        sorted(aggregated_prompt_token_count_by_slot_path.items())
+    )
     merged_image_models = sorted(
         {
             model_name.strip()
@@ -2494,6 +2552,7 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             if isinstance(model_name, str) and model_name.strip()
         }
     )
+    merged_prompt_token_count_total = sum(merged_prompt_token_count_by_slot_path.values())
 
     return final_response.model_copy(
         update={
@@ -2502,6 +2561,8 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             "imageModels": merged_image_models,
             "imageModelBySlotPath": merged_model_by_slot_path,
             "imageSourceBySlotPath": merged_source_by_slot_path,
+            "promptTokenCountBySlotPath": merged_prompt_token_count_by_slot_path,
+            "promptTokenCountTotal": merged_prompt_token_count_total,
             "rateLimitedSlotPaths": [],
             "remainingSlotPaths": [],
             "quotaExhaustedSlotPaths": [],
@@ -2593,10 +2654,16 @@ def _run_client_shopify_theme_template_generate_images_job(job_id: str) -> None:
             return
 
         auth = AuthContext(user_id=user_id.strip(), org_id=org_id.strip())
+        requested_image_model, requested_image_model_source = (
+            resolve_funnel_image_model_config()
+        )
         publish_progress(
             {
                 "stage": "running",
-                "message": "Generating images for Shopify theme template draft.",
+                "message": (
+                    "Generating images for Shopify theme template draft "
+                    f"(model={requested_image_model}, source={requested_image_model_source})."
+                ),
             }
         )
         try:

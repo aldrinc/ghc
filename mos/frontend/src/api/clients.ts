@@ -217,10 +217,14 @@ export type ClientShopifyThemeTemplateGenerateImagesResponse = {
   draft: ClientShopifyThemeTemplateDraft;
   version: ClientShopifyThemeTemplateDraftVersion;
   generatedImageCount: number;
+  requestedImageModel?: string | null;
+  requestedImageModelSource?: string | null;
   generatedSlotPaths: string[];
   imageModels: string[];
   imageModelBySlotPath: Record<string, string>;
   imageSourceBySlotPath: Record<string, string>;
+  promptTokenCountBySlotPath: Record<string, number>;
+  promptTokenCountTotal: number;
   rateLimitedSlotPaths: string[];
   remainingSlotPaths: string[];
   quotaExhaustedSlotPaths: string[];

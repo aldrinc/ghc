@@ -356,10 +356,14 @@ class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):
     draft: ShopifyThemeTemplateDraftResponse
     version: ShopifyThemeTemplateDraftVersionResponse
     generatedImageCount: int
+    requestedImageModel: str | None = None
+    requestedImageModelSource: str | None = None
     generatedSlotPaths: list[str] = Field(default_factory=list)
     imageModels: list[str] = Field(default_factory=list)
     imageModelBySlotPath: dict[str, str] = Field(default_factory=dict)
     imageSourceBySlotPath: dict[str, str] = Field(default_factory=dict)
+    promptTokenCountBySlotPath: dict[str, int] = Field(default_factory=dict)
+    promptTokenCountTotal: int = 0
     rateLimitedSlotPaths: list[str] = Field(default_factory=list)
     remainingSlotPaths: list[str] = Field(default_factory=list)
     quotaExhaustedSlotPaths: list[str] = Field(default_factory=list)

@@ -489,14 +489,29 @@ _GEMINI_IMAGE_GENERATION_RETRY_ATTEMPTS = 6
 _GEMINI_IMAGE_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
-def _resolve_funnel_image_model() -> str:
-    model = os.getenv("FUNNEL_IMAGE_MODEL") or os.getenv("NANO_BANANA_MODEL") or _DEFAULT_FUNNEL_IMAGE_MODEL
+def _resolve_funnel_image_model_with_source() -> tuple[str, str]:
+    raw_funnel_model = os.getenv("FUNNEL_IMAGE_MODEL")
+    if isinstance(raw_funnel_model, str) and raw_funnel_model.strip():
+        model = raw_funnel_model
+        source = "FUNNEL_IMAGE_MODEL"
+    else:
+        raw_nano_banana_model = os.getenv("NANO_BANANA_MODEL")
+        if isinstance(raw_nano_banana_model, str) and raw_nano_banana_model.strip():
+            model = raw_nano_banana_model
+            source = "NANO_BANANA_MODEL"
+        else:
+            model = _DEFAULT_FUNNEL_IMAGE_MODEL
+            source = "default"
     cleaned = str(model).strip()
     if not cleaned:
         raise RuntimeError(
             "Funnel image model is not configured. Set FUNNEL_IMAGE_MODEL or NANO_BANANA_MODEL."
         )
-    return cleaned
+    return cleaned, source
+
+
+def resolve_funnel_image_model_config() -> tuple[str, str]:
+    return _resolve_funnel_image_model_with_source()
 
 
 def _resolve_gemini_retry_delay_seconds(
@@ -515,17 +530,41 @@ def _resolve_gemini_retry_delay_seconds(
     return min(30.0, max(1.0, float(2**attempt)))
 
 
+def _coerce_non_negative_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if cleaned and cleaned.isdigit():
+            return int(cleaned)
+    return None
+
+
+def _extract_gemini_prompt_token_count(response_json: dict[str, Any]) -> int | None:
+    usage_metadata = response_json.get("usageMetadata")
+    if not isinstance(usage_metadata, dict):
+        usage_metadata = response_json.get("usage_metadata")
+    if not isinstance(usage_metadata, dict):
+        return None
+    prompt_tokens = _coerce_non_negative_int(usage_metadata.get("promptTokenCount"))
+    if prompt_tokens is not None:
+        return prompt_tokens
+    return _coerce_non_negative_int(usage_metadata.get("prompt_token_count"))
+
+
 def generate_gemini_image_bytes(
     *,
     prompt: str,
     aspect_ratio: Optional[str] = None,
     reference_image_bytes: Optional[bytes] = None,
     reference_image_mime_type: Optional[str] = None,
-) -> tuple[bytes, str, str]:
+) -> tuple[bytes, str, str, str, int | None]:
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")
-    model = _resolve_funnel_image_model()
+    model, model_source = _resolve_funnel_image_model_with_source()
 
     parts: list[dict[str, Any]] = []
     if reference_image_bytes is not None:
@@ -566,6 +605,26 @@ def generate_gemini_image_bytes(
             status = exc.response.status_code if exc.response is not None else None
             body = exc.response.text if exc.response is not None else ""
             body_lower = body.lower()
+            is_model_not_found = (
+                status == 404
+                and (
+                    "not found" in body_lower
+                    or "not supported for generatecontent" in body_lower
+                    or f"models/{model.lower()}" in body_lower
+                )
+            )
+            if is_model_not_found:
+                if model_source == "default":
+                    source_hint = (
+                        "default model resolution (set FUNNEL_IMAGE_MODEL or NANO_BANANA_MODEL)"
+                    )
+                else:
+                    source_hint = model_source
+                raise RuntimeError(
+                    f"Configured Gemini image model '{model}' is unavailable for generateContent "
+                    f"(source={source_hint}). Update the model env setting to a generateContent-supported "
+                    "model from the ListModels API."
+                ) from exc
             is_hard_quota_exhaustion = (
                 status == 429
                 and (
@@ -600,7 +659,8 @@ def generate_gemini_image_bytes(
         data = resp.json()
         try:
             image_bytes, mime_type = _extract_first_inline_image(data)
-            return image_bytes, mime_type, model
+            prompt_token_count = _extract_gemini_prompt_token_count(data)
+            return image_bytes, mime_type, model, model_source, prompt_token_count
         except Exception as exc:  # noqa: BLE001
             last_summary = _summarize_gemini_response_for_debug(data)
             if attempt >= retries:
@@ -817,11 +877,13 @@ def create_funnel_image_asset(
     product_id: Optional[str] = None,
     tags: Optional[list[str]] = None,
 ) -> Asset:
-    image_bytes, mime_type, image_model = generate_gemini_image_bytes(
-        prompt=prompt,
-        aspect_ratio=aspect_ratio,
-        reference_image_bytes=reference_image_bytes,
-        reference_image_mime_type=reference_image_mime_type,
+    image_bytes, mime_type, image_model, image_model_source, prompt_token_count = (
+        generate_gemini_image_bytes(
+            prompt=prompt,
+            aspect_ratio=aspect_ratio,
+            reference_image_bytes=reference_image_bytes,
+            reference_image_mime_type=reference_image_mime_type,
+        )
     )
     sha256 = hashlib.sha256(image_bytes).hexdigest()
     ext = "png" if "png" in (mime_type or "").lower() else "jpg"
@@ -851,9 +913,12 @@ def create_funnel_image_asset(
         "aspectRatio": aspect_ratio,
         "usageContext": usage_context or {},
         "model": image_model,
+        "modelSource": image_model_source,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "sha256": sha256,
     }
+    if isinstance(prompt_token_count, int):
+        ai_metadata["promptTokenCount"] = prompt_token_count
     if reference_asset_public_id:
         ai_metadata["referenceAssetPublicId"] = reference_asset_public_id
     if reference_asset_id:
