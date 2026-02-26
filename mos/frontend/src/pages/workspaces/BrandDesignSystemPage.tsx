@@ -578,6 +578,10 @@ export function BrandDesignSystemPage() {
   const [templateDraftImageMapInput, setTemplateDraftImageMapInput] = useState("{}");
   const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
   const [templateDraftEditError, setTemplateDraftEditError] = useState<string | null>(null);
+  const [templatePreviewDialogOpen, setTemplatePreviewDialogOpen] = useState(false);
+  const [templatePreviewImageMap, setTemplatePreviewImageMap] = useState<Record<string, string>>({});
+  const [templatePreviewTextValues, setTemplatePreviewTextValues] = useState<Record<string, string>>({});
+  const [templatePreviewImageErrorsByPath, setTemplatePreviewImageErrorsByPath] = useState<Record<string, boolean>>({});
   const [templatePublishResult, setTemplatePublishResult] = useState<ClientShopifyThemeTemplatePublishResponse | null>(null);
   const [themeAuditResult, setThemeAuditResult] = useState<ClientShopifyThemeBrandAuditResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
@@ -652,6 +656,10 @@ export function BrandDesignSystemPage() {
     setTemplateDraftImageMapInput("{}");
     setTemplateDraftTextValuesInput("{}");
     setTemplateDraftEditError(null);
+    setTemplatePreviewDialogOpen(false);
+    setTemplatePreviewImageMap({});
+    setTemplatePreviewTextValues({});
+    setTemplatePreviewImageErrorsByPath({});
     setTemplatePublishResult(null);
     setThemeAuditResult(null);
     setPolicySyncResult(null);
@@ -784,10 +792,57 @@ export function BrandDesignSystemPage() {
   }, [previewBrand.logoAssetPublicId, previewDesignSystemId]);
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  const publicAssetBaseUrl = apiBaseUrl?.replace(/\/$/, "");
   const previewLogoSrc =
     previewBrand.logoAssetPublicId && apiBaseUrl
       ? `${apiBaseUrl.replace(/\/$/, "")}/public/assets/${previewBrand.logoAssetPublicId}`
       : undefined;
+  const templatePreviewImageItems = useMemo(() => {
+    const latestVersion = selectedTemplateDraft?.latestVersion;
+    if (!latestVersion) return [];
+
+    const slotByPath = new Map(
+      latestVersion.data.imageSlots.map((slot) => [slot.path, slot])
+    );
+    const seenPaths = new Set<string>();
+    const items: Array<{
+      path: string;
+      assetPublicId: string;
+      role?: string;
+      recommendedAspect?: string;
+      hasKnownSlot: boolean;
+    }> = [];
+
+    for (const slot of latestVersion.data.imageSlots) {
+      const path = slot.path;
+      seenPaths.add(path);
+      items.push({
+        path,
+        assetPublicId: templatePreviewImageMap[path] || "",
+        role: slot.role,
+        recommendedAspect: slot.recommendedAspect,
+        hasKnownSlot: true,
+      });
+    }
+
+    for (const [path, assetPublicId] of Object.entries(templatePreviewImageMap)) {
+      if (seenPaths.has(path)) continue;
+      const slot = slotByPath.get(path);
+      items.push({
+        path,
+        assetPublicId,
+        role: slot?.role,
+        recommendedAspect: slot?.recommendedAspect,
+        hasKnownSlot: false,
+      });
+    }
+
+    return items;
+  }, [selectedTemplateDraft?.latestVersion, templatePreviewImageMap]);
+  const templatePreviewTextEntries = useMemo(
+    () => Object.entries(templatePreviewTextValues).sort(([a], [b]) => a.localeCompare(b)),
+    [templatePreviewTextValues]
+  );
   const logoAssetOptions = useMemo(
     () =>
       [...logoAssets]
@@ -966,6 +1021,28 @@ export function BrandDesignSystemPage() {
     } catch {
       // Error toast is emitted by the mutation hook.
     }
+  };
+
+  const handleOpenTemplatePreview = () => {
+    if (!selectedTemplateDraft?.latestVersion) {
+      toast.error("Build or select a template draft first.");
+      return;
+    }
+    const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
+    if (!parsedImageMap.value) {
+      setTemplateDraftEditError(parsedImageMap.error || "Invalid image map.");
+      return;
+    }
+    const parsedTextValues = parseStringMap(templateDraftTextValuesInput, "Text values");
+    if (!parsedTextValues.value) {
+      setTemplateDraftEditError(parsedTextValues.error || "Invalid text values.");
+      return;
+    }
+    setTemplateDraftEditError(null);
+    setTemplatePreviewImageMap(parsedImageMap.value);
+    setTemplatePreviewTextValues(parsedTextValues.value);
+    setTemplatePreviewImageErrorsByPath({});
+    setTemplatePreviewDialogOpen(true);
   };
 
   const handlePublishTemplateDraft = async () => {
@@ -1445,6 +1522,13 @@ export function BrandDesignSystemPage() {
                   disabled={updateShopifyThemeTemplateDraft.isPending}
                 >
                   {updateShopifyThemeTemplateDraft.isPending ? "Saving…" : "Save draft edits"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleOpenTemplatePreview}
+                >
+                  Preview mapped content
                 </Button>
                 <Button
                   size="sm"
@@ -2175,6 +2259,110 @@ export function BrandDesignSystemPage() {
           </div>
         )}
       </div>
+
+      <DialogRoot open={templatePreviewDialogOpen} onOpenChange={setTemplatePreviewDialogOpen}>
+        <DialogContent className="max-w-5xl">
+          <div className="space-y-2">
+            <DialogTitle>Template Draft Preview</DialogTitle>
+            <DialogDescription>
+              Review mapped images and text before publishing this template to Shopify.
+            </DialogDescription>
+          </div>
+
+          {!selectedTemplateDraft?.latestVersion ? (
+            <div className="mt-4 rounded-md border border-border bg-surface-2 p-4 text-sm text-content-muted">
+              Select a template draft to preview.
+            </div>
+          ) : (
+            <div className="mt-4 space-y-4">
+              {!publicAssetBaseUrl ? (
+                <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+                  Missing `VITE_API_BASE_URL`; image previews cannot be loaded.
+                </div>
+              ) : null}
+
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-content">Mapped images</div>
+                {templatePreviewImageItems.length ? (
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 max-h-[48vh] overflow-y-auto pr-1">
+                    {templatePreviewImageItems.map((item) => {
+                      const imageUrl =
+                        publicAssetBaseUrl && item.assetPublicId
+                          ? `${publicAssetBaseUrl}/public/assets/${item.assetPublicId}`
+                          : undefined;
+                      const loadErrored = Boolean(templatePreviewImageErrorsByPath[item.path]);
+                      return (
+                        <div key={item.path} className="rounded-md border border-border bg-surface p-3 space-y-2">
+                          <div className="text-[11px] font-mono break-all text-content">{item.path}</div>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
+                            {item.role ? <span>role: {item.role}</span> : null}
+                            {item.recommendedAspect ? <span>aspect: {item.recommendedAspect}</span> : null}
+                            {!item.hasKnownSlot ? <span>custom path</span> : null}
+                          </div>
+                          <div className="rounded-md border border-border bg-surface-2 p-2">
+                            {imageUrl && !loadErrored ? (
+                              <img
+                                src={imageUrl}
+                                alt={item.path}
+                                className="h-44 w-full rounded object-contain bg-white"
+                                onError={() =>
+                                  setTemplatePreviewImageErrorsByPath((current) => ({
+                                    ...current,
+                                    [item.path]: true,
+                                  }))
+                                }
+                              />
+                            ) : (
+                              <div className="grid h-44 place-items-center text-xs text-content-muted">
+                                {item.assetPublicId
+                                  ? "Image could not be loaded."
+                                  : "No mapped asset for this slot."}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-content-muted break-all">
+                            asset: <span className="font-mono text-content">{item.assetPublicId || "n/a"}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                    No image mappings found in this draft.
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-content">Mapped text values</div>
+                {templatePreviewTextEntries.length ? (
+                  <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHeadCell className="w-[55%]">Path</TableHeadCell>
+                        <TableHeadCell>Value</TableHeadCell>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {templatePreviewTextEntries.map(([path, value]) => (
+                        <TableRow key={path}>
+                          <TableCell className="font-mono text-[11px] text-content break-all">{path}</TableCell>
+                          <TableCell className="text-xs text-content break-all">{value}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                    No text mappings found in this draft.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </DialogRoot>
 
       <DialogRoot open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-3xl">

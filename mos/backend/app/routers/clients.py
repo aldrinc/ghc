@@ -109,8 +109,8 @@ _JOB_TYPE_SHOPIFY_THEME_BRAND_SYNC = "shopify_theme_brand_sync"
 _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_BUILD = "shopify_theme_template_build"
 _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_PUBLISH = "shopify_theme_template_publish"
 _JOB_SUBJECT_TYPE_CLIENT = "client"
-_THEME_COMPONENT_INLINE_MARKUP_TAG_RE = re.compile(
-    r"</?\s*(?:strong|em)\s*>",
+_THEME_COMPONENT_HTML_TAG_RE = re.compile(
+    r"</?\s*[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?>",
     re.IGNORECASE,
 )
 _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
@@ -308,8 +308,8 @@ def _serialize_http_exception_detail(detail: Any) -> dict[str, Any]:
 
 
 def _sanitize_theme_component_text_value(value: str) -> str:
-    without_inline_markup = _THEME_COMPONENT_INLINE_MARKUP_TAG_RE.sub(" ", value)
-    sanitized = without_inline_markup.translate(_UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION)
+    without_html_tags = _THEME_COMPONENT_HTML_TAG_RE.sub(" ", value)
+    sanitized = without_html_tags.translate(_UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION)
     return " ".join(sanitized.split()).strip()
 
 
