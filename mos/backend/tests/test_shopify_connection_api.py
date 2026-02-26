@@ -41,6 +41,14 @@ def test_sanitize_theme_component_text_value_strips_block_html_tags():
     )
 
 
+def test_sanitize_theme_component_text_value_strips_orphan_closing_tag_fragments():
+    raw_value = "Our Mission /em Bringing professional-grade LED therapy /strong to your home /p"
+    assert (
+        clients_router._sanitize_theme_component_text_value(raw_value)
+        == "Our Mission Bringing professional-grade LED therapy to your home"
+    )
+
+
 def test_build_theme_sync_image_slot_text_hints_uses_adjacent_feature_copy():
     feature_image_path = (
         "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.image"

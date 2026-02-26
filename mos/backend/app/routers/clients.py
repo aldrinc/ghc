@@ -113,6 +113,10 @@ _THEME_COMPONENT_HTML_TAG_RE = re.compile(
     r"</?\s*(?:p|strong|em|span|b|i|u|br|div|h[1-6]|li|ul|ol|a)\b[^<>]*>",
     re.IGNORECASE,
 )
+_THEME_COMPONENT_ORPHAN_CLOSING_TAG_RE = re.compile(
+    r"/\s*(?:p|strong|em|span|b|i|u|br|div|h[1-6]|li|ul|ol|a)\b",
+    re.IGNORECASE,
+)
 _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
     r"^templates/index\.json\.sections\.ss_feature_1_pro_[^.]+\.blocks\.slide_[^.]+\.settings\.image$",
     re.IGNORECASE,
@@ -309,7 +313,12 @@ def _serialize_http_exception_detail(detail: Any) -> dict[str, Any]:
 
 def _sanitize_theme_component_text_value(value: str) -> str:
     without_html_tags = _THEME_COMPONENT_HTML_TAG_RE.sub(" ", value)
-    sanitized = without_html_tags.translate(_UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION)
+    without_orphan_closing_tags = _THEME_COMPONENT_ORPHAN_CLOSING_TAG_RE.sub(
+        " ", without_html_tags
+    )
+    sanitized = without_orphan_closing_tags.translate(
+        _UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION
+    )
     return " ".join(sanitized.split()).strip()
 
 
