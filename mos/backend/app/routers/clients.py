@@ -79,7 +79,7 @@ from app.services.design_system_generation import (
     DesignSystemGenerationError,
     validate_design_system_tokens,
 )
-from app.services.funnels import create_funnel_image_asset, create_funnel_unsplash_asset
+from app.services.funnels import create_funnel_image_asset
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
     build_client_shopify_install_url,
@@ -185,20 +185,6 @@ def _emit_theme_sync_progress(update: dict[str, Any]) -> None:
         callback(update)
     except Exception:  # noqa: BLE001
         logger.exception("Failed to publish Shopify theme sync progress update")
-
-
-def _build_theme_sync_slot_unsplash_query(*, slot_role: str, slot_key: str) -> str:
-    role_query_by_name = {
-        "hero": "beauty tech skincare lifestyle portrait",
-        "gallery": "premium skincare product closeup",
-        "supporting": "clean beauty wellness routine",
-        "background": "minimal neutral skincare background",
-        "generic": "beauty wellness lifestyle",
-    }
-    base_query = role_query_by_name.get(slot_role, role_query_by_name["generic"])
-    if slot_key and slot_key != "image":
-        return f"{base_query} {slot_key}".strip()
-    return base_query
 
 
 def _normalize_asset_public_id(raw_public_id: Any) -> str | None:
@@ -522,7 +508,6 @@ def _generate_theme_sync_ai_image_assets(
     def _generate_single_slot_asset(
         *,
         slot_path: str,
-        slot_key: str,
         slot_role: str,
         slot_recommended_aspect: str,
         aspect_ratio: str,
@@ -554,45 +539,13 @@ def _generate_theme_sync_ai_image_assets(
                 }
             except Exception as exc:  # noqa: BLE001
                 if _is_gemini_quota_or_rate_limit_error(exc):
-                    try:
-                        generated_asset = create_funnel_unsplash_asset(
-                            session=slot_session,
-                            org_id=org_id,
-                            client_id=client_id,
-                            query=_build_theme_sync_slot_unsplash_query(
-                                slot_role=slot_role, slot_key=slot_key
-                            ),
-                            usage_context={
-                                "kind": "shopify_theme_sync_component_image",
-                                "slotPath": slot_path,
-                                "slotRole": slot_role,
-                                "recommendedAspect": slot_recommended_aspect,
-                                "fallbackSource": "unsplash_after_gemini_rate_limit",
-                            },
-                            product_id=product_id,
-                            tags=[
-                                "shopify_theme_sync",
-                                "component_image",
-                                "unsplash",
-                                "fallback_after_rate_limit",
-                            ],
-                        )
-                        return {
-                            "slotPath": slot_path,
-                            "asset": generated_asset,
-                            "source": "unsplash",
-                            "rateLimited": True,
-                            "error": None,
-                        }
-                    except Exception as unsplash_exc:  # noqa: BLE001
-                        return {
-                            "slotPath": slot_path,
-                            "asset": None,
-                            "source": None,
-                            "rateLimited": True,
-                            "error": str(unsplash_exc),
-                            "geminiError": str(exc),
-                        }
+                    return {
+                        "slotPath": slot_path,
+                        "asset": None,
+                        "source": None,
+                        "rateLimited": True,
+                        "error": str(exc),
+                    }
                 return {
                     "slotPath": slot_path,
                     "asset": None,
@@ -668,7 +621,6 @@ def _generate_theme_sync_ai_image_assets(
             future = pool.submit(
                 _generate_single_slot_asset,
                 slot_path=slot["slotPath"],
-                slot_key=slot["slotKey"],
                 slot_role=slot["slotRole"],
                 slot_recommended_aspect=slot["recommendedAspect"],
                 aspect_ratio=slot["aspectRatio"],
@@ -717,11 +669,10 @@ def _generate_theme_sync_ai_image_assets(
         if generated_asset is None:
             if outcome.get("rateLimited"):
                 logger.warning(
-                    "Theme sync image generation failed for slot after Gemini rate limit; skipping slot.",
+                    "Theme sync image generation failed for slot due Gemini rate limit.",
                     extra={
                         "slotPath": slot_path,
-                        "geminiError": outcome.get("geminiError"),
-                        "unsplashError": outcome.get("error"),
+                        "generationError": outcome.get("error"),
                     },
                 )
                 rate_limited_slot_paths.append(slot_path)
