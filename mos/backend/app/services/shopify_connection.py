@@ -1530,36 +1530,80 @@ def sync_client_shopify_theme_brand(
             detail="Exactly one of themeId or themeName is required.",
         )
 
-    request_payload: dict[str, Any] = {
+    base_request_payload: dict[str, Any] = {
         "workspaceName": cleaned_workspace_name,
         "brandName": cleaned_brand_name,
         "logoUrl": cleaned_logo_url,
         "cssVars": normalized_css_vars,
         "fontUrls": normalized_font_urls,
     }
+    if cleaned_data_theme is not None:
+        base_request_payload["dataTheme"] = cleaned_data_theme
+    if cleaned_theme_id is not None:
+        base_request_payload["themeId"] = cleaned_theme_id
+    if cleaned_theme_name is not None:
+        base_request_payload["themeName"] = cleaned_theme_name
+    if shop_domain is not None:
+        base_request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
+    else:
+        base_request_payload["clientId"] = client_id
+
+    configured_image_batch_size = settings.SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE
+    if configured_image_batch_size <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE must be a positive integer.",
+        )
+
+    def _sync_theme_brand_request(*, request_payload: dict[str, Any]) -> dict[str, Any]:
+        payload = _bridge_request(
+            method="POST",
+            path="/v1/themes/brand/sync",
+            json_body=request_payload,
+            timeout_seconds=settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS,
+        )
+        return _parse_theme_brand_sync_response_payload(payload=payload)
+
+    component_image_items = list(normalized_component_image_urls.items())
+    if len(component_image_items) > configured_image_batch_size:
+        final_response: dict[str, Any] | None = None
+        for chunk_start in range(
+            0, len(component_image_items), configured_image_batch_size
+        ):
+            chunk_items = component_image_items[
+                chunk_start : chunk_start + configured_image_batch_size
+            ]
+            chunk_request_payload = dict(base_request_payload)
+            chunk_request_payload["componentImageUrls"] = dict(chunk_items)
+            if chunk_start == 0 and normalized_component_text_values:
+                chunk_request_payload["componentTextValues"] = (
+                    normalized_component_text_values
+                )
+            if chunk_start == 0 and normalized_auto_component_image_urls:
+                chunk_request_payload["autoComponentImageUrls"] = (
+                    normalized_auto_component_image_urls
+                )
+            final_response = _sync_theme_brand_request(
+                request_payload=chunk_request_payload
+            )
+        if final_response is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to execute chunked Shopify theme sync requests.",
+            )
+        return final_response
+
+    request_payload = dict(base_request_payload)
     if normalized_component_image_urls:
         request_payload["componentImageUrls"] = normalized_component_image_urls
     if normalized_component_text_values:
         request_payload["componentTextValues"] = normalized_component_text_values
     if normalized_auto_component_image_urls:
         request_payload["autoComponentImageUrls"] = normalized_auto_component_image_urls
-    if cleaned_data_theme is not None:
-        request_payload["dataTheme"] = cleaned_data_theme
-    if cleaned_theme_id is not None:
-        request_payload["themeId"] = cleaned_theme_id
-    if cleaned_theme_name is not None:
-        request_payload["themeName"] = cleaned_theme_name
-    if shop_domain is not None:
-        request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
-    else:
-        request_payload["clientId"] = client_id
+    return _sync_theme_brand_request(request_payload=request_payload)
 
-    payload = _bridge_request(
-        method="POST",
-        path="/v1/themes/brand/sync",
-        json_body=request_payload,
-        timeout_seconds=settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS,
-    )
+
+def _parse_theme_brand_sync_response_payload(*, payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

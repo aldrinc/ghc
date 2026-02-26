@@ -1,3 +1,5 @@
+from typing import Any
+
 import httpx
 
 from app.services import shopify_connection
@@ -688,6 +690,89 @@ def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
             "unmappedTypographyPaths": [],
         },
     }
+
+
+def test_sync_client_shopify_theme_brand_batches_component_images(monkeypatch):
+    observed_requests: list[dict[str, Any]] = []
+    image_paths = [
+        f"templates/index.json.sections.hero.blocks.image_{idx}.settings.image"
+        for idx in range(1, 6)
+    ]
+    component_image_urls = {
+        path: f"https://assets.example.com/public/assets/image-{idx}"
+        for idx, path in enumerate(image_paths, start=1)
+    }
+
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/sync"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
+        assert isinstance(json_body, dict)
+        observed_requests.append(json_body)
+        request_index = len(observed_requests)
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": f"Main Theme {request_index}",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+        }
+
+    monkeypatch.setattr(
+        shopify_connection.settings,
+        "SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE",
+        2,
+    )
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.sync_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        css_vars={"--color-brand": "#123456"},
+        component_image_urls=component_image_urls,
+        component_text_values={
+            "templates/index.json.sections.hero.settings.heading": "Sleep Better Tonight",
+        },
+        auto_component_image_urls=[
+            "https://assets.example.com/public/assets/product-image-1",
+            "https://assets.example.com/public/assets/product-image-2",
+        ],
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert len(observed_requests) == 3
+    assert list(observed_requests[0]["componentImageUrls"].keys()) == image_paths[:2]
+    assert list(observed_requests[1]["componentImageUrls"].keys()) == image_paths[2:4]
+    assert list(observed_requests[2]["componentImageUrls"].keys()) == image_paths[4:]
+    assert "componentTextValues" in observed_requests[0]
+    assert "autoComponentImageUrls" in observed_requests[0]
+    assert "componentTextValues" not in observed_requests[1]
+    assert "autoComponentImageUrls" not in observed_requests[1]
+    assert "componentTextValues" not in observed_requests[2]
+    assert "autoComponentImageUrls" not in observed_requests[2]
+    assert response["themeName"] == "Main Theme 3"
 
 
 def test_sync_client_shopify_theme_brand_rejects_invalid_css_key():
