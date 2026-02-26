@@ -674,7 +674,7 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
         }
 
     def fake_get_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
-        if public_id in {"logo-public-id", "product-image-1", "product-image-2"}:
+        if public_id in {"logo-public-id"}:
             return type("FakeAsset", (), {"public_id": public_id})()
         return None
 
@@ -689,9 +689,37 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
             },
         )()
 
-    def fake_collect_product_image_public_ids(*, session, org_id: str, client_id: str, product):
-        observed["collect_product_id"] = str(product.id)
-        return ["logo-public-id", "product-image-1", "product-image-2"]
+    def fake_create_funnel_image_asset(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        prompt: str,
+        aspect_ratio: str | None = None,
+        usage_context: dict[str, object] | None = None,
+        reference_image_bytes=None,
+        reference_image_mime_type=None,
+        reference_asset_public_id: str | None = None,
+        reference_asset_id: str | None = None,
+        funnel_id: str | None = None,
+        product_id: str | None = None,
+        tags: list[str] | None = None,
+    ):
+        observed.setdefault("generated_aspect_ratios", []).append(aspect_ratio)
+        observed.setdefault("generated_prompts", []).append(prompt)
+        generated_index = len(observed["generated_aspect_ratios"])
+        return type(
+            "FakeGeneratedAsset",
+            (),
+            {
+                "public_id": f"generated-image-{generated_index}",
+                "width": 1600 if aspect_ratio == "16:9" else 1000,
+                "height": 900 if aspect_ratio == "16:9" else 1000,
+                "alt": None,
+                "tags": ["shopify_theme_sync"],
+                "ai_metadata": {"source": "ai"},
+            },
+        )()
 
     def fake_list_template_slots(
         *,
@@ -745,8 +773,8 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
         ]
         return {
             "componentImageAssetMap": {
-                "templates/index.json.sections.hero.settings.image": "product-image-2",
-                "templates/product.json.sections.gallery.settings.image": "product-image-1",
+                "templates/index.json.sections.hero.settings.image": "generated-image-2",
+                "templates/product.json.sections.gallery.settings.image": "generated-image-1",
             },
             "componentTextValues": {
                 "templates/index.json.sections.hero.settings.heading": (
@@ -803,6 +831,7 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
     monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_asset)
     monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
+    monkeypatch.setattr(clients_router, "create_funnel_image_asset", fake_create_funnel_image_asset)
     monkeypatch.setattr(
         clients_router,
         "list_client_shopify_theme_template_slots",
@@ -813,11 +842,6 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
         clients_router,
         "plan_shopify_theme_component_content",
         fake_plan_component_content,
-    )
-    monkeypatch.setattr(
-        clients_router.funnel_ai,
-        "_collect_product_image_public_ids",
-        fake_collect_product_image_public_ids,
     )
     monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
     monkeypatch.setattr(
@@ -836,13 +860,13 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
 
     assert response.status_code == 200
     assert observed["product_id"] == "product-123"
-    assert observed["collect_product_id"] == "product-123"
     assert observed["slot_theme_name"] == "futrgroup2-0theme"
     assert observed["offers_product_id"] == "product-123"
     assert observed["planner_asset_public_ids"] == [
-        "product-image-1",
-        "product-image-2",
+        "generated-image-1",
+        "generated-image-2",
     ]
+    assert observed["generated_aspect_ratios"] == ["16:9", "1:1"]
     assert observed["planner_image_slot_paths"] == [
         "templates/index.json.sections.hero.settings.image",
         "templates/product.json.sections.gallery.settings.image",
@@ -852,10 +876,10 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
     ]
     assert observed["component_image_urls"] == {
         "templates/index.json.sections.hero.settings.image": (
-            "https://assets.example.com/public/assets/product-image-2"
+            "https://assets.example.com/public/assets/generated-image-2"
         ),
         "templates/product.json.sections.gallery.settings.image": (
-            "https://assets.example.com/public/assets/product-image-1"
+            "https://assets.example.com/public/assets/generated-image-1"
         ),
     }
     assert observed["component_text_values"] == {
@@ -864,7 +888,7 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
     assert observed["auto_component_image_urls"] == []
 
 
-def test_sync_shopify_theme_brand_requires_multiple_product_images_for_multiple_slots(
+def test_sync_shopify_theme_brand_returns_422_when_ai_theme_image_generation_fails(
     api_client, monkeypatch
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
@@ -905,7 +929,7 @@ def test_sync_shopify_theme_brand_requires_multiple_product_images_for_multiple_
         }
 
     def fake_get_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
-        if public_id in {"logo-public-id", "product-image-1"}:
+        if public_id in {"logo-public-id"}:
             return type("FakeAsset", (), {"public_id": public_id})()
         return None
 
@@ -919,8 +943,23 @@ def test_sync_shopify_theme_brand_requires_multiple_product_images_for_multiple_
             },
         )()
 
-    def fake_collect_product_image_public_ids(*, session, org_id: str, client_id: str, product):
-        return ["logo-public-id", "product-image-1"]
+    def fake_create_funnel_image_asset(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        prompt: str,
+        aspect_ratio: str | None = None,
+        usage_context: dict[str, object] | None = None,
+        reference_image_bytes=None,
+        reference_image_mime_type=None,
+        reference_asset_public_id: str | None = None,
+        reference_asset_id: str | None = None,
+        funnel_id: str | None = None,
+        product_id: str | None = None,
+        tags: list[str] | None = None,
+    ):
+        raise RuntimeError("GEMINI_API_KEY not configured")
 
     def fake_list_template_slots(
         *,
@@ -952,15 +991,11 @@ def test_sync_shopify_theme_brand_requires_multiple_product_images_for_multiple_
     monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
     monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_asset)
     monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
+    monkeypatch.setattr(clients_router, "create_funnel_image_asset", fake_create_funnel_image_asset)
     monkeypatch.setattr(
         clients_router,
         "list_client_shopify_theme_template_slots",
         fake_list_template_slots,
-    )
-    monkeypatch.setattr(
-        clients_router.funnel_ai,
-        "_collect_product_image_public_ids",
-        fake_collect_product_image_public_ids,
     )
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -977,7 +1012,7 @@ def test_sync_shopify_theme_brand_requires_multiple_product_images_for_multiple_
     )
 
     assert response.status_code == 422
-    assert "fewer than two eligible product images were available" in response.json()["detail"]
+    assert "AI theme image generation failed for Shopify sync" in response.json()["detail"]
 
 
 def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omitted(

@@ -54,7 +54,7 @@ from app.services.design_system_generation import (
     DesignSystemGenerationError,
     validate_design_system_tokens,
 )
-from app.services import funnel_ai
+from app.services.funnels import create_funnel_image_asset
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
     build_client_shopify_install_url,
@@ -90,6 +90,30 @@ _THEME_COMPONENT_INLINE_MARKUP_TAG_RE = re.compile(
     r"</?\s*(?:strong|em)\s*>",
     re.IGNORECASE,
 )
+_THEME_SYNC_AI_IMAGE_PROMPT_BASE = (
+    "Premium ecommerce product image for a beauty-tech LED face mask brand. "
+    "Modern skincare aesthetic, soft cinematic lighting, high detail, photoreal quality. "
+    "No text, no logos, no watermark, no UI."
+)
+_THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME = {
+    "hero": "Hero composition with the LED mask as the focal subject in a wide cinematic frame.",
+    "gallery": "Product detail composition showing texture, contour, and premium materials.",
+    "supporting": "Clean supporting visual tied to LED mask benefits and daily routine context.",
+    "background": "Ambient background scene that complements the LED mask product.",
+    "generic": "Lifestyle composition aligned to a premium beauty-tech brand.",
+}
+_THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
+    "landscape": "16:9",
+    "portrait": "3:4",
+    "square": "1:1",
+    "any": "4:3",
+    "16:9": "16:9",
+    "9:16": "9:16",
+    "4:3": "4:3",
+    "3:4": "3:4",
+    "1:1": "1:1",
+}
+_MAX_THEME_SYNC_GENERATED_IMAGES = 8
 _UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION = str.maketrans(
     {
         '"': "",
@@ -211,6 +235,180 @@ def _sanitize_theme_component_text_value(value: str) -> str:
     without_inline_markup = _THEME_COMPONENT_INLINE_MARKUP_TAG_RE.sub(" ", value)
     sanitized = without_inline_markup.translate(_UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION)
     return " ".join(sanitized.split()).strip()
+
+
+def _normalize_theme_slot_role(raw_role: Any) -> str:
+    if not isinstance(raw_role, str):
+        return "generic"
+    normalized = raw_role.strip().lower()
+    if normalized in {"hero", "gallery", "supporting", "background", "generic"}:
+        return normalized
+    return "generic"
+
+
+def _normalize_theme_slot_recommended_aspect(raw_aspect: Any) -> str:
+    if not isinstance(raw_aspect, str):
+        return "any"
+    normalized = raw_aspect.strip().lower()
+    if normalized in {"landscape", "portrait", "square", "any", "16:9", "9:16", "4:3", "3:4", "1:1"}:
+        return normalized
+    return "any"
+
+
+def _resolve_theme_slot_aspect_ratio(raw_recommended_aspect: Any) -> str:
+    normalized = _normalize_theme_slot_recommended_aspect(raw_recommended_aspect)
+    return _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT[normalized]
+
+
+def _build_theme_sync_slot_image_prompt(
+    *,
+    slot_role: str,
+    slot_key: str,
+    aspect_ratio: str,
+    variant_index: int,
+) -> str:
+    role_guidance = _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME.get(
+        slot_role,
+        _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME["generic"],
+    )
+    return (
+        f"{_THEME_SYNC_AI_IMAGE_PROMPT_BASE} "
+        f"{role_guidance} "
+        f"Target slot key: {slot_key}. "
+        f"Aspect ratio: {aspect_ratio}. "
+        f"Variation: {variant_index}."
+    )
+
+
+def _select_theme_sync_slots_for_ai_generation(
+    *,
+    image_slots: list[dict[str, Any]],
+    max_images: int = _MAX_THEME_SYNC_GENERATED_IMAGES,
+) -> list[dict[str, Any]]:
+    normalized_slots: list[dict[str, Any]] = []
+    for slot in image_slots:
+        if not isinstance(slot, dict):
+            continue
+        raw_path = slot.get("path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        normalized_slots.append(slot)
+    if not normalized_slots or max_images <= 0:
+        return []
+
+    sorted_slots = sorted(normalized_slots, key=lambda item: str(item["path"]))
+    max_count = min(max_images, len(sorted_slots))
+    selected: list[dict[str, Any]] = []
+    selected_indices: set[int] = set()
+    seen_role_aspect: set[tuple[str, str]] = set()
+
+    for idx, slot in enumerate(sorted_slots):
+        role = _normalize_theme_slot_role(slot.get("role"))
+        aspect = _normalize_theme_slot_recommended_aspect(slot.get("recommendedAspect"))
+        role_aspect = (role, aspect)
+        if role_aspect in seen_role_aspect:
+            continue
+        seen_role_aspect.add(role_aspect)
+        selected.append(slot)
+        selected_indices.add(idx)
+        if len(selected) >= max_count:
+            return selected
+
+    for idx, slot in enumerate(sorted_slots):
+        if len(selected) >= max_count:
+            break
+        if idx in selected_indices:
+            continue
+        selected.append(slot)
+    return selected
+
+
+def _generate_theme_sync_ai_image_assets(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    product_id: str | None,
+    image_slots: list[dict[str, Any]],
+) -> list[Any]:
+    selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
+    if not selected_slots:
+        return []
+
+    generated_assets: list[Any] = []
+    variant_count_by_role_aspect: dict[tuple[str, str], int] = {}
+    for slot in selected_slots:
+        slot_path = str(slot["path"]).strip()
+        slot_key_raw = slot.get("key")
+        slot_key = (
+            slot_key_raw.strip()
+            if isinstance(slot_key_raw, str) and slot_key_raw.strip()
+            else "image"
+        )
+        slot_role = _normalize_theme_slot_role(slot.get("role"))
+        slot_recommended_aspect = _normalize_theme_slot_recommended_aspect(
+            slot.get("recommendedAspect")
+        )
+        aspect_ratio = _resolve_theme_slot_aspect_ratio(slot_recommended_aspect)
+        role_aspect = (slot_role, slot_recommended_aspect)
+        variant_count = variant_count_by_role_aspect.get(role_aspect, 0) + 1
+        variant_count_by_role_aspect[role_aspect] = variant_count
+        prompt = _build_theme_sync_slot_image_prompt(
+            slot_role=slot_role,
+            slot_key=slot_key,
+            aspect_ratio=aspect_ratio,
+            variant_index=variant_count,
+        )
+
+        try:
+            generated_asset = create_funnel_image_asset(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                prompt=prompt,
+                aspect_ratio=aspect_ratio,
+                usage_context={
+                    "kind": "shopify_theme_sync_component_image",
+                    "slotPath": slot_path,
+                    "slotRole": slot_role,
+                    "recommendedAspect": slot_recommended_aspect,
+                },
+                product_id=product_id,
+                tags=["shopify_theme_sync", "component_image", "ai_generated"],
+            )
+        except Exception as exc:  # noqa: BLE001
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "AI theme image generation failed for Shopify sync. "
+                    f"slotPath={slot_path}. {exc}"
+                ),
+            ) from exc
+
+        public_id = getattr(generated_asset, "public_id", None)
+        if not isinstance(public_id, str) or not public_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "AI theme image generation produced an invalid asset response without public_id. "
+                    f"slotPath={slot_path}."
+                ),
+            )
+        width = (
+            generated_asset.width
+            if isinstance(getattr(generated_asset, "width", None), int)
+            else None
+        )
+        height = (
+            generated_asset.height
+            if isinstance(getattr(generated_asset, "height", None), int)
+            else None
+        )
+        generated_asset.width = width
+        generated_asset.height = height
+        generated_assets.append(generated_asset)
+
+    return generated_assets
 
 
 def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
@@ -819,7 +1017,6 @@ def sync_client_shopify_theme_brand_route(
 
     requested_product_id = payload.productId.strip() if payload.productId else None
     resolved_product: Product | None = None
-    product_image_asset_public_ids: list[str] = []
     if requested_product_id:
         product = ProductsRepository(session).get(
             org_id=auth.org_id, product_id=requested_product_id
@@ -835,29 +1032,6 @@ def sync_client_shopify_theme_brand_route(
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Product must belong to this workspace.",
-            )
-        try:
-            product_image_asset_public_ids = funnel_ai._collect_product_image_public_ids(
-                session=session,
-                org_id=auth.org_id,
-                client_id=client_id,
-                product=product,
-            )
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Unable to resolve product image assets for productId={requested_product_id}: {exc}",
-            ) from exc
-        product_image_asset_public_ids = [
-            public_id for public_id in product_image_asset_public_ids if public_id != logo_public_id
-        ]
-        if not product_image_asset_public_ids:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "No product image assets available for theme sync after excluding the brand logo. "
-                    f"productId={requested_product_id}."
-                ),
             )
 
     workspace_name = str(client.name).strip()
@@ -913,22 +1087,6 @@ def sync_client_shopify_theme_brand_route(
             and isinstance(slot.get("path"), str)
             and slot["path"] not in explicit_image_paths
         ]
-        unique_product_image_asset_public_ids = {
-            public_id.strip()
-            for public_id in product_image_asset_public_ids
-            if isinstance(public_id, str) and public_id.strip()
-        }
-
-        if len(planner_image_slots) > 1 and len(unique_product_image_asset_public_ids) < 2:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Theme sync discovered multiple image component slots, but fewer than two "
-                    "eligible product images were available after filtering. "
-                    f"productId={requested_product_id}. Provide additional product images or set "
-                    "componentImageAssetMap for explicit slot mapping."
-                ),
-            )
 
         if not planner_image_slots and not text_slots:
             raise HTTPException(
@@ -941,22 +1099,37 @@ def sync_client_shopify_theme_brand_route(
 
         product_image_assets: list[Any] = []
         product_image_assets_by_public_id: dict[str, Any] = {}
-        for asset_public_id in product_image_asset_public_ids:
-            mapped_asset = assets_repo.get_by_public_id(
+        if planner_image_slots:
+            generated_theme_assets = _generate_theme_sync_ai_image_assets(
+                session=session,
                 org_id=auth.org_id,
-                public_id=asset_public_id,
                 client_id=client_id,
+                product_id=requested_product_id,
+                image_slots=planner_image_slots,
             )
-            if not mapped_asset:
+            if not generated_theme_assets:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=(
-                        "Product image asset for theme sync could not be resolved in this workspace. "
-                        f"assetPublicId={asset_public_id}, productId={requested_product_id}."
+                        "AI theme image generation did not produce any assets for discovered image slots. "
+                        f"productId={requested_product_id}."
                     ),
                 )
-            product_image_assets.append(mapped_asset)
-            product_image_assets_by_public_id[asset_public_id] = mapped_asset
+            for generated_asset in generated_theme_assets:
+                public_id = getattr(generated_asset, "public_id", None)
+                if not isinstance(public_id, str) or not public_id.strip():
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=(
+                            "AI theme image generation returned an asset without a valid public id. "
+                            f"productId={requested_product_id}."
+                        ),
+                    )
+                normalized_public_id = public_id.strip()
+                if normalized_public_id in product_image_assets_by_public_id:
+                    continue
+                product_image_assets_by_public_id[normalized_public_id] = generated_asset
+                product_image_assets.append(generated_asset)
 
         offers = ProductOffersRepository(session).list_by_product(
             product_id=str(resolved_product.id)
