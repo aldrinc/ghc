@@ -29,6 +29,7 @@ import {
   type ComplianceShopifyPolicySyncResponse,
 } from "@/api/compliance";
 import { useAssets } from "@/api/assets";
+import { useProducts } from "@/api/products";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -552,8 +553,13 @@ export function BrandDesignSystemPage() {
   const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
   const { data: shopifyThemeTemplateDrafts = [] } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
   const auditShopifyThemeBrand = useAuditClientShopifyThemeBrand(workspace?.id);
+  const { data: workspaceProducts = [] } = useProducts(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
+    { enabled: Boolean(workspace?.id) }
+  );
+  const { data: workspaceImageAssets = [], isLoading: isLoadingWorkspaceImageAssets } = useAssets(
+    { clientId: workspace?.id, assetKind: "image" },
     { enabled: Boolean(workspace?.id) }
   );
 
@@ -578,6 +584,8 @@ export function BrandDesignSystemPage() {
   const [templateDraftImageMapInput, setTemplateDraftImageMapInput] = useState("{}");
   const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
   const [templateDraftEditError, setTemplateDraftEditError] = useState<string | null>(null);
+  const [templateAssetSearchQuery, setTemplateAssetSearchQuery] = useState("");
+  const [templateAssetPickerImageErrorsByPublicId, setTemplateAssetPickerImageErrorsByPublicId] = useState<Record<string, boolean>>({});
   const [templatePreviewDialogOpen, setTemplatePreviewDialogOpen] = useState(false);
   const [templatePreviewImageMap, setTemplatePreviewImageMap] = useState<Record<string, string>>({});
   const [templatePreviewTextValues, setTemplatePreviewTextValues] = useState<Record<string, string>>({});
@@ -656,6 +664,8 @@ export function BrandDesignSystemPage() {
     setTemplateDraftImageMapInput("{}");
     setTemplateDraftTextValuesInput("{}");
     setTemplateDraftEditError(null);
+    setTemplateAssetSearchQuery("");
+    setTemplateAssetPickerImageErrorsByPublicId({});
     setTemplatePreviewDialogOpen(false);
     setTemplatePreviewImageMap({});
     setTemplatePreviewTextValues({});
@@ -759,6 +769,8 @@ export function BrandDesignSystemPage() {
       JSON.stringify(latestVersion.data.componentTextValues || {}, null, 2)
     );
     setTemplateDraftEditError(null);
+    setTemplateAssetSearchQuery("");
+    setTemplateAssetPickerImageErrorsByPublicId({});
   }, [selectedTemplateDraft?.id, selectedTemplateDraft?.latestVersion?.id]);
 
   const previewDesignSystem = useMemo(
@@ -793,10 +805,83 @@ export function BrandDesignSystemPage() {
 
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
   const publicAssetBaseUrl = apiBaseUrl?.replace(/\/$/, "");
+  const productById = useMemo(
+    () => new Map(workspaceProducts.map((product) => [product.id, product])),
+    [workspaceProducts]
+  );
+  const workspaceProductImageAssets = useMemo(
+    () =>
+      workspaceImageAssets
+        .filter((asset) => asset.product_id)
+        .sort((a, b) => b.created_at.localeCompare(a.created_at)),
+    [workspaceImageAssets]
+  );
+  const workspaceProductImageAssetEntries = useMemo(
+    () =>
+      workspaceProductImageAssets.map((asset) => {
+        const productTitle = asset.product_id ? productById.get(asset.product_id)?.title : undefined;
+        const createdAt = new Date(asset.created_at);
+        const createdAtLabel = Number.isNaN(createdAt.getTime())
+          ? asset.created_at
+          : createdAt.toLocaleDateString();
+        const dimensions =
+          typeof asset.width === "number" && typeof asset.height === "number"
+            ? `${asset.width}x${asset.height}`
+            : "size unknown";
+        const tagsLabel = asset.tags?.length ? asset.tags.join(", ") : "";
+        const optionLabel = `${productTitle || "Unknown product"} · ${asset.public_id.slice(0, 8)} · ${dimensions} · ${createdAtLabel}`;
+        const searchText = [
+          productTitle || "",
+          asset.product_id || "",
+          asset.public_id,
+          dimensions,
+          asset.status,
+          asset.file_status || "",
+          asset.format,
+          tagsLabel,
+        ]
+          .join(" ")
+          .toLowerCase();
+        return {
+          asset,
+          productTitle: productTitle || "Unknown product",
+          createdAtLabel,
+          dimensions,
+          tagsLabel,
+          optionLabel,
+          searchText,
+        };
+      }),
+    [productById, workspaceProductImageAssets]
+  );
+  const normalizedTemplateAssetSearchQuery = templateAssetSearchQuery.trim().toLowerCase();
+  const filteredWorkspaceProductImageAssetEntries = useMemo(() => {
+    if (!normalizedTemplateAssetSearchQuery) return workspaceProductImageAssetEntries;
+    return workspaceProductImageAssetEntries.filter((entry) =>
+      entry.searchText.includes(normalizedTemplateAssetSearchQuery)
+    );
+  }, [workspaceProductImageAssetEntries, normalizedTemplateAssetSearchQuery]);
+  const filteredWorkspaceProductImageAssetOptions = useMemo(
+    () =>
+      filteredWorkspaceProductImageAssetEntries.map((entry) => ({
+        label: entry.optionLabel,
+        value: entry.asset.public_id,
+      })),
+    [filteredWorkspaceProductImageAssetEntries]
+  );
+  const workspaceProductImageAssetByPublicId = useMemo(
+    () => new Map(workspaceProductImageAssetEntries.map((entry) => [entry.asset.public_id, entry])),
+    [workspaceProductImageAssetEntries]
+  );
   const previewLogoSrc =
     previewBrand.logoAssetPublicId && apiBaseUrl
       ? `${apiBaseUrl.replace(/\/$/, "")}/public/assets/${previewBrand.logoAssetPublicId}`
       : undefined;
+  const parsedTemplateDraftImageMapResult = useMemo(
+    () => parseStringMap(templateDraftImageMapInput, "Image map"),
+    [templateDraftImageMapInput]
+  );
+  const parsedTemplateDraftImageMap = parsedTemplateDraftImageMapResult.value || {};
   const templatePreviewImageItems = useMemo(() => {
     const latestVersion = selectedTemplateDraft?.latestVersion;
     if (!latestVersion) return [];
@@ -1021,6 +1106,23 @@ export function BrandDesignSystemPage() {
     } catch {
       // Error toast is emitted by the mutation hook.
     }
+  };
+
+  const handleTemplateDraftSlotAssetChange = (path: string, assetPublicId: string) => {
+    const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
+    if (!parsedImageMap.value) {
+      setTemplateDraftEditError(parsedImageMap.error || "Invalid image map.");
+      return;
+    }
+    const nextImageMap = { ...parsedImageMap.value };
+    const cleanedAssetPublicId = assetPublicId.trim();
+    if (cleanedAssetPublicId) {
+      nextImageMap[path] = cleanedAssetPublicId;
+    } else {
+      delete nextImageMap[path];
+    }
+    setTemplateDraftImageMapInput(JSON.stringify(nextImageMap, null, 2));
+    setTemplateDraftEditError(null);
   };
 
   const handleOpenTemplatePreview = () => {
@@ -1510,6 +1612,190 @@ export function BrandDesignSystemPage() {
                     )}
                   />
                 </div>
+              </div>
+              <div className="space-y-3 rounded-md border border-divider p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold text-content">Image asset picker</div>
+                    <div className="text-xs text-content-muted">
+                      Search workspace product images, then map each template image slot.
+                    </div>
+                  </div>
+                  <div className="w-full sm:w-[320px]">
+                    <Input
+                      value={templateAssetSearchQuery}
+                      onChange={(event) => setTemplateAssetSearchQuery(event.target.value)}
+                      placeholder="Search by product, asset ID, size, status, tag"
+                    />
+                  </div>
+                </div>
+
+                {!publicAssetBaseUrl ? (
+                  <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+                    Missing `VITE_API_BASE_URL`; picker image previews cannot be loaded.
+                  </div>
+                ) : null}
+
+                {parsedTemplateDraftImageMapResult.error ? (
+                  <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+                    {parsedTemplateDraftImageMapResult.error}
+                  </div>
+                ) : isLoadingWorkspaceImageAssets ? (
+                  <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                    Loading product image assets…
+                  </div>
+                ) : !workspaceProductImageAssetEntries.length ? (
+                  <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                    No product image assets were found for this workspace.
+                  </div>
+                ) : !selectedTemplateDraft.latestVersion.data.imageSlots.length ? (
+                  <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                    This draft has no image slots to map.
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="text-xs text-content-muted">
+                      Showing{" "}
+                      <span className="font-semibold text-content">{filteredWorkspaceProductImageAssetEntries.length}</span> of{" "}
+                      <span className="font-semibold text-content">{workspaceProductImageAssetEntries.length}</span> product image assets.
+                    </div>
+                    <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                      <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                        {selectedTemplateDraft.latestVersion.data.imageSlots.map((slot) => {
+                          const selectedAssetPublicId = parsedTemplateDraftImageMap[slot.path] || "";
+                          const selectedAssetEntry =
+                            selectedAssetPublicId
+                              ? workspaceProductImageAssetByPublicId.get(selectedAssetPublicId)
+                              : undefined;
+                          const slotOptions = [
+                            { label: "No mapped asset", value: "" },
+                            ...filteredWorkspaceProductImageAssetOptions,
+                          ];
+                          if (
+                            selectedAssetPublicId &&
+                            !slotOptions.some((option) => option.value === selectedAssetPublicId)
+                          ) {
+                            slotOptions.splice(1, 0, {
+                              label: `Selected (outside filter) · ${selectedAssetPublicId.slice(0, 8)}`,
+                              value: selectedAssetPublicId,
+                            });
+                          }
+                          const selectedImageUrl =
+                            publicAssetBaseUrl && selectedAssetPublicId
+                              ? `${publicAssetBaseUrl}/public/assets/${selectedAssetPublicId}`
+                              : undefined;
+                          const selectedImageErrored = Boolean(
+                            selectedAssetPublicId && templateAssetPickerImageErrorsByPublicId[selectedAssetPublicId]
+                          );
+                          return (
+                            <div key={slot.path} className="space-y-2 rounded-md border border-border bg-surface p-2">
+                              <div className="text-[11px] font-mono break-all text-content">{slot.path}</div>
+                              <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
+                                {slot.role ? <span>role: {slot.role}</span> : null}
+                                {slot.recommendedAspect ? <span>aspect: {slot.recommendedAspect}</span> : null}
+                              </div>
+                              <Select
+                                value={selectedAssetPublicId}
+                                onValueChange={(value) => handleTemplateDraftSlotAssetChange(slot.path, value)}
+                                options={slotOptions}
+                              />
+                              {selectedAssetPublicId ? (
+                                <div className="space-y-1 rounded-md border border-border bg-surface-2 p-2">
+                                  <div className="rounded-md border border-border bg-white p-1">
+                                    {selectedImageUrl && !selectedImageErrored ? (
+                                      <img
+                                        src={selectedImageUrl}
+                                        alt={slot.path}
+                                        className="h-28 w-full rounded object-contain"
+                                        onError={() =>
+                                          setTemplateAssetPickerImageErrorsByPublicId((current) => ({
+                                            ...current,
+                                            [selectedAssetPublicId]: true,
+                                          }))
+                                        }
+                                      />
+                                    ) : (
+                                      <div className="grid h-28 place-items-center text-xs text-content-muted">
+                                        Preview unavailable.
+                                      </div>
+                                    )}
+                                  </div>
+                                  {selectedAssetEntry ? (
+                                    <div className="text-[11px] text-content-muted">
+                                      {selectedAssetEntry.productTitle} · {selectedAssetEntry.dimensions} ·{" "}
+                                      {selectedAssetEntry.createdAtLabel}
+                                    </div>
+                                  ) : (
+                                    <div className="text-[11px] text-content-muted">
+                                      Asset is not in the current workspace product image list.
+                                    </div>
+                                  )}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                        <div className="text-xs font-semibold text-content">Search results</div>
+                        {filteredWorkspaceProductImageAssetEntries.length ? (
+                          filteredWorkspaceProductImageAssetEntries.map((entry) => {
+                            const { asset } = entry;
+                            const assetImageUrl = publicAssetBaseUrl
+                              ? `${publicAssetBaseUrl}/public/assets/${asset.public_id}`
+                              : undefined;
+                            const assetImageErrored = Boolean(
+                              templateAssetPickerImageErrorsByPublicId[asset.public_id]
+                            );
+                            return (
+                              <div
+                                key={asset.id}
+                                className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 rounded-md border border-border bg-surface p-2"
+                              >
+                                <div className="rounded-md border border-border bg-white p-1">
+                                  {assetImageUrl && !assetImageErrored ? (
+                                    <img
+                                      src={assetImageUrl}
+                                      alt={asset.public_id}
+                                      className="h-20 w-full rounded object-contain"
+                                      onError={() =>
+                                        setTemplateAssetPickerImageErrorsByPublicId((current) => ({
+                                          ...current,
+                                          [asset.public_id]: true,
+                                        }))
+                                      }
+                                    />
+                                  ) : (
+                                    <div className="grid h-20 place-items-center text-[11px] text-content-muted">
+                                      No preview
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="min-w-0 space-y-1">
+                                  <div className="text-xs font-semibold text-content truncate">{entry.productTitle}</div>
+                                  <div className="text-[11px] font-mono text-content break-all">
+                                    {asset.public_id}
+                                  </div>
+                                  <div className="text-[11px] text-content-muted">
+                                    {entry.dimensions} · {entry.createdAtLabel} · {asset.status}
+                                  </div>
+                                  {entry.tagsLabel ? (
+                                    <div className="text-[11px] text-content-muted truncate">tags: {entry.tagsLabel}</div>
+                                  ) : null}
+                                </div>
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                            No assets match this search.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               {templateDraftEditError ? <div className="text-xs text-danger">{templateDraftEditError}</div> : null}
               <div className="flex flex-wrap items-center gap-2">
