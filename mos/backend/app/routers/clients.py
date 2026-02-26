@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import logging
 import re
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
@@ -167,6 +167,16 @@ def _build_theme_sync_slot_unsplash_query(*, slot_role: str, slot_key: str) -> s
     if slot_key and slot_key != "image":
         return f"{base_query} {slot_key}".strip()
     return base_query
+
+
+def _normalize_asset_public_id(raw_public_id: Any) -> str | None:
+    if isinstance(raw_public_id, UUID):
+        return str(raw_public_id)
+    if isinstance(raw_public_id, str):
+        cleaned = raw_public_id.strip()
+        if cleaned:
+            return cleaned
+    return None
 
 
 @router.get("")
@@ -593,8 +603,10 @@ def _generate_theme_sync_ai_image_assets(
                 ),
             )
 
-        public_id = getattr(generated_asset, "public_id", None)
-        if not isinstance(public_id, str) or not public_id.strip():
+        normalized_public_id = _normalize_asset_public_id(
+            getattr(generated_asset, "public_id", None)
+        )
+        if not normalized_public_id:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=(
@@ -1454,8 +1466,10 @@ def sync_client_shopify_theme_brand_route(
                     ),
                 )
             for slot_path, generated_asset in generated_asset_by_slot_path.items():
-                public_id = getattr(generated_asset, "public_id", None)
-                if not isinstance(public_id, str) or not public_id.strip():
+                normalized_public_id = _normalize_asset_public_id(
+                    getattr(generated_asset, "public_id", None)
+                )
+                if not normalized_public_id:
                     raise HTTPException(
                         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                         detail=(
@@ -1464,7 +1478,7 @@ def sync_client_shopify_theme_brand_route(
                         ),
                     )
                 component_image_urls[slot_path] = (
-                    f"{public_asset_base_url}/public/assets/{public_id.strip()}"
+                    f"{public_asset_base_url}/public/assets/{normalized_public_id}"
                 )
 
     if requested_product_id and resolved_product is not None:
@@ -1477,13 +1491,17 @@ def sync_client_shopify_theme_brand_route(
         )
         product_image_assets_by_public_id: dict[str, Any] = {}
         for existing_asset in product_image_assets:
-            existing_public_id = getattr(existing_asset, "public_id", None)
-            if not isinstance(existing_public_id, str) or not existing_public_id.strip():
+            normalized_existing_public_id = _normalize_asset_public_id(
+                getattr(existing_asset, "public_id", None)
+            )
+            if not normalized_existing_public_id:
                 continue
-            product_image_assets_by_public_id[existing_public_id.strip()] = existing_asset
+            product_image_assets_by_public_id[normalized_existing_public_id] = existing_asset
         for generated_asset in generated_theme_assets:
-            public_id = getattr(generated_asset, "public_id", None)
-            if not isinstance(public_id, str) or not public_id.strip():
+            normalized_public_id = _normalize_asset_public_id(
+                getattr(generated_asset, "public_id", None)
+            )
+            if not normalized_public_id:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail=(
@@ -1491,7 +1509,6 @@ def sync_client_shopify_theme_brand_route(
                         f"productId={requested_product_id}."
                     ),
                 )
-            normalized_public_id = public_id.strip()
             if normalized_public_id in product_image_assets_by_public_id:
                 continue
             product_image_assets_by_public_id[normalized_public_id] = generated_asset

@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from app.routers import clients as clients_router
 from app.services.shopify_connection import ShopifyInstallation
 
@@ -22,6 +24,14 @@ def test_sanitize_theme_component_text_value_strips_inline_markup_tags():
         clients_router._sanitize_theme_component_text_value(raw_value)
         == "Boost energy and focus daily"
     )
+
+
+def test_normalize_asset_public_id_handles_uuid_and_string():
+    uuid_value = UUID("11111111-1111-1111-1111-111111111111")
+    assert clients_router._normalize_asset_public_id(uuid_value) == "11111111-1111-1111-1111-111111111111"
+    assert clients_router._normalize_asset_public_id("  abc-123  ") == "abc-123"
+    assert clients_router._normalize_asset_public_id("") is None
+    assert clients_router._normalize_asset_public_id(None) is None
 
 
 def test_get_shopify_status_returns_service_payload(api_client, monkeypatch):
@@ -711,7 +721,7 @@ def test_sync_shopify_theme_brand_generates_ai_images_without_product_id(
         observed.setdefault("generated_product_ids", []).append(product_id)
         slot_path = usage_context.get("slotPath") if isinstance(usage_context, dict) else None
         if slot_path == "templates/index.json.sections.hero.settings.image":
-            public_id = "generated-image-hero"
+            public_id = UUID("11111111-1111-1111-1111-111111111111")
         else:
             public_id = "generated-image-gallery"
         return type(
@@ -826,7 +836,7 @@ def test_sync_shopify_theme_brand_generates_ai_images_without_product_id(
     assert observed["generated_product_ids"] == [None, None]
     assert observed["component_image_urls"] == {
         "templates/index.json.sections.hero.settings.image": (
-            "https://assets.example.com/public/assets/generated-image-hero"
+            "https://assets.example.com/public/assets/11111111-1111-1111-1111-111111111111"
         ),
         "templates/product.json.sections.gallery.settings.image": (
             "https://assets.example.com/public/assets/generated-image-gallery"
