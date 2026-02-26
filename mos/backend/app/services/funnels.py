@@ -485,6 +485,8 @@ def _gemini_image_references_enabled() -> bool:
 
 
 _DEFAULT_FUNNEL_IMAGE_MODEL = "gemini-3-pro-image-preview"
+_GEMINI_IMAGE_GENERATION_RETRY_ATTEMPTS = 6
+_GEMINI_IMAGE_TRANSIENT_STATUS_CODES = {429, 500, 502, 503, 504}
 
 
 def _resolve_funnel_image_model() -> str:
@@ -495,6 +497,22 @@ def _resolve_funnel_image_model() -> str:
             "Funnel image model is not configured. Set FUNNEL_IMAGE_MODEL or NANO_BANANA_MODEL."
         )
     return cleaned
+
+
+def _resolve_gemini_retry_delay_seconds(
+    *,
+    attempt: int,
+    retry_after_raw: str | None = None,
+) -> float:
+    if isinstance(retry_after_raw, str) and retry_after_raw.strip():
+        try:
+            parsed_retry_after = float(retry_after_raw.strip())
+            if parsed_retry_after > 0:
+                return max(1.0, parsed_retry_after)
+        except ValueError:
+            pass
+    # Exponential backoff capped at 30s.
+    return min(30.0, max(1.0, float(2**attempt)))
 
 
 def generate_gemini_image_bytes(
@@ -533,7 +551,7 @@ def generate_gemini_image_bytes(
         payload["generationConfig"] = {"imageConfig": {"aspectRatio": aspect_ratio}}
 
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    retries = 2
+    retries = max(0, _GEMINI_IMAGE_GENERATION_RETRY_ATTEMPTS)
     last_summary: str | None = None
     for attempt in range(retries + 1):
         try:
@@ -557,19 +575,27 @@ def generate_gemini_image_bytes(
             )
             if is_hard_quota_exhaustion:
                 raise RuntimeError(f"Gemini image request failed (status={status}): {body}") from exc
-            if status == 429 and attempt < retries:
-                retry_after_raw = exc.response.headers.get("Retry-After") if exc.response is not None else None
-                try:
-                    retry_after = float(retry_after_raw) if retry_after_raw else 5.0 * (attempt + 1)
-                except ValueError:
-                    retry_after = 5.0 * (attempt + 1)
-                time.sleep(max(retry_after, 1.0))
+            if status in _GEMINI_IMAGE_TRANSIENT_STATUS_CODES and attempt < retries:
+                retry_after_raw = (
+                    exc.response.headers.get("Retry-After") if exc.response is not None else None
+                )
+                retry_after = _resolve_gemini_retry_delay_seconds(
+                    attempt=attempt + 1,
+                    retry_after_raw=retry_after_raw,
+                )
+                time.sleep(retry_after)
                 continue
             raise RuntimeError(f"Gemini image request failed (status={status}): {body}") from exc
+        except httpx.RequestError as exc:
+            if attempt >= retries:
+                raise RuntimeError(f"Gemini image request failed: {exc}") from exc
+            retry_after = _resolve_gemini_retry_delay_seconds(attempt=attempt + 1)
+            time.sleep(retry_after)
+            continue
         except Exception as exc:  # noqa: BLE001
             if attempt >= retries:
                 raise RuntimeError(f"Gemini image request failed: {exc}") from exc
-            time.sleep(0.6 * (attempt + 1))
+            time.sleep(_resolve_gemini_retry_delay_seconds(attempt=attempt + 1))
             continue
         data = resp.json()
         try:
