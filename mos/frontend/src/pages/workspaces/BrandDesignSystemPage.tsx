@@ -22,6 +22,7 @@ import {
   useUpdateClientShopifyInstallation,
   useUpdateClient,
   type ClientShopifyThemeBrandAuditResponse,
+  type ClientShopifyThemeTemplateImageSlot,
   type ClientShopifyThemeTemplatePublishResponse,
 } from "@/api/clients";
 import {
@@ -528,6 +529,63 @@ function parseStringMap(raw: string, label: string): { value?: Record<string, st
   }
 }
 
+function humanizeSlotToken(raw: string): string {
+  const normalized = raw
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return "Image Slot";
+  return normalized
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function deriveImageSlotBaseLabel(slot: ClientShopifyThemeTemplateImageSlot): string {
+  const haystack = `${slot.role} ${slot.key} ${slot.path}`.toLowerCase();
+  if (haystack.includes("feature")) return "Feature";
+  if (haystack.includes("hero") && (haystack.includes("icon") || haystack.includes("badge"))) {
+    return "Hero Icon";
+  }
+  if (haystack.includes("hero")) return "Hero Image";
+  if (haystack.includes("gallery")) return "Gallery Image";
+  if (haystack.includes("review") || haystack.includes("testimonial")) return "Review";
+
+  if (slot.role.trim()) return humanizeSlotToken(slot.role);
+  if (slot.key.trim()) return humanizeSlotToken(slot.key);
+
+  const pathLeaf = slot.path.split(".").pop() || slot.path;
+  return humanizeSlotToken(pathLeaf);
+}
+
+function buildImageSlotReadableLabelMap(
+  slots: ClientShopifyThemeTemplateImageSlot[]
+): Map<string, string> {
+  const baseByPath = slots.map((slot) => ({
+    path: slot.path,
+    baseLabel: deriveImageSlotBaseLabel(slot),
+  }));
+  const totalsByBase = new Map<string, number>();
+  for (const entry of baseByPath) {
+    totalsByBase.set(entry.baseLabel, (totalsByBase.get(entry.baseLabel) || 0) + 1);
+  }
+  const seenByBase = new Map<string, number>();
+  const labelsByPath = new Map<string, string>();
+  for (const entry of baseByPath) {
+    const total = totalsByBase.get(entry.baseLabel) || 0;
+    if (total <= 1) {
+      labelsByPath.set(entry.path, entry.baseLabel);
+      continue;
+    }
+    const nextIndex = (seenByBase.get(entry.baseLabel) || 0) + 1;
+    seenByBase.set(entry.baseLabel, nextIndex);
+    labelsByPath.set(entry.path, `${entry.baseLabel} ${nextIndex}`);
+  }
+  return labelsByPath;
+}
+
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
   const { data: client } = useClient(workspace?.id);
@@ -585,6 +643,7 @@ export function BrandDesignSystemPage() {
   const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
   const [templateDraftEditError, setTemplateDraftEditError] = useState<string | null>(null);
   const [templateAssetSearchQuery, setTemplateAssetSearchQuery] = useState("");
+  const [templateSlotAssetQueryByPath, setTemplateSlotAssetQueryByPath] = useState<Record<string, string>>({});
   const [templateAssetPickerImageErrorsByPublicId, setTemplateAssetPickerImageErrorsByPublicId] = useState<Record<string, boolean>>({});
   const [templatePreviewDialogOpen, setTemplatePreviewDialogOpen] = useState(false);
   const [templatePreviewImageMap, setTemplatePreviewImageMap] = useState<Record<string, string>>({});
@@ -665,6 +724,7 @@ export function BrandDesignSystemPage() {
     setTemplateDraftTextValuesInput("{}");
     setTemplateDraftEditError(null);
     setTemplateAssetSearchQuery("");
+    setTemplateSlotAssetQueryByPath({});
     setTemplateAssetPickerImageErrorsByPublicId({});
     setTemplatePreviewDialogOpen(false);
     setTemplatePreviewImageMap({});
@@ -676,9 +736,18 @@ export function BrandDesignSystemPage() {
   }, [workspace?.id]);
 
   useEffect(() => {
-    if (!shopifyStatus?.shopDomain) return;
-    setShopifyShopDomainDraft((current) => (current.trim() ? current : shopifyStatus.shopDomain || ""));
-  }, [shopifyStatus?.shopDomain]);
+    const connectedShopDomainCandidates = [
+      shopifyStatus?.selectedShopDomain,
+      shopifyStatus?.shopDomain,
+      ...(shopifyStatus?.shopDomains || []),
+    ];
+    const nextConnectedShopDomain =
+      connectedShopDomainCandidates.find(
+        (candidate): candidate is string => typeof candidate === "string" && Boolean(candidate.trim())
+      ) || "";
+    if (!nextConnectedShopDomain) return;
+    setShopifyShopDomainDraft((current) => (current.trim() ? current : nextConnectedShopDomain));
+  }, [shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain, shopifyStatus?.shopDomains]);
 
   useEffect(() => {
     if (!shopifyStatus?.shopDomains?.length) return;
@@ -770,6 +839,7 @@ export function BrandDesignSystemPage() {
     );
     setTemplateDraftEditError(null);
     setTemplateAssetSearchQuery("");
+    setTemplateSlotAssetQueryByPath({});
     setTemplateAssetPickerImageErrorsByPublicId({});
   }, [selectedTemplateDraft?.id, selectedTemplateDraft?.latestVersion?.id]);
 
@@ -861,14 +931,6 @@ export function BrandDesignSystemPage() {
       entry.searchText.includes(normalizedTemplateAssetSearchQuery)
     );
   }, [workspaceProductImageAssetEntries, normalizedTemplateAssetSearchQuery]);
-  const filteredWorkspaceProductImageAssetOptions = useMemo(
-    () =>
-      filteredWorkspaceProductImageAssetEntries.map((entry) => ({
-        label: entry.optionLabel,
-        value: entry.asset.public_id,
-      })),
-    [filteredWorkspaceProductImageAssetEntries]
-  );
   const workspaceProductImageAssetByPublicId = useMemo(
     () => new Map(workspaceProductImageAssetEntries.map((entry) => [entry.asset.public_id, entry])),
     [workspaceProductImageAssetEntries]
@@ -882,6 +944,11 @@ export function BrandDesignSystemPage() {
     [templateDraftImageMapInput]
   );
   const parsedTemplateDraftImageMap = parsedTemplateDraftImageMapResult.value || {};
+  const templateImageSlotReadableLabelByPath = useMemo(() => {
+    const latestVersion = selectedTemplateDraft?.latestVersion;
+    if (!latestVersion) return new Map<string, string>();
+    return buildImageSlotReadableLabelMap(latestVersion.data.imageSlots);
+  }, [selectedTemplateDraft?.latestVersion?.id]);
   const templatePreviewImageItems = useMemo(() => {
     const latestVersion = selectedTemplateDraft?.latestVersion;
     if (!latestVersion) return [];
@@ -1406,37 +1473,50 @@ export function BrandDesignSystemPage() {
               </Button>
             </div>
           ) : null}
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-            <Input
-              placeholder="example-shop.myshopify.com"
-              value={shopifyShopDomainDraft}
-              onChange={(e) => setShopifyShopDomainDraft(e.target.value)}
-              disabled={isShopifyConnectionMutating}
-            />
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => void refetchShopifyStatus()}
-              disabled={isLoadingShopifyStatus || isShopifyConnectionMutating}
-            >
-              Refresh
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => void handleConnectShopify()}
-              disabled={!workspace?.id || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
-            >
-              {createShopifyInstallUrl.isPending ? "Redirecting…" : "Connect Shopify"}
-            </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => void handleDisconnectShopify()}
-              disabled={!workspace?.id || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
-            >
-              {disconnectShopifyInstallation.isPending ? "Disconnecting…" : "Disconnect Shopify"}
-            </Button>
-          </div>
+          {hasShopifyConnectionTarget ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void refetchShopifyStatus()}
+                disabled={isLoadingShopifyStatus || isShopifyConnectionMutating}
+              >
+                Refresh
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => void handleDisconnectShopify()}
+                disabled={!workspace?.id || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
+              >
+                {disconnectShopifyInstallation.isPending ? "Disconnecting…" : "Disconnect Shopify"}
+              </Button>
+            </div>
+          ) : (
+            <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+              <Input
+                placeholder="example-shop.myshopify.com"
+                value={shopifyShopDomainDraft}
+                onChange={(e) => setShopifyShopDomainDraft(e.target.value)}
+                disabled={isShopifyConnectionMutating}
+              />
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void refetchShopifyStatus()}
+                disabled={isLoadingShopifyStatus || isShopifyConnectionMutating}
+              >
+                Refresh
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => void handleConnectShopify()}
+                disabled={!workspace?.id || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
+              >
+                {createShopifyInstallUrl.isPending ? "Redirecting…" : "Connect Shopify"}
+              </Button>
+            </div>
+          )}
           <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
             <Input
               type="password"
@@ -1458,24 +1538,6 @@ export function BrandDesignSystemPage() {
             >
               {updateShopifyInstallation.isPending ? "Saving…" : "Set storefront token"}
             </Button>
-          </div>
-        </div>
-
-        <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
-          <Select
-            value={shopifySyncShopDomain}
-            onValueChange={(value) => setShopifySyncShopDomain(value)}
-            options={
-              shopDomainOptions.length
-                ? shopDomainOptions
-                : [{ label: isLoadingShopifyStatus ? "Loading stores…" : "No connected Shopify stores", value: "" }]
-            }
-            disabled={!shopDomainOptions.length}
-          />
-          <div className="text-xs text-content-muted md:flex md:items-center">
-            {hasShopifyConnectionTarget
-              ? "Choose the target Shopify store for all sync actions below."
-              : "Connect a Shopify store above before syncing theme or policy pages."}
           </div>
         </div>
 
@@ -1667,19 +1729,16 @@ export function BrandDesignSystemPage() {
                             selectedAssetPublicId
                               ? workspaceProductImageAssetByPublicId.get(selectedAssetPublicId)
                               : undefined;
-                          const slotOptions = [
-                            { label: "No mapped asset", value: "" },
-                            ...filteredWorkspaceProductImageAssetOptions,
-                          ];
-                          if (
-                            selectedAssetPublicId &&
-                            !slotOptions.some((option) => option.value === selectedAssetPublicId)
-                          ) {
-                            slotOptions.splice(1, 0, {
-                              label: `Selected (outside filter) · ${selectedAssetPublicId.slice(0, 8)}`,
-                              value: selectedAssetPublicId,
-                            });
-                          }
+                          const readableSlotLabel =
+                            templateImageSlotReadableLabelByPath.get(slot.path) ||
+                            humanizeSlotToken(slot.path.split(".").pop() || slot.path);
+                          const slotAssetQuery = templateSlotAssetQueryByPath[slot.path] ?? selectedAssetPublicId;
+                          const normalizedSlotAssetQuery = slotAssetQuery.trim().toLowerCase();
+                          const slotMatchEntries = normalizedSlotAssetQuery
+                            ? workspaceProductImageAssetEntries
+                                .filter((entry) => entry.searchText.includes(normalizedSlotAssetQuery))
+                                .slice(0, 6)
+                            : [];
                           const selectedImageUrl =
                             publicAssetBaseUrl && selectedAssetPublicId
                               ? `${publicAssetBaseUrl}/public/assets/${selectedAssetPublicId}`
@@ -1689,16 +1748,111 @@ export function BrandDesignSystemPage() {
                           );
                           return (
                             <div key={slot.path} className="space-y-2 rounded-md border border-border bg-surface p-2">
+                              <div className="text-xs font-semibold text-content">{readableSlotLabel}</div>
                               <div className="text-[11px] font-mono break-all text-content">{slot.path}</div>
                               <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
                                 {slot.role ? <span>role: {slot.role}</span> : null}
                                 {slot.recommendedAspect ? <span>aspect: {slot.recommendedAspect}</span> : null}
                               </div>
-                              <Select
-                                value={selectedAssetPublicId}
-                                onValueChange={(value) => handleTemplateDraftSlotAssetChange(slot.path, value)}
-                                options={slotOptions}
-                              />
+                              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                                <Input
+                                  value={slotAssetQuery}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value;
+                                    setTemplateSlotAssetQueryByPath((current) => ({
+                                      ...current,
+                                      [slot.path]: nextValue,
+                                    }));
+                                    setTemplateDraftEditError(null);
+                                  }}
+                                  placeholder="Type asset UUID/public_id or product name"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    const normalizedQuery = slotAssetQuery.trim().toLowerCase();
+                                    if (!normalizedQuery) {
+                                      handleTemplateDraftSlotAssetChange(slot.path, "");
+                                      setTemplateSlotAssetQueryByPath((current) => ({
+                                        ...current,
+                                        [slot.path]: "",
+                                      }));
+                                      return;
+                                    }
+                                    const exactPublicIdMatch = workspaceProductImageAssetEntries.find(
+                                      (entry) => entry.asset.public_id.toLowerCase() === normalizedQuery
+                                    );
+                                    if (exactPublicIdMatch) {
+                                      handleTemplateDraftSlotAssetChange(slot.path, exactPublicIdMatch.asset.public_id);
+                                      setTemplateSlotAssetQueryByPath((current) => ({
+                                        ...current,
+                                        [slot.path]: exactPublicIdMatch.asset.public_id,
+                                      }));
+                                      return;
+                                    }
+                                    if (slotMatchEntries.length === 1) {
+                                      handleTemplateDraftSlotAssetChange(slot.path, slotMatchEntries[0].asset.public_id);
+                                      setTemplateSlotAssetQueryByPath((current) => ({
+                                        ...current,
+                                        [slot.path]: slotMatchEntries[0].asset.public_id,
+                                      }));
+                                      return;
+                                    }
+                                    if (!slotMatchEntries.length) {
+                                      setTemplateDraftEditError(`No asset matched "${slotAssetQuery.trim()}".`);
+                                      return;
+                                    }
+                                    setTemplateDraftEditError("Multiple assets matched. Select one from suggestions below.");
+                                  }}
+                                >
+                                  Apply
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  onClick={() => {
+                                    handleTemplateDraftSlotAssetChange(slot.path, "");
+                                    setTemplateSlotAssetQueryByPath((current) => ({
+                                      ...current,
+                                      [slot.path]: "",
+                                    }));
+                                  }}
+                                >
+                                  Clear
+                                </Button>
+                              </div>
+                              {normalizedSlotAssetQuery ? (
+                                slotMatchEntries.length ? (
+                                  <div className="space-y-1 rounded-md border border-border bg-surface-2 p-2">
+                                    <div className="text-[11px] font-semibold text-content">
+                                      Matches ({slotMatchEntries.length})
+                                    </div>
+                                    {slotMatchEntries.map((entry) => (
+                                      <button
+                                        key={`${slot.path}-${entry.asset.id}`}
+                                        type="button"
+                                        className={cn(
+                                          "w-full rounded border px-2 py-1 text-left text-[11px] transition",
+                                          "border-border bg-surface hover:bg-surface-2"
+                                        )}
+                                        onClick={() => {
+                                          handleTemplateDraftSlotAssetChange(slot.path, entry.asset.public_id);
+                                          setTemplateSlotAssetQueryByPath((current) => ({
+                                            ...current,
+                                            [slot.path]: entry.asset.public_id,
+                                          }));
+                                        }}
+                                      >
+                                        <div className="truncate font-semibold text-content">{entry.productTitle}</div>
+                                        <div className="font-mono text-content-muted">{entry.asset.public_id}</div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-danger">No assets match this input.</div>
+                                )
+                              ) : null}
                               {selectedAssetPublicId ? (
                                 <div className="space-y-1 rounded-md border border-border bg-surface-2 p-2">
                                   <div className="rounded-md border border-border bg-white p-1">
@@ -2577,8 +2731,12 @@ export function BrandDesignSystemPage() {
                           ? `${publicAssetBaseUrl}/public/assets/${item.assetPublicId}`
                           : undefined;
                       const loadErrored = Boolean(templatePreviewImageErrorsByPath[item.path]);
+                      const readableSlotLabel =
+                        templateImageSlotReadableLabelByPath.get(item.path) ||
+                        humanizeSlotToken(item.path.split(".").pop() || item.path);
                       return (
                         <div key={item.path} className="rounded-md border border-border bg-surface p-3 space-y-2">
+                          <div className="text-xs font-semibold text-content">{readableSlotLabel}</div>
                           <div className="text-[11px] font-mono break-all text-content">{item.path}</div>
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
                             {item.role ? <span>role: {item.role}</span> : null}
