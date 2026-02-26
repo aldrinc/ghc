@@ -532,6 +532,31 @@ function parseStringMap(raw: string, label: string): { value?: Record<string, st
   }
 }
 
+function parseSlotPathList(raw: string): { value?: string[]; error?: string } {
+  if (!raw.trim()) return { value: [] };
+  const normalized: string[] = [];
+  const seen = new Set<string>();
+  const duplicatePaths: string[] = [];
+  const segments = raw
+    .split(/\r?\n|,/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  for (const segment of segments) {
+    if (seen.has(segment)) {
+      duplicatePaths.push(segment);
+      continue;
+    }
+    seen.add(segment);
+    normalized.push(segment);
+  }
+  if (duplicatePaths.length) {
+    return {
+      error: `Duplicate slot path(s) in generation scope: ${duplicatePaths.join(", ")}`,
+    };
+  }
+  return { value: normalized };
+}
+
 function humanizeSlotToken(raw: string): string {
   const normalized = raw
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -687,6 +712,7 @@ export function BrandDesignSystemPage() {
   const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
   const [themeSyncProductId, setThemeSyncProductId] = useState("");
   const [selectedTemplateDraftId, setSelectedTemplateDraftId] = useState("");
+  const [templateImageGenerationSlotPathsInput, setTemplateImageGenerationSlotPathsInput] = useState("");
   const [templateDraftImageMapInput, setTemplateDraftImageMapInput] = useState("{}");
   const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
   const [templateDraftEditError, setTemplateDraftEditError] = useState<string | null>(null);
@@ -782,6 +808,7 @@ export function BrandDesignSystemPage() {
     setThemeSyncThemeName("futrgroup2-0theme");
     setThemeSyncProductId("");
     setSelectedTemplateDraftId("");
+    setTemplateImageGenerationSlotPathsInput("");
     setTemplateDraftImageMapInput("{}");
     setTemplateDraftTextValuesInput("{}");
     setTemplateDraftEditError(null);
@@ -902,6 +929,7 @@ export function BrandDesignSystemPage() {
     setTemplateDraftTextValuesInput(
       JSON.stringify(latestVersion.data.componentTextValues || {}, null, 2)
     );
+    setTemplateImageGenerationSlotPathsInput("");
     setTemplateDraftEditError(null);
     setTemplateAssetSearchQuery("");
     setTemplateSlotAssetQueryByPath({});
@@ -1320,11 +1348,18 @@ export function BrandDesignSystemPage() {
       toast.error("Select a template draft first.");
       return;
     }
-    const payload: { draftId: string; productId?: string } = {
+    const parsedSlotPathList = parseSlotPathList(templateImageGenerationSlotPathsInput);
+    if (!parsedSlotPathList.value) {
+      setTemplateDraftEditError(parsedSlotPathList.error || "Invalid image generation slot paths.");
+      return;
+    }
+    const payload: { draftId: string; productId?: string; slotPaths?: string[] } = {
       draftId: selectedTemplateDraftId,
     };
     const explicitProductId = templateAssetUploadProductId.trim() || themeSyncProductId.trim();
     if (explicitProductId) payload.productId = explicitProductId;
+    if (parsedSlotPathList.value.length) payload.slotPaths = parsedSlotPathList.value;
+    setTemplateDraftEditError(null);
 
     try {
       const response = await generateShopifyThemeTemplateImages.mutateAsync(payload);
@@ -2202,6 +2237,52 @@ export function BrandDesignSystemPage() {
               </div>
               */}
               <div className="space-y-3 rounded-md border border-divider p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold text-content">Image generation scope (optional)</div>
+                    <div className="text-xs text-content-muted">
+                      Leave blank to generate all unmapped slots. To target specific images, enter slot paths (one per line).
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() =>
+                        setTemplateImageGenerationSlotPathsInput(
+                          selectedTemplateDraft.latestVersion.data.imageSlots.map((slot) => slot.path).join("\n")
+                        )
+                      }
+                    >
+                      Use all slot paths
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setTemplateImageGenerationSlotPathsInput("")}
+                    >
+                      Clear scope
+                    </Button>
+                  </div>
+                </div>
+                <textarea
+                  rows={4}
+                  value={templateImageGenerationSlotPathsInput}
+                  onChange={(event) => {
+                    setTemplateImageGenerationSlotPathsInput(event.target.value);
+                    setTemplateDraftEditError(null);
+                  }}
+                  placeholder="templates/index.json.sections.hero.settings.image"
+                  className={cn(
+                    "w-full rounded-md border border-border bg-surface px-3 py-2 text-[11px] font-mono text-content shadow-sm",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                  )}
+                />
+                <div className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] text-content-muted">
+                  Known image slots: {selectedTemplateDraft.latestVersion.data.imageSlots.length}
+                </div>
+              </div>
+              <div className="space-y-3 rounded-md border border-divider p-3">
                 <div>
                   <div className="text-xs font-semibold text-content">Text values</div>
                   <div className="text-xs text-content-muted">
@@ -2268,7 +2349,7 @@ export function BrandDesignSystemPage() {
                   }}
                   disabled={generateShopifyThemeTemplateImages.isPending}
                 >
-                  {generateShopifyThemeTemplateImages.isPending ? "Generating…" : "Generate all template images"}
+                  {generateShopifyThemeTemplateImages.isPending ? "Generating…" : "Generate template images"}
                 </Button>
                 <Button
                   size="sm"

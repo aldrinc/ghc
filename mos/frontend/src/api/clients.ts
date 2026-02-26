@@ -211,6 +211,7 @@ export type ClientShopifyThemeTemplateDraftUpdatePayload = {
 export type ClientShopifyThemeTemplateGenerateImagesPayload = {
   draftId: string;
   productId?: string;
+  slotPaths?: string[];
 };
 
 export type ClientShopifyThemeTemplateGenerateImagesResponse = {

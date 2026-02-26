@@ -229,6 +229,33 @@ def _coerce_non_negative_int(raw_value: Any) -> int | None:
     return None
 
 
+def _normalize_theme_template_slot_path_filter(raw_slot_paths: Any) -> list[str]:
+    if raw_slot_paths is None:
+        return []
+    if not isinstance(raw_slot_paths, list):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="slotPaths must be an array of non-empty strings when provided.",
+        )
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for index, raw_path in enumerate(raw_slot_paths):
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"slotPaths[{index}] must be a non-empty string.",
+            )
+        slot_path = raw_path.strip()
+        if slot_path in seen:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"slotPaths contains a duplicate path: {slot_path}",
+            )
+        seen.add(slot_path)
+        normalized.append(slot_path)
+    return normalized
+
+
 @router.get("")
 def list_clients(
     auth: AuthContext = Depends(get_current_user),
@@ -1962,6 +1989,28 @@ def _generate_shopify_theme_template_draft_images(
             if isinstance(slot.get("path"), str) and str(slot.get("path")).strip()
         }
     )
+    requested_slot_paths = _normalize_theme_template_slot_path_filter(payload.slotPaths)
+    if requested_slot_paths:
+        unknown_requested_slot_paths = sorted(
+            {
+                slot_path
+                for slot_path in requested_slot_paths
+                if slot_path not in all_slot_paths
+            }
+        )
+        if unknown_requested_slot_paths:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "slotPaths contains one or more unknown template image slot paths: "
+                    + ", ".join(unknown_requested_slot_paths)
+                ),
+            )
+        generation_scope_slot_path_set = set(requested_slot_paths)
+        generation_scope_slot_paths = list(requested_slot_paths)
+    else:
+        generation_scope_slot_path_set = set(all_slot_paths)
+        generation_scope_slot_paths = list(all_slot_paths)
     next_component_image_asset_map = dict(latest_data.componentImageAssetMap)
     mapped_slot_paths = {
         raw_path.strip()
@@ -1976,6 +2025,7 @@ def _generate_shopify_theme_template_draft_images(
         for slot in image_slots
         if isinstance(slot.get("path"), str)
         and str(slot.get("path")).strip()
+        and str(slot.get("path")).strip() in generation_scope_slot_path_set
         and str(slot.get("path")).strip() not in mapped_slot_paths
     ]
     if not image_slots_pending_generation:
@@ -2037,7 +2087,14 @@ def _generate_shopify_theme_template_draft_images(
     _emit_theme_sync_progress(
         {
             "stage": "image_generation",
-            "message": "Generating template images from deterministic slot requirements.",
+            "message": (
+                "Generating template images from deterministic slot requirements."
+                if not requested_slot_paths
+                else (
+                    "Generating template images from deterministic slot requirements "
+                    f"for {len(requested_slot_paths)} selected slot(s)."
+                )
+            ),
             "totalImageSlots": len(image_slots_pending_generation),
             "completedImageSlots": 0,
             "generatedImageCount": 0,
@@ -2135,7 +2192,7 @@ def _generate_shopify_theme_template_draft_images(
     remaining_slot_paths = sorted(
         {
             slot_path
-            for slot_path in all_slot_paths
+            for slot_path in generation_scope_slot_paths
             if slot_path not in normalized_component_image_asset_map
         }
     )

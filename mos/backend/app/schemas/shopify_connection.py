@@ -348,6 +348,7 @@ class ShopifyThemeTemplateGenerateImagesRequest(BaseModel):
 
     draftId: str = Field(..., min_length=1)
     productId: str | None = Field(default=None, min_length=1)
+    slotPaths: list[str] = Field(default_factory=list)
 
 
 class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):
