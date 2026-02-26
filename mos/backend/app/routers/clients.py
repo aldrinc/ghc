@@ -154,6 +154,7 @@ _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
 _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY = max(
     1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY
 )
+_SHOPIFY_TEMPLATE_IMAGE_GENERATION_MAX_CONCURRENCY = 1
 _SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_MAX_ATTEMPTS = 24
 _SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_BASE_DELAY_SECONDS = 8.0
 _SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_MAX_DELAY_SECONDS = 120.0
@@ -2364,6 +2365,13 @@ def _generate_shopify_theme_template_draft_images_with_retry(
     final_response: ShopifyThemeTemplateGenerateImagesResponse | None = None
 
     max_attempts = max(1, _SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_MAX_ATTEMPTS)
+    template_max_concurrency = max(
+        1,
+        min(
+            _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY,
+            _SHOPIFY_TEMPLATE_IMAGE_GENERATION_MAX_CONCURRENCY,
+        ),
+    )
     for attempt_number in range(1, max_attempts + 1):
         if attempt_number > 1:
             delay_seconds = _compute_shopify_template_image_retry_delay_seconds(
@@ -2383,16 +2391,13 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             )
             time.sleep(delay_seconds)
 
-        reduced_concurrency = max(
-            1, _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY // (2 ** (attempt_number - 1))
-        )
         publish_progress(
             {
                 "stage": "running",
                 "message": (
                     "Generating images for Shopify theme template draft "
                     f"(attempt {attempt_number}/{max_attempts}, "
-                    f"concurrency={reduced_concurrency})."
+                    f"concurrency={template_max_concurrency})."
                 ),
                 "generatedImageCount": len(aggregated_slot_paths),
                 "skippedImageCount": len(last_remaining_slot_paths),
@@ -2403,7 +2408,7 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             payload=payload,
             auth=auth,
             session=session,
-            image_generation_max_concurrency=reduced_concurrency,
+            image_generation_max_concurrency=template_max_concurrency,
         )
         final_response = response
 
