@@ -212,6 +212,8 @@ export type ClientShopifyThemeTemplateGenerateImagesPayload = {
   draftId: string;
   productId?: string;
   slotPaths?: string[];
+  generalContext?: string;
+  slotContextByPath?: Record<string, string>;
 };
 
 export type ClientShopifyThemeTemplateGenerateImagesResponse = {

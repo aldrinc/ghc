@@ -131,6 +131,8 @@ _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
     re.IGNORECASE,
 )
 _THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH = 180
+_THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH = 2000
+_THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH = 600
 _THEME_SYNC_AI_IMAGE_PROMPT_BASE = (
     "Premium ecommerce product image for a beauty-tech LED face mask brand. "
     "Modern skincare aesthetic, soft cinematic lighting, high detail, photoreal quality. "
@@ -271,6 +273,86 @@ def _normalize_theme_template_slot_path_filter(raw_slot_paths: Any) -> list[str]
     return normalized
 
 
+def _normalize_theme_template_general_context(raw_context: Any) -> str | None:
+    if raw_context is None:
+        return None
+    if not isinstance(raw_context, str):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="generalContext must be a string when provided.",
+        )
+    if not raw_context.strip():
+        return None
+    normalized_context = _sanitize_theme_component_text_value(raw_context)
+    if not normalized_context:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="generalContext became empty after sanitization.",
+        )
+    if len(normalized_context) > _THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "generalContext is too long. "
+                f"Maximum length is {_THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH} characters."
+            ),
+        )
+    return normalized_context
+
+
+def _normalize_theme_template_slot_context_by_path(raw_slot_context: Any) -> dict[str, str]:
+    if raw_slot_context is None:
+        return {}
+    if not isinstance(raw_slot_context, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="slotContextByPath must be an object when provided.",
+        )
+    normalized_context_by_path: dict[str, str] = {}
+    for raw_path, raw_context in raw_slot_context.items():
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="slotContextByPath keys must be non-empty strings.",
+            )
+        slot_path = raw_path.strip()
+        if slot_path in normalized_context_by_path:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "slotContextByPath contains duplicate path after normalization: "
+                    f"{slot_path}"
+                ),
+            )
+        if not isinstance(raw_context, str) or not raw_context.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "slotContextByPath values must be non-empty strings. "
+                    f"Invalid value at path {slot_path}."
+                ),
+            )
+        normalized_context = _sanitize_theme_component_text_value(raw_context)
+        if not normalized_context:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "slotContextByPath value became empty after sanitization. "
+                    f"path={slot_path}."
+                ),
+            )
+        if len(normalized_context) > _THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "slotContextByPath value is too long. "
+                    f"path={slot_path}. Maximum length is {_THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH} characters."
+                ),
+            )
+        normalized_context_by_path[slot_path] = normalized_context
+    return normalized_context_by_path
+
+
 @router.get("")
 def list_clients(
     auth: AuthContext = Depends(get_current_user),
@@ -391,14 +473,11 @@ def _is_theme_feature_image_slot_path(slot_path: str) -> bool:
     return bool(_THEME_FEATURE_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
 
 
-def _build_theme_sync_image_slot_text_hints(
+def _collect_theme_sync_text_values_by_path(
     *,
-    image_slots: list[dict[str, Any]],
     text_slots: list[dict[str, Any]],
+    component_text_values: dict[str, str] | None = None,
 ) -> dict[str, str]:
-    if not image_slots or not text_slots:
-        return {}
-
     text_values_by_path: dict[str, str] = {}
     for raw_slot in text_slots:
         if not isinstance(raw_slot, dict):
@@ -414,6 +493,68 @@ def _build_theme_sync_image_slot_text_hints(
             continue
         text_values_by_path[raw_path.strip()] = normalized_value
 
+    for raw_path, raw_value in (component_text_values or {}).items():
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            continue
+        normalized_value = _sanitize_theme_component_text_value(raw_value)
+        if not normalized_value:
+            continue
+        text_values_by_path[raw_path.strip()] = normalized_value
+    return text_values_by_path
+
+
+def _build_theme_sync_slot_text_fragments(
+    *,
+    slot_path: str,
+    text_values_by_path: dict[str, str],
+) -> list[str]:
+    slot_prefix, separator, _ = slot_path.partition(".settings.")
+    if not separator:
+        return []
+
+    preferred_keys = ("title", "text", "heading", "subheading", "caption")
+    text_fragments: list[str] = []
+    for key in preferred_keys:
+        candidate_path = f"{slot_prefix}.settings.{key}"
+        candidate_value = text_values_by_path.get(candidate_path)
+        if not candidate_value:
+            continue
+        if candidate_value in text_fragments:
+            continue
+        text_fragments.append(candidate_value)
+
+    if not text_fragments:
+        slot_text_prefix = f"{slot_prefix}.settings."
+        for candidate_path, candidate_value in text_values_by_path.items():
+            if not candidate_path.startswith(slot_text_prefix):
+                continue
+            if candidate_value in text_fragments:
+                continue
+            text_fragments.append(candidate_value)
+            if len(text_fragments) >= 2:
+                break
+    return text_fragments
+
+
+def _build_theme_sync_image_slot_text_hints(
+    *,
+    image_slots: list[dict[str, Any]],
+    text_slots: list[dict[str, Any]],
+    component_text_values: dict[str, str] | None = None,
+    feature_slots_only: bool = True,
+) -> dict[str, str]:
+    if not image_slots or not text_slots:
+        return {}
+
+    text_values_by_path = _collect_theme_sync_text_values_by_path(
+        text_slots=text_slots,
+        component_text_values=component_text_values,
+    )
+    if not text_values_by_path:
+        return {}
+
     hints_by_image_slot_path: dict[str, str] = {}
     for raw_image_slot in image_slots:
         if not isinstance(raw_image_slot, dict):
@@ -422,38 +563,18 @@ def _build_theme_sync_image_slot_text_hints(
         if not isinstance(raw_image_path, str) or not raw_image_path.strip():
             continue
         normalized_image_path = raw_image_path.strip()
-        if not _is_theme_feature_image_slot_path(normalized_image_path):
+        if feature_slots_only and not _is_theme_feature_image_slot_path(
+            normalized_image_path
+        ):
             continue
-        slot_prefix, separator, _ = normalized_image_path.partition(".settings.")
-        if not separator:
-            continue
-
-        preferred_keys = ("title", "text", "heading", "subheading", "caption")
-        feature_text_fragments: list[str] = []
-        for key in preferred_keys:
-            candidate_path = f"{slot_prefix}.settings.{key}"
-            candidate_value = text_values_by_path.get(candidate_path)
-            if not candidate_value:
-                continue
-            if candidate_value in feature_text_fragments:
-                continue
-            feature_text_fragments.append(candidate_value)
-
-        if not feature_text_fragments:
-            slot_text_prefix = f"{slot_prefix}.settings."
-            for candidate_path, candidate_value in text_values_by_path.items():
-                if not candidate_path.startswith(slot_text_prefix):
-                    continue
-                if candidate_value in feature_text_fragments:
-                    continue
-                feature_text_fragments.append(candidate_value)
-                if len(feature_text_fragments) >= 2:
-                    break
-
-        if not feature_text_fragments:
+        text_fragments = _build_theme_sync_slot_text_fragments(
+            slot_path=normalized_image_path,
+            text_values_by_path=text_values_by_path,
+        )
+        if not text_fragments:
             continue
 
-        combined_hint = " ".join(feature_text_fragments).strip()
+        combined_hint = " ".join(text_fragments).strip()
         if len(combined_hint) > _THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH:
             combined_hint = combined_hint[:_THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH].rstrip()
         if not combined_hint:
@@ -461,6 +582,151 @@ def _build_theme_sync_image_slot_text_hints(
         hints_by_image_slot_path[normalized_image_path] = combined_hint
 
     return hints_by_image_slot_path
+
+
+def _humanize_theme_slot_token(raw_value: str) -> str:
+    normalized = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", raw_value)
+    normalized = re.sub(r"[_./-]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    if not normalized:
+        return "Image Slot"
+    words = [word for word in normalized.split(" ") if word]
+    return " ".join(word[:1].upper() + word[1:].lower() for word in words)
+
+
+def _derive_theme_sync_slot_display_name(
+    *,
+    slot_path: str,
+    slot_key: str,
+    slot_role: str,
+) -> str:
+    haystack = f"{slot_role} {slot_key} {slot_path}".lower()
+    if "feature" in haystack:
+        return "Feature Image"
+    if "hero" in haystack and ("icon" in haystack or "badge" in haystack):
+        return "Hero Icon"
+    if "hero" in haystack:
+        return "Hero Image"
+    if "gallery" in haystack:
+        return "Gallery Image"
+    if "review" in haystack or "testimonial" in haystack:
+        return "Review Image"
+    if slot_role.strip():
+        return _humanize_theme_slot_token(slot_role)
+    if slot_key.strip():
+        return _humanize_theme_slot_token(slot_key)
+    path_leaf = slot_path.split(".")[-1] if "." in slot_path else slot_path
+    return _humanize_theme_slot_token(path_leaf)
+
+
+def _build_theme_sync_default_general_prompt_context(
+    *,
+    draft_data: ShopifyThemeTemplateDraftData,
+    product: Product,
+) -> str:
+    context_segments: list[str] = []
+    workspace_name = _sanitize_theme_component_text_value(draft_data.workspaceName)
+    if workspace_name:
+        context_segments.append(f"Workspace: {workspace_name}.")
+    brand_name = _sanitize_theme_component_text_value(draft_data.brandName)
+    if brand_name:
+        context_segments.append(f"Brand: {brand_name}.")
+    theme_name = _sanitize_theme_component_text_value(draft_data.themeName)
+    if theme_name:
+        context_segments.append(f"Shopify theme: {theme_name}.")
+    theme_role = _sanitize_theme_component_text_value(draft_data.themeRole)
+    if theme_role:
+        context_segments.append(f"Theme role: {theme_role}.")
+
+    product_title = _sanitize_theme_component_text_value(str(product.title or ""))
+    if product_title:
+        context_segments.append(f"Product: {product_title}.")
+    product_type = _sanitize_theme_component_text_value(str(product.product_type or ""))
+    if product_type:
+        context_segments.append(f"Product type: {product_type}.")
+    product_description = _sanitize_theme_component_text_value(str(product.description or ""))
+    if product_description:
+        if len(product_description) > 280:
+            product_description = product_description[:280].rstrip()
+        context_segments.append(f"Product summary: {product_description}.")
+    benefit_values = [
+        _sanitize_theme_component_text_value(str(item))
+        for item in (product.primary_benefits or [])
+        if isinstance(item, str) and item.strip()
+    ]
+    benefit_values = [item for item in benefit_values if item]
+    if benefit_values:
+        context_segments.append("Primary benefits: " + "; ".join(benefit_values[:4]) + ".")
+    color_brand = draft_data.cssVars.get("--color-brand")
+    if isinstance(color_brand, str) and color_brand.strip():
+        context_segments.append(f"Primary brand color: {color_brand.strip()}.")
+    color_cta = draft_data.cssVars.get("--color-cta")
+    if isinstance(color_cta, str) and color_cta.strip():
+        context_segments.append(f"CTA color: {color_cta.strip()}.")
+
+    combined_context = " ".join(context_segments).strip()
+    if not combined_context:
+        return ""
+    if len(combined_context) <= _THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH:
+        return combined_context
+    return combined_context[:_THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH].rstrip()
+
+
+def _build_theme_sync_default_slot_prompt_context_by_path(
+    *,
+    image_slots: list[dict[str, Any]],
+    text_slots: list[dict[str, Any]],
+    component_text_values: dict[str, str] | None = None,
+) -> dict[str, str]:
+    text_values_by_path = _collect_theme_sync_text_values_by_path(
+        text_slots=text_slots,
+        component_text_values=component_text_values,
+    )
+    context_by_path: dict[str, str] = {}
+    for raw_slot in image_slots:
+        if not isinstance(raw_slot, dict):
+            continue
+        raw_path = raw_slot.get("path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        slot_path = raw_path.strip()
+        slot_key_raw = raw_slot.get("key")
+        slot_key = (
+            slot_key_raw.strip()
+            if isinstance(slot_key_raw, str) and slot_key_raw.strip()
+            else "image"
+        )
+        slot_role = _normalize_theme_slot_role(raw_slot.get("role"))
+        slot_aspect = _normalize_theme_slot_recommended_aspect(
+            raw_slot.get("recommendedAspect")
+        )
+        display_name = _derive_theme_sync_slot_display_name(
+            slot_path=slot_path,
+            slot_key=slot_key,
+            slot_role=slot_role,
+        )
+        context_segments = [
+            f"Purpose: {display_name}.",
+            f"Slot role: {slot_role}.",
+            f"Target slot key: {slot_key}.",
+            f"Preferred aspect: {slot_aspect}.",
+        ]
+        text_fragments = _build_theme_sync_slot_text_fragments(
+            slot_path=slot_path,
+            text_values_by_path=text_values_by_path,
+        )
+        if text_fragments:
+            related_text = " ".join(text_fragments).strip()
+            if len(related_text) > _THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH:
+                related_text = related_text[:_THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH].rstrip()
+            if related_text:
+                context_segments.append(f"Related copy context: {related_text}.")
+        context_text = " ".join(context_segments).strip()
+        if len(context_text) > _THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH:
+            context_text = context_text[:_THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH].rstrip()
+        if context_text:
+            context_by_path[slot_path] = context_text
+    return context_by_path
 
 
 def _normalize_theme_slot_role(raw_role: Any) -> str:
@@ -493,6 +759,8 @@ def _build_theme_sync_slot_image_prompt(
     aspect_ratio: str,
     variant_index: int,
     slot_text_hint: str | None = None,
+    general_prompt_context: str | None = None,
+    slot_prompt_context: str | None = None,
 ) -> str:
     role_guidance = _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME.get(
         slot_role,
@@ -505,6 +773,16 @@ def _build_theme_sync_slot_image_prompt(
         f"Aspect ratio: {aspect_ratio}. "
         f"Variation: {variant_index}."
     )
+    if isinstance(general_prompt_context, str) and general_prompt_context.strip():
+        base_prompt = (
+            f"{base_prompt} "
+            f"Brand and campaign context: {general_prompt_context.strip()}."
+        )
+    if isinstance(slot_prompt_context, str) and slot_prompt_context.strip():
+        base_prompt = (
+            f"{base_prompt} "
+            f"Slot-specific objective: {slot_prompt_context.strip()}."
+        )
     if not isinstance(slot_text_hint, str) or not slot_text_hint.strip():
         return base_prompt
     return (
@@ -570,6 +848,8 @@ def _generate_theme_sync_ai_image_assets(
     product_id: str | None,
     image_slots: list[dict[str, Any]],
     text_slots: list[dict[str, Any]] | None = None,
+    general_prompt_context: str | None = None,
+    slot_prompt_context_by_path: dict[str, str] | None = None,
     max_concurrency: int | None = None,
     stop_on_quota_exhausted: bool = False,
 ) -> tuple[list[Any], list[str], dict[str, Any], list[str], dict[str, str]]:
@@ -583,6 +863,16 @@ def _generate_theme_sync_ai_image_assets(
         image_slots=selected_slots,
         text_slots=text_slots or [],
     )
+    normalized_slot_prompt_context_by_path: dict[str, str] = {}
+    for raw_path, raw_context in (slot_prompt_context_by_path or {}).items():
+        if (
+            not isinstance(raw_path, str)
+            or not raw_path.strip()
+            or not isinstance(raw_context, str)
+            or not raw_context.strip()
+        ):
+            continue
+        normalized_slot_prompt_context_by_path[raw_path.strip()] = raw_context.strip()
 
     def _generate_single_slot_asset(
         *,
@@ -674,6 +964,8 @@ def _generate_theme_sync_ai_image_assets(
             aspect_ratio=aspect_ratio,
             variant_index=variant_count,
             slot_text_hint=slot_text_hints.get(slot_path),
+            general_prompt_context=general_prompt_context,
+            slot_prompt_context=normalized_slot_prompt_context_by_path.get(slot_path),
         )
         prepared_slots.append(
             {
@@ -2021,6 +2313,27 @@ def _generate_shopify_theme_template_draft_images(
             if isinstance(slot.get("path"), str) and str(slot.get("path")).strip()
         }
     )
+    normalized_general_context = _normalize_theme_template_general_context(
+        payload.generalContext
+    )
+    normalized_slot_context_by_path = _normalize_theme_template_slot_context_by_path(
+        payload.slotContextByPath
+    )
+    unknown_slot_context_paths = sorted(
+        {
+            slot_path
+            for slot_path in normalized_slot_context_by_path
+            if slot_path not in all_slot_paths
+        }
+    )
+    if unknown_slot_context_paths:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "slotContextByPath contains one or more unknown template image slot paths: "
+                + ", ".join(unknown_slot_context_paths)
+            ),
+        )
     requested_slot_paths = _normalize_theme_template_slot_path_filter(payload.slotPaths)
     if requested_slot_paths:
         unknown_requested_slot_paths = sorted(
@@ -2116,6 +2429,22 @@ def _generate_shopify_theme_template_draft_images(
             status_code=status.HTTP_409_CONFLICT,
             detail="Product must belong to this workspace.",
         )
+    default_general_context = _build_theme_sync_default_general_prompt_context(
+        draft_data=latest_data,
+        product=resolved_product,
+    )
+    default_slot_context_by_path = _build_theme_sync_default_slot_prompt_context_by_path(
+        image_slots=image_slots,
+        text_slots=text_slots,
+        component_text_values=latest_data.componentTextValues,
+    )
+    effective_general_context = (
+        normalized_general_context
+        if normalized_general_context is not None
+        else default_general_context
+    )
+    effective_slot_context_by_path = dict(default_slot_context_by_path)
+    effective_slot_context_by_path.update(normalized_slot_context_by_path)
 
     _emit_theme_sync_progress(
         {
@@ -2133,6 +2462,8 @@ def _generate_shopify_theme_template_draft_images(
             "generatedImageCount": 0,
             "fallbackImageCount": 0,
             "skippedImageCount": 0,
+            "hasCustomGeneralContext": bool(normalized_general_context),
+            "customSlotContextCount": len(normalized_slot_context_by_path),
         }
     )
     (
@@ -2148,6 +2479,8 @@ def _generate_shopify_theme_template_draft_images(
         product_id=resolved_product_id,
         image_slots=image_slots_pending_generation,
         text_slots=text_slots,
+        general_prompt_context=effective_general_context,
+        slot_prompt_context_by_path=effective_slot_context_by_path,
         max_concurrency=image_generation_max_concurrency,
         stop_on_quota_exhausted=True,
     )
@@ -2276,6 +2609,10 @@ def _generate_shopify_theme_template_draft_images(
             "requestedImageModelSource": requested_image_model_source,
             "promptTokenCountBySlotPath": prompt_token_count_by_slot_path,
             "promptTokenCountTotal": prompt_token_count_total,
+            "imagePromptGeneralContext": effective_general_context,
+            "imagePromptGeneralContextIsCustom": bool(normalized_general_context),
+            "imagePromptSlotContextByPath": effective_slot_context_by_path,
+            "imagePromptCustomSlotContextByPath": normalized_slot_context_by_path,
         }
     )
 

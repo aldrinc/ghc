@@ -24,6 +24,7 @@ import {
   useUpdateClientShopifyInstallation,
   useUpdateClient,
   type ClientShopifyThemeBrandAuditResponse,
+  type ClientShopifyThemeTemplateDraftData,
   type ClientShopifyThemeTemplateImageSlot,
   type ClientShopifyThemeTemplateTextSlot,
   type ClientShopifyThemeTemplatePublishResponse,
@@ -44,6 +45,7 @@ import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } fro
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 import type { DesignSystem } from "@/types/designSystems";
+import type { Product } from "@/types/products";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 
@@ -657,6 +659,115 @@ function buildTextSlotReadableLabelMap(
   return labelsByPath;
 }
 
+function normalizePromptContextValue(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim();
+}
+
+function readPromptContextMap(raw: unknown): Record<string, string> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  const normalized: Record<string, string> = {};
+  for (const [rawPath, rawValue] of Object.entries(raw)) {
+    if (typeof rawPath !== "string" || !rawPath.trim()) continue;
+    if (typeof rawValue !== "string") continue;
+    const cleanedValue = normalizePromptContextValue(rawValue);
+    if (!cleanedValue) continue;
+    normalized[rawPath.trim()] = cleanedValue;
+  }
+  return normalized;
+}
+
+function buildTemplateImageGenerationGeneralContext(
+  draftData: ClientShopifyThemeTemplateDraftData,
+  product: Product | null
+): string {
+  const segments: string[] = [];
+  if (draftData.workspaceName.trim()) segments.push(`Workspace: ${draftData.workspaceName.trim()}.`);
+  if (draftData.brandName.trim()) segments.push(`Brand: ${draftData.brandName.trim()}.`);
+  if (draftData.themeName.trim()) segments.push(`Theme: ${draftData.themeName.trim()}.`);
+  if (draftData.themeRole.trim()) segments.push(`Theme role: ${draftData.themeRole.trim()}.`);
+
+  if (product) {
+    if (product.title?.trim()) segments.push(`Product: ${product.title.trim()}.`);
+    if (product.product_type?.trim()) segments.push(`Product type: ${product.product_type.trim()}.`);
+    if (product.description?.trim()) segments.push(`Product summary: ${product.description.trim()}.`);
+    if (product.primary_benefits?.length) {
+      segments.push(`Primary benefits: ${product.primary_benefits.filter(Boolean).slice(0, 4).join("; ")}.`);
+    }
+    if (product.feature_bullets?.length) {
+      segments.push(`Feature points: ${product.feature_bullets.filter(Boolean).slice(0, 4).join("; ")}.`);
+    }
+  }
+
+  const colorBrand = draftData.cssVars?.["--color-brand"];
+  if (typeof colorBrand === "string" && colorBrand.trim()) {
+    segments.push(`Primary brand color: ${colorBrand.trim()}.`);
+  }
+  const colorCta = draftData.cssVars?.["--color-cta"];
+  if (typeof colorCta === "string" && colorCta.trim()) {
+    segments.push(`CTA color: ${colorCta.trim()}.`);
+  }
+
+  return normalizePromptContextValue(segments.join(" "));
+}
+
+function buildTemplateImageGenerationSlotContextByPath(
+  draftData: ClientShopifyThemeTemplateDraftData,
+  imageSlotReadableLabelByPath: Map<string, string>
+): Record<string, string> {
+  const textValuesByPath = new Map<string, string>();
+  for (const slot of draftData.textSlots) {
+    const rawValue = draftData.componentTextValues[slot.path] || slot.currentValue || "";
+    const cleaned = normalizePromptContextValue(rawValue);
+    if (!cleaned) continue;
+    textValuesByPath.set(slot.path, cleaned);
+  }
+  for (const [rawPath, rawValue] of Object.entries(draftData.componentTextValues || {})) {
+    if (typeof rawPath !== "string" || !rawPath.trim()) continue;
+    if (typeof rawValue !== "string") continue;
+    const cleaned = normalizePromptContextValue(rawValue);
+    if (!cleaned) continue;
+    textValuesByPath.set(rawPath.trim(), cleaned);
+  }
+
+  const sortedTextEntries = Array.from(textValuesByPath.entries()).sort(([a], [b]) => a.localeCompare(b));
+  const contextByPath: Record<string, string> = {};
+
+  for (const slot of draftData.imageSlots) {
+    const path = slot.path;
+    const label =
+      imageSlotReadableLabelByPath.get(path) || humanizeSlotToken(path.split(".").pop() || path);
+    const segments: string[] = [
+      `Purpose: ${label}.`,
+      `Slot role: ${slot.role || "generic"}.`,
+      `Target key: ${slot.key || "image"}.`,
+      `Preferred aspect: ${slot.recommendedAspect || "any"}.`,
+    ];
+
+    const sectionPrefix = path.includes(".settings.")
+      ? `${path.split(".settings.")[0]}.settings.`
+      : "";
+    if (sectionPrefix) {
+      const relatedValues: string[] = [];
+      for (const [textPath, value] of sortedTextEntries) {
+        if (!textPath.startsWith(sectionPrefix)) continue;
+        if (relatedValues.includes(value)) continue;
+        relatedValues.push(value);
+        if (relatedValues.length >= 2) break;
+      }
+      if (relatedValues.length) {
+        segments.push(`Related copy context: ${relatedValues.join(" ")}.`);
+      }
+    }
+
+    const normalizedContext = normalizePromptContextValue(segments.join(" "));
+    if (normalizedContext) {
+      contextByPath[path] = normalizedContext;
+    }
+  }
+
+  return contextByPath;
+}
+
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
   const { data: client } = useClient(workspace?.id);
@@ -712,6 +823,10 @@ export function BrandDesignSystemPage() {
   const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
   const [themeSyncProductId, setThemeSyncProductId] = useState("");
   const [selectedTemplateDraftId, setSelectedTemplateDraftId] = useState("");
+  const [templateImageGenerationGeneralContextInput, setTemplateImageGenerationGeneralContextInput] = useState("");
+  const [templateImageGenerationSlotContextByPath, setTemplateImageGenerationSlotContextByPath] = useState<
+    Record<string, string>
+  >({});
   const [templateImageGenerationSlotPathsInput, setTemplateImageGenerationSlotPathsInput] = useState("");
   const [templateDraftImageMapInput, setTemplateDraftImageMapInput] = useState("{}");
   const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
@@ -808,6 +923,8 @@ export function BrandDesignSystemPage() {
     setThemeSyncThemeName("futrgroup2-0theme");
     setThemeSyncProductId("");
     setSelectedTemplateDraftId("");
+    setTemplateImageGenerationGeneralContextInput("");
+    setTemplateImageGenerationSlotContextByPath({});
     setTemplateImageGenerationSlotPathsInput("");
     setTemplateDraftImageMapInput("{}");
     setTemplateDraftTextValuesInput("{}");
@@ -920,6 +1037,8 @@ export function BrandDesignSystemPage() {
     if (!latestVersion) {
       setTemplateDraftImageMapInput("{}");
       setTemplateDraftTextValuesInput("{}");
+      setTemplateImageGenerationGeneralContextInput("");
+      setTemplateImageGenerationSlotContextByPath({});
       setTemplateDraftEditError(null);
       return;
     }
@@ -929,6 +1048,19 @@ export function BrandDesignSystemPage() {
     setTemplateDraftTextValuesInput(
       JSON.stringify(latestVersion.data.componentTextValues || {}, null, 2)
     );
+    const metadata = latestVersion.data.metadata || {};
+    const metadataGeneralContextRaw = metadata["imagePromptGeneralContext"];
+    const metadataGeneralContext =
+      typeof metadataGeneralContextRaw === "string"
+        ? normalizePromptContextValue(metadataGeneralContextRaw)
+        : "";
+    const metadataCustomSlotContext = readPromptContextMap(
+      metadata["imagePromptCustomSlotContextByPath"]
+    );
+    setTemplateImageGenerationGeneralContextInput(
+      metadataGeneralContext || templateImageGenerationDefaultGeneralContext
+    );
+    setTemplateImageGenerationSlotContextByPath(metadataCustomSlotContext);
     setTemplateImageGenerationSlotPathsInput("");
     setTemplateDraftEditError(null);
     setTemplateAssetSearchQuery("");
@@ -1121,6 +1253,47 @@ export function BrandDesignSystemPage() {
     if (!latestVersion) return new Map<string, string>();
     return buildTextSlotReadableLabelMap(latestVersion.data.textSlots);
   }, [selectedTemplateDraft?.latestVersion?.id]);
+  const templateImageGenerationProduct = useMemo(() => {
+    const draftProductId =
+      selectedTemplateDraft?.latestVersion?.data.productId ||
+      selectedTemplateDraft?.productId ||
+      templateAssetUploadProductId ||
+      themeSyncProductId.trim() ||
+      "";
+    if (!draftProductId) return null;
+    return productById.get(draftProductId) || null;
+  }, [
+    selectedTemplateDraft?.id,
+    selectedTemplateDraft?.latestVersion?.id,
+    selectedTemplateDraft?.latestVersion?.data.productId,
+    selectedTemplateDraft?.productId,
+    templateAssetUploadProductId,
+    themeSyncProductId,
+    productById,
+  ]);
+  const templateImageGenerationDefaultGeneralContext = useMemo(() => {
+    const latestVersion = selectedTemplateDraft?.latestVersion;
+    if (!latestVersion) return "";
+    return buildTemplateImageGenerationGeneralContext(
+      latestVersion.data,
+      templateImageGenerationProduct
+    );
+  }, [selectedTemplateDraft?.latestVersion?.id, templateImageGenerationProduct]);
+  const templateImageGenerationDefaultSlotContextByPath = useMemo(() => {
+    const latestVersion = selectedTemplateDraft?.latestVersion;
+    if (!latestVersion) return {} as Record<string, string>;
+    return buildTemplateImageGenerationSlotContextByPath(
+      latestVersion.data,
+      templateImageSlotReadableLabelByPath
+    );
+  }, [selectedTemplateDraft?.latestVersion?.id, templateImageSlotReadableLabelByPath]);
+  const templateImageGenerationEffectiveSlotContextByPath = useMemo(
+    () => ({
+      ...templateImageGenerationDefaultSlotContextByPath,
+      ...templateImageGenerationSlotContextByPath,
+    }),
+    [templateImageGenerationDefaultSlotContextByPath, templateImageGenerationSlotContextByPath]
+  );
   const templatePreviewImageItems = useMemo(() => {
     const latestVersion = selectedTemplateDraft?.latestVersion;
     if (!latestVersion) return [];
@@ -1353,12 +1526,41 @@ export function BrandDesignSystemPage() {
       setTemplateDraftEditError(parsedSlotPathList.error || "Invalid image generation slot paths.");
       return;
     }
-    const payload: { draftId: string; productId?: string; slotPaths?: string[] } = {
+    const payload: {
+      draftId: string;
+      productId?: string;
+      slotPaths?: string[];
+      generalContext?: string;
+      slotContextByPath?: Record<string, string>;
+    } = {
       draftId: selectedTemplateDraftId,
     };
     const explicitProductId = templateAssetUploadProductId.trim() || themeSyncProductId.trim();
     if (explicitProductId) payload.productId = explicitProductId;
     if (parsedSlotPathList.value.length) payload.slotPaths = parsedSlotPathList.value;
+    const cleanedGeneralContext = normalizePromptContextValue(
+      templateImageGenerationGeneralContextInput
+    );
+    if (cleanedGeneralContext) {
+      payload.generalContext = cleanedGeneralContext;
+    }
+    if (selectedTemplateDraft.latestVersion) {
+      const knownSlotPathSet = new Set(
+        selectedTemplateDraft.latestVersion.data.imageSlots.map((slot) => slot.path)
+      );
+      const nextSlotContextByPath: Record<string, string> = {};
+      for (const [path, rawContext] of Object.entries(
+        templateImageGenerationSlotContextByPath
+      )) {
+        if (!knownSlotPathSet.has(path)) continue;
+        const cleanedSlotContext = normalizePromptContextValue(rawContext);
+        if (!cleanedSlotContext) continue;
+        nextSlotContextByPath[path] = cleanedSlotContext;
+      }
+      if (Object.keys(nextSlotContextByPath).length) {
+        payload.slotContextByPath = nextSlotContextByPath;
+      }
+    }
     setTemplateDraftEditError(null);
 
     try {
@@ -1434,6 +1636,31 @@ export function BrandDesignSystemPage() {
       delete nextTextValues[path];
     }
     setTemplateDraftTextValuesInput(JSON.stringify(nextTextValues, null, 2));
+    setTemplateDraftEditError(null);
+  };
+
+  const handleTemplateImageGenerationSlotContextChange = (
+    path: string,
+    nextValue: string
+  ) => {
+    setTemplateImageGenerationSlotContextByPath((current) => {
+      const next = { ...current };
+      const cleanedValue = normalizePromptContextValue(nextValue);
+      if (!cleanedValue) {
+        delete next[path];
+        return next;
+      }
+      next[path] = nextValue;
+      return next;
+    });
+    setTemplateDraftEditError(null);
+  };
+
+  const handleResetTemplateImagePromptContextsToDefault = () => {
+    setTemplateImageGenerationGeneralContextInput(
+      templateImageGenerationDefaultGeneralContext
+    );
+    setTemplateImageGenerationSlotContextByPath({});
     setTemplateDraftEditError(null);
   };
 
@@ -2236,6 +2463,113 @@ export function BrandDesignSystemPage() {
                 )}
               </div>
               */}
+              <div className="space-y-3 rounded-md border border-divider p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <div className="text-xs font-semibold text-content">
+                      Image prompt context (experiment)
+                    </div>
+                    <div className="text-xs text-content-muted">
+                      Edit shared brand/product context and per-slot objectives used by Shopify
+                      template image generation.
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={handleResetTemplateImagePromptContextsToDefault}
+                  >
+                    Reset to defaults
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-content">General context</div>
+                  <textarea
+                    rows={4}
+                    value={templateImageGenerationGeneralContextInput}
+                    onChange={(event) => {
+                      setTemplateImageGenerationGeneralContextInput(event.target.value);
+                      setTemplateDraftEditError(null);
+                    }}
+                    placeholder="General brand and product context for all generated images."
+                    className={cn(
+                      "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                    )}
+                  />
+                  <div className="text-[11px] text-content-muted">
+                    {templateImageGenerationGeneralContextInput.trim().length} characters
+                  </div>
+                </div>
+                {!selectedTemplateDraft.latestVersion.data.imageSlots.length ? (
+                  <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                    This draft has no image slots.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                    {selectedTemplateDraft.latestVersion.data.imageSlots.map((slot) => {
+                      const readableSlotLabel =
+                        templateImageSlotReadableLabelByPath.get(slot.path) ||
+                        humanizeSlotToken(slot.path.split(".").pop() || slot.path);
+                      const slotContextValue =
+                        templateImageGenerationEffectiveSlotContextByPath[slot.path] || "";
+                      const hasCustomSlotContext = Object.prototype.hasOwnProperty.call(
+                        templateImageGenerationSlotContextByPath,
+                        slot.path
+                      );
+                      return (
+                        <div
+                          key={`prompt-context-${slot.path}`}
+                          className="space-y-2 rounded-md border border-border bg-surface p-2"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-xs font-semibold text-content">
+                              {readableSlotLabel}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() =>
+                                setTemplateImageGenerationSlotContextByPath((current) => {
+                                  const next = { ...current };
+                                  delete next[slot.path];
+                                  return next;
+                                })
+                              }
+                              disabled={!hasCustomSlotContext}
+                            >
+                              Use default
+                            </Button>
+                          </div>
+                          <div className="text-[11px] font-mono break-all text-content">
+                            {slot.path}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
+                            <span>role: {slot.role || "generic"}</span>
+                            <span>aspect: {slot.recommendedAspect || "any"}</span>
+                            <span>{hasCustomSlotContext ? "custom" : "default"}</span>
+                          </div>
+                          <textarea
+                            rows={3}
+                            value={slotContextValue}
+                            onChange={(event) =>
+                              handleTemplateImageGenerationSlotContextChange(
+                                slot.path,
+                                event.target.value
+                              )
+                            }
+                            placeholder={`Context for ${readableSlotLabel}`}
+                            className={cn(
+                              "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                            )}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <div className="space-y-3 rounded-md border border-divider p-3">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
