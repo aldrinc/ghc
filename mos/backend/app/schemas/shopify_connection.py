@@ -120,6 +120,17 @@ class ShopifyThemeBrandSyncRequest(BaseModel):
     designSystemId: str | None = Field(default=None, min_length=1)
     productId: str | None = Field(default=None, min_length=1)
     componentImageAssetMap: dict[str, str] = Field(default_factory=dict)
+    componentTextValues: dict[str, str] = Field(default_factory=dict)
+    toneGuidelines: list[str] = Field(default_factory=list, max_length=20)
+    mustAvoidClaims: list[str] = Field(default_factory=list, max_length=20)
+    ctaStyle: Literal["direct", "benefit", "urgent", "soft"] | None = None
+    readingLevel: Literal["grade_5", "grade_8", "grade_10", "general"] | None = None
+    locale: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=16,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
     themeId: str | None = None
     themeName: str | None = None
 
@@ -243,6 +254,16 @@ class ShopifyThemeTemplateBuildRequest(BaseModel):
     productId: str | None = Field(default=None, min_length=1)
     componentImageAssetMap: dict[str, str] = Field(default_factory=dict)
     componentTextValues: dict[str, str] = Field(default_factory=dict)
+    toneGuidelines: list[str] = Field(default_factory=list, max_length=20)
+    mustAvoidClaims: list[str] = Field(default_factory=list, max_length=20)
+    ctaStyle: Literal["direct", "benefit", "urgent", "soft"] | None = None
+    readingLevel: Literal["grade_5", "grade_8", "grade_10", "general"] | None = None
+    locale: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=16,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
     themeId: str | None = None
     themeName: str | None = None
 

@@ -6,6 +6,9 @@ from typing import Any
 from app.db.models import Asset, Product, ProductOffer
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.claude_files import call_claude_structured_message
+from app.services.shopify_theme_copy_agent import (
+    generate_shopify_theme_component_copy,
+)
 
 _MAX_IMAGE_SLOTS = 80
 _MAX_TEXT_SLOTS = 120
@@ -376,7 +379,12 @@ def plan_shopify_theme_component_content(
     product_image_assets: list[Asset],
     image_slots: list[dict[str, Any]],
     text_slots: list[dict[str, Any]],
-) -> dict[str, dict[str, str]]:
+    tone_guidelines: list[str] | None = None,
+    must_avoid_claims: list[str] | None = None,
+    cta_style: str | None = None,
+    reading_level: str | None = None,
+    locale: str | None = None,
+) -> dict[str, Any]:
     if not image_slots and not text_slots:
         raise ValueError(
             "No candidate image or text slots were discovered in the Shopify theme templates."
@@ -472,4 +480,24 @@ def plan_shopify_theme_component_content(
                 "Use varied assets."
             )
     parsed_output["componentImageAssetMap"] = rebalanced_image_asset_map
+    if truncated_text_slots:
+        copy_agent_output = generate_shopify_theme_component_copy(
+            product=product,
+            offers=offers,
+            text_slots=truncated_text_slots,
+            tone_guidelines=tone_guidelines,
+            must_avoid_claims=must_avoid_claims,
+            cta_style=cta_style,
+            reading_level=reading_level,
+            locale=locale,
+        )
+        copy_text_values = copy_agent_output.get("componentTextValues")
+        if not isinstance(copy_text_values, dict):
+            raise ValueError(
+                "Theme copy agent returned an invalid componentTextValues payload."
+            )
+        parsed_output["componentTextValues"] = copy_text_values
+        copy_model = copy_agent_output.get("model")
+        if isinstance(copy_model, str) and copy_model.strip():
+            parsed_output["copyAgentModel"] = copy_model.strip()
     return parsed_output

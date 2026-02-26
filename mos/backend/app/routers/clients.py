@@ -2,6 +2,7 @@ import concurrent.futures
 from contextvars import ContextVar
 from datetime import datetime, timezone
 import logging
+import os
 import re
 import time
 from typing import Any
@@ -82,8 +83,10 @@ from app.services.design_system_generation import (
 )
 from app.services.funnels import (
     create_funnel_image_asset,
+    create_funnel_unsplash_asset,
     resolve_funnel_image_model_config,
 )
+from app.services.media_storage import MediaStorage
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
     build_client_shopify_install_url,
@@ -133,6 +136,10 @@ _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
 _THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH = 180
 _THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH = 2000
 _THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH = 600
+_THEME_IMAGE_PROMPT_BRAND_DESCRIPTION_MAX_LENGTH = 480
+_THEME_IMAGE_PROMPT_METADATA_BRAND_DESCRIPTION_KEY = "brandDescription"
+_THEME_COPY_GUIDELINE_MAX_LENGTH = 180
+_THEME_COPY_OPTION_MAX_LENGTH = 32
 _THEME_SYNC_AI_IMAGE_PROMPT_BASE = (
     "Premium ecommerce product image for a beauty-tech LED face mask brand. "
     "Modern skincare aesthetic, soft cinematic lighting, high detail, photoreal quality. "
@@ -156,6 +163,7 @@ _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
     "3:4": "3:4",
     "1:1": "1:1",
 }
+_GEMINI_IMAGE_REFERENCES_ENABLED_TRUE_VALUES = {"1", "true", "yes", "on"}
 _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY = max(
     1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY
 )
@@ -469,6 +477,295 @@ def _sanitize_theme_component_text_value(value: str) -> str:
     return " ".join(sanitized.split()).strip()
 
 
+def _normalize_theme_copy_instruction_list(
+    *,
+    field_name: str,
+    values: list[str] | None,
+) -> list[str]:
+    if values is None:
+        return []
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for index, raw_value in enumerate(values):
+        if not isinstance(raw_value, str):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{field_name}[{index}] must be a string.",
+            )
+        sanitized_value = _sanitize_theme_component_text_value(raw_value)
+        if not sanitized_value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{field_name}[{index}] cannot be empty.",
+            )
+        if len(sanitized_value) > _THEME_COPY_GUIDELINE_MAX_LENGTH:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"{field_name}[{index}] exceeds max length "
+                    f"{_THEME_COPY_GUIDELINE_MAX_LENGTH}."
+                ),
+            )
+        dedupe_key = sanitized_value.lower()
+        if dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        normalized.append(sanitized_value)
+    return normalized
+
+
+def _normalize_theme_copy_option_value(
+    *,
+    field_name: str,
+    value: str | None,
+) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{field_name} must be a string when provided.",
+        )
+    cleaned_value = value.strip()
+    if not cleaned_value:
+        return None
+    if len(cleaned_value) > _THEME_COPY_OPTION_MAX_LENGTH:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"{field_name} exceeds max length {_THEME_COPY_OPTION_MAX_LENGTH}.",
+        )
+    return cleaned_value
+
+
+def _normalize_theme_copy_settings(
+    *,
+    tone_guidelines: list[str] | None,
+    must_avoid_claims: list[str] | None,
+    cta_style: str | None,
+    reading_level: str | None,
+    locale: str | None,
+) -> dict[str, Any]:
+    return {
+        "toneGuidelines": _normalize_theme_copy_instruction_list(
+            field_name="toneGuidelines",
+            values=tone_guidelines,
+        ),
+        "mustAvoidClaims": _normalize_theme_copy_instruction_list(
+            field_name="mustAvoidClaims",
+            values=must_avoid_claims,
+        ),
+        "ctaStyle": _normalize_theme_copy_option_value(
+            field_name="ctaStyle",
+            value=cta_style,
+        ),
+        "readingLevel": _normalize_theme_copy_option_value(
+            field_name="readingLevel",
+            value=reading_level,
+        ),
+        "locale": _normalize_theme_copy_option_value(
+            field_name="locale",
+            value=locale,
+        ),
+    }
+
+
+def _build_theme_copy_planner_kwargs(*, copy_settings: dict[str, Any]) -> dict[str, Any]:
+    planner_kwargs: dict[str, Any] = {}
+    tone_guidelines = copy_settings.get("toneGuidelines")
+    if isinstance(tone_guidelines, list) and tone_guidelines:
+        planner_kwargs["tone_guidelines"] = tone_guidelines
+    must_avoid_claims = copy_settings.get("mustAvoidClaims")
+    if isinstance(must_avoid_claims, list) and must_avoid_claims:
+        planner_kwargs["must_avoid_claims"] = must_avoid_claims
+    cta_style = copy_settings.get("ctaStyle")
+    if isinstance(cta_style, str) and cta_style.strip():
+        planner_kwargs["cta_style"] = cta_style.strip()
+    reading_level = copy_settings.get("readingLevel")
+    if isinstance(reading_level, str) and reading_level.strip():
+        planner_kwargs["reading_level"] = reading_level.strip()
+    locale = copy_settings.get("locale")
+    if isinstance(locale, str) and locale.strip():
+        planner_kwargs["locale"] = locale.strip()
+    return planner_kwargs
+
+
+def _resolve_workspace_brand_description(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+) -> str | None:
+    onboarding_payload = OnboardingPayloadsRepository(session).latest_for_client(
+        org_id=org_id,
+        client_id=client_id,
+    )
+    if onboarding_payload is None or not isinstance(onboarding_payload.data, dict):
+        return None
+    raw_brand_story = onboarding_payload.data.get("brand_story")
+    if not isinstance(raw_brand_story, str) or not raw_brand_story.strip():
+        return None
+    brand_description = _sanitize_theme_component_text_value(raw_brand_story)
+    if not brand_description:
+        return None
+    if len(brand_description) > _THEME_IMAGE_PROMPT_BRAND_DESCRIPTION_MAX_LENGTH:
+        brand_description = brand_description[
+            :_THEME_IMAGE_PROMPT_BRAND_DESCRIPTION_MAX_LENGTH
+        ].rstrip()
+    return brand_description
+
+
+def _resolve_theme_sync_product_reference_image(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    product: Product,
+) -> dict[str, Any]:
+    product_id = str(product.id).strip()
+    if not product_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Product id is required to resolve a Shopify theme image reference.",
+        )
+
+    assets_repo = AssetsRepository(session)
+    reference_asset: Any | None = None
+
+    primary_asset_id = getattr(product, "primary_asset_id", None)
+    if isinstance(primary_asset_id, UUID):
+        reference_asset = assets_repo.get(
+            org_id=org_id,
+            asset_id=str(primary_asset_id),
+        )
+        if reference_asset is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Product primary asset is missing. Set a valid primary image asset on the product "
+                    "before generating Shopify template images with product visual context."
+                ),
+            )
+
+    if reference_asset is None:
+        product_image_assets = assets_repo.list(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            asset_kind="image",
+            statuses=[AssetStatusEnum.approved, AssetStatusEnum.qa_passed],
+        )
+        if not product_image_assets:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Product visual context is required for Shopify template image generation, "
+                    "but no approved product images were found. Upload at least one product image "
+                    "for this product and retry."
+                ),
+            )
+        reference_asset = product_image_assets[0]
+
+    reference_asset_client_id = str(getattr(reference_asset, "client_id", "")).strip()
+    if reference_asset_client_id != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product reference asset must belong to this workspace.",
+        )
+
+    reference_asset_product_id_raw = getattr(reference_asset, "product_id", None)
+    if reference_asset_product_id_raw is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Product reference asset must be linked to the selected product for Shopify template "
+                "image generation."
+            ),
+        )
+    reference_asset_product_id = str(reference_asset_product_id_raw).strip()
+    if reference_asset_product_id != product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Product reference asset does not belong to the selected product for Shopify template "
+                "image generation."
+            ),
+        )
+
+    storage_key = getattr(reference_asset, "storage_key", None)
+    if not isinstance(storage_key, str) or not storage_key.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Product reference asset is missing media storage metadata (storage_key).",
+        )
+
+    storage = MediaStorage()
+    try:
+        reference_image_bytes, downloaded_mime_type = storage.download_bytes(
+            key=storage_key.strip()
+        )
+    except Exception as exc:  # noqa: BLE001
+        reference_asset_public_id = _normalize_asset_public_id(
+            getattr(reference_asset, "public_id", None)
+        ) or "unknown"
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Failed to download product reference asset for Shopify template image generation. "
+                f"assetPublicId={reference_asset_public_id}. Error: {exc}"
+            ),
+        ) from exc
+    if not reference_image_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Product reference asset has empty media bytes.",
+        )
+
+    configured_mime_type = getattr(reference_asset, "content_type", None)
+    mime_type_candidates = [configured_mime_type, downloaded_mime_type]
+    reference_mime_type: str | None = None
+    for candidate in mime_type_candidates:
+        if isinstance(candidate, str) and candidate.strip().lower().startswith("image/"):
+            reference_mime_type = candidate.strip()
+            break
+    if not reference_mime_type:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Product reference asset content type is not an image. "
+                f"contentType={configured_mime_type!r}, downloadedContentType={downloaded_mime_type!r}."
+            ),
+        )
+
+    reference_asset_public_id = _normalize_asset_public_id(
+        getattr(reference_asset, "public_id", None)
+    )
+    if not reference_asset_public_id:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Product reference asset does not have a valid public id for Shopify template "
+                "image generation."
+            ),
+        )
+
+    reference_asset_id_raw = getattr(reference_asset, "id", None)
+    if not isinstance(reference_asset_id_raw, UUID):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Product reference asset does not have a valid internal id for Shopify template "
+                "image generation."
+            ),
+        )
+
+    return {
+        "imageBytes": reference_image_bytes,
+        "mimeType": reference_mime_type,
+        "assetPublicId": reference_asset_public_id,
+        "assetId": str(reference_asset_id_raw),
+    }
+
+
 def _is_theme_feature_image_slot_path(slot_path: str) -> bool:
     return bool(_THEME_FEATURE_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
 
@@ -623,6 +920,7 @@ def _build_theme_sync_default_general_prompt_context(
     *,
     draft_data: ShopifyThemeTemplateDraftData,
     product: Product,
+    brand_description: str | None = None,
 ) -> str:
     context_segments: list[str] = []
     workspace_name = _sanitize_theme_component_text_value(draft_data.workspaceName)
@@ -631,6 +929,13 @@ def _build_theme_sync_default_general_prompt_context(
     brand_name = _sanitize_theme_component_text_value(draft_data.brandName)
     if brand_name:
         context_segments.append(f"Brand: {brand_name}.")
+    normalized_brand_description = _sanitize_theme_component_text_value(
+        str(brand_description or "")
+    )
+    if normalized_brand_description:
+        context_segments.append(
+            f"Brand description: {normalized_brand_description}."
+        )
     theme_name = _sanitize_theme_component_text_value(draft_data.themeName)
     if theme_name:
         context_segments.append(f"Shopify theme: {theme_name}.")
@@ -752,6 +1057,11 @@ def _resolve_theme_slot_aspect_ratio(raw_recommended_aspect: Any) -> str:
     return _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT[normalized]
 
 
+def _is_gemini_image_references_enabled() -> bool:
+    raw_value = os.getenv("GEMINI_IMAGE_REFERENCES_ENABLED", "")
+    return raw_value.strip().lower() in _GEMINI_IMAGE_REFERENCES_ENABLED_TRUE_VALUES
+
+
 def _build_theme_sync_slot_image_prompt(
     *,
     slot_role: str,
@@ -852,6 +1162,10 @@ def _generate_theme_sync_ai_image_assets(
     slot_prompt_context_by_path: dict[str, str] | None = None,
     max_concurrency: int | None = None,
     stop_on_quota_exhausted: bool = False,
+    reference_image_bytes: bytes | None = None,
+    reference_image_mime_type: str | None = None,
+    reference_asset_public_id: str | None = None,
+    reference_asset_id: str | None = None,
 ) -> tuple[list[Any], list[str], dict[str, Any], list[str], dict[str, str]]:
     selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
     if not selected_slots:
@@ -873,6 +1187,31 @@ def _generate_theme_sync_ai_image_assets(
         ):
             continue
         normalized_slot_prompt_context_by_path[raw_path.strip()] = raw_context.strip()
+    if reference_image_bytes is not None:
+        if not reference_image_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Theme image reference bytes are empty.",
+            )
+        if not isinstance(reference_image_mime_type, str) or not reference_image_mime_type.strip():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Theme image reference mime type is required when reference bytes are provided.",
+            )
+        if not _is_gemini_image_references_enabled():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Product reference images are configured for Shopify theme generation, but "
+                    "Gemini image references are disabled. Set GEMINI_IMAGE_REFERENCES_ENABLED=true "
+                    "and retry."
+                ),
+            )
+    elif reference_image_mime_type is not None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Theme image reference mime type was provided without reference bytes.",
+        )
 
     def _generate_single_slot_asset(
         *,
@@ -896,6 +1235,10 @@ def _generate_theme_sync_ai_image_assets(
                         "slotRole": slot_role,
                         "recommendedAspect": slot_recommended_aspect,
                     },
+                    reference_image_bytes=reference_image_bytes,
+                    reference_image_mime_type=reference_image_mime_type,
+                    reference_asset_public_id=reference_asset_public_id,
+                    reference_asset_id=reference_asset_id,
                     product_id=product_id,
                     tags=["shopify_theme_sync", "component_image", "ai_generated"],
                 )
@@ -992,6 +1335,7 @@ def _generate_theme_sync_ai_image_assets(
             "promptTokenCountBySlotPath": {},
             "requestedImageModel": requested_image_model,
             "requestedImageModelSource": requested_image_model_source,
+            "referenceAssetPublicId": reference_asset_public_id,
         }
     )
 
@@ -1078,6 +1422,7 @@ def _generate_theme_sync_ai_image_assets(
                     "promptTokenCountBySlotPath": dict(prompt_token_count_by_slot_path),
                     "requestedImageModel": requested_image_model,
                     "requestedImageModelSource": requested_image_model_source,
+                    "referenceAssetPublicId": reference_asset_public_id,
                 }
             )
             if stop_on_quota_exhausted and outcome.get("quotaExhausted"):
@@ -1163,6 +1508,7 @@ def _generate_theme_sync_ai_image_assets(
                         "promptTokenCountBySlotPath": dict(prompt_token_count_by_slot_path),
                         "requestedImageModel": requested_image_model,
                         "requestedImageModelSource": requested_image_model_source,
+                        "referenceAssetPublicId": reference_asset_public_id,
                     }
                 )
 
@@ -1477,6 +1823,14 @@ def _prepare_shopify_theme_template_build_data(
     normalized_manual_component_text_values = _normalize_theme_template_component_text_values(
         payload.componentTextValues
     )
+    copy_settings = _normalize_theme_copy_settings(
+        tone_guidelines=payload.toneGuidelines,
+        must_avoid_claims=payload.mustAvoidClaims,
+        cta_style=payload.ctaStyle,
+        reading_level=payload.readingLevel,
+        locale=payload.locale,
+    )
+    planner_copy_kwargs = _build_theme_copy_planner_kwargs(copy_settings=copy_settings)
 
     requested_product_id = payload.productId.strip() if payload.productId else None
     resolved_product: Product | None = None
@@ -1503,6 +1857,11 @@ def _prepare_shopify_theme_template_build_data(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Workspace name is required to build Shopify theme template drafts.",
         )
+    workspace_brand_description = _resolve_workspace_brand_description(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+    )
 
     public_asset_base_url = _require_public_asset_base_url()
     logo_url = f"{public_asset_base_url}/public/assets/{logo_public_id}"
@@ -1570,6 +1929,14 @@ def _prepare_shopify_theme_template_build_data(
     rate_limited_slot_paths: list[str] = []
     quota_exhausted_slot_paths: list[str] = []
     slot_error_by_path: dict[str, str] = {}
+    product_reference_image: dict[str, Any] | None = None
+    if requested_product_id and resolved_product is not None and planner_image_slots:
+        product_reference_image = _resolve_theme_sync_product_reference_image(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            product=resolved_product,
+        )
     if planner_image_slots:
         (
             generated_theme_assets,
@@ -1584,10 +1951,25 @@ def _prepare_shopify_theme_template_build_data(
             product_id=requested_product_id,
             image_slots=planner_image_slots,
             text_slots=text_slots,
+            reference_image_bytes=(
+                product_reference_image["imageBytes"] if product_reference_image else None
+            ),
+            reference_image_mime_type=(
+                product_reference_image["mimeType"] if product_reference_image else None
+            ),
+            reference_asset_public_id=(
+                product_reference_image["assetPublicId"]
+                if product_reference_image
+                else None
+            ),
+            reference_asset_id=(
+                product_reference_image["assetId"] if product_reference_image else None
+            ),
         )
 
     component_image_asset_map: dict[str, str] = dict(normalized_component_image_asset_map)
     component_text_values: dict[str, str] = {}
+    copy_agent_model: str | None = None
 
     if requested_product_id and resolved_product is not None:
         product_image_assets = assets_repo.list(
@@ -1680,6 +2062,7 @@ def _prepare_shopify_theme_template_build_data(
                 product_image_assets=product_image_assets,
                 image_slots=planner_image_slots,
                 text_slots=text_slots,
+                **planner_copy_kwargs,
             )
         except ValueError as exc:
             raise HTTPException(
@@ -1766,6 +2149,9 @@ def _prepare_shopify_theme_template_build_data(
                     ),
                 )
             component_text_values[normalized_path] = sanitized_value
+        copy_agent_model_raw = planner_output.get("copyAgentModel")
+        if isinstance(copy_agent_model_raw, str) and copy_agent_model_raw.strip():
+            copy_agent_model = copy_agent_model_raw.strip()
     else:
         if rate_limited_slot_paths:
             raise HTTPException(
@@ -1879,6 +2265,27 @@ def _prepare_shopify_theme_template_build_data(
         "generatedImageCount": len(generated_theme_assets),
         "rateLimitedSlotPaths": sorted(rate_limited_slot_paths),
     }
+    copy_tone_guidelines = copy_settings.get("toneGuidelines")
+    if isinstance(copy_tone_guidelines, list) and copy_tone_guidelines:
+        metadata["copyToneGuidelines"] = copy_tone_guidelines
+    copy_must_avoid_claims = copy_settings.get("mustAvoidClaims")
+    if isinstance(copy_must_avoid_claims, list) and copy_must_avoid_claims:
+        metadata["copyMustAvoidClaims"] = copy_must_avoid_claims
+    copy_cta_style = copy_settings.get("ctaStyle")
+    if isinstance(copy_cta_style, str) and copy_cta_style.strip():
+        metadata["copyCtaStyle"] = copy_cta_style.strip()
+    copy_reading_level = copy_settings.get("readingLevel")
+    if isinstance(copy_reading_level, str) and copy_reading_level.strip():
+        metadata["copyReadingLevel"] = copy_reading_level.strip()
+    copy_locale = copy_settings.get("locale")
+    if isinstance(copy_locale, str) and copy_locale.strip():
+        metadata["copyLocale"] = copy_locale.strip()
+    if isinstance(copy_agent_model, str) and copy_agent_model.strip():
+        metadata["copyAgentModel"] = copy_agent_model.strip()
+    if workspace_brand_description:
+        metadata[_THEME_IMAGE_PROMPT_METADATA_BRAND_DESCRIPTION_KEY] = (
+            workspace_brand_description
+        )
 
     return ShopifyThemeTemplateDraftData(
         shopDomain=effective_shop_domain or str(status_payload.get("shopDomain") or ""),
@@ -2429,9 +2836,15 @@ def _generate_shopify_theme_template_draft_images(
             status_code=status.HTTP_409_CONFLICT,
             detail="Product must belong to this workspace.",
         )
+    workspace_brand_description = _resolve_workspace_brand_description(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+    )
     default_general_context = _build_theme_sync_default_general_prompt_context(
         draft_data=latest_data,
         product=resolved_product,
+        brand_description=workspace_brand_description,
     )
     default_slot_context_by_path = _build_theme_sync_default_slot_prompt_context_by_path(
         image_slots=image_slots,
@@ -2445,6 +2858,12 @@ def _generate_shopify_theme_template_draft_images(
     )
     effective_slot_context_by_path = dict(default_slot_context_by_path)
     effective_slot_context_by_path.update(normalized_slot_context_by_path)
+    product_reference_image = _resolve_theme_sync_product_reference_image(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        product=resolved_product,
+    )
 
     _emit_theme_sync_progress(
         {
@@ -2483,6 +2902,10 @@ def _generate_shopify_theme_template_draft_images(
         slot_prompt_context_by_path=effective_slot_context_by_path,
         max_concurrency=image_generation_max_concurrency,
         stop_on_quota_exhausted=True,
+        reference_image_bytes=product_reference_image["imageBytes"],
+        reference_image_mime_type=product_reference_image["mimeType"],
+        reference_asset_public_id=product_reference_image["assetPublicId"],
+        reference_asset_id=product_reference_image["assetId"],
     )
     rate_limited_slot_paths = sorted(
         {
@@ -2615,6 +3038,10 @@ def _generate_shopify_theme_template_draft_images(
             "imagePromptCustomSlotContextByPath": normalized_slot_context_by_path,
         }
     )
+    if workspace_brand_description:
+        merged_metadata[_THEME_IMAGE_PROMPT_METADATA_BRAND_DESCRIPTION_KEY] = (
+            workspace_brand_description
+        )
 
     next_data = latest_data.model_copy(
         update={
@@ -4433,6 +4860,17 @@ def sync_client_shopify_theme_brand_route(
                 ),
             )
         normalized_component_image_asset_map[setting_path] = raw_asset_public_id.strip()
+    normalized_manual_component_text_values = _normalize_theme_template_component_text_values(
+        payload.componentTextValues
+    )
+    copy_settings = _normalize_theme_copy_settings(
+        tone_guidelines=payload.toneGuidelines,
+        must_avoid_claims=payload.mustAvoidClaims,
+        cta_style=payload.ctaStyle,
+        reading_level=payload.readingLevel,
+        locale=payload.locale,
+    )
+    planner_copy_kwargs = _build_theme_copy_planner_kwargs(copy_settings=copy_settings)
 
     requested_product_id = payload.productId.strip() if payload.productId else None
     resolved_product: Product | None = None
@@ -4497,6 +4935,7 @@ def sync_client_shopify_theme_brand_route(
     rate_limited_slot_paths: list[str] = []
     quota_exhausted_slot_paths: list[str] = []
     slot_error_by_slot_path: dict[str, str] = {}
+    product_reference_image: dict[str, Any] | None = None
     if should_discover_slots_for_ai:
         _emit_theme_sync_progress(
             {
@@ -4541,6 +4980,13 @@ def sync_client_shopify_theme_brand_route(
             )
 
         if planner_image_slots:
+            if requested_product_id and resolved_product is not None:
+                product_reference_image = _resolve_theme_sync_product_reference_image(
+                    session=session,
+                    org_id=auth.org_id,
+                    client_id=client_id,
+                    product=resolved_product,
+                )
             (
                 generated_theme_assets,
                 rate_limited_slot_paths,
@@ -4554,6 +5000,20 @@ def sync_client_shopify_theme_brand_route(
                 product_id=requested_product_id,
                 image_slots=planner_image_slots,
                 text_slots=text_slots,
+                reference_image_bytes=(
+                    product_reference_image["imageBytes"] if product_reference_image else None
+                ),
+                reference_image_mime_type=(
+                    product_reference_image["mimeType"] if product_reference_image else None
+                ),
+                reference_asset_public_id=(
+                    product_reference_image["assetPublicId"]
+                    if product_reference_image
+                    else None
+                ),
+                reference_asset_id=(
+                    product_reference_image["assetId"] if product_reference_image else None
+                ),
             )
 
         if not requested_product_id:
@@ -4682,6 +5142,7 @@ def sync_client_shopify_theme_brand_route(
                 product_image_assets=product_image_assets,
                 image_slots=planner_image_slots,
                 text_slots=text_slots,
+                **planner_copy_kwargs,
             )
         except ValueError as exc:
             raise HTTPException(
@@ -4777,6 +5238,8 @@ def sync_client_shopify_theme_brand_route(
             component_image_urls[setting_path] = (
                 f"{public_asset_base_url}/public/assets/{asset_public_id}"
             )
+
+    component_text_values.update(normalized_manual_component_text_values)
 
     _emit_theme_sync_progress(
         {
