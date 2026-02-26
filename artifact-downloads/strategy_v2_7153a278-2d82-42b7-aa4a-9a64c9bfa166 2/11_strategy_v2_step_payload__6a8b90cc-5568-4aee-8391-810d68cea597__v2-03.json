@@ -1,0 +1,237 @@
+{
+  "model": "deterministic",
+  "title": "Strategy V2 Scrape + Virality",
+  "payload": {
+    "video_scored": {
+      "videos": [
+        {
+          "rank": 1,
+          "tier": "HIGH_PERFORMING",
+          "likes": 54000,
+          "views": 900000,
+          "author": "Ancient Remedies (AncientRemediesRevived / Natural Healing Handbook ecosystem)",
+          "shares": 3600,
+          "comments": 2100,
+          "platform": "TIKTOK",
+          "velocity": 64285.71,
+          "video_id": "ancientremedies_tiktok_short_01",
+          "z_scores": {
+            "velocity_z": 1.098,
+            "virality_ratio_z": 0.754,
+            "engagement_density_z": 0.841
+          },
+          "followers": 42000,
+          "description": "Short-form “one simple herb/ingredient for X” hook that funnels to a handbook/guide (high-virality symptom/benefit framing).",
+          "viral_score": 0.6472,
+          "virality_ratio": 21.43,
+          "days_since_posted": 14,
+          "velocity_eligible": true,
+          "engagement_density": 6.33,
+          "high_authority_track": true
+        },
+        {
+          "rank": 2,
+          "tier": "ABOVE_AVERAGE",
+          "likes": 5100,
+          "views": 310000,
+          "author": "Ancient Remedies (AncientRemediesRevived / Natural Healing Handbook ecosystem)",
+          "shares": 110,
+          "comments": 420,
+          "platform": "YOUTUBE",
+          "velocity": 3444.44,
+          "video_id": "ancientremedies_youtube_ad_01",
+          "z_scores": {
+            "velocity_z": -0.858,
+            "virality_ratio_z": 0.38,
+            "engagement_density_z": -1.106
+          },
+          "followers": 18000,
+          "description": "Long-form advertorial: “forgotten/ancient remedy” framing + implied broad symptom relief leading to $37 handbook CTA.",
+          "viral_score": 0.4272,
+          "virality_ratio": 17.22,
+          "days_since_posted": 90,
+          "velocity_eligible": true,
+          "engagement_density": 1.71,
+          "high_authority_track": true
+        },
+        {
+          "rank": 3,
+          "tier": "ABOVE_AVERAGE",
+          "likes": 14000,
+          "views": 260000,
+          "author": "Ancient Remedies (AncientRemediesRevived / Natural Healing Handbook ecosystem)",
+          "shares": 640,
+          "comments": 520,
+          "platform": "INSTAGRAM",
+          "velocity": 8666.67,
+          "video_id": "ancientremedies_ig_reel_01",
+          "z_scores": {
+            "velocity_z": -0.241,
+            "virality_ratio_z": -1.134,
+            "engagement_density_z": 0.265
+          },
+          "followers": 38000,
+          "description": "Aesthetic “natural routine” reel with simplified instructions and benefit-forward claims; pushes to “handbook” link in bio.",
+          "viral_score": 0.4256,
+          "virality_ratio": 6.84,
+          "days_since_posted": 30,
+          "velocity_eligible": true,
+          "engagement_density": 4.46,
+          "high_authority_track": true
+        }
+      ],
+      "summary": {
+        "total": 3,
+        "score_stats": {
+          "max": 0.6472,
+          "min": 0.4256,
+          "std": 0.1275,
+          "mean": 0.5,
+          "median": 0.4272
+        },
+        "viral_count": 0,
+        "baseline_count": 0,
+        "above_average_count": 2,
+        "velocity_ineligible": 0,
+        "high_performing_count": 1,
+        "platform_distribution": {
+          "TIKTOK": 1,
+          "YOUTUBE": 1,
+          "INSTAGRAM": 1
+        },
+        "below_min_view_threshold": 0
+      },
+      "platform_stats": {
+        "TIKTOK": {
+          "count": 1,
+          "mean_views": 900000,
+          "viral_count": 0,
+          "mean_viral_score": 0.6472,
+          "mean_virality_ratio": 21.43,
+          "high_performing_count": 1,
+          "mean_engagement_density": 6.33
+        },
+        "YOUTUBE": {
+          "count": 1,
+          "mean_views": 310000,
+          "viral_count": 0,
+          "mean_viral_score": 0.4272,
+          "mean_virality_ratio": 17.22,
+          "high_performing_count": 0,
+          "mean_engagement_density": 1.71
+        },
+        "INSTAGRAM": {
+          "count": 1,
+          "mean_views": 260000,
+          "viral_count": 0,
+          "mean_viral_score": 0.4256,
+          "mean_virality_ratio": 6.84,
+          "high_performing_count": 0,
+          "mean_engagement_density": 4.46
+        }
+      },
+      "tier_distribution": {
+        "VIRAL": 0,
+        "BASELINE": 0,
+        "ABOVE_AVERAGE": 2,
+        "HIGH_PERFORMING": 1
+      },
+      "tier_interpretation": {
+        "VIRAL": "Ratio > 50x followers -- content massively outperformed audience size",
+        "BASELINE": "Ratio < 5x or below 10K views -- standard performance",
+        "ABOVE_AVERAGE": "Ratio > 5x followers -- content outperformed, worth reviewing",
+        "HIGH_PERFORMING": "Ratio > 20x followers -- strong content signal"
+      },
+      "high_authority_track": [
+        {
+          "rank": 1,
+          "tier": "HIGH_PERFORMING",
+          "likes": 54000,
+          "views": 900000,
+          "author": "Ancient Remedies (AncientRemediesRevived / Natural Healing Handbook ecosystem)",
+          "shares": 3600,
+          "comments": 2100,
+          "platform": "TIKTOK",
+          "velocity": 64285.71,
+          "video_id": "ancientremedies_tiktok_short_01",
+          "z_scores": {
+            "velocity_z": 1.098,
+            "virality_ratio_z": 0.754,
+            "engagement_density_z": 0.841
+          },
+          "followers": 42000,
+          "description": "Short-form “one simple herb/ingredient for X” hook that funnels to a handbook/guide (high-virality symptom/benefit framing).",
+          "viral_score": 0.6472,
+          "virality_ratio": 21.43,
+          "days_since_posted": 14,
+          "velocity_eligible": true,
+          "engagement_density": 6.33,
+          "high_authority_track": true
+        },
+        {
+          "rank": 3,
+          "tier": "ABOVE_AVERAGE",
+          "likes": 14000,
+          "views": 260000,
+          "author": "Ancient Remedies (AncientRemediesRevived / Natural Healing Handbook ecosystem)",
+          "shares": 640,
+          "comments": 520,
+          "platform": "INSTAGRAM",
+          "velocity": 8666.67,
+          "video_id": "ancientremedies_ig_reel_01",
+          "z_scores": {
+            "velocity_z": -0.241,
+            "virality_ratio_z": -1.134,
+            "engagement_density_z": 0.265
+          },
+          "followers": 38000,
+          "description": "Aesthetic “natural routine” reel with simplified instructions and benefit-forward claims; pushes to “handbook” link in bio.",
+          "viral_score": 0.4256,
+          "virality_ratio": 6.84,
+          "days_since_posted": 30,
+          "velocity_eligible": true,
+          "engagement_density": 4.46,
+          "high_authority_track": true
+        },
+        {
+          "rank": 2,
+          "tier": "ABOVE_AVERAGE",
+          "likes": 5100,
+          "views": 310000,
+          "author": "Ancient Remedies (AncientRemediesRevived / Natural Healing Handbook ecosystem)",
+          "shares": 110,
+          "comments": 420,
+          "platform": "YOUTUBE",
+          "velocity": 3444.44,
+          "video_id": "ancientremedies_youtube_ad_01",
+          "z_scores": {
+            "velocity_z": -0.858,
+            "virality_ratio_z": 0.38,
+            "engagement_density_z": -1.106
+          },
+          "followers": 18000,
+          "description": "Long-form advertorial: “forgotten/ancient remedy” framing + implied broad symptom relief leading to $37 handbook CTA.",
+          "viral_score": 0.4272,
+          "virality_ratio": 17.22,
+          "days_since_posted": 90,
+          "velocity_eligible": true,
+          "engagement_density": 1.71,
+          "high_authority_track": true
+        }
+      ],
+      "z_score_interpretation": {
+        "strong": "z > 0.5 -- above-average performance, strong angle signal",
+        "average": "-0.5 to 0.5 -- typical performance for this batch",
+        "exceptional": "z > 1.5 -- algorithm-amplified breakout, mine immediately",
+        "below_average": "z < -0.5 -- underperforming, low priority for mining"
+      }
+    },
+    "video_observation_count": 3
+  },
+  "summary": "Social video observations scored for virality.",
+  "step_key": "v2-03",
+  "created_at": "2026-02-23T01:54:26.651398+00:00",
+  "agent_run_id": "d98e41a5-4df9-4b80-b9c5-96d548883827",
+  "prompt_version": "strategy_v2.agent0b.v1",
+  "schema_version": "2.0.0"
+}

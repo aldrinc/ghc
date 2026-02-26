@@ -52,19 +52,54 @@ def build_openai_client(require_api_key: bool = True) -> Optional[Any]:
 
 def extract_output_text(response: Any) -> Optional[str]:
     text = getattr(response, "output_text", None)
-    if text:
+    if isinstance(text, str) and text:
         return text
+
     maybe_output = getattr(response, "output", None)
+    if maybe_output is None and isinstance(response, dict):
+        maybe_output = response.get("output")
     if not maybe_output:
         return None
+
+    def _chunk_text(chunk: Any) -> Optional[str]:
+        if isinstance(chunk, str):
+            return chunk
+        if isinstance(chunk, dict):
+            raw = chunk.get("text")
+            if isinstance(raw, str) and raw:
+                return raw
+            raw_output = chunk.get("output_text")
+            if isinstance(raw_output, str) and raw_output:
+                return raw_output
+            if isinstance(raw_output, dict):
+                nested_text = raw_output.get("text")
+                if isinstance(nested_text, str) and nested_text:
+                    return nested_text
+            refusal = chunk.get("refusal")
+            if isinstance(refusal, str) and refusal:
+                return refusal
+            return None
+        raw_attr = getattr(chunk, "text", None)
+        if isinstance(raw_attr, str) and raw_attr:
+            return raw_attr
+        refusal_attr = getattr(chunk, "refusal", None)
+        if isinstance(refusal_attr, str) and refusal_attr:
+            return refusal_attr
+        return None
+
     try:
         parts: list[str] = []
         for item in maybe_output:
             content = getattr(item, "content", None)
-            if not content:
+            if content is None and isinstance(item, dict):
+                content = item.get("content")
+            if isinstance(content, str) and content:
+                parts.append(content)
+                continue
+            if not isinstance(content, list):
                 continue
             for chunk in content:
-                chunk_text = getattr(chunk, "text", None)
+                chunk_text = _chunk_text(chunk)
                 if chunk_text:
                     parts.append(chunk_text)
         return "".join(parts) if parts else None

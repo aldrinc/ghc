@@ -15,7 +15,16 @@ export function TasksPage() {
   const { data: workflows, isLoading } = useWorkflows();
   const navigate = useNavigate();
 
-  const attentionList = useMemo(() => (workflows || []).filter(needsAttention), [workflows]);
+  const attentionList = useMemo(() => {
+    const rows = (workflows || []).filter(needsAttention);
+    rows.sort((left, right) => {
+      const leftPriority = left.kind === "strategy_v2" ? 0 : left.status === "failed" ? 1 : 2;
+      const rightPriority = right.kind === "strategy_v2" ? 0 : right.status === "failed" ? 1 : 2;
+      if (leftPriority !== rightPriority) return leftPriority - rightPriority;
+      return (right.started_at || "").localeCompare(left.started_at || "");
+    });
+    return rows;
+  }, [workflows]);
 
   return (
     <div className="space-y-4">
@@ -52,6 +61,11 @@ export function TasksPage() {
                     <div className="text-xs text-content-muted">
                       Client: {wf.client_id || "—"} · Campaign: {wf.campaign_id || "—"}
                     </div>
+                    {wf.kind === "strategy_v2" ? (
+                      <div className="text-xs text-content-muted">
+                        Strategy V2 manual gates are available in workflow detail.
+                      </div>
+                    ) : null}
                     <div className="text-xs text-content-muted">Started: {wf.started_at}</div>
                   </div>
                   <Button variant="primary" size="sm" onClick={() => navigate(`/workflows/${wf.id}`)}>

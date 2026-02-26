@@ -31,7 +31,7 @@ const steps: WizardStep[] = [
     label: "Product",
     description: "Add what we should scope research and strategy to.",
   },
-  { key: "funnel", label: "Funnel", description: "Funnel notes" },
+  { key: "funnel", label: "Strategy V2", description: "Required Strategy V2 operator inputs" },
   { key: "review", label: "Review", description: "Confirm and submit" },
 ];
 
@@ -65,6 +65,14 @@ type WizardState = {
   business_type: "new" | "existing";
   brand_story: string;
   funnel_notes: string;
+  product_customizable: boolean;
+  business_model: string;
+  funnel_position: string;
+  target_platforms: string;
+  target_regions: string;
+  existing_proof_assets: string;
+  brand_voice_notes: string;
+  compliance_notes: string;
   products: ProductDraft[];
 };
 
@@ -74,6 +82,14 @@ const baseState: WizardState = {
   business_type: "new",
   brand_story: "",
   funnel_notes: "",
+  product_customizable: false,
+  business_model: "",
+  funnel_position: "",
+  target_platforms: "",
+  target_regions: "",
+  existing_proof_assets: "",
+  brand_voice_notes: "",
+  compliance_notes: "",
   products: [],
 };
 
@@ -82,6 +98,13 @@ const initialState = (clientName?: string, clientIndustry?: string): WizardState
   client_name: clientName || "",
   client_industry: clientIndustry || "",
 });
+
+function parseListInput(value: string): string[] {
+  return value
+    .split(/[\n,]/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 type OnboardingWizardProps = {
   clientId?: string;
@@ -143,6 +166,15 @@ export function OnboardingWizard({
       if (state.products.length !== 1) return false;
       return Boolean(state.products[0]?.product_name?.trim());
     }
+    if (currentStep.key === "funnel") {
+      if (!state.business_model.trim()) return false;
+      if (!state.funnel_position.trim()) return false;
+      if (!parseListInput(state.target_platforms).length) return false;
+      if (!parseListInput(state.target_regions).length) return false;
+      if (!parseListInput(state.existing_proof_assets).length) return false;
+      if (!state.brand_voice_notes.trim()) return false;
+      return true;
+    }
     return true;
   }, [currentStep, requiresClientName, state]);
 
@@ -195,10 +227,45 @@ export function OnboardingWizard({
       toast.error("Client name is required.");
       return;
     }
+    const targetPlatforms = parseListInput(state.target_platforms);
+    const targetRegions = parseListInput(state.target_regions);
+    const existingProofAssets = parseListInput(state.existing_proof_assets);
+    if (!state.business_model.trim()) {
+      toast.error("Business model is required.");
+      return;
+    }
+    if (!state.funnel_position.trim()) {
+      toast.error("Funnel position is required.");
+      return;
+    }
+    if (!targetPlatforms.length) {
+      toast.error("At least one target platform is required.");
+      return;
+    }
+    if (!targetRegions.length) {
+      toast.error("At least one target region is required.");
+      return;
+    }
+    if (!existingProofAssets.length) {
+      toast.error("At least one existing proof asset is required.");
+      return;
+    }
+    if (!state.brand_voice_notes.trim()) {
+      toast.error("Brand voice notes are required.");
+      return;
+    }
     const payload = {
       business_type: state.business_type,
       brand_story: state.brand_story.trim(),
       product_name: firstProduct.product_name.trim(),
+      product_customizable: state.product_customizable,
+      business_model: state.business_model.trim(),
+      funnel_position: state.funnel_position.trim(),
+      target_platforms: targetPlatforms,
+      target_regions: targetRegions,
+      existing_proof_assets: existingProofAssets,
+      brand_voice_notes: state.brand_voice_notes.trim(),
+      compliance_notes: state.compliance_notes.trim() || undefined,
       product_description: firstProduct.product_description.trim() || undefined,
       product_category: firstProduct.product_category.trim() || undefined,
       primary_benefits: firstProduct.primary_benefits.trim()
@@ -573,15 +640,114 @@ export function OnboardingWizard({
       )}
 
       {currentStep.key === "funnel" && (
-        <FieldRoot name="funnel_notes">
-          <FieldLabel>Funnel notes</FieldLabel>
-          <FieldDescription>Optional funnel notes or channel preferences.</FieldDescription>
-          <FieldControl
-            value={state.funnel_notes}
-            onChange={(e) => setState((s) => ({ ...s, funnel_notes: e.target.value }))}
-            render={(props) => <Textarea {...props} rows={2} />}
-          />
-        </FieldRoot>
+        <div className="space-y-4">
+          <label className="flex items-center gap-2 text-sm text-content">
+            <input
+              type="checkbox"
+              checked={state.product_customizable}
+              onChange={() => setState((s) => ({ ...s, product_customizable: !s.product_customizable }))}
+            />
+            Product customizable
+          </label>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldRoot name="business_model">
+              <FieldLabel>Business model</FieldLabel>
+              <FieldDescription>Required. Example: DTC, SaaS, info product.</FieldDescription>
+              <Input
+                value={state.business_model}
+                onChange={(e) => setState((s) => ({ ...s, business_model: e.target.value }))}
+                placeholder="DTC"
+                required
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="funnel_position">
+              <FieldLabel>Funnel position</FieldLabel>
+              <FieldDescription>Required. Example: cold traffic, warm retargeting.</FieldDescription>
+              <Input
+                value={state.funnel_position}
+                onChange={(e) => setState((s) => ({ ...s, funnel_position: e.target.value }))}
+                placeholder="Cold traffic acquisition"
+                required
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="target_platforms">
+              <FieldLabel>Target platforms</FieldLabel>
+              <FieldDescription>Required. Comma or newline separated.</FieldDescription>
+              <FieldControl
+                value={state.target_platforms}
+                onChange={(e) => setState((s) => ({ ...s, target_platforms: e.target.value }))}
+                render={(props) => <Textarea {...props} rows={3} placeholder="Meta Ads, TikTok Ads" required />}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="target_regions">
+              <FieldLabel>Target regions</FieldLabel>
+              <FieldDescription>Required. Comma or newline separated.</FieldDescription>
+              <FieldControl
+                value={state.target_regions}
+                onChange={(e) => setState((s) => ({ ...s, target_regions: e.target.value }))}
+                render={(props) => <Textarea {...props} rows={3} placeholder="United States, Canada" required />}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="existing_proof_assets" className="md:col-span-2">
+              <FieldLabel>Existing proof assets</FieldLabel>
+              <FieldDescription>Required. Comma or newline separated proof references.</FieldDescription>
+              <FieldControl
+                value={state.existing_proof_assets}
+                onChange={(e) => setState((s) => ({ ...s, existing_proof_assets: e.target.value }))}
+                render={(props) => (
+                  <Textarea
+                    {...props}
+                    rows={3}
+                    placeholder="Customer testimonials, before/after screenshots, case study docs"
+                    required
+                  />
+                )}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="brand_voice_notes" className="md:col-span-2">
+              <FieldLabel>Brand voice notes</FieldLabel>
+              <FieldDescription>Required guidance for headline/copy generation.</FieldDescription>
+              <FieldControl
+                value={state.brand_voice_notes}
+                onChange={(e) => setState((s) => ({ ...s, brand_voice_notes: e.target.value }))}
+                render={(props) => (
+                  <Textarea
+                    {...props}
+                    rows={3}
+                    placeholder="Conversational, direct response, confident but compliant."
+                    required
+                  />
+                )}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="compliance_notes" className="md:col-span-2">
+              <FieldLabel>Compliance notes</FieldLabel>
+              <FieldDescription>Optional legal/compliance constraints.</FieldDescription>
+              <FieldControl
+                value={state.compliance_notes}
+                onChange={(e) => setState((s) => ({ ...s, compliance_notes: e.target.value }))}
+                render={(props) => <Textarea {...props} rows={2} placeholder="Avoid medical diagnosis language." />}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="funnel_notes" className="md:col-span-2">
+              <FieldLabel>Additional funnel notes</FieldLabel>
+              <FieldDescription>Optional extra context.</FieldDescription>
+              <FieldControl
+                value={state.funnel_notes}
+                onChange={(e) => setState((s) => ({ ...s, funnel_notes: e.target.value }))}
+                render={(props) => <Textarea {...props} rows={2} />}
+              />
+            </FieldRoot>
+          </div>
+        </div>
       )}
 
       {currentStep.key === "review" && (
@@ -600,6 +766,32 @@ export function OnboardingWizard({
             <p>
               <strong>Brand story:</strong> {state.brand_story || "Missing"}
             </p>
+            <p>
+              <strong>Product customizable:</strong> {state.product_customizable ? "Yes" : "No"}
+            </p>
+            <p>
+              <strong>Business model:</strong> {state.business_model || "Missing"}
+            </p>
+            <p>
+              <strong>Funnel position:</strong> {state.funnel_position || "Missing"}
+            </p>
+            <p>
+              <strong>Target platforms:</strong> {parseListInput(state.target_platforms).join(", ") || "Missing"}
+            </p>
+            <p>
+              <strong>Target regions:</strong> {parseListInput(state.target_regions).join(", ") || "Missing"}
+            </p>
+            <p>
+              <strong>Existing proof assets:</strong> {parseListInput(state.existing_proof_assets).join(", ") || "Missing"}
+            </p>
+            <p>
+              <strong>Brand voice notes:</strong> {state.brand_voice_notes || "Missing"}
+            </p>
+            {state.compliance_notes ? (
+              <p>
+                <strong>Compliance notes:</strong> {state.compliance_notes}
+              </p>
+            ) : null}
             <p>
               <strong>Products:</strong> {state.products.length ? state.products.length : "Missing"}
             </p>

@@ -1,0 +1,28 @@
+{
+  "price": "TBD",
+  "stage": 1,
+  "bottleneck": "“Cautious Caretaker (Pregnancy/Kids)",
+  "description": "A practical handbook for safe, natural remedies and routines at home.",
+  "primary_icps": [
+    "“I am just trying to figure out if there are any interactions” (Reddit r/AskDocs).",
+    "“If you are on eliquis should you avoid turmeric?” (Mayo Clinic Connect).",
+    "“We do not have comprehensive interaction info” (Reddit r/AskDocs)."
+  ],
+  "product_name": "The Honest Herbalist Handbook",
+  "category_niche": "Health & Wellness",
+  "schema_version": "2.0.0",
+  "competitor_urls": [
+    "https://offer.ancientremediesrevived.com/c3-nb"
+  ],
+  "primary_segment": {
+    "name": "“I am just trying to figure out if there are any interactions” (Reddit r/AskDocs).",
+    "size_estimate": "“If you are on eliquis should you avoid turmeric?” (Mayo Clinic Connect).",
+    "key_differentiator": "“We do not have comprehensive interaction info” (Reddit r/AskDocs)."
+  },
+  "positioning_gaps": [
+    "**Safety-first herbal handbook** with explicit “do-not-use-if” lists, medication interaction highlights, and escalation prompts—positioned away from “synergy miracle” marketing while still practical for home use. (Gap inferred from the contrast between broad publishers and synergy-funnel framing.) ([offer.ancientremediesrevived.com](https://offer.ancientremediesrevived.com/c3-nb))"
+  ],
+  "product_customizable": false,
+  "market_maturity_stage": "Growth",
+  "competitor_count_validated": 60
+}

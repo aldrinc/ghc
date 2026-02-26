@@ -1,0 +1,116 @@
+{
+  "ump": "Counterfeit-Proof Buying Guide (Avoid fake books/supplements traps)",
+  "ums": "Fake-Spotter™ Checklist: marketplace red flags, seller verification steps, packaging/label sanity checks, and “buy vs skip” rules for common herb formats",
+  "price": "TBD",
+  "stage": 3,
+  "bottleneck": "“Cautious Caretaker (Pregnancy/Kids)",
+  "description": "A practical handbook for safe, natural remedies and routines at home.",
+  "core_promise": "The “Cautious Caretaker” edition: a safety-first herbal reference built for households navigating pregnancy, breastfeeding, and kids—using conservative “avoid / use only with clinician guidance” rules, clear escalation prompts, and a Fake-Spotter™ checklist to help you buy more confidently. Educational content only; not medical advice.",
+  "primary_icps": [
+    "“I am just trying to figure out if there are any interactions” (Reddit r/AskDocs).",
+    "“If you are on eliquis should you avoid turmeric?” (Mayo Clinic Connect).",
+    "“We do not have comprehensive interaction info” (Reddit r/AskDocs)."
+  ],
+  "product_name": "The Honest Herbalist Handbook",
+  "category_niche": "Health & Wellness",
+  "guarantee_type": "30-day satisfaction guarantee: if it’s not a helpful educational reference for safer decision-making at home, request a refund. No medical or outcome guarantees.",
+  "schema_version": "2.0.0",
+  "selected_angle": {
+    "angle_id": "A01",
+    "evidence": {
+      "top_quotes": [
+        {
+          "quote": "Please don't trust any of these... books on Amazon",
+          "voc_id": "V062",
+          "adjusted_score": 14.4
+        },
+        {
+          "quote": "fake supplements are all over Amazon.",
+          "voc_id": "V053",
+          "adjusted_score": 11.8
+        },
+        {
+          "quote": "Amazon has fake books in general.",
+          "voc_id": "V099",
+          "adjusted_score": 11.8
+        },
+        {
+          "quote": "I don't trust anyone on the Internet who tries to sell their lifestyle",
+          "voc_id": "V009",
+          "adjusted_score": 0.0
+        },
+        {
+          "quote": "do not trust any social media creator that claims to have a “cure”",
+          "voc_id": "V057",
+          "adjusted_score": 0.0
+        }
+      ],
+      "velocity_status": "STEADY",
+      "contradiction_count": 0,
+      "supporting_voc_count": 5,
+      "triangulation_status": "DUAL"
+    },
+    "angle_name": "Trust And Credibility Concerns",
+    "definition": {
+      "who": "value-sensitive buyer",
+      "trigger": "Context from Reddit r/herbalism",
+      "pain_desire": "Trust And Credibility Concerns -> Relief for value-sensitive buyer",
+      "belief_shift": {
+        "after": "Relief for value-sensitive buyer",
+        "before": "Existing approaches discussed in Reddit r/herbalism"
+      },
+      "mechanism_why": "Existing approaches discussed in Reddit r/herbalism"
+    },
+    "hook_starters": [
+      {
+        "lever": "problem crystallization",
+        "visual": "Real-world scene: value-sensitive buyer",
+        "opening_line": "Please don't trust any of these... books on Amazon"
+      },
+      {
+        "lever": "urgency",
+        "visual": "Trigger context: Context from Reddit r/herbalism",
+        "opening_line": "When context from reddit r/herbalism, most advice misses the real mechanism."
+      },
+      {
+        "lever": "desired outcome",
+        "visual": "Outcome shift: Relief for value-sensitive buyer",
+        "opening_line": "Move from trust and credibility concerns to relief for value-sensitive buyer."
+      }
+    ]
+  },
+  "competitor_urls": [
+    "https://offer.ancientremediesrevived.com/c3-nb"
+  ],
+  "composite_score": 6.31,
+  "primary_segment": {
+    "name": "“I am just trying to figure out if there are any interactions” (Reddit r/AskDocs).",
+    "size_estimate": "“If you are on eliquis should you avoid turmeric?” (Mayo Clinic Connect).",
+    "key_differentiator": "“We do not have comprehensive interaction info” (Reddit r/AskDocs)."
+  },
+  "positioning_gaps": [
+    "**Safety-first herbal handbook** with explicit “do-not-use-if” lists, medication interaction highlights, and escalation prompts—positioned away from “synergy miracle” marketing while still practical for home use. (Gap inferred from the contrast between broad publishers and synergy-funnel framing.) ([offer.ancientremediesrevived.com](https://offer.ancientremediesrevived.com/c3-nb))"
+  ],
+  "purchase_emotion": "relief",
+  "variant_selected": "variant_a",
+  "price_sensitivity": "medium",
+  "pricing_rationale": "Priced as a specialized safety-first reference for a high-anxiety segment (pregnancy/kids) where buyers pay for clarity, conservative guardrails, and decision aids—without making treatment claims. Differentiates from generic remedy books by emphasizing avoidance criteria and escalation prompts.",
+  "value_stack_summary": [
+    "The Honest Herbalist Handbook (Cautious Caretaker Edition)",
+    "Caretaker Safety Matrix (pregnancy/breastfeeding/kids: conservative “avoid / clinician-guided only” flags)",
+    "Red-Flag Escalation Prompts (when to pause home remedies and seek professional care)",
+    "Fake-Spotter™ Checklist (marketplace verification steps + buy/skip rules by format)",
+    "Printable Fridge Cards (quick “check first” reminders + clinician question prompts)"
+  ],
+  "product_customizable": false,
+  "sophistication_level": 3,
+  "market_maturity_stage": "Growth",
+  "compliance_constraints": {
+    "overall_risk": "GREEN",
+    "platform_notes": "Use platform-safe framing from selected angle evidence.",
+    "red_flag_patterns": []
+  },
+  "awareness_level_primary": "Problem-Aware",
+  "buyer_behavior_archetype": "Evidence-seeking buyer",
+  "competitor_count_validated": 60
+}

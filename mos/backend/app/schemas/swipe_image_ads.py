@@ -30,6 +30,12 @@ class SwipeImageAdGenerateRequest(BaseModel):
     )
 
     model: str | None = Field(None, description="Gemini model name to use for swipe prompt generation.")
+    render_model_id: str | None = Field(
+        None,
+        description="Model id for the final image-rendering step only.",
+        validation_alias="renderModelId",
+        serialization_alias="renderModelId",
+    )
     max_output_tokens: int | None = Field(
         None,
         ge=256,
@@ -49,4 +55,14 @@ class SwipeImageAdGenerateRequest(BaseModel):
     def _validate_swipe_source(self) -> "SwipeImageAdGenerateRequest":
         if bool(self.company_swipe_id) == bool(self.swipe_image_url):
             raise ValueError("Provide exactly one of companySwipeId or swipeImageUrl.")
+        model_value = (self.model or "").strip().lower()
+        if model_value and (
+            "image-preview" in model_value
+            or "image-generation" in model_value
+            or model_value.endswith("-image")
+        ):
+            raise ValueError(
+                "model is only for stage-1 prompt generation. "
+                "Use renderModelId for final image rendering models."
+            )
         return self

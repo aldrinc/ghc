@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr
 class ClientCreate(BaseModel):
     name: str
     industry: Optional[str] = None
+    strategyV2Enabled: bool = False
 
 
 class CampaignCreate(BaseModel):

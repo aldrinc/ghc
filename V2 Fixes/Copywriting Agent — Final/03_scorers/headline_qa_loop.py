@@ -71,6 +71,8 @@ WORD_COUNT_RANGES = {
     "advertorial": "10-18",
     "sales_page": "8-20",
 }
+LLM_CALL_TIMEOUT_SECONDS = float(os.getenv("STRATEGY_V2_HEADLINE_QA_CALL_TIMEOUT_SECONDS", "45"))
+LLM_CALL_MAX_RETRIES = max(0, int(os.getenv("STRATEGY_V2_HEADLINE_QA_CALL_MAX_RETRIES", "0")))
 
 # Page-type-specific calibration context for the LLM.
 # Extracted from WORKFLOW.md Section 4 (Headline-to-Page-Type Calibration)
@@ -196,28 +198,80 @@ OUTPUT: Return ONLY the improved headline text. Nothing else. No quotes, no expl
 # SECTION 3: LLM CALL FUNCTION
 # ============================================================
 
-def call_llm(prompt, api_key, model="claude-sonnet-4-20250514"):
-    """Call the Anthropic API to get a rewritten headline."""
+def call_llm(prompt, api_key, model="claude-sonnet-4-20250514", messages=None):
+    """Call the Anthropic API to get a rewritten headline + request diagnostics."""
     try:
         import anthropic
     except ImportError:
         print("  ERROR: 'anthropic' package not installed. Run: pip install anthropic")
         sys.exit(1)
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(
+        api_key=api_key,
+        timeout=LLM_CALL_TIMEOUT_SECONDS,
+        max_retries=LLM_CALL_MAX_RETRIES,
+    )
+
+    def _extract_request_id_from_headers(headers):
+        if headers is None:
+            return None
+        for key in ("request-id", "x-request-id", "anthropic-request-id"):
+            value = headers.get(key) if hasattr(headers, "get") else None
+            if not value:
+                continue
+            text = str(value).strip()
+            if text:
+                return text
+        return None
 
     try:
-        response = client.messages.create(
+        if messages is None:
+            messages = [{"role": "user", "content": prompt}]
+        raw_response = client.messages.with_raw_response.create(
             model=model,
             max_tokens=200,
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
+            timeout=LLM_CALL_TIMEOUT_SECONDS,
         )
+        response = raw_response.parse()
         text = response.content[0].text.strip()
         # Strip quotes if the LLM wrapped the headline
         text = text.strip('"').strip("'").strip('\u201c').strip('\u201d')
-        return text
+        request_id = getattr(raw_response, "request_id", None)
+        if not request_id:
+            http_response = getattr(raw_response, "http_response", None)
+            request_id = _extract_request_id_from_headers(
+                getattr(http_response, "headers", None)
+            )
+        if not request_id:
+            request_id = getattr(response, "_request_id", None) or getattr(response, "request_id", None)
+        usage = getattr(response, "usage", None)
+        input_tokens = getattr(usage, "input_tokens", None) if usage is not None else None
+        output_tokens = getattr(usage, "output_tokens", None) if usage is not None else None
+        stop_reason = getattr(response, "stop_reason", None)
+        print(
+            "  INFO: LLM call completed: "
+            f"request_id={request_id or 'missing'} input_tokens={input_tokens} output_tokens={output_tokens} "
+            f"stop_reason={stop_reason}"
+        )
+        return {
+            "text": text,
+            "request_id": request_id,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "stop_reason": stop_reason,
+        }
     except Exception as e:
-        print(f"  WARNING: LLM call failed: {e}")
+        status_code = getattr(e, "status_code", None)
+        error_response = getattr(e, "response", None) or getattr(e, "http_response", None)
+        request_id = _extract_request_id_from_headers(getattr(error_response, "headers", None))
+        extra_parts = []
+        if status_code:
+            extra_parts.append(f"status={status_code}")
+        if request_id:
+            extra_parts.append(f"request_id={request_id}")
+        suffix = f" ({', '.join(extra_parts)})" if extra_parts else ""
+        print(f"  WARNING: LLM call failed: {e}{suffix}")
         return None
 
 
@@ -256,6 +310,8 @@ def run_qa_loop(headline, page_type=None, max_iterations=3, min_tier="A",
     The best-scoring iteration wins (regression protection).
     """
     iterations = []
+    request_ids = []
+    conversation_messages = []
 
     # --- Iteration 0: Score original headline ---
     result = scorer.score_headline(headline, page_type)
@@ -267,11 +323,11 @@ def run_qa_loop(headline, page_type=None, max_iterations=3, min_tier="A",
 
     # Check if already passes the minimum tier
     if TIER_ORDER.get(json_out["tier"], 0) >= TIER_ORDER.get(min_tier, 4):
-        return build_result(iterations, min_tier)
+        return build_result(iterations, min_tier, request_ids=request_ids)
 
     # Dry run: just score, no LLM
     if dry_run:
-        return build_result(iterations, min_tier)
+        return build_result(iterations, min_tier, request_ids=request_ids)
 
     # Check for API key
     if not api_key:
@@ -279,7 +335,7 @@ def run_qa_loop(headline, page_type=None, max_iterations=3, min_tier="A",
     if not api_key:
         print("  WARNING: No API key provided. Use --api-key or set ANTHROPIC_API_KEY env var.")
         print("  Running in dry-run mode (score only).")
-        return build_result(iterations, min_tier)
+        return build_result(iterations, min_tier, request_ids=request_ids)
 
     # --- Iterations 1+: LLM fix cycles ---
     current_headline = headline
@@ -288,19 +344,27 @@ def run_qa_loop(headline, page_type=None, max_iterations=3, min_tier="A",
     for i in range(1, max_iterations):
         # Build the fix prompt from current failures
         prompt = build_fix_prompt(current_headline, current_json, page_type, i)
+        pending_messages = conversation_messages + [{"role": "user", "content": prompt}]
 
         # Call LLM for rewrite
-        rewritten = call_llm(prompt, api_key, model)
+        llm_response = call_llm(prompt, api_key, model, messages=pending_messages)
 
         # Validate LLM response
-        if not rewritten:
+        if not llm_response:
             continue  # Skip this iteration on API failure
+        request_id = llm_response.get("request_id")
+        if request_id and request_id not in request_ids:
+            request_ids.append(request_id)
+        rewritten = llm_response.get("text")
+        if not rewritten:
+            continue
         if len(rewritten.split()) > 50:
             continue  # Too long, not a headline
         if '\n' in rewritten:
             continue  # Contains newlines, not a single headline
         if rewritten == current_headline:
             continue  # No change
+        conversation_messages = pending_messages + [{"role": "assistant", "content": rewritten}]
 
         # Rescore the rewritten headline
         new_result = scorer.score_headline(rewritten, page_type)
@@ -325,14 +389,14 @@ def run_qa_loop(headline, page_type=None, max_iterations=3, min_tier="A",
         current_headline = rewritten
         current_json = new_json
 
-    return build_result(iterations, min_tier)
+    return build_result(iterations, min_tier, request_ids=request_ids)
 
 
 # ============================================================
 # SECTION 6: RESULT BUILDER
 # ============================================================
 
-def build_result(iterations, min_tier):
+def build_result(iterations, min_tier, request_ids=None):
     """
     Build the final result dict from iteration history.
 
@@ -359,6 +423,7 @@ def build_result(iterations, min_tier):
         "iterations": iterations,
         "min_tier": min_tier,
         "total_iterations": len(iterations),
+        "request_ids": request_ids or [],
     }
 
 
@@ -443,6 +508,7 @@ def to_json(qa_result):
         "metadata": {
             "min_tier": qa_result["min_tier"],
             "scorer_version": "2.0",
+            "request_ids": qa_result.get("request_ids", []),
         },
     }
 

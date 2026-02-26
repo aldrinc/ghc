@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
@@ -19,6 +20,7 @@ from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.design_systems import DesignSystemsRepository
 from app.services.design_systems import resolve_design_system_tokens
+from app.strategy_v2.downstream import load_strategy_v2_outputs
 
 
 _DEFAULT_AI_DRAFT_EMPTY_PAGE_MAX_ATTEMPTS = 3
@@ -148,6 +150,14 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     variant = params.get("variant")
     strategy_sheet = params.get("strategy_sheet") or {}
     asset_briefs = params.get("asset_briefs") or []
+    strategy_v2_packet_raw = params.get("strategy_v2_packet")
+    strategy_v2_copy_context_raw = params.get("strategy_v2_copy_context")
+    strategy_v2_packet = (
+        strategy_v2_packet_raw if isinstance(strategy_v2_packet_raw, dict) else {}
+    )
+    strategy_v2_copy_context = (
+        strategy_v2_copy_context_raw if isinstance(strategy_v2_copy_context_raw, dict) else {}
+    )
     idea_workspace_id = params.get("idea_workspace_id")
     actor_user_id = params.get("actor_user_id") or "workflow"
     generate_ai_drafts = bool(params.get("generate_ai_drafts", False))
@@ -310,6 +320,8 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     experiment=experiment,
                     variant=variant,
                     asset_briefs=asset_briefs,
+                    strategy_v2_packet=strategy_v2_packet,
+                    strategy_v2_copy_context=strategy_v2_copy_context,
                     page_name=page_name,
                     template_id=template_id,
                 )
@@ -519,11 +531,19 @@ def _build_funnel_prompt(
     experiment: Dict[str, Any],
     variant: Dict[str, Any],
     asset_briefs: List[Dict[str, Any]],
+    strategy_v2_packet: Dict[str, Any],
+    strategy_v2_copy_context: Dict[str, Any],
     page_name: str,
     template_id: Optional[str],
 ) -> str:
     experiment_name = experiment.get("name") or experiment.get("id")
     variant_name = variant.get("name") or variant.get("id")
+    strategy_v2_packet_summary = json.dumps(strategy_v2_packet, ensure_ascii=True)[:6000] if strategy_v2_packet else "{}"
+    strategy_v2_copy_context_summary = (
+        json.dumps(strategy_v2_copy_context, ensure_ascii=True)[:4000]
+        if strategy_v2_copy_context
+        else "{}"
+    )
     return f"""
 You are generating funnel page copy for a marketing experiment.
 
@@ -543,6 +563,10 @@ Variant guardrails: {variant.get("guardrails") or []}
 
 Asset briefs (requirements + concepts):
 {asset_briefs}
+Strategy V2 downstream packet:
+{strategy_v2_packet_summary}
+Strategy V2 copy context:
+{strategy_v2_copy_context_summary}
 
 Page to generate: {page_name}
 Template: {template_id}
@@ -550,6 +574,7 @@ Template: {template_id}
 Instructions:
 - Align copy and structure to the experiment variant angle.
 - Use brand voice, constraints, and claims from the attached context documents.
+- Treat Strategy V2 downstream packet + copy context as source-of-truth context when present.
 - Keep claims compliant and avoid medical promises.
 - Do NOT invent product facts or policy specifics (warranty length, return window, price, FDA status, clinical study outcomes, time-to-results, session length, brightness levels).
 - Do NOT include any numbers anywhere unless the number is explicitly present in the attached product/offer context (if absent, rewrite without numbers).
@@ -779,11 +804,27 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
         briefs_artifact = artifacts_repo.get_latest_by_type_for_campaign(
             org_id=org_id, campaign_id=campaign_id, artifact_type=ArtifactTypeEnum.asset_brief
         )
+        strategy_v2_outputs = load_strategy_v2_outputs(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+        )
 
     if not strategy:
         raise ValueError("Strategy sheet not found for funnel generation")
 
     strategy_sheet = strategy.data if isinstance(strategy.data, dict) else {}
+    strategy_v2_packet = (
+        strategy_v2_outputs.get("downstream_packet")
+        if isinstance(strategy_v2_outputs.get("downstream_packet"), dict)
+        else {}
+    )
+    strategy_v2_copy_context = (
+        strategy_v2_outputs.get("copy_context")
+        if isinstance(strategy_v2_outputs.get("copy_context"), dict)
+        else {}
+    )
     asset_briefs_all: list[dict[str, Any]] = []
     if briefs_artifact and isinstance(briefs_artifact.data, dict):
         raw_briefs = briefs_artifact.data.get("asset_briefs") or []
@@ -844,6 +885,8 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
                         "variant": variant,
                         "strategy_sheet": strategy_sheet,
                         "asset_briefs": matching_briefs,
+                        "strategy_v2_packet": strategy_v2_packet,
+                        "strategy_v2_copy_context": strategy_v2_copy_context,
                         "idea_workspace_id": idea_workspace_id,
                         "actor_user_id": actor_user_id,
                         "generate_ai_drafts": generate_ai_drafts,

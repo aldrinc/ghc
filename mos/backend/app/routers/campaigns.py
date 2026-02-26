@@ -25,6 +25,8 @@ from app.temporal.workflows.campaign_funnel_generation import (
     CampaignFunnelGenerationWorkflow,
 )
 from app.temporal.workflows.creative_production import CreativeProductionInput, CreativeProductionWorkflow
+from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
+from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from temporalio.api.enums.v1 import WorkflowExecutionStatus
 
 
@@ -62,23 +64,38 @@ def _validate_planning_prereqs(
     session: Session,
 ) -> None:
     artifacts_repo = ArtifactsRepository(session)
-    canon = artifacts_repo.get_latest_by_type(
+    strategy_v2_required = is_strategy_v2_enabled(
+        session=session,
         org_id=org_id,
         client_id=client_id,
-        product_id=product_id,
-        artifact_type=ArtifactTypeEnum.client_canon,
     )
-    metric = artifacts_repo.get_latest_by_type(
-        org_id=org_id,
-        client_id=client_id,
-        product_id=product_id,
-        artifact_type=ArtifactTypeEnum.metric_schema,
-    )
-    if not canon or not metric:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Complete client onboarding (canon + metric schema) before starting campaign planning.",
+    if not strategy_v2_required:
+        canon = artifacts_repo.get_latest_by_type(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            artifact_type=ArtifactTypeEnum.client_canon,
         )
+        metric = artifacts_repo.get_latest_by_type(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            artifact_type=ArtifactTypeEnum.metric_schema,
+        )
+        if not canon or not metric:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Complete client onboarding (canon + metric schema) before starting campaign planning.",
+            )
+    try:
+        require_strategy_v2_outputs_if_enabled(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 async def _start_campaign_planning(
@@ -291,6 +308,15 @@ async def generate_campaign_funnels(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing creative brief types. Set creative brief types before creating funnels.",
         )
+    try:
+        require_strategy_v2_outputs_if_enabled(
+            session=session,
+            org_id=auth.org_id,
+            client_id=str(campaign.client_id),
+            product_id=str(campaign.product_id),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if not payload.experiment_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

@@ -119,7 +119,7 @@ const ASSETS_NAV: NavSection = {
 
 const AI_NAV: NavSection = {
   label: "AI",
-  items: [{ title: "Claude Chat", path: "/claude-chat", icon: MessageSquare }],
+  items: [{ title: "Assistant Chat", path: "/claude-chat", icon: MessageSquare }],
 };
 
 function NavigationMenu({ label, items }: NavSection) {

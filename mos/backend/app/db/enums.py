@@ -92,6 +92,15 @@ class ArtifactTypeEnum(str, Enum):
     experiment_report = "experiment_report"
     playbook = "playbook"
     funnel_runtime_bundle = "funnel_runtime_bundle"
+    strategy_v2_step_payload = "strategy_v2_step_payload"
+    strategy_v2_stage0 = "strategy_v2_stage0"
+    strategy_v2_stage1 = "strategy_v2_stage1"
+    strategy_v2_stage2 = "strategy_v2_stage2"
+    strategy_v2_stage3 = "strategy_v2_stage3"
+    strategy_v2_awareness_angle_matrix = "strategy_v2_awareness_angle_matrix"
+    strategy_v2_offer = "strategy_v2_offer"
+    strategy_v2_copy = "strategy_v2_copy"
+    strategy_v2_copy_context = "strategy_v2_copy_context"
 
 
 class WorkflowKindEnum(str, Enum):
@@ -103,6 +112,7 @@ class WorkflowKindEnum(str, Enum):
     experiment_cycle = "experiment_cycle"
     playbook_update = "playbook_update"
     test_campaign = "test_campaign"
+    strategy_v2 = "strategy_v2"
 
 
 class WorkflowStatusEnum(str, Enum):
@@ -139,6 +149,12 @@ class AssetSourceEnum(str, Enum):
 
 
 class ClaudeContextFileStatusEnum(str, Enum):
+    ready = "ready"
+    failed = "failed"
+    deleted = "deleted"
+
+
+class GeminiContextFileStatusEnum(str, Enum):
     ready = "ready"
     failed = "failed"
     deleted = "deleted"

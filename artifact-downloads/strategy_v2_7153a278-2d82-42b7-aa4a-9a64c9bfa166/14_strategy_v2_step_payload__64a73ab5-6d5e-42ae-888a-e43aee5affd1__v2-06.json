@@ -1,0 +1,154 @@
+{
+  "model": "gpt-5.2-2025-12-11",
+  "title": "Strategy V2 Angle Synthesis",
+  "payload": {
+    "scorecard": {
+      "angles": [
+        {
+          "rank": 1,
+          "z_score": 0.0,
+          "angle_id": "A01",
+          "angle_name": "Trust And Credibility Concerns",
+          "components": {
+            "plausibility": 100.0,
+            "demand_signal": 34.5,
+            "executability": 100.0,
+            "market_timing": 76.2,
+            "pain_intensity": 0.0,
+            "distinctiveness": 18.7,
+            "evidence_quality": 57.7,
+            "addressable_scope": 50.0,
+            "compliance_safety": 100.0
+          },
+          "final_score": 45.6,
+          "raw_composite": 45.6,
+          "lifecycle_stage": "EARLY_GROWTH_STEADY",
+          "confidence_range": [
+            30.2,
+            61.0
+          ],
+          "evidence_floor_gate": false,
+          "plausibility_gate_applied": false
+        }
+      ],
+      "summary": {
+        "top_3": [
+          {
+            "name": "Trust And Credibility Concerns",
+            "score": 45.6,
+            "confidence": [
+              30.2,
+              61.0
+            ]
+          }
+        ],
+        "std_score": 0,
+        "mean_score": 45.6,
+        "total_angles": 1,
+        "gates_applied": 0,
+        "lifecycle_distribution": {
+          "EARLY_GROWTH_STEADY": 1
+        }
+      },
+      "z_score_interpretation": {
+        "gated": "Score capped at 30 -- plausibility concerns, do not test without product changes",
+        "strong": "z > 0.5 -- strong candidate, include in first test batch",
+        "average": "0 to 0.5 -- viable but not differentiated",
+        "exceptional": "z > 1.5 -- top tier, test immediately",
+        "below_average": "z < 0 -- deprioritize unless strategic reason to test"
+      }
+    },
+    "ranked_candidates": [
+      {
+        "rank": 1,
+        "angle": {
+          "angle_id": "A01",
+          "evidence": {
+            "top_quotes": [
+              {
+                "quote": "Please don't trust any of these... books on Amazon",
+                "voc_id": "V062",
+                "adjusted_score": 14.4
+              },
+              {
+                "quote": "fake supplements are all over Amazon.",
+                "voc_id": "V053",
+                "adjusted_score": 11.8
+              },
+              {
+                "quote": "Amazon has fake books in general.",
+                "voc_id": "V099",
+                "adjusted_score": 11.8
+              },
+              {
+                "quote": "I don't trust anyone on the Internet who tries to sell their lifestyle",
+                "voc_id": "V009",
+                "adjusted_score": 0.0
+              },
+              {
+                "quote": "do not trust any social media creator that claims to have a “cure”",
+                "voc_id": "V057",
+                "adjusted_score": 0.0
+              }
+            ],
+            "velocity_status": "STEADY",
+            "contradiction_count": 0,
+            "supporting_voc_count": 5,
+            "triangulation_status": "DUAL"
+          },
+          "angle_name": "Trust And Credibility Concerns",
+          "definition": {
+            "who": "value-sensitive buyer",
+            "trigger": "Context from Reddit r/herbalism",
+            "pain_desire": "Trust And Credibility Concerns -> Relief for value-sensitive buyer",
+            "belief_shift": {
+              "after": "Relief for value-sensitive buyer",
+              "before": "Existing approaches discussed in Reddit r/herbalism"
+            },
+            "mechanism_why": "Existing approaches discussed in Reddit r/herbalism"
+          },
+          "hook_starters": [
+            {
+              "lever": "problem crystallization",
+              "visual": "Real-world scene: value-sensitive buyer",
+              "opening_line": "Please don't trust any of these... books on Amazon"
+            },
+            {
+              "lever": "urgency",
+              "visual": "Trigger context: Context from Reddit r/herbalism",
+              "opening_line": "When context from reddit r/herbalism, most advice misses the real mechanism."
+            },
+            {
+              "lever": "desired outcome",
+              "visual": "Outcome shift: Relief for value-sensitive buyer",
+              "opening_line": "Move from trust and credibility concerns to relief for value-sensitive buyer."
+            }
+          ]
+        },
+        "score": 45.6,
+        "components": {
+          "plausibility": 100.0,
+          "demand_signal": 34.5,
+          "executability": 100.0,
+          "market_timing": 76.2,
+          "pain_intensity": 0.0,
+          "distinctiveness": 18.7,
+          "evidence_quality": 57.7,
+          "addressable_scope": 50.0,
+          "compliance_safety": 100.0
+        },
+        "confidence_range": [
+          30.2,
+          61.0
+        ]
+      }
+    ],
+    "stage1_artifact_id": "6bb9a3aa-24d4-4b4c-b34d-9ba730410f54"
+  },
+  "summary": "Angle candidates synthesized from VOC clusters and ranked.",
+  "step_key": "v2-06",
+  "created_at": "2026-02-23T01:54:26.702428+00:00",
+  "agent_run_id": "459abb1a-167a-4b73-92bc-2e246b6f7ebd",
+  "prompt_version": "strategy_v2.agent3.v1",
+  "schema_version": "2.0.0"
+}

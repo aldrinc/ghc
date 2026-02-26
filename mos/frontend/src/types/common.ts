@@ -30,6 +30,29 @@ export interface WorkflowRun {
   finished_at?: string | null;
 }
 
+export interface PendingActivityProgress {
+  activity_id: string;
+  activity_type: string;
+  state?: string | null;
+  attempt?: number;
+  last_worker_identity?: string;
+  last_started_time?: string | null;
+  last_heartbeat_time?: string | null;
+  scheduled_time?: string | null;
+  expiration_time?: string | null;
+  heartbeat_progress?: Record<string, unknown> | null;
+}
+
+export interface StrategyV2State {
+  workflow_run_id?: string;
+  current_stage?: string;
+  pending_signal_type?: string | null;
+  required_signal_type?: string | null;
+  pending_decision_payload?: Record<string, unknown> | null;
+  scored_candidate_summaries?: Record<string, unknown> | null;
+  artifact_refs?: Record<string, string> | null;
+}
+
 export interface ActivityLog {
   id: string;
   workflow_run_id: string;
@@ -82,7 +105,7 @@ export interface ResearchArtifactRef {
   doc_url: string;
   doc_id: string;
   summary?: string;
-  content?: string;
+  content?: unknown;
 }
 
 export interface Experiment {
@@ -107,4 +130,13 @@ export interface WorkflowDetail {
   precanon_research?: Record<string, unknown> | null;
   research_artifacts?: ResearchArtifactRef[] | null;
   research_highlights?: Record<string, unknown> | null;
+  temporal_status?: string | null;
+  pending_activity_progress?: PendingActivityProgress[] | null;
+  strategy_v2_state?: StrategyV2State | null;
+  strategy_v2_stage3?: Artifact | null;
+  strategy_v2_offer?: Artifact | null;
+  strategy_v2_copy?: Artifact | null;
+  strategy_v2_copy_canonical?: Record<string, unknown> | null;
+  strategy_v2_copy_context?: Artifact | null;
+  strategy_v2_awareness_angle_matrix?: Artifact | null;
 }

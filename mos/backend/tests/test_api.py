@@ -4,11 +4,11 @@ from uuid import UUID, uuid4
 
 from app.auth import dependencies as auth_dependencies
 from app.db.deps import get_session
-from app.db.enums import ArtifactTypeEnum
-from app.db.models import Artifact
-from app.db.models import Funnel
-from app.db.models import Org
+from app.db.enums import ArtifactTypeEnum, GeminiContextFileStatusEnum
+from app.db.models import Artifact, Funnel, GeminiContextFile, Org
 from app.main import app
+from app.routers import gemini as gemini_router
+from app.services.gemini_file_search import GeminiChatResult, GeminiCitation
 
 
 def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tuple[str, str, str]:
@@ -36,6 +36,44 @@ def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tup
     assert campaign_resp.status_code == 201
     campaign_id = campaign_resp.json()["id"]
     return client_id, product_id, campaign_id
+
+
+def _insert_gemini_context_file(
+    db_session,
+    *,
+    org_id: UUID,
+    workspace_id: str,
+    client_id: str,
+    product_id: str,
+    doc_key: str,
+    document_name: str,
+    store_name: str,
+) -> GeminiContextFile:
+    record = GeminiContextFile(
+        org_id=org_id,
+        idea_workspace_id=workspace_id,
+        client_id=UUID(client_id),
+        product_id=UUID(product_id),
+        campaign_id=None,
+        doc_key=doc_key,
+        doc_title=f"{doc_key} title",
+        source_kind="research_step",
+        step_key="step-01",
+        sha256=f"sha-{doc_key}",
+        gemini_store_name=store_name,
+        gemini_file_name=None,
+        gemini_document_name=document_name,
+        filename=f"{doc_key}.txt",
+        mime_type="text/plain",
+        size_bytes=128,
+        drive_doc_id=None,
+        drive_url=None,
+        status=GeminiContextFileStatusEnum.ready,
+    )
+    db_session.add(record)
+    db_session.commit()
+    db_session.refresh(record)
+    return record
 
 
 def test_protected_routes_require_auth():
@@ -101,6 +139,7 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
             "business_type": "new",
             "brand_story": "Brand story for testing",
             "product_name": "Test Product",
+            "product_customizable": True,
             "product_description": "A simple test product for onboarding.",
             "goals": ["grow"],
         },
@@ -267,6 +306,104 @@ def test_generate_campaign_funnels_rejects_when_run_in_progress(api_client, fake
         == "A funnel generation workflow is already running for this campaign. Wait for it to finish."
     )
     assert len(fake_temporal.started) == 1
+
+
+def test_gemini_context_requires_feature_flag(api_client, monkeypatch):
+    monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "false")
+
+    response = api_client.get("/gemini/context", params={"ideaWorkspaceId": "ws-test"})
+    assert response.status_code == 409
+    assert response.json()["detail"] == "Gemini File Search is disabled."
+
+
+def test_gemini_context_lists_scoped_files(api_client, db_session, auth_context, monkeypatch):
+    monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "true")
+    client_id, product_id, _campaign_id = _create_campaign_with_product(
+        api_client, suffix="Gemini Context"
+    )
+    workspace_id = client_id
+
+    created = _insert_gemini_context_file(
+        db_session,
+        org_id=UUID(auth_context.org_id),
+        workspace_id=workspace_id,
+        client_id=client_id,
+        product_id=product_id,
+        doc_key="gemini-context-doc",
+        document_name="fileSearchStores/test/documents/doc-123",
+        store_name="fileSearchStores/test",
+    )
+
+    response = api_client.get(
+        "/gemini/context",
+        params={
+            "ideaWorkspaceId": workspace_id,
+            "clientId": client_id,
+            "productId": product_id,
+        },
+    )
+    assert response.status_code == 200
+    files = response.json()["files"]
+    assert len(files) == 1
+    assert files[0]["id"] == str(created.id)
+    assert files[0]["gemini_document_name"] == "fileSearchStores/test/documents/doc-123"
+
+
+def test_gemini_chat_stream_returns_text_and_citations(
+    api_client, db_session, auth_context, monkeypatch
+):
+    monkeypatch.setenv("GEMINI_FILE_SEARCH_ENABLED", "true")
+    client_id, product_id, _campaign_id = _create_campaign_with_product(
+        api_client, suffix="Gemini Stream"
+    )
+    workspace_id = client_id
+    document_name = "fileSearchStores/test/documents/doc-abc"
+    _insert_gemini_context_file(
+        db_session,
+        org_id=UUID(auth_context.org_id),
+        workspace_id=workspace_id,
+        client_id=client_id,
+        product_id=product_id,
+        doc_key="gemini-stream-doc",
+        document_name=document_name,
+        store_name="fileSearchStores/test",
+    )
+
+    def _fake_generate(**_kwargs):
+        return GeminiChatResult(
+            text="Grounded answer from Gemini.",
+            stop_reason="STOP",
+            output_tokens=42,
+            citations=[
+                GeminiCitation(
+                    title="Doc Citation",
+                    uri="https://example.com/doc",
+                    source_kind="retrieved_context",
+                    document_name=document_name,
+                    start_index=0,
+                    end_index=18,
+                )
+            ],
+        )
+
+    monkeypatch.setattr(gemini_router, "generate_with_gemini_file_search", _fake_generate)
+
+    response = api_client.post(
+        "/gemini/chat/stream",
+        json={
+            "prompt": "What does the context say?",
+            "ideaWorkspaceId": workspace_id,
+            "clientId": client_id,
+            "productId": product_id,
+            "fileIds": [document_name],
+        },
+    )
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"type":"text"' in response.text
+    assert "Grounded answer from Gemini." in response.text
+    assert '"type":"done"' in response.text
+    assert '"citations"' in response.text
 
 
 def test_artifacts_assets_experiments_and_swipes(api_client, seed_data):

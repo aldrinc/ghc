@@ -20,6 +20,41 @@ function isCanonArtifactRef(value: unknown): value is CanonArtifactRef {
   );
 }
 
+function toJsonMarkdown(title: string, value: unknown): string {
+  let body = "";
+  try {
+    body = JSON.stringify(value, null, 2) || "null";
+  } catch {
+    body = String(value);
+  }
+  const heading = title.trim() ? `# ${title.trim()}\n\n` : "";
+  return `${heading}\`\`\`json\n${body}\n\`\`\`\n`;
+}
+
+function normalizeMarkdownContent(title: string, value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value === null || value === undefined) return "";
+  if (typeof value !== "object") return String(value);
+
+  const asRecord = value as Record<string, unknown>;
+  const directContent = asRecord.content;
+  if (typeof directContent === "string" && directContent.trim()) return directContent;
+
+  const directMarkdown = asRecord.markdown;
+  if (typeof directMarkdown === "string" && directMarkdown.trim()) return directMarkdown;
+
+  const payload = asRecord.payload;
+  if (payload && typeof payload === "object") {
+    const payloadRecord = payload as Record<string, unknown>;
+    const payloadContent = payloadRecord.content;
+    if (typeof payloadContent === "string" && payloadContent.trim()) return payloadContent;
+    const payloadMarkdown = payloadRecord.markdown;
+    if (typeof payloadMarkdown === "string" && payloadMarkdown.trim()) return payloadMarkdown;
+  }
+
+  return toJsonMarkdown(title, value);
+}
+
 export function ResearchDetailPage() {
   const { workflowId, stepKey } = useParams();
   const navigate = useNavigate();
@@ -48,11 +83,11 @@ export function ResearchDetailPage() {
   const stepContents =
     ((precanonResearch?.step_contents ||
       (precanonResearch as { stepContents?: unknown } | null | undefined)?.stepContents) as
-      | Record<string, string>
+      | Record<string, unknown>
       | undefined) || {};
 
   const resolvedStepKey = stepKey || "";
-  const inlineContent = artifact?.content || stepContents[resolvedStepKey] || "";
+  const inlineContent = normalizeMarkdownContent(artifact?.title || resolvedStepKey, artifact?.content ?? stepContents[resolvedStepKey]);
   const hasInlineContent = Boolean(inlineContent.trim());
 
   const shouldFetchFullContent = Boolean(workflowId && resolvedStepKey && !hasInlineContent);
@@ -63,7 +98,12 @@ export function ResearchDetailPage() {
     error: fullError,
   } = useWorkflowResearchArtifact(workflowId, resolvedStepKey, { enabled: shouldFetchFullContent });
 
-  const fullContent = hasInlineContent ? inlineContent : fullArtifact?.content || "";
+  const fullContent = hasInlineContent
+    ? inlineContent
+    : normalizeMarkdownContent(
+        artifact?.title || canonArtifactRef?.title || fullArtifact?.title || resolvedStepKey,
+        fullArtifact?.content,
+      );
   const hasFullContent = Boolean(fullContent.trim());
 
   const docUrl = artifact?.doc_url || canonArtifactRef?.doc_url || fullArtifact?.doc_url;

@@ -12,6 +12,11 @@ from app.db.repositories.campaigns import CampaignsRepository
 from app.db.base import session_scope
 from app.schemas.strategy_sheet import StrategySheet
 from app.services.claude_files import CLAUDE_DEFAULT_MODEL, call_claude_structured_message, ensure_uploaded_to_claude
+from app.strategy_v2.downstream import load_strategy_v2_outputs
+from app.services.gemini_file_search import (
+    ensure_uploaded_to_gemini_file_search,
+    is_gemini_file_search_enabled,
+)
 
 
 CLAUDE_STRATEGY_MODEL = os.getenv("CLAUDE_STRATEGY_MODEL", CLAUDE_DEFAULT_MODEL)
@@ -92,6 +97,7 @@ def _build_prompt(
     canon: Dict[str, Any],
     metric: Dict[str, Any],
     campaign_id: Optional[str],
+    strategy_v2_packet: Optional[Dict[str, Any]] = None,
     campaign_channels: Optional[list[str]] = None,
     asset_brief_types: Optional[list[str]] = None,
 ) -> str:
@@ -107,6 +113,7 @@ def _build_prompt(
     research_summaries = _resolve_research_summaries(canon)
     primary_kpis = metric.get("primaryKpis") or metric.get("primary_kpis") or []
     secondary_kpis = metric.get("secondaryKpis") or metric.get("secondary_kpis") or []
+    strategy_v2_packet_summary = strategy_v2_packet or {}
 
     channel_constraint = "Channel constraint: Facebook Ads only."
     channel_plan_rule = "channelPlan (list of 1 object for Facebook Ads only with channel, objective, budgetSplitPercent, notes)"
@@ -136,6 +143,7 @@ Constraints: {constraints}
 Primary KPIs: {primary_kpis}
 Secondary KPIs: {secondary_kpis}
 Research summaries: {research_summaries}
+Strategy V2 downstream packet (if present): {strategy_v2_packet_summary}
 Campaign ID: {campaign_id}
 {channel_constraint}
 {asset_brief_hint}
@@ -167,6 +175,7 @@ def build_strategy_sheet_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     if not idea_workspace_id:
         idea_workspace_id = f"client-{client_id}"
     allow_claude_stub = bool(params.get("allow_claude_stub", False))
+    gemini_enabled = is_gemini_file_search_enabled()
     if not product_id:
         raise ValueError("product_id is required to build a strategy sheet")
 
@@ -176,6 +185,17 @@ def build_strategy_sheet_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         repo = ArtifactsRepository(session)
         canon = _load_artifact(repo, org_id, client_id, product_id, ArtifactTypeEnum.client_canon) or {}
         metric = _load_artifact(repo, org_id, client_id, product_id, ArtifactTypeEnum.metric_schema) or {}
+        strategy_v2_outputs = load_strategy_v2_outputs(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+        )
+        strategy_v2_stage3 = strategy_v2_outputs.get("stage3")
+        strategy_v2_offer = strategy_v2_outputs.get("offer")
+        strategy_v2_copy = strategy_v2_outputs.get("copy")
+        strategy_v2_copy_context = strategy_v2_outputs.get("copy_context")
+        strategy_v2_packet = strategy_v2_outputs.get("downstream_packet")
         if campaign_id:
             campaigns_repo = CampaignsRepository(session)
             campaign = campaigns_repo.get(org_id=org_id, campaign_id=campaign_id)
@@ -198,7 +218,7 @@ def build_strategy_sheet_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         if not doc:
             return None
         content_bytes = json.dumps(doc, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
-        return ensure_uploaded_to_claude(
+        claude_file_id = ensure_uploaded_to_claude(
             org_id=org_id,
             idea_workspace_id=idea_workspace_id or "",
             client_id=client_id,
@@ -215,11 +235,36 @@ def build_strategy_sheet_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             drive_url=None,
             allow_stub=allow_claude_stub,
         )
+        if gemini_enabled:
+            ensure_uploaded_to_gemini_file_search(
+                org_id=org_id,
+                idea_workspace_id=idea_workspace_id or "",
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                doc_key=doc_key,
+                doc_title=title,
+                source_kind=source_kind,
+                step_key=None,
+                filename=f"{doc_key}.json",
+                mime_type="text/plain",
+                content_bytes=content_bytes,
+                drive_doc_id=None,
+                drive_url=None,
+            )
+        return claude_file_id
 
     canon_file_id = _upload_context(canon, doc_key="client_canon", title="Client Canon", source_kind="client_canon")
     metric_file_id = _upload_context(metric, doc_key="metric_schema", title="Metric Schema", source_kind="metric_schema")
 
-    prompt = _build_prompt(canon, metric, campaign_id, campaign_channels, asset_brief_types)
+    prompt = _build_prompt(
+        canon,
+        metric,
+        campaign_id,
+        strategy_v2_packet,
+        campaign_channels,
+        asset_brief_types,
+    )
     strategy_schema = _build_strategy_schema(len(campaign_channels) if campaign_channels else 1)
     claude_response = call_claude_structured_message(
         model=CLAUDE_STRATEGY_MODEL,
@@ -329,6 +374,11 @@ def build_strategy_sheet_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     data_out["inputs"] = {
         "client_canon_present": bool(canon),
         "metric_schema_present": bool(metric),
+        "strategy_v2_stage3_present": bool(strategy_v2_stage3),
+        "strategy_v2_offer_present": bool(strategy_v2_offer),
+        "strategy_v2_copy_present": bool(strategy_v2_copy),
+        "strategy_v2_copy_context_present": bool(strategy_v2_copy_context),
+        "strategy_v2_downstream_packet_present": bool(strategy_v2_packet),
     }
     data_out["rawPrompt"] = prompt
     data_out["claudeResponse"] = claude_response.get("raw")
@@ -363,6 +413,23 @@ def build_strategy_sheet_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         drive_url=None,
         allow_stub=allow_claude_stub,
     )
+    if gemini_enabled:
+        ensure_uploaded_to_gemini_file_search(
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id or "",
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            doc_key=strategy_doc_key,
+            doc_title="Campaign Strategy Sheet",
+            source_kind="strategy_sheet",
+            step_key=None,
+            filename=f"{strategy_doc_key}.json",
+            mime_type="text/plain",
+            content_bytes=strategy_bytes,
+            drive_doc_id=None,
+            drive_url=None,
+        )
 
     data_out["claudeFileId"] = strategy_file_id
     data_out["claudeContext"] = {

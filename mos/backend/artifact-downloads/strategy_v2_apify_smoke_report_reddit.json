@@ -1,0 +1,69 @@
+{
+  "ts_utc": "2026-02-24T16:44:22.686387+00:00",
+  "overall_status": "passed",
+  "passed_cases": 1,
+  "total_cases": 1,
+  "config": {
+    "max_items_per_dataset": 1,
+    "max_wait_seconds": 120,
+    "max_actor_runs": 6,
+    "meta_actor_id": "curious_coder~facebook-ads-library-scraper",
+    "tiktok_actor_id": "clockworks/tiktok-scraper",
+    "instagram_actor_id": "apify/instagram-scraper",
+    "youtube_actor_id": "streamers/youtube-scraper",
+    "reddit_actor_id": "practicaltools/apify-reddit-api",
+    "web_actor_id": "apify/web-scraper"
+  },
+  "actor_preflight": {
+    "apify/web-scraper": true,
+    "clockworks/tiktok-scraper": true,
+    "curious_coder~facebook-ads-library-scraper": true,
+    "practicaltools/apify-reddit-api": true
+  },
+  "cases": [
+    {
+      "case": "reddit",
+      "source_refs": [
+        "https://www.facebook.com/duolingo",
+        "https://www.tiktok.com/@duolingo",
+        "https://www.reddit.com/r/herbalism/comments/1expmex",
+        "https://offer.ancientremediesrevived.com/c3-nb"
+      ],
+      "expected_actor_id": "practicaltools/apify-reddit-api",
+      "status": "passed",
+      "checks": {
+        "expected_actor_run_present": true,
+        "ads_context_present": true,
+        "video_context_present": true,
+        "external_voc_present": true,
+        "proof_candidates_present": true,
+        "workflow_context_contract": true
+      },
+      "actor_ids": [
+        "curious_coder~facebook-ads-library-scraper",
+        "clockworks/tiktok-scraper",
+        "practicaltools/apify-reddit-api",
+        "apify/web-scraper"
+      ],
+      "run_items_by_actor": {
+        "curious_coder~facebook-ads-library-scraper": 1,
+        "clockworks/tiktok-scraper": 1,
+        "practicaltools/apify-reddit-api": 1,
+        "apify/web-scraper": 1
+      },
+      "counts": {
+        "candidate_assets": 6,
+        "social_video_observations": 1,
+        "external_voc_corpus": 4,
+        "proof_asset_candidates": 4
+      },
+      "summary": {
+        "run_count": 4,
+        "candidate_asset_count": 6,
+        "social_video_count": 1,
+        "external_voc_count": 4,
+        "proof_candidate_count": 4
+      }
+    }
+  ]
+}

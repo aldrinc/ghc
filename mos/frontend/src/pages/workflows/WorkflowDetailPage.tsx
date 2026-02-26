@@ -7,10 +7,14 @@ import { Callout } from "@/components/ui/callout";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
+import { StrategyV2ReviewWorkspace } from "@/components/workflows/StrategyV2ReviewWorkspace";
 import { useAssets } from "@/api/assets";
 import { useStopWorkflow, useWorkflowDetail, useWorkflowSignal } from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
-import type { Asset, ResearchArtifactRef } from "@/types/common";
+import type { Asset, ResearchArtifactRef, StrategyV2State } from "@/types/common";
+
+const EMPTY_RESEARCH_ARTIFACTS: ResearchArtifactRef[] = [];
+const EMPTY_ARTIFACT_LIST: any[] = [];
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -30,6 +34,36 @@ function truncate(text?: string, max = 120) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+type StrategyV2PendingSignal =
+  | "strategy_v2_proceed_research"
+  | "strategy_v2_confirm_competitor_assets"
+  | "strategy_v2_select_angle"
+  | "strategy_v2_select_ump_ums"
+  | "strategy_v2_select_offer_winner"
+  | "strategy_v2_approve_final_copy";
+
+type StrategyV2Candidate = {
+  id: string;
+  label: string;
+  assetRef?: string;
+  raw?: Record<string, unknown>;
+};
+
+function resolveStrategyV2PendingSignal(state?: StrategyV2State | null): StrategyV2PendingSignal | null {
+  const raw = state?.pending_signal_type || state?.required_signal_type;
+  if (
+    raw === "strategy_v2_proceed_research" ||
+    raw === "strategy_v2_confirm_competitor_assets" ||
+    raw === "strategy_v2_select_angle" ||
+    raw === "strategy_v2_select_ump_ums" ||
+    raw === "strategy_v2_select_offer_winner" ||
+    raw === "strategy_v2_approve_final_copy"
+  ) {
+    return raw;
+  }
+  return null;
+}
+
 export function WorkflowDetailPage() {
   const { workflowId } = useParams();
   const navigate = useNavigate();
@@ -44,22 +78,37 @@ export function WorkflowDetailPage() {
     [products, run?.product_id]
   );
   const researchArtifacts: ResearchArtifactRef[] = useMemo(
-    () => (data?.research_artifacts || []) as ResearchArtifactRef[],
-    [data?.research_artifacts]
+    () => (Array.isArray(data?.research_artifacts) ? (data?.research_artifacts as ResearchArtifactRef[]) : EMPTY_RESEARCH_ARTIFACTS),
+    [data?.research_artifacts],
   );
   const stepSummaries = (data?.precanon_research?.step_summaries as Record<string, string> | undefined) || {};
   const canonStory = (data?.client_canon?.data?.brand as any)?.story as string | undefined;
   const isOnboarding = run?.kind === "client_onboarding";
   const isCampaignPlanning = run?.kind === "campaign_planning" || run?.kind === "campaign_intent";
   const isCreativeProduction = run?.kind === "creative_production";
+  const isStrategyV2 = run?.kind === "strategy_v2";
   const approvalsDisabled = !run || run.status !== "running";
+  const strategyV2State = data?.strategy_v2_state || null;
+  const strategyV2PendingSignal = resolveStrategyV2PendingSignal(strategyV2State);
+  const strategyV2PendingPayload = (strategyV2State?.pending_decision_payload || {}) as Record<string, unknown>;
   const strategyData = (data?.strategy_sheet?.data || {}) as any;
   const channelPlan = (strategyData.channelPlan as any[]) || [];
   const messaging = (strategyData.messaging as any[]) || [];
   const risks = (strategyData.risks as string[]) || [];
   const mitigations = (strategyData.mitigations as string[]) || [];
-  const experimentArtifacts = data?.experiment_specs || [];
-  const assetBriefArtifacts = data?.asset_briefs || [];
+  const experimentArtifacts = useMemo(
+    () => (Array.isArray(data?.experiment_specs) ? (data?.experiment_specs as any[]) : EMPTY_ARTIFACT_LIST),
+    [data?.experiment_specs],
+  );
+  const assetBriefArtifacts = useMemo(
+    () => (Array.isArray(data?.asset_briefs) ? (data?.asset_briefs as any[]) : EMPTY_ARTIFACT_LIST),
+    [data?.asset_briefs],
+  );
+  const strategyV2Stage3Data = (data?.strategy_v2_stage3?.data || {}) as Record<string, unknown>;
+  const strategyV2OfferData = (data?.strategy_v2_offer?.data || {}) as Record<string, unknown>;
+  const strategyV2CopyCanonical = (data?.strategy_v2_copy_canonical || {}) as Record<string, unknown>;
+  const strategyV2CopyContextData = (data?.strategy_v2_copy_context?.data || {}) as Record<string, unknown>;
+  const strategyV2AwarenessData = (data?.strategy_v2_awareness_angle_matrix?.data || {}) as Record<string, unknown>;
   const latestLog = data?.logs?.[0];
 
   const experimentSpecs = useMemo(() => {
@@ -86,9 +135,96 @@ export function WorkflowDetailPage() {
     return Array.from(map.values());
   }, [assetBriefArtifacts]);
 
+  const strategyV2Candidates = useMemo<StrategyV2Candidate[]>(() => {
+    if (!strategyV2PendingSignal) return [];
+    const candidates: StrategyV2Candidate[] = [];
+    if (
+      strategyV2PendingSignal === "strategy_v2_select_angle" ||
+      strategyV2PendingSignal === "strategy_v2_select_ump_ums" ||
+      strategyV2PendingSignal === "strategy_v2_select_offer_winner"
+    ) {
+      const rawCandidates = strategyV2PendingPayload.candidates;
+      if (!Array.isArray(rawCandidates)) return [];
+      rawCandidates.forEach((row, index) => {
+        if (!row || typeof row !== "object") return;
+        const candidate = row as Record<string, unknown>;
+        let id = "";
+        let label = "";
+        if (strategyV2PendingSignal === "strategy_v2_select_angle") {
+          id = String(candidate.angle_id || "").trim();
+          label = String(candidate.angle_name || candidate.angle_id || `Angle ${index + 1}`).trim();
+        } else if (strategyV2PendingSignal === "strategy_v2_select_ump_ums") {
+          id = String(candidate.pair_id || "").trim();
+          const ump = String(candidate.ump_name || "").trim();
+          const ums = String(candidate.ums_name || "").trim();
+          label = `${ump || "UMP"} / ${ums || "UMS"}`.trim();
+        } else {
+          id = String(candidate.variant_id || "").trim();
+          label = String(candidate.ump || candidate.variant_id || `Variant ${index + 1}`).trim();
+        }
+        if (!id) return;
+        candidates.push({ id, label, raw: candidate });
+      });
+      return candidates;
+    }
+
+    if (strategyV2PendingSignal === "strategy_v2_confirm_competitor_assets") {
+      const rawCandidates = strategyV2PendingPayload.candidates;
+      if (!Array.isArray(rawCandidates)) return [];
+      rawCandidates.forEach((row, index) => {
+        if (!row || typeof row !== "object") return;
+        const candidate = row as Record<string, unknown>;
+        const candidateId = String(candidate.candidate_id || "").trim();
+        const assetRef = String(candidate.source_ref || "").trim();
+        if (!candidateId || !assetRef) return;
+        const label = String(
+          candidate.competitor_name || candidate.title || candidate.name || assetRef || `Competitor Candidate ${index + 1}`
+        ).trim();
+        candidates.push({
+          id: candidateId,
+          label,
+          assetRef,
+          raw: candidate,
+        });
+      });
+      return candidates;
+    }
+
+    if (strategyV2PendingSignal === "strategy_v2_approve_final_copy") {
+      const copyArtifactId = String(strategyV2PendingPayload.copy_artifact_id || "").trim();
+      if (copyArtifactId) {
+        const headline = String(strategyV2PendingPayload.headline || "").trim();
+        candidates.push({
+          id: copyArtifactId,
+          label: headline ? `Copy artifact: ${truncate(headline, 80)}` : `Copy artifact: ${copyArtifactId}`,
+          raw: { copy_artifact_id: copyArtifactId },
+        });
+      }
+    }
+    return candidates;
+  }, [strategyV2PendingPayload, strategyV2PendingSignal]);
+
+  const strategyCandidateIds = useMemo(
+    () => strategyV2Candidates.map((candidate) => candidate.id),
+    [strategyV2Candidates]
+  );
+
   const [selectedExperimentIds, setSelectedExperimentIds] = useState<string[]>([]);
   useEffect(() => {
-    setSelectedExperimentIds((prev) => prev.filter((id) => experimentSpecs.some((spec: any) => spec.id === id)));
+    setSelectedExperimentIds((prev) => {
+      if (!prev.length) return prev;
+      const allowed = new Set(
+        experimentSpecs
+          .map((spec: any) => String(spec?.id || "").trim())
+          .filter(Boolean),
+      );
+      if (!allowed.size) return prev.length ? [] : prev;
+      const next = prev.filter((id) => allowed.has(id));
+      if (next.length === prev.length && next.every((id, index) => id === prev[index])) {
+        return prev;
+      }
+      return next;
+    });
   }, [experimentSpecs]);
 
   const allExperimentIds = useMemo(
@@ -184,6 +320,9 @@ export function WorkflowDetailPage() {
       },
     });
   };
+  const handleStrategyV2SubmitSignal = (signal: string, body: Record<string, unknown>) => {
+    workflowSignal.mutate({ signal, body });
+  };
   const handleStopWorkflow = () => {
     if (!run?.id || stopWorkflow.isPending) return;
     stopWorkflow.mutate(run.id);
@@ -194,8 +333,8 @@ export function WorkflowDetailPage() {
       <PageHeader
         title="Workflow detail"
         description={
-          runProduct?.name
-            ? `Inspect research artifacts for ${runProduct.name}.`
+          runProduct?.title
+            ? `Inspect research artifacts for ${runProduct.title}.`
             : "Inspect research artifacts and unblock any required gates."
         }
         actions={
@@ -250,7 +389,7 @@ export function WorkflowDetailPage() {
                   size="sm"
                   onClick={() =>
                     selectProduct(run.product_id || "", {
-                      name: runProduct?.name,
+                      title: runProduct?.title,
                       client_id: run.client_id || undefined,
                     })
                   }
@@ -261,7 +400,7 @@ export function WorkflowDetailPage() {
             >
               <>
                 This workflow is scoped to{" "}
-                <span className="font-semibold text-content">{runProduct?.name || run.product_id}</span>. Switch product
+                <span className="font-semibold text-content">{runProduct?.title || run.product_id}</span>. Switch product
                 to review artifacts in context.
               </>
             </Callout>
@@ -287,7 +426,7 @@ export function WorkflowDetailPage() {
                 <div>
                   <div className="text-content-muted">Product</div>
                   <div className="font-mono text-[11px] text-content-muted">
-                    {runProduct?.name || run.product_id || "—"}
+                    {runProduct?.title || run.product_id || "—"}
                   </div>
                 </div>
                 <div>
@@ -314,6 +453,8 @@ export function WorkflowDetailPage() {
                   <div className="text-xs text-content-muted">
                     {isOnboarding
                       ? "Onboarding is automatic and does not require approvals."
+                      : isStrategyV2
+                        ? "Strategy V2 requires explicit HITL decisions at each manual checkpoint."
                       : isCreativeProduction
                         ? "Creative production waits for asset approvals."
                         : isCampaignPlanning
@@ -326,6 +467,22 @@ export function WorkflowDetailPage() {
                 <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
                   No action required. This run will proceed automatically as activities complete.
                 </div>
+              ) : isStrategyV2 ? (
+                <StrategyV2ReviewWorkspace
+                  workflowId={workflowId}
+                  runStatus={run.status}
+                  pendingSignal={strategyV2PendingSignal}
+                  pendingPayload={strategyV2PendingPayload}
+                  strategyState={strategyV2State}
+                  candidates={strategyV2Candidates}
+                  candidateIds={strategyCandidateIds}
+                  researchArtifacts={researchArtifacts}
+                  stepSummaries={stepSummaries}
+                  logs={data?.logs || []}
+                  disabled={approvalsDisabled}
+                  isSubmitting={workflowSignal.isPending}
+                  onSubmitSignal={handleStrategyV2SubmitSignal}
+                />
               ) : isCampaignPlanning ? (
                 <div className="mt-3 space-y-3 text-sm">
                   {experimentSpecs.length ? (
@@ -386,6 +543,33 @@ export function WorkflowDetailPage() {
             </div>
           </div>
 
+          {data?.pending_activity_progress?.length ? (
+            <div className="ds-card ds-card--md p-0 shadow-none">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-content">Pending activity progress</div>
+                  <div className="text-xs text-content-muted">Temporal heartbeat snapshots for active activities.</div>
+                </div>
+              </div>
+              <div className="space-y-2 p-4 text-xs text-content">
+                {data.pending_activity_progress.map((row) => (
+                  <div key={`${row.activity_id}-${row.attempt || 0}`} className="ds-card ds-card--sm bg-surface-2">
+                    <div className="font-semibold text-content">{row.activity_type || row.activity_id}</div>
+                    <div className="mt-1 text-content-muted">
+                      State: {row.state || "—"} · Attempt: {row.attempt || 0} · Last heartbeat:{" "}
+                      {formatDate(row.last_heartbeat_time || null)}
+                    </div>
+                    {row.heartbeat_progress ? (
+                      <div className="mt-1 text-content-muted">
+                        Heartbeat: {truncate(JSON.stringify(row.heartbeat_progress), 200)}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {researchArtifacts?.length ? (
             <div className="ds-card ds-card--md p-0 shadow-none">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -423,6 +607,63 @@ export function WorkflowDetailPage() {
                     })}
                   </TableBody>
                 </Table>
+              </div>
+            </div>
+          ) : null}
+
+          {isStrategyV2 ? (
+            <div className="ds-card ds-card--md p-0 shadow-none">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-content">Strategy V2 outputs</div>
+                  <div className="text-xs text-content-muted">Canonical stage, offer, copy, and context artifacts.</div>
+                </div>
+              </div>
+              <div className="grid gap-3 p-4 md:grid-cols-2 text-xs text-content">
+                <div className="ds-card ds-card--sm bg-surface-2">
+                  <div className="font-semibold text-content">Stage 3</div>
+                  <div className="mt-1 text-content-muted">
+                    Angle: {String((strategyV2Stage3Data.selected_angle as any)?.angle_name || "—")}
+                  </div>
+                  <div className="text-content-muted">UMP: {String(strategyV2Stage3Data.ump || "—")}</div>
+                  <div className="text-content-muted">UMS: {String(strategyV2Stage3Data.ums || "—")}</div>
+                </div>
+                <div className="ds-card ds-card--sm bg-surface-2">
+                  <div className="font-semibold text-content">Offer</div>
+                  <div className="mt-1 text-content-muted">
+                    Winner: {String((strategyV2OfferData.variant_selected as string) || "—")}
+                  </div>
+                  <div className="text-content-muted">
+                    Composite score: {String(strategyV2OfferData.composite_score || "—")}
+                  </div>
+                  <div className="text-content-muted">
+                    Guarantee: {String(strategyV2OfferData.guarantee_type || "—")}
+                  </div>
+                </div>
+                <div className="ds-card ds-card--sm bg-surface-2 md:col-span-2">
+                  <div className="font-semibold text-content">Copy (canonical)</div>
+                  <div className="mt-1 text-content-muted">
+                    Headline: {String(strategyV2CopyCanonical.headline || "—")}
+                  </div>
+                  <div className="text-content-muted">
+                    Presell length: {String(String(strategyV2CopyCanonical.presell_markdown || "").length || 0)} chars
+                  </div>
+                  <div className="text-content-muted">
+                    Sales length: {String(String(strategyV2CopyCanonical.sales_page_markdown || "").length || 0)} chars
+                  </div>
+                </div>
+                <div className="ds-card ds-card--sm bg-surface-2">
+                  <div className="font-semibold text-content">Awareness matrix</div>
+                  <div className="mt-1 text-content-muted">
+                    Angle name: {String(strategyV2AwarenessData.angle_name || "—")}
+                  </div>
+                </div>
+                <div className="ds-card ds-card--sm bg-surface-2">
+                  <div className="font-semibold text-content">Copy context</div>
+                  <div className="mt-1 text-content-muted">
+                    Context keys: {Object.keys(strategyV2CopyContextData || {}).length}
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}

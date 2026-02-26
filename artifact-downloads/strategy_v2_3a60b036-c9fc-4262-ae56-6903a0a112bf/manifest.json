@@ -1,0 +1,111 @@
+{
+  "workflow_run_id": "3a60b036-c9fc-4262-ae56-6903a0a112bf",
+  "artifact_count": 8,
+  "artifacts": [
+    {
+      "artifact_id": "3e06e6cd-eda0-4ade-a20b-560e25d276a7",
+      "artifact_type": "strategy_v2_stage0",
+      "org_id": "41c2ac3c-91a2-4f00-ba55-c0d2a190b2a7",
+      "client_id": "c4dc509f-6d7e-4a60-b499-de351e796fb0",
+      "product_id": "c1eb6b1d-1d0e-4c9b-ada8-ec1f8284fd40",
+      "campaign_id": null,
+      "created_at": "2026-02-22 22:25:14.734359+00:00",
+      "files": [
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/01_strategy_v2_stage0__3e06e6cd-eda0-4ade-a20b-560e25d276a7.json"
+      ]
+    },
+    {
+      "artifact_id": "7400b326-2cee-410a-966b-1aa5db588001",
+      "artifact_type": "strategy_v2_stage1",
+      "org_id": "41c2ac3c-91a2-4f00-ba55-c0d2a190b2a7",
+      "client_id": "c4dc509f-6d7e-4a60-b499-de351e796fb0",
+      "product_id": "c1eb6b1d-1d0e-4c9b-ada8-ec1f8284fd40",
+      "campaign_id": null,
+      "created_at": "2026-02-22 22:25:14.772454+00:00",
+      "files": [
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/02_strategy_v2_stage1__7400b326-2cee-410a-966b-1aa5db588001.json"
+      ]
+    },
+    {
+      "artifact_id": "bfacfe31-eb19-4c31-a240-db07b46f51bc",
+      "artifact_type": "strategy_v2_stage2",
+      "org_id": "41c2ac3c-91a2-4f00-ba55-c0d2a190b2a7",
+      "client_id": "c4dc509f-6d7e-4a60-b499-de351e796fb0",
+      "product_id": "c1eb6b1d-1d0e-4c9b-ada8-ec1f8284fd40",
+      "campaign_id": null,
+      "created_at": "2026-02-22 22:44:50.286812+00:00",
+      "files": [
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/03_strategy_v2_stage2__bfacfe31-eb19-4c31-a240-db07b46f51bc.json"
+      ]
+    },
+    {
+      "artifact_id": "70ee040b-6edc-4c73-a33f-b2e48df520ec",
+      "artifact_type": "strategy_v2_awareness_angle_matrix",
+      "org_id": "41c2ac3c-91a2-4f00-ba55-c0d2a190b2a7",
+      "client_id": "c4dc509f-6d7e-4a60-b499-de351e796fb0",
+      "product_id": "c1eb6b1d-1d0e-4c9b-ada8-ec1f8284fd40",
+      "campaign_id": null,
+      "created_at": "2026-02-22 22:45:21.275175+00:00",
+      "files": [
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/04_strategy_v2_awareness_angle_matrix__70ee040b-6edc-4c73-a33f-b2e48df520ec.json"
+      ]
+    },
+    {
+      "artifact_id": "721869e6-8f67-418f-8af5-5a62588198f9",
+      "artifact_type": "strategy_v2_stage3",
+      "org_id": "41c2ac3c-91a2-4f00-ba55-c0d2a190b2a7",
+      "client_id": "c4dc509f-6d7e-4a60-b499-de351e796fb0",
+      "product_id": "c1eb6b1d-1d0e-4c9b-ada8-ec1f8284fd40",
+      "campaign_id": null,
+      "created_at": "2026-02-22 22:56:21.202960+00:00",
+      "files": [
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/05_strategy_v2_stage3__721869e6-8f67-418f-8af5-5a62588198f9.json"
+      ]
+    },
+    {
+      "artifact_id": "2e4caa9a-b6b9-4b07-adcc-6325a4734f9c",
+      "artifact_type": "strategy_v2_copy_context",
+      "org_id": "41c2ac3c-91a2-4f00-ba55-c0d2a190b2a7",
+      "client_id": "c4dc509f-6d7e-4a60-b499-de351e796fb0",
+      "product_id": "c1eb6b1d-1d0e-4c9b-ada8-ec1f8284fd40",
+      "campaign_id": null,
+      "created_at": "2026-02-22 22:56:21.212845+00:00",
+      "files": [
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/06_strategy_v2_copy_context__2e4caa9a-b6b9-4b07-adcc-6325a4734f9c.json",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/06_strategy_v2_copy_context__2e4caa9a-b6b9-4b07-adcc-6325a4734f9c__compliance_markdown.md",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/06_strategy_v2_copy_context__2e4caa9a-b6b9-4b07-adcc-6325a4734f9c__brand_voice_markdown.md",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/06_strategy_v2_copy_context__2e4caa9a-b6b9-4b07-adcc-6325a4734f9c__mental_models_markdown.md",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/06_strategy_v2_copy_context__2e4caa9a-b6b9-4b07-adcc-6325a4734f9c__audience_product_markdown.md",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/06_strategy_v2_copy_context__2e4caa9a-b6b9-4b07-adcc-6325a4734f9c__awareness_angle_matrix_markdown.md"
+      ]
+    },
+    {
+      "artifact_id": "7d85cb3f-1f11-4225-8b00-983a64c56cef",
+      "artifact_type": "strategy_v2_copy",
+      "org_id": "41c2ac3c-91a2-4f00-ba55-c0d2a190b2a7",
+      "client_id": "c4dc509f-6d7e-4a60-b499-de351e796fb0",
+      "product_id": "c1eb6b1d-1d0e-4c9b-ada8-ec1f8284fd40",
+      "campaign_id": null,
+      "created_at": "2026-02-22 22:56:57.245036+00:00",
+      "files": [
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/07_strategy_v2_copy__7d85cb3f-1f11-4225-8b00-983a64c56cef.json",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/07_strategy_v2_copy__7d85cb3f-1f11-4225-8b00-983a64c56cef__body_markdown.md",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/07_strategy_v2_copy__7d85cb3f-1f11-4225-8b00-983a64c56cef__body_markdown.md"
+      ]
+    },
+    {
+      "artifact_id": "bd88b8c2-b091-4efc-9f01-5042de36d6a0",
+      "artifact_type": "strategy_v2_copy",
+      "org_id": "41c2ac3c-91a2-4f00-ba55-c0d2a190b2a7",
+      "client_id": "c4dc509f-6d7e-4a60-b499-de351e796fb0",
+      "product_id": "c1eb6b1d-1d0e-4c9b-ada8-ec1f8284fd40",
+      "campaign_id": null,
+      "created_at": "2026-02-22 22:57:06.242447+00:00",
+      "files": [
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/08_strategy_v2_copy__bd88b8c2-b091-4efc-9f01-5042de36d6a0.json",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/08_strategy_v2_copy__bd88b8c2-b091-4efc-9f01-5042de36d6a0__approved_body_markdown.md",
+        "artifact-downloads/strategy_v2_3a60b036-c9fc-4262-ae56-6903a0a112bf/08_strategy_v2_copy__bd88b8c2-b091-4efc-9f01-5042de36d6a0__approved_headline.txt"
+      ]
+    }
+  ]
+}

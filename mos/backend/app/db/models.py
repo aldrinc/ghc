@@ -36,6 +36,7 @@ from app.db.enums import (
     ProductBrandRelationshipSourceEnum,
     ProductBrandRelationshipTypeEnum,
     ClaudeContextFileStatusEnum,
+    GeminiContextFileStatusEnum,
     CampaignStatusEnum,
     ClientStatusEnum,
     FunnelAssetKindEnum,
@@ -63,6 +64,11 @@ class Org(Base):
     id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     external_id: Mapped[Optional[str]] = mapped_column(Text, unique=True, nullable=True)
     name: Mapped[str] = mapped_column(Text, nullable=False)
+    strategy_v2_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=sa.text("false"),
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -139,6 +145,11 @@ class Client(Base):
         Enum(ClientStatusEnum, name="client_status"),
         server_default=ClientStatusEnum.active.value,
         nullable=False,
+    )
+    strategy_v2_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=sa.text("false"),
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -743,6 +754,63 @@ class ClaudeContextFile(Base):
         Enum(ClaudeContextFileStatusEnum, name="claude_context_file_status"),
         nullable=False,
         server_default=ClaudeContextFileStatusEnum.ready.value,
+    )
+    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class GeminiContextFile(Base):
+    __tablename__ = "gemini_context_files"
+    __table_args__ = (
+        UniqueConstraint(
+            "org_id",
+            "idea_workspace_id",
+            "product_id",
+            "doc_key",
+            "sha256",
+            name="uq_gemini_context_workspace_doc_hash",
+        ),
+        sa.Index("idx_gemini_ctx_org_workspace", "org_id", "idea_workspace_id"),
+        sa.Index("idx_gemini_ctx_client", "client_id"),
+        sa.Index("idx_gemini_ctx_product", "product_id"),
+        sa.Index("idx_gemini_ctx_campaign", "campaign_id"),
+        sa.Index("idx_gemini_ctx_doc_key", "doc_key"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    idea_workspace_id: Mapped[str] = mapped_column(Text, nullable=False)
+    client_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("clients.id", ondelete="SET NULL"), nullable=True
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"), nullable=True
+    )
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    doc_key: Mapped[str] = mapped_column(Text, nullable=False)
+    doc_title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_kind: Mapped[str] = mapped_column(Text, nullable=False)
+    step_key: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sha256: Mapped[str] = mapped_column(Text, nullable=False)
+    gemini_store_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gemini_file_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    gemini_document_name: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    filename: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    mime_type: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    size_bytes: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    drive_doc_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    drive_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    status: Mapped[GeminiContextFileStatusEnum] = mapped_column(
+        Enum(GeminiContextFileStatusEnum, name="gemini_context_file_status"),
+        nullable=False,
+        server_default=GeminiContextFileStatusEnum.ready.value,
     )
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(

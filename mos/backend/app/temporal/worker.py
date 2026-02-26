@@ -24,6 +24,7 @@ from app.temporal.workflows.test_campaign import TestCampaignWorkflow
 from app.temporal.workflows.precanon_market_research import PreCanonMarketResearchWorkflow
 from app.temporal.workflows.ads_ingestion import AdsIngestionWorkflow, AdsIngestionRetryWorkflow
 from app.temporal.workflows.ad_creative_analysis import AdsCreativeAnalysisWorkflow
+from app.temporal.workflows.strategy_v2 import StrategyV2Workflow
 from app.temporal.activities import placeholders as placeholder_activities
 from app.temporal.activities.client_onboarding_activities import (
     build_client_canon_activity,
@@ -84,6 +85,23 @@ from app.temporal.activities.ad_breakdown_activities import (
 from app.temporal.activities.swipe_image_ad_activities import (
     generate_swipe_image_ad_activity,
 )
+from app.temporal.activities.strategy_v2_activities import (
+    apply_strategy_v2_angle_selection_activity,
+    build_strategy_v2_foundational_research_activity,
+    build_strategy_v2_offer_variants_activity,
+    build_strategy_v2_stage0_activity,
+    check_strategy_v2_enabled_activity,
+    ensure_strategy_v2_workflow_run_activity,
+    finalize_strategy_v2_competitor_assets_confirmation_activity,
+    finalize_strategy_v2_copy_approval_activity,
+    finalize_strategy_v2_offer_winner_activity,
+    finalize_strategy_v2_research_proceed_activity,
+    mark_strategy_v2_failed_activity,
+    prepare_strategy_v2_competitor_asset_candidates_activity,
+    run_strategy_v2_copy_pipeline_activity,
+    run_strategy_v2_offer_pipeline_activity,
+    run_strategy_v2_voc_angle_pipeline_activity,
+)
 
 
 async def main() -> None:
@@ -108,6 +126,7 @@ async def main() -> None:
             AdsIngestionRetryWorkflow,
             AdsCreativeAnalysisWorkflow,
             TestCampaignWorkflow,
+            StrategyV2Workflow,
         ]
         primary_activities = [
             placeholder_activities.noop_activity,
@@ -154,6 +173,21 @@ async def main() -> None:
             generate_ad_breakdown_activity,
             persist_teardown_from_breakdown_activity,
             generate_swipe_image_ad_activity,
+            check_strategy_v2_enabled_activity,
+            ensure_strategy_v2_workflow_run_activity,
+            build_strategy_v2_stage0_activity,
+            build_strategy_v2_foundational_research_activity,
+            finalize_strategy_v2_research_proceed_activity,
+            prepare_strategy_v2_competitor_asset_candidates_activity,
+            finalize_strategy_v2_competitor_assets_confirmation_activity,
+            run_strategy_v2_voc_angle_pipeline_activity,
+            apply_strategy_v2_angle_selection_activity,
+            run_strategy_v2_offer_pipeline_activity,
+            build_strategy_v2_offer_variants_activity,
+            finalize_strategy_v2_offer_winner_activity,
+            run_strategy_v2_copy_pipeline_activity,
+            finalize_strategy_v2_copy_approval_activity,
+            mark_strategy_v2_failed_activity,
         ]
 
         with (

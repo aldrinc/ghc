@@ -15,11 +15,16 @@ from app.db.repositories.claude_context_files import ClaudeContextFilesRepositor
 from app.db.base import session_scope
 from app.schemas.experiment_spec import ExperimentSpecSet
 from app.schemas.asset_brief import AssetBrief
+from app.strategy_v2.downstream import load_strategy_v2_outputs
 from app.services.claude_files import (
     CLAUDE_DEFAULT_MODEL,
     build_document_blocks,
     call_claude_structured_message,
     ensure_uploaded_to_claude,
+)
+from app.services.gemini_file_search import (
+    ensure_uploaded_to_gemini_file_search,
+    is_gemini_file_search_enabled,
 )
 
 
@@ -171,6 +176,7 @@ def _build_asset_brief_prompt(
     format_hint: str,
     tone_guidelines: list[str],
     constraints: list[str],
+    strategy_v2_packet_summary: str,
     chunk_index: int,
     chunk_total: int,
 ) -> str:
@@ -190,6 +196,7 @@ You are a creative strategist. Using the experiment specs below and the attached
 - This request is chunk {chunk_index} of {chunk_total}; include only briefs for experiment variants present in this chunk.
 {channel_hint}
 {format_hint}
+Strategy V2 downstream packet context (if present): {strategy_v2_packet_summary}
 
 Experiment specs (inline):
 {experiments_json}
@@ -274,6 +281,7 @@ def _build_experiment_prompt(
     *,
     available_metric_ids: list[str],
     purple_ocean_angles: list[str],
+    strategy_v2_packet: Optional[Dict[str, Any]] = None,
     campaign_channels: Optional[list[str]] = None,
     asset_brief_types: Optional[list[str]] = None,
 ) -> str:
@@ -282,7 +290,7 @@ def _build_experiment_prompt(
     if not purple_ocean_angles:
         raise RuntimeError(
             "purple_ocean_angles is required to build experiments. "
-            "Precanon step 015 (Purple Ocean Angle Analysis) must be present in client canon."
+            "Provide angles from Strategy V2 stage3 or precanon step 015."
         )
     channel_hint = ""
     format_hint = ""
@@ -293,12 +301,14 @@ def _build_experiment_prompt(
     if asset_brief_types:
         format_hint = f"\nCreative brief types for this campaign: {asset_brief_types}"
     angles_hint = "\n".join([f"- {angle}" for angle in purple_ocean_angles])
+    strategy_v2_packet_hint = strategy_v2_packet or {}
     return f"""
-You are a media & experiment architect. Use the attached client canon, Purple Ocean Angle Analysis, and metric schema to propose ONE experiment per Purple Ocean angle below.
+You are a media & experiment architect. Use attached strategy context and metric schema to propose ONE experiment per Purple Ocean angle below.
 
 Context hints:
 - Available metricIds (use ONLY these exact ids in metricIds): {available_metric_ids}
 {channel_hint}{format_hint}
+- Strategy V2 downstream packet context (if present): {strategy_v2_packet_hint}
 
 Purple Ocean angle library (use these exact names as experiment.name):
 {angles_hint}
@@ -328,7 +338,11 @@ Return JSON only that conforms to the requested schema.
 """
 
 
-def _extract_purple_ocean_angles(canon: Dict[str, Any]) -> list[str]:
+def _extract_purple_ocean_angles(
+    canon: Dict[str, Any],
+    *,
+    strategy_v2_stage3: Optional[Dict[str, Any]] = None,
+) -> list[str]:
     precanon = canon.get("precanon_research") if isinstance(canon, dict) else None
     step_contents = (precanon or {}).get("step_contents") if isinstance(precanon, dict) else None
     step_summaries = (precanon or {}).get("step_summaries") if isinstance(precanon, dict) else None
@@ -396,10 +410,24 @@ def _extract_purple_ocean_angles(canon: Dict[str, Any]) -> list[str]:
             continue
         seen.add(key)
         out.append(angle)
+    if out:
+        return out
+
+    if isinstance(strategy_v2_stage3, dict):
+        selected_angle = strategy_v2_stage3.get("selected_angle")
+        if isinstance(selected_angle, dict):
+            angle_name = selected_angle.get("angle_name")
+            if isinstance(angle_name, str) and angle_name.strip():
+                return [angle_name.strip()]
+
     return out
 
 
-def _build_client_canon_compact(canon: Dict[str, Any]) -> Dict[str, Any]:
+def _build_client_canon_compact(
+    canon: Dict[str, Any],
+    *,
+    purple_ocean_angles: list[str],
+) -> Dict[str, Any]:
     brand = canon.get("brand") if isinstance(canon, dict) else {}
     voice = canon.get("voiceOfCustomer") if isinstance(canon, dict) else {}
     constraints = canon.get("constraints") if isinstance(canon, dict) else {}
@@ -408,8 +436,6 @@ def _build_client_canon_compact(canon: Dict[str, Any]) -> Dict[str, Any]:
 
     step_summaries = (precanon or {}).get("step_summaries") if isinstance(precanon, dict) else None
     step_summaries = step_summaries if isinstance(step_summaries, dict) else {}
-
-    angles = _extract_purple_ocean_angles(canon)
 
     return {
         "clientId": canon.get("clientId"),
@@ -433,7 +459,7 @@ def _build_client_canon_compact(canon: Dict[str, Any]) -> Dict[str, Any]:
         "precanon_research": {
             "step_summaries": step_summaries,
         },
-        "purple_ocean_angles": angles,
+        "purple_ocean_angles": purple_ocean_angles,
     }
 
 
@@ -452,16 +478,38 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     if not idea_workspace_id:
         idea_workspace_id = f"client-{client_id}"
     allow_claude_stub = bool(params.get("allow_claude_stub", False))
+    gemini_enabled = is_gemini_file_search_enabled()
     model = params.get("model") or CLAUDE_EXPERIMENT_MODEL
     if not product_id:
         raise RuntimeError("product_id is required to generate experiment specs.")
 
     campaign_channels: Optional[list[str]] = None
     asset_brief_types: Optional[list[str]] = None
+    strategy_v2_stage3: Dict[str, Any] = {}
+    strategy_v2_offer: Dict[str, Any] = {}
+    strategy_v2_copy: Dict[str, Any] = {}
+    strategy_v2_copy_context: Dict[str, Any] = {}
+    strategy_v2_packet: Dict[str, Any] = {}
     with session_scope() as session:
         repo = ArtifactsRepository(session)
         metric = _load_metric(repo, org_id, client_id, product_id)
         canon = _load_canon(repo, org_id, client_id, product_id)
+        strategy_v2_outputs = load_strategy_v2_outputs(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+        )
+        if isinstance(strategy_v2_outputs.get("stage3"), dict):
+            strategy_v2_stage3 = strategy_v2_outputs["stage3"]
+        if isinstance(strategy_v2_outputs.get("offer"), dict):
+            strategy_v2_offer = strategy_v2_outputs["offer"]
+        if isinstance(strategy_v2_outputs.get("copy"), dict):
+            strategy_v2_copy = strategy_v2_outputs["copy"]
+        if isinstance(strategy_v2_outputs.get("copy_context"), dict):
+            strategy_v2_copy_context = strategy_v2_outputs["copy_context"]
+        if isinstance(strategy_v2_outputs.get("downstream_packet"), dict):
+            strategy_v2_packet = strategy_v2_outputs["downstream_packet"]
         if campaign_id:
             campaigns_repo = CampaignsRepository(session)
             campaign = campaigns_repo.get(org_id=org_id, campaign_id=campaign_id)
@@ -502,16 +550,22 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "Metric schema KPI definitions are present but invalid (expected non-empty strings)."
         )
 
-    purple_ocean_angles = _extract_purple_ocean_angles(canon)
+    purple_ocean_angles = _extract_purple_ocean_angles(
+        canon,
+        strategy_v2_stage3=strategy_v2_stage3 or None,
+    )
     if not purple_ocean_angles:
         raise RuntimeError(
-            "Purple Ocean angles not found in client canon. "
-            "Expected precanon_research step 015 to be present before generating experiments."
+            "Purple Ocean angles were not found. "
+            "Expected Strategy V2 selected angle or precanon step 015 to be present before generating experiments."
         )
 
     # Keep the experiment generator focused: upload a compact canon that includes Purple Ocean
     # angle names + step summaries, rather than passing the entire canon (which can be very large).
-    canon_compact = _build_client_canon_compact(canon)
+    canon_compact = _build_client_canon_compact(
+        canon,
+        purple_ocean_angles=purple_ocean_angles,
+    )
     canon_compact_bytes = json.dumps(canon_compact, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
     ensure_uploaded_to_claude(
         org_id=org_id,
@@ -529,6 +583,87 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         drive_doc_id=None,
         drive_url=None,
         allow_stub=allow_claude_stub,
+    )
+    if gemini_enabled:
+        ensure_uploaded_to_gemini_file_search(
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            doc_key="client_canon_compact",
+            doc_title="Client Canon (Compact)",
+            source_kind="client_canon_compact",
+            step_key=None,
+            filename="client_canon_compact.json",
+            mime_type="text/plain",
+            content_bytes=canon_compact_bytes,
+            drive_doc_id=None,
+            drive_url=None,
+        )
+
+    def _upload_optional_context(*, data: Dict[str, Any], doc_key: str, title: str, source_kind: str) -> None:
+        if not data:
+            return
+        payload_bytes = json.dumps(data, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+        ensure_uploaded_to_claude(
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            doc_key=doc_key,
+            doc_title=title,
+            source_kind=source_kind,
+            step_key=None,
+            filename=f"{doc_key}.json",
+            mime_type="text/plain",
+            content_bytes=payload_bytes,
+            drive_doc_id=None,
+            drive_url=None,
+            allow_stub=allow_claude_stub,
+        )
+        if gemini_enabled:
+            ensure_uploaded_to_gemini_file_search(
+                org_id=org_id,
+                idea_workspace_id=idea_workspace_id,
+                client_id=client_id,
+                product_id=product_id,
+                campaign_id=campaign_id,
+                doc_key=doc_key,
+                doc_title=title,
+                source_kind=source_kind,
+                step_key=None,
+                filename=f"{doc_key}.json",
+                mime_type="text/plain",
+                content_bytes=payload_bytes,
+                drive_doc_id=None,
+                drive_url=None,
+            )
+
+    _upload_optional_context(
+        data=strategy_v2_stage3,
+        doc_key="strategy_v2_stage3",
+        title="Strategy V2 Stage3",
+        source_kind="strategy_v2_stage3",
+    )
+    _upload_optional_context(
+        data=strategy_v2_offer,
+        doc_key="strategy_v2_offer",
+        title="Strategy V2 Offer",
+        source_kind="strategy_v2_offer",
+    )
+    _upload_optional_context(
+        data=strategy_v2_copy,
+        doc_key="strategy_v2_copy",
+        title="Strategy V2 Copy",
+        source_kind="strategy_v2_copy",
+    )
+    _upload_optional_context(
+        data=strategy_v2_copy_context,
+        doc_key="strategy_v2_copy_context",
+        title="Strategy V2 Copy Context",
+        source_kind="strategy_v2_copy_context",
     )
 
     # Ensure metric schema is available in this idea workspace so downstream steps can reuse it.
@@ -550,6 +685,23 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         drive_url=None,
         allow_stub=allow_claude_stub,
     )
+    if gemini_enabled:
+        ensure_uploaded_to_gemini_file_search(
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            doc_key="metric_schema",
+            doc_title="Metric Schema",
+            source_kind="metric_schema",
+            step_key=None,
+            filename="metric_schema.json",
+            mime_type="text/plain",
+            content_bytes=metric_bytes,
+            drive_doc_id=None,
+            drive_url=None,
+        )
 
     with session_scope() as session:
         ctx_repo = ClaudeContextFilesRepository(session)
@@ -570,7 +722,7 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     if not context_files:
         raise RuntimeError(
             f"No eligible Claude context files registered for workspace {idea_workspace_id}; "
-            "client_canon and metric_schema are required."
+            "strategy context and metric_schema are required."
         )
 
     def _pick_latest(files: list, *, doc_key: str):
@@ -592,25 +744,34 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
     # Prefer a small, angle-focused context set.
     selected: list = []
-    for key in ("client_canon_compact", "precanon:015", "precanon:07", "precanon:08", "precanon:09", "metric_schema"):
+    for key in (
+        "client_canon_compact",
+        "precanon:015",
+        "precanon:07",
+        "precanon:08",
+        "precanon:09",
+        "strategy_v2_stage3",
+        "strategy_v2_offer",
+        "strategy_v2_copy",
+        "strategy_v2_copy_context",
+        "metric_schema",
+    ):
         picked = _pick_latest(context_files, doc_key=key)
         if picked is not None:
             selected.append(picked)
 
-    if not any((cf.doc_key or "").startswith("client_canon") for cf in selected):
-        raise RuntimeError("Missing required Claude context file: client_canon (expected client_canon_compact).")
     if not any((cf.doc_key or "").startswith("metric_schema") for cf in selected):
         raise RuntimeError("Missing required Claude context file: metric_schema.")
-    if not any((cf.doc_key or "") == "precanon:015" for cf in selected):
+    if not any((cf.doc_key or "") in {"precanon:015", "strategy_v2_stage3"} for cf in selected):
         raise RuntimeError(
-            "Missing required Claude context file: precanon:015 (Purple Ocean Angle Analysis). "
-            "This is required to generate Purple Ocean-aligned experiments."
+            "Missing required angle context file: expected one of strategy_v2_stage3 or precanon:015."
         )
 
     documents = build_document_blocks(selected)
     prompt = _build_experiment_prompt(
         available_metric_ids=available_metric_ids,
         purple_ocean_angles=purple_ocean_angles,
+        strategy_v2_packet=strategy_v2_packet,
         campaign_channels=campaign_channels,
         asset_brief_types=asset_brief_types,
     )
@@ -753,6 +914,23 @@ def build_experiment_specs_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         drive_url=None,
         allow_stub=allow_claude_stub,
     )
+    if gemini_enabled:
+        ensure_uploaded_to_gemini_file_search(
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            doc_key=experiments_doc_key,
+            doc_title="Experiment Specs",
+            source_kind="experiment_specs",
+            step_key=None,
+            filename=f"{experiments_doc_key}.json",
+            mime_type="text/plain",
+            content_bytes=experiments_bytes,
+            drive_doc_id=None,
+            drive_url=None,
+        )
     data_out["claudeFileId"] = experiments_file_id
     return {"experiment_specs": experiments, "claude_file_id": experiments_file_id}
 
@@ -807,12 +985,14 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
     if not idea_workspace_id:
         idea_workspace_id = f"client-{client_id}"
     allow_claude_stub = bool(params.get("allow_claude_stub", False))
+    gemini_enabled = is_gemini_file_search_enabled()
     model = params.get("model") or CLAUDE_ASSET_BRIEF_MODEL
     if not product_id:
         raise RuntimeError("product_id is required to generate asset briefs.")
 
     campaign_channels: Optional[list[str]] = None
     asset_brief_types: Optional[list[str]] = None
+    strategy_v2_packet_summary = "{}"
     with session_scope() as session:
         ctx_repo = ClaudeContextFilesRepository(session)
         # Funnel generation runs may use a fresh Temporal workflow id as idea_workspace_id.
@@ -832,6 +1012,17 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
             product_id=product_id,
             artifact_type=ArtifactTypeEnum.client_canon,
         )
+        strategy_v2_outputs = load_strategy_v2_outputs(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+        )
+        if isinstance(strategy_v2_outputs.get("downstream_packet"), dict):
+            strategy_v2_packet_summary = json.dumps(
+                strategy_v2_outputs["downstream_packet"],
+                ensure_ascii=True,
+            )[:4000]
         if campaign_id:
             campaigns_repo = CampaignsRepository(session)
             campaign = campaigns_repo.get(org_id=org_id, campaign_id=campaign_id)
@@ -912,6 +1103,10 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
         "precanon:07",
         "precanon:08",
         "precanon:09",
+        "strategy_v2_stage3",
+        "strategy_v2_offer",
+        "strategy_v2_copy",
+        "strategy_v2_copy_context",
         "metric_schema",
         strategy_doc_key,
     ):
@@ -919,8 +1114,14 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
         if picked is not None:
             selected.append(picked)
 
-    if not any((cf.doc_key or "").startswith("client_canon") for cf in selected):
-        raise RuntimeError("Missing required Claude context file: client_canon (expected client_canon_compact).")
+    if not any(
+        (cf.doc_key or "").startswith("client_canon")
+        or (cf.doc_key or "") in {"strategy_v2_stage3", "strategy_v2_offer", "strategy_v2_copy", "strategy_v2_copy_context"}
+        for cf in selected
+    ):
+        raise RuntimeError(
+            "Missing required context file: expected client_canon* or Strategy V2 context artifacts."
+        )
 
     if CLAUDE_ASSET_BRIEF_EXPERIMENTS_PER_CALL <= 0:
         raise RuntimeError("CLAUDE_ASSET_BRIEF_EXPERIMENTS_PER_CALL must be greater than zero.")
@@ -956,6 +1157,7 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
             format_hint=format_hint,
             tone_guidelines=tone_guidelines,
             constraints=constraints,
+            strategy_v2_packet_summary=strategy_v2_packet_summary,
             chunk_index=chunk_idx,
             chunk_total=len(experiment_chunks),
         )
@@ -1139,5 +1341,22 @@ def create_asset_briefs_for_experiments_activity(params: Dict[str, Any]) -> Dict
         drive_url=None,
         allow_stub=allow_claude_stub,
     )
+    if gemini_enabled:
+        ensure_uploaded_to_gemini_file_search(
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            doc_key=briefs_doc_key,
+            doc_title="Asset Briefs",
+            source_kind="asset_briefs",
+            step_key=None,
+            filename=f"{briefs_doc_key}.json",
+            mime_type="text/plain",
+            content_bytes=briefs_bytes,
+            drive_doc_id=None,
+            drive_url=None,
+        )
 
     return {"asset_brief_ids": brief_ids, "briefs": data_out, "claude_file_id": claude_file_id}

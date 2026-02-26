@@ -1,0 +1,18 @@
+{
+  "model": "human_decision",
+  "title": "Strategy V2 Final Approval HITL",
+  "payload": {
+    "decision": {
+      "approved": true,
+      "operator_note": "Approved after rerun quality gate validation.",
+      "operator_user_id": "aldrin.clement"
+    },
+    "approved_artifact_id": "0909e7d2-55a0-4573-a5a0-d15dbc365d68"
+  },
+  "summary": "Final copy approval recorded and workflow completed.",
+  "step_key": "v2-11",
+  "created_at": "2026-02-23T02:12:28.889283+00:00",
+  "agent_run_id": "d34824c0-29d2-429d-b2cb-0ee7a8a920ed",
+  "prompt_version": "strategy_v2.final_approval.v1",
+  "schema_version": "2.0.0"
+}

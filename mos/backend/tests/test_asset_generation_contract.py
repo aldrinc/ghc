@@ -1,6 +1,7 @@
 from app.temporal.activities.asset_activities import (
     _ProductReferenceAsset,
     _build_image_reference_text,
+    _extract_requirement_swipe_source,
     _extract_remote_reference_asset_id,
     _split_requirement_asset_counts,
 )
@@ -55,3 +56,37 @@ def test_build_image_reference_text_includes_urls() -> None:
     )
     assert "Hero Product" in text
     assert "https://example.com/asset-1.png" in text
+
+
+def test_extract_requirement_swipe_source_prefers_explicit_keys() -> None:
+    company_swipe_id, swipe_image_url = _extract_requirement_swipe_source(
+        {
+            "companySwipeId": " swipe-123 ",
+            "swipeImageUrl": None,
+        }
+    )
+    assert company_swipe_id == "swipe-123"
+    assert swipe_image_url is None
+
+    company_swipe_id, swipe_image_url = _extract_requirement_swipe_source(
+        {
+            "company_swipe_id": None,
+            "swipe_image_url": " https://example.com/swipe.png ",
+        }
+    )
+    assert company_swipe_id is None
+    assert swipe_image_url == "https://example.com/swipe.png"
+
+
+def test_extract_requirement_swipe_source_rejects_ambiguous_payload() -> None:
+    try:
+        _extract_requirement_swipe_source(
+            {
+                "companySwipeId": "swipe-123",
+                "swipeImageUrl": "https://example.com/swipe.png",
+            }
+        )
+    except ValueError as exc:
+        assert "exactly one swipe source" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected ValueError when both company swipe id and swipe image url are provided.")

@@ -38,7 +38,7 @@ export function useWorkflowDetail(workflowId?: string) {
   });
 }
 
-export type WorkflowResearchArtifact = ResearchArtifactRef & { content: string };
+export type WorkflowResearchArtifact = ResearchArtifactRef & { content: unknown };
 
 export function useWorkflowResearchArtifact(
   workflowId?: string,

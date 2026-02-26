@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import time
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote
 
 import httpx
 
@@ -27,7 +28,8 @@ class ApifyClient:
         return {"Content-Type": "application/json"}
 
     def start_actor_run(self, actor_id: str, *, input_payload: Dict[str, Any]) -> Dict[str, Any]:
-        url = f"{self.base_url}/acts/{actor_id}/runs"
+        encoded_actor_id = quote(actor_id, safe="~")
+        url = f"{self.base_url}/acts/{encoded_actor_id}/runs"
         params = {"token": self.token}
         response = httpx.post(url, params=params, json=input_payload, timeout=self.timeout_seconds)
         response.raise_for_status()

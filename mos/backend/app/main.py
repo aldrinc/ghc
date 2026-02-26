@@ -19,6 +19,7 @@ from app.routers import (
     artifacts,
     assets,
     claude,
+    gemini,
     campaigns,
     compliance,
     brands,
@@ -146,6 +147,7 @@ def create_app() -> FastAPI:
     app.include_router(openai_webhooks.router)
     app.include_router(stripe_webhooks.router)
     app.include_router(claude.router)
+    app.include_router(gemini.router)
     app.include_router(deploy.router)
 
     return app

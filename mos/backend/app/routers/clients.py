@@ -127,6 +127,8 @@ from app.services.shopify_theme_copy_agent import (
 from app.services.shopify_theme_content_planner import (
     plan_shopify_theme_component_content,
 )
+from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
+from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.client_onboarding import (
     ClientOnboardingInput,
@@ -321,7 +323,12 @@ def create_client(
     session: Session = Depends(get_session),
 ):
     repo = ClientsRepository(session)
-    client = repo.create(org_id=auth.org_id, name=payload.name, industry=payload.industry)
+    client = repo.create(
+        org_id=auth.org_id,
+        name=payload.name,
+        industry=payload.industry,
+        strategy_v2_enabled=payload.strategyV2Enabled,
+    )
     return jsonable_encoder(client)
 
 
@@ -6085,6 +6092,8 @@ def update_client(
                     detail="Design system must belong to the same client",
                 )
         fields["design_system_id"] = design_system_id
+    if "strategyV2Enabled" in payload.model_fields_set and payload.strategyV2Enabled is not None:
+        fields["strategy_v2_enabled"] = payload.strategyV2Enabled
 
     updated = repo.update(org_id=auth.org_id, client_id=client_id, **fields)
     return jsonable_encoder(updated)
@@ -6166,7 +6175,7 @@ async def start_client_onboarding(
 
     offer_fields: dict[str, object] = {
         "name": product.title,
-        "business_model": "unspecified",
+        "business_model": payload.business_model.strip(),
     }
     if payload.product_description is not None:
         offer_fields["description"] = payload.product_description
@@ -6201,6 +6210,13 @@ async def start_client_onboarding(
             client_id=client_id,
             onboarding_payload_id=str(onboarding_payload.id),
             product_id=str(product.id),
+            business_model=payload.business_model.strip(),
+            funnel_position=payload.funnel_position.strip(),
+            target_platforms=list(payload.target_platforms),
+            target_regions=list(payload.target_regions),
+            existing_proof_assets=list(payload.existing_proof_assets),
+            brand_voice_notes=payload.brand_voice_notes.strip(),
+            compliance_notes=payload.compliance_notes.strip() if isinstance(payload.compliance_notes, str) and payload.compliance_notes.strip() else None,
         ),
         id=f"client-onboarding-{auth.org_id}-{client_id}-{onboarding_payload.id}",
         task_queue=settings.TEMPORAL_TASK_QUEUE,
@@ -6272,25 +6288,40 @@ async def start_campaign_intent(
             detail="assetBriefTypes must include at least one non-empty value.",
         )
 
+    strategy_v2_required = is_strategy_v2_enabled(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+    )
     artifacts_repo = ArtifactsRepository(session)
-    canon = artifacts_repo.get_latest_by_type(
-        org_id=auth.org_id,
-        client_id=client_id,
-        product_id=product_id,
-        artifact_type=ArtifactTypeEnum.client_canon,
-    )
-    metric = artifacts_repo.get_latest_by_type(
-        org_id=auth.org_id,
-        client_id=client_id,
-        product_id=product_id,
-        artifact_type=ArtifactTypeEnum.metric_schema,
-    )
     wf_repo = WorkflowsRepository(session)
-    if not canon or not metric:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Complete client onboarding (canon + metric schema) before starting campaign intent.",
+    if not strategy_v2_required:
+        canon = artifacts_repo.get_latest_by_type(
+            org_id=auth.org_id,
+            client_id=client_id,
+            product_id=product_id,
+            artifact_type=ArtifactTypeEnum.client_canon,
         )
+        metric = artifacts_repo.get_latest_by_type(
+            org_id=auth.org_id,
+            client_id=client_id,
+            product_id=product_id,
+            artifact_type=ArtifactTypeEnum.metric_schema,
+        )
+        if not canon or not metric:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Complete client onboarding (canon + metric schema) before starting campaign intent.",
+            )
+    try:
+        require_strategy_v2_outputs_if_enabled(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            product_id=product_id,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
     temporal = await get_temporal_client()
     handle = await temporal.start_workflow(

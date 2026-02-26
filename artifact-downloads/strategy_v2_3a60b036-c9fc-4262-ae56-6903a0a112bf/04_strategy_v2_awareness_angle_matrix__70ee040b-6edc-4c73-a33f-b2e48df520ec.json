@@ -1,0 +1,46 @@
+{
+  "angle_name": "Agree! It Interacts With Some Prescriptions And It’S Becoming A Pain In The Butt To Find S",
+  "awareness_framing": {
+    "unaware": {
+      "frame": "Story-led opening for long-time Amazon skeptic that surfaces hidden friction around Context from Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai)).",
+      "exit_belief": "Agree! It interacts with some prescriptions and it’s becoming a pain in the butt to find supplements without it. -> Relief for long-time Amazon skeptic may be caused by an unseen mechanism.",
+      "entry_emotion": "complacent uncertainty",
+      "headline_direction": "Narrative curiosity first, mechanism implied but not named."
+    },
+    "most_aware": {
+      "frame": "Offer-first close with direct value, guarantee, and action path.",
+      "exit_belief": "Acting now is rational and low risk.",
+      "entry_emotion": "purchase readiness",
+      "headline_direction": "Product + core benefit + urgency-safe CTA."
+    },
+    "problem_aware": {
+      "frame": "Name the problem directly and anchor it in Context from Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai)).",
+      "exit_belief": "The issue persists because existing approaches discussed in reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai)).",
+      "entry_emotion": "frustration",
+      "headline_direction": "Problem crystallization with concrete language."
+    },
+    "product_aware": {
+      "frame": "Resolve purchase objections with implementation clarity and proof sequence.",
+      "exit_belief": "Relief for long-time Amazon skeptic",
+      "entry_emotion": "skeptical interest",
+      "headline_direction": "Objection handling with concrete deliverables."
+    },
+    "solution_aware": {
+      "frame": "Differentiate from generic solutions and preview mechanism-based correction.",
+      "exit_belief": "A mechanism-matched solution category is required.",
+      "entry_emotion": "skeptical hope",
+      "headline_direction": "Category differentiation with mechanism emphasis."
+    }
+  },
+  "constant_elements": [
+    "Existing approaches discussed in Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai))",
+    "Relief for long-time Amazon skeptic",
+    "Context from Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai))"
+  ],
+  "variable_elements": [
+    "headline_direction",
+    "proof emphasis",
+    "CTA directness"
+  ],
+  "product_name_first_appears": "product_aware"
+}

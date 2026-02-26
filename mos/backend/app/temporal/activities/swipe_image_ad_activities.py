@@ -4,14 +4,17 @@ import hashlib
 import os
 import re
 import time
+import json
 from typing import Any, Dict, List, Tuple
 
 import httpx
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types as genai_types
     _GENAI_IMPORT_ERROR: Exception | None = None
 except Exception as exc:  # pragma: no cover - environment-specific dependency issue
     genai = None
+    genai_types = None
     _GENAI_IMPORT_ERROR = exc
 from sqlalchemy import select
 from temporalio import activity
@@ -22,6 +25,7 @@ from app.db.enums import ArtifactTypeEnum
 from app.db.models import DesignSystem, Funnel, ProductOffer, ProductVariant
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.clients import ClientsRepository
+from app.db.repositories.gemini_context_files import GeminiContextFilesRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.swipes import CompanySwipesRepository
 from app.db.repositories.workflows import WorkflowsRepository
@@ -36,41 +40,79 @@ from app.services.creative_service_client import (
     CreativeServiceConfigError,
     CreativeServiceRequestError,
 )
+from app.services.gemini_file_search import (
+    ensure_uploaded_to_gemini_file_search,
+    is_gemini_file_search_enabled,
+)
 from app.services.swipe_prompt import (
     SwipePromptParseError,
-    build_swipe_context_block,
     extract_new_image_prompt_from_markdown,
     load_swipe_to_image_ad_prompt,
 )
 
 # Reuse existing asset generation helpers to keep asset storage consistent.
 from app.temporal.activities.asset_activities import (  # noqa: E402
+    _build_image_reference_text,
     _create_generated_asset_from_url,
+    _ensure_remote_reference_asset_ids,
     _extract_brief,
     _retention_expires_at,
+    _select_product_reference_assets,
     _stable_idempotency_key,
     _validate_brief_scope,
 )
 
 
-_GEMINI_CONFIGURED = False
+_GEMINI_CLIENT: Any | None = None
 
 
-def _ensure_gemini_configured() -> None:
-    global _GEMINI_CONFIGURED
-    if _GEMINI_CONFIGURED:
-        return
+def _ensure_gemini_client():
+    global _GEMINI_CLIENT
+    if _GEMINI_CLIENT is not None:
+        return _GEMINI_CLIENT
     if genai is None:
         detail = str(_GENAI_IMPORT_ERROR) if _GENAI_IMPORT_ERROR else "unknown import error"
         raise RuntimeError(
-            "google-generativeai dependency is unavailable for swipe image activity. "
+            "google-genai dependency is unavailable for swipe image activity. "
             f"Fix dependency compatibility and retry. Original error: {detail}"
         )
+    if genai_types is None:
+        detail = str(_GENAI_IMPORT_ERROR) if _GENAI_IMPORT_ERROR else "unknown import error"
+        raise RuntimeError(f"google.genai.types is unavailable: {detail}")
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY not configured")
-    genai.configure(api_key=api_key)
-    _GEMINI_CONFIGURED = True
+    _GEMINI_CLIENT = genai.Client(api_key=api_key)
+    return _GEMINI_CLIENT
+
+
+def _normalize_gemini_model_name(model: str) -> str:
+    normalized = (model or "").strip()
+    if not normalized:
+        raise ValueError("model is required (provide params.model or set SWIPE_PROMPT_MODEL).")
+    if normalized.startswith("models/"):
+        return normalized.split("/", 1)[1]
+    return normalized
+
+
+def _is_image_render_model_name(model: str) -> bool:
+    normalized = _normalize_gemini_model_name(model).lower()
+    return (
+        "image-preview" in normalized
+        or "image-generation" in normalized
+        or normalized.endswith("-image")
+    )
+
+
+def _normalize_render_model_id(model: str) -> str:
+    normalized = (model or "").strip()
+    if not normalized:
+        raise ValueError("render_model_id must be a non-empty string when provided.")
+    if normalized.startswith("models/"):
+        return normalized
+    if normalized.startswith("gemini-"):
+        return f"models/{normalized}"
+    return normalized
 
 
 def _download_bytes(url: str, *, max_bytes: int, timeout_seconds: float) -> Tuple[bytes, str]:
@@ -263,6 +305,141 @@ def _must_avoid_claims_from_canon(canon: Dict[str, Any]) -> List[str]:
     return out
 
 
+def _normalize_prompt_value(value: str | None) -> str:
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return "[UNKNOWN]"
+
+
+def _prompt_assets_value(*, product_reference_assets: List[Any], design_system_tokens: Dict[str, Any]) -> str:
+    packshot_titles: List[str] = []
+    for reference in product_reference_assets:
+        title = getattr(reference, "title", None)
+        if isinstance(title, str) and title.strip():
+            packshot_titles.append(title.strip())
+
+    has_logo = False
+    if isinstance(design_system_tokens, dict):
+        brand = design_system_tokens.get("brand")
+        if isinstance(brand, dict):
+            logo_public_id = brand.get("logoAssetPublicId")
+            has_logo = isinstance(logo_public_id, str) and bool(logo_public_id.strip())
+
+    if not packshot_titles and not has_logo:
+        return "[UNKNOWN]"
+
+    packshot_part = ", ".join(packshot_titles) if packshot_titles else "[UNKNOWN]"
+    logo_part = "available" if has_logo else "[UNKNOWN]"
+    return f"PACKSHOT: {packshot_part}; LOGO: {logo_part}"
+
+
+def _render_swipe_prompt_template(
+    *,
+    prompt_template: str,
+    brand_name: str,
+    product_name: str,
+    audience: str | None,
+    angle_from_docs: str | None,
+    brand_colors_fonts: str | None,
+    must_avoid_claims: List[str],
+    assets_value: str,
+) -> str:
+    if not isinstance(prompt_template, str) or not prompt_template.strip():
+        raise ValueError("prompt_template is required and must be non-empty.")
+
+    cleaned_brand_name = _normalize_prompt_value(brand_name)
+    cleaned_product_name = _normalize_prompt_value(product_name)
+    cleaned_audience = _normalize_prompt_value(audience)
+    cleaned_angle_from_docs = _normalize_prompt_value(angle_from_docs)
+    cleaned_brand_colors_fonts = _normalize_prompt_value(brand_colors_fonts)
+    claims_value = (
+        "; ".join(item.strip() for item in must_avoid_claims if isinstance(item, str) and item.strip())
+        if must_avoid_claims
+        else "[UNKNOWN]"
+    )
+    cleaned_assets = _normalize_prompt_value(assets_value)
+
+    rendered = prompt_template
+    rendered = re.sub(
+        r"Brand name:\s*\[BRAND_NAME\]",
+        lambda _m: f"Brand name: {cleaned_brand_name}",
+        rendered,
+    )
+    rendered = re.sub(
+        r"Product:\s*\[PRODUCT\]",
+        lambda _m: f"Product: {cleaned_product_name}",
+        rendered,
+    )
+    rendered = re.sub(
+        r"Audience:\s*\[AUDIENCE\]\s*\(optional\)",
+        lambda _m: f"Audience: {cleaned_audience} (optional)",
+        rendered,
+    )
+    rendered = re.sub(
+        r"Brand colors/fonts:\s*\[UNKNOWN if not given\]",
+        lambda _m: f"Brand colors/fonts: {cleaned_brand_colors_fonts}",
+        rendered,
+    )
+    rendered = re.sub(
+        r"Must-avoid claims:\s*\[UNKNOWN if not given\]",
+        lambda _m: f"Must-avoid claims: {claims_value}",
+        rendered,
+    )
+    rendered = re.sub(
+        r"Assets:\s*\[PACKSHOT\?\s*LOGO\?\]\s*\(optional\)",
+        lambda _m: f"Assets: {cleaned_assets} (optional)",
+        rendered,
+    )
+
+    rendered = rendered.replace(
+        "[User uploads image]",
+        "Competitor swipe image is attached below as image input.",
+    )
+    rendered = rendered.replace("[BRAND_NAME]", cleaned_brand_name)
+    rendered = rendered.replace("[PRODUCT]", cleaned_product_name)
+    rendered = rendered.replace("[AUDIENCE]", cleaned_audience)
+
+    rendered = re.sub(
+        r"\n*---\s*\n*\s*But with the items shown in brackets populated with our product/brand specific info\.\s*$",
+        "",
+        rendered,
+        flags=re.IGNORECASE,
+    )
+
+    unresolved = [
+        token
+        for token in (
+            "[BRAND_NAME]",
+            "[PRODUCT]",
+            "[AUDIENCE]",
+            "[UNKNOWN if not given]",
+            "[PACKSHOT? LOGO?]",
+            "[User uploads image]",
+        )
+        if token in rendered
+    ]
+    if unresolved:
+        raise ValueError(
+            "Swipe prompt template has unresolved runtime placeholders after rendering: "
+            f"{', '.join(unresolved)}"
+        )
+
+    angle_line = f"Angle: {cleaned_angle_from_docs}"
+    vocc_instruction = (
+        "Use emotional, raw, visceral VOCC from research documents around the primary precision, "
+        "safety, dosage angle and secondary angles. Should be a punch in the gut style."
+    )
+    rendered = rendered.rstrip()
+    if re.search(r"(?im)^Angle:\s*", rendered):
+        rendered = re.sub(r"(?im)^Angle:\s*.*$", angle_line, rendered, count=1)
+    else:
+        rendered = f"{rendered}\n\n{angle_line}"
+    if vocc_instruction.lower() not in rendered.lower():
+        rendered = f"{rendered}\n\n{vocc_instruction}"
+
+    return rendered.strip()
+
+
 def _format_price(amount_cents: int, currency: str) -> str:
     cleaned_currency = (currency or "").strip().upper()
     if cleaned_currency == "USD":
@@ -383,6 +560,127 @@ def _build_product_offer_context_block(
     return text, signature, metadata
 
 
+def _build_swipe_foundation_seed_doc(
+    *,
+    client_name: str,
+    product_title: str,
+    canon: dict[str, Any],
+    design_system_tokens: dict[str, Any],
+    swipe_context_block: str,
+    offer_context_block: str,
+) -> str:
+    return "\n".join(
+        [
+            "# SWIPE FOUNDATION CONTEXT",
+            f"Brand name: {client_name}",
+            f"Product: {product_title}",
+            "",
+            "## CLIENT_CANON_JSON",
+            "```json",
+            json.dumps(canon, ensure_ascii=True, sort_keys=True),
+            "```",
+            "",
+            "## DESIGN_SYSTEM_TOKENS_JSON",
+            "```json",
+            json.dumps(design_system_tokens, ensure_ascii=True, sort_keys=True),
+            "```",
+            "",
+            "## SWIPE_CONTEXT_BLOCK",
+            swipe_context_block,
+            "",
+            "## OFFER_CONTEXT_BLOCK",
+            offer_context_block,
+        ]
+    ).strip()
+
+
+def _resolve_gemini_file_search_store_names(
+    *,
+    session,
+    org_id: str,
+    idea_workspace_id: str,
+    client_id: str,
+    product_id: str,
+    campaign_id: str | None,
+    client_name: str,
+    product_title: str,
+    canon: dict[str, Any],
+    design_system_tokens: dict[str, Any],
+    swipe_context_block: str,
+    offer_context_block: str,
+) -> list[str]:
+    if not is_gemini_file_search_enabled():
+        raise RuntimeError(
+            "Gemini File Search must be enabled for swipe image ad generation. "
+            "Set GEMINI_FILE_SEARCH_ENABLED=true."
+        )
+
+    repo = GeminiContextFilesRepository(session)
+    records = repo.list_for_workspace_or_client(
+        org_id=org_id,
+        idea_workspace_id=idea_workspace_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+    )
+    store_names = sorted(
+        {
+            str(getattr(record, "gemini_store_name", "") or "").strip()
+            for record in records
+            if str(getattr(record, "gemini_store_name", "") or "").strip()
+        }
+    )
+    if store_names:
+        return store_names
+
+    foundation_text = _build_swipe_foundation_seed_doc(
+        client_name=client_name,
+        product_title=product_title,
+        canon=canon,
+        design_system_tokens=design_system_tokens,
+        swipe_context_block=swipe_context_block,
+        offer_context_block=offer_context_block,
+    )
+    ensure_uploaded_to_gemini_file_search(
+        org_id=org_id,
+        idea_workspace_id=idea_workspace_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        doc_key="swipe_foundation_context",
+        doc_title="Swipe Foundation Context",
+        source_kind="swipe_foundation_context",
+        step_key="swipe_image_ad",
+        filename="swipe_foundation_context.md",
+        mime_type="text/plain",
+        content_bytes=foundation_text.encode("utf-8"),
+        drive_doc_id=None,
+        drive_url=None,
+    )
+
+    session.expire_all()
+    seeded_records = repo.list_for_workspace_or_client(
+        org_id=org_id,
+        idea_workspace_id=idea_workspace_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+    )
+    seeded_store_names = sorted(
+        {
+            str(getattr(record, "gemini_store_name", "") or "").strip()
+            for record in seeded_records
+            if str(getattr(record, "gemini_store_name", "") or "").strip()
+        }
+    )
+    if seeded_store_names:
+        return seeded_store_names
+
+    raise RuntimeError(
+        "No Gemini File Search stores are available for this workspace after seeding foundation context."
+    )
+
+
 def _poll_image_job(
     *,
     creative_client: CreativeServiceClient,
@@ -409,7 +707,7 @@ def _poll_image_job(
 
 def _extract_gemini_text(result: Any) -> str | None:
     """
-    Extract text from a google.generativeai generation result.
+    Extract text from a google.genai generation result.
 
     Note: In some library versions, `result.text` raises instead of returning a string.
     """
@@ -494,20 +792,48 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     asset_brief_id = params["asset_brief_id"]
     requirement_index = int(params.get("requirement_index") or 0)
     workflow_run_id = params.get("workflow_run_id")
+    idea_workspace_id = (
+        params.get("idea_workspace_id")
+        or params.get("workflow_id")
+        or params.get("campaign_id")
+        or params.get("client_id")
+    )
+    if not isinstance(idea_workspace_id, str) or not idea_workspace_id.strip():
+        raise ValueError("idea_workspace_id resolution failed; expected campaign_id or client_id in params.")
+    idea_workspace_id = idea_workspace_id.strip()
 
     company_swipe_id: str | None = params.get("company_swipe_id")
     swipe_image_url: str | None = params.get("swipe_image_url")
 
-    model = params.get("model") or os.getenv("SWIPE_PROMPT_MODEL")
-    if not isinstance(model, str) or not model.strip():
-        raise ValueError("model is required (provide params.model or set SWIPE_PROMPT_MODEL).")
+    model = (
+        params.get("model")
+        or os.getenv("SWIPE_PROMPT_MODEL")
+        or os.getenv("GEMINI_FILE_SEARCH_MODEL")
+        or settings.GEMINI_FILE_SEARCH_MODEL
+    )
+    model_name = _normalize_gemini_model_name(str(model or ""))
+    if _is_image_render_model_name(model_name):
+        raise ValueError(
+            "model is used for stage-1 swipe prompt generation only and cannot be an image rendering model. "
+            "Set model/SWIPE_PROMPT_MODEL to a Gemini File Search-capable text model, and set "
+            "render_model_id/SWIPE_IMAGE_RENDER_MODEL for the final image rendering step."
+        )
+    requested_render_model_id = params.get("render_model_id") or os.getenv("SWIPE_IMAGE_RENDER_MODEL")
+    render_model_id: str | None = None
+    if requested_render_model_id is not None:
+        if not isinstance(requested_render_model_id, str) or not requested_render_model_id.strip():
+            raise ValueError("render_model_id must be a non-empty string when provided.")
+        requested_render_model_id = requested_render_model_id.strip()
+        render_model_id = _normalize_render_model_id(requested_render_model_id)
+    else:
+        requested_render_model_id = None
 
     max_output_tokens = int(params.get("max_output_tokens") or os.getenv("SWIPE_PROMPT_MAX_OUTPUT_TOKENS") or "6000")
     aspect_ratio = (params.get("aspect_ratio") or "1:1").strip()
     count = int(params.get("count") or 1)
     if count <= 0:
         raise ValueError("count must be >= 1 for swipe image ad generation.")
-    render_count = max(6, count)
+    render_count = count
     render_max_attempts = int(os.getenv("SWIPE_IMAGE_RENDER_MAX_ATTEMPTS", "3"))
     if render_max_attempts <= 0:
         raise ValueError("SWIPE_IMAGE_RENDER_MAX_ATTEMPTS must be greater than zero.")
@@ -533,7 +859,9 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "campaign_id": campaign_id,
             "company_swipe_id": company_swipe_id,
             "swipe_image_url": swipe_image_url,
-            "model": model,
+            "model": model_name,
+            "render_model_id_requested": requested_render_model_id,
+            "render_model_id_used": render_model_id,
             "count": count,
             "render_count": render_count,
             "aspect_ratio": aspect_ratio,
@@ -613,12 +941,46 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         brand_colors_fonts = _brand_colors_fonts_from_design_tokens(tokens)
         must_avoid_claims = _must_avoid_claims_from_canon(canon)
 
-        offer_context_block, offer_context_signature, offer_context_metadata = _build_product_offer_context_block(
+        offer_context_metadata = {
+            "offerId": None,
+            "offerName": None,
+            "pricePoints": [],
+        }
+
+        # Final image generation must include real product image references.
+        product_reference_assets = _select_product_reference_assets(
             session=session,
             org_id=org_id,
-            client_id=client_id,
             product_id=product_id,
-            funnel_id=funnel_id,
+        )
+        product_reference_remote_ids = _ensure_remote_reference_asset_ids(
+            session=session,
+            org_id=org_id,
+            creative_client=creative_client,
+            references=product_reference_assets,
+        )
+        image_reference_text = _build_image_reference_text(product_reference_assets)
+        product_reference_signature = _stable_idempotency_key(
+            "swipe_product_references_v1",
+            *product_reference_remote_ids,
+        )
+        prompt_assets_value = _prompt_assets_value(
+            product_reference_assets=product_reference_assets,
+            design_system_tokens=tokens if isinstance(tokens, dict) else {},
+        )
+        rendered_prompt_template = _render_swipe_prompt_template(
+            prompt_template=prompt_template,
+            brand_name=str(client_name),
+            product_name=str(product_title),
+            audience=audience,
+            angle_from_docs=angle,
+            brand_colors_fonts=brand_colors_fonts,
+            must_avoid_claims=must_avoid_claims,
+            assets_value=prompt_assets_value,
+        )
+        rendered_prompt_signature = _stable_idempotency_key(
+            "swipe_prompt_input_v1",
+            rendered_prompt_template,
         )
 
         # Swipe image bytes.
@@ -628,45 +990,48 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             company_swipe_id=company_swipe_id,
             swipe_image_url=swipe_image_url,
         )
+        swipe_image_sha256 = hashlib.sha256(swipe_bytes).hexdigest()
+        swipe_image_size_bytes = len(swipe_bytes)
 
-        # Build the LLM prompt context.
-        context_block = build_swipe_context_block(
-            brand_name=str(client_name),
-            product_name=str(product_title),
-            audience=audience,
-            brand_colors_fonts=brand_colors_fonts,
-            must_avoid_claims=must_avoid_claims,
-            assets=None,
-            creative_concept=creative_concept,
-            channel=channel_id,
-            angle=angle,
-            hook=hook,
-            constraints=constraints,
-            tone_guidelines=tone_guidelines,
-            visual_guidelines=visual_guidelines,
-        )
-        context_block = "\n\n".join([context_block, offer_context_block]).strip()
-
-        brief_context_signature = _stable_idempotency_key(
-            "swipe_brief_context_v1",
-            creative_concept,
-            channel_id,
-            angle.strip() if isinstance(angle, str) else "",
-            hook.strip() if isinstance(hook, str) else "",
-            "||".join(constraints),
-            "||".join(tone_guidelines),
-            "||".join(visual_guidelines),
+        # The Gemini input must be only the rendered swipe prompt template plus the competitor image.
+        # File Search still attaches foundational stores as an external tool context.
+        swipe_context_block = ""
+        offer_context_block = ""
+        gemini_store_names = _resolve_gemini_file_search_store_names(
+            session=session,
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            client_name=str(client_name),
+            product_title=str(product_title),
+            canon=canon if isinstance(canon, dict) else {},
+            design_system_tokens=tokens if isinstance(tokens, dict) else {},
+            swipe_context_block=swipe_context_block,
+            offer_context_block=offer_context_block,
         )
 
-        # Run Gemini to generate the generation-ready image prompt.
-        _ensure_gemini_configured()
-        model_name = model if model.startswith("models/") else f"models/{model}"
+        # Run Gemini vision with File Search context to generate the generation-ready image prompt.
+        gemini_client = _ensure_gemini_client()
         generation_config = {
             "temperature": 0.2,
             "max_output_tokens": max_output_tokens,
+            "stores_attached": len(gemini_store_names),
         }
-        model_client = genai.GenerativeModel(model_name=model_name, generation_config=generation_config)
-        contents: List[Any] = [context_block, prompt_template, {"mime_type": swipe_mime_type, "data": swipe_bytes}]
+        contents: List[Any] = [
+            rendered_prompt_template,
+            genai_types.Part.from_bytes(data=swipe_bytes, mime_type=swipe_mime_type),
+        ]
+        generate_config = genai_types.GenerateContentConfig(
+            temperature=0.2,
+            max_output_tokens=max_output_tokens,
+            tools=[
+                genai_types.Tool(
+                    file_search=genai_types.FileSearch(file_search_store_names=gemini_store_names)
+                )
+            ],
+        )
 
         trace_context = LangfuseTraceContext(
             name="workflow.swipe_image_ad",
@@ -676,35 +1041,51 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "clientId": client_id,
                 "campaignId": campaign_id,
                 "productId": product_id,
+                "ideaWorkspaceId": idea_workspace_id,
                 "assetBriefId": asset_brief_id,
                 "workflowRunId": workflow_run_id,
-                "model": model,
+                "model": model_name,
+                "storesAttached": len(gemini_store_names),
                 "requirementIndex": requirement_index,
             },
-            tags=["workflow", "swipe_image_ad", "gemini"],
+            tags=["workflow", "swipe_image_ad", "gemini", "file_search"],
         )
         with bind_langfuse_trace_context(trace_context):
             with start_langfuse_generation(
                 name="llm.gemini.swipe_prompt",
-                model=model,
+                model=model_name,
                 input={"asset_brief_id": asset_brief_id, "prompt_sha256": prompt_sha},
                 metadata={
                     "channel": channel_id,
                     "format": fmt,
                     "companySwipeId": company_swipe_id,
                     "swipeSourceUrl": swipe_source_url,
+                    "storesAttached": len(gemini_store_names),
                 },
                 model_parameters=generation_config,
-                tags=["workflow", "swipe_image_ad", "gemini"],
+                tags=["workflow", "swipe_image_ad", "gemini", "file_search"],
                 trace_name="workflow.swipe_image_ad",
             ) as generation:
                 try:
-                    result = model_client.generate_content(contents, request_options={"timeout": 120})
+                    result = gemini_client.models.generate_content(
+                        model=model_name,
+                        contents=contents,
+                        config=generate_config,
+                    )
                     raw_output = _extract_gemini_text(result)
                     if not raw_output:
                         raise RuntimeError("Gemini returned no text for swipe prompt generation")
                 except Exception as exc:  # noqa: BLE001
-                    raise RuntimeError(f"Swipe prompt generation failed: {exc}") from exc
+                    error_text = str(exc)
+                    if "File search tool is not enabled for this model" in error_text:
+                        raise RuntimeError(
+                            "Swipe prompt generation model does not support Gemini File Search. "
+                            f"model={model_name}. Choose a Gemini model with File Search support for this workflow."
+                        ) from exc
+                    raise RuntimeError(
+                        "Swipe prompt generation failed with Gemini File Search context: "
+                        f"{error_text}"
+                    ) from exc
                 if generation is not None:
                     generation.update(
                         output=raw_output,
@@ -731,10 +1112,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             str(company_swipe_id or swipe_source_url or ""),
             aspect_ratio,
             str(render_count),
-            model,
+            model_name,
+            str(render_model_id or ""),
             prompt_sha,
-            brief_context_signature,
-            offer_context_signature,
+            rendered_prompt_signature,
+            product_reference_signature,
         )
 
         completed_job: Any | None = None
@@ -745,8 +1127,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             )
             image_payload = CreativeServiceImageAdsCreateIn(
                 prompt=image_prompt,
+                reference_text=image_reference_text,
+                reference_asset_ids=product_reference_remote_ids,
                 count=render_count,
                 aspect_ratio=aspect_ratio,
+                model_id=render_model_id,
                 client_request_id=attempt_idempotency_key,
             )
 
@@ -798,18 +1183,32 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "promptUsed": output.prompt_used,
                 "swipeCompanyId": company_swipe_id,
                 "swipeSourceUrl": swipe_source_url,
-                "swipePromptModel": model,
+                "swipePromptModel": model_name,
+                "swipeRenderModelIdRequested": requested_render_model_id,
+                "swipeRenderModelIdUsed": getattr(completed_job, "model_id", None) or render_model_id,
+                "swipeGeminiStoreNames": gemini_store_names,
                 "swipePromptTemplateKey": "prompts/swipe/swipe_to_image_ad.md",
                 "swipePromptTemplateSha256": prompt_sha,
-                "swipePromptContextBlock": context_block,
-                "swipeBriefContextSignature": brief_context_signature,
-                "swipeOfferContextSignature": offer_context_signature,
+                "swipePromptInputText": rendered_prompt_template,
+                "swipePromptImageAttached": True,
+                "swipePromptImageSourceUrl": swipe_source_url,
+                "swipePromptImageMimeType": swipe_mime_type,
+                "swipePromptImageSizeBytes": swipe_image_size_bytes,
+                "swipePromptImageSha256": swipe_image_sha256,
                 "swipeOfferId": offer_context_metadata.get("offerId"),
                 "swipeOfferName": offer_context_metadata.get("offerName"),
                 "swipeOfferPricePoints": offer_context_metadata.get("pricePoints"),
                 "swipePromptMarkdownSha256": hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
                 "swipePromptMarkdown": raw_output,
                 "swipePromptMarkdownPreview": raw_output[:4000],
+                "swipeProductReferenceRemoteAssetIds": product_reference_remote_ids,
+                "swipeProductReferenceLocalAssetIds": [
+                    reference.local_asset_id for reference in product_reference_assets
+                ],
+                "swipeProductReferenceTitles": [
+                    reference.title for reference in product_reference_assets if isinstance(reference.title, str)
+                ],
+                "swipeProductReferenceText": image_reference_text,
             }
 
             local_asset_id = _create_generated_asset_from_url(
@@ -843,8 +1242,10 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             payload_out={
                 "asset_ids": created_asset_ids,
                 "job_id": completed_job.id,
-                "swipe_prompt_model": model,
+                "swipe_prompt_model": model_name,
+                "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
                 "prompt_template_sha256": prompt_sha,
+                "stores_attached": len(gemini_store_names),
             },
         )
 
@@ -853,6 +1254,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "job_id": completed_job.id,
             "image_prompt": image_prompt,
             "swipe_prompt_markdown": raw_output,
-            "swipe_prompt_model": model,
+            "swipe_prompt_model": model_name,
+            "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
+            "stores_attached": len(gemini_store_names),
             "prompt_template_sha256": prompt_sha,
         }

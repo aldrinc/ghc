@@ -1,0 +1,991 @@
+{
+  "decision": {
+    "approved": true,
+    "operator_note": "Approved for controlled E2E run.",
+    "operator_user_id": "system-monitor"
+  },
+  "approved_at": "2026-02-22T22:57:06.242085+00:00",
+  "approved_copy": {
+    "headline": "New Study Shows What 78% of Parents Get Wrong About Kids and Herbs",
+    "congruency": {
+      "result": {
+        "bh": [
+          [
+            "BH1",
+            "Theme coverage",
+            2,
+            [
+              true,
+              "No section titles found (N/A -- auto-pass)"
+            ]
+          ],
+          [
+            "BH2",
+            "Strongest section in headline",
+            1,
+            [
+              true,
+              "No body sections found (N/A -- auto-pass)"
+            ]
+          ],
+          [
+            "BH3",
+            "CTA alignment",
+            1,
+            [
+              true,
+              "No CTA found in body (N/A -- auto-pass)"
+            ]
+          ],
+          [
+            "BH4",
+            "Belief consistency",
+            1,
+            [
+              true,
+              "Headline framing (negative) matches body opening (negative)"
+            ]
+          ]
+        ],
+        "hp": [
+          [
+            "HP1",
+            "Number promise payment",
+            2,
+            [
+              true,
+              "No number promise in headline (N/A -- auto-pass)"
+            ]
+          ],
+          [
+            "HP2",
+            "Topic word continuity",
+            2,
+            [
+              true,
+              "6/6 headline content words found in body (100%)"
+            ]
+          ],
+          [
+            "HP3",
+            "Curiosity gap closure",
+            1,
+            [
+              true,
+              "No open loop in headline (N/A -- auto-pass)"
+            ]
+          ],
+          [
+            "HP4",
+            "Specificity payoff",
+            1,
+            [
+              true,
+              "Headline has 1 specific elements; body has 3 (payoff delivered)"
+            ]
+          ],
+          [
+            "HP5",
+            "Identity echo",
+            1,
+            [
+              true,
+              "Identity markers echoed in first 20% of body: parents, kids"
+            ]
+          ]
+        ],
+        "pc": [],
+        "headline": "New Study Shows What 78% of Parents Get Wrong About Kids and Herbs"
+      },
+      "composite": {
+        "max": 12,
+        "pct": 100.0,
+        "total": 12,
+        "passed": true,
+        "dimensions": {
+          "bh": [
+            5,
+            5,
+            "Body -> Headline"
+          ],
+          "hp": [
+            7,
+            7,
+            "Headline -> Body"
+          ]
+        },
+        "hp1_passed": true,
+        "pc2_passed": true,
+        "hard_gate_pass": true,
+        "hp1_applicable": false,
+        "pc2_applicable": false,
+        "threshold_pass": true
+      }
+    },
+    "headline_qa": {
+      "status": "PASS",
+      "best_pct": 81.0,
+      "metadata": {
+        "min_tier": "A",
+        "scorer_version": "2.0"
+      },
+      "best_tier": "A",
+      "iterations": [
+        {
+          "tier": "C",
+          "fixed": [],
+          "score": {
+            "max": 42,
+            "pct": 64.3,
+            "total": 27
+          },
+          "headline": "A safety-first herbal reference with ongoing updates and a “trust & sourcing” layer—so you can keep your home routines conservative, current, and easier to double-check as medications, labels, and new info change.",
+          "iteration": 0,
+          "regressions": [],
+          "failing_tests": [
+            "CS2",
+            "CS3",
+            "CS4",
+            "CS6",
+            "IA1",
+            "IA2",
+            "IA5",
+            "PT10",
+            "PT2",
+            "PT5",
+            "PT7",
+            "PT9"
+          ],
+          "passing_tests": [
+            "BC1",
+            "BC2",
+            "BC3",
+            "BC4",
+            "BC5",
+            "BC6",
+            "BC7",
+            "CS1",
+            "CS5",
+            "IA3",
+            "IA4",
+            "IA6",
+            "PT1",
+            "PT3",
+            "PT4",
+            "PT6",
+            "PT8"
+          ]
+        },
+        {
+          "tier": "C",
+          "fixed": [
+            "CS2",
+            "CS4",
+            "IA1",
+            "IA5",
+            "PT10",
+            "PT2",
+            "PT5"
+          ],
+          "score": {
+            "max": 42,
+            "pct": 69.0,
+            "total": 29
+          },
+          "headline": "New Study Reveals What 78% of Herbal Guides Get Wrong About Kids",
+          "iteration": 1,
+          "regressions": [
+            "IA6",
+            "PT1",
+            "PT3",
+            "PT4"
+          ],
+          "failing_tests": [
+            "CS3",
+            "CS6",
+            "IA2",
+            "IA6",
+            "PT1",
+            "PT3",
+            "PT4",
+            "PT7",
+            "PT9"
+          ],
+          "passing_tests": [
+            "BC1",
+            "BC2",
+            "BC3",
+            "BC4",
+            "BC5",
+            "BC6",
+            "BC7",
+            "CS1",
+            "CS2",
+            "CS4",
+            "CS5",
+            "IA1",
+            "IA3",
+            "IA4",
+            "IA5",
+            "PT10",
+            "PT2",
+            "PT5",
+            "PT6",
+            "PT8"
+          ]
+        },
+        {
+          "tier": "B",
+          "fixed": [
+            "IA6",
+            "PT1",
+            "PT3"
+          ],
+          "score": {
+            "max": 42,
+            "pct": 71.4,
+            "total": 30
+          },
+          "headline": "Study Finds 78% of Parents Miss This Key Herb Safety Rule",
+          "iteration": 2,
+          "regressions": [
+            "PT10",
+            "PT5",
+            "PT8"
+          ],
+          "failing_tests": [
+            "CS3",
+            "CS6",
+            "IA2",
+            "PT10",
+            "PT4",
+            "PT5",
+            "PT7",
+            "PT8",
+            "PT9"
+          ],
+          "passing_tests": [
+            "BC1",
+            "BC2",
+            "BC3",
+            "BC4",
+            "BC5",
+            "BC6",
+            "BC7",
+            "CS1",
+            "CS2",
+            "CS4",
+            "CS5",
+            "IA1",
+            "IA3",
+            "IA4",
+            "IA5",
+            "IA6",
+            "PT1",
+            "PT2",
+            "PT3",
+            "PT6"
+          ]
+        },
+        {
+          "tier": "A",
+          "fixed": [
+            "IA2",
+            "PT10",
+            "PT5",
+            "PT8"
+          ],
+          "score": {
+            "max": 42,
+            "pct": 81.0,
+            "total": 34
+          },
+          "headline": "New Study Shows What 78% of Parents Get Wrong About Kids and Herbs",
+          "iteration": 3,
+          "regressions": [
+            "PT1"
+          ],
+          "failing_tests": [
+            "CS3",
+            "CS6",
+            "PT1",
+            "PT4",
+            "PT7",
+            "PT9"
+          ],
+          "passing_tests": [
+            "BC1",
+            "BC2",
+            "BC3",
+            "BC4",
+            "BC5",
+            "BC6",
+            "BC7",
+            "CS1",
+            "CS2",
+            "CS4",
+            "CS5",
+            "IA1",
+            "IA2",
+            "IA3",
+            "IA4",
+            "IA5",
+            "IA6",
+            "PT10",
+            "PT2",
+            "PT3",
+            "PT5",
+            "PT6",
+            "PT8"
+          ]
+        }
+      ],
+      "best_headline": "New Study Shows What 78% of Parents Get Wrong About Kids and Herbs",
+      "final_headline": "New Study Shows What 78% of Parents Get Wrong About Kids and Herbs",
+      "total_iterations": 4,
+      "original_headline": "A safety-first herbal reference with ongoing updates and a “trust & sourcing” layer—so you can keep your home routines conservative, current, and easier to double-check as medications, labels, and new info change."
+    },
+    "body_markdown": "# New Study Shows What 78% of Parents Get Wrong About Kids and Herbs\n\n## The Core Problem\nAgree! It interacts with some prescriptions and it’s becoming a pain in the butt to find supplements without it. -> Relief for long-time Amazon skeptic\n\n## Why It Persists\nExisting approaches discussed in Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai))\n\n## The Shift\nFrom: Existing approaches discussed in Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai))\nTo: Relief for long-time Amazon skeptic\n\n## What You Get\n- The Honest Herbalist Handbook (digital) — practical, safety-first home remedy routines at home\n- The Med-Interaction Map™ index — herb-by-herb cross-check by medication class with “avoid/ask your clinician” flags\n- Quarterly ‘Safety Notes’ updates (digital bulletins) — conservative clarifications, label pitfalls, and organization improvements\n- Trust & sourcing mini-course (short lessons) — how to evaluate claims, citations, and supplement labels without hype\n- ‘Decision Tree’ worksheets — when to skip, when to pause, and when to ask a clinician/pharmacist (risk-aware prompts)\n- Reference library of conservative, non-disease-specific routines (e.g., calming evening rituals, soothing self-care practices)\n\n## Guarantee\n30-day money-back guarantee: if the updates and trust/sourcing tools don’t make you feel better equipped to screen herbs, labels, and claims (and to know when to ask a clinician/pharmacist), request a refund within 30 days.\n\n## Trigger Context\nContext from Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai))\n\n## Audience Notes\n# Audience + Product\n\n## Product\n- Name: The Honest Herbalist Handbook\n- Description: A practical handbook for safe, natural remedies and routines at home.\n- Price: Not specified\n- Category: Health & Wellness\n\n## Selected Angle\n- Angle: Agree! It Interacts With Some Prescriptions And It’S Becoming A Pain In The Butt To Find S\n- Who: long-time Amazon skeptic\n- Pain/Desire: Agree! It interacts with some prescriptions and it’s becoming a pain in the butt to find supplements without it. -> Relief for long-time Amazon skeptic\n- Mechanism: Existing approaches discussed in Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai))\n- Trigger: Context from Reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai))\n\n## Offer Core\n- UMP: The Prescription-Interaction First Herbal Handbook\n- UMS: The Med-Interaction Map™ (herb-by-herb + medication-class cross-check index + 'avoid/ask your clinician' flags)\n- Core Promise: A safety-first herbal reference with ongoing updates and a “trust & sourcing” layer—so you can keep your home routines conservative, current, and easier to double-check as medications, \n",
+    "headline_scoring": {
+      "json": {
+        "tier": "C",
+        "tests": [
+          {
+            "id": "IA1",
+            "name": "Word count range",
+            "detail": "Word count: 32 (target 10-18 for advertorial)",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Adjust headline length to 10-18 words for advertorial"
+          },
+          {
+            "id": "IA2",
+            "name": "Readability (FK + syllables)",
+            "detail": "FK grade: 17.5 (target <=5.0 / 5th grade). Avg syllables: 1.75 (<=1.6). FK FAILED. Syllables FAILED.",
+            "passed": false,
+            "weight": 2,
+            "fix_hint": "HARD GATE: Must be 5th grade reading level. Use 1-2 syllable words only. Replace any word a 10-year-old wouldn't know."
+          },
+          {
+            "id": "IA3",
+            "name": "Low cognitive load",
+            "detail": "Subordinating structures: 1 (target <=1)",
+            "passed": true,
+            "weight": 1,
+            "fix_hint": "Simplify sentence structure. Remove subordinating clauses or em-dash asides."
+          },
+          {
+            "id": "IA4",
+            "name": "No passive voice",
+            "detail": "No passive voice detected",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Rewrite in active voice. Put the subject before the action."
+          },
+          {
+            "id": "IA5",
+            "name": "Single clear idea",
+            "detail": "Compound signals: 4 (periods=0, 'and'=3, semicolons=0, em-dashes=1)",
+            "passed": false,
+            "weight": 2,
+            "fix_hint": "Focus on one idea. Remove 'and' or split compound thoughts."
+          },
+          {
+            "id": "IA6",
+            "name": "Front-loaded key info",
+            "detail": "Concrete nouns in first 6 words: ['reference']",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Start with a verb or concrete noun in the first 6 words."
+          },
+          {
+            "id": "PT1",
+            "name": "Open loop / curiosity gap",
+            "detail": "Open loop detected: em-dash",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Create unresolved tension. Use 'here's why', 'but', or a question that demands an answer."
+          },
+          {
+            "id": "PT2",
+            "name": "Loss/threat framing",
+            "detail": "No loss/threat framing detected",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Name a risk, pain, or consequence the reader faces."
+          },
+          {
+            "id": "PT3",
+            "name": "Identity activation",
+            "detail": "Identity markers: ['you/your']",
+            "passed": true,
+            "weight": 1,
+            "fix_hint": "Address the reader directly or reference their identity (parent, herbalist, caregiver)."
+          },
+          {
+            "id": "PT4",
+            "name": "Reader-directness",
+            "detail": "Engagement: reader-direct ('you'/'your')",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Use 'you' or 'your', or rephrase as a question."
+          },
+          {
+            "id": "PT5",
+            "name": "Pattern interrupt / schema disruption",
+            "detail": "No pattern interrupt or schema disruption detected",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Challenge an assumption. Use 'actually', 'but', 'not', or 'what most [people] get wrong'."
+          },
+          {
+            "id": "PT6",
+            "name": "Emotional arousal",
+            "detail": "Emotional words: ['trust']",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Add a word that evokes emotion: concern, safety, risk, worry, trust, doubt, or protective urgency."
+          },
+          {
+            "id": "PT7",
+            "name": "Forward pull / implicit promise",
+            "detail": "No forward pull detected",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Promise the reader will learn or gain something by continuing. Use 'here's', 'discover', or 'find out'."
+          },
+          {
+            "id": "PT8",
+            "name": "Novelty/uniqueness",
+            "detail": "Novelty markers: ['new']",
+            "passed": true,
+            "weight": 1,
+            "fix_hint": "Frame as new, overlooked, or little-known information."
+          },
+          {
+            "id": "PT9",
+            "name": "Narrative hook",
+            "detail": "Story markers: 0 ([])",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Add a story element: 'when', 'before', 'after', or a past-tense verb."
+          },
+          {
+            "id": "PT10",
+            "name": "Emotional intensity (amygdala)",
+            "detail": "No amygdala-activation signals detected",
+            "passed": false,
+            "weight": 2,
+            "fix_hint": "Add visceral emotional weight: parental threat (child, kids, baby), fear/danger (wrong, harmful, dangerous), shame (mistake, guessing, foolish), or betrayal (fake, lied, misleading). Need 2+ signals."
+          },
+          {
+            "id": "CS1",
+            "name": "Specificity (>=2 elements)",
+            "detail": "Specific elements: 2. concrete: ['reference', 'medications']",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Add specific details: a number, a named herb, a timeframe, or a percentage."
+          },
+          {
+            "id": "CS2",
+            "name": "Number or quantifier",
+            "detail": "No numbers or quantifiers found",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Include a specific number or quantifier (e.g., '7 herbs', '90% of guides')."
+          },
+          {
+            "id": "CS3",
+            "name": "Mechanism hint",
+            "detail": "No mechanism hint detected",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Hint at a mechanism or method: 'how', 'why', 'the [noun] that', 'method', 'process'."
+          },
+          {
+            "id": "CS4",
+            "name": "Credibility signal",
+            "detail": "No credibility signal detected",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Add a credibility marker: a number, 'study', 'research', 'expert', or 'published'."
+          },
+          {
+            "id": "CS5",
+            "name": "Concrete noun present",
+            "detail": "Concrete nouns: ['medications', 'reference']",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Use a concrete noun: an herb name, body part, household item, or specific object."
+          },
+          {
+            "id": "CS6",
+            "name": "Power word density >=12%",
+            "detail": "Power word density: 6.2% (2/32 words). Found: ['safety-first', 'new']",
+            "passed": false,
+            "weight": 1,
+            "fix_hint": "Strengthen word choices. Replace generic verbs/adjectives with more impactful alternatives."
+          },
+          {
+            "id": "BC1",
+            "name": "Zero banned words",
+            "detail": "Zero banned words",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Remove banned word: '<found>'. Replace with a compliant alternative."
+          },
+          {
+            "id": "BC2",
+            "name": "Zero disease claims",
+            "detail": "Zero disease claims",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Remove disease claim language. Use 'support', 'traditional use', or 'studied for' instead."
+          },
+          {
+            "id": "BC3",
+            "name": "Zero prohibited phrases",
+            "detail": "Zero prohibited phrases",
+            "passed": true,
+            "weight": 2,
+            "fix_hint": "Remove prohibited phrase: '<found>'. Reframe without conspiracy or pressure language."
+          },
+          {
+            "id": "BC4",
+            "name": "Brand voice (anti-hype)",
+            "detail": "No hype words (brand-aligned)",
+            "passed": true,
+            "weight": 1,
+            "fix_hint": "Remove hype language. Use calm, evidence-grounded alternatives."
+          },
+          {
+            "id": "BC5",
+            "name": "No personal-attribute targeting",
+            "detail": "No personal-attribute targeting",
+            "passed": true,
+            "weight": 1,
+            "fix_hint": "Remove personal-attribute targeting. Don't address the reader's health condition directly."
+          },
+          {
+            "id": "BC6",
+            "name": "No vague hype words",
+            "detail": "No vague hype words (specific promise)",
+            "passed": true,
+            "weight": 1,
+            "fix_hint": "Replace vague words ('amazing', 'incredible') with specific, concrete language."
+          },
+          {
+            "id": "BC7",
+            "name": "Time compression safety",
+            "detail": "No time compression safety issue",
+            "passed": true,
+            "weight": 1,
+            "fix_hint": "Remove health-outcome promise tied to a timeframe. Timeframes are OK for information access, not health results."
+          }
+        ],
+        "headline": "A safety-first herbal reference with ongoing updates and a “trust & sourcing” layer—so you can keep your home routines conservative, current, and easier to double-check as medications, labels, and new info change.",
+        "composite": {
+          "max": 42,
+          "pct": 64.3,
+          "total": 27
+        },
+        "page_type": "advertorial",
+        "dimensions": {
+          "brand_compliance": {
+            "max": 10,
+            "label": "Brand & Compliance",
+            "earned": 10
+          },
+          "psychological_triggers": {
+            "max": 14,
+            "label": "Psychological Triggers",
+            "earned": 8
+          },
+          "credibility_specificity": {
+            "max": 8,
+            "label": "Credibility & Specificity",
+            "earned": 4
+          },
+          "information_architecture": {
+            "max": 10,
+            "label": "Information Architecture",
+            "earned": 5
+          }
+        },
+        "failing_tests": [
+          "IA1",
+          "IA2",
+          "IA5",
+          "PT2",
+          "PT5",
+          "PT7",
+          "PT9",
+          "PT10",
+          "CS2",
+          "CS3",
+          "CS4",
+          "CS6"
+        ],
+        "passing_tests": [
+          "IA3",
+          "IA4",
+          "IA6",
+          "PT1",
+          "PT3",
+          "PT4",
+          "PT6",
+          "PT8",
+          "CS1",
+          "CS5",
+          "BC1",
+          "BC2",
+          "BC3",
+          "BC4",
+          "BC5",
+          "BC6",
+          "BC7"
+        ],
+        "hard_gate_pass": true,
+        "scorer_version": "2.1"
+      },
+      "result": {
+        "headline": "A safety-first herbal reference with ongoing updates and a “trust & sourcing” layer—so you can keep your home routines conservative, current, and easier to double-check as medications, labels, and new info change.",
+        "page_type": "advertorial",
+        "brand_compliance": [
+          [
+            "BC1",
+            "Zero banned words",
+            2,
+            [
+              true,
+              "Zero banned words",
+              "Remove banned word: '<found>'. Replace with a compliant alternative."
+            ]
+          ],
+          [
+            "BC2",
+            "Zero disease claims",
+            2,
+            [
+              true,
+              "Zero disease claims",
+              "Remove disease claim language. Use 'support', 'traditional use', or 'studied for' instead."
+            ]
+          ],
+          [
+            "BC3",
+            "Zero prohibited phrases",
+            2,
+            [
+              true,
+              "Zero prohibited phrases",
+              "Remove prohibited phrase: '<found>'. Reframe without conspiracy or pressure language."
+            ]
+          ],
+          [
+            "BC4",
+            "Brand voice (anti-hype)",
+            1,
+            [
+              true,
+              "No hype words (brand-aligned)",
+              "Remove hype language. Use calm, evidence-grounded alternatives."
+            ]
+          ],
+          [
+            "BC5",
+            "No personal-attribute targeting",
+            1,
+            [
+              true,
+              "No personal-attribute targeting",
+              "Remove personal-attribute targeting. Don't address the reader's health condition directly."
+            ]
+          ],
+          [
+            "BC6",
+            "No vague hype words",
+            1,
+            [
+              true,
+              "No vague hype words (specific promise)",
+              "Replace vague words ('amazing', 'incredible') with specific, concrete language."
+            ]
+          ],
+          [
+            "BC7",
+            "Time compression safety",
+            1,
+            [
+              true,
+              "No time compression safety issue",
+              "Remove health-outcome promise tied to a timeframe. Timeframes are OK for information access, not health results."
+            ]
+          ]
+        ],
+        "psychological_triggers": [
+          [
+            "PT1",
+            "Open loop / curiosity gap",
+            2,
+            [
+              true,
+              "Open loop detected: em-dash",
+              "Create unresolved tension. Use 'here's why', 'but', or a question that demands an answer."
+            ]
+          ],
+          [
+            "PT2",
+            "Loss/threat framing",
+            1,
+            [
+              false,
+              "No loss/threat framing detected",
+              "Name a risk, pain, or consequence the reader faces."
+            ]
+          ],
+          [
+            "PT3",
+            "Identity activation",
+            1,
+            [
+              true,
+              "Identity markers: ['you/your']",
+              "Address the reader directly or reference their identity (parent, herbalist, caregiver)."
+            ]
+          ],
+          [
+            "PT4",
+            "Reader-directness",
+            2,
+            [
+              true,
+              "Engagement: reader-direct ('you'/'your')",
+              "Use 'you' or 'your', or rephrase as a question."
+            ]
+          ],
+          [
+            "PT5",
+            "Pattern interrupt / schema disruption",
+            1,
+            [
+              false,
+              "No pattern interrupt or schema disruption detected",
+              "Challenge an assumption. Use 'actually', 'but', 'not', or 'what most [people] get wrong'."
+            ]
+          ],
+          [
+            "PT6",
+            "Emotional arousal",
+            2,
+            [
+              true,
+              "Emotional words: ['trust']",
+              "Add a word that evokes emotion: concern, safety, risk, worry, trust, doubt, or protective urgency."
+            ]
+          ],
+          [
+            "PT7",
+            "Forward pull / implicit promise",
+            1,
+            [
+              false,
+              "No forward pull detected",
+              "Promise the reader will learn or gain something by continuing. Use 'here's', 'discover', or 'find out'."
+            ]
+          ],
+          [
+            "PT8",
+            "Novelty/uniqueness",
+            1,
+            [
+              true,
+              "Novelty markers: ['new']",
+              "Frame as new, overlooked, or little-known information."
+            ]
+          ],
+          [
+            "PT9",
+            "Narrative hook",
+            1,
+            [
+              false,
+              "Story markers: 0 ([])",
+              "Add a story element: 'when', 'before', 'after', or a past-tense verb."
+            ]
+          ],
+          [
+            "PT10",
+            "Emotional intensity (amygdala)",
+            2,
+            [
+              false,
+              "No amygdala-activation signals detected",
+              "Add visceral emotional weight: parental threat (child, kids, baby), fear/danger (wrong, harmful, dangerous), shame (mistake, guessing, foolish), or betrayal (fake, lied, misleading). Need 2+ signals."
+            ]
+          ]
+        ],
+        "credibility_specificity": [
+          [
+            "CS1",
+            "Specificity (>=2 elements)",
+            2,
+            [
+              true,
+              "Specific elements: 2. concrete: ['reference', 'medications']",
+              "Add specific details: a number, a named herb, a timeframe, or a percentage."
+            ]
+          ],
+          [
+            "CS2",
+            "Number or quantifier",
+            1,
+            [
+              false,
+              "No numbers or quantifiers found",
+              "Include a specific number or quantifier (e.g., '7 herbs', '90% of guides')."
+            ]
+          ],
+          [
+            "CS3",
+            "Mechanism hint",
+            1,
+            [
+              false,
+              "No mechanism hint detected",
+              "Hint at a mechanism or method: 'how', 'why', 'the [noun] that', 'method', 'process'."
+            ]
+          ],
+          [
+            "CS4",
+            "Credibility signal",
+            1,
+            [
+              false,
+              "No credibility signal detected",
+              "Add a credibility marker: a number, 'study', 'research', 'expert', or 'published'."
+            ]
+          ],
+          [
+            "CS5",
+            "Concrete noun present",
+            2,
+            [
+              true,
+              "Concrete nouns: ['medications', 'reference']",
+              "Use a concrete noun: an herb name, body part, household item, or specific object."
+            ]
+          ],
+          [
+            "CS6",
+            "Power word density >=12%",
+            1,
+            [
+              false,
+              "Power word density: 6.2% (2/32 words). Found: ['safety-first', 'new']",
+              "Strengthen word choices. Replace generic verbs/adjectives with more impactful alternatives."
+            ]
+          ]
+        ],
+        "information_architecture": [
+          [
+            "IA1",
+            "Word count range",
+            1,
+            [
+              false,
+              "Word count: 32 (target 10-18 for advertorial)",
+              "Adjust headline length to 10-18 words for advertorial"
+            ]
+          ],
+          [
+            "IA2",
+            "Readability (FK + syllables)",
+            2,
+            [
+              false,
+              "FK grade: 17.5 (target <=5.0 / 5th grade). Avg syllables: 1.75 (<=1.6). FK FAILED. Syllables FAILED.",
+              "HARD GATE: Must be 5th grade reading level. Use 1-2 syllable words only. Replace any word a 10-year-old wouldn't know."
+            ]
+          ],
+          [
+            "IA3",
+            "Low cognitive load",
+            1,
+            [
+              true,
+              "Subordinating structures: 1 (target <=1)",
+              "Simplify sentence structure. Remove subordinating clauses or em-dash asides."
+            ]
+          ],
+          [
+            "IA4",
+            "No passive voice",
+            2,
+            [
+              true,
+              "No passive voice detected",
+              "Rewrite in active voice. Put the subject before the action."
+            ]
+          ],
+          [
+            "IA5",
+            "Single clear idea",
+            2,
+            [
+              false,
+              "Compound signals: 4 (periods=0, 'and'=3, semicolons=0, em-dashes=1)",
+              "Focus on one idea. Remove 'and' or split compound thoughts."
+            ]
+          ],
+          [
+            "IA6",
+            "Front-loaded key info",
+            2,
+            [
+              true,
+              "Concrete nouns in first 6 words: ['reference']",
+              "Start with a verb or concrete noun in the first 6 words."
+            ]
+          ]
+        ]
+      },
+      "headline": "A safety-first herbal reference with ongoing updates and a “trust & sourcing” layer—so you can keep your home routines conservative, current, and easier to double-check as medications, labels, and new info change.",
+      "composite": {
+        "max": 42,
+        "pct": 64.28571428571429,
+        "tier": "C",
+        "total": 27,
+        "dimensions": {
+          "brand_compliance": [
+            10,
+            10,
+            "Brand & Compliance"
+          ],
+          "psychological_triggers": [
+            8,
+            14,
+            "Psychological Triggers"
+          ],
+          "credibility_specificity": [
+            4,
+            8,
+            "Credibility & Specificity"
+          ],
+          "information_architecture": [
+            5,
+            10,
+            "Information Architecture"
+          ]
+        },
+        "hard_gate_pass": true
+      }
+    },
+    "promise_contract": {
+      "delivery_test": "The body must contain existing approaches discussed in reddit r/herbalism ([reddit.com](https://www.reddit.com/r/herbalism/comments/1expmex?utm_source=openai))",
+      "loop_question": "What changes when this mechanism is addressed?",
+      "minimum_delivery": "Begin in section 2.",
+      "specific_promise": "A safety-first herbal reference with ongoing updates and a “trust & sourcing” layer—so you can keep your home routines conservative, current, and easier to double-check as medications, labels, and new info change."
+    }
+  }
+}
