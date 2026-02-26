@@ -26,6 +26,42 @@ def test_sanitize_theme_component_text_value_strips_inline_markup_tags():
     )
 
 
+def test_build_theme_sync_image_slot_text_hints_uses_adjacent_feature_copy():
+    feature_image_path = (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.image"
+    )
+    hints = clients_router._build_theme_sync_image_slot_text_hints(
+        image_slots=[
+            {"path": feature_image_path},
+            {"path": "templates/index.json.sections.hero.settings.image"},
+        ],
+        text_slots=[
+            {
+                "path": (
+                    "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep."
+                    "settings.title"
+                ),
+                "currentValue": "We deliver worldwide",
+            },
+            {
+                "path": (
+                    "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep."
+                    "settings.text"
+                ),
+                "currentValue": "Fast <strong>shipping</strong> for all orders",
+            },
+            {
+                "path": "templates/index.json.sections.hero.settings.heading",
+                "currentValue": "Hero heading",
+            },
+        ],
+    )
+
+    assert hints == {
+        feature_image_path: "We deliver worldwide Fast shipping for all orders"
+    }
+
+
 def test_normalize_asset_public_id_handles_uuid_and_string():
     uuid_value = UUID("11111111-1111-1111-1111-111111111111")
     assert clients_router._normalize_asset_public_id(uuid_value) == "11111111-1111-1111-1111-111111111111"
@@ -1500,6 +1536,378 @@ def test_sync_shopify_theme_brand_uses_existing_product_images_when_ai_is_rate_l
         ),
     }
     assert sorted(observed["attempted_aspects"]) == ["1:1", "16:9"]
+
+
+def test_sync_shopify_theme_brand_feature_slots_keep_their_generated_assets(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    observed: dict[str, object] = {}
+    feature_slot_one = (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.image"
+    )
+    feature_slot_two = (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp.settings.image"
+    )
+    feature_slot_three = (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN.settings.image"
+    )
+    feature_slot_four = (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV.settings.image"
+    )
+    feature_slots = [
+        feature_slot_one,
+        feature_slot_two,
+        feature_slot_three,
+        feature_slot_four,
+    ]
+    hero_slot = "templates/index.json.sections.hero.settings.image"
+    generated_public_id_by_slot = {
+        feature_slot_one: "generated-feature-1",
+        feature_slot_two: "generated-feature-2",
+        feature_slot_three: "generated-feature-3",
+        feature_slot_four: "generated-feature-4",
+        hero_slot: "generated-hero",
+    }
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_design_system_get(self, *, org_id: str, design_system_id: str):
+        return type(
+            "FakeDesignSystem",
+            (),
+            {
+                "id": design_system_id,
+                "name": "Acme Design System",
+                "client_id": client_id,
+                "tokens": {"placeholder": True},
+            },
+        )()
+
+    def fake_validate(tokens):
+        assert tokens == {"placeholder": True}
+        return {
+            "dataTheme": "light",
+            "fontUrls": [
+                "https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"
+            ],
+            "cssVars": {"--color-brand": "#123456"},
+            "brand": {"name": "Acme", "logoAssetPublicId": "logo-public-id"},
+            "funnelDefaults": {"containerWidth": "lg"},
+        }
+
+    def fake_get_asset(self, *, org_id: str, public_id: str, client_id: str | None = None):
+        if public_id == "logo-public-id":
+            return type("FakeAsset", (), {"public_id": public_id})()
+        return None
+
+    def fake_list_assets(
+        self,
+        org_id: str,
+        client_id: str | None = None,
+        campaign_id: str | None = None,
+        experiment_id: str | None = None,
+        product_id: str | None = None,
+        funnel_id: str | None = None,
+        asset_kind: str | None = None,
+        tags: list[str] | None = None,
+        statuses: list[object] | None = None,
+    ):
+        assert product_id == "product-123"
+        assert asset_kind == "image"
+        return []
+
+    def fake_get_product(self, *, org_id: str, product_id: str):
+        return type(
+            "FakeProduct",
+            (),
+            {
+                "id": product_id,
+                "client_id": client_id,
+            },
+        )()
+
+    def fake_create_funnel_image_asset(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        prompt: str,
+        aspect_ratio: str | None = None,
+        usage_context: dict[str, object] | None = None,
+        reference_image_bytes=None,
+        reference_image_mime_type=None,
+        reference_asset_public_id: str | None = None,
+        reference_asset_id: str | None = None,
+        funnel_id: str | None = None,
+        product_id: str | None = None,
+        tags: list[str] | None = None,
+    ):
+        slot_path = usage_context.get("slotPath") if isinstance(usage_context, dict) else None
+        assert isinstance(slot_path, str)
+        observed.setdefault("prompts_by_slot", {})[slot_path] = prompt
+        generated_public_id = generated_public_id_by_slot.get(slot_path)
+        assert generated_public_id is not None
+        return type(
+            "FakeGeneratedAsset",
+            (),
+            {
+                "public_id": generated_public_id,
+                "width": 1600 if aspect_ratio == "16:9" else 1000,
+                "height": 900 if aspect_ratio == "16:9" else 1000,
+                "alt": None,
+                "tags": ["shopify_theme_sync"],
+                "ai_metadata": {"source": "ai"},
+            },
+        )()
+
+    def fake_list_template_slots(
+        *,
+        client_id: str,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        return {
+            "imageSlots": [
+                {
+                    "path": hero_slot,
+                    "role": "hero",
+                    "recommendedAspect": "16:9",
+                    "currentValue": None,
+                },
+                {
+                    "path": feature_slot_one,
+                    "role": "supporting",
+                    "recommendedAspect": "1:1",
+                    "currentValue": None,
+                },
+                {
+                    "path": feature_slot_two,
+                    "role": "supporting",
+                    "recommendedAspect": "1:1",
+                    "currentValue": None,
+                },
+                {
+                    "path": feature_slot_three,
+                    "role": "supporting",
+                    "recommendedAspect": "1:1",
+                    "currentValue": None,
+                },
+                {
+                    "path": feature_slot_four,
+                    "role": "supporting",
+                    "recommendedAspect": "1:1",
+                    "currentValue": None,
+                },
+            ],
+            "textSlots": [
+                {
+                    "path": (
+                        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep."
+                        "settings.title"
+                    ),
+                    "role": "body",
+                    "maxLength": 120,
+                    "currentValue": "We deliver worldwide",
+                },
+                {
+                    "path": (
+                        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep."
+                        "settings.text"
+                    ),
+                    "role": "body",
+                    "maxLength": 120,
+                    "currentValue": "<strong>Fast</strong> shipping worldwide",
+                },
+                {
+                    "path": (
+                        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp."
+                        "settings.title"
+                    ),
+                    "role": "body",
+                    "maxLength": 120,
+                    "currentValue": "Cruelty free care",
+                },
+                {
+                    "path": (
+                        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp."
+                        "settings.text"
+                    ),
+                    "role": "body",
+                    "maxLength": 120,
+                    "currentValue": "Gentle on <em>all</em> skin types",
+                },
+                {
+                    "path": (
+                        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN."
+                        "settings.title"
+                    ),
+                    "role": "body",
+                    "maxLength": 120,
+                    "currentValue": "Clinically tested",
+                },
+                {
+                    "path": (
+                        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN."
+                        "settings.text"
+                    ),
+                    "role": "body",
+                    "maxLength": 120,
+                    "currentValue": "Backed by <strong>derm</strong> experts",
+                },
+                {
+                    "path": (
+                        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV."
+                        "settings.title"
+                    ),
+                    "role": "body",
+                    "maxLength": 120,
+                    "currentValue": "Rechargeable at home",
+                },
+                {
+                    "path": (
+                        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV."
+                        "settings.text"
+                    ),
+                    "role": "body",
+                    "maxLength": 120,
+                    "currentValue": "Simple routine in 10 minutes",
+                },
+            ],
+        }
+
+    def fake_list_offers(self, *, product_id: str):
+        return []
+
+    def fake_plan_component_content(
+        *,
+        product,
+        offers,
+        product_image_assets,
+        image_slots,
+        text_slots,
+    ):
+        observed["planner_asset_public_ids"] = {
+            getattr(asset, "public_id", None) for asset in product_image_assets
+        }
+        component_image_asset_map = {hero_slot: "generated-hero"}
+        for feature_slot in feature_slots:
+            component_image_asset_map[feature_slot] = "generated-hero"
+        return {"componentImageAssetMap": component_image_asset_map, "componentTextValues": {}}
+
+    def fake_sync_theme_brand(
+        *,
+        client_id: str,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        css_vars: dict[str, str],
+        font_urls: list[str] | None,
+        data_theme: str | None,
+        component_image_urls: dict[str, str] | None,
+        component_text_values: dict[str, str] | None,
+        auto_component_image_urls: list[str] | None,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        observed["component_image_urls"] = component_image_urls
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+            },
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router.DesignSystemsRepository, "get", fake_design_system_get)
+    monkeypatch.setattr(clients_router, "validate_design_system_tokens", fake_validate)
+    monkeypatch.setattr(clients_router.AssetsRepository, "get_by_public_id", fake_get_asset)
+    monkeypatch.setattr(clients_router.AssetsRepository, "list", fake_list_assets)
+    monkeypatch.setattr(clients_router.ProductsRepository, "get", fake_get_product)
+    monkeypatch.setattr(clients_router, "create_funnel_image_asset", fake_create_funnel_image_asset)
+    monkeypatch.setattr(
+        clients_router,
+        "list_client_shopify_theme_template_slots",
+        fake_list_template_slots,
+    )
+    monkeypatch.setattr(clients_router.ProductOffersRepository, "list_by_product", fake_list_offers)
+    monkeypatch.setattr(
+        clients_router,
+        "plan_shopify_theme_component_content",
+        fake_plan_component_content,
+    )
+    monkeypatch.setattr(clients_router, "sync_client_shopify_theme_brand", fake_sync_theme_brand)
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/sync",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "productId": "product-123",
+            "themeName": "futrgroup2-0theme",
+        },
+    )
+
+    assert response.status_code == 200
+    prompts_by_slot = observed["prompts_by_slot"]
+    assert isinstance(prompts_by_slot, dict)
+    assert "Feature context: We deliver worldwide Fast shipping worldwide." in (
+        prompts_by_slot[feature_slot_one]
+    )
+    assert "Feature context: Cruelty free care Gentle on all skin types." in (
+        prompts_by_slot[feature_slot_two]
+    )
+    assert "Feature context: Clinically tested Backed by derm experts." in (
+        prompts_by_slot[feature_slot_three]
+    )
+    assert "Feature context: Rechargeable at home Simple routine in 10 minutes." in (
+        prompts_by_slot[feature_slot_four]
+    )
+    assert observed["planner_asset_public_ids"] == {
+        "generated-feature-1",
+        "generated-feature-2",
+        "generated-feature-3",
+        "generated-feature-4",
+        "generated-hero",
+    }
+    assert observed["component_image_urls"] == {
+        hero_slot: "https://assets.example.com/public/assets/generated-hero",
+        feature_slot_one: "https://assets.example.com/public/assets/generated-feature-1",
+        feature_slot_two: "https://assets.example.com/public/assets/generated-feature-2",
+        feature_slot_three: "https://assets.example.com/public/assets/generated-feature-3",
+        feature_slot_four: "https://assets.example.com/public/assets/generated-feature-4",
+    }
 
 
 def test_sync_shopify_theme_brand_returns_422_when_ai_theme_image_generation_fails(

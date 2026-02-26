@@ -94,6 +94,11 @@ _THEME_COMPONENT_INLINE_MARKUP_TAG_RE = re.compile(
     r"</?\s*(?:strong|em)\s*>",
     re.IGNORECASE,
 )
+_THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
+    r"^templates/index\.json\.sections\.ss_feature_1_pro_[^.]+\.blocks\.slide_[^.]+\.settings\.image$",
+    re.IGNORECASE,
+)
+_THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH = 180
 _THEME_SYNC_AI_IMAGE_PROMPT_BASE = (
     "Premium ecommerce product image for a beauty-tech LED face mask brand. "
     "Modern skincare aesthetic, soft cinematic lighting, high detail, photoreal quality. "
@@ -117,7 +122,6 @@ _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
     "3:4": "3:4",
     "1:1": "1:1",
 }
-_MAX_THEME_SYNC_GENERATED_IMAGES = 8
 _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY = max(
     1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY
 )
@@ -290,6 +294,82 @@ def _sanitize_theme_component_text_value(value: str) -> str:
     return " ".join(sanitized.split()).strip()
 
 
+def _is_theme_feature_image_slot_path(slot_path: str) -> bool:
+    return bool(_THEME_FEATURE_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
+
+
+def _build_theme_sync_image_slot_text_hints(
+    *,
+    image_slots: list[dict[str, Any]],
+    text_slots: list[dict[str, Any]],
+) -> dict[str, str]:
+    if not image_slots or not text_slots:
+        return {}
+
+    text_values_by_path: dict[str, str] = {}
+    for raw_slot in text_slots:
+        if not isinstance(raw_slot, dict):
+            continue
+        raw_path = raw_slot.get("path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        raw_value = raw_slot.get("currentValue")
+        if not isinstance(raw_value, str) or not raw_value.strip():
+            continue
+        normalized_value = _sanitize_theme_component_text_value(raw_value)
+        if not normalized_value:
+            continue
+        text_values_by_path[raw_path.strip()] = normalized_value
+
+    hints_by_image_slot_path: dict[str, str] = {}
+    for raw_image_slot in image_slots:
+        if not isinstance(raw_image_slot, dict):
+            continue
+        raw_image_path = raw_image_slot.get("path")
+        if not isinstance(raw_image_path, str) or not raw_image_path.strip():
+            continue
+        normalized_image_path = raw_image_path.strip()
+        if not _is_theme_feature_image_slot_path(normalized_image_path):
+            continue
+        slot_prefix, separator, _ = normalized_image_path.partition(".settings.")
+        if not separator:
+            continue
+
+        preferred_keys = ("title", "text", "heading", "subheading", "caption")
+        feature_text_fragments: list[str] = []
+        for key in preferred_keys:
+            candidate_path = f"{slot_prefix}.settings.{key}"
+            candidate_value = text_values_by_path.get(candidate_path)
+            if not candidate_value:
+                continue
+            if candidate_value in feature_text_fragments:
+                continue
+            feature_text_fragments.append(candidate_value)
+
+        if not feature_text_fragments:
+            slot_text_prefix = f"{slot_prefix}.settings."
+            for candidate_path, candidate_value in text_values_by_path.items():
+                if not candidate_path.startswith(slot_text_prefix):
+                    continue
+                if candidate_value in feature_text_fragments:
+                    continue
+                feature_text_fragments.append(candidate_value)
+                if len(feature_text_fragments) >= 2:
+                    break
+
+        if not feature_text_fragments:
+            continue
+
+        combined_hint = " ".join(feature_text_fragments).strip()
+        if len(combined_hint) > _THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH:
+            combined_hint = combined_hint[:_THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH].rstrip()
+        if not combined_hint:
+            continue
+        hints_by_image_slot_path[normalized_image_path] = combined_hint
+
+    return hints_by_image_slot_path
+
+
 def _normalize_theme_slot_role(raw_role: Any) -> str:
     if not isinstance(raw_role, str):
         return "generic"
@@ -319,24 +399,32 @@ def _build_theme_sync_slot_image_prompt(
     slot_key: str,
     aspect_ratio: str,
     variant_index: int,
+    slot_text_hint: str | None = None,
 ) -> str:
     role_guidance = _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME.get(
         slot_role,
         _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME["generic"],
     )
-    return (
+    base_prompt = (
         f"{_THEME_SYNC_AI_IMAGE_PROMPT_BASE} "
         f"{role_guidance} "
         f"Target slot key: {slot_key}. "
         f"Aspect ratio: {aspect_ratio}. "
         f"Variation: {variant_index}."
     )
+    if not isinstance(slot_text_hint, str) or not slot_text_hint.strip():
+        return base_prompt
+    return (
+        f"{base_prompt} "
+        f"Feature context: {slot_text_hint.strip()}. "
+        "The image must visually represent this context."
+    )
 
 
 def _select_theme_sync_slots_for_ai_generation(
     *,
     image_slots: list[dict[str, Any]],
-    max_images: int = _MAX_THEME_SYNC_GENERATED_IMAGES,
+    max_images: int | None = None,
 ) -> list[dict[str, Any]]:
     normalized_slots: list[dict[str, Any]] = []
     for slot in image_slots:
@@ -346,11 +434,16 @@ def _select_theme_sync_slots_for_ai_generation(
         if not isinstance(raw_path, str) or not raw_path.strip():
             continue
         normalized_slots.append(slot)
-    if not normalized_slots or max_images <= 0:
+    if not normalized_slots:
         return []
 
     sorted_slots = sorted(normalized_slots, key=lambda item: str(item["path"]))
-    max_count = min(max_images, len(sorted_slots))
+    if max_images is None:
+        max_count = len(sorted_slots)
+    elif max_images <= 0:
+        return []
+    else:
+        max_count = min(max_images, len(sorted_slots))
     selected: list[dict[str, Any]] = []
     selected_indices: set[int] = set()
     seen_role_aspect: set[tuple[str, str]] = set()
@@ -383,10 +476,15 @@ def _generate_theme_sync_ai_image_assets(
     client_id: str,
     product_id: str | None,
     image_slots: list[dict[str, Any]],
+    text_slots: list[dict[str, Any]] | None = None,
 ) -> tuple[list[Any], list[str], dict[str, Any]]:
     selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
     if not selected_slots:
         return [], [], {}
+    slot_text_hints = _build_theme_sync_image_slot_text_hints(
+        image_slots=selected_slots,
+        text_slots=text_slots or [],
+    )
 
     def _generate_single_slot_asset(
         *,
@@ -496,6 +594,7 @@ def _generate_theme_sync_ai_image_assets(
             slot_key=slot_key,
             aspect_ratio=aspect_ratio,
             variant_index=variant_count,
+            slot_text_hint=slot_text_hints.get(slot_path),
         )
         prepared_slots.append(
             {
@@ -1452,6 +1551,7 @@ def sync_client_shopify_theme_brand_route(
                 client_id=client_id,
                 product_id=requested_product_id,
                 image_slots=planner_image_slots,
+                text_slots=text_slots,
             )
 
         if not requested_product_id:
@@ -1583,6 +1683,18 @@ def sync_client_shopify_theme_brand_route(
                 )
             normalized_path = setting_path.strip()
             normalized_asset_public_id = asset_public_id.strip()
+            if _is_theme_feature_image_slot_path(normalized_path):
+                generated_feature_asset = generated_asset_by_slot_path.get(normalized_path)
+                if generated_feature_asset is not None:
+                    generated_feature_asset_public_id = _normalize_asset_public_id(
+                        getattr(generated_feature_asset, "public_id", None)
+                    )
+                    if (
+                        generated_feature_asset_public_id
+                        and generated_feature_asset_public_id
+                        in product_image_assets_by_public_id
+                    ):
+                        normalized_asset_public_id = generated_feature_asset_public_id
             if normalized_asset_public_id not in product_image_assets_by_public_id:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
