@@ -1862,6 +1862,89 @@ class Job(Base):
     )
 
 
+class ShopifyThemeTemplateDraft(Base):
+    __tablename__ = "shopify_theme_template_drafts"
+    __table_args__ = (
+        sa.Index("idx_shopify_theme_template_drafts_org_client", "org_id", "client_id"),
+        sa.Index("idx_shopify_theme_template_drafts_theme", "shop_domain", "theme_id"),
+        sa.Index("idx_shopify_theme_template_drafts_status", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    design_system_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("design_systems.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    product_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("products.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    shop_domain: Mapped[str] = mapped_column(Text, nullable=False)
+    theme_id: Mapped[str] = mapped_column(Text, nullable=False)
+    theme_name: Mapped[str] = mapped_column(Text, nullable=False)
+    theme_role: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="draft")
+    published_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_by_user_external_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class ShopifyThemeTemplateDraftVersion(Base):
+    __tablename__ = "shopify_theme_template_draft_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "draft_id",
+            "version_number",
+            name="uq_shopify_theme_template_draft_versions_draft_version",
+        ),
+        sa.Index("idx_shopify_theme_template_draft_versions_draft", "draft_id"),
+        sa.Index(
+            "idx_shopify_theme_template_draft_versions_org_client",
+            "org_id",
+            "client_id",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    draft_id: Mapped[str] = mapped_column(
+        ForeignKey("shopify_theme_template_drafts.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    client_id: Mapped[str] = mapped_column(
+        ForeignKey("clients.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(Text, nullable=False, server_default="build_job")
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSONB,
+        nullable=False,
+        server_default=sa.text("'{}'::jsonb"),
+    )
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_user_external_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
 class AdIngestRun(Base):
     __tablename__ = "ad_ingest_runs"
 

@@ -123,6 +123,101 @@ export type ClientShopifyThemeBrandSyncResponse = {
   settingsSync: ClientShopifyThemeSettingsSyncSummary;
 };
 
+export type ClientShopifyThemeTemplateBuildPayload = {
+  draftId?: string;
+  designSystemId?: string;
+  productId?: string;
+  componentImageAssetMap?: Record<string, string>;
+  componentTextValues?: Record<string, string>;
+  shopDomain?: string;
+  themeId?: string;
+  themeName?: string;
+};
+
+export type ClientShopifyThemeTemplateImageSlot = {
+  path: string;
+  key: string;
+  role: string;
+  recommendedAspect: string;
+  currentValue?: string | null;
+};
+
+export type ClientShopifyThemeTemplateTextSlot = {
+  path: string;
+  key: string;
+  currentValue?: string | null;
+};
+
+export type ClientShopifyThemeTemplateDraftData = {
+  shopDomain: string;
+  workspaceName: string;
+  designSystemId: string;
+  designSystemName: string;
+  brandName: string;
+  logoAssetPublicId: string;
+  logoUrl: string;
+  themeId: string;
+  themeName: string;
+  themeRole: string;
+  cssVars: Record<string, string>;
+  fontUrls: string[];
+  dataTheme: string;
+  productId?: string | null;
+  componentImageAssetMap: Record<string, string>;
+  componentTextValues: Record<string, string>;
+  imageSlots: ClientShopifyThemeTemplateImageSlot[];
+  textSlots: ClientShopifyThemeTemplateTextSlot[];
+  metadata: Record<string, unknown>;
+};
+
+export type ClientShopifyThemeTemplateDraftVersion = {
+  id: string;
+  draftId: string;
+  versionNumber: number;
+  source: string;
+  notes?: string | null;
+  createdByUserExternalId?: string | null;
+  createdAt: string;
+  data: ClientShopifyThemeTemplateDraftData;
+};
+
+export type ClientShopifyThemeTemplateDraft = {
+  id: string;
+  status: string;
+  shopDomain: string;
+  themeId: string;
+  themeName: string;
+  themeRole: string;
+  designSystemId?: string | null;
+  productId?: string | null;
+  createdByUserExternalId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  publishedAt?: string | null;
+  latestVersion?: ClientShopifyThemeTemplateDraftVersion | null;
+};
+
+export type ClientShopifyThemeTemplateBuildResponse = {
+  draft: ClientShopifyThemeTemplateDraft;
+  version: ClientShopifyThemeTemplateDraftVersion;
+};
+
+export type ClientShopifyThemeTemplateDraftUpdatePayload = {
+  componentImageAssetMap?: Record<string, string>;
+  componentTextValues?: Record<string, string>;
+  notes?: string;
+};
+
+export type ClientShopifyThemeTemplatePublishPayload = {
+  draftId: string;
+};
+
+export type ClientShopifyThemeTemplatePublishResponse = {
+  draft: ClientShopifyThemeTemplateDraft;
+  version: ClientShopifyThemeTemplateDraftVersion;
+  sync: ClientShopifyThemeBrandSyncResponse;
+};
+
 type ClientShopifyThemeBrandSyncJobStatus = "queued" | "running" | "succeeded" | "failed";
 
 type ClientShopifyThemeBrandSyncJobStartResponse = {
@@ -153,6 +248,42 @@ type ClientShopifyThemeBrandSyncJobStatusResponse = {
   error?: string | null;
   progress?: ClientShopifyThemeBrandSyncJobProgress | null;
   result?: ClientShopifyThemeBrandSyncResponse | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+};
+
+type ClientShopifyThemeTemplateBuildJobStartResponse = {
+  jobId: string;
+  status: ClientShopifyThemeBrandSyncJobStatus;
+  statusPath: string;
+};
+
+type ClientShopifyThemeTemplateBuildJobStatusResponse = {
+  jobId: string;
+  status: ClientShopifyThemeBrandSyncJobStatus;
+  error?: string | null;
+  progress?: ClientShopifyThemeBrandSyncJobProgress | null;
+  result?: ClientShopifyThemeTemplateBuildResponse | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+};
+
+type ClientShopifyThemeTemplatePublishJobStartResponse = {
+  jobId: string;
+  status: ClientShopifyThemeBrandSyncJobStatus;
+  statusPath: string;
+};
+
+type ClientShopifyThemeTemplatePublishJobStatusResponse = {
+  jobId: string;
+  status: ClientShopifyThemeBrandSyncJobStatus;
+  error?: string | null;
+  progress?: ClientShopifyThemeBrandSyncJobProgress | null;
+  result?: ClientShopifyThemeTemplatePublishResponse | null;
   createdAt: string;
   updatedAt: string;
   startedAt?: string | null;
@@ -367,6 +498,159 @@ export function useSyncClientShopifyThemeBrand(clientId?: string) {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to sync Shopify theme brand";
+      toast.error(message);
+    },
+  });
+}
+
+export function useListClientShopifyThemeTemplateDrafts(clientId?: string) {
+  const { get } = useApiClient();
+  return useQuery<ClientShopifyThemeTemplateDraft[]>({
+    queryKey: ["clients", "shopify-theme-template-drafts", clientId],
+    queryFn: () => get(`/clients/${clientId}/shopify/theme/brand/template/drafts`),
+    enabled: Boolean(clientId),
+  });
+}
+
+export function useBuildClientShopifyThemeTemplateDraft(clientId?: string) {
+  const { get, post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: ClientShopifyThemeTemplateBuildPayload) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      const startResponse = await post<ClientShopifyThemeTemplateBuildJobStartResponse>(
+        `/clients/${clientId}/shopify/theme/brand/template/build-async`,
+        payload,
+      );
+      const buildJobId = startResponse.jobId;
+      if (!buildJobId || !buildJobId.trim()) {
+        throw new Error("Shopify template build job was not started.");
+      }
+
+      const pollTimeoutMs = 1000 * 60 * 20;
+      const pollIntervalMs = 2000;
+      const startedAt = Date.now();
+
+      while (true) {
+        const statusResponse = await get<ClientShopifyThemeTemplateBuildJobStatusResponse>(
+          `/clients/${clientId}/shopify/theme/brand/template/build-jobs/${buildJobId}`,
+        );
+        if (statusResponse.status === "succeeded") {
+          if (statusResponse.result) return statusResponse.result;
+          throw new Error("Shopify template build completed but no result payload was returned.");
+        }
+        if (statusResponse.status === "failed") {
+          const errorMessage = statusResponse.error?.trim();
+          throw new Error(errorMessage || "Shopify template build failed.");
+        }
+        if (Date.now() - startedAt > pollTimeoutMs) {
+          throw new Error("Timed out waiting for Shopify template build to complete.");
+        }
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      }
+    },
+    onSuccess: (response) => {
+      toast.success(
+        `Built template draft v${response.version.versionNumber} for ${response.draft.themeName}`,
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["clients", "shopify-theme-template-drafts", clientId],
+      });
+    },
+    onError: (err: ApiError | Error) => {
+      const message =
+        "message" in err ? err.message : err?.message || "Failed to build Shopify theme template draft";
+      toast.error(message);
+    },
+  });
+}
+
+export function useUpdateClientShopifyThemeTemplateDraft(clientId?: string) {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      draftId,
+      payload,
+    }: {
+      draftId: string;
+      payload: ClientShopifyThemeTemplateDraftUpdatePayload;
+    }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      if (!draftId?.trim()) throw new Error("Draft ID is required.");
+      return request<ClientShopifyThemeTemplateDraft>(
+        `/clients/${clientId}/shopify/theme/brand/template/drafts/${draftId}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        },
+      );
+    },
+    onSuccess: () => {
+      toast.success("Template draft updated");
+      queryClient.invalidateQueries({
+        queryKey: ["clients", "shopify-theme-template-drafts", clientId],
+      });
+    },
+    onError: (err: ApiError | Error) => {
+      const message =
+        "message" in err ? err.message : err?.message || "Failed to update Shopify template draft";
+      toast.error(message);
+    },
+  });
+}
+
+export function usePublishClientShopifyThemeTemplateDraft(clientId?: string) {
+  const { get, post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: ClientShopifyThemeTemplatePublishPayload) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      const startResponse = await post<ClientShopifyThemeTemplatePublishJobStartResponse>(
+        `/clients/${clientId}/shopify/theme/brand/template/publish-async`,
+        payload,
+      );
+      const publishJobId = startResponse.jobId;
+      if (!publishJobId || !publishJobId.trim()) {
+        throw new Error("Shopify template publish job was not started.");
+      }
+
+      const pollTimeoutMs = 1000 * 60 * 20;
+      const pollIntervalMs = 2000;
+      const startedAt = Date.now();
+
+      while (true) {
+        const statusResponse = await get<ClientShopifyThemeTemplatePublishJobStatusResponse>(
+          `/clients/${clientId}/shopify/theme/brand/template/publish-jobs/${publishJobId}`,
+        );
+        if (statusResponse.status === "succeeded") {
+          if (statusResponse.result) return statusResponse.result;
+          throw new Error("Shopify template publish completed but no result payload was returned.");
+        }
+        if (statusResponse.status === "failed") {
+          const errorMessage = statusResponse.error?.trim();
+          throw new Error(errorMessage || "Shopify template publish failed.");
+        }
+        if (Date.now() - startedAt > pollTimeoutMs) {
+          throw new Error("Timed out waiting for Shopify template publish to complete.");
+        }
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      }
+    },
+    onSuccess: (response) => {
+      toast.success(
+        `Published template draft v${response.version.versionNumber} to ${response.sync.themeName}`,
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["clients", "shopify-theme-template-drafts", clientId],
+      });
+    },
+    onError: (err: ApiError | Error) => {
+      const message =
+        "message" in err ? err.message : err?.message || "Failed to publish Shopify template draft";
       toast.error(message);
     },
   });

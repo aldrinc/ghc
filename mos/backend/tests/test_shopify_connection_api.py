@@ -1,7 +1,11 @@
-from uuid import UUID
+from datetime import datetime, timezone
+from uuid import UUID, uuid4
 
 from app.routers import clients as clients_router
+from app.db.enums import AssetSourceEnum
+from app.db.models import Asset, Client, ShopifyThemeTemplateDraft, ShopifyThemeTemplateDraftVersion
 from app.services.shopify_connection import ShopifyInstallation
+from sqlalchemy import select
 
 
 def _create_client(api_client, *, name: str = "Shopify Workspace") -> str:
@@ -415,6 +419,201 @@ def test_enqueue_shopify_theme_brand_sync_job_returns_accepted(api_client, monke
     assert status_payload["jobId"] == payload["jobId"]
     assert status_payload["status"] in {"queued", "running", "succeeded", "failed"}
 
+
+def test_enqueue_shopify_theme_template_build_job_returns_accepted(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    observed: dict[str, object] = {}
+
+    def fake_run_build_job(job_id: str):
+        observed["job_id"] = job_id
+
+    monkeypatch.setattr(
+        clients_router,
+        "_run_client_shopify_theme_template_build_job",
+        fake_run_build_job,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/template/build-async",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "designSystemId": "design-system-1",
+            "themeName": "futrgroup2-0theme",
+        },
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert isinstance(payload["jobId"], str) and payload["jobId"]
+    assert payload["status"] in {"queued", "running", "succeeded", "failed"}
+    assert payload["statusPath"] == (
+        f"/clients/{client_id}/shopify/theme/brand/template/build-jobs/{payload['jobId']}"
+    )
+    assert observed["job_id"] == payload["jobId"]
+
+    status_response = api_client.get(
+        f"/clients/{client_id}/shopify/theme/brand/template/build-jobs/{payload['jobId']}"
+    )
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["jobId"] == payload["jobId"]
+    assert status_payload["status"] in {"queued", "running", "succeeded", "failed"}
+
+
+def test_enqueue_shopify_theme_template_publish_job_returns_accepted(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    observed: dict[str, object] = {}
+
+    def fake_run_publish_job(job_id: str):
+        observed["job_id"] = job_id
+
+    monkeypatch.setattr(
+        clients_router,
+        "_run_client_shopify_theme_template_publish_job",
+        fake_run_publish_job,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/template/publish-async",
+        json={"draftId": "draft-1"},
+    )
+
+    assert response.status_code == 202
+    payload = response.json()
+    assert isinstance(payload["jobId"], str) and payload["jobId"]
+    assert payload["status"] in {"queued", "running", "succeeded", "failed"}
+    assert payload["statusPath"] == (
+        f"/clients/{client_id}/shopify/theme/brand/template/publish-jobs/{payload['jobId']}"
+    )
+    assert observed["job_id"] == payload["jobId"]
+
+    status_response = api_client.get(
+        f"/clients/{client_id}/shopify/theme/brand/template/publish-jobs/{payload['jobId']}"
+    )
+    assert status_response.status_code == 200
+    status_payload = status_response.json()
+    assert status_payload["jobId"] == payload["jobId"]
+    assert status_payload["status"] in {"queued", "running", "succeeded", "failed"}
+
+
+def test_update_shopify_theme_template_draft_creates_new_version(api_client, db_session, monkeypatch):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    image_asset_public_id = uuid4()
+    text_asset_public_id = uuid4()
+    db_session.add(
+        Asset(
+            org_id=client.org_id,
+            client_id=client.id,
+            source_type=AssetSourceEnum.generated,
+            channel_id="meta",
+            format="image",
+            content={"label": "image one"},
+            public_id=image_asset_public_id,
+            asset_kind="image",
+        )
+    )
+    db_session.add(
+        Asset(
+            org_id=client.org_id,
+            client_id=client.id,
+            source_type=AssetSourceEnum.generated,
+            channel_id="meta",
+            format="image",
+            content={"label": "image two"},
+            public_id=text_asset_public_id,
+            asset_kind="image",
+        )
+    )
+
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="futrgroup2-0theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    version = ShopifyThemeTemplateDraftVersion(
+        draft_id=draft.id,
+        org_id=client.org_id,
+        client_id=client.id,
+        version_number=1,
+        source="build_job",
+        payload={
+            "shopDomain": "example.myshopify.com",
+            "workspaceName": "Acme Workspace",
+            "designSystemId": "design-system-1",
+            "designSystemName": "Acme DS",
+            "brandName": "Acme",
+            "logoAssetPublicId": str(uuid4()),
+            "logoUrl": "https://assets.example.com/public/assets/logo-1",
+            "themeId": "gid://shopify/OnlineStoreTheme/123",
+            "themeName": "futrgroup2-0theme",
+            "themeRole": "MAIN",
+            "cssVars": {"--color-brand": "#123456"},
+            "fontUrls": [],
+            "dataTheme": "light",
+            "productId": None,
+            "componentImageAssetMap": {
+                "templates/index.json.sections.hero.settings.image": str(image_asset_public_id)
+            },
+            "componentTextValues": {
+                "templates/index.json.sections.hero.settings.heading": "Old heading"
+            },
+            "imageSlots": [],
+            "textSlots": [],
+            "metadata": {},
+        },
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(version)
+    db_session.commit()
+
+    list_response = api_client.get(f"/clients/{client_id}/shopify/theme/brand/template/drafts")
+    assert list_response.status_code == 200
+    list_payload = list_response.json()
+    assert len(list_payload) == 1
+    assert list_payload[0]["id"] == str(draft.id)
+    assert list_payload[0]["latestVersion"]["versionNumber"] == 1
+
+    update_response = api_client.put(
+        f"/clients/{client_id}/shopify/theme/brand/template/drafts/{draft.id}",
+        json={
+            "componentImageAssetMap": {
+                "templates/index.json.sections.hero.settings.image": str(text_asset_public_id)
+            },
+            "componentTextValues": {
+                "templates/index.json.sections.hero.settings.heading": "New heading"
+            },
+            "notes": "Updated hero creative",
+        },
+    )
+    assert update_response.status_code == 200
+    update_payload = update_response.json()
+    assert update_payload["id"] == str(draft.id)
+    assert update_payload["latestVersion"]["versionNumber"] == 2
+    assert update_payload["latestVersion"]["source"] == "manual_edit"
+    assert update_payload["latestVersion"]["data"]["componentImageAssetMap"] == {
+        "templates/index.json.sections.hero.settings.image": str(text_asset_public_id)
+    }
+    assert update_payload["latestVersion"]["data"]["componentTextValues"] == {
+        "templates/index.json.sections.hero.settings.heading": "New heading"
+    }
 
 def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Acme Workspace")

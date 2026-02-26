@@ -26,6 +26,9 @@ from app.db.repositories.jobs import (
     JOB_STATUS_SUCCEEDED,
     JobsRepository,
 )
+from app.db.repositories.shopify_theme_template_drafts import (
+    ShopifyThemeTemplateDraftsRepository,
+)
 from app.db.repositories.products import ProductOffersRepository, ProductsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
@@ -53,6 +56,20 @@ from app.schemas.shopify_connection import (
     ShopifyThemeBrandSyncJobProgress,
     ShopifyThemeBrandSyncJobStatusResponse,
     ShopifyThemeBrandSyncResponse,
+    ShopifyThemeTemplateBuildJobStartResponse,
+    ShopifyThemeTemplateBuildJobStatusResponse,
+    ShopifyThemeTemplateBuildRequest,
+    ShopifyThemeTemplateBuildResponse,
+    ShopifyThemeTemplateDraftData,
+    ShopifyThemeTemplateDraftResponse,
+    ShopifyThemeTemplateDraftUpdateRequest,
+    ShopifyThemeTemplateDraftVersionResponse,
+    ShopifyThemeTemplateImageSlot,
+    ShopifyThemeTemplatePublishJobStartResponse,
+    ShopifyThemeTemplatePublishJobStatusResponse,
+    ShopifyThemeTemplatePublishRequest,
+    ShopifyThemeTemplatePublishResponse,
+    ShopifyThemeTemplateTextSlot,
 )
 from app.services.design_system_generation import (
     DesignSystemGenerationError,
@@ -89,6 +106,8 @@ router = APIRouter(prefix="/clients", tags=["clients"])
 logger = logging.getLogger(__name__)
 
 _JOB_TYPE_SHOPIFY_THEME_BRAND_SYNC = "shopify_theme_brand_sync"
+_JOB_TYPE_SHOPIFY_THEME_TEMPLATE_BUILD = "shopify_theme_template_build"
+_JOB_TYPE_SHOPIFY_THEME_TEMPLATE_PUBLISH = "shopify_theme_template_publish"
 _JOB_SUBJECT_TYPE_CLIENT = "client"
 _THEME_COMPONENT_INLINE_MARKUP_TAG_RE = re.compile(
     r"</?\s*(?:strong|em)\s*>",
@@ -731,6 +750,736 @@ def _generate_theme_sync_ai_image_assets(
     return generated_assets, rate_limited_slot_paths, generated_asset_by_slot_path
 
 
+def _normalize_theme_template_component_image_asset_map(
+    component_image_asset_map_raw: dict[str, str] | None,
+) -> dict[str, str]:
+    normalized_component_image_asset_map: dict[str, str] = {}
+    for raw_setting_path, raw_asset_public_id in (component_image_asset_map_raw or {}).items():
+        if not isinstance(raw_setting_path, str) or not raw_setting_path.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="componentImageAssetMap keys must be non-empty strings.",
+            )
+        setting_path = raw_setting_path.strip()
+        if setting_path in normalized_component_image_asset_map:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentImageAssetMap contains duplicate path after normalization: "
+                    f"{setting_path}"
+                ),
+            )
+        if not isinstance(raw_asset_public_id, str) or not raw_asset_public_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentImageAssetMap values must be non-empty asset public ids. "
+                    f"Invalid value at path {setting_path}."
+                ),
+            )
+        normalized_component_image_asset_map[setting_path] = raw_asset_public_id.strip()
+    return normalized_component_image_asset_map
+
+
+def _normalize_theme_template_component_text_values(
+    component_text_values_raw: dict[str, str] | None,
+) -> dict[str, str]:
+    normalized_component_text_values: dict[str, str] = {}
+    for raw_setting_path, raw_text_value in (component_text_values_raw or {}).items():
+        if not isinstance(raw_setting_path, str) or not raw_setting_path.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="componentTextValues keys must be non-empty strings.",
+            )
+        setting_path = raw_setting_path.strip()
+        if setting_path in normalized_component_text_values:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentTextValues contains duplicate path after normalization: "
+                    f"{setting_path}"
+                ),
+            )
+        if not isinstance(raw_text_value, str) or not raw_text_value.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentTextValues values must be non-empty strings. "
+                    f"Invalid value at path {setting_path}."
+                ),
+            )
+        sanitized_value = _sanitize_theme_component_text_value(raw_text_value)
+        if not sanitized_value:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentTextValues value became empty after sanitization. "
+                    f"path={setting_path}."
+                ),
+            )
+        normalized_component_text_values[setting_path] = sanitized_value
+    return normalized_component_text_values
+
+
+def _prepare_shopify_theme_template_build_data(
+    *,
+    client_id: str,
+    payload: ShopifyThemeTemplateBuildRequest,
+    auth: AuthContext,
+    session: Session,
+) -> ShopifyThemeTemplateDraftData:
+    _emit_theme_sync_progress(
+        {
+            "stage": "preparing",
+            "message": "Validating Shopify template build request and workspace data.",
+        }
+    )
+    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    effective_shop_domain = payload.shopDomain or selected_shop_domain
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=effective_shop_domain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Shopify connection is not ready: {status_payload['message']}",
+        )
+
+    requested_design_system_id = payload.designSystemId.strip() if payload.designSystemId else None
+    resolved_design_system_id = requested_design_system_id or (
+        str(client.design_system_id) if client.design_system_id else None
+    )
+    if not resolved_design_system_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No design system selected for Shopify template build. "
+                "Set a workspace default design system or provide designSystemId."
+            ),
+        )
+
+    design_system_repo = DesignSystemsRepository(session)
+    design_system = design_system_repo.get(
+        org_id=auth.org_id,
+        design_system_id=resolved_design_system_id,
+    )
+    if not design_system:
+        if requested_design_system_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Design system not found"
+            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace default design system was not found.",
+        )
+
+    design_system_client_id = str(design_system.client_id) if design_system.client_id else None
+    if design_system_client_id and design_system_client_id != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Design system must belong to this workspace.",
+        )
+
+    try:
+        validated_tokens = validate_design_system_tokens(design_system.tokens)
+    except DesignSystemGenerationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from exc
+
+    brand_obj = validated_tokens.get("brand")
+    if not isinstance(brand_obj, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Design system tokens.brand must be a JSON object.",
+        )
+    brand_name_raw = brand_obj.get("name")
+    if not isinstance(brand_name_raw, str) or not brand_name_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Design system tokens.brand.name must be a non-empty string.",
+        )
+    logo_public_id_raw = brand_obj.get("logoAssetPublicId")
+    if not isinstance(logo_public_id_raw, str) or not logo_public_id_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Design system tokens.brand.logoAssetPublicId must be a non-empty string.",
+        )
+    brand_name = brand_name_raw.strip()
+    logo_public_id = logo_public_id_raw.strip()
+
+    css_vars_raw = validated_tokens.get("cssVars")
+    if not isinstance(css_vars_raw, dict) or not css_vars_raw:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Design system tokens.cssVars must be a non-empty JSON object.",
+        )
+    css_vars: dict[str, str] = {}
+    for raw_key, raw_value in css_vars_raw.items():
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Design system tokens.cssVars keys must be non-empty strings.",
+            )
+        if not isinstance(raw_value, (str, int, float)):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Design system cssVars[{raw_key}] must be a string or number.",
+            )
+        if isinstance(raw_value, str):
+            cleaned_value = raw_value.strip()
+            if not cleaned_value:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Design system cssVars[{raw_key}] must not be an empty string.",
+                )
+        else:
+            cleaned_value = str(raw_value)
+        css_vars[raw_key.strip()] = cleaned_value
+
+    font_urls_raw = validated_tokens.get("fontUrls")
+    if not isinstance(font_urls_raw, list):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Design system tokens.fontUrls must be a list of non-empty strings.",
+        )
+    font_urls: list[str] = []
+    for item in font_urls_raw:
+        if not isinstance(item, str) or not item.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Design system tokens.fontUrls must be a list of non-empty strings.",
+            )
+        font_urls.append(item.strip())
+
+    data_theme_raw = validated_tokens.get("dataTheme")
+    if not isinstance(data_theme_raw, str) or not data_theme_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Design system tokens.dataTheme must be a non-empty string.",
+        )
+    data_theme = data_theme_raw.strip()
+
+    assets_repo = AssetsRepository(session)
+    logo_asset = assets_repo.get_by_public_id(
+        org_id=auth.org_id,
+        public_id=logo_public_id,
+        client_id=client_id,
+    )
+    if not logo_asset:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Design system brand.logoAssetPublicId does not reference an existing logo asset "
+                "for this workspace."
+            ),
+        )
+
+    normalized_component_image_asset_map = _normalize_theme_template_component_image_asset_map(
+        payload.componentImageAssetMap
+    )
+    normalized_manual_component_text_values = _normalize_theme_template_component_text_values(
+        payload.componentTextValues
+    )
+
+    requested_product_id = payload.productId.strip() if payload.productId else None
+    resolved_product: Product | None = None
+    if requested_product_id:
+        product = ProductsRepository(session).get(
+            org_id=auth.org_id, product_id=requested_product_id
+        )
+        if not product:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Product not found for productId={requested_product_id}.",
+            )
+        resolved_product = product
+        product_client_id = str(product.client_id).strip()
+        if product_client_id != client_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Product must belong to this workspace.",
+            )
+
+    workspace_name = str(client.name).strip()
+    if not workspace_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Workspace name is required to build Shopify theme template drafts.",
+        )
+
+    public_asset_base_url = _require_public_asset_base_url()
+    logo_url = f"{public_asset_base_url}/public/assets/{logo_public_id}"
+
+    for setting_path, asset_public_id in normalized_component_image_asset_map.items():
+        mapped_asset = assets_repo.get_by_public_id(
+            org_id=auth.org_id,
+            public_id=asset_public_id,
+            client_id=client_id,
+        )
+        if not mapped_asset:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentImageAssetMap references an asset that does not exist for this workspace. "
+                    f"path={setting_path}, assetPublicId={asset_public_id}."
+                ),
+            )
+
+    _emit_theme_sync_progress(
+        {
+            "stage": "discover_slots",
+            "message": "Discovering theme component slots for template build.",
+        }
+    )
+    discovered_slots = list_client_shopify_theme_template_slots(
+        client_id=client_id,
+        theme_id=payload.themeId,
+        theme_name=payload.themeName,
+        shop_domain=effective_shop_domain,
+    )
+    raw_image_slots = discovered_slots.get("imageSlots")
+    raw_text_slots = discovered_slots.get("textSlots")
+    image_slots = raw_image_slots if isinstance(raw_image_slots, list) else []
+    text_slots = raw_text_slots if isinstance(raw_text_slots, list) else []
+
+    explicit_image_paths = set(normalized_component_image_asset_map.keys())
+    planner_image_slots = [
+        slot
+        for slot in image_slots
+        if isinstance(slot, dict)
+        and isinstance(slot.get("path"), str)
+        and slot["path"] not in explicit_image_paths
+    ]
+    _emit_theme_sync_progress(
+        {
+            "stage": "discover_slots",
+            "message": "Theme component slot discovery completed.",
+            "totalImageSlots": len(planner_image_slots),
+            "totalTextSlots": len(text_slots),
+        }
+    )
+
+    if requested_product_id and not planner_image_slots and not text_slots:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "No image or text component slots were discovered for AI product content mapping. "
+                f"productId={requested_product_id}."
+            ),
+        )
+
+    generated_theme_assets: list[Any] = []
+    generated_asset_by_slot_path: dict[str, Any] = {}
+    rate_limited_slot_paths: list[str] = []
+    if planner_image_slots:
+        (
+            generated_theme_assets,
+            rate_limited_slot_paths,
+            generated_asset_by_slot_path,
+        ) = _generate_theme_sync_ai_image_assets(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            product_id=requested_product_id,
+            image_slots=planner_image_slots,
+            text_slots=text_slots,
+        )
+
+    component_image_asset_map: dict[str, str] = dict(normalized_component_image_asset_map)
+    component_text_values: dict[str, str] = {}
+
+    if requested_product_id and resolved_product is not None:
+        product_image_assets = assets_repo.list(
+            org_id=auth.org_id,
+            client_id=client_id,
+            product_id=requested_product_id,
+            asset_kind="image",
+            statuses=[AssetStatusEnum.approved, AssetStatusEnum.qa_passed],
+        )
+        product_image_assets_by_public_id: dict[str, Any] = {}
+        for existing_asset in product_image_assets:
+            normalized_existing_public_id = _normalize_asset_public_id(
+                getattr(existing_asset, "public_id", None)
+            )
+            if not normalized_existing_public_id:
+                continue
+            product_image_assets_by_public_id[normalized_existing_public_id] = existing_asset
+        for generated_asset in generated_theme_assets:
+            normalized_public_id = _normalize_asset_public_id(
+                getattr(generated_asset, "public_id", None)
+            )
+            if not normalized_public_id:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme image generation returned an asset without a valid public id. "
+                        f"productId={requested_product_id}."
+                    ),
+                )
+            if normalized_public_id in product_image_assets_by_public_id:
+                continue
+            product_image_assets_by_public_id[normalized_public_id] = generated_asset
+            product_image_assets.append(generated_asset)
+        if planner_image_slots and not product_image_assets:
+            if rate_limited_slot_paths:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        "AI theme image generation is rate-limited or out of Gemini quota for template build, "
+                        "and no existing product images were available. "
+                        f"productId={requested_product_id}. "
+                        "Upload product images or provide componentImageAssetMap for these slots: "
+                        + ", ".join(sorted(rate_limited_slot_paths))
+                    ),
+                )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "No usable product image assets were available for Shopify theme image slot planning. "
+                    f"productId={requested_product_id}."
+                ),
+            )
+
+        offers = ProductOffersRepository(session).list_by_product(
+            product_id=str(resolved_product.id)
+        )
+        _emit_theme_sync_progress(
+            {
+                "stage": "planning_content",
+                "message": "Planning product copy and image-to-slot assignments.",
+                "totalImageSlots": len(planner_image_slots),
+                "totalTextSlots": len(text_slots),
+            }
+        )
+        try:
+            planner_output = plan_shopify_theme_component_content(
+                product=resolved_product,
+                offers=offers,
+                product_image_assets=product_image_assets,
+                image_slots=planner_image_slots,
+                text_slots=text_slots,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "AI theme component planner failed for template build. "
+                    f"productId={requested_product_id}. {exc}"
+                ),
+            ) from exc
+
+        planner_image_map = planner_output.get("componentImageAssetMap") or {}
+        if not isinstance(planner_image_map, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AI theme component planner returned an invalid componentImageAssetMap payload.",
+            )
+        for setting_path, asset_public_id in planner_image_map.items():
+            if not isinstance(setting_path, str) or not setting_path.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="AI theme component planner returned an invalid image mapping path.",
+                )
+            if not isinstance(asset_public_id, str) or not asset_public_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned an invalid image mapping asset id "
+                        f"for path {setting_path}."
+                    ),
+                )
+            normalized_path = setting_path.strip()
+            normalized_asset_public_id = asset_public_id.strip()
+            if _is_theme_feature_image_slot_path(normalized_path):
+                generated_feature_asset = generated_asset_by_slot_path.get(normalized_path)
+                if generated_feature_asset is not None:
+                    generated_feature_asset_public_id = _normalize_asset_public_id(
+                        getattr(generated_feature_asset, "public_id", None)
+                    )
+                    if (
+                        generated_feature_asset_public_id
+                        and generated_feature_asset_public_id
+                        in product_image_assets_by_public_id
+                    ):
+                        normalized_asset_public_id = generated_feature_asset_public_id
+            if normalized_asset_public_id not in product_image_assets_by_public_id:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned an image asset id that does not belong to "
+                        "the product asset set. "
+                        f"path={normalized_path}, assetPublicId={normalized_asset_public_id}."
+                    ),
+                )
+            component_image_asset_map[normalized_path] = normalized_asset_public_id
+
+        planner_text_values = planner_output.get("componentTextValues") or {}
+        if not isinstance(planner_text_values, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="AI theme component planner returned an invalid componentTextValues payload.",
+            )
+        for setting_path, value in planner_text_values.items():
+            if not isinstance(setting_path, str) or not setting_path.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="AI theme component planner returned an invalid text mapping path.",
+                )
+            if not isinstance(value, str) or not value.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned an invalid text value "
+                        f"for path {setting_path}."
+                    ),
+                )
+            normalized_path = setting_path.strip()
+            sanitized_value = _sanitize_theme_component_text_value(value)
+            if not sanitized_value:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned text that became empty after "
+                        f"sanitization for path {normalized_path}."
+                    ),
+                )
+            component_text_values[normalized_path] = sanitized_value
+    else:
+        if rate_limited_slot_paths:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    "AI theme image generation is rate-limited or out of Gemini quota for template build, "
+                    "and productId was not provided for fallback product images. "
+                    "Provide componentImageAssetMap for these slots: "
+                    + ", ".join(sorted(rate_limited_slot_paths))
+                ),
+            )
+        for slot_path, generated_asset in generated_asset_by_slot_path.items():
+            normalized_public_id = _normalize_asset_public_id(
+                getattr(generated_asset, "public_id", None)
+            )
+            if not normalized_public_id:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme image generation returned an asset without a valid public id. "
+                        f"slotPath={slot_path}."
+                    ),
+                )
+            component_image_asset_map[slot_path] = normalized_public_id
+
+    for setting_path, asset_public_id in normalized_component_image_asset_map.items():
+        component_image_asset_map[setting_path] = asset_public_id
+
+    component_text_values.update(normalized_manual_component_text_values)
+
+    component_image_urls: dict[str, str] = {}
+    for setting_path, asset_public_id in component_image_asset_map.items():
+        component_image_urls[setting_path] = (
+            f"{public_asset_base_url}/public/assets/{asset_public_id}"
+        )
+
+    discovered_theme_id_raw = discovered_slots.get("themeId")
+    discovered_theme_name_raw = discovered_slots.get("themeName")
+    discovered_theme_role_raw = discovered_slots.get("themeRole")
+    if not isinstance(discovered_theme_id_raw, str) or not discovered_theme_id_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Theme slot discovery did not return a valid themeId.",
+        )
+    if not isinstance(discovered_theme_name_raw, str) or not discovered_theme_name_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Theme slot discovery did not return a valid themeName.",
+        )
+    if not isinstance(discovered_theme_role_raw, str) or not discovered_theme_role_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Theme slot discovery did not return a valid themeRole.",
+        )
+
+    image_slot_payloads: list[ShopifyThemeTemplateImageSlot] = []
+    for raw_slot in image_slots:
+        if not isinstance(raw_slot, dict):
+            continue
+        path = raw_slot.get("path")
+        key = raw_slot.get("key")
+        role = raw_slot.get("role")
+        recommended_aspect = raw_slot.get("recommendedAspect")
+        current_value = raw_slot.get("currentValue")
+        if (
+            not isinstance(path, str)
+            or not path.strip()
+            or not isinstance(key, str)
+            or not key.strip()
+            or not isinstance(role, str)
+            or not role.strip()
+            or not isinstance(recommended_aspect, str)
+            or not recommended_aspect.strip()
+        ):
+            continue
+        image_slot_payloads.append(
+            ShopifyThemeTemplateImageSlot(
+                path=path.strip(),
+                key=key.strip(),
+                role=role.strip(),
+                recommendedAspect=recommended_aspect.strip(),
+                currentValue=current_value if isinstance(current_value, str) else None,
+            )
+        )
+
+    text_slot_payloads: list[ShopifyThemeTemplateTextSlot] = []
+    for raw_slot in text_slots:
+        if not isinstance(raw_slot, dict):
+            continue
+        path = raw_slot.get("path")
+        key = raw_slot.get("key")
+        current_value = raw_slot.get("currentValue")
+        if (
+            not isinstance(path, str)
+            or not path.strip()
+            or not isinstance(key, str)
+            or not key.strip()
+        ):
+            continue
+        text_slot_payloads.append(
+            ShopifyThemeTemplateTextSlot(
+                path=path.strip(),
+                key=key.strip(),
+                currentValue=current_value if isinstance(current_value, str) else None,
+            )
+        )
+
+    metadata = {
+        "componentImageUrlCount": len(component_image_urls),
+        "componentTextValueCount": len(component_text_values),
+        "generatedImageCount": len(generated_theme_assets),
+        "rateLimitedSlotPaths": sorted(rate_limited_slot_paths),
+    }
+
+    return ShopifyThemeTemplateDraftData(
+        shopDomain=effective_shop_domain or str(status_payload.get("shopDomain") or ""),
+        workspaceName=workspace_name,
+        designSystemId=str(design_system.id),
+        designSystemName=str(design_system.name),
+        brandName=brand_name,
+        logoAssetPublicId=logo_public_id,
+        logoUrl=logo_url,
+        themeId=discovered_theme_id_raw.strip(),
+        themeName=discovered_theme_name_raw.strip(),
+        themeRole=discovered_theme_role_raw.strip(),
+        cssVars=css_vars,
+        fontUrls=font_urls,
+        dataTheme=data_theme,
+        productId=requested_product_id,
+        componentImageAssetMap=component_image_asset_map,
+        componentTextValues=component_text_values,
+        imageSlots=image_slot_payloads,
+        textSlots=text_slot_payloads,
+        metadata=metadata,
+    )
+
+
+def _serialize_shopify_theme_template_draft_version(
+    *,
+    version: Any,
+) -> ShopifyThemeTemplateDraftVersionResponse:
+    payload_raw = version.payload if isinstance(version.payload, dict) else {}
+    try:
+        data = ShopifyThemeTemplateDraftData(**payload_raw)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Stored Shopify theme template draft version payload is invalid: {exc}",
+        ) from exc
+
+    return ShopifyThemeTemplateDraftVersionResponse(
+        id=str(version.id),
+        draftId=str(version.draft_id),
+        versionNumber=int(version.version_number),
+        source=str(version.source),
+        notes=str(version.notes) if isinstance(version.notes, str) else None,
+        createdByUserExternalId=(
+            str(version.created_by_user_external_id)
+            if isinstance(version.created_by_user_external_id, str)
+            else None
+        ),
+        createdAt=version.created_at,
+        data=data,
+    )
+
+
+def _serialize_shopify_theme_template_draft(
+    *,
+    draft: Any,
+    latest_version: Any | None,
+) -> ShopifyThemeTemplateDraftResponse:
+    latest_version_payload: ShopifyThemeTemplateDraftVersionResponse | None = None
+    if latest_version is not None:
+        latest_version_payload = _serialize_shopify_theme_template_draft_version(
+            version=latest_version
+        )
+
+    return ShopifyThemeTemplateDraftResponse(
+        id=str(draft.id),
+        status=str(draft.status),
+        shopDomain=str(draft.shop_domain),
+        themeId=str(draft.theme_id),
+        themeName=str(draft.theme_name),
+        themeRole=str(draft.theme_role),
+        designSystemId=(str(draft.design_system_id) if draft.design_system_id else None),
+        productId=(str(draft.product_id) if draft.product_id else None),
+        createdByUserExternalId=(
+            str(draft.created_by_user_external_id)
+            if isinstance(draft.created_by_user_external_id, str)
+            else None
+        ),
+        createdAt=draft.created_at,
+        updatedAt=draft.updated_at,
+        publishedAt=draft.published_at,
+        latestVersion=latest_version_payload,
+    )
+
+
+def _resolve_component_image_urls_from_asset_map(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    component_image_asset_map: dict[str, str],
+) -> dict[str, str]:
+    public_asset_base_url = _require_public_asset_base_url()
+    assets_repo = AssetsRepository(session)
+    component_image_urls: dict[str, str] = {}
+    for setting_path, asset_public_id in component_image_asset_map.items():
+        mapped_asset = assets_repo.get_by_public_id(
+            org_id=org_id,
+            public_id=asset_public_id,
+            client_id=client_id,
+        )
+        if not mapped_asset:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Stored theme template draft references an asset that does not exist for this workspace. "
+                    f"path={setting_path}, assetPublicId={asset_public_id}."
+                ),
+            )
+        component_image_urls[setting_path] = (
+            f"{public_asset_base_url}/public/assets/{asset_public_id}"
+        )
+    return component_image_urls
+
+
 def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
     session = SessionLocal()
     progress_token = None
@@ -918,6 +1667,506 @@ def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
         except Exception:  # noqa: BLE001
             logger.exception(
                 "Failed to mark Shopify theme brand sync job as failed after exception",
+                extra={"job_id": job_id},
+            )
+    finally:
+        if progress_token is not None:
+            _THEME_SYNC_PROGRESS_CALLBACK.reset(progress_token)
+        session.close()
+
+
+def _build_or_update_shopify_theme_template_draft(
+    *,
+    client_id: str,
+    payload: ShopifyThemeTemplateBuildRequest,
+    auth: AuthContext,
+    session: Session,
+) -> ShopifyThemeTemplateBuildResponse:
+    build_data = _prepare_shopify_theme_template_build_data(
+        client_id=client_id,
+        payload=payload,
+        auth=auth,
+        session=session,
+    )
+    drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
+
+    draft_id = payload.draftId.strip() if payload.draftId else None
+    if draft_id:
+        draft = drafts_repo.get(org_id=auth.org_id, client_id=client_id, draft_id=draft_id)
+        if not draft:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Shopify theme template draft not found.",
+            )
+        if str(draft.theme_id) != build_data.themeId:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Requested draft does not match the discovered Shopify theme. "
+                    "Create a new draft or use the matching theme selector."
+                ),
+            )
+        if str(draft.shop_domain).strip().lower() != build_data.shopDomain.strip().lower():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Requested draft belongs to a different Shopify store. "
+                    "Build against the same shopDomain or create a new draft."
+                ),
+            )
+        draft.design_system_id = build_data.designSystemId
+        draft.product_id = build_data.productId
+        draft.theme_name = build_data.themeName
+        draft.theme_role = build_data.themeRole
+        draft.status = "draft"
+    else:
+        draft = drafts_repo.create_draft(
+            org_id=auth.org_id,
+            client_id=client_id,
+            design_system_id=build_data.designSystemId,
+            product_id=build_data.productId,
+            shop_domain=build_data.shopDomain,
+            theme_id=build_data.themeId,
+            theme_name=build_data.themeName,
+            theme_role=build_data.themeRole,
+            created_by_user_external_id=auth.user_id,
+            status="draft",
+        )
+
+    version = drafts_repo.create_version(
+        draft=draft,
+        payload=build_data.model_dump(mode="json"),
+        source="build_job",
+        created_by_user_external_id=auth.user_id,
+    )
+    serialized_version = _serialize_shopify_theme_template_draft_version(version=version)
+    serialized_draft = _serialize_shopify_theme_template_draft(
+        draft=draft,
+        latest_version=version,
+    )
+    return ShopifyThemeTemplateBuildResponse(
+        draft=serialized_draft,
+        version=serialized_version,
+    )
+
+
+def _publish_shopify_theme_template_draft(
+    *,
+    client_id: str,
+    payload: ShopifyThemeTemplatePublishRequest,
+    auth: AuthContext,
+    session: Session,
+) -> ShopifyThemeTemplatePublishResponse:
+    drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
+    draft = drafts_repo.get(
+        org_id=auth.org_id,
+        client_id=client_id,
+        draft_id=payload.draftId.strip(),
+    )
+    if not draft:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify theme template draft not found.",
+        )
+    version = drafts_repo.get_latest_version(draft_id=str(draft.id))
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shopify theme template draft has no versions to publish.",
+        )
+
+    serialized_version = _serialize_shopify_theme_template_draft_version(version=version)
+    draft_data = serialized_version.data
+
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=draft_data.shopDomain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify connection is not ready for template publish: "
+                f"{status_payload['message']}"
+            ),
+        )
+
+    component_image_asset_map = _normalize_theme_template_component_image_asset_map(
+        draft_data.componentImageAssetMap
+    )
+    component_text_values = _normalize_theme_template_component_text_values(
+        draft_data.componentTextValues
+    )
+    component_image_urls = _resolve_component_image_urls_from_asset_map(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        component_image_asset_map=component_image_asset_map,
+    )
+
+    _emit_theme_sync_progress(
+        {
+            "stage": "sync_theme",
+            "message": "Publishing approved Shopify theme template draft.",
+            "componentImageUrlCount": len(component_image_urls),
+            "componentTextValueCount": len(component_text_values),
+        }
+    )
+    synced = sync_client_shopify_theme_brand(
+        client_id=client_id,
+        workspace_name=draft_data.workspaceName,
+        brand_name=draft_data.brandName,
+        logo_url=draft_data.logoUrl,
+        css_vars=draft_data.cssVars,
+        font_urls=draft_data.fontUrls,
+        data_theme=draft_data.dataTheme,
+        component_image_urls=component_image_urls,
+        component_text_values=component_text_values,
+        auto_component_image_urls=[],
+        theme_id=draft_data.themeId,
+        theme_name=None,
+        shop_domain=draft_data.shopDomain,
+    )
+
+    drafts_repo.mark_published(draft=draft)
+    serialized_draft = _serialize_shopify_theme_template_draft(
+        draft=draft,
+        latest_version=version,
+    )
+    sync_response = ShopifyThemeBrandSyncResponse(
+        shopDomain=synced["shopDomain"],
+        workspaceName=draft_data.workspaceName,
+        designSystemId=draft_data.designSystemId,
+        designSystemName=draft_data.designSystemName,
+        brandName=draft_data.brandName,
+        logoAssetPublicId=draft_data.logoAssetPublicId,
+        logoUrl=draft_data.logoUrl,
+        themeId=synced["themeId"],
+        themeName=synced["themeName"],
+        themeRole=synced["themeRole"],
+        layoutFilename=synced["layoutFilename"],
+        cssFilename=synced["cssFilename"],
+        settingsFilename=synced.get("settingsFilename"),
+        jobId=synced["jobId"],
+        coverage=synced["coverage"],
+        settingsSync=synced["settingsSync"],
+    )
+
+    return ShopifyThemeTemplatePublishResponse(
+        draft=serialized_draft,
+        version=serialized_version,
+        sync=sync_response,
+    )
+
+
+def _run_client_shopify_theme_template_build_job(job_id: str) -> None:
+    session = SessionLocal()
+    progress_token = None
+    try:
+        jobs_repo = JobsRepository(session)
+        job = jobs_repo.mark_running(job_id)
+        if not job:
+            return
+        progress_state: dict[str, Any] = {
+            "stage": "running",
+            "message": "Shopify theme template build job started.",
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+        def publish_progress(update: dict[str, Any]) -> None:
+            if not isinstance(update, dict):
+                return
+            progress_state.update(update)
+            progress_state["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            progress_session = SessionLocal()
+            try:
+                JobsRepository(progress_session).set_output(
+                    job_id,
+                    output={"progress": dict(progress_state)},
+                )
+            finally:
+                progress_session.close()
+
+        publish_progress({})
+        progress_token = _THEME_SYNC_PROGRESS_CALLBACK.set(publish_progress)
+
+        input_payload = job.input if isinstance(job.input, dict) else {}
+        client_id = input_payload.get("clientId")
+        raw_request_payload = input_payload.get("payload")
+        raw_auth_context = input_payload.get("auth")
+
+        if not isinstance(client_id, str) or not client_id.strip():
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: missing clientId.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+        if not isinstance(raw_request_payload, dict):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: payload must be an object.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+        if not isinstance(raw_auth_context, dict):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: auth context must be an object.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        user_id = raw_auth_context.get("userId")
+        org_id = raw_auth_context.get("orgId")
+        if (
+            not isinstance(user_id, str)
+            or not user_id.strip()
+            or not isinstance(org_id, str)
+            or not org_id.strip()
+        ):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: missing auth.userId or auth.orgId.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        try:
+            payload = ShopifyThemeTemplateBuildRequest(**raw_request_payload)
+        except Exception as exc:  # noqa: BLE001
+            jobs_repo.mark_failed(
+                job_id,
+                error=f"Invalid queued job payload: {exc}",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        auth = AuthContext(user_id=user_id.strip(), org_id=org_id.strip())
+        publish_progress(
+            {
+                "stage": "running",
+                "message": "Building Shopify theme template draft.",
+            }
+        )
+        try:
+            build_response = _build_or_update_shopify_theme_template_draft(
+                client_id=client_id.strip(),
+                payload=payload,
+                auth=auth,
+                session=session,
+            )
+        except HTTPException as exc:
+            detail_payload = _serialize_http_exception_detail(exc.detail)
+            error_message = detail_payload.get("message")
+            if not isinstance(error_message, str) or not error_message.strip():
+                error_message = (
+                    f"Shopify theme template build failed with status {exc.status_code}."
+                )
+            publish_progress({"stage": "failed", "message": error_message})
+            jobs_repo.mark_failed(
+                job_id,
+                error=error_message,
+                output={
+                    "statusCode": exc.status_code,
+                    "detail": detail_payload,
+                    "progress": dict(progress_state),
+                },
+            )
+            return
+
+        result_payload = build_response.model_dump(mode="json")
+        publish_progress(
+            {
+                "stage": "succeeded",
+                "message": "Shopify theme template draft built successfully.",
+                "draftId": build_response.draft.id,
+                "draftVersionNumber": build_response.version.versionNumber,
+            }
+        )
+        jobs_repo.mark_succeeded(
+            job_id,
+            output={"result": result_payload, "progress": dict(progress_state)},
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "Unhandled exception while running Shopify theme template build job",
+            extra={"job_id": job_id},
+        )
+        try:
+            JobsRepository(session).mark_failed(
+                job_id,
+                error=str(exc) or "Unhandled error while running Shopify theme template build job.",
+                output={
+                    "progress": {
+                        "stage": "failed",
+                        "message": str(exc)
+                        or "Unhandled error while running Shopify theme template build job.",
+                        "updatedAt": datetime.now(timezone.utc).isoformat(),
+                    }
+                },
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Failed to mark Shopify theme template build job as failed after exception",
+                extra={"job_id": job_id},
+            )
+    finally:
+        if progress_token is not None:
+            _THEME_SYNC_PROGRESS_CALLBACK.reset(progress_token)
+        session.close()
+
+
+def _run_client_shopify_theme_template_publish_job(job_id: str) -> None:
+    session = SessionLocal()
+    progress_token = None
+    try:
+        jobs_repo = JobsRepository(session)
+        job = jobs_repo.mark_running(job_id)
+        if not job:
+            return
+        progress_state: dict[str, Any] = {
+            "stage": "running",
+            "message": "Shopify theme template publish job started.",
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+        def publish_progress(update: dict[str, Any]) -> None:
+            if not isinstance(update, dict):
+                return
+            progress_state.update(update)
+            progress_state["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            progress_session = SessionLocal()
+            try:
+                JobsRepository(progress_session).set_output(
+                    job_id,
+                    output={"progress": dict(progress_state)},
+                )
+            finally:
+                progress_session.close()
+
+        publish_progress({})
+        progress_token = _THEME_SYNC_PROGRESS_CALLBACK.set(publish_progress)
+
+        input_payload = job.input if isinstance(job.input, dict) else {}
+        client_id = input_payload.get("clientId")
+        raw_request_payload = input_payload.get("payload")
+        raw_auth_context = input_payload.get("auth")
+
+        if not isinstance(client_id, str) or not client_id.strip():
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: missing clientId.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+        if not isinstance(raw_request_payload, dict):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: payload must be an object.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+        if not isinstance(raw_auth_context, dict):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: auth context must be an object.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        user_id = raw_auth_context.get("userId")
+        org_id = raw_auth_context.get("orgId")
+        if (
+            not isinstance(user_id, str)
+            or not user_id.strip()
+            or not isinstance(org_id, str)
+            or not org_id.strip()
+        ):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: missing auth.userId or auth.orgId.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        try:
+            payload = ShopifyThemeTemplatePublishRequest(**raw_request_payload)
+        except Exception as exc:  # noqa: BLE001
+            jobs_repo.mark_failed(
+                job_id,
+                error=f"Invalid queued job payload: {exc}",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        auth = AuthContext(user_id=user_id.strip(), org_id=org_id.strip())
+        publish_progress(
+            {
+                "stage": "running",
+                "message": "Publishing Shopify theme template draft.",
+            }
+        )
+        try:
+            publish_response = _publish_shopify_theme_template_draft(
+                client_id=client_id.strip(),
+                payload=payload,
+                auth=auth,
+                session=session,
+            )
+        except HTTPException as exc:
+            detail_payload = _serialize_http_exception_detail(exc.detail)
+            error_message = detail_payload.get("message")
+            if not isinstance(error_message, str) or not error_message.strip():
+                error_message = (
+                    f"Shopify theme template publish failed with status {exc.status_code}."
+                )
+            publish_progress({"stage": "failed", "message": error_message})
+            jobs_repo.mark_failed(
+                job_id,
+                error=error_message,
+                output={
+                    "statusCode": exc.status_code,
+                    "detail": detail_payload,
+                    "progress": dict(progress_state),
+                },
+            )
+            return
+
+        result_payload = publish_response.model_dump(mode="json")
+        publish_progress(
+            {
+                "stage": "succeeded",
+                "message": "Shopify theme template draft published successfully.",
+                "draftId": publish_response.draft.id,
+                "draftVersionNumber": publish_response.version.versionNumber,
+            }
+        )
+        jobs_repo.mark_succeeded(
+            job_id,
+            output={"result": result_payload, "progress": dict(progress_state)},
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "Unhandled exception while running Shopify theme template publish job",
+            extra={"job_id": job_id},
+        )
+        try:
+            JobsRepository(session).mark_failed(
+                job_id,
+                error=str(exc) or "Unhandled error while running Shopify theme template publish job.",
+                output={
+                    "progress": {
+                        "stage": "failed",
+                        "message": str(exc)
+                        or "Unhandled error while running Shopify theme template publish job.",
+                        "updatedAt": datetime.now(timezone.utc).isoformat(),
+                    }
+                },
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Failed to mark Shopify theme template publish job as failed after exception",
                 extra={"job_id": job_id},
             )
     finally:
@@ -1140,6 +2389,342 @@ def create_client_shopify_product_route(
         shop_domain=effective_shop_domain,
     )
     return ShopifyProductCreateResponse(**created)
+
+
+@router.post(
+    "/{client_id}/shopify/theme/brand/template/build-async",
+    response_model=ShopifyThemeTemplateBuildJobStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def enqueue_client_shopify_theme_template_build_route(
+    client_id: str,
+    payload: ShopifyThemeTemplateBuildRequest,
+    background_tasks: BackgroundTasks,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+
+    jobs_repo = JobsRepository(session)
+    job, _ = jobs_repo.get_or_create(
+        org_id=auth.org_id,
+        client_id=client_id,
+        research_run_id=None,
+        job_type=_JOB_TYPE_SHOPIFY_THEME_TEMPLATE_BUILD,
+        subject_type=_JOB_SUBJECT_TYPE_CLIENT,
+        subject_id=client_id,
+        dedupe_key=None,
+        input_payload={
+            "clientId": client_id,
+            "payload": payload.model_dump(mode="json"),
+            "auth": {
+                "userId": auth.user_id,
+                "orgId": auth.org_id,
+            },
+        },
+        status=JOB_STATUS_QUEUED,
+    )
+    background_tasks.add_task(_run_client_shopify_theme_template_build_job, str(job.id))
+
+    return ShopifyThemeTemplateBuildJobStartResponse(
+        jobId=str(job.id),
+        status=job.status,
+        statusPath=f"/clients/{client_id}/shopify/theme/brand/template/build-jobs/{job.id}",
+    )
+
+
+@router.get(
+    "/{client_id}/shopify/theme/brand/template/build-jobs/{job_id}",
+    response_model=ShopifyThemeTemplateBuildJobStatusResponse,
+)
+def get_client_shopify_theme_template_build_job_status_route(
+    client_id: str,
+    job_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    job = JobsRepository(session).get(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Build job not found.")
+
+    if (
+        str(job.org_id) != auth.org_id
+        or str(job.subject_id) != client_id
+        or job.job_type != _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_BUILD
+        or job.subject_type != _JOB_SUBJECT_TYPE_CLIENT
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Build job not found.")
+
+    if job.status not in {
+        JOB_STATUS_QUEUED,
+        JOB_STATUS_RUNNING,
+        JOB_STATUS_SUCCEEDED,
+        JOB_STATUS_FAILED,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Build job is in an unsupported state: {job.status}",
+        )
+
+    output_payload = job.output if isinstance(job.output, dict) else {}
+    raw_progress = output_payload.get("progress")
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    if isinstance(raw_progress, dict):
+        try:
+            progress = ShopifyThemeBrandSyncJobProgress(**raw_progress)
+        except Exception:  # noqa: BLE001
+            progress = None
+    raw_result = output_payload.get("result")
+    result: ShopifyThemeTemplateBuildResponse | None = None
+    if isinstance(raw_result, dict):
+        try:
+            result = ShopifyThemeTemplateBuildResponse(**raw_result)
+        except Exception:  # noqa: BLE001
+            result = None
+
+    error = job.error.strip() if isinstance(job.error, str) and job.error.strip() else None
+    return ShopifyThemeTemplateBuildJobStatusResponse(
+        jobId=str(job.id),
+        status=job.status,
+        error=error,
+        progress=progress,
+        result=result,
+        createdAt=job.created_at,
+        updatedAt=job.updated_at,
+        startedAt=job.started_at,
+        finishedAt=job.finished_at,
+    )
+
+
+@router.get(
+    "/{client_id}/shopify/theme/brand/template/drafts",
+    response_model=list[ShopifyThemeTemplateDraftResponse],
+)
+def list_client_shopify_theme_template_drafts_route(
+    client_id: str,
+    limit: int = Query(default=20, ge=1, le=100),
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
+    drafts = drafts_repo.list_for_client(org_id=auth.org_id, client_id=client_id, limit=limit)
+    response_payload: list[ShopifyThemeTemplateDraftResponse] = []
+    for draft in drafts:
+        latest_version = drafts_repo.get_latest_version(draft_id=str(draft.id))
+        response_payload.append(
+            _serialize_shopify_theme_template_draft(
+                draft=draft,
+                latest_version=latest_version,
+            )
+        )
+    return response_payload
+
+
+@router.get(
+    "/{client_id}/shopify/theme/brand/template/drafts/{draft_id}",
+    response_model=ShopifyThemeTemplateDraftResponse,
+)
+def get_client_shopify_theme_template_draft_route(
+    client_id: str,
+    draft_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
+    draft = drafts_repo.get(org_id=auth.org_id, client_id=client_id, draft_id=draft_id)
+    if not draft:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify theme template draft not found.",
+        )
+    latest_version = drafts_repo.get_latest_version(draft_id=str(draft.id))
+    return _serialize_shopify_theme_template_draft(
+        draft=draft,
+        latest_version=latest_version,
+    )
+
+
+@router.put(
+    "/{client_id}/shopify/theme/brand/template/drafts/{draft_id}",
+    response_model=ShopifyThemeTemplateDraftResponse,
+)
+def update_client_shopify_theme_template_draft_route(
+    client_id: str,
+    draft_id: str,
+    payload: ShopifyThemeTemplateDraftUpdateRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
+    draft = drafts_repo.get(org_id=auth.org_id, client_id=client_id, draft_id=draft_id)
+    if not draft:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify theme template draft not found.",
+        )
+    latest_version = drafts_repo.get_latest_version(draft_id=str(draft.id))
+    if not latest_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shopify theme template draft has no versions to update.",
+        )
+    serialized_latest_version = _serialize_shopify_theme_template_draft_version(
+        version=latest_version
+    )
+    latest_data = serialized_latest_version.data
+
+    if payload.componentImageAssetMap is None:
+        component_image_asset_map = dict(latest_data.componentImageAssetMap)
+    else:
+        component_image_asset_map = _normalize_theme_template_component_image_asset_map(
+            payload.componentImageAssetMap
+        )
+    if payload.componentTextValues is None:
+        component_text_values = dict(latest_data.componentTextValues)
+    else:
+        component_text_values = _normalize_theme_template_component_text_values(
+            payload.componentTextValues
+        )
+
+    _resolve_component_image_urls_from_asset_map(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        component_image_asset_map=component_image_asset_map,
+    )
+
+    merged_metadata = dict(latest_data.metadata or {})
+    merged_metadata["componentImageAssetCount"] = len(component_image_asset_map)
+    merged_metadata["componentTextValueCount"] = len(component_text_values)
+
+    next_data = latest_data.model_copy(
+        update={
+            "componentImageAssetMap": component_image_asset_map,
+            "componentTextValues": component_text_values,
+            "metadata": merged_metadata,
+        }
+    )
+    next_version = drafts_repo.create_version(
+        draft=draft,
+        payload=next_data.model_dump(mode="json"),
+        source="manual_edit",
+        notes=(payload.notes.strip() if isinstance(payload.notes, str) and payload.notes.strip() else None),
+        created_by_user_external_id=auth.user_id,
+    )
+    return _serialize_shopify_theme_template_draft(
+        draft=draft,
+        latest_version=next_version,
+    )
+
+
+@router.post(
+    "/{client_id}/shopify/theme/brand/template/publish-async",
+    response_model=ShopifyThemeTemplatePublishJobStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def enqueue_client_shopify_theme_template_publish_route(
+    client_id: str,
+    payload: ShopifyThemeTemplatePublishRequest,
+    background_tasks: BackgroundTasks,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+
+    jobs_repo = JobsRepository(session)
+    job, _ = jobs_repo.get_or_create(
+        org_id=auth.org_id,
+        client_id=client_id,
+        research_run_id=None,
+        job_type=_JOB_TYPE_SHOPIFY_THEME_TEMPLATE_PUBLISH,
+        subject_type=_JOB_SUBJECT_TYPE_CLIENT,
+        subject_id=client_id,
+        dedupe_key=None,
+        input_payload={
+            "clientId": client_id,
+            "payload": payload.model_dump(mode="json"),
+            "auth": {
+                "userId": auth.user_id,
+                "orgId": auth.org_id,
+            },
+        },
+        status=JOB_STATUS_QUEUED,
+    )
+    background_tasks.add_task(_run_client_shopify_theme_template_publish_job, str(job.id))
+
+    return ShopifyThemeTemplatePublishJobStartResponse(
+        jobId=str(job.id),
+        status=job.status,
+        statusPath=f"/clients/{client_id}/shopify/theme/brand/template/publish-jobs/{job.id}",
+    )
+
+
+@router.get(
+    "/{client_id}/shopify/theme/brand/template/publish-jobs/{job_id}",
+    response_model=ShopifyThemeTemplatePublishJobStatusResponse,
+)
+def get_client_shopify_theme_template_publish_job_status_route(
+    client_id: str,
+    job_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    job = JobsRepository(session).get(job_id)
+    if not job:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publish job not found.")
+
+    if (
+        str(job.org_id) != auth.org_id
+        or str(job.subject_id) != client_id
+        or job.job_type != _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_PUBLISH
+        or job.subject_type != _JOB_SUBJECT_TYPE_CLIENT
+    ):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Publish job not found.")
+
+    if job.status not in {
+        JOB_STATUS_QUEUED,
+        JOB_STATUS_RUNNING,
+        JOB_STATUS_SUCCEEDED,
+        JOB_STATUS_FAILED,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Publish job is in an unsupported state: {job.status}",
+        )
+
+    output_payload = job.output if isinstance(job.output, dict) else {}
+    raw_progress = output_payload.get("progress")
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    if isinstance(raw_progress, dict):
+        try:
+            progress = ShopifyThemeBrandSyncJobProgress(**raw_progress)
+        except Exception:  # noqa: BLE001
+            progress = None
+    raw_result = output_payload.get("result")
+    result: ShopifyThemeTemplatePublishResponse | None = None
+    if isinstance(raw_result, dict):
+        try:
+            result = ShopifyThemeTemplatePublishResponse(**raw_result)
+        except Exception:  # noqa: BLE001
+            result = None
+
+    error = job.error.strip() if isinstance(job.error, str) and job.error.strip() else None
+    return ShopifyThemeTemplatePublishJobStatusResponse(
+        jobId=str(job.id),
+        status=job.status,
+        error=error,
+        progress=progress,
+        result=result,
+        createdAt=job.created_at,
+        updatedAt=job.updated_at,
+        startedAt=job.started_at,
+        finishedAt=job.finished_at,
+    )
 
 
 @router.post(

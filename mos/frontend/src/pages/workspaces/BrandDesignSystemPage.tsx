@@ -10,16 +10,19 @@ import {
 } from "@/api/designSystems";
 import {
   useAuditClientShopifyThemeBrand,
+  useBuildClientShopifyThemeTemplateDraft,
   useClient,
+  useListClientShopifyThemeTemplateDrafts,
+  usePublishClientShopifyThemeTemplateDraft,
   useCreateClientShopifyInstallUrl,
   useClientShopifyStatus,
   useDisconnectClientShopifyInstallation,
   useSetClientShopifyDefaultShop,
-  useSyncClientShopifyThemeBrand,
+  useUpdateClientShopifyThemeTemplateDraft,
   useUpdateClientShopifyInstallation,
   useUpdateClient,
   type ClientShopifyThemeBrandAuditResponse,
-  type ClientShopifyThemeBrandSyncResponse,
+  type ClientShopifyThemeTemplatePublishResponse,
 } from "@/api/clients";
 import {
   useSyncComplianceShopifyPolicyPages,
@@ -501,6 +504,29 @@ function parseTokens(raw: string): { value?: Record<string, unknown>; error?: st
   }
 }
 
+function parseStringMap(raw: string, label: string): { value?: Record<string, string>; error?: string } {
+  if (!raw.trim()) return { value: {} };
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { error: `${label} must be a JSON object.` };
+    }
+    const normalized: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof key !== "string" || !key.trim()) {
+        return { error: `${label} keys must be non-empty strings.` };
+      }
+      if (typeof value !== "string" || !value.trim()) {
+        return { error: `${label} values must be non-empty strings.` };
+      }
+      normalized[key.trim()] = value.trim();
+    }
+    return { value: normalized };
+  } catch {
+    return { error: `${label} must be valid JSON.` };
+  }
+}
+
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
   const { data: client } = useClient(workspace?.id);
@@ -521,7 +547,10 @@ export function BrandDesignSystemPage() {
   const uploadDesignSystemLogo = useUploadDesignSystemLogo();
   const deleteDesignSystem = useDeleteDesignSystem();
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
-  const syncShopifyThemeBrand = useSyncClientShopifyThemeBrand(workspace?.id);
+  const buildShopifyThemeTemplateDraft = useBuildClientShopifyThemeTemplateDraft(workspace?.id);
+  const publishShopifyThemeTemplateDraft = usePublishClientShopifyThemeTemplateDraft(workspace?.id);
+  const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
+  const { data: shopifyThemeTemplateDrafts = [] } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
   const auditShopifyThemeBrand = useAuditClientShopifyThemeBrand(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
@@ -545,7 +574,11 @@ export function BrandDesignSystemPage() {
   const [themeSyncDesignSystemId, setThemeSyncDesignSystemId] = useState("");
   const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
   const [themeSyncProductId, setThemeSyncProductId] = useState("");
-  const [themeSyncResult, setThemeSyncResult] = useState<ClientShopifyThemeBrandSyncResponse | null>(null);
+  const [selectedTemplateDraftId, setSelectedTemplateDraftId] = useState("");
+  const [templateDraftImageMapInput, setTemplateDraftImageMapInput] = useState("{}");
+  const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
+  const [templateDraftEditError, setTemplateDraftEditError] = useState<string | null>(null);
+  const [templatePublishResult, setTemplatePublishResult] = useState<ClientShopifyThemeTemplatePublishResponse | null>(null);
   const [themeAuditResult, setThemeAuditResult] = useState<ClientShopifyThemeBrandAuditResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
@@ -615,7 +648,11 @@ export function BrandDesignSystemPage() {
     setThemeSyncDesignSystemId("");
     setThemeSyncThemeName("futrgroup2-0theme");
     setThemeSyncProductId("");
-    setThemeSyncResult(null);
+    setSelectedTemplateDraftId("");
+    setTemplateDraftImageMapInput("{}");
+    setTemplateDraftTextValuesInput("{}");
+    setTemplateDraftEditError(null);
+    setTemplatePublishResult(null);
     setThemeAuditResult(null);
     setPolicySyncResult(null);
   }, [workspace?.id]);
@@ -673,6 +710,48 @@ export function BrandDesignSystemPage() {
       return "";
     });
   }, [client?.design_system_id, designSystems]);
+
+  const templateDraftOptions = useMemo(
+    () =>
+      shopifyThemeTemplateDrafts.map((draft) => ({
+        label: `${draft.themeName} · v${draft.latestVersion?.versionNumber ?? 0}`,
+        value: draft.id,
+      })),
+    [shopifyThemeTemplateDrafts]
+  );
+
+  useEffect(() => {
+    if (!shopifyThemeTemplateDrafts.length) {
+      setSelectedTemplateDraftId("");
+      return;
+    }
+    setSelectedTemplateDraftId((current) => {
+      if (current && shopifyThemeTemplateDrafts.some((draft) => draft.id === current)) return current;
+      return shopifyThemeTemplateDrafts[0]?.id || "";
+    });
+  }, [shopifyThemeTemplateDrafts]);
+
+  const selectedTemplateDraft = useMemo(
+    () => shopifyThemeTemplateDrafts.find((draft) => draft.id === selectedTemplateDraftId) ?? null,
+    [shopifyThemeTemplateDrafts, selectedTemplateDraftId]
+  );
+
+  useEffect(() => {
+    const latestVersion = selectedTemplateDraft?.latestVersion;
+    if (!latestVersion) {
+      setTemplateDraftImageMapInput("{}");
+      setTemplateDraftTextValuesInput("{}");
+      setTemplateDraftEditError(null);
+      return;
+    }
+    setTemplateDraftImageMapInput(
+      JSON.stringify(latestVersion.data.componentImageAssetMap || {}, null, 2)
+    );
+    setTemplateDraftTextValuesInput(
+      JSON.stringify(latestVersion.data.componentTextValues || {}, null, 2)
+    );
+    setTemplateDraftEditError(null);
+  }, [selectedTemplateDraft?.id, selectedTemplateDraft?.latestVersion?.id]);
 
   const previewDesignSystem = useMemo(
     () => designSystems.find((ds) => ds.id === previewDesignSystemId) ?? null,
@@ -823,7 +902,7 @@ export function BrandDesignSystemPage() {
     await refetchShopifyStatus();
   };
 
-  const handleSyncShopifyThemeBrand = async () => {
+  const handleBuildShopifyThemeTemplateDraft = async () => {
     if (!workspace?.id) return;
     const cleanedThemeName = themeSyncThemeName.trim();
     const cleanedProductId = themeSyncProductId.trim();
@@ -831,15 +910,75 @@ export function BrandDesignSystemPage() {
       toast.error("Enter a Shopify theme name.");
       return;
     }
-    const payload: { designSystemId?: string; shopDomain?: string; productId?: string; themeName: string } = {
+    const payload: {
+      draftId?: string;
+      designSystemId?: string;
+      shopDomain?: string;
+      productId?: string;
+      themeName: string;
+    } = {
       themeName: cleanedThemeName,
     };
+    if (selectedTemplateDraftId) payload.draftId = selectedTemplateDraftId;
     if (themeSyncDesignSystemId) payload.designSystemId = themeSyncDesignSystemId;
     if (shopifySyncShopDomain) payload.shopDomain = shopifySyncShopDomain;
     if (cleanedProductId) payload.productId = cleanedProductId;
     try {
-      const response = await syncShopifyThemeBrand.mutateAsync(payload);
-      setThemeSyncResult(response);
+      const response = await buildShopifyThemeTemplateDraft.mutateAsync(payload);
+      setSelectedTemplateDraftId(response.draft.id);
+      setTemplateDraftImageMapInput(
+        JSON.stringify(response.version.data.componentImageAssetMap || {}, null, 2)
+      );
+      setTemplateDraftTextValuesInput(
+        JSON.stringify(response.version.data.componentTextValues || {}, null, 2)
+      );
+      setTemplateDraftEditError(null);
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
+  };
+
+  const handleSaveTemplateDraftEdits = async () => {
+    if (!workspace?.id) return;
+    if (!selectedTemplateDraftId) {
+      toast.error("Select a template draft first.");
+      return;
+    }
+    const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
+    if (!parsedImageMap.value) {
+      setTemplateDraftEditError(parsedImageMap.error || "Invalid image map.");
+      return;
+    }
+    const parsedTextValues = parseStringMap(templateDraftTextValuesInput, "Text values");
+    if (!parsedTextValues.value) {
+      setTemplateDraftEditError(parsedTextValues.error || "Invalid text values.");
+      return;
+    }
+    setTemplateDraftEditError(null);
+    try {
+      await updateShopifyThemeTemplateDraft.mutateAsync({
+        draftId: selectedTemplateDraftId,
+        payload: {
+          componentImageAssetMap: parsedImageMap.value,
+          componentTextValues: parsedTextValues.value,
+        },
+      });
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
+  };
+
+  const handlePublishTemplateDraft = async () => {
+    if (!workspace?.id) return;
+    if (!selectedTemplateDraftId) {
+      toast.error("Select a template draft first.");
+      return;
+    }
+    try {
+      const response = await publishShopifyThemeTemplateDraft.mutateAsync({
+        draftId: selectedTemplateDraftId,
+      });
+      setTemplatePublishResult(response);
     } catch {
       // Error toast is emitted by the mutation hook.
     }
@@ -1164,9 +1303,9 @@ export function BrandDesignSystemPage() {
         <div className="rounded-md border border-divider p-3 space-y-3">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-sm font-semibold text-content">Base theme brand sync</div>
+              <div className="text-sm font-semibold text-content">Theme template workflow</div>
               <div className="text-xs text-content-muted">
-                Sync Brand tab tokens into a specific Shopify theme by name. Your `layout/theme.liquid` must include the managed marker block.
+                Job 1 builds an editable template draft in mOS. Job 2 publishes the approved draft to Shopify.
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1187,15 +1326,15 @@ export function BrandDesignSystemPage() {
               <Button
                 size="sm"
                 onClick={() => {
-                  void handleSyncShopifyThemeBrand();
+                  void handleBuildShopifyThemeTemplateDraft();
                 }}
                 disabled={
-                  syncShopifyThemeBrand.isPending ||
+                  buildShopifyThemeTemplateDraft.isPending ||
                   !hasShopifyConnectionTarget ||
                   !themeSyncThemeName.trim()
                 }
               >
-                {syncShopifyThemeBrand.isPending ? "Syncing…" : "Sync base theme"}
+                {buildShopifyThemeTemplateDraft.isPending ? "Building…" : "Job 1: Build template draft"}
               </Button>
             </div>
           </div>
@@ -1207,7 +1346,7 @@ export function BrandDesignSystemPage() {
               placeholder="futrgroup2-0theme"
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
-              Target Shopify theme name. Default is set to <span className="font-semibold text-content">futrgroup2-0theme</span>.
+              Target Shopify theme name. This is used when building or auditing drafts.
             </div>
           </div>
 
@@ -1218,7 +1357,7 @@ export function BrandDesignSystemPage() {
               placeholder="Optional product ID"
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
-              Optional product ID for product-specific asset mapping before theme sync.
+              Optional product ID for product-specific image/text planning in Job 1.
             </div>
           </div>
 
@@ -1237,62 +1376,134 @@ export function BrandDesignSystemPage() {
               disabled={!designSystems.length}
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
-              Leave as workspace default to use the default design system, or pick a specific design system override.
+              Leave as workspace default, or pick a specific design system override for Job 1.
             </div>
           </div>
 
-          {themeSyncResult ? (
-            <div className="space-y-2">
+          <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
+            <Select
+              value={selectedTemplateDraftId}
+              onValueChange={(value) => setSelectedTemplateDraftId(value)}
+              options={
+                templateDraftOptions.length
+                  ? templateDraftOptions
+                  : [{ label: "No template drafts yet", value: "" }]
+              }
+              disabled={!templateDraftOptions.length}
+            />
+            <div className="text-xs text-content-muted md:flex md:items-center">
+              Select a draft to review/edit in mOS before publishing.
+            </div>
+          </div>
+
+          {selectedTemplateDraft?.latestVersion ? (
+            <div className="space-y-3 rounded-md border border-divider p-3">
               <div className="text-xs text-content-muted">
-                Last sync: <span className="font-semibold text-content">{themeSyncResult.shopDomain}</span> ·{" "}
-                <span className="font-semibold text-content">{themeSyncResult.themeName}</span>
+                Editing draft <span className="font-semibold text-content">{selectedTemplateDraft.themeName}</span> · v
+                <span className="font-semibold text-content">{selectedTemplateDraft.latestVersion.versionNumber}</span>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-content">Image asset map (JSON)</label>
+                  <textarea
+                    rows={10}
+                    value={templateDraftImageMapInput}
+                    onChange={(event) => {
+                      setTemplateDraftImageMapInput(event.target.value);
+                      setTemplateDraftEditError(null);
+                    }}
+                    className={cn(
+                      "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                    )}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-content">Text values (JSON)</label>
+                  <textarea
+                    rows={10}
+                    value={templateDraftTextValuesInput}
+                    onChange={(event) => {
+                      setTemplateDraftTextValuesInput(event.target.value);
+                      setTemplateDraftEditError(null);
+                    }}
+                    className={cn(
+                      "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                    )}
+                  />
+                </div>
+              </div>
+              {templateDraftEditError ? <div className="text-xs text-danger">{templateDraftEditError}</div> : null}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    void handleSaveTemplateDraftEdits();
+                  }}
+                  disabled={updateShopifyThemeTemplateDraft.isPending}
+                >
+                  {updateShopifyThemeTemplateDraft.isPending ? "Saving…" : "Save draft edits"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    void handlePublishTemplateDraft();
+                  }}
+                  disabled={publishShopifyThemeTemplateDraft.isPending}
+                >
+                  {publishShopifyThemeTemplateDraft.isPending ? "Publishing…" : "Job 2: Publish template"}
+                </Button>
+              </div>
+              <div className="text-xs text-content-muted">
+                Slots: {selectedTemplateDraft.latestVersion.data.imageSlots.length} image ·{" "}
+                {selectedTemplateDraft.latestVersion.data.textSlots.length} text
+              </div>
+            </div>
+          ) : null}
+
+          {templatePublishResult ? (
+            <div className="space-y-2 rounded-md border border-divider p-3">
+              <div className="text-xs text-content-muted">
+                Last publish: <span className="font-semibold text-content">{templatePublishResult.sync.shopDomain}</span> ·{" "}
+                <span className="font-semibold text-content">{templatePublishResult.sync.themeName}</span>
               </div>
               <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
                 <TableBody>
                   <TableRow>
-                    <TableCell className="w-[240px] text-xs text-content-muted">Design system</TableCell>
-                    <TableCell className="text-xs text-content">{themeSyncResult.designSystemName}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Brand</TableCell>
-                    <TableCell className="text-xs text-content">{themeSyncResult.brandName}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Theme role</TableCell>
-                    <TableCell className="text-xs text-content">{themeSyncResult.themeRole}</TableCell>
+                    <TableCell className="w-[240px] text-xs text-content-muted">Draft</TableCell>
+                    <TableCell className="text-xs text-content break-all">
+                      {templatePublishResult.draft.id} · v{templatePublishResult.version.versionNumber}
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs text-content-muted">CSS asset</TableCell>
-                    <TableCell className="text-xs text-content break-all">{themeSyncResult.cssFilename}</TableCell>
+                    <TableCell className="text-xs text-content break-all">{templatePublishResult.sync.cssFilename}</TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs text-content-muted">Settings file</TableCell>
-                    <TableCell className="text-xs text-content break-all">{themeSyncResult.settingsFilename || "n/a"}</TableCell>
+                    <TableCell className="text-xs text-content break-all">
+                      {templatePublishResult.sync.settingsFilename || "n/a"}
+                    </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs text-content-muted">Coverage</TableCell>
                     <TableCell className="text-xs text-content">
-                      {themeSyncResult.coverage.requiredThemeVars.length} required theme vars ·{" "}
-                      {themeSyncResult.coverage.missingThemeVars.length} missing
+                      {templatePublishResult.sync.coverage.requiredThemeVars.length} required theme vars ·{" "}
+                      {templatePublishResult.sync.coverage.missingThemeVars.length} missing
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs text-content-muted">Settings paths</TableCell>
                     <TableCell className="text-xs text-content">
-                      {themeSyncResult.settingsSync.updatedPaths.length} updated ·{" "}
-                      {themeSyncResult.settingsSync.missingPaths.length} missing
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Component styles</TableCell>
-                    <TableCell className="text-xs text-content">
-                      {themeSyncResult.settingsSync.semanticUpdatedPaths.length} synced ·{" "}
-                      {themeSyncResult.settingsSync.unmappedColorPaths.length + themeSyncResult.settingsSync.unmappedTypographyPaths.length} unmapped
+                      {templatePublishResult.sync.settingsSync.updatedPaths.length} updated ·{" "}
+                      {templatePublishResult.sync.settingsSync.missingPaths.length} missing
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs text-content-muted">Job ID</TableCell>
-                    <TableCell className="text-xs text-content break-all">{themeSyncResult.jobId || "n/a (completed without async job)"}</TableCell>
+                    <TableCell className="text-xs text-content break-all">{templatePublishResult.sync.jobId || "n/a"}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
