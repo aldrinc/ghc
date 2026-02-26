@@ -208,6 +208,21 @@ export type ClientShopifyThemeTemplateDraftUpdatePayload = {
   notes?: string;
 };
 
+export type ClientShopifyThemeTemplateGenerateImagesPayload = {
+  draftId: string;
+  productId?: string;
+};
+
+export type ClientShopifyThemeTemplateGenerateImagesResponse = {
+  draft: ClientShopifyThemeTemplateDraft;
+  version: ClientShopifyThemeTemplateDraftVersion;
+  generatedImageCount: number;
+  generatedSlotPaths: string[];
+  imageModels: string[];
+  imageModelBySlotPath: Record<string, string>;
+  imageSourceBySlotPath: Record<string, string>;
+};
+
 export type ClientShopifyThemeTemplatePublishPayload = {
   draftId: string;
 };
@@ -284,6 +299,24 @@ type ClientShopifyThemeTemplatePublishJobStatusResponse = {
   error?: string | null;
   progress?: ClientShopifyThemeBrandSyncJobProgress | null;
   result?: ClientShopifyThemeTemplatePublishResponse | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+};
+
+type ClientShopifyThemeTemplateGenerateImagesJobStartResponse = {
+  jobId: string;
+  status: ClientShopifyThemeBrandSyncJobStatus;
+  statusPath: string;
+};
+
+type ClientShopifyThemeTemplateGenerateImagesJobStatusResponse = {
+  jobId: string;
+  status: ClientShopifyThemeBrandSyncJobStatus;
+  error?: string | null;
+  progress?: ClientShopifyThemeBrandSyncJobProgress | null;
+  result?: ClientShopifyThemeTemplateGenerateImagesResponse | null;
   createdAt: string;
   updatedAt: string;
   startedAt?: string | null;
@@ -651,6 +684,59 @@ export function usePublishClientShopifyThemeTemplateDraft(clientId?: string) {
     onError: (err: ApiError | Error) => {
       const message =
         "message" in err ? err.message : err?.message || "Failed to publish Shopify template draft";
+      toast.error(message);
+    },
+  });
+}
+
+export function useGenerateClientShopifyThemeTemplateImages(clientId?: string) {
+  const { get, post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (payload: ClientShopifyThemeTemplateGenerateImagesPayload) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      if (!payload.draftId?.trim()) throw new Error("Draft ID is required.");
+      const startResponse = await post<ClientShopifyThemeTemplateGenerateImagesJobStartResponse>(
+        `/clients/${clientId}/shopify/theme/brand/template/generate-images-async`,
+        payload,
+      );
+      const generationJobId = startResponse.jobId;
+      if (!generationJobId || !generationJobId.trim()) {
+        throw new Error("Shopify template image generation job was not started.");
+      }
+
+      const pollTimeoutMs = 1000 * 60 * 20;
+      const pollIntervalMs = 2000;
+      const startedAt = Date.now();
+
+      while (true) {
+        const statusResponse = await get<ClientShopifyThemeTemplateGenerateImagesJobStatusResponse>(
+          `/clients/${clientId}/shopify/theme/brand/template/generate-images-jobs/${generationJobId}`,
+        );
+        if (statusResponse.status === "succeeded") {
+          if (statusResponse.result) return statusResponse.result;
+          throw new Error("Template image generation completed but no result payload was returned.");
+        }
+        if (statusResponse.status === "failed") {
+          const errorMessage = statusResponse.error?.trim();
+          throw new Error(errorMessage || "Shopify template image generation failed.");
+        }
+        if (Date.now() - startedAt > pollTimeoutMs) {
+          throw new Error("Timed out waiting for template image generation to complete.");
+        }
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      }
+    },
+    onSuccess: (response) => {
+      toast.success(`Generated ${response.generatedImageCount} template image(s)`);
+      queryClient.invalidateQueries({
+        queryKey: ["clients", "shopify-theme-template-drafts", clientId],
+      });
+    },
+    onError: (err: ApiError | Error) => {
+      const message =
+        "message" in err ? err.message : err?.message || "Failed to generate Shopify template images";
       toast.error(message);
     },
   });

@@ -12,6 +12,7 @@ import {
   useAuditClientShopifyThemeBrand,
   useBuildClientShopifyThemeTemplateDraft,
   useClient,
+  useGenerateClientShopifyThemeTemplateImages,
   useListClientShopifyThemeTemplateDrafts,
   usePublishClientShopifyThemeTemplateDraft,
   useCreateClientShopifyInstallUrl,
@@ -23,6 +24,7 @@ import {
   useUpdateClient,
   type ClientShopifyThemeBrandAuditResponse,
   type ClientShopifyThemeTemplateImageSlot,
+  type ClientShopifyThemeTemplateTextSlot,
   type ClientShopifyThemeTemplatePublishResponse,
 } from "@/api/clients";
 import {
@@ -30,7 +32,7 @@ import {
   type ComplianceShopifyPolicySyncResponse,
 } from "@/api/compliance";
 import { useAssets } from "@/api/assets";
-import { useProducts } from "@/api/products";
+import { useProducts, useUploadProductAssets } from "@/api/products";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -586,6 +588,49 @@ function buildImageSlotReadableLabelMap(
   return labelsByPath;
 }
 
+function deriveTextSlotBaseLabel(slot: ClientShopifyThemeTemplateTextSlot): string {
+  const haystack = `${slot.key} ${slot.path}`.toLowerCase();
+  if (haystack.includes("headline") || haystack.includes("heading") || haystack.includes("title")) {
+    return "Headline";
+  }
+  if (haystack.includes("subheading") || haystack.includes("subtitle")) {
+    return "Subheadline";
+  }
+  if (haystack.includes("feature")) return "Feature Copy";
+  if (haystack.includes("body") || haystack.includes("description")) return "Body Copy";
+  if (haystack.includes("cta") || haystack.includes("button")) return "CTA Label";
+  if (haystack.includes("review") || haystack.includes("testimonial")) return "Review Copy";
+  if (slot.key.trim()) return humanizeSlotToken(slot.key);
+  const pathLeaf = slot.path.split(".").pop() || slot.path;
+  return humanizeSlotToken(pathLeaf);
+}
+
+function buildTextSlotReadableLabelMap(
+  slots: ClientShopifyThemeTemplateTextSlot[]
+): Map<string, string> {
+  const baseByPath = slots.map((slot) => ({
+    path: slot.path,
+    baseLabel: deriveTextSlotBaseLabel(slot),
+  }));
+  const totalsByBase = new Map<string, number>();
+  for (const entry of baseByPath) {
+    totalsByBase.set(entry.baseLabel, (totalsByBase.get(entry.baseLabel) || 0) + 1);
+  }
+  const seenByBase = new Map<string, number>();
+  const labelsByPath = new Map<string, string>();
+  for (const entry of baseByPath) {
+    const total = totalsByBase.get(entry.baseLabel) || 0;
+    if (total <= 1) {
+      labelsByPath.set(entry.path, entry.baseLabel);
+      continue;
+    }
+    const nextIndex = (seenByBase.get(entry.baseLabel) || 0) + 1;
+    seenByBase.set(entry.baseLabel, nextIndex);
+    labelsByPath.set(entry.path, `${entry.baseLabel} ${nextIndex}`);
+  }
+  return labelsByPath;
+}
+
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
   const { data: client } = useClient(workspace?.id);
@@ -607,6 +652,7 @@ export function BrandDesignSystemPage() {
   const deleteDesignSystem = useDeleteDesignSystem();
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
   const buildShopifyThemeTemplateDraft = useBuildClientShopifyThemeTemplateDraft(workspace?.id);
+  const generateShopifyThemeTemplateImages = useGenerateClientShopifyThemeTemplateImages(workspace?.id);
   const publishShopifyThemeTemplateDraft = usePublishClientShopifyThemeTemplateDraft(workspace?.id);
   const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
   const { data: shopifyThemeTemplateDrafts = [] } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
@@ -616,10 +662,11 @@ export function BrandDesignSystemPage() {
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
     { enabled: Boolean(workspace?.id) }
   );
-  const { data: workspaceImageAssets = [], isLoading: isLoadingWorkspaceImageAssets } = useAssets(
-    { clientId: workspace?.id, assetKind: "image" },
-    { enabled: Boolean(workspace?.id) }
-  );
+  const {
+    data: workspaceImageAssets = [],
+    isLoading: isLoadingWorkspaceImageAssets,
+    refetch: refetchWorkspaceImageAssets,
+  } = useAssets({ clientId: workspace?.id, assetKind: "image" }, { enabled: Boolean(workspace?.id) });
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<DesignSystem | null>(null);
@@ -642,6 +689,7 @@ export function BrandDesignSystemPage() {
   const [templateDraftImageMapInput, setTemplateDraftImageMapInput] = useState("{}");
   const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
   const [templateDraftEditError, setTemplateDraftEditError] = useState<string | null>(null);
+  const [templateAssetUploadProductId, setTemplateAssetUploadProductId] = useState("");
   const [templateAssetSearchQuery, setTemplateAssetSearchQuery] = useState("");
   const [templateSlotAssetQueryByPath, setTemplateSlotAssetQueryByPath] = useState<Record<string, string>>({});
   const [templateAssetPickerImageErrorsByPublicId, setTemplateAssetPickerImageErrorsByPublicId] = useState<Record<string, boolean>>({});
@@ -653,6 +701,8 @@ export function BrandDesignSystemPage() {
   const [themeAuditResult, setThemeAuditResult] = useState<ClientShopifyThemeBrandAuditResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadTemplateProductAssets = useUploadProductAssets(templateAssetUploadProductId || "");
 
   const designSystemOptions = useMemo(
     () => [
@@ -698,7 +748,8 @@ export function BrandDesignSystemPage() {
       const message = (shopifyStatusError as { message?: unknown }).message;
       if (typeof message === "string" && message.trim()) return message;
     }
-    if (typeof shopifyStatusError === "string" && shopifyStatusError.trim()) return shopifyStatusError;
+    const fallbackErrorMessage = String(shopifyStatusError ?? "").trim();
+    if (fallbackErrorMessage) return fallbackErrorMessage;
     return "Checking Shopify connection status.";
   }, [shopifyStatus?.message, shopifyStatusError]);
   const isShopifyConnectionMutating =
@@ -723,6 +774,7 @@ export function BrandDesignSystemPage() {
     setTemplateDraftImageMapInput("{}");
     setTemplateDraftTextValuesInput("{}");
     setTemplateDraftEditError(null);
+    setTemplateAssetUploadProductId("");
     setTemplateAssetSearchQuery("");
     setTemplateSlotAssetQueryByPath({});
     setTemplateAssetPickerImageErrorsByPublicId({});
@@ -843,6 +895,30 @@ export function BrandDesignSystemPage() {
     setTemplateAssetPickerImageErrorsByPublicId({});
   }, [selectedTemplateDraft?.id, selectedTemplateDraft?.latestVersion?.id]);
 
+  useEffect(() => {
+    if (!workspaceProducts.length) {
+      setTemplateAssetUploadProductId("");
+      return;
+    }
+    setTemplateAssetUploadProductId((current) => {
+      if (current && workspaceProducts.some((product) => product.id === current)) return current;
+      const draftProductId =
+        selectedTemplateDraft?.productId ||
+        selectedTemplateDraft?.latestVersion?.data.productId ||
+        themeSyncProductId.trim();
+      if (draftProductId && workspaceProducts.some((product) => product.id === draftProductId)) {
+        return draftProductId;
+      }
+      return workspaceProducts[0]?.id || "";
+    });
+  }, [
+    workspaceProducts,
+    selectedTemplateDraft?.id,
+    selectedTemplateDraft?.productId,
+    selectedTemplateDraft?.latestVersion?.data.productId,
+    themeSyncProductId,
+  ]);
+
   const previewDesignSystem = useMemo(
     () => designSystems.find((ds) => ds.id === previewDesignSystemId) ?? null,
     [designSystems, previewDesignSystemId]
@@ -877,6 +953,14 @@ export function BrandDesignSystemPage() {
   const publicAssetBaseUrl = apiBaseUrl?.replace(/\/$/, "");
   const productById = useMemo(
     () => new Map(workspaceProducts.map((product) => [product.id, product])),
+    [workspaceProducts]
+  );
+  const templateAssetUploadProductOptions = useMemo(
+    () =>
+      workspaceProducts.map((product) => ({
+        label: product.title,
+        value: product.id,
+      })),
     [workspaceProducts]
   );
   const workspaceProductImageAssets = useMemo(
@@ -944,10 +1028,20 @@ export function BrandDesignSystemPage() {
     [templateDraftImageMapInput]
   );
   const parsedTemplateDraftImageMap = parsedTemplateDraftImageMapResult.value || {};
+  const parsedTemplateDraftTextValuesResult = useMemo(
+    () => parseStringMap(templateDraftTextValuesInput, "Text values"),
+    [templateDraftTextValuesInput]
+  );
+  const parsedTemplateDraftTextValues = parsedTemplateDraftTextValuesResult.value || {};
   const templateImageSlotReadableLabelByPath = useMemo(() => {
     const latestVersion = selectedTemplateDraft?.latestVersion;
     if (!latestVersion) return new Map<string, string>();
     return buildImageSlotReadableLabelMap(latestVersion.data.imageSlots);
+  }, [selectedTemplateDraft?.latestVersion?.id]);
+  const templateTextSlotReadableLabelByPath = useMemo(() => {
+    const latestVersion = selectedTemplateDraft?.latestVersion;
+    if (!latestVersion) return new Map<string, string>();
+    return buildTextSlotReadableLabelMap(latestVersion.data.textSlots);
   }, [selectedTemplateDraft?.latestVersion?.id]);
   const templatePreviewImageItems = useMemo(() => {
     const latestVersion = selectedTemplateDraft?.latestVersion;
@@ -1175,6 +1269,38 @@ export function BrandDesignSystemPage() {
     }
   };
 
+  const handleGenerateTemplateDraftImages = async () => {
+    if (!workspace?.id) return;
+    if (!selectedTemplateDraftId) {
+      toast.error("Select a template draft first.");
+      return;
+    }
+    const payload: { draftId: string; productId?: string } = {
+      draftId: selectedTemplateDraftId,
+    };
+    const explicitProductId = templateAssetUploadProductId.trim() || themeSyncProductId.trim();
+    if (explicitProductId) payload.productId = explicitProductId;
+
+    try {
+      const response = await generateShopifyThemeTemplateImages.mutateAsync(payload);
+      setSelectedTemplateDraftId(response.draft.id);
+      setTemplateDraftImageMapInput(
+        JSON.stringify(response.version.data.componentImageAssetMap || {}, null, 2)
+      );
+      setTemplateDraftTextValuesInput(
+        JSON.stringify(response.version.data.componentTextValues || {}, null, 2)
+      );
+      const generatedProductId = response.version.data.productId?.trim();
+      if (generatedProductId) {
+        setTemplateAssetUploadProductId(generatedProductId);
+      }
+      setTemplateDraftEditError(null);
+      await refetchWorkspaceImageAssets();
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
+  };
+
   const handleTemplateDraftSlotAssetChange = (path: string, assetPublicId: string) => {
     const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
     if (!parsedImageMap.value) {
@@ -1190,6 +1316,48 @@ export function BrandDesignSystemPage() {
     }
     setTemplateDraftImageMapInput(JSON.stringify(nextImageMap, null, 2));
     setTemplateDraftEditError(null);
+  };
+
+  const handleTemplateDraftSlotTextValueChange = (path: string, nextValue: string) => {
+    const parsedTextValues = parseStringMap(templateDraftTextValuesInput, "Text values");
+    if (!parsedTextValues.value) {
+      setTemplateDraftEditError(parsedTextValues.error || "Invalid text values.");
+      return;
+    }
+    const nextTextValues = { ...parsedTextValues.value };
+    if (nextValue.trim()) {
+      nextTextValues[path] = nextValue;
+    } else {
+      delete nextTextValues[path];
+    }
+    setTemplateDraftTextValuesInput(JSON.stringify(nextTextValues, null, 2));
+    setTemplateDraftEditError(null);
+  };
+
+  const handleTemplateImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) {
+      toast.error("No files selected.");
+      event.currentTarget.value = "";
+      return;
+    }
+    if (!templateAssetUploadProductId.trim()) {
+      toast.error("Select a product before uploading images.");
+      event.currentTarget.value = "";
+      return;
+    }
+    const nonImageFiles = files.filter((file) => !file.type.toLowerCase().startsWith("image/"));
+    if (nonImageFiles.length) {
+      toast.error("Only image files are allowed in this uploader.");
+      event.currentTarget.value = "";
+      return;
+    }
+    try {
+      await uploadTemplateProductAssets.mutateAsync(files);
+      await refetchWorkspaceImageAssets();
+    } finally {
+      event.currentTarget.value = "";
+    }
   };
 
   const handleOpenTemplatePreview = () => {
@@ -1643,38 +1811,6 @@ export function BrandDesignSystemPage() {
                 Editing draft <span className="font-semibold text-content">{selectedTemplateDraft.themeName}</span> · v
                 <span className="font-semibold text-content">{selectedTemplateDraft.latestVersion.versionNumber}</span>
               </div>
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-content">Image asset map (JSON)</label>
-                  <textarea
-                    rows={10}
-                    value={templateDraftImageMapInput}
-                    onChange={(event) => {
-                      setTemplateDraftImageMapInput(event.target.value);
-                      setTemplateDraftEditError(null);
-                    }}
-                    className={cn(
-                      "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                    )}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-content">Text values (JSON)</label>
-                  <textarea
-                    rows={10}
-                    value={templateDraftTextValuesInput}
-                    onChange={(event) => {
-                      setTemplateDraftTextValuesInput(event.target.value);
-                      setTemplateDraftEditError(null);
-                    }}
-                    className={cn(
-                      "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                    )}
-                  />
-                </div>
-              </div>
               <div className="space-y-3 rounded-md border border-divider p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -1683,12 +1819,42 @@ export function BrandDesignSystemPage() {
                       Search workspace product images, then map each template image slot.
                     </div>
                   </div>
-                  <div className="w-full sm:w-[320px]">
+                  <div className="w-full space-y-2 lg:w-auto lg:min-w-[520px]">
                     <Input
                       value={templateAssetSearchQuery}
                       onChange={(event) => setTemplateAssetSearchQuery(event.target.value)}
                       placeholder="Search by product, asset ID, size, status, tag"
                     />
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                      <Select
+                        value={templateAssetUploadProductId}
+                        onValueChange={(value) => setTemplateAssetUploadProductId(value)}
+                        options={
+                          templateAssetUploadProductOptions.length
+                            ? templateAssetUploadProductOptions
+                            : [{ label: "No products in this workspace", value: "" }]
+                        }
+                        disabled={!templateAssetUploadProductOptions.length || uploadTemplateProductAssets.isPending}
+                      />
+                      <div className="flex items-center gap-2">
+                        <input
+                          ref={templateAssetUploadInputRef}
+                          className="hidden"
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={handleTemplateImageUpload}
+                        />
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => templateAssetUploadInputRef.current?.click()}
+                          disabled={!templateAssetUploadProductOptions.length || uploadTemplateProductAssets.isPending}
+                        >
+                          {uploadTemplateProductAssets.isPending ? "Uploading…" : "Upload images"}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
@@ -1951,8 +2117,65 @@ export function BrandDesignSystemPage() {
                   </div>
                 )}
               </div>
+              <div className="space-y-3 rounded-md border border-divider p-3">
+                <div>
+                  <div className="text-xs font-semibold text-content">Text values</div>
+                  <div className="text-xs text-content-muted">
+                    Edit each discovered text slot directly. Mapped values override the theme's current values.
+                  </div>
+                </div>
+                {parsedTemplateDraftTextValuesResult.error ? (
+                  <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+                    {parsedTemplateDraftTextValuesResult.error}
+                  </div>
+                ) : !selectedTemplateDraft.latestVersion.data.textSlots.length ? (
+                  <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                    This draft has no text slots to map.
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                    {selectedTemplateDraft.latestVersion.data.textSlots.map((slot) => {
+                      const readableSlotLabel =
+                        templateTextSlotReadableLabelByPath.get(slot.path) ||
+                        humanizeSlotToken(slot.path.split(".").pop() || slot.path);
+                      const mappedValue = parsedTemplateDraftTextValues[slot.path] || "";
+                      const currentThemeValue = slot.currentValue || "";
+                      return (
+                        <div key={slot.path} className="space-y-2 rounded-md border border-border bg-surface p-2">
+                          <div className="text-xs font-semibold text-content">{readableSlotLabel}</div>
+                          <div className="text-[11px] font-mono break-all text-content">{slot.path}</div>
+                          <div className="text-[11px] text-content-muted">key: {slot.key}</div>
+                          <textarea
+                            rows={3}
+                            value={mappedValue}
+                            onChange={(event) => handleTemplateDraftSlotTextValueChange(slot.path, event.target.value)}
+                            placeholder={currentThemeValue || "Enter mapped text value for this slot"}
+                            className={cn(
+                              "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                            )}
+                          />
+                          <div className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] text-content-muted">
+                            Current theme value: {currentThemeValue || "None"}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               {templateDraftEditError ? <div className="text-xs text-danger">{templateDraftEditError}</div> : null}
               <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    void handleGenerateTemplateDraftImages();
+                  }}
+                  disabled={generateShopifyThemeTemplateImages.isPending}
+                >
+                  {generateShopifyThemeTemplateImages.isPending ? "Generating…" : "Generate all template images"}
+                </Button>
                 <Button
                   size="sm"
                   variant="secondary"

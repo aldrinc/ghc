@@ -64,6 +64,10 @@ from app.schemas.shopify_connection import (
     ShopifyThemeTemplateDraftResponse,
     ShopifyThemeTemplateDraftUpdateRequest,
     ShopifyThemeTemplateDraftVersionResponse,
+    ShopifyThemeTemplateGenerateImagesJobStartResponse,
+    ShopifyThemeTemplateGenerateImagesJobStatusResponse,
+    ShopifyThemeTemplateGenerateImagesRequest,
+    ShopifyThemeTemplateGenerateImagesResponse,
     ShopifyThemeTemplateImageSlot,
     ShopifyThemeTemplatePublishJobStartResponse,
     ShopifyThemeTemplatePublishJobStatusResponse,
@@ -107,6 +111,7 @@ logger = logging.getLogger(__name__)
 
 _JOB_TYPE_SHOPIFY_THEME_BRAND_SYNC = "shopify_theme_brand_sync"
 _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_BUILD = "shopify_theme_template_build"
+_JOB_TYPE_SHOPIFY_THEME_TEMPLATE_GENERATE_IMAGES = "shopify_theme_template_generate_images"
 _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_PUBLISH = "shopify_theme_template_publish"
 _JOB_SUBJECT_TYPE_CLIENT = "client"
 _THEME_COMPONENT_HTML_TAG_RE = re.compile(
@@ -1759,6 +1764,204 @@ def _build_or_update_shopify_theme_template_draft(
     )
 
 
+def _generate_shopify_theme_template_draft_images(
+    *,
+    client_id: str,
+    payload: ShopifyThemeTemplateGenerateImagesRequest,
+    auth: AuthContext,
+    session: Session,
+) -> ShopifyThemeTemplateGenerateImagesResponse:
+    drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
+    draft = drafts_repo.get(
+        org_id=auth.org_id,
+        client_id=client_id,
+        draft_id=payload.draftId.strip(),
+    )
+    if not draft:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify theme template draft not found.",
+        )
+    latest_version = drafts_repo.get_latest_version(draft_id=str(draft.id))
+    if not latest_version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shopify theme template draft has no versions to generate images from.",
+        )
+
+    latest_data = _serialize_shopify_theme_template_draft_version(
+        version=latest_version
+    ).data
+    image_slots = [
+        slot.model_dump(mode="json")
+        for slot in latest_data.imageSlots
+        if isinstance(slot.path, str) and slot.path.strip()
+    ]
+    text_slots = [slot.model_dump(mode="json") for slot in latest_data.textSlots]
+    if not image_slots:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Template draft has no image slots available for generation.",
+        )
+
+    resolved_product_id = payload.productId.strip() if payload.productId else None
+    if not resolved_product_id and isinstance(latest_data.productId, str):
+        candidate = latest_data.productId.strip()
+        if candidate:
+            resolved_product_id = candidate
+    if not resolved_product_id and isinstance(draft.product_id, UUID):
+        resolved_product_id = str(draft.product_id)
+    if not resolved_product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Template image generation requires a productId so generated assets can be attached "
+                "to a workspace product."
+            ),
+        )
+
+    resolved_product = ProductsRepository(session).get(
+        org_id=auth.org_id,
+        product_id=resolved_product_id,
+    )
+    if not resolved_product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product not found for productId={resolved_product_id}.",
+        )
+    if str(resolved_product.client_id).strip() != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product must belong to this workspace.",
+        )
+
+    _emit_theme_sync_progress(
+        {
+            "stage": "image_generation",
+            "message": "Generating template images from deterministic slot requirements.",
+            "totalImageSlots": len(image_slots),
+            "completedImageSlots": 0,
+            "generatedImageCount": 0,
+            "fallbackImageCount": 0,
+            "skippedImageCount": 0,
+        }
+    )
+    _, rate_limited_slot_paths, generated_asset_by_slot_path = (
+        _generate_theme_sync_ai_image_assets(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            product_id=resolved_product_id,
+            image_slots=image_slots,
+            text_slots=text_slots,
+        )
+    )
+    if rate_limited_slot_paths:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Image generation was rate-limited for one or more required template slots. "
+                "Retry once quota recovers. Slots: "
+                + ", ".join(sorted(rate_limited_slot_paths))
+            ),
+        )
+
+    next_component_image_asset_map = dict(latest_data.componentImageAssetMap)
+    generated_slot_paths: list[str] = []
+    image_model_by_slot_path: dict[str, str] = {}
+    image_source_by_slot_path: dict[str, str] = {}
+    for image_slot in latest_data.imageSlots:
+        slot_path = image_slot.path.strip()
+        generated_asset = generated_asset_by_slot_path.get(slot_path)
+        if generated_asset is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Image generation did not return an asset for a required template slot. "
+                    f"slotPath={slot_path}."
+                ),
+            )
+        normalized_public_id = _normalize_asset_public_id(
+            getattr(generated_asset, "public_id", None)
+        )
+        if not normalized_public_id:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Image generation returned an invalid asset without public_id. "
+                    f"slotPath={slot_path}."
+                ),
+            )
+        next_component_image_asset_map[slot_path] = normalized_public_id
+        generated_slot_paths.append(slot_path)
+        raw_ai_metadata = getattr(generated_asset, "ai_metadata", None)
+        if isinstance(raw_ai_metadata, dict):
+            raw_model = raw_ai_metadata.get("model")
+            if isinstance(raw_model, str) and raw_model.strip():
+                image_model_by_slot_path[slot_path] = raw_model.strip()
+            raw_source = raw_ai_metadata.get("source")
+            if isinstance(raw_source, str) and raw_source.strip():
+                image_source_by_slot_path[slot_path] = raw_source.strip()
+        if slot_path not in image_source_by_slot_path:
+            raw_file_source = getattr(generated_asset, "file_source", None)
+            if isinstance(raw_file_source, str) and raw_file_source.strip():
+                image_source_by_slot_path[slot_path] = raw_file_source.strip()
+
+    normalized_component_image_asset_map = (
+        _normalize_theme_template_component_image_asset_map(next_component_image_asset_map)
+    )
+    image_models = sorted(
+        {
+            model_name
+            for model_name in image_model_by_slot_path.values()
+            if isinstance(model_name, str) and model_name.strip()
+        }
+    )
+    merged_metadata = dict(latest_data.metadata or {})
+    merged_metadata.update(
+        {
+            "generatedImageCount": len(generated_slot_paths),
+            "rateLimitedSlotPaths": [],
+            "imageGenerationSlotCount": len(generated_slot_paths),
+            "imageGenerationGeneratedAt": datetime.now(timezone.utc).isoformat(),
+            "imageModels": image_models,
+            "imageModelBySlotPath": image_model_by_slot_path,
+            "imageSourceBySlotPath": image_source_by_slot_path,
+        }
+    )
+
+    next_data = latest_data.model_copy(
+        update={
+            "productId": resolved_product_id,
+            "componentImageAssetMap": normalized_component_image_asset_map,
+            "metadata": merged_metadata,
+        }
+    )
+    draft.product_id = resolved_product.id
+    next_version = drafts_repo.create_version(
+        draft=draft,
+        payload=next_data.model_dump(mode="json"),
+        source="agent_image_generation_job",
+        created_by_user_external_id=auth.user_id,
+    )
+    serialized_draft = _serialize_shopify_theme_template_draft(
+        draft=draft,
+        latest_version=next_version,
+    )
+    serialized_version = _serialize_shopify_theme_template_draft_version(
+        version=next_version
+    )
+    return ShopifyThemeTemplateGenerateImagesResponse(
+        draft=serialized_draft,
+        version=serialized_version,
+        generatedImageCount=len(generated_slot_paths),
+        generatedSlotPaths=sorted(generated_slot_paths),
+        imageModels=image_models,
+        imageModelBySlotPath=image_model_by_slot_path,
+        imageSourceBySlotPath=image_source_by_slot_path,
+    )
+
+
 def _publish_shopify_theme_template_draft(
     *,
     client_id: str,
@@ -2018,6 +2221,167 @@ def _run_client_shopify_theme_template_build_job(job_id: str) -> None:
         except Exception:  # noqa: BLE001
             logger.exception(
                 "Failed to mark Shopify theme template build job as failed after exception",
+                extra={"job_id": job_id},
+            )
+    finally:
+        if progress_token is not None:
+            _THEME_SYNC_PROGRESS_CALLBACK.reset(progress_token)
+        session.close()
+
+
+def _run_client_shopify_theme_template_generate_images_job(job_id: str) -> None:
+    session = SessionLocal()
+    progress_token = None
+    try:
+        jobs_repo = JobsRepository(session)
+        job = jobs_repo.mark_running(job_id)
+        if not job:
+            return
+        progress_state: dict[str, Any] = {
+            "stage": "running",
+            "message": "Shopify template image generation job started.",
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+        def publish_progress(update: dict[str, Any]) -> None:
+            if not isinstance(update, dict):
+                return
+            progress_state.update(update)
+            progress_state["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            progress_session = SessionLocal()
+            try:
+                JobsRepository(progress_session).set_output(
+                    job_id,
+                    output={"progress": dict(progress_state)},
+                )
+            finally:
+                progress_session.close()
+
+        publish_progress({})
+        progress_token = _THEME_SYNC_PROGRESS_CALLBACK.set(publish_progress)
+
+        input_payload = job.input if isinstance(job.input, dict) else {}
+        client_id = input_payload.get("clientId")
+        raw_request_payload = input_payload.get("payload")
+        raw_auth_context = input_payload.get("auth")
+
+        if not isinstance(client_id, str) or not client_id.strip():
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: missing clientId.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+        if not isinstance(raw_request_payload, dict):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: payload must be an object.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+        if not isinstance(raw_auth_context, dict):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: auth context must be an object.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        user_id = raw_auth_context.get("userId")
+        org_id = raw_auth_context.get("orgId")
+        if (
+            not isinstance(user_id, str)
+            or not user_id.strip()
+            or not isinstance(org_id, str)
+            or not org_id.strip()
+        ):
+            jobs_repo.mark_failed(
+                job_id,
+                error="Invalid queued job payload: missing auth.userId or auth.orgId.",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        try:
+            payload = ShopifyThemeTemplateGenerateImagesRequest(**raw_request_payload)
+        except Exception as exc:  # noqa: BLE001
+            jobs_repo.mark_failed(
+                job_id,
+                error=f"Invalid queued job payload: {exc}",
+                output={"progress": dict(progress_state)},
+            )
+            return
+
+        auth = AuthContext(user_id=user_id.strip(), org_id=org_id.strip())
+        publish_progress(
+            {
+                "stage": "running",
+                "message": "Generating images for Shopify theme template draft.",
+            }
+        )
+        try:
+            generate_images_response = _generate_shopify_theme_template_draft_images(
+                client_id=client_id.strip(),
+                payload=payload,
+                auth=auth,
+                session=session,
+            )
+        except HTTPException as exc:
+            detail_payload = _serialize_http_exception_detail(exc.detail)
+            error_message = detail_payload.get("message")
+            if not isinstance(error_message, str) or not error_message.strip():
+                error_message = (
+                    "Shopify template image generation failed "
+                    f"with status {exc.status_code}."
+                )
+            publish_progress({"stage": "failed", "message": error_message})
+            jobs_repo.mark_failed(
+                job_id,
+                error=error_message,
+                output={
+                    "statusCode": exc.status_code,
+                    "detail": detail_payload,
+                    "progress": dict(progress_state),
+                },
+            )
+            return
+
+        result_payload = generate_images_response.model_dump(mode="json")
+        publish_progress(
+            {
+                "stage": "succeeded",
+                "message": "Shopify template images generated successfully.",
+                "draftId": generate_images_response.draft.id,
+                "draftVersionNumber": generate_images_response.version.versionNumber,
+                "generatedImageCount": generate_images_response.generatedImageCount,
+            }
+        )
+        jobs_repo.mark_succeeded(
+            job_id,
+            output={"result": result_payload, "progress": dict(progress_state)},
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(
+            "Unhandled exception while running Shopify theme template image generation job",
+            extra={"job_id": job_id},
+        )
+        try:
+            JobsRepository(session).mark_failed(
+                job_id,
+                error=str(exc)
+                or "Unhandled error while running Shopify template image generation job.",
+                output={
+                    "progress": {
+                        "stage": "failed",
+                        "message": str(exc)
+                        or "Unhandled error while running Shopify template image generation job.",
+                        "updatedAt": datetime.now(timezone.utc).isoformat(),
+                    }
+                },
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Failed to mark Shopify template image generation job as failed after exception",
                 extra={"job_id": job_id},
             )
     finally:
@@ -2627,6 +2991,123 @@ def update_client_shopify_theme_template_draft_route(
     return _serialize_shopify_theme_template_draft(
         draft=draft,
         latest_version=next_version,
+    )
+
+
+@router.post(
+    "/{client_id}/shopify/theme/brand/template/generate-images-async",
+    response_model=ShopifyThemeTemplateGenerateImagesJobStartResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def enqueue_client_shopify_theme_template_generate_images_route(
+    client_id: str,
+    payload: ShopifyThemeTemplateGenerateImagesRequest,
+    background_tasks: BackgroundTasks,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+
+    jobs_repo = JobsRepository(session)
+    job, _ = jobs_repo.get_or_create(
+        org_id=auth.org_id,
+        client_id=client_id,
+        research_run_id=None,
+        job_type=_JOB_TYPE_SHOPIFY_THEME_TEMPLATE_GENERATE_IMAGES,
+        subject_type=_JOB_SUBJECT_TYPE_CLIENT,
+        subject_id=client_id,
+        dedupe_key=None,
+        input_payload={
+            "clientId": client_id,
+            "payload": payload.model_dump(mode="json"),
+            "auth": {
+                "userId": auth.user_id,
+                "orgId": auth.org_id,
+            },
+        },
+        status=JOB_STATUS_QUEUED,
+    )
+    background_tasks.add_task(
+        _run_client_shopify_theme_template_generate_images_job, str(job.id)
+    )
+
+    return ShopifyThemeTemplateGenerateImagesJobStartResponse(
+        jobId=str(job.id),
+        status=job.status,
+        statusPath=f"/clients/{client_id}/shopify/theme/brand/template/generate-images-jobs/{job.id}",
+    )
+
+
+@router.get(
+    "/{client_id}/shopify/theme/brand/template/generate-images-jobs/{job_id}",
+    response_model=ShopifyThemeTemplateGenerateImagesJobStatusResponse,
+)
+def get_client_shopify_theme_template_generate_images_job_status_route(
+    client_id: str,
+    job_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    job = JobsRepository(session).get(job_id)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Template image generation job not found.",
+        )
+
+    if (
+        str(job.org_id) != auth.org_id
+        or str(job.subject_id) != client_id
+        or job.job_type != _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_GENERATE_IMAGES
+        or job.subject_type != _JOB_SUBJECT_TYPE_CLIENT
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Template image generation job not found.",
+        )
+
+    if job.status not in {
+        JOB_STATUS_QUEUED,
+        JOB_STATUS_RUNNING,
+        JOB_STATUS_SUCCEEDED,
+        JOB_STATUS_FAILED,
+    }:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Template image generation job is in an unsupported state: "
+                f"{job.status}"
+            ),
+        )
+
+    output_payload = job.output if isinstance(job.output, dict) else {}
+    raw_progress = output_payload.get("progress")
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    if isinstance(raw_progress, dict):
+        try:
+            progress = ShopifyThemeBrandSyncJobProgress(**raw_progress)
+        except Exception:  # noqa: BLE001
+            progress = None
+    raw_result = output_payload.get("result")
+    result: ShopifyThemeTemplateGenerateImagesResponse | None = None
+    if isinstance(raw_result, dict):
+        try:
+            result = ShopifyThemeTemplateGenerateImagesResponse(**raw_result)
+        except Exception:  # noqa: BLE001
+            result = None
+
+    error = job.error.strip() if isinstance(job.error, str) and job.error.strip() else None
+    return ShopifyThemeTemplateGenerateImagesJobStatusResponse(
+        jobId=str(job.id),
+        status=job.status,
+        error=error,
+        progress=progress,
+        result=result,
+        createdAt=job.created_at,
+        updatedAt=job.updated_at,
+        startedAt=job.started_at,
+        finishedAt=job.finished_at,
     )
 
 

@@ -343,6 +343,47 @@ class ShopifyThemeTemplateDraftUpdateRequest(BaseModel):
     notes: str | None = None
 
 
+class ShopifyThemeTemplateGenerateImagesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draftId: str = Field(..., min_length=1)
+    productId: str | None = Field(default=None, min_length=1)
+
+
+class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draft: ShopifyThemeTemplateDraftResponse
+    version: ShopifyThemeTemplateDraftVersionResponse
+    generatedImageCount: int
+    generatedSlotPaths: list[str] = Field(default_factory=list)
+    imageModels: list[str] = Field(default_factory=list)
+    imageModelBySlotPath: dict[str, str] = Field(default_factory=dict)
+    imageSourceBySlotPath: dict[str, str] = Field(default_factory=dict)
+
+
+class ShopifyThemeTemplateGenerateImagesJobStartResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    statusPath: str
+
+
+class ShopifyThemeTemplateGenerateImagesJobStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    error: str | None = None
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    result: ShopifyThemeTemplateGenerateImagesResponse | None = None
+    createdAt: datetime
+    updatedAt: datetime
+    startedAt: datetime | None = None
+    finishedAt: datetime | None = None
+
+
 class ShopifyThemeTemplateBuildJobStartResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
