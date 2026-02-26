@@ -529,10 +529,14 @@ def _generate_theme_sync_ai_image_assets(
     image_slots: list[dict[str, Any]],
     text_slots: list[dict[str, Any]] | None = None,
     max_concurrency: int | None = None,
+    stop_on_quota_exhausted: bool = False,
 ) -> tuple[list[Any], list[str], dict[str, Any], list[str]]:
     selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
     if not selected_slots:
         return [], [], {}, []
+    requested_image_model, requested_image_model_source = (
+        resolve_funnel_image_model_config()
+    )
     slot_text_hints = _build_theme_sync_image_slot_text_hints(
         image_slots=selected_slots,
         text_slots=text_slots or [],
@@ -649,6 +653,10 @@ def _generate_theme_sync_ai_image_assets(
             "generatedImageCount": 0,
             "fallbackImageCount": 0,
             "skippedImageCount": 0,
+            "promptTokenCountTotal": 0,
+            "promptTokenCountBySlotPath": {},
+            "requestedImageModel": requested_image_model,
+            "requestedImageModelSource": requested_image_model_source,
         }
     )
 
@@ -674,22 +682,21 @@ def _generate_theme_sync_ai_image_assets(
     generated_count = 0
     fallback_count = 0
     skipped_count = 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures: dict[concurrent.futures.Future[dict[str, Any]], str] = {}
+    prompt_token_count_total = 0
+    prompt_token_count_by_slot_path: dict[str, int] = {}
+    if max_workers == 1:
+        hard_quota_exhausted = False
+        hard_quota_slot_path: str | None = None
         for slot in prepared_slots:
-            future = pool.submit(
-                _generate_single_slot_asset,
-                slot_path=slot["slotPath"],
-                slot_role=slot["slotRole"],
-                slot_recommended_aspect=slot["recommendedAspect"],
-                aspect_ratio=slot["aspectRatio"],
-                prompt=slot["prompt"],
-            )
-            futures[future] = slot["slotPath"]
-        for future in concurrent.futures.as_completed(futures):
-            slot_path = futures[future]
+            slot_path = slot["slotPath"]
             try:
-                outcome = future.result()
+                outcome = _generate_single_slot_asset(
+                    slot_path=slot_path,
+                    slot_role=slot["slotRole"],
+                    slot_recommended_aspect=slot["recommendedAspect"],
+                    aspect_ratio=slot["aspectRatio"],
+                    prompt=slot["prompt"],
+                )
             except Exception as exc:  # noqa: BLE001
                 outcome = {
                     "slotPath": slot_path,
@@ -701,6 +708,17 @@ def _generate_theme_sync_ai_image_assets(
                 }
             outcomes_by_path[slot_path] = outcome
             completed_count += 1
+            slot_prompt_token_count: int | None = None
+            generated_asset = outcome.get("asset")
+            if generated_asset is not None:
+                raw_ai_metadata = getattr(generated_asset, "ai_metadata", None)
+                if isinstance(raw_ai_metadata, dict):
+                    slot_prompt_token_count = _coerce_non_negative_int(
+                        raw_ai_metadata.get("promptTokenCount")
+                    )
+                    if slot_prompt_token_count is not None:
+                        prompt_token_count_by_slot_path[slot_path] = slot_prompt_token_count
+                        prompt_token_count_total += slot_prompt_token_count
             if outcome.get("asset") is not None:
                 if outcome.get("source") == "unsplash":
                     fallback_count += 1
@@ -719,8 +737,98 @@ def _generate_theme_sync_ai_image_assets(
                     "skippedImageCount": skipped_count,
                     "currentSlotPath": slot_path,
                     "currentSlotSource": outcome.get("source"),
+                    "currentSlotPromptTokenCount": slot_prompt_token_count,
+                    "promptTokenCountTotal": prompt_token_count_total,
+                    "promptTokenCountBySlotPath": dict(prompt_token_count_by_slot_path),
+                    "requestedImageModel": requested_image_model,
+                    "requestedImageModelSource": requested_image_model_source,
                 }
             )
+            if stop_on_quota_exhausted and outcome.get("quotaExhausted"):
+                hard_quota_exhausted = True
+                hard_quota_slot_path = slot_path
+                break
+
+        if hard_quota_exhausted and hard_quota_slot_path:
+            for slot in prepared_slots:
+                slot_path = slot["slotPath"]
+                if slot_path in outcomes_by_path:
+                    continue
+                outcomes_by_path[slot_path] = {
+                    "slotPath": slot_path,
+                    "asset": None,
+                    "source": None,
+                    "rateLimited": True,
+                    "quotaExhausted": False,
+                    "error": (
+                        "Skipped because hard Gemini quota exhaustion was detected "
+                        f"at slotPath={hard_quota_slot_path}."
+                    ),
+                }
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures: dict[concurrent.futures.Future[dict[str, Any]], str] = {}
+            for slot in prepared_slots:
+                future = pool.submit(
+                    _generate_single_slot_asset,
+                    slot_path=slot["slotPath"],
+                    slot_role=slot["slotRole"],
+                    slot_recommended_aspect=slot["recommendedAspect"],
+                    aspect_ratio=slot["aspectRatio"],
+                    prompt=slot["prompt"],
+                )
+                futures[future] = slot["slotPath"]
+            for future in concurrent.futures.as_completed(futures):
+                slot_path = futures[future]
+                try:
+                    outcome = future.result()
+                except Exception as exc:  # noqa: BLE001
+                    outcome = {
+                        "slotPath": slot_path,
+                        "asset": None,
+                        "source": None,
+                        "rateLimited": False,
+                        "quotaExhausted": False,
+                        "error": str(exc),
+                    }
+                outcomes_by_path[slot_path] = outcome
+                completed_count += 1
+                slot_prompt_token_count: int | None = None
+                generated_asset = outcome.get("asset")
+                if generated_asset is not None:
+                    raw_ai_metadata = getattr(generated_asset, "ai_metadata", None)
+                    if isinstance(raw_ai_metadata, dict):
+                        slot_prompt_token_count = _coerce_non_negative_int(
+                            raw_ai_metadata.get("promptTokenCount")
+                        )
+                        if slot_prompt_token_count is not None:
+                            prompt_token_count_by_slot_path[slot_path] = slot_prompt_token_count
+                            prompt_token_count_total += slot_prompt_token_count
+                if outcome.get("asset") is not None:
+                    if outcome.get("source") == "unsplash":
+                        fallback_count += 1
+                    else:
+                        generated_count += 1
+                elif outcome.get("rateLimited"):
+                    skipped_count += 1
+                _emit_theme_sync_progress(
+                    {
+                        "stage": "image_generation",
+                        "message": "Generating component images for Shopify theme sync.",
+                        "totalImageSlots": total_slots,
+                        "completedImageSlots": completed_count,
+                        "generatedImageCount": generated_count,
+                        "fallbackImageCount": fallback_count,
+                        "skippedImageCount": skipped_count,
+                        "currentSlotPath": slot_path,
+                        "currentSlotSource": outcome.get("source"),
+                        "currentSlotPromptTokenCount": slot_prompt_token_count,
+                        "promptTokenCountTotal": prompt_token_count_total,
+                        "promptTokenCountBySlotPath": dict(prompt_token_count_by_slot_path),
+                        "requestedImageModel": requested_image_model,
+                        "requestedImageModelSource": requested_image_model_source,
+                    }
+                )
 
     for slot in prepared_slots:
         slot_path = slot["slotPath"]
@@ -1946,6 +2054,7 @@ def _generate_shopify_theme_template_draft_images(
             image_slots=image_slots_pending_generation,
             text_slots=text_slots,
             max_concurrency=image_generation_max_concurrency,
+            stop_on_quota_exhausted=True,
         )
     )
     rate_limited_slot_paths = sorted(
