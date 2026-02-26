@@ -110,7 +110,7 @@ _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_BUILD = "shopify_theme_template_build"
 _JOB_TYPE_SHOPIFY_THEME_TEMPLATE_PUBLISH = "shopify_theme_template_publish"
 _JOB_SUBJECT_TYPE_CLIENT = "client"
 _THEME_COMPONENT_HTML_TAG_RE = re.compile(
-    r"</?\s*[a-zA-Z][a-zA-Z0-9:-]*(?:\s+[^<>]*)?>",
+    r"</?\s*(?:p|strong|em|span|b|i|u|br|div|h[1-6]|li|ul|ol|a)\b[^<>]*>",
     re.IGNORECASE,
 )
 _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
