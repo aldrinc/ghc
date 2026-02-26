@@ -86,19 +86,40 @@ def _error_detail_from_response(response: httpx.Response) -> str:
 
 
 def _bridge_request(
-    *, method: str, path: str, json_body: dict[str, Any] | None = None
+    *,
+    method: str,
+    path: str,
+    json_body: dict[str, Any] | None = None,
+    timeout_seconds: float | None = None,
 ) -> Any:
     base_url, internal_token = _require_checkout_service_config()
     headers = {
         "Authorization": f"Bearer {internal_token}",
         "Content-Type": "application/json",
     }
+    resolved_timeout_seconds = (
+        timeout_seconds
+        if isinstance(timeout_seconds, (int, float)) and timeout_seconds > 0
+        else settings.SHOPIFY_CHECKOUT_REQUEST_TIMEOUT_SECONDS
+    )
+    request_timeout = httpx.Timeout(
+        timeout=resolved_timeout_seconds,
+        connect=min(resolved_timeout_seconds, 10.0),
+    )
 
     try:
-        with httpx.Client(timeout=20.0) as client:
+        with httpx.Client(timeout=request_timeout) as client:
             response = client.request(
                 method, f"{base_url}{path}", headers=headers, json=json_body
             )
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=(
+                "Shopify checkout app request timed out "
+                f"after {resolved_timeout_seconds:.1f}s ({method} {path})."
+            ),
+        ) from exc
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -1537,6 +1558,7 @@ def sync_client_shopify_theme_brand(
         method="POST",
         path="/v1/themes/brand/sync",
         json_body=request_payload,
+        timeout_seconds=settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS,
     )
     if not isinstance(payload, dict):
         raise HTTPException(
@@ -1757,6 +1779,7 @@ def list_client_shopify_theme_template_slots(
         method="POST",
         path="/v1/themes/brand/template-slots",
         json_body=request_payload,
+        timeout_seconds=settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS,
     )
     if not isinstance(payload, dict):
         raise HTTPException(
@@ -2033,6 +2056,7 @@ def audit_client_shopify_theme_brand(
         method="POST",
         path="/v1/themes/brand/audit",
         json_body=request_payload,
+        timeout_seconds=settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS,
     )
     if not isinstance(payload, dict):
         raise HTTPException(

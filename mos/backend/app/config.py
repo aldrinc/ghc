@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     SHOPIFY_APP_BASE_URL: str | None = None
     SHOPIFY_INTERNAL_API_TOKEN: str | None = None
     SHOPIFY_ORDER_WEBHOOK_SECRET: str | None = None
+    SHOPIFY_CHECKOUT_REQUEST_TIMEOUT_SECONDS: float = 20.0
+    SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS: float = 180.0
 
     META_GRAPH_API_VERSION: str | None = None
     META_GRAPH_API_BASE_URL: str = "https://graph.facebook.com"

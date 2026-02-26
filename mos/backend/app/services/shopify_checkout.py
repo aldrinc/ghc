@@ -81,10 +81,23 @@ def create_shopify_checkout(
         "Authorization": f"Bearer {internal_token}",
         "Content-Type": "application/json",
     }
+    timeout_seconds = settings.SHOPIFY_CHECKOUT_REQUEST_TIMEOUT_SECONDS
+    request_timeout = httpx.Timeout(
+        timeout=timeout_seconds,
+        connect=min(timeout_seconds, 10.0),
+    )
 
     try:
-        with httpx.Client(timeout=20.0) as client:
+        with httpx.Client(timeout=request_timeout) as client:
             response = client.post(f"{base_url}/v1/checkouts", json=payload, headers=headers)
+    except httpx.TimeoutException as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=(
+                "Shopify checkout app request timed out "
+                f"after {timeout_seconds:.1f}s (POST /v1/checkouts)."
+            ),
+        ) from exc
     except httpx.RequestError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

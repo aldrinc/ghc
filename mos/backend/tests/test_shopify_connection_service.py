@@ -1,3 +1,5 @@
+import httpx
+
 from app.services import shopify_connection
 from app.services.shopify_connection import ShopifyInstallation
 from fastapi import HTTPException
@@ -207,8 +209,50 @@ def test_status_write_scopes_imply_read_scopes(monkeypatch):
     assert status["missingScopes"] == []
 
 
+def test_bridge_request_returns_504_on_timeout(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "_require_checkout_service_config",
+        lambda: ("https://bridge.example.com", "internal-token"),
+    )
+    monkeypatch.setattr(
+        shopify_connection.settings, "SHOPIFY_CHECKOUT_REQUEST_TIMEOUT_SECONDS", 42.0
+    )
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            timeout = kwargs.get("timeout")
+            assert isinstance(timeout, httpx.Timeout)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def request(self, method, url, headers=None, json=None):  # noqa: A002
+            raise httpx.ReadTimeout("The read operation timed out")
+
+    monkeypatch.setattr(shopify_connection.httpx, "Client", FakeClient)
+
+    try:
+        shopify_connection._bridge_request(
+            method="POST",
+            path="/v1/themes/brand/sync",
+            json_body={"clientId": "client_1"},
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 504
+        assert (
+            exc.detail
+            == "Shopify checkout app request timed out after 42.0s (POST /v1/themes/brand/sync)."
+        )
+    else:
+        raise AssertionError("Expected _bridge_request to raise timeout HTTPException")
+
+
 def test_list_client_shopify_products_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/catalog/products/list"
         assert json_body["clientId"] == "client_1"
@@ -245,7 +289,7 @@ def test_list_client_shopify_products_rejects_out_of_range_limit():
 
 
 def test_get_client_shopify_product_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/catalog/products/get"
         assert json_body["clientId"] == "client_1"
@@ -303,7 +347,7 @@ def test_get_client_shopify_product_rejects_invalid_product_gid():
 
 
 def test_create_client_shopify_product_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/catalog/products/create"
         assert json_body["clientId"] == "client_1"
@@ -338,7 +382,7 @@ def test_create_client_shopify_product_parses_response(monkeypatch):
 
 
 def test_update_client_shopify_variant_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "PATCH"
         assert path == "/v1/catalog/variants"
         assert json_body["clientId"] == "client_1"
@@ -364,7 +408,7 @@ def test_update_client_shopify_variant_parses_response(monkeypatch):
 
 
 def test_update_client_shopify_variant_sends_inventory_related_fields(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "PATCH"
         assert path == "/v1/catalog/variants"
         assert json_body["clientId"] == "client_1"
@@ -444,7 +488,7 @@ def test_disconnect_client_shopify_store_unlinks_workspace(monkeypatch):
 
     observed: dict[str, object] = {}
 
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         observed["method"] = method
         observed["path"] = path
         observed["json_body"] = json_body
@@ -497,7 +541,7 @@ def test_disconnect_client_shopify_store_requires_matching_workspace(monkeypatch
 
 
 def test_upsert_client_shopify_policy_pages_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/policies/pages/upsert"
         assert json_body["clientId"] == "client_1"
@@ -546,9 +590,10 @@ def test_upsert_client_shopify_policy_pages_rejects_empty_pages():
 
 
 def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/themes/brand/sync"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
         assert json_body["clientId"] == "client_1"
         assert json_body["workspaceName"] == "Acme Workspace"
         assert json_body["brandName"] == "Acme"
@@ -729,9 +774,10 @@ def test_sync_client_shopify_theme_brand_rejects_invalid_auto_component_image_ur
 
 
 def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/themes/brand/sync"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
         return {
             "shopDomain": "example.myshopify.com",
             "themeId": "gid://shopify/OnlineStoreTheme/1",
@@ -775,9 +821,10 @@ def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
 
 
 def test_audit_client_shopify_theme_brand_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/themes/brand/audit"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
         assert json_body["clientId"] == "client_1"
         assert json_body["workspaceName"] == "Acme Workspace"
         assert json_body["themeName"] == "futrgroup2-0theme"
@@ -864,9 +911,10 @@ def test_audit_client_shopify_theme_brand_parses_response(monkeypatch):
 
 
 def test_audit_client_shopify_theme_brand_rejects_invalid_marker_flag(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/themes/brand/audit"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
         return {
             "shopDomain": "example.myshopify.com",
             "themeId": "gid://shopify/OnlineStoreTheme/1",
