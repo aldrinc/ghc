@@ -1,3 +1,6 @@
+import concurrent.futures
+from contextvars import ContextVar
+from datetime import datetime, timezone
 import logging
 import re
 from typing import Any
@@ -47,6 +50,7 @@ from app.schemas.shopify_connection import (
     ShopifyInstallUrlResponse,
     ShopifyThemeBrandSyncRequest,
     ShopifyThemeBrandSyncJobStartResponse,
+    ShopifyThemeBrandSyncJobProgress,
     ShopifyThemeBrandSyncJobStatusResponse,
     ShopifyThemeBrandSyncResponse,
 )
@@ -114,6 +118,9 @@ _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
     "1:1": "1:1",
 }
 _MAX_THEME_SYNC_GENERATED_IMAGES = 8
+_THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY = max(
+    1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY
+)
 _UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION = str.maketrans(
     {
         '"': "",
@@ -124,6 +131,9 @@ _UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION = str.maketrans(
         "\r": " ",
     }
 )
+_THEME_SYNC_PROGRESS_CALLBACK: ContextVar[Any | None] = ContextVar(
+    "theme_sync_progress_callback", default=None
+)
 
 
 def _is_gemini_quota_or_rate_limit_error(exc: BaseException) -> bool:
@@ -133,6 +143,16 @@ def _is_gemini_quota_or_rate_limit_error(exc: BaseException) -> bool:
         or "too many requests" in message
         or "resource_exhausted" in message
     )
+
+
+def _emit_theme_sync_progress(update: dict[str, Any]) -> None:
+    callback = _THEME_SYNC_PROGRESS_CALLBACK.get()
+    if not callable(callback):
+        return
+    try:
+        callback(update)
+    except Exception:  # noqa: BLE001
+        logger.exception("Failed to publish Shopify theme sync progress update")
 
 
 def _build_theme_sync_slot_unsplash_query(*, slot_role: str, slot_key: str) -> str:
@@ -353,13 +373,97 @@ def _generate_theme_sync_ai_image_assets(
     client_id: str,
     product_id: str | None,
     image_slots: list[dict[str, Any]],
-) -> tuple[list[Any], list[str]]:
+) -> tuple[list[Any], list[str], dict[str, Any]]:
     selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
     if not selected_slots:
-        return [], []
+        return [], [], {}
 
+    def _generate_single_slot_asset(
+        *,
+        slot_path: str,
+        slot_key: str,
+        slot_role: str,
+        slot_recommended_aspect: str,
+        aspect_ratio: str,
+        prompt: str,
+    ) -> dict[str, Any]:
+        with SessionLocal() as slot_session:
+            try:
+                generated_asset = create_funnel_image_asset(
+                    session=slot_session,
+                    org_id=org_id,
+                    client_id=client_id,
+                    prompt=prompt,
+                    aspect_ratio=aspect_ratio,
+                    usage_context={
+                        "kind": "shopify_theme_sync_component_image",
+                        "slotPath": slot_path,
+                        "slotRole": slot_role,
+                        "recommendedAspect": slot_recommended_aspect,
+                    },
+                    product_id=product_id,
+                    tags=["shopify_theme_sync", "component_image", "ai_generated"],
+                )
+                return {
+                    "slotPath": slot_path,
+                    "asset": generated_asset,
+                    "source": "ai",
+                    "rateLimited": False,
+                    "error": None,
+                }
+            except Exception as exc:  # noqa: BLE001
+                if _is_gemini_quota_or_rate_limit_error(exc):
+                    try:
+                        generated_asset = create_funnel_unsplash_asset(
+                            session=slot_session,
+                            org_id=org_id,
+                            client_id=client_id,
+                            query=_build_theme_sync_slot_unsplash_query(
+                                slot_role=slot_role, slot_key=slot_key
+                            ),
+                            usage_context={
+                                "kind": "shopify_theme_sync_component_image",
+                                "slotPath": slot_path,
+                                "slotRole": slot_role,
+                                "recommendedAspect": slot_recommended_aspect,
+                                "fallbackSource": "unsplash_after_gemini_rate_limit",
+                            },
+                            product_id=product_id,
+                            tags=[
+                                "shopify_theme_sync",
+                                "component_image",
+                                "unsplash",
+                                "fallback_after_rate_limit",
+                            ],
+                        )
+                        return {
+                            "slotPath": slot_path,
+                            "asset": generated_asset,
+                            "source": "unsplash",
+                            "rateLimited": True,
+                            "error": None,
+                        }
+                    except Exception as unsplash_exc:  # noqa: BLE001
+                        return {
+                            "slotPath": slot_path,
+                            "asset": None,
+                            "source": None,
+                            "rateLimited": True,
+                            "error": str(unsplash_exc),
+                            "geminiError": str(exc),
+                        }
+                return {
+                    "slotPath": slot_path,
+                    "asset": None,
+                    "source": None,
+                    "rateLimited": False,
+                    "error": str(exc),
+                }
+
+    prepared_slots: list[dict[str, Any]] = []
     generated_assets: list[Any] = []
     rate_limited_slot_paths: list[str] = []
+    generated_asset_by_slot_path: dict[str, Any] = {}
     variant_count_by_role_aspect: dict[tuple[str, str], int] = {}
     for slot in selected_slots:
         slot_path = str(slot["path"]).strip()
@@ -383,67 +487,111 @@ def _generate_theme_sync_ai_image_assets(
             aspect_ratio=aspect_ratio,
             variant_index=variant_count,
         )
+        prepared_slots.append(
+            {
+                "slotPath": slot_path,
+                "slotKey": slot_key,
+                "slotRole": slot_role,
+                "recommendedAspect": slot_recommended_aspect,
+                "aspectRatio": aspect_ratio,
+                "prompt": prompt,
+            }
+        )
 
-        try:
-            generated_asset = create_funnel_image_asset(
-                session=session,
-                org_id=org_id,
-                client_id=client_id,
-                prompt=prompt,
-                aspect_ratio=aspect_ratio,
-                usage_context={
-                    "kind": "shopify_theme_sync_component_image",
-                    "slotPath": slot_path,
-                    "slotRole": slot_role,
-                    "recommendedAspect": slot_recommended_aspect,
-                },
-                product_id=product_id,
-                tags=["shopify_theme_sync", "component_image", "ai_generated"],
+    total_slots = len(prepared_slots)
+    _emit_theme_sync_progress(
+        {
+            "stage": "image_generation",
+            "message": "Generating component images for Shopify theme sync.",
+            "totalImageSlots": total_slots,
+            "completedImageSlots": 0,
+            "generatedImageCount": 0,
+            "fallbackImageCount": 0,
+            "skippedImageCount": 0,
+        }
+    )
+
+    if not prepared_slots:
+        return generated_assets, rate_limited_slot_paths, generated_asset_by_slot_path
+
+    max_workers = min(_THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY, len(prepared_slots))
+    outcomes_by_path: dict[str, dict[str, Any]] = {}
+    completed_count = 0
+    generated_count = 0
+    fallback_count = 0
+    skipped_count = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures: dict[concurrent.futures.Future[dict[str, Any]], str] = {}
+        for slot in prepared_slots:
+            future = pool.submit(
+                _generate_single_slot_asset,
+                slot_path=slot["slotPath"],
+                slot_key=slot["slotKey"],
+                slot_role=slot["slotRole"],
+                slot_recommended_aspect=slot["recommendedAspect"],
+                aspect_ratio=slot["aspectRatio"],
+                prompt=slot["prompt"],
             )
-        except Exception as exc:  # noqa: BLE001
-            if _is_gemini_quota_or_rate_limit_error(exc):
-                try:
-                    generated_asset = create_funnel_unsplash_asset(
-                        session=session,
-                        org_id=org_id,
-                        client_id=client_id,
-                        query=_build_theme_sync_slot_unsplash_query(
-                            slot_role=slot_role, slot_key=slot_key
-                        ),
-                        usage_context={
-                            "kind": "shopify_theme_sync_component_image",
-                            "slotPath": slot_path,
-                            "slotRole": slot_role,
-                            "recommendedAspect": slot_recommended_aspect,
-                            "fallbackSource": "unsplash_after_gemini_rate_limit",
-                        },
-                        product_id=product_id,
-                        tags=[
-                            "shopify_theme_sync",
-                            "component_image",
-                            "unsplash",
-                            "fallback_after_rate_limit",
-                        ],
-                    )
-                except Exception as unsplash_exc:  # noqa: BLE001
-                    logger.warning(
-                        "Theme sync image generation failed for slot after Gemini rate limit; skipping slot.",
-                        extra={
-                            "slotPath": slot_path,
-                            "geminiError": str(exc),
-                            "unsplashError": str(unsplash_exc),
-                        },
-                    )
-                    rate_limited_slot_paths.append(slot_path)
-                    continue
-            else:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=(
-                        "AI theme image generation failed for Shopify sync. "
-                        f"slotPath={slot_path}. {exc}"
-                    ),
-                ) from exc
+            futures[future] = slot["slotPath"]
+        for future in concurrent.futures.as_completed(futures):
+            slot_path = futures[future]
+            try:
+                outcome = future.result()
+            except Exception as exc:  # noqa: BLE001
+                outcome = {
+                    "slotPath": slot_path,
+                    "asset": None,
+                    "source": None,
+                    "rateLimited": False,
+                    "error": str(exc),
+                }
+            outcomes_by_path[slot_path] = outcome
+            completed_count += 1
+            if outcome.get("asset") is not None:
+                if outcome.get("source") == "unsplash":
+                    fallback_count += 1
+                else:
+                    generated_count += 1
+            elif outcome.get("rateLimited"):
+                skipped_count += 1
+            _emit_theme_sync_progress(
+                {
+                    "stage": "image_generation",
+                    "message": "Generating component images for Shopify theme sync.",
+                    "totalImageSlots": total_slots,
+                    "completedImageSlots": completed_count,
+                    "generatedImageCount": generated_count,
+                    "fallbackImageCount": fallback_count,
+                    "skippedImageCount": skipped_count,
+                    "currentSlotPath": slot_path,
+                    "currentSlotSource": outcome.get("source"),
+                }
+            )
+
+    for slot in prepared_slots:
+        slot_path = slot["slotPath"]
+        outcome = outcomes_by_path.get(slot_path) or {}
+        generated_asset = outcome.get("asset")
+        if generated_asset is None:
+            if outcome.get("rateLimited"):
+                logger.warning(
+                    "Theme sync image generation failed for slot after Gemini rate limit; skipping slot.",
+                    extra={
+                        "slotPath": slot_path,
+                        "geminiError": outcome.get("geminiError"),
+                        "unsplashError": outcome.get("error"),
+                    },
+                )
+                rate_limited_slot_paths.append(slot_path)
+                continue
+            error_message = str(outcome.get("error") or "Unknown image generation error.")
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "AI theme image generation failed for Shopify sync. "
+                    f"slotPath={slot_path}. {error_message}"
+                ),
+            )
 
         public_id = getattr(generated_asset, "public_id", None)
         if not isinstance(public_id, str) or not public_id.strip():
@@ -467,17 +615,41 @@ def _generate_theme_sync_ai_image_assets(
         generated_asset.width = width
         generated_asset.height = height
         generated_assets.append(generated_asset)
+        generated_asset_by_slot_path[slot_path] = generated_asset
 
-    return generated_assets, rate_limited_slot_paths
+    return generated_assets, rate_limited_slot_paths, generated_asset_by_slot_path
 
 
 def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
     session = SessionLocal()
+    progress_token = None
     try:
         jobs_repo = JobsRepository(session)
         job = jobs_repo.mark_running(job_id)
         if not job:
             return
+        progress_state: dict[str, Any] = {
+            "stage": "running",
+            "message": "Shopify theme sync job started.",
+            "updatedAt": datetime.now(timezone.utc).isoformat(),
+        }
+
+        def publish_progress(update: dict[str, Any]) -> None:
+            if not isinstance(update, dict):
+                return
+            progress_state.update(update)
+            progress_state["updatedAt"] = datetime.now(timezone.utc).isoformat()
+            progress_session = SessionLocal()
+            try:
+                JobsRepository(progress_session).set_output(
+                    job_id,
+                    output={"progress": dict(progress_state)},
+                )
+            finally:
+                progress_session.close()
+
+        publish_progress({})
+        progress_token = _THEME_SYNC_PROGRESS_CALLBACK.set(publish_progress)
 
         input_payload = job.input if isinstance(job.input, dict) else {}
         client_id = input_payload.get("clientId")
@@ -485,21 +657,42 @@ def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
         raw_auth_context = input_payload.get("auth")
 
         if not isinstance(client_id, str) or not client_id.strip():
+            publish_progress(
+                {
+                    "stage": "failed",
+                    "message": "Queued job payload is missing clientId.",
+                }
+            )
             jobs_repo.mark_failed(
                 job_id,
                 error="Invalid queued job payload: missing clientId.",
+                output={"progress": dict(progress_state)},
             )
             return
         if not isinstance(raw_request_payload, dict):
+            publish_progress(
+                {
+                    "stage": "failed",
+                    "message": "Queued job payload is missing sync request data.",
+                }
+            )
             jobs_repo.mark_failed(
                 job_id,
                 error="Invalid queued job payload: payload must be an object.",
+                output={"progress": dict(progress_state)},
             )
             return
         if not isinstance(raw_auth_context, dict):
+            publish_progress(
+                {
+                    "stage": "failed",
+                    "message": "Queued job payload is missing auth context.",
+                }
+            )
             jobs_repo.mark_failed(
                 job_id,
                 error="Invalid queued job payload: auth context must be an object.",
+                output={"progress": dict(progress_state)},
             )
             return
 
@@ -511,22 +704,42 @@ def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
             or not isinstance(org_id, str)
             or not org_id.strip()
         ):
+            publish_progress(
+                {
+                    "stage": "failed",
+                    "message": "Queued job payload has invalid auth context values.",
+                }
+            )
             jobs_repo.mark_failed(
                 job_id,
                 error="Invalid queued job payload: missing auth.userId or auth.orgId.",
+                output={"progress": dict(progress_state)},
             )
             return
 
         try:
             payload = ShopifyThemeBrandSyncRequest(**raw_request_payload)
         except Exception as exc:  # noqa: BLE001
+            publish_progress(
+                {
+                    "stage": "failed",
+                    "message": "Queued job payload failed validation.",
+                }
+            )
             jobs_repo.mark_failed(
                 job_id,
                 error=f"Invalid queued job payload: {exc}",
+                output={"progress": dict(progress_state)},
             )
             return
 
         auth = AuthContext(user_id=user_id.strip(), org_id=org_id.strip())
+        publish_progress(
+            {
+                "stage": "running",
+                "message": "Running Shopify theme sync.",
+            }
+        )
         try:
             sync_response = sync_client_shopify_theme_brand_route(
                 client_id=client_id.strip(),
@@ -539,12 +752,19 @@ def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
             error_message = detail_payload.get("message")
             if not isinstance(error_message, str) or not error_message.strip():
                 error_message = f"Shopify theme brand sync failed with status {exc.status_code}."
+            publish_progress(
+                {
+                    "stage": "failed",
+                    "message": error_message,
+                }
+            )
             jobs_repo.mark_failed(
                 job_id,
                 error=error_message,
                 output={
                     "statusCode": exc.status_code,
                     "detail": detail_payload,
+                    "progress": dict(progress_state),
                 },
             )
             return
@@ -556,9 +776,15 @@ def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
         else:
             result_payload = jsonable_encoder(sync_response)
 
+        publish_progress(
+            {
+                "stage": "succeeded",
+                "message": "Shopify theme sync completed successfully.",
+            }
+        )
         jobs_repo.mark_succeeded(
             job_id,
-            output={"result": result_payload},
+            output={"result": result_payload, "progress": dict(progress_state)},
         )
     except Exception as exc:  # noqa: BLE001
         logger.exception(
@@ -569,6 +795,14 @@ def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
             JobsRepository(session).mark_failed(
                 job_id,
                 error=str(exc) or "Unhandled error while running Shopify theme brand sync job.",
+                output={
+                    "progress": {
+                        "stage": "failed",
+                        "message": str(exc)
+                        or "Unhandled error while running Shopify theme brand sync job.",
+                        "updatedAt": datetime.now(timezone.utc).isoformat(),
+                    }
+                },
             )
         except Exception:  # noqa: BLE001
             logger.exception(
@@ -576,6 +810,8 @@ def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
                 extra={"job_id": job_id},
             )
     finally:
+        if progress_token is not None:
+            _THEME_SYNC_PROGRESS_CALLBACK.reset(progress_token)
         session.close()
 
 
@@ -872,6 +1108,13 @@ def get_client_shopify_theme_brand_sync_job_status_route(
         )
 
     output_payload = job.output if isinstance(job.output, dict) else {}
+    raw_progress = output_payload.get("progress")
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    if isinstance(raw_progress, dict):
+        try:
+            progress = ShopifyThemeBrandSyncJobProgress(**raw_progress)
+        except Exception:  # noqa: BLE001
+            progress = None
     raw_result = output_payload.get("result")
     result: ShopifyThemeBrandSyncResponse | None = None
     if isinstance(raw_result, dict):
@@ -885,6 +1128,7 @@ def get_client_shopify_theme_brand_sync_job_status_route(
         jobId=str(job.id),
         status=job.status,
         error=error,
+        progress=progress,
         result=result,
         createdAt=job.created_at,
         updatedAt=job.updated_at,
@@ -903,6 +1147,12 @@ def sync_client_shopify_theme_brand_route(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
+    _emit_theme_sync_progress(
+        {
+            "stage": "preparing",
+            "message": "Validating Shopify theme sync request and workspace data.",
+        }
+    )
     client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
     selected_shop_domain = _get_selected_shop_domain(
         session=session,
@@ -1128,7 +1378,21 @@ def sync_client_shopify_theme_brand_route(
             )
     auto_component_image_urls: list[str] = []
 
-    if requested_product_id and resolved_product is not None:
+    should_discover_slots_for_ai = bool(
+        requested_product_id or not normalized_component_image_asset_map
+    )
+    planner_image_slots: list[dict[str, Any]] = []
+    text_slots: list[dict[str, Any]] = []
+    generated_theme_assets: list[Any] = []
+    generated_asset_by_slot_path: dict[str, Any] = {}
+    rate_limited_slot_paths: list[str] = []
+    if should_discover_slots_for_ai:
+        _emit_theme_sync_progress(
+            {
+                "stage": "discover_slots",
+                "message": "Discovering theme component slots for AI mapping.",
+            }
+        )
         discovered_slots = list_client_shopify_theme_template_slots(
             client_id=client_id,
             theme_id=payload.themeId,
@@ -1147,8 +1411,16 @@ def sync_client_shopify_theme_brand_route(
             and isinstance(slot.get("path"), str)
             and slot["path"] not in explicit_image_paths
         ]
+        _emit_theme_sync_progress(
+            {
+                "stage": "discover_slots",
+                "message": "Theme component slot discovery completed.",
+                "totalImageSlots": len(planner_image_slots),
+                "totalTextSlots": len(text_slots),
+            }
+        )
 
-        if not planner_image_slots and not text_slots:
+        if requested_product_id and not planner_image_slots and not text_slots:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
@@ -1157,6 +1429,45 @@ def sync_client_shopify_theme_brand_route(
                 ),
             )
 
+        if planner_image_slots:
+            (
+                generated_theme_assets,
+                rate_limited_slot_paths,
+                generated_asset_by_slot_path,
+            ) = _generate_theme_sync_ai_image_assets(
+                session=session,
+                org_id=auth.org_id,
+                client_id=client_id,
+                product_id=requested_product_id,
+                image_slots=planner_image_slots,
+            )
+
+        if not requested_product_id:
+            if rate_limited_slot_paths:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        "AI theme image generation is rate-limited or out of Gemini quota for Shopify sync, "
+                        "and productId was not provided for fallback product images. "
+                        "Provide componentImageAssetMap for these slots: "
+                        + ", ".join(sorted(rate_limited_slot_paths))
+                    ),
+                )
+            for slot_path, generated_asset in generated_asset_by_slot_path.items():
+                public_id = getattr(generated_asset, "public_id", None)
+                if not isinstance(public_id, str) or not public_id.strip():
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=(
+                            "AI theme image generation returned an asset without a valid public id. "
+                            f"slotPath={slot_path}."
+                        ),
+                    )
+                component_image_urls[slot_path] = (
+                    f"{public_asset_base_url}/public/assets/{public_id.strip()}"
+                )
+
+    if requested_product_id and resolved_product is not None:
         product_image_assets = assets_repo.list(
             org_id=auth.org_id,
             client_id=client_id,
@@ -1170,30 +1481,21 @@ def sync_client_shopify_theme_brand_route(
             if not isinstance(existing_public_id, str) or not existing_public_id.strip():
                 continue
             product_image_assets_by_public_id[existing_public_id.strip()] = existing_asset
-        rate_limited_slot_paths: list[str] = []
-        if planner_image_slots:
-            generated_theme_assets, rate_limited_slot_paths = _generate_theme_sync_ai_image_assets(
-                session=session,
-                org_id=auth.org_id,
-                client_id=client_id,
-                product_id=requested_product_id,
-                image_slots=planner_image_slots,
-            )
-            for generated_asset in generated_theme_assets:
-                public_id = getattr(generated_asset, "public_id", None)
-                if not isinstance(public_id, str) or not public_id.strip():
-                    raise HTTPException(
-                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                        detail=(
-                            "AI theme image generation returned an asset without a valid public id. "
-                            f"productId={requested_product_id}."
-                        ),
-                    )
-                normalized_public_id = public_id.strip()
-                if normalized_public_id in product_image_assets_by_public_id:
-                    continue
-                product_image_assets_by_public_id[normalized_public_id] = generated_asset
-                product_image_assets.append(generated_asset)
+        for generated_asset in generated_theme_assets:
+            public_id = getattr(generated_asset, "public_id", None)
+            if not isinstance(public_id, str) or not public_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme image generation returned an asset without a valid public id. "
+                        f"productId={requested_product_id}."
+                    ),
+                )
+            normalized_public_id = public_id.strip()
+            if normalized_public_id in product_image_assets_by_public_id:
+                continue
+            product_image_assets_by_public_id[normalized_public_id] = generated_asset
+            product_image_assets.append(generated_asset)
         if planner_image_slots and not product_image_assets:
             if rate_limited_slot_paths:
                 raise HTTPException(
@@ -1216,6 +1518,14 @@ def sync_client_shopify_theme_brand_route(
 
         offers = ProductOffersRepository(session).list_by_product(
             product_id=str(resolved_product.id)
+        )
+        _emit_theme_sync_progress(
+            {
+                "stage": "planning_content",
+                "message": "Planning product copy and image-to-slot assignments.",
+                "totalImageSlots": len(planner_image_slots),
+                "totalTextSlots": len(text_slots),
+            }
         )
         try:
             planner_output = plan_shopify_theme_component_content(
@@ -1308,6 +1618,14 @@ def sync_client_shopify_theme_brand_route(
                 f"{public_asset_base_url}/public/assets/{asset_public_id}"
             )
 
+    _emit_theme_sync_progress(
+        {
+            "stage": "sync_theme",
+            "message": "Applying generated component assets and copy to Shopify theme.",
+            "componentImageUrlCount": len(component_image_urls),
+            "componentTextValueCount": len(component_text_values),
+        }
+    )
     synced = sync_client_shopify_theme_brand(
         client_id=client_id,
         workspace_name=workspace_name,

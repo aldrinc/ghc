@@ -546,6 +546,17 @@ def generate_gemini_image_bytes(
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code if exc.response is not None else None
+            body = exc.response.text if exc.response is not None else ""
+            body_lower = body.lower()
+            is_hard_quota_exhaustion = (
+                status == 429
+                and (
+                    "resource_exhausted" in body_lower
+                    or "exceeded your current quota" in body_lower
+                )
+            )
+            if is_hard_quota_exhaustion:
+                raise RuntimeError(f"Gemini image request failed (status={status}): {body}") from exc
             if status == 429 and attempt < retries:
                 retry_after_raw = exc.response.headers.get("Retry-After") if exc.response is not None else None
                 try:
@@ -554,7 +565,6 @@ def generate_gemini_image_bytes(
                     retry_after = 5.0 * (attempt + 1)
                 time.sleep(max(retry_after, 1.0))
                 continue
-            body = exc.response.text if exc.response is not None else ""
             raise RuntimeError(f"Gemini image request failed (status={status}): {body}") from exc
         except Exception as exc:  # noqa: BLE001
             if attempt >= retries:

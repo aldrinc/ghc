@@ -202,12 +202,31 @@ class ShopifyThemeBrandSyncJobStartResponse(BaseModel):
     statusPath: str
 
 
+class ShopifyThemeBrandSyncJobProgress(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    stage: str | None = None
+    message: str | None = None
+    totalImageSlots: int | None = None
+    completedImageSlots: int | None = None
+    generatedImageCount: int | None = None
+    fallbackImageCount: int | None = None
+    skippedImageCount: int | None = None
+    totalTextSlots: int | None = None
+    componentImageUrlCount: int | None = None
+    componentTextValueCount: int | None = None
+    currentSlotPath: str | None = None
+    currentSlotSource: str | None = None
+    updatedAt: str | None = None
+
+
 class ShopifyThemeBrandSyncJobStatusResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     jobId: str
     status: Literal["queued", "running", "succeeded", "failed"]
     error: str | None = None
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
     result: ShopifyThemeBrandSyncResponse | None = None
     createdAt: datetime
     updatedAt: datetime

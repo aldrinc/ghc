@@ -131,10 +131,27 @@ type ClientShopifyThemeBrandSyncJobStartResponse = {
   statusPath: string;
 };
 
+type ClientShopifyThemeBrandSyncJobProgress = {
+  stage?: string | null;
+  message?: string | null;
+  totalImageSlots?: number | null;
+  completedImageSlots?: number | null;
+  generatedImageCount?: number | null;
+  fallbackImageCount?: number | null;
+  skippedImageCount?: number | null;
+  totalTextSlots?: number | null;
+  componentImageUrlCount?: number | null;
+  componentTextValueCount?: number | null;
+  currentSlotPath?: string | null;
+  currentSlotSource?: string | null;
+  updatedAt?: string | null;
+};
+
 type ClientShopifyThemeBrandSyncJobStatusResponse = {
   jobId: string;
   status: ClientShopifyThemeBrandSyncJobStatus;
   error?: string | null;
+  progress?: ClientShopifyThemeBrandSyncJobProgress | null;
   result?: ClientShopifyThemeBrandSyncResponse | null;
   createdAt: string;
   updatedAt: string;
