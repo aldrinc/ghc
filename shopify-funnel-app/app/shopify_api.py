@@ -5932,6 +5932,45 @@ class ShopifyApiClient:
             report,
         )
 
+    @classmethod
+    def _extract_footer_logo_component_setting_paths(
+        cls,
+        *,
+        template_filename: str,
+        template_content: str,
+    ) -> list[str]:
+        if template_filename != _THEME_FOOTER_GROUP_FILENAME:
+            return []
+
+        template_data = cls._parse_theme_template_json(
+            filename=template_filename,
+            template_content=template_content,
+        )
+        raw_sections = template_data.get("sections")
+        if not isinstance(raw_sections, dict):
+            return []
+
+        setting_paths: list[str] = []
+        for section_key, raw_section in raw_sections.items():
+            if not isinstance(section_key, str) or not section_key.strip():
+                continue
+            if not isinstance(raw_section, dict):
+                continue
+            raw_type = raw_section.get("type")
+            normalized_type = raw_type.strip().lower() if isinstance(raw_type, str) else ""
+            normalized_section_key = section_key.strip().lower()
+            if "footer" not in normalized_type and "footer" not in normalized_section_key:
+                continue
+            raw_settings = raw_section.get("settings")
+            if not isinstance(raw_settings, dict):
+                continue
+            if "logo" not in raw_settings:
+                continue
+            setting_paths.append(
+                f"{template_filename}.sections.{section_key.strip()}.settings.logo"
+            )
+        return sorted(set(setting_paths))
+
     @staticmethod
     def _parse_theme_settings_json(*, settings_content: str) -> dict[str, Any]:
         # Shopify settings_data.json may include a UTF-8 BOM and a leading
@@ -7884,6 +7923,25 @@ class ShopifyApiClient:
                 ),
                 status_code=422,
             )
+
+        footer_group_content = next_template_contents.get(_THEME_FOOTER_GROUP_FILENAME)
+        if isinstance(footer_group_content, str):
+            footer_logo_component_paths = (
+                self._extract_footer_logo_component_setting_paths(
+                    template_filename=_THEME_FOOTER_GROUP_FILENAME,
+                    template_content=footer_group_content,
+                )
+            )
+            if footer_logo_component_paths:
+                resolved_logo_component_url = settings_logo_url or cleaned_logo_url
+                footer_component_image_map = component_image_urls_by_template.setdefault(
+                    _THEME_FOOTER_GROUP_FILENAME, {}
+                )
+                for setting_path in footer_logo_component_paths:
+                    footer_component_image_map[setting_path] = resolved_logo_component_url
+                    normalized_component_image_urls[setting_path] = (
+                        resolved_logo_component_url
+                    )
 
         auto_component_image_urls_by_setting_path = (
             self._build_auto_theme_component_image_urls(
