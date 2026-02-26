@@ -360,6 +360,8 @@ class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):
     imageModels: list[str] = Field(default_factory=list)
     imageModelBySlotPath: dict[str, str] = Field(default_factory=dict)
     imageSourceBySlotPath: dict[str, str] = Field(default_factory=dict)
+    rateLimitedSlotPaths: list[str] = Field(default_factory=list)
+    remainingSlotPaths: list[str] = Field(default_factory=list)
 
 
 class ShopifyThemeTemplateGenerateImagesJobStartResponse(BaseModel):

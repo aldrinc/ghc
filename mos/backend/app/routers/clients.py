@@ -3,6 +3,7 @@ from contextvars import ContextVar
 from datetime import datetime, timezone
 import logging
 import re
+import time
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -153,6 +154,9 @@ _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
 _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY = max(
     1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY
 )
+_SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_MAX_ATTEMPTS = 24
+_SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_BASE_DELAY_SECONDS = 8.0
+_SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_MAX_DELAY_SECONDS = 120.0
 _UNSUPPORTED_THEME_TEXT_VALUE_TRANSLATION = str.maketrans(
     {
         '"': "",
@@ -496,6 +500,7 @@ def _generate_theme_sync_ai_image_assets(
     product_id: str | None,
     image_slots: list[dict[str, Any]],
     text_slots: list[dict[str, Any]] | None = None,
+    max_concurrency: int | None = None,
 ) -> tuple[list[Any], list[str], dict[str, Any]]:
     selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
     if not selected_slots:
@@ -609,7 +614,15 @@ def _generate_theme_sync_ai_image_assets(
     if not prepared_slots:
         return generated_assets, rate_limited_slot_paths, generated_asset_by_slot_path
 
-    max_workers = min(_THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY, len(prepared_slots))
+    resolved_max_concurrency = _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY
+    if max_concurrency is not None:
+        if not isinstance(max_concurrency, int) or max_concurrency < 1:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Image generation max_concurrency must be a positive integer.",
+            )
+        resolved_max_concurrency = max_concurrency
+    max_workers = min(resolved_max_concurrency, len(prepared_slots))
     outcomes_by_path: dict[str, dict[str, Any]] = {}
     completed_count = 0
     generated_count = 0
@@ -1721,6 +1734,7 @@ def _generate_shopify_theme_template_draft_images(
     payload: ShopifyThemeTemplateGenerateImagesRequest,
     auth: AuthContext,
     session: Session,
+    image_generation_max_concurrency: int | None = None,
 ) -> ShopifyThemeTemplateGenerateImagesResponse:
     drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
     draft = drafts_repo.get(
@@ -1753,6 +1767,49 @@ def _generate_shopify_theme_template_draft_images(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Template draft has no image slots available for generation.",
+        )
+
+    all_slot_paths = sorted(
+        {
+            str(slot.get("path")).strip()
+            for slot in image_slots
+            if isinstance(slot.get("path"), str) and str(slot.get("path")).strip()
+        }
+    )
+    next_component_image_asset_map = dict(latest_data.componentImageAssetMap)
+    mapped_slot_paths = {
+        raw_path.strip()
+        for raw_path, raw_asset_public_id in next_component_image_asset_map.items()
+        if isinstance(raw_path, str)
+        and raw_path.strip()
+        and isinstance(raw_asset_public_id, str)
+        and raw_asset_public_id.strip()
+    }
+    image_slots_pending_generation = [
+        slot
+        for slot in image_slots
+        if isinstance(slot.get("path"), str)
+        and str(slot.get("path")).strip()
+        and str(slot.get("path")).strip() not in mapped_slot_paths
+    ]
+    if not image_slots_pending_generation:
+        serialized_draft = _serialize_shopify_theme_template_draft(
+            draft=draft,
+            latest_version=latest_version,
+        )
+        serialized_version = _serialize_shopify_theme_template_draft_version(
+            version=latest_version
+        )
+        return ShopifyThemeTemplateGenerateImagesResponse(
+            draft=serialized_draft,
+            version=serialized_version,
+            generatedImageCount=0,
+            generatedSlotPaths=[],
+            imageModels=[],
+            imageModelBySlotPath={},
+            imageSourceBySlotPath={},
+            rateLimitedSlotPaths=[],
+            remainingSlotPaths=[],
         )
 
     resolved_product_id = payload.productId.strip() if payload.productId else None
@@ -1790,7 +1847,7 @@ def _generate_shopify_theme_template_draft_images(
         {
             "stage": "image_generation",
             "message": "Generating template images from deterministic slot requirements.",
-            "totalImageSlots": len(image_slots),
+            "totalImageSlots": len(image_slots_pending_generation),
             "completedImageSlots": 0,
             "generatedImageCount": 0,
             "fallbackImageCount": 0,
@@ -1803,28 +1860,29 @@ def _generate_shopify_theme_template_draft_images(
             org_id=auth.org_id,
             client_id=client_id,
             product_id=resolved_product_id,
-            image_slots=image_slots,
+            image_slots=image_slots_pending_generation,
             text_slots=text_slots,
+            max_concurrency=image_generation_max_concurrency,
         )
     )
-    if rate_limited_slot_paths:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                "Image generation was rate-limited for one or more required template slots. "
-                "Retry once quota recovers. Slots: "
-                + ", ".join(sorted(rate_limited_slot_paths))
-            ),
-        )
+    rate_limited_slot_paths = sorted(
+        {
+            slot_path.strip()
+            for slot_path in rate_limited_slot_paths
+            if isinstance(slot_path, str) and slot_path.strip()
+        }
+    )
+    rate_limited_slot_path_set = set(rate_limited_slot_paths)
 
-    next_component_image_asset_map = dict(latest_data.componentImageAssetMap)
     generated_slot_paths: list[str] = []
     image_model_by_slot_path: dict[str, str] = {}
     image_source_by_slot_path: dict[str, str] = {}
-    for image_slot in latest_data.imageSlots:
-        slot_path = image_slot.path.strip()
+    for image_slot in image_slots_pending_generation:
+        slot_path = str(image_slot["path"]).strip()
         generated_asset = generated_asset_by_slot_path.get(slot_path)
         if generated_asset is None:
+            if slot_path in rate_limited_slot_path_set:
+                continue
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=(
@@ -1868,11 +1926,40 @@ def _generate_shopify_theme_template_draft_images(
             if isinstance(model_name, str) and model_name.strip()
         }
     )
+    remaining_slot_paths = sorted(
+        {
+            slot_path
+            for slot_path in all_slot_paths
+            if slot_path not in normalized_component_image_asset_map
+        }
+    )
+
+    if not generated_slot_paths:
+        serialized_draft = _serialize_shopify_theme_template_draft(
+            draft=draft,
+            latest_version=latest_version,
+        )
+        serialized_version = _serialize_shopify_theme_template_draft_version(
+            version=latest_version
+        )
+        return ShopifyThemeTemplateGenerateImagesResponse(
+            draft=serialized_draft,
+            version=serialized_version,
+            generatedImageCount=0,
+            generatedSlotPaths=[],
+            imageModels=[],
+            imageModelBySlotPath={},
+            imageSourceBySlotPath={},
+            rateLimitedSlotPaths=rate_limited_slot_paths,
+            remainingSlotPaths=remaining_slot_paths,
+        )
+
     merged_metadata = dict(latest_data.metadata or {})
     merged_metadata.update(
         {
             "generatedImageCount": len(generated_slot_paths),
-            "rateLimitedSlotPaths": [],
+            "rateLimitedSlotPaths": rate_limited_slot_paths,
+            "remainingSlotPaths": remaining_slot_paths,
             "imageGenerationSlotCount": len(generated_slot_paths),
             "imageGenerationGeneratedAt": datetime.now(timezone.utc).isoformat(),
             "imageModels": image_models,
@@ -1910,6 +1997,8 @@ def _generate_shopify_theme_template_draft_images(
         imageModels=image_models,
         imageModelBySlotPath=image_model_by_slot_path,
         imageSourceBySlotPath=image_source_by_slot_path,
+        rateLimitedSlotPaths=rate_limited_slot_paths,
+        remainingSlotPaths=remaining_slot_paths,
     )
 
 
@@ -2180,6 +2269,150 @@ def _run_client_shopify_theme_template_build_job(job_id: str) -> None:
         session.close()
 
 
+def _compute_shopify_template_image_retry_delay_seconds(attempt_number: int) -> float:
+    if attempt_number <= 1:
+        return 0.0
+    retry_power = max(0, attempt_number - 2)
+    delay_seconds = _SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_BASE_DELAY_SECONDS * (2**retry_power)
+    return min(_SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_MAX_DELAY_SECONDS, delay_seconds)
+
+
+def _generate_shopify_theme_template_draft_images_with_retry(
+    *,
+    client_id: str,
+    payload: ShopifyThemeTemplateGenerateImagesRequest,
+    auth: AuthContext,
+    session: Session,
+    publish_progress: Any,
+) -> ShopifyThemeTemplateGenerateImagesResponse:
+    aggregated_slot_paths: set[str] = set()
+    aggregated_model_by_slot_path: dict[str, str] = {}
+    aggregated_source_by_slot_path: dict[str, str] = {}
+    last_remaining_slot_paths: list[str] = []
+    final_response: ShopifyThemeTemplateGenerateImagesResponse | None = None
+
+    max_attempts = max(1, _SHOPIFY_TEMPLATE_IMAGE_AUTO_RETRY_MAX_ATTEMPTS)
+    for attempt_number in range(1, max_attempts + 1):
+        if attempt_number > 1:
+            delay_seconds = _compute_shopify_template_image_retry_delay_seconds(
+                attempt_number
+            )
+            publish_progress(
+                {
+                    "stage": "waiting_for_retry",
+                    "message": (
+                        "Template image generation is rate-limited. "
+                        f"Retrying pending slots in {delay_seconds:.0f}s "
+                        f"(attempt {attempt_number}/{max_attempts})."
+                    ),
+                    "generatedImageCount": len(aggregated_slot_paths),
+                    "skippedImageCount": len(last_remaining_slot_paths),
+                }
+            )
+            time.sleep(delay_seconds)
+
+        reduced_concurrency = max(
+            1, _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY // (2 ** (attempt_number - 1))
+        )
+        publish_progress(
+            {
+                "stage": "running",
+                "message": (
+                    "Generating images for Shopify theme template draft "
+                    f"(attempt {attempt_number}/{max_attempts}, "
+                    f"concurrency={reduced_concurrency})."
+                ),
+                "generatedImageCount": len(aggregated_slot_paths),
+                "skippedImageCount": len(last_remaining_slot_paths),
+            }
+        )
+        response = _generate_shopify_theme_template_draft_images(
+            client_id=client_id,
+            payload=payload,
+            auth=auth,
+            session=session,
+            image_generation_max_concurrency=reduced_concurrency,
+        )
+        final_response = response
+
+        aggregated_slot_paths.update(response.generatedSlotPaths)
+        aggregated_model_by_slot_path.update(response.imageModelBySlotPath)
+        aggregated_source_by_slot_path.update(response.imageSourceBySlotPath)
+
+        remaining_slot_paths = sorted(
+            {
+                slot_path.strip()
+                for slot_path in response.remainingSlotPaths
+                if isinstance(slot_path, str) and slot_path.strip()
+            }
+        )
+        rate_limited_slot_paths = sorted(
+            {
+                slot_path.strip()
+                for slot_path in response.rateLimitedSlotPaths
+                if isinstance(slot_path, str) and slot_path.strip()
+            }
+        )
+        last_remaining_slot_paths = remaining_slot_paths
+        if not remaining_slot_paths:
+            break
+
+        if not rate_limited_slot_paths:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Template image generation left pending image slots without a retryable "
+                    "rate-limit signal. Remaining slots: "
+                    + ", ".join(remaining_slot_paths)
+                ),
+            )
+
+    if final_response is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Template image generation did not produce a response payload.",
+        )
+
+    if last_remaining_slot_paths:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Template image generation remained rate-limited after "
+                f"{max_attempts} attempts. Remaining slots: "
+                + ", ".join(last_remaining_slot_paths)
+            ),
+        )
+
+    if (
+        not aggregated_slot_paths
+        and final_response.generatedImageCount == 0
+        and not final_response.generatedSlotPaths
+    ):
+        return final_response
+
+    merged_model_by_slot_path = dict(aggregated_model_by_slot_path)
+    merged_source_by_slot_path = dict(aggregated_source_by_slot_path)
+    merged_image_models = sorted(
+        {
+            model_name.strip()
+            for model_name in merged_model_by_slot_path.values()
+            if isinstance(model_name, str) and model_name.strip()
+        }
+    )
+
+    return final_response.model_copy(
+        update={
+            "generatedImageCount": len(aggregated_slot_paths),
+            "generatedSlotPaths": sorted(aggregated_slot_paths),
+            "imageModels": merged_image_models,
+            "imageModelBySlotPath": merged_model_by_slot_path,
+            "imageSourceBySlotPath": merged_source_by_slot_path,
+            "rateLimitedSlotPaths": [],
+            "remainingSlotPaths": [],
+        }
+    )
+
+
 def _run_client_shopify_theme_template_generate_images_job(job_id: str) -> None:
     session = SessionLocal()
     progress_token = None
@@ -2271,11 +2504,12 @@ def _run_client_shopify_theme_template_generate_images_job(job_id: str) -> None:
             }
         )
         try:
-            generate_images_response = _generate_shopify_theme_template_draft_images(
+            generate_images_response = _generate_shopify_theme_template_draft_images_with_retry(
                 client_id=client_id.strip(),
                 payload=payload,
                 auth=auth,
                 session=session,
+                publish_progress=publish_progress,
             )
         except HTTPException as exc:
             detail_payload = _serialize_http_exception_detail(exc.detail)

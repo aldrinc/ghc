@@ -221,6 +221,8 @@ export type ClientShopifyThemeTemplateGenerateImagesResponse = {
   imageModels: string[];
   imageModelBySlotPath: Record<string, string>;
   imageSourceBySlotPath: Record<string, string>;
+  rateLimitedSlotPaths: string[];
+  remainingSlotPaths: string[];
 };
 
 export type ClientShopifyThemeTemplatePublishPayload = {
@@ -561,7 +563,7 @@ export function useBuildClientShopifyThemeTemplateDraft(clientId?: string) {
         throw new Error("Shopify template build job was not started.");
       }
 
-      const pollTimeoutMs = 1000 * 60 * 20;
+      const pollTimeoutMs = 1000 * 60 * 90;
       const pollIntervalMs = 2000;
       const startedAt = Date.now();
 
@@ -751,7 +753,7 @@ export function useGenerateClientShopifyThemeTemplateImages(clientId?: string) {
         throw new Error("Shopify template image generation job was not started.");
       }
 
-      const pollTimeoutMs = 1000 * 60 * 20;
+      const pollTimeoutMs = 1000 * 60 * 90;
       const pollIntervalMs = 2000;
       const startedAt = Date.now();
 
@@ -774,7 +776,14 @@ export function useGenerateClientShopifyThemeTemplateImages(clientId?: string) {
       }
     },
     onSuccess: (response) => {
-      toast.success(`Generated ${response.generatedImageCount} template image(s)`);
+      if (response.remainingSlotPaths.length) {
+        toast.success(
+          `Generated ${response.generatedImageCount} template image(s). ` +
+            `${response.remainingSlotPaths.length} slot(s) still pending.`,
+        );
+      } else {
+        toast.success(`Generated ${response.generatedImageCount} template image(s)`);
+      }
       queryClient.invalidateQueries({
         queryKey: ["clients", "shopify-theme-template-drafts", clientId],
       });

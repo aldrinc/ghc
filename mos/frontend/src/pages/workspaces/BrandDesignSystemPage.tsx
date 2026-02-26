@@ -1346,6 +1346,29 @@ export function BrandDesignSystemPage() {
     }
   };
 
+  const handleClearTemplateDraftImageMappings = async () => {
+    if (!workspace?.id) return;
+    if (!selectedTemplateDraftId) {
+      toast.error("Select a template draft first.");
+      return;
+    }
+    try {
+      await updateShopifyThemeTemplateDraft.mutateAsync({
+        draftId: selectedTemplateDraftId,
+        payload: {
+          componentImageAssetMap: {},
+          notes: "Cleared mapped image slots.",
+        },
+      });
+      setTemplateDraftImageMapInput("{}");
+      setTemplateSlotAssetQueryByPath({});
+      setTemplateAssetPickerImageErrorsByPublicId({});
+      setTemplateDraftEditError(null);
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
+  };
+
   const handleTemplateDraftSlotAssetChange = (path: string, assetPublicId: string) => {
     const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
     if (!parsedImageMap.value) {
@@ -2227,6 +2250,16 @@ export function BrandDesignSystemPage() {
               </div>
               {templateDraftEditError ? <div className="text-xs text-danger">{templateDraftEditError}</div> : null}
               <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    void handleClearTemplateDraftImageMappings();
+                  }}
+                  disabled={updateShopifyThemeTemplateDraft.isPending}
+                >
+                  {updateShopifyThemeTemplateDraft.isPending ? "Clearing…" : "Clear all mapped image slots"}
+                </Button>
                 <Button
                   size="sm"
                   variant="secondary"
