@@ -368,6 +368,7 @@ class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):
     rateLimitedSlotPaths: list[str] = Field(default_factory=list)
     remainingSlotPaths: list[str] = Field(default_factory=list)
     quotaExhaustedSlotPaths: list[str] = Field(default_factory=list)
+    slotErrorsByPath: dict[str, str] = Field(default_factory=dict)
 
 
 class ShopifyThemeTemplateGenerateImagesJobStartResponse(BaseModel):

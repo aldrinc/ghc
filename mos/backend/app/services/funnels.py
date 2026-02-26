@@ -542,6 +542,19 @@ def _coerce_non_negative_int(value: Any) -> int | None:
     return None
 
 
+def _has_explicit_gemini_hard_quota_signal(message: str) -> bool:
+    if not isinstance(message, str):
+        return False
+    message_lower = message.lower()
+    return (
+        "exceeded your current quota" in message_lower
+        or "quota exceeded" in message_lower
+        or "insufficient quota" in message_lower
+        or "billing account" in message_lower
+        or "quota has been exhausted" in message_lower
+    )
+
+
 def _extract_gemini_prompt_token_count(response_json: dict[str, Any]) -> int | None:
     usage_metadata = response_json.get("usageMetadata")
     if not isinstance(usage_metadata, dict):
@@ -627,10 +640,7 @@ def generate_gemini_image_bytes(
                 ) from exc
             is_hard_quota_exhaustion = (
                 status == 429
-                and (
-                    "resource_exhausted" in body_lower
-                    or "exceeded your current quota" in body_lower
-                )
+                and _has_explicit_gemini_hard_quota_signal(body_lower)
             )
             if is_hard_quota_exhaustion:
                 raise RuntimeError(f"Gemini image request failed (status={status}): {body}") from exc

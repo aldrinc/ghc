@@ -229,6 +229,7 @@ export type ClientShopifyThemeTemplateGenerateImagesResponse = {
   rateLimitedSlotPaths: string[];
   remainingSlotPaths: string[];
   quotaExhaustedSlotPaths: string[];
+  slotErrorsByPath: Record<string, string>;
 };
 
 export type ClientShopifyThemeTemplatePublishPayload = {
