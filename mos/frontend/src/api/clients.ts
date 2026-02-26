@@ -269,13 +269,13 @@ type ClientShopifyThemeBrandSyncJobStatusResponse = {
   finishedAt?: string | null;
 };
 
-type ClientShopifyThemeTemplateBuildJobStartResponse = {
+export type ClientShopifyThemeTemplateBuildJobStartResponse = {
   jobId: string;
   status: ClientShopifyThemeBrandSyncJobStatus;
   statusPath: string;
 };
 
-type ClientShopifyThemeTemplateBuildJobStatusResponse = {
+export type ClientShopifyThemeTemplateBuildJobStatusResponse = {
   jobId: string;
   status: ClientShopifyThemeBrandSyncJobStatus;
   error?: string | null;
@@ -595,6 +595,51 @@ export function useBuildClientShopifyThemeTemplateDraft(clientId?: string) {
       const message =
         "message" in err ? err.message : err?.message || "Failed to build Shopify theme template draft";
       toast.error(message);
+    },
+  });
+}
+
+export function useEnqueueClientShopifyThemeTemplateBuildJob(clientId?: string) {
+  const { post } = useApiClient();
+
+  return useMutation({
+    mutationFn: async (payload: ClientShopifyThemeTemplateBuildPayload) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      const startResponse = await post<ClientShopifyThemeTemplateBuildJobStartResponse>(
+        `/clients/${clientId}/shopify/theme/brand/template/build-async`,
+        payload,
+      );
+      const buildJobId = startResponse.jobId;
+      if (!buildJobId || !buildJobId.trim()) {
+        throw new Error("Shopify template build job was not started.");
+      }
+      return startResponse;
+    },
+    onError: (err: ApiError | Error) => {
+      const message =
+        "message" in err ? err.message : err?.message || "Failed to start Shopify template build job";
+      toast.error(message);
+    },
+  });
+}
+
+export function useClientShopifyThemeTemplateBuildJobStatus(
+  clientId?: string,
+  jobId?: string,
+  options?: { enabled?: boolean; refetchIntervalMs?: number },
+) {
+  const { get } = useApiClient();
+  const shouldEnable = Boolean(clientId && jobId && (options?.enabled ?? true));
+  const refetchIntervalMs = options?.refetchIntervalMs ?? 2000;
+
+  return useQuery<ClientShopifyThemeTemplateBuildJobStatusResponse>({
+    queryKey: ["clients", "shopify-theme-template-build-job", clientId, jobId],
+    queryFn: () => get(`/clients/${clientId}/shopify/theme/brand/template/build-jobs/${jobId}`),
+    enabled: shouldEnable,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (!status) return refetchIntervalMs;
+      return status === "queued" || status === "running" ? refetchIntervalMs : false;
     },
   });
 }

@@ -10,8 +10,9 @@ import {
 } from "@/api/designSystems";
 import {
   useAuditClientShopifyThemeBrand,
-  useBuildClientShopifyThemeTemplateDraft,
+  useClientShopifyThemeTemplateBuildJobStatus,
   useClient,
+  useEnqueueClientShopifyThemeTemplateBuildJob,
   useGenerateClientShopifyThemeTemplateImages,
   useListClientShopifyThemeTemplateDrafts,
   usePublishClientShopifyThemeTemplateDraft,
@@ -651,7 +652,7 @@ export function BrandDesignSystemPage() {
   const uploadDesignSystemLogo = useUploadDesignSystemLogo();
   const deleteDesignSystem = useDeleteDesignSystem();
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
-  const buildShopifyThemeTemplateDraft = useBuildClientShopifyThemeTemplateDraft(workspace?.id);
+  const enqueueShopifyThemeTemplateBuildJob = useEnqueueClientShopifyThemeTemplateBuildJob(workspace?.id);
   const generateShopifyThemeTemplateImages = useGenerateClientShopifyThemeTemplateImages(workspace?.id);
   const publishShopifyThemeTemplateDraft = usePublishClientShopifyThemeTemplateDraft(workspace?.id);
   const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
@@ -689,6 +690,8 @@ export function BrandDesignSystemPage() {
   const [templateDraftImageMapInput, setTemplateDraftImageMapInput] = useState("{}");
   const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
   const [templateDraftEditError, setTemplateDraftEditError] = useState<string | null>(null);
+  const [activeTemplateBuildJobId, setActiveTemplateBuildJobId] = useState("");
+  const [lastHandledTemplateBuildJobId, setLastHandledTemplateBuildJobId] = useState("");
   const [templateAssetUploadProductId, setTemplateAssetUploadProductId] = useState("");
   const [templateAssetSearchQuery, setTemplateAssetSearchQuery] = useState("");
   const [templateSlotAssetQueryByPath, setTemplateSlotAssetQueryByPath] = useState<Record<string, string>>({});
@@ -703,6 +706,11 @@ export function BrandDesignSystemPage() {
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
   const uploadTemplateProductAssets = useUploadProductAssets(templateAssetUploadProductId || "");
+  const { data: activeTemplateBuildJobStatus } = useClientShopifyThemeTemplateBuildJobStatus(
+    workspace?.id,
+    activeTemplateBuildJobId || undefined,
+    { enabled: Boolean(activeTemplateBuildJobId) }
+  );
 
   const designSystemOptions = useMemo(
     () => [
@@ -757,6 +765,9 @@ export function BrandDesignSystemPage() {
     updateShopifyInstallation.isPending ||
     disconnectShopifyInstallation.isPending ||
     setDefaultShop.isPending;
+  const activeTemplateBuildJobState = activeTemplateBuildJobStatus?.status || null;
+  const isTemplateBuildJobRunning =
+    activeTemplateBuildJobState === "queued" || activeTemplateBuildJobState === "running";
 
   useEffect(() => {
     setPreviewDesignSystemId("");
@@ -774,6 +785,8 @@ export function BrandDesignSystemPage() {
     setTemplateDraftImageMapInput("{}");
     setTemplateDraftTextValuesInput("{}");
     setTemplateDraftEditError(null);
+    setActiveTemplateBuildJobId("");
+    setLastHandledTemplateBuildJobId("");
     setTemplateAssetUploadProductId("");
     setTemplateAssetSearchQuery("");
     setTemplateSlotAssetQueryByPath({});
@@ -917,6 +930,43 @@ export function BrandDesignSystemPage() {
     selectedTemplateDraft?.productId,
     selectedTemplateDraft?.latestVersion?.data.productId,
     themeSyncProductId,
+  ]);
+
+  useEffect(() => {
+    const statusPayload = activeTemplateBuildJobStatus;
+    if (!statusPayload) return;
+    if (!activeTemplateBuildJobId || statusPayload.jobId !== activeTemplateBuildJobId) return;
+    if (lastHandledTemplateBuildJobId === statusPayload.jobId) return;
+
+    if (statusPayload.status === "succeeded") {
+      if (!statusPayload.result) return;
+      const response = statusPayload.result;
+      setSelectedTemplateDraftId(response.draft.id);
+      setTemplateDraftImageMapInput(
+        JSON.stringify(response.version.data.componentImageAssetMap || {}, null, 2)
+      );
+      setTemplateDraftTextValuesInput(
+        JSON.stringify(response.version.data.componentTextValues || {}, null, 2)
+      );
+      setTemplateDraftEditError(null);
+      setLastHandledTemplateBuildJobId(statusPayload.jobId);
+      setActiveTemplateBuildJobId("");
+      toast.success(
+        `Built template draft v${response.version.versionNumber} for ${response.draft.themeName}`
+      );
+      return;
+    }
+
+    if (statusPayload.status === "failed") {
+      const errorMessage = statusPayload.error?.trim() || "Shopify template build failed.";
+      setLastHandledTemplateBuildJobId(statusPayload.jobId);
+      setActiveTemplateBuildJobId("");
+      toast.error(errorMessage);
+    }
+  }, [
+    activeTemplateBuildJobId,
+    activeTemplateBuildJobStatus,
+    lastHandledTemplateBuildJobId,
   ]);
 
   const previewDesignSystem = useMemo(
@@ -1225,15 +1275,10 @@ export function BrandDesignSystemPage() {
     if (shopifySyncShopDomain) payload.shopDomain = shopifySyncShopDomain;
     if (cleanedProductId) payload.productId = cleanedProductId;
     try {
-      const response = await buildShopifyThemeTemplateDraft.mutateAsync(payload);
-      setSelectedTemplateDraftId(response.draft.id);
-      setTemplateDraftImageMapInput(
-        JSON.stringify(response.version.data.componentImageAssetMap || {}, null, 2)
-      );
-      setTemplateDraftTextValuesInput(
-        JSON.stringify(response.version.data.componentTextValues || {}, null, 2)
-      );
-      setTemplateDraftEditError(null);
+      const startResponse = await enqueueShopifyThemeTemplateBuildJob.mutateAsync(payload);
+      setLastHandledTemplateBuildJobId("");
+      setActiveTemplateBuildJobId(startResponse.jobId);
+      toast.success(`Template build job queued (${startResponse.jobId.slice(0, 8)})`);
     } catch {
       // Error toast is emitted by the mutation hook.
     }
@@ -1738,15 +1783,29 @@ export function BrandDesignSystemPage() {
                   void handleBuildShopifyThemeTemplateDraft();
                 }}
                 disabled={
-                  buildShopifyThemeTemplateDraft.isPending ||
+                  enqueueShopifyThemeTemplateBuildJob.isPending ||
+                  isTemplateBuildJobRunning ||
                   !hasShopifyConnectionTarget ||
                   !themeSyncThemeName.trim()
                 }
               >
-                {buildShopifyThemeTemplateDraft.isPending ? "Building…" : "Job 1: Build template draft"}
+                {enqueueShopifyThemeTemplateBuildJob.isPending
+                  ? "Queueing…"
+                  : isTemplateBuildJobRunning
+                    ? "Building…"
+                    : "Job 1: Build template draft"}
               </Button>
             </div>
           </div>
+          {activeTemplateBuildJobStatus ? (
+            <div className="rounded-md border border-divider bg-surface-2 px-3 py-2 text-xs text-content-muted">
+              Build job <span className="font-mono text-content">{activeTemplateBuildJobStatus.jobId}</span>:{" "}
+              <span className="font-semibold text-content">{activeTemplateBuildJobStatus.status}</span>
+              {activeTemplateBuildJobStatus.progress?.message ? (
+                <span> · {activeTemplateBuildJobStatus.progress.message}</span>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
             <Input
@@ -1811,6 +1870,7 @@ export function BrandDesignSystemPage() {
                 Editing draft <span className="font-semibold text-content">{selectedTemplateDraft.themeName}</span> · v
                 <span className="font-semibold text-content">{selectedTemplateDraft.latestVersion.versionNumber}</span>
               </div>
+              {/*
               <div className="space-y-3 rounded-md border border-divider p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -2117,6 +2177,7 @@ export function BrandDesignSystemPage() {
                   </div>
                 )}
               </div>
+              */}
               <div className="space-y-3 rounded-md border border-divider p-3">
                 <div>
                   <div className="text-xs font-semibold text-content">Text values</div>
