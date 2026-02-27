@@ -83,7 +83,6 @@ from app.services.design_system_generation import (
 )
 from app.services.funnels import (
     create_funnel_image_asset,
-    create_funnel_unsplash_asset,
     resolve_funnel_image_model_config,
 )
 from app.services.media_storage import MediaStorage
@@ -279,86 +278,6 @@ def _normalize_theme_template_slot_path_filter(raw_slot_paths: Any) -> list[str]
         seen.add(slot_path)
         normalized.append(slot_path)
     return normalized
-
-
-def _normalize_theme_template_general_context(raw_context: Any) -> str | None:
-    if raw_context is None:
-        return None
-    if not isinstance(raw_context, str):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="generalContext must be a string when provided.",
-        )
-    if not raw_context.strip():
-        return None
-    normalized_context = _sanitize_theme_component_text_value(raw_context)
-    if not normalized_context:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="generalContext became empty after sanitization.",
-        )
-    if len(normalized_context) > _THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "generalContext is too long. "
-                f"Maximum length is {_THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH} characters."
-            ),
-        )
-    return normalized_context
-
-
-def _normalize_theme_template_slot_context_by_path(raw_slot_context: Any) -> dict[str, str]:
-    if raw_slot_context is None:
-        return {}
-    if not isinstance(raw_slot_context, dict):
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="slotContextByPath must be an object when provided.",
-        )
-    normalized_context_by_path: dict[str, str] = {}
-    for raw_path, raw_context in raw_slot_context.items():
-        if not isinstance(raw_path, str) or not raw_path.strip():
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="slotContextByPath keys must be non-empty strings.",
-            )
-        slot_path = raw_path.strip()
-        if slot_path in normalized_context_by_path:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "slotContextByPath contains duplicate path after normalization: "
-                    f"{slot_path}"
-                ),
-            )
-        if not isinstance(raw_context, str) or not raw_context.strip():
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "slotContextByPath values must be non-empty strings. "
-                    f"Invalid value at path {slot_path}."
-                ),
-            )
-        normalized_context = _sanitize_theme_component_text_value(raw_context)
-        if not normalized_context:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "slotContextByPath value became empty after sanitization. "
-                    f"path={slot_path}."
-                ),
-            )
-        if len(normalized_context) > _THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "slotContextByPath value is too long. "
-                    f"path={slot_path}. Maximum length is {_THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH} characters."
-                ),
-            )
-        normalized_context_by_path[slot_path] = normalized_context
-    return normalized_context_by_path
 
 
 @router.get("")
@@ -2720,27 +2639,6 @@ def _generate_shopify_theme_template_draft_images(
             if isinstance(slot.get("path"), str) and str(slot.get("path")).strip()
         }
     )
-    normalized_general_context = _normalize_theme_template_general_context(
-        payload.generalContext
-    )
-    normalized_slot_context_by_path = _normalize_theme_template_slot_context_by_path(
-        payload.slotContextByPath
-    )
-    unknown_slot_context_paths = sorted(
-        {
-            slot_path
-            for slot_path in normalized_slot_context_by_path
-            if slot_path not in all_slot_paths
-        }
-    )
-    if unknown_slot_context_paths:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=(
-                "slotContextByPath contains one or more unknown template image slot paths: "
-                + ", ".join(unknown_slot_context_paths)
-            ),
-        )
     requested_slot_paths = _normalize_theme_template_slot_path_filter(payload.slotPaths)
     if requested_slot_paths:
         unknown_requested_slot_paths = sorted(
@@ -2851,13 +2749,8 @@ def _generate_shopify_theme_template_draft_images(
         text_slots=text_slots,
         component_text_values=latest_data.componentTextValues,
     )
-    effective_general_context = (
-        normalized_general_context
-        if normalized_general_context is not None
-        else default_general_context
-    )
+    effective_general_context = default_general_context
     effective_slot_context_by_path = dict(default_slot_context_by_path)
-    effective_slot_context_by_path.update(normalized_slot_context_by_path)
     product_reference_image = _resolve_theme_sync_product_reference_image(
         session=session,
         org_id=auth.org_id,
@@ -2881,8 +2774,6 @@ def _generate_shopify_theme_template_draft_images(
             "generatedImageCount": 0,
             "fallbackImageCount": 0,
             "skippedImageCount": 0,
-            "hasCustomGeneralContext": bool(normalized_general_context),
-            "customSlotContextCount": len(normalized_slot_context_by_path),
         }
     )
     (
@@ -3032,10 +2923,6 @@ def _generate_shopify_theme_template_draft_images(
             "requestedImageModelSource": requested_image_model_source,
             "promptTokenCountBySlotPath": prompt_token_count_by_slot_path,
             "promptTokenCountTotal": prompt_token_count_total,
-            "imagePromptGeneralContext": effective_general_context,
-            "imagePromptGeneralContextIsCustom": bool(normalized_general_context),
-            "imagePromptSlotContextByPath": effective_slot_context_by_path,
-            "imagePromptCustomSlotContextByPath": normalized_slot_context_by_path,
         }
     )
     if workspace_brand_description:

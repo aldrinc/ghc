@@ -5006,6 +5006,175 @@ class ShopifyApiClient:
         return template_filename, json_path
 
     @classmethod
+    def _coerce_theme_template_order_entries(cls, *, raw_order: Any) -> list[str]:
+        if not isinstance(raw_order, list):
+            return []
+        ordered_entries: list[str] = []
+        seen_entries: set[str] = set()
+        for item in raw_order:
+            if not isinstance(item, str):
+                continue
+            cleaned_item = item.strip()
+            if not cleaned_item or cleaned_item in seen_entries:
+                continue
+            seen_entries.add(cleaned_item)
+            ordered_entries.append(cleaned_item)
+        return ordered_entries
+
+    @classmethod
+    def _extract_theme_template_slot_location(
+        cls, *, setting_path: str
+    ) -> tuple[str, str | None, str | None]:
+        template_filename, json_path = cls._split_theme_template_setting_path(
+            setting_path=setting_path
+        )
+        tokens = [token.strip() for token in json_path.split(".") if token.strip()]
+        if len(tokens) < 2 or tokens[0] != "sections":
+            return template_filename, None, None
+        section_id = tokens[1]
+        if len(tokens) >= 4 and tokens[2] == "blocks":
+            return template_filename, section_id, tokens[3]
+        return template_filename, section_id, None
+
+    @classmethod
+    def _build_theme_template_render_order_maps(
+        cls, *, template_contents_by_filename: dict[str, str]
+    ) -> tuple[
+        dict[str, int],
+        dict[tuple[str, str], int],
+        dict[tuple[str, str, str], int],
+    ]:
+        template_filenames = sorted(template_contents_by_filename.keys())
+        template_rank_by_filename = {
+            template_filename: index
+            for index, template_filename in enumerate(template_filenames)
+        }
+        section_rank_by_key: dict[tuple[str, str], int] = {}
+        block_rank_by_key: dict[tuple[str, str, str], int] = {}
+
+        for template_filename in template_filenames:
+            template_content = template_contents_by_filename.get(template_filename)
+            if template_content is None:
+                continue
+            template_data = cls._parse_theme_template_json(
+                filename=template_filename,
+                template_content=template_content,
+            )
+            sections_node = template_data.get("sections")
+            if not isinstance(sections_node, dict):
+                continue
+
+            ordered_section_ids: list[str] = []
+            section_ids_seen: set[str] = set()
+            for section_id in cls._coerce_theme_template_order_entries(
+                raw_order=template_data.get("order")
+            ):
+                if section_id in sections_node and section_id not in section_ids_seen:
+                    section_ids_seen.add(section_id)
+                    ordered_section_ids.append(section_id)
+            for section_id in sections_node.keys():
+                if (
+                    isinstance(section_id, str)
+                    and section_id
+                    and section_id not in section_ids_seen
+                ):
+                    section_ids_seen.add(section_id)
+                    ordered_section_ids.append(section_id)
+
+            for section_index, section_id in enumerate(ordered_section_ids):
+                section_rank_by_key[(template_filename, section_id)] = section_index
+                section_node = sections_node.get(section_id)
+                if not isinstance(section_node, dict):
+                    continue
+                blocks_node = section_node.get("blocks")
+                if not isinstance(blocks_node, dict):
+                    continue
+
+                ordered_block_ids: list[str] = []
+                block_ids_seen: set[str] = set()
+                for raw_order in (
+                    section_node.get("block_order"),
+                    section_node.get("order"),
+                ):
+                    for block_id in cls._coerce_theme_template_order_entries(
+                        raw_order=raw_order
+                    ):
+                        if block_id in blocks_node and block_id not in block_ids_seen:
+                            block_ids_seen.add(block_id)
+                            ordered_block_ids.append(block_id)
+                for block_id in blocks_node.keys():
+                    if (
+                        isinstance(block_id, str)
+                        and block_id
+                        and block_id not in block_ids_seen
+                    ):
+                        block_ids_seen.add(block_id)
+                        ordered_block_ids.append(block_id)
+
+                for block_index, block_id in enumerate(ordered_block_ids):
+                    block_rank_by_key[(template_filename, section_id, block_id)] = (
+                        block_index
+                    )
+
+        return template_rank_by_filename, section_rank_by_key, block_rank_by_key
+
+    @classmethod
+    def _sort_theme_template_image_slots_by_render_order(
+        cls,
+        *,
+        image_slots: list[dict[str, Any]],
+        template_contents_by_filename: dict[str, str],
+    ) -> list[dict[str, Any]]:
+        if not image_slots:
+            return []
+
+        (
+            template_rank_by_filename,
+            section_rank_by_key,
+            block_rank_by_key,
+        ) = cls._build_theme_template_render_order_maps(
+            template_contents_by_filename=template_contents_by_filename
+        )
+        max_rank = 10**9
+        manifest_rank_by_path = {
+            str(item["path"]): index
+            for index, item in enumerate(image_slots)
+            if isinstance(item.get("path"), str) and str(item["path"]).strip()
+        }
+
+        def sort_key(item: dict[str, Any]) -> tuple[int, int, int, int, str]:
+            path = item.get("path")
+            if not isinstance(path, str) or not path.strip():
+                return max_rank, max_rank, max_rank, max_rank, ""
+            normalized_path = path.strip()
+            template_filename, section_id, block_id = (
+                cls._extract_theme_template_slot_location(setting_path=normalized_path)
+            )
+            template_rank = template_rank_by_filename.get(template_filename, max_rank)
+            if section_id:
+                section_rank = section_rank_by_key.get(
+                    (template_filename, section_id), max_rank
+                )
+            else:
+                section_rank = max_rank
+            if block_id:
+                block_rank = block_rank_by_key.get(
+                    (template_filename, section_id or "", block_id), max_rank
+                )
+            else:
+                block_rank = -1
+            manifest_rank = manifest_rank_by_path.get(normalized_path, max_rank)
+            return (
+                template_rank,
+                section_rank,
+                block_rank,
+                manifest_rank,
+                normalized_path,
+            )
+
+        return sorted(image_slots, key=sort_key)
+
+    @classmethod
     def _normalize_theme_component_image_urls(
         cls,
         *,
@@ -7641,12 +7810,16 @@ class ShopifyApiClient:
             profile=profile,
             template_contents_by_filename=template_contents_by_filename,
         )
+        ordered_image_slots = self._sort_theme_template_image_slots_by_render_order(
+            image_slots=image_slots,
+            template_contents_by_filename=template_contents_by_filename,
+        )
 
         return {
             "themeId": theme["id"],
             "themeName": theme["name"],
             "themeRole": theme["role"],
-            "imageSlots": sorted(image_slots, key=lambda item: str(item["path"])),
+            "imageSlots": ordered_image_slots,
             "textSlots": sorted(text_slots, key=lambda item: str(item["path"])),
         }
 

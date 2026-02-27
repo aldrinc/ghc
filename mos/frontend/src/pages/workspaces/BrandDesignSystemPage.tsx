@@ -10,9 +10,7 @@ import {
 } from "@/api/designSystems";
 import {
   useAuditClientShopifyThemeBrand,
-  useClientShopifyThemeTemplateBuildJobStatus,
   useClient,
-  useEnqueueClientShopifyThemeTemplateBuildJob,
   useGenerateClientShopifyThemeTemplateImages,
   useListClientShopifyThemeTemplateDrafts,
   usePublishClientShopifyThemeTemplateDraft,
@@ -45,7 +43,6 @@ import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } fro
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DesignSystemProvider } from "@/components/design-system/DesignSystemProvider";
 import type { DesignSystem } from "@/types/designSystems";
-import type { Product } from "@/types/products";
 import { cn } from "@/lib/utils";
 import { toast } from "@/components/ui/toast";
 
@@ -659,119 +656,6 @@ function buildTextSlotReadableLabelMap(
   return labelsByPath;
 }
 
-function normalizePromptContextValue(raw: string): string {
-  return raw.replace(/\s+/g, " ").trim();
-}
-
-function readPromptContextMap(raw: unknown): Record<string, string> {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-  const normalized: Record<string, string> = {};
-  for (const [rawPath, rawValue] of Object.entries(raw)) {
-    if (typeof rawPath !== "string" || !rawPath.trim()) continue;
-    if (typeof rawValue !== "string") continue;
-    const cleanedValue = normalizePromptContextValue(rawValue);
-    if (!cleanedValue) continue;
-    normalized[rawPath.trim()] = cleanedValue;
-  }
-  return normalized;
-}
-
-function buildTemplateImageGenerationGeneralContext(
-  draftData: ClientShopifyThemeTemplateDraftData,
-  product: Product | null
-): string {
-  const segments: string[] = [];
-  if (draftData.workspaceName.trim()) segments.push(`Workspace: ${draftData.workspaceName.trim()}.`);
-  if (draftData.brandName.trim()) segments.push(`Brand: ${draftData.brandName.trim()}.`);
-  const rawBrandDescription = draftData.metadata?.["brandDescription"];
-  if (typeof rawBrandDescription === "string" && rawBrandDescription.trim()) {
-    segments.push(`Brand description: ${normalizePromptContextValue(rawBrandDescription)}.`);
-  }
-  if (draftData.themeName.trim()) segments.push(`Theme: ${draftData.themeName.trim()}.`);
-  if (draftData.themeRole.trim()) segments.push(`Theme role: ${draftData.themeRole.trim()}.`);
-
-  if (product) {
-    if (product.title?.trim()) segments.push(`Product: ${product.title.trim()}.`);
-    if (product.product_type?.trim()) segments.push(`Product type: ${product.product_type.trim()}.`);
-    if (product.description?.trim()) segments.push(`Product summary: ${product.description.trim()}.`);
-    if (product.primary_benefits?.length) {
-      segments.push(`Primary benefits: ${product.primary_benefits.filter(Boolean).slice(0, 4).join("; ")}.`);
-    }
-    if (product.feature_bullets?.length) {
-      segments.push(`Feature points: ${product.feature_bullets.filter(Boolean).slice(0, 4).join("; ")}.`);
-    }
-  }
-
-  const colorBrand = draftData.cssVars?.["--color-brand"];
-  if (typeof colorBrand === "string" && colorBrand.trim()) {
-    segments.push(`Primary brand color: ${colorBrand.trim()}.`);
-  }
-  const colorCta = draftData.cssVars?.["--color-cta"];
-  if (typeof colorCta === "string" && colorCta.trim()) {
-    segments.push(`CTA color: ${colorCta.trim()}.`);
-  }
-
-  return normalizePromptContextValue(segments.join(" "));
-}
-
-function buildTemplateImageGenerationSlotContextByPath(
-  draftData: ClientShopifyThemeTemplateDraftData,
-  imageSlotReadableLabelByPath: Map<string, string>
-): Record<string, string> {
-  const textValuesByPath = new Map<string, string>();
-  for (const slot of draftData.textSlots) {
-    const rawValue = draftData.componentTextValues[slot.path] || slot.currentValue || "";
-    const cleaned = normalizePromptContextValue(rawValue);
-    if (!cleaned) continue;
-    textValuesByPath.set(slot.path, cleaned);
-  }
-  for (const [rawPath, rawValue] of Object.entries(draftData.componentTextValues || {})) {
-    if (typeof rawPath !== "string" || !rawPath.trim()) continue;
-    if (typeof rawValue !== "string") continue;
-    const cleaned = normalizePromptContextValue(rawValue);
-    if (!cleaned) continue;
-    textValuesByPath.set(rawPath.trim(), cleaned);
-  }
-
-  const sortedTextEntries = Array.from(textValuesByPath.entries()).sort(([a], [b]) => a.localeCompare(b));
-  const contextByPath: Record<string, string> = {};
-
-  for (const slot of draftData.imageSlots) {
-    const path = slot.path;
-    const label =
-      imageSlotReadableLabelByPath.get(path) || humanizeSlotToken(path.split(".").pop() || path);
-    const segments: string[] = [
-      `Purpose: ${label}.`,
-      `Slot role: ${slot.role || "generic"}.`,
-      `Target key: ${slot.key || "image"}.`,
-      `Preferred aspect: ${slot.recommendedAspect || "any"}.`,
-    ];
-
-    const sectionPrefix = path.includes(".settings.")
-      ? `${path.split(".settings.")[0]}.settings.`
-      : "";
-    if (sectionPrefix) {
-      const relatedValues: string[] = [];
-      for (const [textPath, value] of sortedTextEntries) {
-        if (!textPath.startsWith(sectionPrefix)) continue;
-        if (relatedValues.includes(value)) continue;
-        relatedValues.push(value);
-        if (relatedValues.length >= 2) break;
-      }
-      if (relatedValues.length) {
-        segments.push(`Related copy context: ${relatedValues.join(" ")}.`);
-      }
-    }
-
-    const normalizedContext = normalizePromptContextValue(segments.join(" "));
-    if (normalizedContext) {
-      contextByPath[path] = normalizedContext;
-    }
-  }
-
-  return contextByPath;
-}
-
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
   const { data: client } = useClient(workspace?.id);
@@ -792,7 +676,6 @@ export function BrandDesignSystemPage() {
   const uploadDesignSystemLogo = useUploadDesignSystemLogo();
   const deleteDesignSystem = useDeleteDesignSystem();
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
-  const enqueueShopifyThemeTemplateBuildJob = useEnqueueClientShopifyThemeTemplateBuildJob(workspace?.id);
   const generateShopifyThemeTemplateImages = useGenerateClientShopifyThemeTemplateImages(workspace?.id);
   const publishShopifyThemeTemplateDraft = usePublishClientShopifyThemeTemplateDraft(workspace?.id);
   const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
@@ -827,20 +710,15 @@ export function BrandDesignSystemPage() {
   const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
   const [themeSyncProductId, setThemeSyncProductId] = useState("");
   const [selectedTemplateDraftId, setSelectedTemplateDraftId] = useState("");
-  const [templateImageGenerationGeneralContextInput, setTemplateImageGenerationGeneralContextInput] = useState("");
-  const [templateImageGenerationSlotContextByPath, setTemplateImageGenerationSlotContextByPath] = useState<
-    Record<string, string>
-  >({});
   const [templateImageGenerationSlotPathsInput, setTemplateImageGenerationSlotPathsInput] = useState("");
   const [templateDraftImageMapInput, setTemplateDraftImageMapInput] = useState("{}");
   const [templateDraftTextValuesInput, setTemplateDraftTextValuesInput] = useState("{}");
   const [templateDraftEditError, setTemplateDraftEditError] = useState<string | null>(null);
-  const [activeTemplateBuildJobId, setActiveTemplateBuildJobId] = useState("");
-  const [lastHandledTemplateBuildJobId, setLastHandledTemplateBuildJobId] = useState("");
   const [templateAssetUploadProductId, setTemplateAssetUploadProductId] = useState("");
   const [templateAssetSearchQuery, setTemplateAssetSearchQuery] = useState("");
   const [templateSlotAssetQueryByPath, setTemplateSlotAssetQueryByPath] = useState<Record<string, string>>({});
   const [templateAssetPickerImageErrorsByPublicId, setTemplateAssetPickerImageErrorsByPublicId] = useState<Record<string, boolean>>({});
+  const [clearingTemplateDraftImageSlotPath, setClearingTemplateDraftImageSlotPath] = useState("");
   const [templatePreviewDialogOpen, setTemplatePreviewDialogOpen] = useState(false);
   const [templatePreviewImageMap, setTemplatePreviewImageMap] = useState<Record<string, string>>({});
   const [templatePreviewTextValues, setTemplatePreviewTextValues] = useState<Record<string, string>>({});
@@ -851,11 +729,6 @@ export function BrandDesignSystemPage() {
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
   const uploadTemplateProductAssets = useUploadProductAssets(templateAssetUploadProductId || "");
-  const { data: activeTemplateBuildJobStatus } = useClientShopifyThemeTemplateBuildJobStatus(
-    workspace?.id,
-    activeTemplateBuildJobId || undefined,
-    { enabled: Boolean(activeTemplateBuildJobId) }
-  );
 
   const designSystemOptions = useMemo(
     () => [
@@ -910,9 +783,6 @@ export function BrandDesignSystemPage() {
     updateShopifyInstallation.isPending ||
     disconnectShopifyInstallation.isPending ||
     setDefaultShop.isPending;
-  const activeTemplateBuildJobState = activeTemplateBuildJobStatus?.status || null;
-  const isTemplateBuildJobRunning =
-    activeTemplateBuildJobState === "queued" || activeTemplateBuildJobState === "running";
 
   useEffect(() => {
     setPreviewDesignSystemId("");
@@ -927,18 +797,15 @@ export function BrandDesignSystemPage() {
     setThemeSyncThemeName("futrgroup2-0theme");
     setThemeSyncProductId("");
     setSelectedTemplateDraftId("");
-    setTemplateImageGenerationGeneralContextInput("");
-    setTemplateImageGenerationSlotContextByPath({});
     setTemplateImageGenerationSlotPathsInput("");
     setTemplateDraftImageMapInput("{}");
     setTemplateDraftTextValuesInput("{}");
     setTemplateDraftEditError(null);
-    setActiveTemplateBuildJobId("");
-    setLastHandledTemplateBuildJobId("");
     setTemplateAssetUploadProductId("");
     setTemplateAssetSearchQuery("");
     setTemplateSlotAssetQueryByPath({});
     setTemplateAssetPickerImageErrorsByPublicId({});
+    setClearingTemplateDraftImageSlotPath("");
     setTemplatePreviewDialogOpen(false);
     setTemplatePreviewImageMap({});
     setTemplatePreviewTextValues({});
@@ -1041,8 +908,6 @@ export function BrandDesignSystemPage() {
     if (!latestVersion) {
       setTemplateDraftImageMapInput("{}");
       setTemplateDraftTextValuesInput("{}");
-      setTemplateImageGenerationGeneralContextInput("");
-      setTemplateImageGenerationSlotContextByPath({});
       setTemplateDraftEditError(null);
       return;
     }
@@ -1052,24 +917,12 @@ export function BrandDesignSystemPage() {
     setTemplateDraftTextValuesInput(
       JSON.stringify(latestVersion.data.componentTextValues || {}, null, 2)
     );
-    const metadata = latestVersion.data.metadata || {};
-    const metadataGeneralContextRaw = metadata["imagePromptGeneralContext"];
-    const metadataGeneralContext =
-      typeof metadataGeneralContextRaw === "string"
-        ? normalizePromptContextValue(metadataGeneralContextRaw)
-        : "";
-    const metadataCustomSlotContext = readPromptContextMap(
-      metadata["imagePromptCustomSlotContextByPath"]
-    );
-    setTemplateImageGenerationGeneralContextInput(
-      metadataGeneralContext || templateImageGenerationDefaultGeneralContext
-    );
-    setTemplateImageGenerationSlotContextByPath(metadataCustomSlotContext);
     setTemplateImageGenerationSlotPathsInput("");
     setTemplateDraftEditError(null);
     setTemplateAssetSearchQuery("");
     setTemplateSlotAssetQueryByPath({});
     setTemplateAssetPickerImageErrorsByPublicId({});
+    setClearingTemplateDraftImageSlotPath("");
   }, [selectedTemplateDraft?.id, selectedTemplateDraft?.latestVersion?.id]);
 
   useEffect(() => {
@@ -1094,43 +947,6 @@ export function BrandDesignSystemPage() {
     selectedTemplateDraft?.productId,
     selectedTemplateDraft?.latestVersion?.data.productId,
     themeSyncProductId,
-  ]);
-
-  useEffect(() => {
-    const statusPayload = activeTemplateBuildJobStatus;
-    if (!statusPayload) return;
-    if (!activeTemplateBuildJobId || statusPayload.jobId !== activeTemplateBuildJobId) return;
-    if (lastHandledTemplateBuildJobId === statusPayload.jobId) return;
-
-    if (statusPayload.status === "succeeded") {
-      if (!statusPayload.result) return;
-      const response = statusPayload.result;
-      setSelectedTemplateDraftId(response.draft.id);
-      setTemplateDraftImageMapInput(
-        JSON.stringify(response.version.data.componentImageAssetMap || {}, null, 2)
-      );
-      setTemplateDraftTextValuesInput(
-        JSON.stringify(response.version.data.componentTextValues || {}, null, 2)
-      );
-      setTemplateDraftEditError(null);
-      setLastHandledTemplateBuildJobId(statusPayload.jobId);
-      setActiveTemplateBuildJobId("");
-      toast.success(
-        `Built template draft v${response.version.versionNumber} for ${response.draft.themeName}`
-      );
-      return;
-    }
-
-    if (statusPayload.status === "failed") {
-      const errorMessage = statusPayload.error?.trim() || "Shopify template build failed.";
-      setLastHandledTemplateBuildJobId(statusPayload.jobId);
-      setActiveTemplateBuildJobId("");
-      toast.error(errorMessage);
-    }
-  }, [
-    activeTemplateBuildJobId,
-    activeTemplateBuildJobStatus,
-    lastHandledTemplateBuildJobId,
   ]);
 
   const previewDesignSystem = useMemo(
@@ -1257,47 +1073,30 @@ export function BrandDesignSystemPage() {
     if (!latestVersion) return new Map<string, string>();
     return buildTextSlotReadableLabelMap(latestVersion.data.textSlots);
   }, [selectedTemplateDraft?.latestVersion?.id]);
-  const templateImageGenerationProduct = useMemo(() => {
-    const draftProductId =
-      selectedTemplateDraft?.latestVersion?.data.productId ||
-      selectedTemplateDraft?.productId ||
-      templateAssetUploadProductId ||
-      themeSyncProductId.trim() ||
-      "";
-    if (!draftProductId) return null;
-    return productById.get(draftProductId) || null;
+  const mappedTemplateImageSlotEntries = useMemo(() => {
+    const latestVersion = selectedTemplateDraft?.latestVersion;
+    const slotByPath = new Map((latestVersion?.data.imageSlots || []).map((slot) => [slot.path, slot]));
+    return Object.entries(parsedTemplateDraftImageMap)
+      .filter(([path, assetPublicId]) => path.trim() && typeof assetPublicId === "string" && assetPublicId.trim())
+      .map(([path, assetPublicId]) => {
+        const slot = slotByPath.get(path);
+        const readableSlotLabel =
+          templateImageSlotReadableLabelByPath.get(path) ||
+          humanizeSlotToken(path.split(".").pop() || path);
+        return {
+          path,
+          assetPublicId: assetPublicId.trim(),
+          readableSlotLabel,
+          role: slot?.role || "",
+          recommendedAspect: slot?.recommendedAspect || "",
+        };
+      })
+      .sort((a, b) => a.path.localeCompare(b.path));
   }, [
-    selectedTemplateDraft?.id,
+    parsedTemplateDraftImageMap,
     selectedTemplateDraft?.latestVersion?.id,
-    selectedTemplateDraft?.latestVersion?.data.productId,
-    selectedTemplateDraft?.productId,
-    templateAssetUploadProductId,
-    themeSyncProductId,
-    productById,
+    templateImageSlotReadableLabelByPath,
   ]);
-  const templateImageGenerationDefaultGeneralContext = useMemo(() => {
-    const latestVersion = selectedTemplateDraft?.latestVersion;
-    if (!latestVersion) return "";
-    return buildTemplateImageGenerationGeneralContext(
-      latestVersion.data,
-      templateImageGenerationProduct
-    );
-  }, [selectedTemplateDraft?.latestVersion?.id, templateImageGenerationProduct]);
-  const templateImageGenerationDefaultSlotContextByPath = useMemo(() => {
-    const latestVersion = selectedTemplateDraft?.latestVersion;
-    if (!latestVersion) return {} as Record<string, string>;
-    return buildTemplateImageGenerationSlotContextByPath(
-      latestVersion.data,
-      templateImageSlotReadableLabelByPath
-    );
-  }, [selectedTemplateDraft?.latestVersion?.id, templateImageSlotReadableLabelByPath]);
-  const templateImageGenerationEffectiveSlotContextByPath = useMemo(
-    () => ({
-      ...templateImageGenerationDefaultSlotContextByPath,
-      ...templateImageGenerationSlotContextByPath,
-    }),
-    [templateImageGenerationDefaultSlotContextByPath, templateImageGenerationSlotContextByPath]
-  );
   const templatePreviewImageItems = useMemo(() => {
     const latestVersion = selectedTemplateDraft?.latestVersion;
     if (!latestVersion) return [];
@@ -1458,37 +1257,6 @@ export function BrandDesignSystemPage() {
     await refetchShopifyStatus();
   };
 
-  const handleBuildShopifyThemeTemplateDraft = async () => {
-    if (!workspace?.id) return;
-    const cleanedThemeName = themeSyncThemeName.trim();
-    const cleanedProductId = themeSyncProductId.trim();
-    if (!cleanedThemeName) {
-      toast.error("Enter a Shopify theme name.");
-      return;
-    }
-    const payload: {
-      draftId?: string;
-      designSystemId?: string;
-      shopDomain?: string;
-      productId?: string;
-      themeName: string;
-    } = {
-      themeName: cleanedThemeName,
-    };
-    if (selectedTemplateDraftId) payload.draftId = selectedTemplateDraftId;
-    if (themeSyncDesignSystemId) payload.designSystemId = themeSyncDesignSystemId;
-    if (shopifySyncShopDomain) payload.shopDomain = shopifySyncShopDomain;
-    if (cleanedProductId) payload.productId = cleanedProductId;
-    try {
-      const startResponse = await enqueueShopifyThemeTemplateBuildJob.mutateAsync(payload);
-      setLastHandledTemplateBuildJobId("");
-      setActiveTemplateBuildJobId(startResponse.jobId);
-      toast.success(`Template build job queued (${startResponse.jobId.slice(0, 8)})`);
-    } catch {
-      // Error toast is emitted by the mutation hook.
-    }
-  };
-
   const handleSaveTemplateDraftEdits = async () => {
     if (!workspace?.id) return;
     if (!selectedTemplateDraftId) {
@@ -1534,37 +1302,12 @@ export function BrandDesignSystemPage() {
       draftId: string;
       productId?: string;
       slotPaths?: string[];
-      generalContext?: string;
-      slotContextByPath?: Record<string, string>;
     } = {
       draftId: selectedTemplateDraftId,
     };
     const explicitProductId = templateAssetUploadProductId.trim() || themeSyncProductId.trim();
     if (explicitProductId) payload.productId = explicitProductId;
     if (parsedSlotPathList.value.length) payload.slotPaths = parsedSlotPathList.value;
-    const cleanedGeneralContext = normalizePromptContextValue(
-      templateImageGenerationGeneralContextInput
-    );
-    if (cleanedGeneralContext) {
-      payload.generalContext = cleanedGeneralContext;
-    }
-    if (selectedTemplateDraft.latestVersion) {
-      const knownSlotPathSet = new Set(
-        selectedTemplateDraft.latestVersion.data.imageSlots.map((slot) => slot.path)
-      );
-      const nextSlotContextByPath: Record<string, string> = {};
-      for (const [path, rawContext] of Object.entries(
-        templateImageGenerationSlotContextByPath
-      )) {
-        if (!knownSlotPathSet.has(path)) continue;
-        const cleanedSlotContext = normalizePromptContextValue(rawContext);
-        if (!cleanedSlotContext) continue;
-        nextSlotContextByPath[path] = cleanedSlotContext;
-      }
-      if (Object.keys(nextSlotContextByPath).length) {
-        payload.slotContextByPath = nextSlotContextByPath;
-      }
-    }
     setTemplateDraftEditError(null);
 
     try {
@@ -1604,9 +1347,52 @@ export function BrandDesignSystemPage() {
       setTemplateDraftImageMapInput("{}");
       setTemplateSlotAssetQueryByPath({});
       setTemplateAssetPickerImageErrorsByPublicId({});
+      setClearingTemplateDraftImageSlotPath("");
       setTemplateDraftEditError(null);
     } catch {
       // Error toast is emitted by the mutation hook.
+    }
+  };
+
+  const handleClearTemplateDraftImageMapping = async (slotPath: string) => {
+    if (!workspace?.id) return;
+    if (!selectedTemplateDraftId) {
+      toast.error("Select a template draft first.");
+      return;
+    }
+    const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
+    if (!parsedImageMap.value) {
+      setTemplateDraftEditError(parsedImageMap.error || "Invalid image map.");
+      return;
+    }
+    const normalizedSlotPath = slotPath.trim();
+    if (!normalizedSlotPath) return;
+    if (!Object.prototype.hasOwnProperty.call(parsedImageMap.value, normalizedSlotPath)) {
+      return;
+    }
+    const nextImageMap = { ...parsedImageMap.value };
+    delete nextImageMap[normalizedSlotPath];
+    setClearingTemplateDraftImageSlotPath(normalizedSlotPath);
+    try {
+      await updateShopifyThemeTemplateDraft.mutateAsync({
+        draftId: selectedTemplateDraftId,
+        payload: {
+          componentImageAssetMap: nextImageMap,
+          notes: `Cleared mapped image slot: ${normalizedSlotPath}`,
+        },
+      });
+      setTemplateDraftImageMapInput(JSON.stringify(nextImageMap, null, 2));
+      setTemplateSlotAssetQueryByPath((current) => {
+        if (!Object.prototype.hasOwnProperty.call(current, normalizedSlotPath)) return current;
+        const next = { ...current };
+        delete next[normalizedSlotPath];
+        return next;
+      });
+      setTemplateDraftEditError(null);
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    } finally {
+      setClearingTemplateDraftImageSlotPath("");
     }
   };
 
@@ -1640,31 +1426,6 @@ export function BrandDesignSystemPage() {
       delete nextTextValues[path];
     }
     setTemplateDraftTextValuesInput(JSON.stringify(nextTextValues, null, 2));
-    setTemplateDraftEditError(null);
-  };
-
-  const handleTemplateImageGenerationSlotContextChange = (
-    path: string,
-    nextValue: string
-  ) => {
-    setTemplateImageGenerationSlotContextByPath((current) => {
-      const next = { ...current };
-      const cleanedValue = normalizePromptContextValue(nextValue);
-      if (!cleanedValue) {
-        delete next[path];
-        return next;
-      }
-      next[path] = nextValue;
-      return next;
-    });
-    setTemplateDraftEditError(null);
-  };
-
-  const handleResetTemplateImagePromptContextsToDefault = () => {
-    setTemplateImageGenerationGeneralContextInput(
-      templateImageGenerationDefaultGeneralContext
-    );
-    setTemplateImageGenerationSlotContextByPath({});
     setTemplateDraftEditError(null);
   };
 
@@ -2048,53 +1809,10 @@ export function BrandDesignSystemPage() {
             <div>
               <div className="text-sm font-semibold text-content">Theme template workflow</div>
               <div className="text-xs text-content-muted">
-                Job 1 builds an editable template draft in mOS. Job 2 publishes the approved draft to Shopify.
+                Review and edit the template draft in mOS, then publish the approved draft to Shopify.
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  void handleAuditShopifyThemeBrand();
-                }}
-                disabled={
-                  auditShopifyThemeBrand.isPending ||
-                  !hasShopifyConnectionTarget ||
-                  !themeSyncThemeName.trim()
-                }
-              >
-                {auditShopifyThemeBrand.isPending ? "Auditing…" : "Audit theme"}
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => {
-                  void handleBuildShopifyThemeTemplateDraft();
-                }}
-                disabled={
-                  enqueueShopifyThemeTemplateBuildJob.isPending ||
-                  isTemplateBuildJobRunning ||
-                  !hasShopifyConnectionTarget ||
-                  !themeSyncThemeName.trim()
-                }
-              >
-                {enqueueShopifyThemeTemplateBuildJob.isPending
-                  ? "Queueing…"
-                  : isTemplateBuildJobRunning
-                    ? "Building…"
-                    : "Job 1: Build template draft"}
-              </Button>
-            </div>
           </div>
-          {activeTemplateBuildJobStatus ? (
-            <div className="rounded-md border border-divider bg-surface-2 px-3 py-2 text-xs text-content-muted">
-              Build job <span className="font-mono text-content">{activeTemplateBuildJobStatus.jobId}</span>:{" "}
-              <span className="font-semibold text-content">{activeTemplateBuildJobStatus.status}</span>
-              {activeTemplateBuildJobStatus.progress?.message ? (
-                <span> · {activeTemplateBuildJobStatus.progress.message}</span>
-              ) : null}
-            </div>
-          ) : null}
 
           <div className="grid gap-2 md:grid-cols-[280px_minmax(0,1fr)]">
             <Input
@@ -2114,7 +1832,7 @@ export function BrandDesignSystemPage() {
               placeholder="Optional product ID"
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
-              Optional product ID for product-specific image/text planning in Job 1.
+              Optional product ID for product-specific image/text planning.
             </div>
           </div>
 
@@ -2133,7 +1851,7 @@ export function BrandDesignSystemPage() {
               disabled={!designSystems.length}
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
-              Leave as workspace default, or pick a specific design system override for Job 1.
+              Leave as workspace default, or pick a specific design system override.
             </div>
           </div>
 
@@ -2468,106 +2186,58 @@ export function BrandDesignSystemPage() {
               </div>
               */}
               <div className="space-y-3 rounded-md border border-divider p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-xs font-semibold text-content">
-                      Image prompt context (experiment)
-                    </div>
-                    <div className="text-xs text-content-muted">
-                      Edit shared brand/product context and per-slot objectives used by Shopify
-                      template image generation.
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={handleResetTemplateImagePromptContextsToDefault}
-                  >
-                    Reset to defaults
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold text-content">General context</div>
-                  <textarea
-                    rows={4}
-                    value={templateImageGenerationGeneralContextInput}
-                    onChange={(event) => {
-                      setTemplateImageGenerationGeneralContextInput(event.target.value);
-                      setTemplateDraftEditError(null);
-                    }}
-                    placeholder="General brand and product context for all generated images."
-                    className={cn(
-                      "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                    )}
-                  />
-                  <div className="text-[11px] text-content-muted">
-                    {templateImageGenerationGeneralContextInput.trim().length} characters
+                <div>
+                  <div className="text-xs font-semibold text-content">Mapped image slots</div>
+                  <div className="text-xs text-content-muted">
+                    Clear one mapped image slot without clearing all mappings.
                   </div>
                 </div>
-                {!selectedTemplateDraft.latestVersion.data.imageSlots.length ? (
+                {parsedTemplateDraftImageMapResult.error ? (
+                  <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+                    {parsedTemplateDraftImageMapResult.error}
+                  </div>
+                ) : !mappedTemplateImageSlotEntries.length ? (
                   <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
-                    This draft has no image slots.
+                    No mapped image slots yet.
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                    {selectedTemplateDraft.latestVersion.data.imageSlots.map((slot) => {
-                      const readableSlotLabel =
-                        templateImageSlotReadableLabelByPath.get(slot.path) ||
-                        humanizeSlotToken(slot.path.split(".").pop() || slot.path);
-                      const slotContextValue =
-                        templateImageGenerationEffectiveSlotContextByPath[slot.path] || "";
-                      const hasCustomSlotContext = Object.prototype.hasOwnProperty.call(
-                        templateImageGenerationSlotContextByPath,
-                        slot.path
-                      );
+                  <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                    {mappedTemplateImageSlotEntries.map((entry) => {
+                      const isClearingThisSlot =
+                        updateShopifyThemeTemplateDraft.isPending &&
+                        clearingTemplateDraftImageSlotPath === entry.path;
                       return (
                         <div
-                          key={`prompt-context-${slot.path}`}
+                          key={`mapped-slot-${entry.path}`}
                           className="space-y-2 rounded-md border border-border bg-surface p-2"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="text-xs font-semibold text-content">
-                              {readableSlotLabel}
+                              {entry.readableSlotLabel}
                             </div>
                             <Button
                               size="sm"
                               variant="secondary"
-                              onClick={() =>
-                                setTemplateImageGenerationSlotContextByPath((current) => {
-                                  const next = { ...current };
-                                  delete next[slot.path];
-                                  return next;
-                                })
-                              }
-                              disabled={!hasCustomSlotContext}
+                              onClick={() => {
+                                void handleClearTemplateDraftImageMapping(entry.path);
+                              }}
+                              disabled={updateShopifyThemeTemplateDraft.isPending}
                             >
-                              Use default
+                              {isClearingThisSlot ? "Clearing…" : "Clear slot"}
                             </Button>
                           </div>
                           <div className="text-[11px] font-mono break-all text-content">
-                            {slot.path}
+                            {entry.path}
+                          </div>
+                          <div className="text-[11px] font-mono break-all text-content-muted">
+                            asset: {entry.assetPublicId}
                           </div>
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
-                            <span>role: {slot.role || "generic"}</span>
-                            <span>aspect: {slot.recommendedAspect || "any"}</span>
-                            <span>{hasCustomSlotContext ? "custom" : "default"}</span>
+                            {entry.role ? <span>role: {entry.role}</span> : null}
+                            {entry.recommendedAspect ? (
+                              <span>aspect: {entry.recommendedAspect}</span>
+                            ) : null}
                           </div>
-                          <textarea
-                            rows={3}
-                            value={slotContextValue}
-                            onChange={(event) =>
-                              handleTemplateImageGenerationSlotContextChange(
-                                slot.path,
-                                event.target.value
-                              )
-                            }
-                            placeholder={`Context for ${readableSlotLabel}`}
-                            className={cn(
-                              "w-full rounded-md border border-border bg-surface px-3 py-2 text-xs text-content shadow-sm",
-                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                            )}
-                          />
                         </div>
                       );
                     })}
@@ -2661,12 +2331,26 @@ export function BrandDesignSystemPage() {
                 </Button>
                 <Button
                   size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    void handleAuditShopifyThemeBrand();
+                  }}
+                  disabled={
+                    auditShopifyThemeBrand.isPending ||
+                    !hasShopifyConnectionTarget ||
+                    !themeSyncThemeName.trim()
+                  }
+                >
+                  {auditShopifyThemeBrand.isPending ? "Auditing…" : "Audit theme"}
+                </Button>
+                <Button
+                  size="sm"
                   onClick={() => {
                     void handlePublishTemplateDraft();
                   }}
                   disabled={publishShopifyThemeTemplateDraft.isPending}
                 >
-                  {publishShopifyThemeTemplateDraft.isPending ? "Publishing…" : "Job 2: Publish template"}
+                  {publishShopifyThemeTemplateDraft.isPending ? "Publishing…" : "Publish template"}
                 </Button>
               </div>
               <div className="text-xs text-content-muted">

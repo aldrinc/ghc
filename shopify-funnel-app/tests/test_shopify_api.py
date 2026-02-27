@@ -349,6 +349,122 @@ def test_list_theme_brand_template_slots_errors_when_manifest_path_missing(monke
     )
 
 
+def test_list_theme_brand_template_slots_orders_image_slots_by_render_order(monkeypatch):
+    client = ShopifyApiClient()
+    manifest = {
+        "futrgroup2-0theme": {
+            "imageSlots": (
+                {
+                    "path": "templates/index.json.sections.aa_section.settings.image",
+                    "key": "image",
+                    "role": "supporting",
+                    "recommendedAspect": "landscape",
+                },
+                {
+                    "path": "templates/index.json.sections.zz_section.blocks.block_1.settings.image",
+                    "key": "image",
+                    "role": "gallery",
+                    "recommendedAspect": "portrait",
+                },
+                {
+                    "path": "templates/index.json.sections.zz_section.blocks.block_2.settings.image",
+                    "key": "image",
+                    "role": "gallery",
+                    "recommendedAspect": "square",
+                },
+                {
+                    "path": "templates/index.json.sections.zz_section.settings.image",
+                    "key": "image",
+                    "role": "hero",
+                    "recommendedAspect": "landscape",
+                },
+            ),
+            "textSlots": (),
+        }
+    }
+    monkeypatch.setattr(
+        shopify_api_module,
+        "_THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME",
+        manifest,
+    )
+
+    template_json = (
+        json.dumps(
+            {
+                "order": ["zz_section", "aa_section"],
+                "sections": {
+                    "aa_section": {
+                        "settings": {"image": "shopify://shop_images/aa.jpg"},
+                    },
+                    "zz_section": {
+                        "settings": {"image": "shopify://shop_images/zz-main.jpg"},
+                        "blocks": {
+                            "block_1": {
+                                "settings": {"image": "shopify://shop_images/zz-1.jpg"},
+                            },
+                            "block_2": {
+                                "settings": {"image": "shopify://shop_images/zz-2.jpg"},
+                            },
+                        },
+                        "block_order": ["block_2", "block_1"],
+                    },
+                },
+            }
+        )
+        + "\n"
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": template_json,
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.list_theme_brand_template_slots(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert [slot["path"] for slot in result["imageSlots"]] == [
+        "templates/index.json.sections.zz_section.settings.image",
+        "templates/index.json.sections.zz_section.blocks.block_2.settings.image",
+        "templates/index.json.sections.zz_section.blocks.block_1.settings.image",
+        "templates/index.json.sections.aa_section.settings.image",
+    ]
+
+
 def test_admin_graphql_reports_missing_navigation_scopes_for_menus_access_denied():
     client = ShopifyApiClient()
 
