@@ -679,7 +679,10 @@ export function BrandDesignSystemPage() {
   const generateShopifyThemeTemplateImages = useGenerateClientShopifyThemeTemplateImages(workspace?.id);
   const publishShopifyThemeTemplateDraft = usePublishClientShopifyThemeTemplateDraft(workspace?.id);
   const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
-  const { data: shopifyThemeTemplateDrafts = [] } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
+  const {
+    data: shopifyThemeTemplateDrafts = [],
+    refetch: refetchShopifyThemeTemplateDrafts,
+  } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
   const auditShopifyThemeBrand = useAuditClientShopifyThemeBrand(workspace?.id);
   const { data: workspaceProducts = [] } = useProducts(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
@@ -886,6 +889,10 @@ export function BrandDesignSystemPage() {
       })),
     [shopifyThemeTemplateDrafts]
   );
+  const selectedTemplateDraftStorageKey = useMemo(() => {
+    if (!workspace?.id) return "";
+    return `workspace:${workspace.id}:shopify:template-draft-id`;
+  }, [workspace?.id]);
 
   useEffect(() => {
     if (!shopifyThemeTemplateDrafts.length) {
@@ -893,10 +900,36 @@ export function BrandDesignSystemPage() {
       return;
     }
     setSelectedTemplateDraftId((current) => {
-      if (current && shopifyThemeTemplateDrafts.some((draft) => draft.id === current)) return current;
+      const normalizedCurrent = current.trim();
+      if (
+        normalizedCurrent &&
+        shopifyThemeTemplateDrafts.some((draft) => draft.id === normalizedCurrent)
+      ) {
+        return normalizedCurrent;
+      }
+      if (typeof window !== "undefined" && selectedTemplateDraftStorageKey) {
+        const storedDraftId = window.localStorage.getItem(selectedTemplateDraftStorageKey) || "";
+        const normalizedStoredDraftId = storedDraftId.trim();
+        if (
+          normalizedStoredDraftId &&
+          shopifyThemeTemplateDrafts.some((draft) => draft.id === normalizedStoredDraftId)
+        ) {
+          return normalizedStoredDraftId;
+        }
+      }
       return shopifyThemeTemplateDrafts[0]?.id || "";
     });
-  }, [shopifyThemeTemplateDrafts]);
+  }, [shopifyThemeTemplateDrafts, selectedTemplateDraftStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !selectedTemplateDraftStorageKey) return;
+    const normalizedDraftId = selectedTemplateDraftId.trim();
+    if (!normalizedDraftId) {
+      window.localStorage.removeItem(selectedTemplateDraftStorageKey);
+      return;
+    }
+    window.localStorage.setItem(selectedTemplateDraftStorageKey, normalizedDraftId);
+  }, [selectedTemplateDraftId, selectedTemplateDraftStorageKey]);
 
   const selectedTemplateDraft = useMemo(
     () => shopifyThemeTemplateDrafts.find((draft) => draft.id === selectedTemplateDraftId) ?? null,
@@ -1310,24 +1343,30 @@ export function BrandDesignSystemPage() {
     if (parsedSlotPathList.value.length) payload.slotPaths = parsedSlotPathList.value;
     setTemplateDraftEditError(null);
 
-    try {
-      const response = await generateShopifyThemeTemplateImages.mutateAsync(payload);
-      setSelectedTemplateDraftId(response.draft.id);
-      setTemplateDraftImageMapInput(
-        JSON.stringify(response.version.data.componentImageAssetMap || {}, null, 2)
-      );
-      setTemplateDraftTextValuesInput(
-        JSON.stringify(response.version.data.componentTextValues || {}, null, 2)
-      );
-      const generatedProductId = response.version.data.productId?.trim();
-      if (generatedProductId) {
-        setTemplateAssetUploadProductId(generatedProductId);
-      }
-      setTemplateDraftEditError(null);
-      await refetchWorkspaceImageAssets();
-    } catch {
-      // Error toast is emitted by the mutation hook.
+    const response = await generateShopifyThemeTemplateImages.mutateAsync(payload);
+    const draftsResponse = await refetchShopifyThemeTemplateDrafts();
+    const refreshedDrafts = draftsResponse.data || [];
+    const refreshedDraft = refreshedDrafts.find((draft) => draft.id === response.draft.id);
+    if (!refreshedDraft?.latestVersion) {
+      const errorMessage =
+        "Generated images were not persisted to the template draft. Refresh and retry generation.";
+      setTemplateDraftEditError(errorMessage);
+      toast.error(errorMessage);
+      return;
     }
+    setSelectedTemplateDraftId(refreshedDraft.id);
+    setTemplateDraftImageMapInput(
+      JSON.stringify(refreshedDraft.latestVersion.data.componentImageAssetMap || {}, null, 2)
+    );
+    setTemplateDraftTextValuesInput(
+      JSON.stringify(refreshedDraft.latestVersion.data.componentTextValues || {}, null, 2)
+    );
+    const generatedProductId = refreshedDraft.latestVersion.data.productId?.trim();
+    if (generatedProductId) {
+      setTemplateAssetUploadProductId(generatedProductId);
+    }
+    setTemplateDraftEditError(null);
+    await refetchWorkspaceImageAssets();
   };
 
   const handleClearTemplateDraftImageMappings = async () => {

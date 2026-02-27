@@ -1089,9 +1089,6 @@ def _generate_theme_sync_ai_image_assets(
     selected_slots = _select_theme_sync_slots_for_ai_generation(image_slots=image_slots)
     if not selected_slots:
         return [], [], {}, [], {}
-    requested_image_model, requested_image_model_source = (
-        resolve_funnel_image_model_config()
-    )
     slot_text_hints = _build_theme_sync_image_slot_text_hints(
         image_slots=selected_slots,
         text_slots=text_slots or [],
@@ -1248,13 +1245,7 @@ def _generate_theme_sync_ai_image_assets(
             "totalImageSlots": total_slots,
             "completedImageSlots": 0,
             "generatedImageCount": 0,
-            "fallbackImageCount": 0,
             "skippedImageCount": 0,
-            "promptTokenCountTotal": 0,
-            "promptTokenCountBySlotPath": {},
-            "requestedImageModel": requested_image_model,
-            "requestedImageModelSource": requested_image_model_source,
-            "referenceAssetPublicId": reference_asset_public_id,
         }
     )
 
@@ -1279,10 +1270,7 @@ def _generate_theme_sync_ai_image_assets(
     outcomes_by_path: dict[str, dict[str, Any]] = {}
     completed_count = 0
     generated_count = 0
-    fallback_count = 0
     skipped_count = 0
-    prompt_token_count_total = 0
-    prompt_token_count_by_slot_path: dict[str, int] = {}
     if max_workers == 1:
         hard_quota_exhausted = False
         hard_quota_slot_path: str | None = None
@@ -1307,21 +1295,8 @@ def _generate_theme_sync_ai_image_assets(
                 }
             outcomes_by_path[slot_path] = outcome
             completed_count += 1
-            slot_prompt_token_count: int | None = None
-            generated_asset = outcome.get("asset")
-            if generated_asset is not None:
-                raw_ai_metadata = getattr(generated_asset, "ai_metadata", None)
-                if isinstance(raw_ai_metadata, dict):
-                    slot_prompt_token_count = _coerce_non_negative_int(
-                        raw_ai_metadata.get("promptTokenCount")
-                    )
-                    if slot_prompt_token_count is not None:
-                        prompt_token_count_by_slot_path[slot_path] = slot_prompt_token_count
-                        prompt_token_count_total += slot_prompt_token_count
             if outcome.get("asset") is not None:
-                if outcome.get("source") == "unsplash":
-                    fallback_count += 1
-                else:
+                if outcome.get("source") != "unsplash":
                     generated_count += 1
             elif outcome.get("rateLimited"):
                 skipped_count += 1
@@ -1332,16 +1307,7 @@ def _generate_theme_sync_ai_image_assets(
                     "totalImageSlots": total_slots,
                     "completedImageSlots": completed_count,
                     "generatedImageCount": generated_count,
-                    "fallbackImageCount": fallback_count,
                     "skippedImageCount": skipped_count,
-                    "currentSlotPath": slot_path,
-                    "currentSlotSource": outcome.get("source"),
-                    "currentSlotPromptTokenCount": slot_prompt_token_count,
-                    "promptTokenCountTotal": prompt_token_count_total,
-                    "promptTokenCountBySlotPath": dict(prompt_token_count_by_slot_path),
-                    "requestedImageModel": requested_image_model,
-                    "requestedImageModelSource": requested_image_model_source,
-                    "referenceAssetPublicId": reference_asset_public_id,
                 }
             )
             if stop_on_quota_exhausted and outcome.get("quotaExhausted"):
@@ -1393,21 +1359,8 @@ def _generate_theme_sync_ai_image_assets(
                     }
                 outcomes_by_path[slot_path] = outcome
                 completed_count += 1
-                slot_prompt_token_count: int | None = None
-                generated_asset = outcome.get("asset")
-                if generated_asset is not None:
-                    raw_ai_metadata = getattr(generated_asset, "ai_metadata", None)
-                    if isinstance(raw_ai_metadata, dict):
-                        slot_prompt_token_count = _coerce_non_negative_int(
-                            raw_ai_metadata.get("promptTokenCount")
-                        )
-                        if slot_prompt_token_count is not None:
-                            prompt_token_count_by_slot_path[slot_path] = slot_prompt_token_count
-                            prompt_token_count_total += slot_prompt_token_count
                 if outcome.get("asset") is not None:
-                    if outcome.get("source") == "unsplash":
-                        fallback_count += 1
-                    else:
+                    if outcome.get("source") != "unsplash":
                         generated_count += 1
                 elif outcome.get("rateLimited"):
                     skipped_count += 1
@@ -1418,16 +1371,7 @@ def _generate_theme_sync_ai_image_assets(
                         "totalImageSlots": total_slots,
                         "completedImageSlots": completed_count,
                         "generatedImageCount": generated_count,
-                        "fallbackImageCount": fallback_count,
                         "skippedImageCount": skipped_count,
-                        "currentSlotPath": slot_path,
-                        "currentSlotSource": outcome.get("source"),
-                        "currentSlotPromptTokenCount": slot_prompt_token_count,
-                        "promptTokenCountTotal": prompt_token_count_total,
-                        "promptTokenCountBySlotPath": dict(prompt_token_count_by_slot_path),
-                        "requestedImageModel": requested_image_model,
-                        "requestedImageModelSource": requested_image_model_source,
-                        "referenceAssetPublicId": reference_asset_public_id,
                     }
                 )
 

@@ -256,18 +256,7 @@ type ClientShopifyThemeBrandSyncJobProgress = {
   totalImageSlots?: number | null;
   completedImageSlots?: number | null;
   generatedImageCount?: number | null;
-  fallbackImageCount?: number | null;
   skippedImageCount?: number | null;
-  requestedImageModel?: string | null;
-  requestedImageModelSource?: string | null;
-  currentSlotPromptTokenCount?: number | null;
-  promptTokenCountTotal?: number | null;
-  promptTokenCountBySlotPath?: Record<string, number> | null;
-  totalTextSlots?: number | null;
-  componentImageUrlCount?: number | null;
-  componentTextValueCount?: number | null;
-  currentSlotPath?: string | null;
-  currentSlotSource?: string | null;
   updatedAt?: string | null;
 };
 

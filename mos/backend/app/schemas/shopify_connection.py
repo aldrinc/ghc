@@ -214,20 +214,14 @@ class ShopifyThemeBrandSyncJobStartResponse(BaseModel):
 
 
 class ShopifyThemeBrandSyncJobProgress(BaseModel):
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="ignore")
 
     stage: str | None = None
     message: str | None = None
     totalImageSlots: int | None = None
     completedImageSlots: int | None = None
     generatedImageCount: int | None = None
-    fallbackImageCount: int | None = None
     skippedImageCount: int | None = None
-    totalTextSlots: int | None = None
-    componentImageUrlCount: int | None = None
-    componentTextValueCount: int | None = None
-    currentSlotPath: str | None = None
-    currentSlotSource: str | None = None
     updatedAt: str | None = None
 
 
