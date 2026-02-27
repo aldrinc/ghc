@@ -531,6 +531,47 @@ function parseStringMap(raw: string, label: string): { value?: Record<string, st
   }
 }
 
+function buildImageSlotPathOrder(slots: ClientShopifyThemeTemplateImageSlot[]): string[] {
+  const orderedPaths: string[] = [];
+  const seenPaths = new Set<string>();
+  for (const slot of slots) {
+    const path = typeof slot.path === "string" ? slot.path.trim() : "";
+    if (!path || seenPaths.has(path)) continue;
+    seenPaths.add(path);
+    orderedPaths.push(path);
+  }
+  return orderedPaths;
+}
+
+function orderStringMapByPreferredPaths(
+  source: Record<string, string>,
+  preferredPaths: string[]
+): Record<string, string> {
+  const ordered: Record<string, string> = {};
+  const seenPaths = new Set<string>();
+
+  for (const rawPath of preferredPaths) {
+    const path = rawPath.trim();
+    if (!path || seenPaths.has(path)) continue;
+    if (!Object.prototype.hasOwnProperty.call(source, path)) continue;
+    const rawValue = source[path];
+    const value = typeof rawValue === "string" ? rawValue.trim() : "";
+    if (!value) continue;
+    ordered[path] = value;
+    seenPaths.add(path);
+  }
+
+  for (const [rawPath, rawValue] of Object.entries(source)) {
+    const path = rawPath.trim();
+    const value = typeof rawValue === "string" ? rawValue.trim() : "";
+    if (!path || !value || seenPaths.has(path)) continue;
+    ordered[path] = value;
+    seenPaths.add(path);
+  }
+
+  return ordered;
+}
+
 function parseSlotPathList(raw: string): { value?: string[]; error?: string } {
   if (!raw.trim()) return { value: [] };
   const normalized: string[] = [];
@@ -944,8 +985,13 @@ export function BrandDesignSystemPage() {
       setTemplateDraftEditError(null);
       return;
     }
+    const imageSlotPathOrder = buildImageSlotPathOrder(latestVersion.data.imageSlots);
+    const orderedImageMap = orderStringMapByPreferredPaths(
+      latestVersion.data.componentImageAssetMap || {},
+      imageSlotPathOrder
+    );
     setTemplateDraftImageMapInput(
-      JSON.stringify(latestVersion.data.componentImageAssetMap || {}, null, 2)
+      JSON.stringify(orderedImageMap, null, 2)
     );
     setTemplateDraftTextValuesInput(
       JSON.stringify(latestVersion.data.componentTextValues || {}, null, 2)
@@ -1101,6 +1147,11 @@ export function BrandDesignSystemPage() {
     if (!latestVersion) return new Map<string, string>();
     return buildImageSlotReadableLabelMap(latestVersion.data.imageSlots);
   }, [selectedTemplateDraft?.latestVersion?.id]);
+  const templateImageSlotPathOrder = useMemo(() => {
+    const latestVersion = selectedTemplateDraft?.latestVersion;
+    if (!latestVersion) return [] as string[];
+    return buildImageSlotPathOrder(latestVersion.data.imageSlots);
+  }, [selectedTemplateDraft?.latestVersion?.id]);
   const templateTextSlotReadableLabelByPath = useMemo(() => {
     const latestVersion = selectedTemplateDraft?.latestVersion;
     if (!latestVersion) return new Map<string, string>();
@@ -1109,7 +1160,11 @@ export function BrandDesignSystemPage() {
   const mappedTemplateImageSlotEntries = useMemo(() => {
     const latestVersion = selectedTemplateDraft?.latestVersion;
     const slotByPath = new Map((latestVersion?.data.imageSlots || []).map((slot) => [slot.path, slot]));
-    return Object.entries(parsedTemplateDraftImageMap)
+    const orderedImageMap = orderStringMapByPreferredPaths(
+      parsedTemplateDraftImageMap,
+      templateImageSlotPathOrder
+    );
+    return Object.entries(orderedImageMap)
       .filter(([path, assetPublicId]) => path.trim() && typeof assetPublicId === "string" && assetPublicId.trim())
       .map(([path, assetPublicId]) => {
         const slot = slotByPath.get(path);
@@ -1123,11 +1178,11 @@ export function BrandDesignSystemPage() {
           role: slot?.role || "",
           recommendedAspect: slot?.recommendedAspect || "",
         };
-      })
-      .sort((a, b) => a.path.localeCompare(b.path));
+      });
   }, [
     parsedTemplateDraftImageMap,
     selectedTemplateDraft?.latestVersion?.id,
+    templateImageSlotPathOrder,
     templateImageSlotReadableLabelByPath,
   ]);
   const templatePreviewImageItems = useMemo(() => {
@@ -1298,11 +1353,15 @@ export function BrandDesignSystemPage() {
     componentTextValues: Record<string, string>;
   }) => {
     if (!workspace?.id || !selectedTemplateDraftId) return;
+    const orderedImageMap = orderStringMapByPreferredPaths(
+      componentImageAssetMap,
+      templateImageSlotPathOrder
+    );
     try {
       await updateShopifyThemeTemplateDraft.mutateAsync({
         draftId: selectedTemplateDraftId,
         payload: {
-          componentImageAssetMap,
+          componentImageAssetMap: orderedImageMap,
           componentTextValues,
         },
         suppressSuccessToast: true,
@@ -1348,8 +1407,15 @@ export function BrandDesignSystemPage() {
       return;
     }
     setSelectedTemplateDraftId(refreshedDraft.id);
+    const refreshedImageSlotPathOrder = buildImageSlotPathOrder(
+      refreshedDraft.latestVersion.data.imageSlots
+    );
+    const refreshedOrderedImageMap = orderStringMapByPreferredPaths(
+      refreshedDraft.latestVersion.data.componentImageAssetMap || {},
+      refreshedImageSlotPathOrder
+    );
     setTemplateDraftImageMapInput(
-      JSON.stringify(refreshedDraft.latestVersion.data.componentImageAssetMap || {}, null, 2)
+      JSON.stringify(refreshedOrderedImageMap, null, 2)
     );
     setTemplateDraftTextValuesInput(
       JSON.stringify(refreshedDraft.latestVersion.data.componentTextValues || {}, null, 2)
@@ -1404,16 +1470,20 @@ export function BrandDesignSystemPage() {
     }
     const nextImageMap = { ...parsedImageMap.value };
     delete nextImageMap[normalizedSlotPath];
+    const orderedNextImageMap = orderStringMapByPreferredPaths(
+      nextImageMap,
+      templateImageSlotPathOrder
+    );
     setClearingTemplateDraftImageSlotPath(normalizedSlotPath);
     try {
       await updateShopifyThemeTemplateDraft.mutateAsync({
         draftId: selectedTemplateDraftId,
         payload: {
-          componentImageAssetMap: nextImageMap,
+          componentImageAssetMap: orderedNextImageMap,
           notes: `Cleared mapped image slot: ${normalizedSlotPath}`,
         },
       });
-      setTemplateDraftImageMapInput(JSON.stringify(nextImageMap, null, 2));
+      setTemplateDraftImageMapInput(JSON.stringify(orderedNextImageMap, null, 2));
       setTemplateSlotAssetQueryByPath((current) => {
         if (!Object.prototype.hasOwnProperty.call(current, normalizedSlotPath)) return current;
         const next = { ...current };
@@ -1446,10 +1516,14 @@ export function BrandDesignSystemPage() {
     } else {
       delete nextImageMap[path];
     }
-    setTemplateDraftImageMapInput(JSON.stringify(nextImageMap, null, 2));
+    const orderedNextImageMap = orderStringMapByPreferredPaths(
+      nextImageMap,
+      templateImageSlotPathOrder
+    );
+    setTemplateDraftImageMapInput(JSON.stringify(orderedNextImageMap, null, 2));
     setTemplateDraftEditError(null);
     void persistTemplateDraftEdits({
-      componentImageAssetMap: nextImageMap,
+      componentImageAssetMap: orderedNextImageMap,
       componentTextValues: parsedTextValues.value,
     });
   };
