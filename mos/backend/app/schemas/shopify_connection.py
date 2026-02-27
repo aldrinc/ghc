@@ -372,6 +372,8 @@ class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):
     draft: ShopifyThemeTemplateDraftResponse
     version: ShopifyThemeTemplateDraftVersionResponse
     generatedImageCount: int
+    generatedTextCount: int = 0
+    copyAgentModel: str | None = None
     requestedImageModel: str | None = None
     requestedImageModelSource: str | None = None
     generatedSlotPaths: list[str] = Field(default_factory=list)

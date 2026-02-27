@@ -1290,31 +1290,24 @@ export function BrandDesignSystemPage() {
     await refetchShopifyStatus();
   };
 
-  const handleSaveTemplateDraftEdits = async () => {
-    if (!workspace?.id) return;
-    if (!selectedTemplateDraftId) {
-      toast.error("Select a template draft first.");
-      return;
-    }
-    const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
-    if (!parsedImageMap.value) {
-      setTemplateDraftEditError(parsedImageMap.error || "Invalid image map.");
-      return;
-    }
-    const parsedTextValues = parseStringMap(templateDraftTextValuesInput, "Text values");
-    if (!parsedTextValues.value) {
-      setTemplateDraftEditError(parsedTextValues.error || "Invalid text values.");
-      return;
-    }
-    setTemplateDraftEditError(null);
+  const persistTemplateDraftEdits = async ({
+    componentImageAssetMap,
+    componentTextValues,
+  }: {
+    componentImageAssetMap: Record<string, string>;
+    componentTextValues: Record<string, string>;
+  }) => {
+    if (!workspace?.id || !selectedTemplateDraftId) return;
     try {
       await updateShopifyThemeTemplateDraft.mutateAsync({
         draftId: selectedTemplateDraftId,
         payload: {
-          componentImageAssetMap: parsedImageMap.value,
-          componentTextValues: parsedTextValues.value,
+          componentImageAssetMap,
+          componentTextValues,
         },
+        suppressSuccessToast: true,
       });
+      setTemplateDraftEditError(null);
     } catch {
       // Error toast is emitted by the mutation hook.
     }
@@ -1441,6 +1434,11 @@ export function BrandDesignSystemPage() {
       setTemplateDraftEditError(parsedImageMap.error || "Invalid image map.");
       return;
     }
+    const parsedTextValues = parseStringMap(templateDraftTextValuesInput, "Text values");
+    if (!parsedTextValues.value) {
+      setTemplateDraftEditError(parsedTextValues.error || "Invalid text values.");
+      return;
+    }
     const nextImageMap = { ...parsedImageMap.value };
     const cleanedAssetPublicId = assetPublicId.trim();
     if (cleanedAssetPublicId) {
@@ -1450,9 +1448,18 @@ export function BrandDesignSystemPage() {
     }
     setTemplateDraftImageMapInput(JSON.stringify(nextImageMap, null, 2));
     setTemplateDraftEditError(null);
+    void persistTemplateDraftEdits({
+      componentImageAssetMap: nextImageMap,
+      componentTextValues: parsedTextValues.value,
+    });
   };
 
   const handleTemplateDraftSlotTextValueChange = (path: string, nextValue: string) => {
+    const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
+    if (!parsedImageMap.value) {
+      setTemplateDraftEditError(parsedImageMap.error || "Invalid image map.");
+      return;
+    }
     const parsedTextValues = parseStringMap(templateDraftTextValuesInput, "Text values");
     if (!parsedTextValues.value) {
       setTemplateDraftEditError(parsedTextValues.error || "Invalid text values.");
@@ -1466,6 +1473,10 @@ export function BrandDesignSystemPage() {
     }
     setTemplateDraftTextValuesInput(JSON.stringify(nextTextValues, null, 2));
     setTemplateDraftEditError(null);
+    void persistTemplateDraftEdits({
+      componentImageAssetMap: parsedImageMap.value,
+      componentTextValues: nextTextValues,
+    });
   };
 
   const handleTemplateImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2349,17 +2360,9 @@ export function BrandDesignSystemPage() {
                   }}
                   disabled={generateShopifyThemeTemplateImages.isPending}
                 >
-                  {generateShopifyThemeTemplateImages.isPending ? "Generating…" : "Generate template images"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    void handleSaveTemplateDraftEdits();
-                  }}
-                  disabled={updateShopifyThemeTemplateDraft.isPending}
-                >
-                  {updateShopifyThemeTemplateDraft.isPending ? "Saving…" : "Save draft edits"}
+                  {generateShopifyThemeTemplateImages.isPending
+                    ? "Generating…"
+                    : "Generate template images + text"}
                 </Button>
                 <Button
                   size="sm"
@@ -2394,7 +2397,7 @@ export function BrandDesignSystemPage() {
               </div>
               <div className="text-xs text-content-muted">
                 Slots: {selectedTemplateDraft.latestVersion.data.imageSlots.length} image ·{" "}
-                {selectedTemplateDraft.latestVersion.data.textSlots.length} text
+                {selectedTemplateDraft.latestVersion.data.textSlots.length} text · Draft edits auto-save
               </div>
             </div>
           ) : null}

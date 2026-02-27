@@ -218,6 +218,8 @@ export type ClientShopifyThemeTemplateGenerateImagesResponse = {
   draft: ClientShopifyThemeTemplateDraft;
   version: ClientShopifyThemeTemplateDraftVersion;
   generatedImageCount: number;
+  generatedTextCount: number;
+  copyAgentModel?: string | null;
   requestedImageModel?: string | null;
   requestedImageModelSource?: string | null;
   generatedSlotPaths: string[];
@@ -655,9 +657,11 @@ export function useUpdateClientShopifyThemeTemplateDraft(clientId?: string) {
     mutationFn: async ({
       draftId,
       payload,
+      suppressSuccessToast,
     }: {
       draftId: string;
       payload: ClientShopifyThemeTemplateDraftUpdatePayload;
+      suppressSuccessToast?: boolean;
     }) => {
       if (!clientId) throw new Error("Client ID is required.");
       if (!draftId?.trim()) throw new Error("Draft ID is required.");
@@ -669,8 +673,10 @@ export function useUpdateClientShopifyThemeTemplateDraft(clientId?: string) {
         },
       );
     },
-    onSuccess: () => {
-      toast.success("Template draft updated");
+    onSuccess: (_response, vars) => {
+      if (!vars.suppressSuccessToast) {
+        toast.success("Template draft updated");
+      }
       queryClient.invalidateQueries({
         queryKey: ["clients", "shopify-theme-template-drafts", clientId],
       });
@@ -702,11 +708,43 @@ export function usePublishClientShopifyThemeTemplateDraft(clientId?: string) {
       const pollTimeoutMs = 1000 * 60 * 20;
       const pollIntervalMs = 2000;
       const startedAt = Date.now();
+      const maxConsecutiveTransientFailures = 8;
+      let consecutiveTransientFailures = 0;
 
       while (true) {
-        const statusResponse = await get<ClientShopifyThemeTemplatePublishJobStatusResponse>(
-          `/clients/${clientId}/shopify/theme/brand/template/publish-jobs/${publishJobId}`,
-        );
+        let statusResponse: ClientShopifyThemeTemplatePublishJobStatusResponse;
+        try {
+          statusResponse = await get<ClientShopifyThemeTemplatePublishJobStatusResponse>(
+            `/clients/${clientId}/shopify/theme/brand/template/publish-jobs/${publishJobId}`,
+          );
+          consecutiveTransientFailures = 0;
+        } catch (err) {
+          const statusCode =
+            typeof err === "object" && err !== null && "status" in err
+              ? (err as { status?: unknown }).status
+              : undefined;
+          const isTransientFailure =
+            statusCode === 0 ||
+            statusCode === 502 ||
+            statusCode === 503 ||
+            statusCode === 504;
+          if (!isTransientFailure) {
+            throw err;
+          }
+          consecutiveTransientFailures += 1;
+          if (Date.now() - startedAt > pollTimeoutMs) {
+            throw new Error("Timed out waiting for Shopify template publish to complete.");
+          }
+          if (consecutiveTransientFailures >= maxConsecutiveTransientFailures) {
+            throw new Error(
+              "Unable to reach publish status endpoint after multiple attempts. " +
+                "The publish job may still be running; refresh and check draft publish status.",
+            );
+          }
+          const retryDelayMs = Math.min(10000, pollIntervalMs * consecutiveTransientFailures);
+          await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+          continue;
+        }
         if (statusResponse.status === "succeeded") {
           if (statusResponse.result) return statusResponse.result;
           throw new Error("Shopify template publish completed but no result payload was returned.");
@@ -777,13 +815,20 @@ export function useGenerateClientShopifyThemeTemplateImages(clientId?: string) {
       }
     },
     onSuccess: (response) => {
+      const textSummary =
+        response.generatedTextCount > 0
+          ? ` Refreshed ${response.generatedTextCount} text slot(s).`
+          : "";
       if (response.remainingSlotPaths.length) {
         toast.success(
           `Generated ${response.generatedImageCount} template image(s). ` +
-            `${response.remainingSlotPaths.length} slot(s) still pending.`,
+            `${response.remainingSlotPaths.length} slot(s) still pending.` +
+            textSummary,
         );
       } else {
-        toast.success(`Generated ${response.generatedImageCount} template image(s)`);
+        toast.success(
+          `Generated ${response.generatedImageCount} template image(s).` + textSummary,
+        );
       }
       queryClient.invalidateQueries({
         queryKey: ["clients", "shopify-theme-template-drafts", clientId],

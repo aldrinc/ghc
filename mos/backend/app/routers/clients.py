@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 import logging
 import os
 import re
+import threading
 import time
 from typing import Any
 from uuid import UUID, uuid4
@@ -98,6 +99,9 @@ from app.services.shopify_connection import (
     normalize_shop_domain,
     set_client_shopify_storefront_token,
     sync_client_shopify_theme_brand,
+)
+from app.services.shopify_theme_copy_agent import (
+    generate_shopify_theme_component_copy,
 )
 from app.services.shopify_theme_content_planner import (
     plan_shopify_theme_component_content,
@@ -506,6 +510,77 @@ def _build_theme_copy_planner_kwargs(*, copy_settings: dict[str, Any]) -> dict[s
     if isinstance(locale, str) and locale.strip():
         planner_kwargs["locale"] = locale.strip()
     return planner_kwargs
+
+
+def _resolve_theme_copy_settings_from_template_metadata(
+    *,
+    metadata: dict[str, Any],
+) -> dict[str, Any]:
+    raw_tone_guidelines = metadata.get("copyToneGuidelines")
+    raw_must_avoid_claims = metadata.get("copyMustAvoidClaims")
+    raw_cta_style = metadata.get("copyCtaStyle")
+    raw_reading_level = metadata.get("copyReadingLevel")
+    raw_locale = metadata.get("copyLocale")
+    if raw_tone_guidelines is not None and not isinstance(raw_tone_guidelines, list):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Stored Shopify template draft copy settings are invalid. "
+                "copyToneGuidelines must be a list when present."
+            ),
+        )
+    if raw_must_avoid_claims is not None and not isinstance(raw_must_avoid_claims, list):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Stored Shopify template draft copy settings are invalid. "
+                "copyMustAvoidClaims must be a list when present."
+            ),
+        )
+    if raw_cta_style is not None and not isinstance(raw_cta_style, str):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Stored Shopify template draft copy settings are invalid. "
+                "copyCtaStyle must be a string when present."
+            ),
+        )
+    if raw_reading_level is not None and not isinstance(raw_reading_level, str):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Stored Shopify template draft copy settings are invalid. "
+                "copyReadingLevel must be a string when present."
+            ),
+        )
+    if raw_locale is not None and not isinstance(raw_locale, str):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Stored Shopify template draft copy settings are invalid. "
+                "copyLocale must be a string when present."
+            ),
+        )
+    try:
+        return _normalize_theme_copy_settings(
+            tone_guidelines=raw_tone_guidelines,
+            must_avoid_claims=raw_must_avoid_claims,
+            cta_style=raw_cta_style,
+            reading_level=raw_reading_level,
+            locale=raw_locale,
+        )
+    except HTTPException as exc:
+        detail_payload = _serialize_http_exception_detail(exc.detail)
+        detail_message = detail_payload.get("message")
+        if not isinstance(detail_message, str) or not detail_message.strip():
+            detail_message = "Stored copy settings are invalid."
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Stored Shopify template draft copy settings are invalid. "
+                f"{detail_message}"
+            ),
+        ) from exc
 
 
 def _resolve_workspace_brand_description(
@@ -2541,6 +2616,7 @@ def _generate_shopify_theme_template_draft_images(
     auth: AuthContext,
     session: Session,
     image_generation_max_concurrency: int | None = None,
+    generate_text: bool = True,
 ) -> ShopifyThemeTemplateGenerateImagesResponse:
     drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
     draft = drafts_repo.get(
@@ -2569,10 +2645,10 @@ def _generate_shopify_theme_template_draft_images(
         if isinstance(slot.path, str) and slot.path.strip()
     ]
     text_slots = [slot.model_dump(mode="json") for slot in latest_data.textSlots]
-    if not image_slots:
+    if not image_slots and not text_slots:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Template draft has no image slots available for generation.",
+            detail="Template draft has no image or text slots available for generation.",
         )
     requested_image_model, requested_image_model_source = resolve_funnel_image_model_config()
 
@@ -2606,6 +2682,8 @@ def _generate_shopify_theme_template_draft_images(
         generation_scope_slot_path_set = set(all_slot_paths)
         generation_scope_slot_paths = list(all_slot_paths)
     next_component_image_asset_map = dict(latest_data.componentImageAssetMap)
+    next_component_text_values = dict(latest_data.componentTextValues)
+    latest_metadata = dict(latest_data.metadata or {})
     mapped_slot_paths = {
         raw_path.strip()
         for raw_path, raw_asset_public_id in next_component_image_asset_map.items()
@@ -2622,7 +2700,9 @@ def _generate_shopify_theme_template_draft_images(
         and str(slot.get("path")).strip() in generation_scope_slot_path_set
         and str(slot.get("path")).strip() not in mapped_slot_paths
     ]
-    if not image_slots_pending_generation:
+    should_generate_images = bool(image_slots_pending_generation)
+    should_generate_text = bool(text_slots) and generate_text
+    if not should_generate_images and not should_generate_text:
         serialized_draft = _serialize_shopify_theme_template_draft(
             draft=draft,
             latest_version=latest_version,
@@ -2634,6 +2714,8 @@ def _generate_shopify_theme_template_draft_images(
             draft=serialized_draft,
             version=serialized_version,
             generatedImageCount=0,
+            generatedTextCount=0,
+            copyAgentModel=None,
             requestedImageModel=requested_image_model,
             requestedImageModelSource=requested_image_model_source,
             generatedSlotPaths=[],
@@ -2659,8 +2741,8 @@ def _generate_shopify_theme_template_draft_images(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "Template image generation requires a productId so generated assets can be attached "
-                "to a workspace product."
+                "Template image and copy generation requires a productId so assets and copy can "
+                "be generated for a workspace product."
             ),
         )
 
@@ -2683,79 +2765,84 @@ def _generate_shopify_theme_template_draft_images(
         org_id=auth.org_id,
         client_id=client_id,
     )
-    default_general_context = _build_theme_sync_default_general_prompt_context(
-        draft_data=latest_data,
-        product=resolved_product,
-        brand_description=workspace_brand_description,
-    )
-    default_slot_context_by_path = _build_theme_sync_default_slot_prompt_context_by_path(
-        image_slots=image_slots,
-        text_slots=text_slots,
-        component_text_values=latest_data.componentTextValues,
-    )
-    effective_general_context = default_general_context
-    effective_slot_context_by_path = dict(default_slot_context_by_path)
-    product_reference_image = _resolve_theme_sync_product_reference_image(
-        session=session,
-        org_id=auth.org_id,
-        client_id=client_id,
-        product=resolved_product,
-    )
+    rate_limited_slot_paths: list[str] = []
+    quota_exhausted_slot_paths: list[str] = []
+    slot_error_by_path: dict[str, str] = {}
+    generated_asset_by_slot_path: dict[str, Any] = {}
+    if should_generate_images:
+        default_general_context = _build_theme_sync_default_general_prompt_context(
+            draft_data=latest_data,
+            product=resolved_product,
+            brand_description=workspace_brand_description,
+        )
+        default_slot_context_by_path = _build_theme_sync_default_slot_prompt_context_by_path(
+            image_slots=image_slots,
+            text_slots=text_slots,
+            component_text_values=latest_data.componentTextValues,
+        )
+        effective_general_context = default_general_context
+        effective_slot_context_by_path = dict(default_slot_context_by_path)
+        product_reference_image = _resolve_theme_sync_product_reference_image(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            product=resolved_product,
+        )
 
-    _emit_theme_sync_progress(
-        {
-            "stage": "image_generation",
-            "message": (
-                "Generating template images from deterministic slot requirements."
-                if not requested_slot_paths
-                else (
-                    "Generating template images from deterministic slot requirements "
-                    f"for {len(requested_slot_paths)} selected slot(s)."
-                )
-            ),
-            "totalImageSlots": len(image_slots_pending_generation),
-            "completedImageSlots": 0,
-            "generatedImageCount": 0,
-            "fallbackImageCount": 0,
-            "skippedImageCount": 0,
-        }
-    )
-    (
-        _,
-        rate_limited_slot_paths,
-        generated_asset_by_slot_path,
-        quota_exhausted_slot_paths,
-        slot_error_by_path,
-    ) = _generate_theme_sync_ai_image_assets(
-        session=session,
-        org_id=auth.org_id,
-        client_id=client_id,
-        product_id=resolved_product_id,
-        image_slots=image_slots_pending_generation,
-        text_slots=text_slots,
-        general_prompt_context=effective_general_context,
-        slot_prompt_context_by_path=effective_slot_context_by_path,
-        max_concurrency=image_generation_max_concurrency,
-        stop_on_quota_exhausted=True,
-        reference_image_bytes=product_reference_image["imageBytes"],
-        reference_image_mime_type=product_reference_image["mimeType"],
-        reference_asset_public_id=product_reference_image["assetPublicId"],
-        reference_asset_id=product_reference_image["assetId"],
-    )
-    rate_limited_slot_paths = sorted(
-        {
-            slot_path.strip()
-            for slot_path in rate_limited_slot_paths
-            if isinstance(slot_path, str) and slot_path.strip()
-        }
-    )
-    quota_exhausted_slot_paths = sorted(
-        {
-            slot_path.strip()
-            for slot_path in quota_exhausted_slot_paths
-            if isinstance(slot_path, str) and slot_path.strip()
-        }
-    )
+        _emit_theme_sync_progress(
+            {
+                "stage": "image_generation",
+                "message": (
+                    "Generating template images from deterministic slot requirements."
+                    if not requested_slot_paths
+                    else (
+                        "Generating template images from deterministic slot requirements "
+                        f"for {len(requested_slot_paths)} selected slot(s)."
+                    )
+                ),
+                "totalImageSlots": len(image_slots_pending_generation),
+                "completedImageSlots": 0,
+                "generatedImageCount": 0,
+                "fallbackImageCount": 0,
+                "skippedImageCount": 0,
+            }
+        )
+        (
+            _,
+            rate_limited_slot_paths,
+            generated_asset_by_slot_path,
+            quota_exhausted_slot_paths,
+            slot_error_by_path,
+        ) = _generate_theme_sync_ai_image_assets(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            product_id=resolved_product_id,
+            image_slots=image_slots_pending_generation,
+            text_slots=text_slots,
+            general_prompt_context=effective_general_context,
+            slot_prompt_context_by_path=effective_slot_context_by_path,
+            max_concurrency=image_generation_max_concurrency,
+            stop_on_quota_exhausted=True,
+            reference_image_bytes=product_reference_image["imageBytes"],
+            reference_image_mime_type=product_reference_image["mimeType"],
+            reference_asset_public_id=product_reference_image["assetPublicId"],
+            reference_asset_id=product_reference_image["assetId"],
+        )
+        rate_limited_slot_paths = sorted(
+            {
+                slot_path.strip()
+                for slot_path in rate_limited_slot_paths
+                if isinstance(slot_path, str) and slot_path.strip()
+            }
+        )
+        quota_exhausted_slot_paths = sorted(
+            {
+                slot_path.strip()
+                for slot_path in quota_exhausted_slot_paths
+                if isinstance(slot_path, str) and slot_path.strip()
+            }
+        )
     rate_limited_slot_path_set = set(rate_limited_slot_paths)
 
     generated_slot_paths: list[str] = []
@@ -2806,8 +2893,113 @@ def _generate_shopify_theme_template_draft_images(
             if isinstance(raw_file_source, str) and raw_file_source.strip():
                 image_source_by_slot_path[slot_path] = raw_file_source.strip()
 
+    generated_component_text_values: dict[str, str] = {}
+    copy_agent_model: str | None = None
+    if should_generate_text:
+        copy_settings = _resolve_theme_copy_settings_from_template_metadata(
+            metadata=latest_metadata
+        )
+        planner_copy_kwargs = _build_theme_copy_planner_kwargs(copy_settings=copy_settings)
+        offers = ProductOffersRepository(session).list_by_product(
+            product_id=str(resolved_product.id)
+        )
+        _emit_theme_sync_progress(
+            {
+                "stage": "planning_content",
+                "message": "Generating template copy for discovered text slots.",
+                "totalTextSlots": len(text_slots),
+            }
+        )
+        try:
+            copy_agent_output = generate_shopify_theme_component_copy(
+                product=resolved_product,
+                offers=offers,
+                text_slots=text_slots,
+                **planner_copy_kwargs,
+            )
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Theme copy agent failed for Shopify template generation. "
+                    f"productId={resolved_product_id}. {exc}"
+                ),
+            ) from exc
+
+        copy_text_values = copy_agent_output.get("componentTextValues")
+        if not isinstance(copy_text_values, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Theme copy agent returned an invalid componentTextValues payload.",
+            )
+        expected_text_slot_paths = {
+            str(slot.get("path")).strip()
+            for slot in text_slots
+            if isinstance(slot.get("path"), str) and str(slot.get("path")).strip()
+        }
+        for setting_path, value in copy_text_values.items():
+            if not isinstance(setting_path, str) or not setting_path.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Theme copy agent returned an invalid text mapping path.",
+                )
+            normalized_path = setting_path.strip()
+            if normalized_path not in expected_text_slot_paths:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Theme copy agent returned an unknown text slot path: "
+                        f"{normalized_path}."
+                    ),
+                )
+            if not isinstance(value, str) or not value.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Theme copy agent returned an invalid text value for path "
+                        f"{normalized_path}."
+                    ),
+                )
+            sanitized_value = _sanitize_theme_component_text_value(value)
+            if not sanitized_value:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Theme copy agent returned text that became empty after sanitization "
+                        f"for path {normalized_path}."
+                    ),
+                )
+            if normalized_path in generated_component_text_values:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Theme copy agent returned duplicate text mapping path "
+                        f"{normalized_path}."
+                    ),
+                )
+            generated_component_text_values[normalized_path] = sanitized_value
+        if expected_text_slot_paths != set(generated_component_text_values.keys()):
+            missing_paths = sorted(
+                expected_text_slot_paths - set(generated_component_text_values.keys())
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Theme copy agent did not assign all text slots: "
+                    + ", ".join(missing_paths)
+                    + "."
+                ),
+            )
+        next_component_text_values.update(generated_component_text_values)
+        copy_model_raw = copy_agent_output.get("model")
+        if isinstance(copy_model_raw, str) and copy_model_raw.strip():
+            copy_agent_model = copy_model_raw.strip()
+
     normalized_component_image_asset_map = (
         _normalize_theme_template_component_image_asset_map(next_component_image_asset_map)
+    )
+    normalized_component_text_values = _normalize_theme_template_component_text_values(
+        next_component_text_values
     )
     image_models = sorted(
         {
@@ -2825,7 +3017,7 @@ def _generate_shopify_theme_template_draft_images(
         }
     )
 
-    if not generated_slot_paths:
+    if not generated_slot_paths and not generated_component_text_values:
         serialized_draft = _serialize_shopify_theme_template_draft(
             draft=draft,
             latest_version=latest_version,
@@ -2837,6 +3029,8 @@ def _generate_shopify_theme_template_draft_images(
             draft=serialized_draft,
             version=serialized_version,
             generatedImageCount=0,
+            generatedTextCount=0,
+            copyAgentModel=None,
             requestedImageModel=requested_image_model,
             requestedImageModelSource=requested_image_model_source,
             generatedSlotPaths=[],
@@ -2851,15 +3045,15 @@ def _generate_shopify_theme_template_draft_images(
             slotErrorsByPath=slot_error_by_path,
         )
 
-    merged_metadata = dict(latest_data.metadata or {})
+    merged_metadata = dict(latest_metadata)
     merged_metadata.update(
         {
             "generatedImageCount": len(generated_slot_paths),
+            "generatedTextCount": len(generated_component_text_values),
             "rateLimitedSlotPaths": rate_limited_slot_paths,
             "remainingSlotPaths": remaining_slot_paths,
             "quotaExhaustedSlotPaths": quota_exhausted_slot_paths,
             "imageGenerationSlotCount": len(generated_slot_paths),
-            "imageGenerationGeneratedAt": datetime.now(timezone.utc).isoformat(),
             "imageModels": image_models,
             "imageModelBySlotPath": image_model_by_slot_path,
             "imageSourceBySlotPath": image_source_by_slot_path,
@@ -2867,8 +3061,16 @@ def _generate_shopify_theme_template_draft_images(
             "requestedImageModelSource": requested_image_model_source,
             "promptTokenCountBySlotPath": prompt_token_count_by_slot_path,
             "promptTokenCountTotal": prompt_token_count_total,
+            "componentImageAssetCount": len(normalized_component_image_asset_map),
+            "componentTextValueCount": len(normalized_component_text_values),
         }
     )
+    if should_generate_images:
+        merged_metadata["imageGenerationGeneratedAt"] = datetime.now(timezone.utc).isoformat()
+    if generated_component_text_values:
+        merged_metadata["copyGenerationGeneratedAt"] = datetime.now(timezone.utc).isoformat()
+    if isinstance(copy_agent_model, str) and copy_agent_model.strip():
+        merged_metadata["copyAgentModel"] = copy_agent_model.strip()
     if workspace_brand_description:
         merged_metadata[_THEME_IMAGE_PROMPT_METADATA_BRAND_DESCRIPTION_KEY] = (
             workspace_brand_description
@@ -2878,6 +3080,7 @@ def _generate_shopify_theme_template_draft_images(
         update={
             "productId": resolved_product_id,
             "componentImageAssetMap": normalized_component_image_asset_map,
+            "componentTextValues": normalized_component_text_values,
             "metadata": merged_metadata,
         }
     )
@@ -2899,6 +3102,8 @@ def _generate_shopify_theme_template_draft_images(
         draft=serialized_draft,
         version=serialized_version,
         generatedImageCount=len(generated_slot_paths),
+        generatedTextCount=len(generated_component_text_values),
+        copyAgentModel=copy_agent_model,
         requestedImageModel=requested_image_model,
         requestedImageModelSource=requested_image_model_source,
         generatedSlotPaths=sorted(generated_slot_paths),
@@ -3198,6 +3403,8 @@ def _generate_shopify_theme_template_draft_images_with_retry(
     publish_progress: Any,
 ) -> ShopifyThemeTemplateGenerateImagesResponse:
     aggregated_slot_paths: set[str] = set()
+    aggregated_generated_text_count = 0
+    aggregated_copy_agent_model: str | None = None
     aggregated_model_by_slot_path: dict[str, str] = {}
     aggregated_source_by_slot_path: dict[str, str] = {}
     aggregated_prompt_token_count_by_slot_path: dict[str, int] = {}
@@ -3250,9 +3457,21 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             auth=auth,
             session=session,
             image_generation_max_concurrency=template_max_concurrency,
+            generate_text=attempt_number == 1,
         )
         final_response = response
 
+        if response.generatedTextCount > 0:
+            aggregated_generated_text_count = max(
+                aggregated_generated_text_count,
+                response.generatedTextCount,
+            )
+        if (
+            aggregated_copy_agent_model is None
+            and isinstance(response.copyAgentModel, str)
+            and response.copyAgentModel.strip()
+        ):
+            aggregated_copy_agent_model = response.copyAgentModel.strip()
         aggregated_slot_paths.update(response.generatedSlotPaths)
         aggregated_model_by_slot_path.update(response.imageModelBySlotPath)
         aggregated_source_by_slot_path.update(response.imageSourceBySlotPath)
@@ -3369,7 +3588,12 @@ def _generate_shopify_theme_template_draft_images_with_retry(
         and final_response.generatedImageCount == 0
         and not final_response.generatedSlotPaths
     ):
-        return final_response
+        return final_response.model_copy(
+            update={
+                "generatedTextCount": aggregated_generated_text_count,
+                "copyAgentModel": aggregated_copy_agent_model,
+            }
+        )
 
     merged_model_by_slot_path = dict(aggregated_model_by_slot_path)
     merged_source_by_slot_path = dict(aggregated_source_by_slot_path)
@@ -3389,6 +3613,8 @@ def _generate_shopify_theme_template_draft_images_with_retry(
     return final_response.model_copy(
         update={
             "generatedImageCount": len(aggregated_slot_paths),
+            "generatedTextCount": aggregated_generated_text_count,
+            "copyAgentModel": aggregated_copy_agent_model,
             "generatedSlotPaths": sorted(aggregated_slot_paths),
             "imageModels": merged_image_models,
             "imageModelBySlotPath": merged_model_by_slot_path,
@@ -3413,7 +3639,7 @@ def _run_client_shopify_theme_template_generate_images_job(job_id: str) -> None:
             return
         progress_state: dict[str, Any] = {
             "stage": "running",
-            "message": "Shopify template image generation job started.",
+            "message": "Shopify template image and copy generation job started.",
             "updatedAt": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -3494,7 +3720,7 @@ def _run_client_shopify_theme_template_generate_images_job(job_id: str) -> None:
             {
                 "stage": "running",
                 "message": (
-                    "Generating images for Shopify theme template draft "
+                    "Generating images and copy for Shopify theme template draft "
                     f"(model={requested_image_model}, source={requested_image_model_source})."
                 ),
             }
@@ -3531,10 +3757,11 @@ def _run_client_shopify_theme_template_generate_images_job(job_id: str) -> None:
         publish_progress(
             {
                 "stage": "succeeded",
-                "message": "Shopify template images generated successfully.",
+                "message": "Shopify template images and copy generated successfully.",
                 "draftId": generate_images_response.draft.id,
                 "draftVersionNumber": generate_images_response.version.versionNumber,
                 "generatedImageCount": generate_images_response.generatedImageCount,
+                "generatedTextCount": generate_images_response.generatedTextCount,
             }
         )
         jobs_repo.mark_succeeded(
@@ -4300,7 +4527,6 @@ def get_client_shopify_theme_template_generate_images_job_status_route(
 def enqueue_client_shopify_theme_template_publish_route(
     client_id: str,
     payload: ShopifyThemeTemplatePublishRequest,
-    background_tasks: BackgroundTasks,
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
@@ -4325,10 +4551,16 @@ def enqueue_client_shopify_theme_template_publish_route(
         },
         status=JOB_STATUS_QUEUED,
     )
-    background_tasks.add_task(_run_client_shopify_theme_template_publish_job, str(job.id))
+    job_id = str(job.id)
+    threading.Thread(
+        target=_run_client_shopify_theme_template_publish_job,
+        args=(job_id,),
+        daemon=True,
+        name=f"shopify-template-publish-{job_id}",
+    ).start()
 
     return ShopifyThemeTemplatePublishJobStartResponse(
-        jobId=str(job.id),
+        jobId=job_id,
         status=job.status,
         statusPath=f"/clients/{client_id}/shopify/theme/brand/template/publish-jobs/{job.id}",
     )
