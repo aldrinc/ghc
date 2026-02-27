@@ -17,6 +17,7 @@ from app.models import OAuthState, ProcessedWebhookEvent, ShopInstallation
 from app.schemas import (
     AuditThemeBrandRequest,
     AuditThemeBrandResponse,
+    AutoProvisionStorefrontTokenRequest,
     CatalogProductVariant,
     CatalogProductSummary,
     CreateCatalogProductRequest,
@@ -114,6 +115,35 @@ async def _register_required_webhooks(
         )
 
 
+async def _provision_storefront_token_if_missing(
+    *,
+    installation: ShopInstallation,
+    session: Session,
+) -> bool:
+    if installation.storefront_access_token:
+        return False
+
+    if not installation.admin_access_token:
+        raise ShopifyApiError(
+            message=(
+                "Cannot auto-provision storefront token because installation "
+                "admin_access_token is missing."
+            ),
+            status_code=409,
+        )
+
+    storefront_access_token = await shopify_api.create_storefront_access_token(
+        shop_domain=installation.shop_domain,
+        access_token=installation.admin_access_token,
+    )
+    installation.storefront_access_token = storefront_access_token
+    installation.updated_at = datetime.now(timezone.utc)
+    session.add(installation)
+    session.commit()
+    session.refresh(installation)
+    return True
+
+
 @app.get("/auth/install")
 def auth_install(
     shop: str,
@@ -161,6 +191,8 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
             detail="OAuth state does not match the shop domain",
         )
 
+    auto_provision_error: str | None = None
+    auto_provisioned = False
     try:
         admin_access_token, scopes_csv = (
             await shopify_api.exchange_code_for_access_token(
@@ -195,26 +227,56 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
         )
         session.delete(oauth_state)
         session.commit()
+        session.refresh(installation)
 
     except ShopifyApiError as exc:
         session.rollback()
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
+    try:
+        auto_provisioned = await _provision_storefront_token_if_missing(
+            installation=installation,
+            session=session,
+        )
+    except ShopifyApiError as exc:
+        session.rollback()
+        auto_provision_error = str(exc)
+
     if settings.SHOPIFY_INSTALL_SUCCESS_REDIRECT_URL:
+        redirect_query: dict[str, str] = {"shop": shop_domain}
+        if auto_provision_error:
+            redirect_query["storefront_token_status"] = "failed"
+        elif installation.storefront_access_token:
+            redirect_query["storefront_token_status"] = "ready"
         success_url = (
             f"{str(settings.SHOPIFY_INSTALL_SUCCESS_REDIRECT_URL).rstrip('/')}"
-            f"?shop={shop_domain}"
+            f"?{urlencode(redirect_query)}"
         )
         return RedirectResponse(url=success_url, status_code=302)
+
+    if auto_provision_error:
+        next_step = (
+            "Storefront token auto-provisioning failed. "
+            f"Retry via POST /admin/installations/{shop_domain}/storefront-token/auto "
+            "or set manually via PATCH /admin/installations/{shop_domain}."
+        )
+    elif installation.storefront_access_token:
+        next_step = "Shopify installation is ready for checkout."
+    else:
+        next_step = (
+            "Set storefrontAccessToken via PATCH /admin/installations/{shop_domain} "
+            "before creating checkouts."
+        )
 
     return {
         "ok": True,
         "shopDomain": shop_domain,
         "clientId": installation.client_id,
         "scopes": [scope.strip() for scope in scopes_csv.split(",") if scope.strip()],
-        "next": (
-            "Set storefrontAccessToken via PATCH /admin/installations/{shop_domain} before creating checkouts."
-        ),
+        "hasStorefrontAccessToken": bool(installation.storefront_access_token),
+        "storefrontTokenAutoProvisioned": auto_provisioned,
+        "storefrontTokenAutoProvisioningError": auto_provision_error,
+        "next": next_step,
     }
 
 
@@ -258,6 +320,61 @@ def update_installation(
     session.add(installation)
     session.commit()
     session.refresh(installation)
+    return _serialize_installation(installation)
+
+
+@app.post(
+    "/admin/installations/{shop_domain}/storefront-token/auto",
+    response_model=InstallationResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def auto_provision_installation_storefront_token(
+    shop_domain: str,
+    payload: AutoProvisionStorefrontTokenRequest,
+    session: Session = Depends(get_session),
+):
+    normalized_shop = normalize_shop_domain(shop_domain)
+    installation = session.scalars(
+        select(ShopInstallation).where(ShopInstallation.shop_domain == normalized_shop)
+    ).first()
+    if not installation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Shop installation not found"
+        )
+    if installation.uninstalled_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shop installation is not active.",
+        )
+
+    requested_client_id = (
+        payload.clientId.strip() if isinstance(payload.clientId, str) else None
+    )
+    if requested_client_id:
+        if installation.client_id and installation.client_id != requested_client_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This Shopify store is already connected to a different workspace. "
+                    f"connectedWorkspaceId={installation.client_id}"
+                ),
+            )
+        if installation.client_id != requested_client_id:
+            installation.client_id = requested_client_id
+            installation.updated_at = datetime.now(timezone.utc)
+            session.add(installation)
+            session.commit()
+            session.refresh(installation)
+
+    try:
+        await _provision_storefront_token_if_missing(
+            installation=installation,
+            session=session,
+        )
+    except ShopifyApiError as exc:
+        session.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
     return _serialize_installation(installation)
 
 
@@ -320,7 +437,8 @@ def _resolve_checkout_installation(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 "Installation is missing storefront_access_token. "
-                "Set it via PATCH /admin/installations/{shop_domain}."
+                "Retry auto setup via POST /admin/installations/{shop_domain}/storefront-token/auto "
+                "or set it via PATCH /admin/installations/{shop_domain}."
             ),
         )
     return installation

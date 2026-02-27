@@ -17,6 +17,7 @@ This service is a Shopify app bridge for Marketi funnels. It does three things:
 - `GET /auth/callback`
 - `GET /admin/installations` (Bearer internal token)
 - `PATCH /admin/installations/{shop}.myshopify.com` (Bearer internal token)
+- `POST /admin/installations/{shop}.myshopify.com/storefront-token/auto` (Bearer internal token)
 - `POST /v1/checkouts` (Bearer internal token)
 - `POST /webhooks/orders/create`
 - `POST /webhooks/app/uninstalled`
@@ -47,8 +48,18 @@ uvicorn app.main:app --reload --port 8011
 ## Storefront token setup
 
 The app requires a storefront access token per shop to run `cartCreate`.
+During OAuth callback, the bridge automatically attempts to create and store this token.
 
-Set/update it with:
+If a shop still reports missing token, retry automatic setup first:
+
+```bash
+curl -X POST "http://localhost:8011/admin/installations/{shop}.myshopify.com/storefront-token/auto" \
+  -H "Authorization: Bearer ${SHOPIFY_INTERNAL_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"clientId":"<mos_client_uuid>"}'
+```
+
+Manual token set remains available as an explicit recovery path:
 
 ```bash
 curl -X PATCH "http://localhost:8011/admin/installations/{shop}.myshopify.com" \

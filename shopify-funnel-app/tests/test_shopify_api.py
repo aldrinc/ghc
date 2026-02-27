@@ -69,6 +69,82 @@ def _build_minimal_theme_settings_json(
     return json.dumps({"current": current}) + "\n"
 
 
+def test_create_storefront_access_token_returns_token():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "admin_token"
+        assert "mutation storefrontAccessTokenCreate" in payload.get("query", "")
+        assert payload.get("variables") == {"input": {"title": "Marketi Funnel Checkout"}}
+        return {
+            "storefrontAccessTokenCreate": {
+                "storefrontAccessToken": {"accessToken": "shpat_abc"},
+                "userErrors": [],
+            }
+        }
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    storefront_access_token = asyncio.run(
+        client.create_storefront_access_token(
+            shop_domain="example.myshopify.com",
+            access_token="admin_token",
+        )
+    )
+
+    assert storefront_access_token == "shpat_abc"
+
+
+def test_create_storefront_access_token_raises_user_errors():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        return {
+            "storefrontAccessTokenCreate": {
+                "storefrontAccessToken": None,
+                "userErrors": [
+                    {"field": ["title"], "message": "Title is already in use."}
+                ],
+            }
+        }
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    with pytest.raises(ShopifyApiError, match="storefrontAccessTokenCreate failed"):
+        asyncio.run(
+            client.create_storefront_access_token(
+                shop_domain="example.myshopify.com",
+                access_token="admin_token",
+            )
+        )
+
+
+def test_create_storefront_access_token_requires_access_token_field():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        return {
+            "storefrontAccessTokenCreate": {
+                "storefrontAccessToken": {},
+                "userErrors": [],
+            }
+        }
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="storefrontAccessTokenCreate response is missing storefrontAccessToken.accessToken",
+    ):
+        asyncio.run(
+            client.create_storefront_access_token(
+                shop_domain="example.myshopify.com",
+                access_token="admin_token",
+            )
+        )
+
+
 def test_sync_theme_template_component_text_settings_wraps_richtext_values():
     template_filename = "sections/footer-group.json"
     setting_path = f"{template_filename}.sections.footer.settings.text"

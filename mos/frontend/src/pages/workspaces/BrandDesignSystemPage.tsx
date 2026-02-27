@@ -17,6 +17,7 @@ import {
   useCreateClientShopifyInstallUrl,
   useClientShopifyStatus,
   useDisconnectClientShopifyInstallation,
+  useAutoProvisionClientShopifyStorefrontToken,
   useSetClientShopifyDefaultShop,
   useUpdateClientShopifyThemeTemplateDraft,
   useUpdateClientShopifyInstallation,
@@ -710,6 +711,9 @@ export function BrandDesignSystemPage() {
   const updateClient = useUpdateClient();
   const createShopifyInstallUrl = useCreateClientShopifyInstallUrl(workspace?.id || "");
   const setDefaultShop = useSetClientShopifyDefaultShop(workspace?.id || "");
+  const autoProvisionShopifyStorefrontToken = useAutoProvisionClientShopifyStorefrontToken(
+    workspace?.id || ""
+  );
   const updateShopifyInstallation = useUpdateClientShopifyInstallation(workspace?.id || "");
   const disconnectShopifyInstallation = useDisconnectClientShopifyInstallation(workspace?.id || "");
   const createDesignSystem = useCreateDesignSystem();
@@ -749,6 +753,7 @@ export function BrandDesignSystemPage() {
   const [shopifyShopDomainDraft, setShopifyShopDomainDraft] = useState("");
   const [defaultShopDomainDraft, setDefaultShopDomainDraft] = useState("");
   const [storefrontAccessTokenDraft, setStorefrontAccessTokenDraft] = useState("");
+  const [showManualStorefrontTokenInput, setShowManualStorefrontTokenInput] = useState(false);
   const [shopifySyncShopDomain, setShopifySyncShopDomain] = useState("");
   const [themeSyncDesignSystemId, setThemeSyncDesignSystemId] = useState("");
   const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
@@ -824,6 +829,7 @@ export function BrandDesignSystemPage() {
   }, [shopifyStatus?.message, shopifyStatusError]);
   const isShopifyConnectionMutating =
     createShopifyInstallUrl.isPending ||
+    autoProvisionShopifyStorefrontToken.isPending ||
     updateShopifyInstallation.isPending ||
     disconnectShopifyInstallation.isPending ||
     setDefaultShop.isPending;
@@ -836,6 +842,7 @@ export function BrandDesignSystemPage() {
     setShopifyShopDomainDraft("");
     setDefaultShopDomainDraft("");
     setStorefrontAccessTokenDraft("");
+    setShowManualStorefrontTokenInput(false);
     setShopifySyncShopDomain("");
     setThemeSyncDesignSystemId("");
     setThemeSyncThemeName("futrgroup2-0theme");
@@ -881,6 +888,13 @@ export function BrandDesignSystemPage() {
       return shopifyStatus.shopDomains[0] || "";
     });
   }, [shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomains]);
+
+  useEffect(() => {
+    if (shopifyState !== "installed_missing_storefront_token") {
+      setShowManualStorefrontTokenInput(false);
+      setStorefrontAccessTokenDraft("");
+    }
+  }, [shopifyState]);
 
   useEffect(() => {
     if (!shopDomainOptions.length) {
@@ -1313,6 +1327,23 @@ export function BrandDesignSystemPage() {
       storefrontAccessToken: nextToken,
     });
     setStorefrontAccessTokenDraft("");
+    setShowManualStorefrontTokenInput(false);
+    await refetchShopifyStatus();
+  };
+
+  const handleRetryAutomaticStorefrontTokenSetup = async () => {
+    if (!workspace?.id) {
+      toast.error("Select a workspace before updating Shopify installation.");
+      return;
+    }
+    const nextDomain = shopifyShopDomainDraft.trim();
+    if (!nextDomain) {
+      toast.error("Shop domain is required.");
+      return;
+    }
+    await autoProvisionShopifyStorefrontToken.mutateAsync({ shopDomain: nextDomain });
+    setStorefrontAccessTokenDraft("");
+    setShowManualStorefrontTokenInput(false);
     await refetchShopifyStatus();
   };
 
@@ -1904,28 +1935,54 @@ export function BrandDesignSystemPage() {
               </Button>
             </div>
           )}
-          <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-            <Input
-              type="password"
-              placeholder="Storefront access token"
-              value={storefrontAccessTokenDraft}
-              onChange={(e) => setStorefrontAccessTokenDraft(e.target.value)}
-              disabled={isShopifyConnectionMutating}
-            />
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => void handleSetStorefrontToken()}
-              disabled={
-                !workspace?.id ||
-                !shopifyShopDomainDraft.trim() ||
-                !storefrontAccessTokenDraft.trim() ||
-                isShopifyConnectionMutating
-              }
-            >
-              {updateShopifyInstallation.isPending ? "Saving…" : "Set storefront token"}
-            </Button>
-          </div>
+          {shopifyState === "installed_missing_storefront_token" ? (
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleRetryAutomaticStorefrontTokenSetup()}
+                  disabled={!workspace?.id || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
+                >
+                  {autoProvisionShopifyStorefrontToken.isPending
+                    ? "Retrying…"
+                    : "Retry automatic token setup"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowManualStorefrontTokenInput((current) => !current)}
+                  disabled={isShopifyConnectionMutating}
+                >
+                  {showManualStorefrontTokenInput ? "Hide manual token form" : "Enter token manually"}
+                </Button>
+              </div>
+              {showManualStorefrontTokenInput ? (
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                  <Input
+                    type="password"
+                    placeholder="Storefront access token"
+                    value={storefrontAccessTokenDraft}
+                    onChange={(e) => setStorefrontAccessTokenDraft(e.target.value)}
+                    disabled={isShopifyConnectionMutating}
+                  />
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void handleSetStorefrontToken()}
+                    disabled={
+                      !workspace?.id ||
+                      !shopifyShopDomainDraft.trim() ||
+                      !storefrontAccessTokenDraft.trim() ||
+                      isShopifyConnectionMutating
+                    }
+                  >
+                    {updateShopifyInstallation.isPending ? "Saving…" : "Set storefront token"}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-md border border-divider p-3 space-y-3">

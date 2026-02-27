@@ -411,6 +411,32 @@ export function useUpdateClientShopifyInstallation(clientId: string) {
   });
 }
 
+export function useAutoProvisionClientShopifyStorefrontToken(clientId: string) {
+  const { post } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { shopDomain: string }) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      return post<ClientShopifyStatus>(
+        `/clients/${clientId}/shopify/installation/auto-storefront-token`,
+        payload
+      );
+    },
+    onSuccess: () => {
+      toast.success("Automatic storefront token setup complete");
+      queryClient.invalidateQueries({ queryKey: ["clients", "shopify-status", clientId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message =
+        "message" in err
+          ? err.message
+          : err?.message || "Failed to retry automatic storefront token setup";
+      toast.error(message);
+    },
+  });
+}
+
 export function useDisconnectClientShopifyInstallation(clientId: string) {
   const { request } = useApiClient();
   const queryClient = useQueryClient();

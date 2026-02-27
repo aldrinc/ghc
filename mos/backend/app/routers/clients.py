@@ -49,6 +49,7 @@ from app.schemas.shopify_connection import (
     ShopifyCreateProductRequest,
     ShopifyDefaultShopRequest,
     ShopifyInstallationDisconnectRequest,
+    ShopifyInstallationAutoStorefrontTokenRequest,
     ShopifyProductListResponse,
     ShopifyProductCreateResponse,
     ShopifyConnectionStatusResponse,
@@ -91,6 +92,7 @@ from app.services.funnels import (
 from app.services.media_storage import MediaStorage
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
+    auto_provision_client_shopify_storefront_token,
     build_client_shopify_install_url,
     create_client_shopify_product,
     disconnect_client_shopify_store,
@@ -4015,6 +4017,34 @@ def update_client_shopify_installation(
         client_id=client_id,
         shop_domain=payload.shopDomain,
         storefront_access_token=payload.storefrontAccessToken,
+    )
+    selected_shop_domain = _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=selected_shop_domain,
+    )
+    return ShopifyConnectionStatusResponse(**status_payload)
+
+
+@router.post(
+    "/{client_id}/shopify/installation/auto-storefront-token",
+    response_model=ShopifyConnectionStatusResponse,
+)
+def auto_provision_client_shopify_installation_storefront_token(
+    client_id: str,
+    payload: ShopifyInstallationAutoStorefrontTokenRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    auto_provision_client_shopify_storefront_token(
+        client_id=client_id,
+        shop_domain=payload.shopDomain,
     )
     selected_shop_domain = _get_selected_shop_domain(
         session=session,

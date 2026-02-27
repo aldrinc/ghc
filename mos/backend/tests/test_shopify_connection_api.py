@@ -182,6 +182,48 @@ def test_update_shopify_installation_sets_token_and_returns_status(api_client, m
     assert response.json()["state"] == "installed_missing_storefront_token"
 
 
+def test_auto_provision_shopify_installation_storefront_token_returns_status(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client)
+
+    observed: dict[str, str] = {}
+
+    def fake_auto_provision(*, client_id: str, shop_domain: str) -> None:
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": ["example.myshopify.com"],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    monkeypatch.setattr(
+        clients_router,
+        "auto_provision_client_shopify_storefront_token",
+        fake_auto_provision,
+    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/installation/auto-storefront-token",
+        json={"shopDomain": "example.myshopify.com"},
+    )
+
+    assert response.status_code == 200
+    assert observed == {
+        "client_id": client_id,
+        "shop_domain": "example.myshopify.com",
+    }
+    assert response.json()["state"] == "ready"
+
+
 def test_disconnect_shopify_installation_unlinks_workspace_and_returns_status(
     api_client, monkeypatch
 ):
@@ -2720,6 +2762,10 @@ def test_shopify_routes_require_existing_client(api_client):
         f"/clients/{missing_client_id}/shopify/installation",
         json={"shopDomain": "example.myshopify.com", "storefrontAccessToken": "token"},
     )
+    auto_provision_response = api_client.post(
+        f"/clients/{missing_client_id}/shopify/installation/auto-storefront-token",
+        json={"shopDomain": "example.myshopify.com"},
+    )
     disconnect_response = api_client.request(
         method="DELETE",
         url=f"/clients/{missing_client_id}/shopify/installation",
@@ -2749,6 +2795,7 @@ def test_shopify_routes_require_existing_client(api_client):
     assert status_response.status_code == 404
     assert install_response.status_code == 404
     assert patch_response.status_code == 404
+    assert auto_provision_response.status_code == 404
     assert disconnect_response.status_code == 404
     assert default_shop_response.status_code == 404
     assert create_product_response.status_code == 404

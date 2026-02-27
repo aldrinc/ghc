@@ -412,6 +412,10 @@ class UpdateInstallationRequest(BaseModel):
     storefrontAccessToken: str | None = None
 
 
+class AutoProvisionStorefrontTokenRequest(BaseModel):
+    clientId: str | None = None
+
+
 class InstallationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

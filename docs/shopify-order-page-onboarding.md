@@ -73,9 +73,20 @@ curl "http://localhost:8011/admin/installations" \
 
 If OAuth callback fails with an `ORDERS_CREATE` protected customer data error, set `SHOPIFY_ENABLE_ORDER_FORWARDING=false` in `shopify-funnel-app/.env` and retry install. This keeps checkout creation working while webhook forwarding remains disabled.
 
-## 5) Set storefront token for the installed shop
+## 5) Storefront token setup (automatic + recovery)
 
-Generate/storefront token in Shopify admin, then attach it:
+After OAuth install, the bridge automatically attempts storefront token creation.
+
+If status still shows `installed_missing_storefront_token`, retry automatic setup:
+
+```bash
+curl -X POST "http://localhost:8011/admin/installations/{your-store}.myshopify.com/storefront-token/auto" \
+  -H "Authorization: Bearer ${SHOPIFY_INTERNAL_API_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{"clientId":"<mos_client_uuid>"}'
+```
+
+If auto setup still fails, manually set a storefront token:
 
 ```bash
 curl -X PATCH "http://localhost:8011/admin/installations/{your-store}.myshopify.com" \

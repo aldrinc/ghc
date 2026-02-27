@@ -473,6 +473,94 @@ def test_update_client_shopify_variant_rejects_invalid_inventory_management():
         )
 
 
+def test_auto_provision_client_shopify_storefront_token_posts_to_bridge(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="example.myshopify.com",
+                client_id="client_1",
+                has_storefront_access_token=False,
+                scopes=[],
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    observed: dict[str, object] = {}
+
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        observed["method"] = method
+        observed["path"] = path
+        observed["json_body"] = json_body
+        return {"ok": True}
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    shopify_connection.auto_provision_client_shopify_storefront_token(
+        client_id="client_1",
+        shop_domain="example.myshopify.com",
+    )
+
+    assert observed == {
+        "method": "POST",
+        "path": "/admin/installations/example.myshopify.com/storefront-token/auto",
+        "json_body": {"clientId": "client_1"},
+    }
+
+
+def test_auto_provision_client_shopify_storefront_token_requires_installation(monkeypatch):
+    monkeypatch.setattr(shopify_connection, "list_shopify_installations", lambda: [])
+
+    try:
+        shopify_connection.auto_provision_client_shopify_storefront_token(
+            client_id="client_1",
+            shop_domain="example.myshopify.com",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 404
+        assert exc.detail == "Shopify installation not found for this store."
+    else:
+        raise AssertionError(
+            "Expected auto_provision_client_shopify_storefront_token to require installation"
+        )
+
+
+def test_auto_provision_client_shopify_storefront_token_requires_matching_workspace(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="example.myshopify.com",
+                client_id="client_other",
+                has_storefront_access_token=False,
+                scopes=[],
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    try:
+        shopify_connection.auto_provision_client_shopify_storefront_token(
+            client_id="client_1",
+            shop_domain="example.myshopify.com",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert (
+            exc.detail
+            == "This Shopify store is already connected to a different workspace."
+        )
+    else:
+        raise AssertionError(
+            "Expected auto_provision_client_shopify_storefront_token to reject workspace mismatch"
+        )
+
+
 def test_disconnect_client_shopify_store_unlinks_workspace(monkeypatch):
     monkeypatch.setattr(
         shopify_connection,

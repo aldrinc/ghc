@@ -1299,6 +1299,56 @@ class ShopifyApiClient:
                     return webhook_id
         return None
 
+    async def create_storefront_access_token(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        title: str = "Marketi Funnel Checkout",
+    ) -> str:
+        query = """
+        mutation storefrontAccessTokenCreate($input: StorefrontAccessTokenInput!) {
+            storefrontAccessTokenCreate(input: $input) {
+                storefrontAccessToken {
+                    accessToken
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        payload = {"query": query, "variables": {"input": {"title": title}}}
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload=payload,
+        )
+        create_data = response.get("storefrontAccessTokenCreate") or {}
+        user_errors = create_data.get("userErrors") or []
+        if user_errors:
+            messages = "; ".join(str(error.get("message")) for error in user_errors)
+            raise ShopifyApiError(
+                message=f"storefrontAccessTokenCreate failed: {messages}",
+                status_code=409,
+            )
+
+        storefront_access_token = (
+            (create_data.get("storefrontAccessToken") or {}).get("accessToken")
+        )
+        if (
+            not isinstance(storefront_access_token, str)
+            or not storefront_access_token.strip()
+        ):
+            raise ShopifyApiError(
+                message=(
+                    "storefrontAccessTokenCreate response is missing "
+                    "storefrontAccessToken.accessToken"
+                )
+            )
+        return storefront_access_token
+
     async def create_cart(
         self,
         *,
