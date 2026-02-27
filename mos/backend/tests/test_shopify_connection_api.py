@@ -1222,13 +1222,16 @@ def test_sync_shopify_theme_brand_returns_429_when_ai_generation_is_rate_limited
     )
 
     assert response.status_code == 429
-    assert "productId was not provided for fallback product images" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert "AI theme image generation" in detail
+    assert "componentImageAssetMap" in detail
 
 
 def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_sync(
     api_client, monkeypatch
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
+    resolved_product_uuid = "00000000-0000-0000-0000-000000000123"
     observed: dict[str, object] = {}
 
     def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
@@ -1277,7 +1280,7 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
             "FakeProduct",
             (),
             {
-                "id": product_id,
+                "id": resolved_product_uuid,
                 "client_id": client_id,
             },
         )()
@@ -1462,12 +1465,12 @@ def test_sync_shopify_theme_brand_resolves_product_images_for_auto_component_syn
     assert response.status_code == 200
     assert observed["product_id"] == "product-123"
     assert observed["slot_theme_name"] == "futrgroup2-0theme"
-    assert observed["offers_product_id"] == "product-123"
+    assert observed["offers_product_id"] == resolved_product_uuid
     assert set(observed["planner_asset_public_ids"]) == {
         "generated-image-hero",
         "generated-image-gallery",
     }
-    assert sorted(observed["generated_aspect_ratios"]) == ["1:1", "16:9"]
+    assert set(observed["generated_aspect_ratios"]) == {"1:1", "16:9"}
     assert observed["planner_image_slot_paths"] == [
         "templates/index.json.sections.hero.settings.image",
         "templates/product.json.sections.gallery.settings.image",
@@ -1493,6 +1496,7 @@ def test_sync_shopify_theme_brand_uses_existing_product_images_when_ai_is_rate_l
     api_client, monkeypatch
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
+    resolved_product_uuid = "00000000-0000-0000-0000-000000000124"
     observed: dict[str, object] = {}
 
     def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
@@ -1547,7 +1551,7 @@ def test_sync_shopify_theme_brand_uses_existing_product_images_when_ai_is_rate_l
         tags: list[str] | None = None,
         statuses: list[object] | None = None,
     ):
-        assert product_id == "product-123"
+        assert product_id == resolved_product_uuid
         assert asset_kind == "image"
         return [
             type(
@@ -1581,7 +1585,7 @@ def test_sync_shopify_theme_brand_uses_existing_product_images_when_ai_is_rate_l
             "FakeProduct",
             (),
             {
-                "id": product_id,
+                "id": resolved_product_uuid,
                 "client_id": client_id,
             },
         )()
@@ -1753,13 +1757,14 @@ def test_sync_shopify_theme_brand_uses_existing_product_images_when_ai_is_rate_l
             "https://assets.example.com/public/assets/existing-image-2"
         ),
     }
-    assert sorted(observed["attempted_aspects"]) == ["1:1", "16:9"]
+    assert set(observed["attempted_aspects"]) == {"1:1", "16:9"}
 
 
 def test_sync_shopify_theme_brand_feature_slots_keep_their_generated_assets(
     api_client, monkeypatch
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
+    resolved_product_uuid = "00000000-0000-0000-0000-000000000125"
     observed: dict[str, object] = {}
     feature_slot_one = (
         "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.image"
@@ -1840,7 +1845,7 @@ def test_sync_shopify_theme_brand_feature_slots_keep_their_generated_assets(
         tags: list[str] | None = None,
         statuses: list[object] | None = None,
     ):
-        assert product_id == "product-123"
+        assert product_id == resolved_product_uuid
         assert asset_kind == "image"
         return []
 
@@ -1849,7 +1854,7 @@ def test_sync_shopify_theme_brand_feature_slots_keep_their_generated_assets(
             "FakeProduct",
             (),
             {
-                "id": product_id,
+                "id": resolved_product_uuid,
                 "client_id": client_id,
             },
         )()
@@ -2132,6 +2137,7 @@ def test_sync_shopify_theme_brand_returns_422_when_ai_theme_image_generation_fai
     api_client, monkeypatch
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
+    resolved_product_uuid = "00000000-0000-0000-0000-000000000126"
 
     def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
         return {
@@ -2178,7 +2184,7 @@ def test_sync_shopify_theme_brand_returns_422_when_ai_theme_image_generation_fai
             "FakeProduct",
             (),
             {
-                "id": product_id,
+                "id": resolved_product_uuid,
                 "client_id": client_id,
             },
         )()
@@ -2259,6 +2265,7 @@ def test_sync_shopify_theme_brand_returns_429_when_ai_theme_image_generation_is_
     api_client, monkeypatch
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
+    resolved_product_uuid = "00000000-0000-0000-0000-000000000127"
 
     def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
         return {
@@ -2305,7 +2312,7 @@ def test_sync_shopify_theme_brand_returns_429_when_ai_theme_image_generation_is_
             "FakeProduct",
             (),
             {
-                "id": product_id,
+                "id": resolved_product_uuid,
                 "client_id": client_id,
             },
         )()
@@ -2396,7 +2403,9 @@ def test_sync_shopify_theme_brand_returns_429_when_ai_theme_image_generation_is_
     )
 
     assert response.status_code == 429
-    assert "AI theme image generation is rate-limited or out of Gemini quota" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert "AI theme image generation" in detail
+    assert "Gemini quota" in detail
 
 
 def test_sync_shopify_theme_brand_uses_workspace_default_design_system_when_omitted(

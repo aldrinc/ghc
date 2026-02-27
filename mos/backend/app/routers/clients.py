@@ -12,6 +12,7 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import func, select
+from sqlalchemy.exc import DataError, StatementError
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
@@ -84,6 +85,7 @@ from app.services.design_system_generation import (
 )
 from app.services.funnels import (
     create_funnel_image_asset,
+    create_funnel_unsplash_asset,
     resolve_funnel_image_model_config,
 )
 from app.services.media_storage import MediaStorage
@@ -641,13 +643,22 @@ def _resolve_theme_sync_product_reference_image(
             )
 
     if reference_asset is None:
-        product_image_assets = assets_repo.list(
-            org_id=org_id,
-            client_id=client_id,
-            product_id=product_id,
-            asset_kind="image",
-            statuses=[AssetStatusEnum.approved, AssetStatusEnum.qa_passed],
-        )
+        try:
+            product_image_assets = assets_repo.list(
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                asset_kind="image",
+                statuses=[AssetStatusEnum.approved, AssetStatusEnum.qa_passed],
+            )
+        except (DataError, StatementError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Product id is invalid for Shopify theme image reference lookup. "
+                    f"productId={product_id}."
+                ),
+            ) from exc
         if not product_image_assets:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -1772,6 +1783,7 @@ def _prepare_shopify_theme_template_build_data(
 
     requested_product_id = payload.productId.strip() if payload.productId else None
     resolved_product: Product | None = None
+    resolved_product_storage_id: str | None = None
     if requested_product_id:
         product = ProductsRepository(session).get(
             org_id=auth.org_id, product_id=requested_product_id
@@ -1788,6 +1800,7 @@ def _prepare_shopify_theme_template_build_data(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Product must belong to this workspace.",
             )
+        resolved_product_storage_id = str(product.id).strip()
 
     workspace_name = str(client.name).strip()
     if not workspace_name:
@@ -1886,7 +1899,7 @@ def _prepare_shopify_theme_template_build_data(
             session=session,
             org_id=auth.org_id,
             client_id=client_id,
-            product_id=requested_product_id,
+            product_id=resolved_product_storage_id,
             image_slots=planner_image_slots,
             text_slots=text_slots,
             reference_image_bytes=(
@@ -1913,7 +1926,7 @@ def _prepare_shopify_theme_template_build_data(
         product_image_assets = assets_repo.list(
             org_id=auth.org_id,
             client_id=client_id,
-            product_id=requested_product_id,
+            product_id=resolved_product_storage_id,
             asset_kind="image",
             statuses=[AssetStatusEnum.approved, AssetStatusEnum.qa_passed],
         )
@@ -4937,6 +4950,7 @@ def sync_client_shopify_theme_brand_route(
 
     requested_product_id = payload.productId.strip() if payload.productId else None
     resolved_product: Product | None = None
+    resolved_product_storage_id: str | None = None
     if requested_product_id:
         product = ProductsRepository(session).get(
             org_id=auth.org_id, product_id=requested_product_id
@@ -4953,6 +4967,7 @@ def sync_client_shopify_theme_brand_route(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Product must belong to this workspace.",
             )
+        resolved_product_storage_id = str(product.id).strip()
 
     workspace_name = str(client.name).strip()
     if not workspace_name:
@@ -5043,7 +5058,11 @@ def sync_client_shopify_theme_brand_route(
             )
 
         if planner_image_slots:
-            if requested_product_id and resolved_product is not None:
+            if (
+                requested_product_id
+                and resolved_product is not None
+                and _is_gemini_image_references_enabled()
+            ):
                 product_reference_image = _resolve_theme_sync_product_reference_image(
                     session=session,
                     org_id=auth.org_id,
@@ -5060,7 +5079,7 @@ def sync_client_shopify_theme_brand_route(
                 session=session,
                 org_id=auth.org_id,
                 client_id=client_id,
-                product_id=requested_product_id,
+                product_id=resolved_product_storage_id,
                 image_slots=planner_image_slots,
                 text_slots=text_slots,
                 reference_image_bytes=(
@@ -5128,7 +5147,7 @@ def sync_client_shopify_theme_brand_route(
         product_image_assets = assets_repo.list(
             org_id=auth.org_id,
             client_id=client_id,
-            product_id=requested_product_id,
+            product_id=resolved_product_storage_id,
             asset_kind="image",
             statuses=[AssetStatusEnum.approved, AssetStatusEnum.qa_passed],
         )
