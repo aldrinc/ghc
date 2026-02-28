@@ -35,9 +35,66 @@ def _sync_ready_profile_payload() -> dict:
     payload = _base_profile_payload()
     payload["metadata"] = {
         "owner": "ops",
-        "effective_date": "2026-02-19",
-        "refund_window_days": "30",
-        "fulfillment_window": "2-5 business days",
+        "effective_date": "2026-02-27",
+        "brand_name": "Acme Labs",
+        "privacy_data_collected": (
+            "We collect contact, checkout, account, support, and device data including analytics/pixel events."
+        ),
+        "privacy_data_usage": (
+            "We use data for fulfillment, customer support, billing, fraud prevention, analytics, and marketing opt-ins."
+        ),
+        "privacy_data_sharing": (
+            "We share data with payment, shipping, analytics, and messaging vendors needed to operate the service."
+        ),
+        "privacy_user_choices": (
+            "Users can unsubscribe from marketing and request access, correction, or deletion through support."
+        ),
+        "privacy_security_retention": (
+            "We apply reasonable administrative and technical safeguards and retain data only as needed for business/legal use."
+        ),
+        "privacy_update_notice": "We post updates on this page and revise the effective date when material changes occur.",
+        "terms_offer_scope": "We provide physical products, digital content, and related support as described on each product page.",
+        "terms_eligibility": "Customers must provide accurate payment and delivery details and comply with applicable laws.",
+        "terms_pricing_billing": (
+            "Prices are shown in local currency where available and include all disclosed fees before checkout."
+        ),
+        "terms_fulfillment_access": (
+            "Physical goods ship after processing; digital access is provided after payment confirmation."
+        ),
+        "terms_refund_cancellation": (
+            "Refund and cancellation rights are described in our Returns and Refunds Policy and Subscription Terms pages."
+        ),
+        "terms_disclaimers": "Availability, delivery timelines, and promotional terms are subject to stated conditions.",
+        "refund_eligibility": (
+            "Eligible requests require order details and compliance with item condition requirements where applicable."
+        ),
+        "refund_window_policy": "Refund requests must be submitted within 30 days of delivery or purchase date.",
+        "refund_request_steps": "Contact support with order number, reason, and evidence if requested.",
+        "refund_method_timing": "Approved refunds are issued to original payment method within 5-10 business days.",
+        "refund_fees_deductions": "Return shipping or restocking deductions, if any, are disclosed before return approval.",
+        "refund_exceptions": "Final-sale, custom, and abuse-related transactions are non-refundable unless required by law.",
+        "shipping_regions": "We ship within the United States and selected international destinations.",
+        "shipping_processing_time": "Orders are processed within 1-2 business days.",
+        "shipping_options_costs": "Shipping options and costs are shown at checkout before payment.",
+        "shipping_delivery_estimates": "Standard delivery estimates are 2-7 business days after dispatch.",
+        "shipping_tracking": "Tracking links are sent after dispatch and displayed in order status communications.",
+        "shipping_address_changes": "Address updates are available before fulfillment lock-in; contact support immediately.",
+        "shipping_lost_damaged": "Report lost or damaged packages to support for carrier claim and replacement/refund review.",
+        "shipping_customs_duties": "International customs and import duties are the buyer's responsibility unless stated otherwise.",
+        "shipping_return_address": "Returns are sent to the address provided by support during return authorization.",
+        "support_order_help_links": (
+            "Track Order: /order-status | Returns: /refunds | Subscription Cancel: /subscription-terms"
+        ),
+        "subscription_included_features": "Each plan includes account access, product updates, and support per plan limits.",
+        "subscription_plan_table": "- Monthly Plan: $29/month\n- Annual Plan: $299/year",
+        "subscription_auto_renew_terms": "Plans auto-renew at the listed interval until canceled.",
+        "subscription_trial_terms": "If a trial is offered, billing begins automatically at trial end unless canceled first.",
+        "subscription_explicit_consent": (
+            "Checkout requires explicit consent acknowledging recurring charges before order completion."
+        ),
+        "cancellation_steps": "1. Open account settings\n2. Select billing\n3. Click cancel subscription",
+        "subscription_refund_rules": "Subscription refunds and prorations follow plan-specific policy terms disclosed before purchase.",
+        "subscription_billing_support": "Billing support is available at support@acme.test.",
     }
     return payload
 
