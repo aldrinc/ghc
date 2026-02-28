@@ -772,11 +772,13 @@ export function BrandDesignSystemPage() {
   const [templatePreviewImageMap, setTemplatePreviewImageMap] = useState<Record<string, string>>({});
   const [templatePreviewTextValues, setTemplatePreviewTextValues] = useState<Record<string, string>>({});
   const [templatePreviewImageErrorsByPath, setTemplatePreviewImageErrorsByPath] = useState<Record<string, boolean>>({});
+  const [focusGalleryImageOneOnPreviewOpen, setFocusGalleryImageOneOnPreviewOpen] = useState(false);
   const [templatePublishResult, setTemplatePublishResult] = useState<ClientShopifyThemeTemplatePublishResponse | null>(null);
   const [themeAuditResult, setThemeAuditResult] = useState<ClientShopifyThemeBrandAuditResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryImageOnePreviewCardRef = useRef<HTMLDivElement | null>(null);
   const uploadTemplateProductAssets = useUploadProductAssets(templateAssetUploadProductId || "");
 
   const designSystemOptions = useMemo(
@@ -861,6 +863,7 @@ export function BrandDesignSystemPage() {
     setTemplatePreviewImageMap({});
     setTemplatePreviewTextValues({});
     setTemplatePreviewImageErrorsByPath({});
+    setFocusGalleryImageOneOnPreviewOpen(false);
     setTemplatePublishResult(null);
     setThemeAuditResult(null);
     setPolicySyncResult(null);
@@ -1245,6 +1248,17 @@ export function BrandDesignSystemPage() {
     () => Object.entries(templatePreviewTextValues).sort(([a], [b]) => a.localeCompare(b)),
     [templatePreviewTextValues]
   );
+  const templatePreviewGalleryImageOnePath = useMemo(() => {
+    for (const item of templatePreviewImageItems) {
+      const readableSlotLabel =
+        templateImageSlotReadableLabelByPath.get(item.path) ||
+        humanizeSlotToken(item.path.split(".").pop() || item.path);
+      if (readableSlotLabel.trim().toLowerCase() === "gallery image 1") {
+        return item.path;
+      }
+    }
+    return "";
+  }, [templatePreviewImageItems, templateImageSlotReadableLabelByPath]);
   const logoAssetOptions = useMemo(
     () =>
       [...logoAssets]
@@ -1610,7 +1624,7 @@ export function BrandDesignSystemPage() {
     }
   };
 
-  const handleOpenTemplatePreview = () => {
+  const openTemplatePreview = ({ focusGalleryImageOne = false }: { focusGalleryImageOne?: boolean } = {}) => {
     if (!selectedTemplateDraft?.latestVersion) {
       toast.error("Build or select a template draft first.");
       return;
@@ -1629,8 +1643,43 @@ export function BrandDesignSystemPage() {
     setTemplatePreviewImageMap(parsedImageMap.value);
     setTemplatePreviewTextValues(parsedTextValues.value);
     setTemplatePreviewImageErrorsByPath({});
+    setFocusGalleryImageOneOnPreviewOpen(focusGalleryImageOne);
     setTemplatePreviewDialogOpen(true);
   };
+  const handleOpenTemplatePreview = () => {
+    openTemplatePreview();
+  };
+  const handleOpenGalleryImageOnePreview = () => {
+    if (!selectedTemplateDraft?.latestVersion) {
+      toast.error("Build or select a template draft first.");
+      return;
+    }
+    const hasGalleryImageOneSlot = selectedTemplateDraft.latestVersion.data.imageSlots.some((slot) => {
+      const readableSlotLabel =
+        templateImageSlotReadableLabelByPath.get(slot.path) ||
+        humanizeSlotToken(slot.path.split(".").pop() || slot.path);
+      return readableSlotLabel.trim().toLowerCase() === "gallery image 1";
+    });
+    if (!hasGalleryImageOneSlot) {
+      toast.error("Gallery Image 1 was not found in this draft.");
+      return;
+    }
+    openTemplatePreview({ focusGalleryImageOne: true });
+  };
+
+  useEffect(() => {
+    if (!templatePreviewDialogOpen || !focusGalleryImageOneOnPreviewOpen) return;
+    if (!templatePreviewGalleryImageOnePath) return;
+    const timeoutId = window.setTimeout(() => {
+      galleryImageOnePreviewCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 0);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    templatePreviewDialogOpen,
+    focusGalleryImageOneOnPreviewOpen,
+    templatePreviewGalleryImageOnePath,
+    templatePreviewImageItems.length,
+  ]);
 
   const handlePublishTemplateDraft = async () => {
     if (!workspace?.id) return;
@@ -2053,11 +2102,7 @@ export function BrandDesignSystemPage() {
           </div>
 
           {selectedTemplateDraft?.latestVersion ? (
-            <div className="space-y-3 rounded-md border border-divider p-3">
-              <div className="text-xs text-content-muted">
-                Editing draft <span className="font-semibold text-content">{selectedTemplateDraft.themeName}</span> · v
-                <span className="font-semibold text-content">{selectedTemplateDraft.latestVersion.versionNumber}</span>
-              </div>
+            <div className="space-y-3">
               {/*
               <div className="space-y-3 rounded-md border border-divider p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -2366,7 +2411,7 @@ export function BrandDesignSystemPage() {
                 )}
               </div>
               */}
-              <div className="space-y-3 rounded-md border border-divider p-3">
+              <div className="space-y-3">
                 <div>
                   <div className="text-xs font-semibold text-content">Mapped image slots</div>
                   <div className="text-xs text-content-muted">
@@ -2425,52 +2470,6 @@ export function BrandDesignSystemPage() {
                   </div>
                 )}
               </div>
-              <div className="space-y-3 rounded-md border border-divider p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <div className="text-xs font-semibold text-content">Image generation scope (optional)</div>
-                    <div className="text-xs text-content-muted">
-                      Leave blank to generate all unmapped slots. To target specific images, enter slot paths (one per line).
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() =>
-                        setTemplateImageGenerationSlotPathsInput(
-                          selectedTemplateDraft.latestVersion.data.imageSlots.map((slot) => slot.path).join("\n")
-                        )
-                      }
-                    >
-                      Use all slot paths
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setTemplateImageGenerationSlotPathsInput("")}
-                    >
-                      Clear scope
-                    </Button>
-                  </div>
-                </div>
-                <textarea
-                  rows={4}
-                  value={templateImageGenerationSlotPathsInput}
-                  onChange={(event) => {
-                    setTemplateImageGenerationSlotPathsInput(event.target.value);
-                    setTemplateDraftEditError(null);
-                  }}
-                  placeholder="templates/index.json.sections.hero.settings.image"
-                  className={cn(
-                    "w-full rounded-md border border-border bg-surface px-3 py-2 text-[11px] font-mono text-content shadow-sm",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
-                  )}
-                />
-                <div className="rounded-md border border-border bg-surface-2 px-2 py-1 text-[11px] text-content-muted">
-                  Known image slots: {selectedTemplateDraft.latestVersion.data.imageSlots.length}
-                </div>
-              </div>
               {templateDraftEditError ? <div className="text-xs text-danger">{templateDraftEditError}</div> : null}
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -2501,6 +2500,13 @@ export function BrandDesignSystemPage() {
                   onClick={handleOpenTemplatePreview}
                 >
                   Preview mapped content
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleOpenGalleryImageOnePreview}
+                >
+                  View Gallery Image 1
                 </Button>
                 <Button
                   size="sm"
@@ -3246,7 +3252,13 @@ export function BrandDesignSystemPage() {
         )}
       </div>
 
-      <DialogRoot open={templatePreviewDialogOpen} onOpenChange={setTemplatePreviewDialogOpen}>
+      <DialogRoot
+        open={templatePreviewDialogOpen}
+        onOpenChange={(open) => {
+          setTemplatePreviewDialogOpen(open);
+          if (!open) setFocusGalleryImageOneOnPreviewOpen(false);
+        }}
+      >
         <DialogContent className="max-w-5xl">
           <div className="space-y-2">
             <DialogTitle>Template Draft Preview</DialogTitle>
@@ -3280,8 +3292,18 @@ export function BrandDesignSystemPage() {
                       const readableSlotLabel =
                         templateImageSlotReadableLabelByPath.get(item.path) ||
                         humanizeSlotToken(item.path.split(".").pop() || item.path);
+                      const isGalleryImageOne = readableSlotLabel.trim().toLowerCase() === "gallery image 1";
                       return (
-                        <div key={item.path} className="rounded-md border border-border bg-surface p-3 space-y-2">
+                        <div
+                          key={item.path}
+                          ref={isGalleryImageOne ? galleryImageOnePreviewCardRef : undefined}
+                          className={cn(
+                            "rounded-md border border-border bg-surface p-3 space-y-2",
+                            focusGalleryImageOneOnPreviewOpen && isGalleryImageOne
+                              ? "border-accent/40 ring-2 ring-accent/30"
+                              : null
+                          )}
+                        >
                           <div className="text-xs font-semibold text-content">{readableSlotLabel}</div>
                           <div className="text-[11px] font-mono break-all text-content">{item.path}</div>
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
