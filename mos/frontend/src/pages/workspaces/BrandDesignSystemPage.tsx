@@ -772,6 +772,7 @@ export function BrandDesignSystemPage() {
   const [templatePreviewImageMap, setTemplatePreviewImageMap] = useState<Record<string, string>>({});
   const [templatePreviewTextValues, setTemplatePreviewTextValues] = useState<Record<string, string>>({});
   const [templatePreviewImageErrorsByPath, setTemplatePreviewImageErrorsByPath] = useState<Record<string, boolean>>({});
+  const [mappedImageSlotsDialogOpen, setMappedImageSlotsDialogOpen] = useState(false);
   const [focusGalleryImageOneOnPreviewOpen, setFocusGalleryImageOneOnPreviewOpen] = useState(false);
   const [templatePublishResult, setTemplatePublishResult] = useState<ClientShopifyThemeTemplatePublishResponse | null>(null);
   const [themeAuditResult, setThemeAuditResult] = useState<ClientShopifyThemeBrandAuditResponse | null>(null);
@@ -863,6 +864,7 @@ export function BrandDesignSystemPage() {
     setTemplatePreviewImageMap({});
     setTemplatePreviewTextValues({});
     setTemplatePreviewImageErrorsByPath({});
+    setMappedImageSlotsDialogOpen(false);
     setFocusGalleryImageOneOnPreviewOpen(false);
     setTemplatePublishResult(null);
     setThemeAuditResult(null);
@@ -1666,6 +1668,13 @@ export function BrandDesignSystemPage() {
     }
     openTemplatePreview({ focusGalleryImageOne: true });
   };
+  const handleOpenMappedImageSlotsModal = () => {
+    if (!selectedTemplateDraft?.latestVersion) {
+      toast.error("Build or select a template draft first.");
+      return;
+    }
+    setMappedImageSlotsDialogOpen(true);
+  };
 
   useEffect(() => {
     if (!templatePreviewDialogOpen || !focusGalleryImageOneOnPreviewOpen) return;
@@ -2411,65 +2420,13 @@ export function BrandDesignSystemPage() {
                 )}
               </div>
               */}
-              <div className="space-y-3">
-                <div>
-                  <div className="text-xs font-semibold text-content">Mapped image slots</div>
-                  <div className="text-xs text-content-muted">
-                    Clear one mapped image slot without clearing all mappings.
-                  </div>
-                </div>
-                {parsedTemplateDraftImageMapResult.error ? (
-                  <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
-                    {parsedTemplateDraftImageMapResult.error}
-                  </div>
-                ) : !mappedTemplateImageSlotEntries.length ? (
-                  <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
-                    No mapped image slots yet.
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                    {mappedTemplateImageSlotEntries.map((entry) => {
-                      const isClearingThisSlot =
-                        updateShopifyThemeTemplateDraft.isPending &&
-                        clearingTemplateDraftImageSlotPath === entry.path;
-                      return (
-                        <div
-                          key={`mapped-slot-${entry.path}`}
-                          className="space-y-2 rounded-md border border-border bg-surface p-2"
-                        >
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-xs font-semibold text-content">
-                              {entry.readableSlotLabel}
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => {
-                                void handleClearTemplateDraftImageMapping(entry.path);
-                              }}
-                              disabled={updateShopifyThemeTemplateDraft.isPending}
-                            >
-                              {isClearingThisSlot ? "Clearing…" : "Clear slot"}
-                            </Button>
-                          </div>
-                          <div className="text-[11px] font-mono break-all text-content">
-                            {entry.path}
-                          </div>
-                          <div className="text-[11px] font-mono break-all text-content-muted">
-                            asset: {entry.assetPublicId}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
-                            {entry.role ? <span>role: {entry.role}</span> : null}
-                            {entry.recommendedAspect ? (
-                              <span>aspect: {entry.recommendedAspect}</span>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleOpenMappedImageSlotsModal}
+              >
+                Mapped image slots
+              </Button>
               {templateDraftEditError ? <div className="text-xs text-danger">{templateDraftEditError}</div> : null}
               <div className="flex flex-wrap items-center gap-2">
                 <Button
@@ -3251,6 +3208,71 @@ export function BrandDesignSystemPage() {
           </div>
         )}
       </div>
+
+      <DialogRoot open={mappedImageSlotsDialogOpen} onOpenChange={setMappedImageSlotsDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <div className="space-y-2">
+            <DialogTitle>Mapped image slots</DialogTitle>
+            <DialogDescription>
+              Clear one mapped image slot without clearing all mappings.
+            </DialogDescription>
+          </div>
+
+          <div className="mt-4">
+            {parsedTemplateDraftImageMapResult.error ? (
+              <div className="rounded-md border border-danger/30 bg-danger/5 p-3 text-xs text-danger">
+                {parsedTemplateDraftImageMapResult.error}
+              </div>
+            ) : !mappedTemplateImageSlotEntries.length ? (
+              <div className="rounded-md border border-dashed border-border bg-surface-2 p-3 text-xs text-content-muted">
+                No mapped image slots yet.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+                {mappedTemplateImageSlotEntries.map((entry) => {
+                  const isClearingThisSlot =
+                    updateShopifyThemeTemplateDraft.isPending &&
+                    clearingTemplateDraftImageSlotPath === entry.path;
+                  return (
+                    <div
+                      key={`mapped-slot-modal-${entry.path}`}
+                      className="space-y-2 rounded-md border border-border bg-surface p-2"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-xs font-semibold text-content">
+                          {entry.readableSlotLabel}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            void handleClearTemplateDraftImageMapping(entry.path);
+                          }}
+                          disabled={updateShopifyThemeTemplateDraft.isPending}
+                        >
+                          {isClearingThisSlot ? "Clearing…" : "Clear slot"}
+                        </Button>
+                      </div>
+                      <div className="text-[11px] font-mono break-all text-content">
+                        {entry.path}
+                      </div>
+                      <div className="text-[11px] font-mono break-all text-content-muted">
+                        asset: {entry.assetPublicId}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">
+                        {entry.role ? <span>role: {entry.role}</span> : null}
+                        {entry.recommendedAspect ? (
+                          <span>aspect: {entry.recommendedAspect}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </DialogRoot>
 
       <DialogRoot
         open={templatePreviewDialogOpen}
