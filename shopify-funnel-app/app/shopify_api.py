@@ -8167,7 +8167,10 @@ class ShopifyApiClient:
                 if self._is_shopify_file_url(value=cleaned_logo_url):
                     settings_logo_url = cleaned_logo_url
                 elif not resolve_external_images_to_shopify_files:
-                    settings_logo_url = cleaned_logo_url
+                    # Export mode can disable external URL -> Shopify file uploads.
+                    # In that mode, skip settings logo-field sync when the logo URL
+                    # is not already a shopify:// reference.
+                    settings_logo_url = None
                 else:
                     settings_logo_url = (
                         await self._create_shopify_logo_file_reference_from_url(
