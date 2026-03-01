@@ -9,8 +9,8 @@ import {
   useUploadDesignSystemLogo,
 } from "@/api/designSystems";
 import {
-  useAuditClientShopifyThemeBrand,
   useClient,
+  useDownloadClientShopifyThemeTemplateZip,
   useGenerateClientShopifyThemeTemplateImages,
   useListClientShopifyThemeTemplateDrafts,
   usePublishClientShopifyThemeTemplateDraft,
@@ -22,7 +22,6 @@ import {
   useUpdateClientShopifyThemeTemplateDraft,
   useUpdateClientShopifyInstallation,
   useUpdateClient,
-  type ClientShopifyThemeBrandAuditResponse,
   type ClientShopifyThemeTemplateDraftData,
   type ClientShopifyThemeTemplateImageSlot,
   type ClientShopifyThemeTemplateTextSlot,
@@ -723,12 +722,12 @@ export function BrandDesignSystemPage() {
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
   const generateShopifyThemeTemplateImages = useGenerateClientShopifyThemeTemplateImages(workspace?.id);
   const publishShopifyThemeTemplateDraft = usePublishClientShopifyThemeTemplateDraft(workspace?.id);
+  const downloadShopifyThemeTemplateZip = useDownloadClientShopifyThemeTemplateZip(workspace?.id);
   const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
   const {
     data: shopifyThemeTemplateDrafts = [],
     refetch: refetchShopifyThemeTemplateDrafts,
   } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
-  const auditShopifyThemeBrand = useAuditClientShopifyThemeBrand(workspace?.id);
   const { data: workspaceProducts = [] } = useProducts(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
@@ -773,13 +772,10 @@ export function BrandDesignSystemPage() {
   const [templatePreviewTextValues, setTemplatePreviewTextValues] = useState<Record<string, string>>({});
   const [templatePreviewImageErrorsByPath, setTemplatePreviewImageErrorsByPath] = useState<Record<string, boolean>>({});
   const [mappedImageSlotsDialogOpen, setMappedImageSlotsDialogOpen] = useState(false);
-  const [focusGalleryImageOneOnPreviewOpen, setFocusGalleryImageOneOnPreviewOpen] = useState(false);
   const [templatePublishResult, setTemplatePublishResult] = useState<ClientShopifyThemeTemplatePublishResponse | null>(null);
-  const [themeAuditResult, setThemeAuditResult] = useState<ClientShopifyThemeBrandAuditResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
-  const galleryImageOnePreviewCardRef = useRef<HTMLDivElement | null>(null);
   const uploadTemplateProductAssets = useUploadProductAssets(templateAssetUploadProductId || "");
 
   const designSystemOptions = useMemo(
@@ -865,9 +861,7 @@ export function BrandDesignSystemPage() {
     setTemplatePreviewTextValues({});
     setTemplatePreviewImageErrorsByPath({});
     setMappedImageSlotsDialogOpen(false);
-    setFocusGalleryImageOneOnPreviewOpen(false);
     setTemplatePublishResult(null);
-    setThemeAuditResult(null);
     setPolicySyncResult(null);
   }, [workspace?.id]);
 
@@ -1250,17 +1244,6 @@ export function BrandDesignSystemPage() {
     () => Object.entries(templatePreviewTextValues).sort(([a], [b]) => a.localeCompare(b)),
     [templatePreviewTextValues]
   );
-  const templatePreviewGalleryImageOnePath = useMemo(() => {
-    for (const item of templatePreviewImageItems) {
-      const readableSlotLabel =
-        templateImageSlotReadableLabelByPath.get(item.path) ||
-        humanizeSlotToken(item.path.split(".").pop() || item.path);
-      if (readableSlotLabel.trim().toLowerCase() === "gallery image 1") {
-        return item.path;
-      }
-    }
-    return "";
-  }, [templatePreviewImageItems, templateImageSlotReadableLabelByPath]);
   const logoAssetOptions = useMemo(
     () =>
       [...logoAssets]
@@ -1626,7 +1609,7 @@ export function BrandDesignSystemPage() {
     }
   };
 
-  const openTemplatePreview = ({ focusGalleryImageOne = false }: { focusGalleryImageOne?: boolean } = {}) => {
+  const openTemplatePreview = () => {
     if (!selectedTemplateDraft?.latestVersion) {
       toast.error("Build or select a template draft first.");
       return;
@@ -1645,28 +1628,10 @@ export function BrandDesignSystemPage() {
     setTemplatePreviewImageMap(parsedImageMap.value);
     setTemplatePreviewTextValues(parsedTextValues.value);
     setTemplatePreviewImageErrorsByPath({});
-    setFocusGalleryImageOneOnPreviewOpen(focusGalleryImageOne);
     setTemplatePreviewDialogOpen(true);
   };
   const handleOpenTemplatePreview = () => {
     openTemplatePreview();
-  };
-  const handleOpenGalleryImageOnePreview = () => {
-    if (!selectedTemplateDraft?.latestVersion) {
-      toast.error("Build or select a template draft first.");
-      return;
-    }
-    const hasGalleryImageOneSlot = selectedTemplateDraft.latestVersion.data.imageSlots.some((slot) => {
-      const readableSlotLabel =
-        templateImageSlotReadableLabelByPath.get(slot.path) ||
-        humanizeSlotToken(slot.path.split(".").pop() || slot.path);
-      return readableSlotLabel.trim().toLowerCase() === "gallery image 1";
-    });
-    if (!hasGalleryImageOneSlot) {
-      toast.error("Gallery Image 1 was not found in this draft.");
-      return;
-    }
-    openTemplatePreview({ focusGalleryImageOne: true });
   };
   const handleOpenMappedImageSlotsModal = () => {
     if (!selectedTemplateDraft?.latestVersion) {
@@ -1675,20 +1640,6 @@ export function BrandDesignSystemPage() {
     }
     setMappedImageSlotsDialogOpen(true);
   };
-
-  useEffect(() => {
-    if (!templatePreviewDialogOpen || !focusGalleryImageOneOnPreviewOpen) return;
-    if (!templatePreviewGalleryImageOnePath) return;
-    const timeoutId = window.setTimeout(() => {
-      galleryImageOnePreviewCardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 0);
-    return () => window.clearTimeout(timeoutId);
-  }, [
-    templatePreviewDialogOpen,
-    focusGalleryImageOneOnPreviewOpen,
-    templatePreviewGalleryImageOnePath,
-    templatePreviewImageItems.length,
-  ]);
 
   const handlePublishTemplateDraft = async () => {
     if (!workspace?.id) return;
@@ -1706,21 +1657,16 @@ export function BrandDesignSystemPage() {
     }
   };
 
-  const handleAuditShopifyThemeBrand = async () => {
+  const handleDownloadTemplateZip = async () => {
     if (!workspace?.id) return;
-    const cleanedThemeName = themeSyncThemeName.trim();
-    if (!cleanedThemeName) {
-      toast.error("Enter a Shopify theme name.");
+    if (!selectedTemplateDraftId.trim()) {
+      toast.error("Select a template draft first.");
       return;
     }
-    const payload: { designSystemId?: string; shopDomain?: string; themeName: string } = {
-      themeName: cleanedThemeName,
-    };
-    if (themeSyncDesignSystemId) payload.designSystemId = themeSyncDesignSystemId;
-    if (shopifySyncShopDomain) payload.shopDomain = shopifySyncShopDomain;
     try {
-      const response = await auditShopifyThemeBrand.mutateAsync(payload);
-      setThemeAuditResult(response);
+      await downloadShopifyThemeTemplateZip.mutateAsync({
+        draftId: selectedTemplateDraftId.trim(),
+      });
     } catch {
       // Error toast is emitted by the mutation hook.
     }
@@ -2461,23 +2407,16 @@ export function BrandDesignSystemPage() {
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={handleOpenGalleryImageOnePreview}
-                >
-                  View Gallery Image 1
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
                   onClick={() => {
-                    void handleAuditShopifyThemeBrand();
+                    void handleDownloadTemplateZip();
                   }}
                   disabled={
-                    auditShopifyThemeBrand.isPending ||
+                    downloadShopifyThemeTemplateZip.isPending ||
                     !hasShopifyConnectionTarget ||
-                    !themeSyncThemeName.trim()
+                    !selectedTemplateDraftId.trim()
                   }
                 >
-                  {auditShopifyThemeBrand.isPending ? "Auditing…" : "Audit theme"}
+                  {downloadShopifyThemeTemplateZip.isPending ? "Preparing ZIP…" : "Download template ZIP"}
                 </Button>
                 <Button
                   size="sm"
@@ -2543,55 +2482,6 @@ export function BrandDesignSystemPage() {
             </div>
           ) : null}
 
-          {themeAuditResult ? (
-            <div className="space-y-2 rounded-md border border-divider p-3">
-              <div className="text-xs text-content-muted">
-                Last audit: <span className="font-semibold text-content">{themeAuditResult.shopDomain}</span> ·{" "}
-                <span className="font-semibold text-content">{themeAuditResult.themeName}</span>
-              </div>
-              <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="w-[240px] text-xs text-content-muted">Status</TableCell>
-                    <TableCell className={cn("text-xs font-semibold", themeAuditResult.isReady ? "text-emerald-600" : "text-amber-600")}>
-                      {themeAuditResult.isReady ? "Ready" : "Has gaps"}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Marker block</TableCell>
-                    <TableCell className="text-xs text-content">{themeAuditResult.hasManagedMarkerBlock ? "Present" : "Missing/invalid"}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Managed CSS asset</TableCell>
-                    <TableCell className="text-xs text-content">
-                      {themeAuditResult.managedCssAssetExists ? "Found" : "Missing"} ·{" "}
-                      {themeAuditResult.layoutIncludesManagedCssAsset ? "Linked in layout" : "Not linked in layout"}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Coverage gaps</TableCell>
-                    <TableCell className="text-xs text-content">
-                      {themeAuditResult.coverage.missingSourceVars.length + themeAuditResult.coverage.missingThemeVars.length}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Settings gaps</TableCell>
-                    <TableCell className="text-xs text-content">
-                      {themeAuditResult.settingsAudit.missingPaths.length + themeAuditResult.settingsAudit.mismatchedPaths.length}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Component style gaps</TableCell>
-                    <TableCell className="text-xs text-content">
-                      {themeAuditResult.settingsAudit.semanticMismatchedPaths.length +
-                        themeAuditResult.settingsAudit.unmappedColorPaths.length +
-                        themeAuditResult.settingsAudit.unmappedTypographyPaths.length}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          ) : null}
         </div>
 
         <div className="rounded-md border border-divider p-3 space-y-3">
@@ -3276,10 +3166,7 @@ export function BrandDesignSystemPage() {
 
       <DialogRoot
         open={templatePreviewDialogOpen}
-        onOpenChange={(open) => {
-          setTemplatePreviewDialogOpen(open);
-          if (!open) setFocusGalleryImageOneOnPreviewOpen(false);
-        }}
+        onOpenChange={setTemplatePreviewDialogOpen}
       >
         <DialogContent className="max-w-5xl">
           <div className="space-y-2">
@@ -3314,18 +3201,8 @@ export function BrandDesignSystemPage() {
                       const readableSlotLabel =
                         templateImageSlotReadableLabelByPath.get(item.path) ||
                         humanizeSlotToken(item.path.split(".").pop() || item.path);
-                      const isGalleryImageOne = readableSlotLabel.trim().toLowerCase() === "gallery image 1";
                       return (
-                        <div
-                          key={item.path}
-                          ref={isGalleryImageOne ? galleryImageOnePreviewCardRef : undefined}
-                          className={cn(
-                            "rounded-md border border-border bg-surface p-3 space-y-2",
-                            focusGalleryImageOneOnPreviewOpen && isGalleryImageOne
-                              ? "border-accent/40 ring-2 ring-accent/30"
-                              : null
-                          )}
-                        >
+                        <div key={item.path} className="rounded-md border border-border bg-surface p-3 space-y-2">
                           <div className="text-xs font-semibold text-content">{readableSlotLabel}</div>
                           <div className="text-[11px] font-mono break-all text-content">{item.path}</div>
                           <div className="flex flex-wrap items-center gap-2 text-[11px] text-content-muted">

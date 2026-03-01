@@ -1,3 +1,6 @@
+import io
+import json
+import zipfile
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
@@ -675,6 +678,188 @@ def test_update_shopify_theme_template_draft_creates_new_version(api_client, db_
     assert update_payload["latestVersion"]["data"]["componentTextValues"] == {
         "templates/index.json.sections.hero.settings.heading": "New heading"
     }
+
+
+def test_export_shopify_theme_template_zip_returns_archive(api_client, db_session, monkeypatch):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+    monkeypatch.setattr(
+        clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
+    )
+
+    image_asset_public_id = uuid4()
+    db_session.add(
+        Asset(
+            org_id=client.org_id,
+            client_id=client.id,
+            source_type=AssetSourceEnum.generated,
+            channel_id="meta",
+            format="image",
+            content={"label": "hero image"},
+            public_id=image_asset_public_id,
+            asset_kind="image",
+        )
+    )
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="futrgroup2-0theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    version = ShopifyThemeTemplateDraftVersion(
+        draft_id=draft.id,
+        org_id=client.org_id,
+        client_id=client.id,
+        version_number=4,
+        source="build_job",
+        payload={
+            "shopDomain": "example.myshopify.com",
+            "workspaceName": "Acme Workspace",
+            "designSystemId": "design-system-1",
+            "designSystemName": "Acme DS",
+            "brandName": "Acme",
+            "logoAssetPublicId": str(uuid4()),
+            "logoUrl": "https://assets.example.com/public/assets/logo-1",
+            "themeId": "gid://shopify/OnlineStoreTheme/123",
+            "themeName": "futrgroup2-0theme",
+            "themeRole": "MAIN",
+            "cssVars": {"--color-brand": "#123456"},
+            "fontUrls": [],
+            "dataTheme": "light",
+            "productId": None,
+            "componentImageAssetMap": {
+                "templates/index.json.sections.hero.settings.image": str(image_asset_public_id)
+            },
+            "componentTextValues": {
+                "templates/index.json.sections.hero.settings.heading": "Glow brighter"
+            },
+            "imageSlots": [],
+            "textSlots": [],
+            "metadata": {},
+        },
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(version)
+    db_session.commit()
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_export_theme_brand(
+        *,
+        client_id: str,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        css_vars: dict[str, str],
+        font_urls: list[str] | None,
+        data_theme: str | None,
+        component_image_urls: dict[str, str] | None,
+        component_text_values: dict[str, str] | None,
+        auto_component_image_urls: list[str] | None,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        assert workspace_name == "Acme Workspace"
+        assert brand_name == "Acme"
+        assert theme_id == "gid://shopify/OnlineStoreTheme/123"
+        assert theme_name is None
+        assert shop_domain == "example.myshopify.com"
+        assert component_image_urls is not None
+        assert component_text_values is not None
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/123",
+            "themeName": "futrgroup2-0theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": None,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+            "files": [
+                {
+                    "filename": "layout/theme.liquid",
+                    "content": "{% comment %}Managed by mOS{% endcomment %}",
+                },
+                {
+                    "filename": "assets/acme-workspace-workspace-brand.css",
+                    "content": ":root { --color-brand: #123456; }",
+                },
+                {
+                    "filename": "templates/index.json",
+                    "content": '{"sections":{"hero":{"settings":{"heading":"Glow brighter"}}}}',
+                },
+            ],
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(clients_router, "export_client_shopify_theme_brand", fake_export_theme_brand)
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/template/export-zip",
+        json={"draftId": str(draft.id)},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+    assert "attachment; filename=" in response.headers["content-disposition"]
+
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    namelist = sorted(archive.namelist())
+    assert "assets/acme-workspace-workspace-brand.css" in namelist
+    assert "layout/theme.liquid" in namelist
+    assert "templates/index.json" in namelist
+    assert "mos-template-export/manifest.json" in namelist
+
+    manifest = json.loads(archive.read("mos-template-export/manifest.json").decode("utf-8"))
+    assert manifest["draftId"] == str(draft.id)
+    assert manifest["draftVersionId"] == str(version.id)
+    assert manifest["shopDomain"] == "example.myshopify.com"
+    assert manifest["themeName"] == "futrgroup2-0theme"
+    assert manifest["exportedFiles"] == [
+        "layout/theme.liquid",
+        "assets/acme-workspace-workspace-brand.css",
+        "templates/index.json",
+    ]
+
 
 def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Acme Workspace")

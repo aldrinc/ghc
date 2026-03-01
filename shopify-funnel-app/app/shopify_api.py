@@ -7015,6 +7015,168 @@ class ShopifyApiClient:
             status_code=409,
         )
 
+    async def _list_theme_text_files_with_content(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        theme_id: str,
+    ) -> list[dict[str, str]]:
+        query = """
+        query themeTextFilesForExport($id: ID!, $first: Int!, $after: String) {
+            theme(id: $id) {
+                files(first: $first, after: $after) {
+                    nodes {
+                        filename
+                        body {
+                            __typename
+                            ... on OnlineStoreThemeFileBodyText {
+                                content
+                            }
+                        }
+                    }
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    userErrors {
+                        code
+                        filename
+                    }
+                }
+            }
+        }
+        """
+        files_by_filename: dict[str, str] = {}
+        non_text_filenames: set[str] = set()
+        after: str | None = None
+
+        for _ in range(40):
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={
+                    "query": query,
+                    "variables": {
+                        "id": theme_id,
+                        "first": 250,
+                        "after": after,
+                    },
+                },
+            )
+            theme = response.get("theme")
+            if not isinstance(theme, dict):
+                raise ShopifyApiError(
+                    message=f"Theme not found for themeId={theme_id}.",
+                    status_code=404,
+                )
+            files = theme.get("files")
+            if not isinstance(files, dict):
+                raise ShopifyApiError(
+                    message="theme text files export query response is invalid."
+                )
+            user_errors = files.get("userErrors") or []
+            if user_errors:
+                details: list[str] = []
+                for error in user_errors:
+                    if not isinstance(error, dict):
+                        continue
+                    code = error.get("code")
+                    errored_filename = error.get("filename")
+                    if isinstance(code, str) and isinstance(errored_filename, str):
+                        details.append(f"{code} ({errored_filename})")
+                    elif isinstance(code, str):
+                        details.append(code)
+                    elif isinstance(errored_filename, str):
+                        details.append(errored_filename)
+                detail_text = "; ".join(details) if details else str(user_errors)
+                raise ShopifyApiError(
+                    message=f"theme text files export query failed: {detail_text}",
+                    status_code=409,
+                )
+
+            nodes = files.get("nodes")
+            if not isinstance(nodes, list):
+                raise ShopifyApiError(
+                    message="theme text files export query response is missing nodes."
+                )
+            for node in nodes:
+                if not isinstance(node, dict):
+                    continue
+                filename = node.get("filename")
+                if not isinstance(filename, str) or not filename.strip():
+                    continue
+                cleaned_filename = filename.strip()
+                body = node.get("body")
+                typename = body.get("__typename") if isinstance(body, dict) else None
+                if typename != "OnlineStoreThemeFileBodyText":
+                    non_text_filenames.add(cleaned_filename)
+                    continue
+                content = body.get("content") if isinstance(body, dict) else None
+                if not isinstance(content, str):
+                    raise ShopifyApiError(
+                        message=(
+                            "theme text files export query returned an invalid text body "
+                            f"for filename={cleaned_filename}."
+                        ),
+                        status_code=409,
+                    )
+                files_by_filename[cleaned_filename] = content
+
+            page_info = files.get("pageInfo")
+            if not isinstance(page_info, dict):
+                raise ShopifyApiError(
+                    message="theme text files export query response is missing pageInfo."
+                )
+            has_next_page = page_info.get("hasNextPage")
+            if not isinstance(has_next_page, bool):
+                raise ShopifyApiError(
+                    message=(
+                        "theme text files export query response is missing "
+                        "pageInfo.hasNextPage."
+                    )
+                )
+            if not has_next_page:
+                if non_text_filenames:
+                    sample = ", ".join(sorted(non_text_filenames)[:10])
+                    raise ShopifyApiError(
+                        message=(
+                            "Theme export requires every file body to be text-backed, but non-text files "
+                            f"were detected ({len(non_text_filenames)}): {sample}. "
+                            "Binary theme file export is not supported by this endpoint."
+                        ),
+                        status_code=409,
+                    )
+                if not files_by_filename:
+                    raise ShopifyApiError(
+                        message=(
+                            "Theme export could not load any text-backed files. "
+                            "The theme cannot be exported as a text ZIP package."
+                        ),
+                        status_code=409,
+                    )
+                return [
+                    {"filename": filename, "content": files_by_filename[filename]}
+                    for filename in sorted(files_by_filename.keys())
+                ]
+            end_cursor = page_info.get("endCursor")
+            if not isinstance(end_cursor, str) or not end_cursor:
+                raise ShopifyApiError(
+                    message=(
+                        "theme text files export query response is missing "
+                        "pageInfo.endCursor."
+                    )
+                )
+            after = end_cursor
+
+        raise ShopifyApiError(
+            message=(
+                "Theme text files export query exceeded pagination limit while exporting. "
+                "Reduce theme file count or adjust pagination strategy."
+            ),
+            status_code=409,
+        )
+
     async def _upsert_theme_files(
         self,
         *,
@@ -7889,6 +8051,10 @@ class ShopifyApiClient:
         data_theme: str | None = None,
         theme_id: str | None = None,
         theme_name: str | None = None,
+        upsert_theme_files: bool = True,
+        include_file_payloads: bool = False,
+        include_all_theme_text_files: bool = False,
+        resolve_external_images_to_shopify_files: bool = True,
     ) -> dict[str, Any]:
         cleaned_workspace_name = workspace_name.strip()
         if not cleaned_workspace_name:
@@ -7999,6 +8165,8 @@ class ShopifyApiClient:
                 settings_data=parsed_settings_for_logo
             ):
                 if self._is_shopify_file_url(value=cleaned_logo_url):
+                    settings_logo_url = cleaned_logo_url
+                elif not resolve_external_images_to_shopify_files:
                     settings_logo_url = cleaned_logo_url
                 else:
                     settings_logo_url = (
@@ -8278,6 +8446,8 @@ class ShopifyApiClient:
                     if resolved_component_image_url is None:
                         if self._is_shopify_file_url(value=component_image_url):
                             resolved_component_image_url = component_image_url
+                        elif not resolve_external_images_to_shopify_files:
+                            resolved_component_image_url = component_image_url
                         else:
                             resolved_component_image_url = (
                                 await self._create_shopify_logo_file_reference_from_url(
@@ -8333,20 +8503,22 @@ class ShopifyApiClient:
                 }
             )
         files_to_upsert.extend(template_files_to_upsert)
-        job_id = await self._upsert_theme_files(
-            shop_domain=shop_domain,
-            access_token=access_token,
-            theme_id=theme["id"],
-            files=files_to_upsert,
-        )
-        if job_id is not None:
-            await self._wait_for_job_completion(
+        job_id: str | None = None
+        if upsert_theme_files:
+            job_id = await self._upsert_theme_files(
                 shop_domain=shop_domain,
                 access_token=access_token,
-                job_id=job_id,
+                theme_id=theme["id"],
+                files=files_to_upsert,
             )
+            if job_id is not None:
+                await self._wait_for_job_completion(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    job_id=job_id,
+                )
 
-        return {
+        response: dict[str, Any] = {
             "themeId": theme["id"],
             "themeName": theme["name"],
             "themeRole": theme["role"],
@@ -8359,6 +8531,25 @@ class ShopifyApiClient:
             "coverage": coverage,
             "settingsSync": settings_sync,
         }
+        if include_file_payloads:
+            response_files = files_to_upsert
+            if include_all_theme_text_files:
+                full_theme_text_files = await self._list_theme_text_files_with_content(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    theme_id=theme["id"],
+                )
+                merged_by_filename = {
+                    item["filename"]: item["content"] for item in full_theme_text_files
+                }
+                for item in files_to_upsert:
+                    merged_by_filename[item["filename"]] = item["content"]
+                response_files = [
+                    {"filename": filename, "content": merged_by_filename[filename]}
+                    for filename in sorted(merged_by_filename.keys())
+                ]
+            response["files"] = response_files
+        return response
 
     async def audit_theme_brand(
         self,

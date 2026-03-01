@@ -1207,6 +1207,7 @@ def sync_client_shopify_theme_brand(
     theme_id: str | None = None,
     theme_name: str | None = None,
     shop_domain: str | None = None,
+    export_files: bool = False,
 ) -> dict[str, Any]:
     cleaned_workspace_name = workspace_name.strip()
     if not cleaned_workspace_name:
@@ -1555,23 +1556,29 @@ def sync_client_shopify_theme_brand(
             detail="SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE must be a positive integer.",
         )
 
+    component_image_items = list(normalized_component_image_urls.items())
+    image_batch_size = configured_image_batch_size
+    if export_files and component_image_items:
+        image_batch_size = max(image_batch_size, len(component_image_items))
+
     def _sync_theme_brand_request(*, request_payload: dict[str, Any]) -> dict[str, Any]:
         payload = _bridge_request(
             method="POST",
-            path="/v1/themes/brand/sync",
+            path="/v1/themes/brand/export" if export_files else "/v1/themes/brand/sync",
             json_body=request_payload,
             timeout_seconds=settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS,
         )
+        if export_files:
+            return _parse_theme_brand_export_response_payload(payload=payload)
         return _parse_theme_brand_sync_response_payload(payload=payload)
 
-    component_image_items = list(normalized_component_image_urls.items())
-    if len(component_image_items) > configured_image_batch_size:
+    if len(component_image_items) > image_batch_size:
         final_response: dict[str, Any] | None = None
         for chunk_start in range(
-            0, len(component_image_items), configured_image_batch_size
+            0, len(component_image_items), image_batch_size
         ):
             chunk_items = component_image_items[
-                chunk_start : chunk_start + configured_image_batch_size
+                chunk_start : chunk_start + image_batch_size
             ]
             chunk_request_payload = dict(base_request_payload)
             chunk_request_payload["componentImageUrls"] = dict(chunk_items)
@@ -1601,6 +1608,40 @@ def sync_client_shopify_theme_brand(
     if normalized_auto_component_image_urls:
         request_payload["autoComponentImageUrls"] = normalized_auto_component_image_urls
     return _sync_theme_brand_request(request_payload=request_payload)
+
+
+def export_client_shopify_theme_brand(
+    *,
+    client_id: str,
+    workspace_name: str,
+    brand_name: str,
+    logo_url: str,
+    css_vars: dict[str, str],
+    font_urls: list[str] | None = None,
+    data_theme: str | None = None,
+    component_image_urls: dict[str, str] | None = None,
+    component_text_values: dict[str, str] | None = None,
+    auto_component_image_urls: list[str] | None = None,
+    theme_id: str | None = None,
+    theme_name: str | None = None,
+    shop_domain: str | None = None,
+) -> dict[str, Any]:
+    return sync_client_shopify_theme_brand(
+        client_id=client_id,
+        workspace_name=workspace_name,
+        brand_name=brand_name,
+        logo_url=logo_url,
+        css_vars=css_vars,
+        font_urls=font_urls,
+        data_theme=data_theme,
+        component_image_urls=component_image_urls,
+        component_text_values=component_text_values,
+        auto_component_image_urls=auto_component_image_urls,
+        theme_id=theme_id,
+        theme_name=theme_name,
+        shop_domain=shop_domain,
+        export_files=True,
+    )
 
 
 def _parse_theme_brand_sync_response_payload(*, payload: Any) -> dict[str, Any]:
@@ -1773,6 +1814,49 @@ def _parse_theme_brand_sync_response_payload(*, payload: Any) -> dict[str, Any]:
             "unmappedTypographyPaths": unmapped_typography_paths,
         },
     }
+
+
+def _parse_theme_brand_export_response_payload(*, payload: Any) -> dict[str, Any]:
+    parsed_sync_payload = _parse_theme_brand_sync_response_payload(payload=payload)
+
+    files_payload = payload.get("files") if isinstance(payload, dict) else None
+    if not isinstance(files_payload, list) or not files_payload:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid files for theme brand export.",
+        )
+
+    parsed_files: list[dict[str, str]] = []
+    seen_filenames: set[str] = set()
+    for item in files_payload:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid file entry for theme brand export.",
+            )
+        filename = item.get("filename")
+        content = item.get("content")
+        if not isinstance(filename, str) or not filename.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid filename for theme brand export.",
+            )
+        if not isinstance(content, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid file content for theme brand export.",
+            )
+        cleaned_filename = filename.strip()
+        if cleaned_filename in seen_filenames:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Shopify checkout app returned duplicate export filename: {cleaned_filename}",
+            )
+        seen_filenames.add(cleaned_filename)
+        parsed_files.append({"filename": cleaned_filename, "content": content})
+
+    parsed_sync_payload["files"] = parsed_files
+    return parsed_sync_payload
 
 
 def list_client_shopify_theme_template_slots(

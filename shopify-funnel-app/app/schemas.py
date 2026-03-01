@@ -325,6 +325,15 @@ class SyncThemeBrandResponse(BaseModel):
     settingsSync: ThemeBrandSettingsSyncSummary
 
 
+class ThemeBrandExportFile(BaseModel):
+    filename: str
+    content: str
+
+
+class ExportThemeBrandResponse(SyncThemeBrandResponse):
+    files: list[ThemeBrandExportFile] = Field(default_factory=list)
+
+
 class ListThemeBrandTemplateSlotsRequest(BaseModel):
     clientId: str | None = None
     shopDomain: str | None = None

@@ -1,6 +1,8 @@
 import concurrent.futures
 from contextvars import ContextVar
 from datetime import datetime, timezone
+import io
+import json
 import logging
 import os
 import re
@@ -8,9 +10,11 @@ import threading
 import time
 from typing import Any
 from uuid import UUID, uuid4
+import zipfile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.exc import DataError, StatementError
 from sqlalchemy.orm import Session
@@ -96,6 +100,7 @@ from app.services.shopify_connection import (
     build_client_shopify_install_url,
     create_client_shopify_product,
     disconnect_client_shopify_store,
+    export_client_shopify_theme_brand,
     get_client_shopify_connection_status,
     list_client_shopify_theme_template_slots,
     list_client_shopify_products,
@@ -3243,6 +3248,132 @@ def _publish_shopify_theme_template_draft(
     )
 
 
+def _slugify_theme_export_token(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    normalized = normalized.strip("-")
+    return normalized or "template"
+
+
+def _build_shopify_theme_template_export_zip_response(
+    *,
+    client_id: str,
+    payload: ShopifyThemeTemplatePublishRequest,
+    auth: AuthContext,
+    session: Session,
+) -> StreamingResponse:
+    drafts_repo = ShopifyThemeTemplateDraftsRepository(session)
+    draft = drafts_repo.get(
+        org_id=auth.org_id,
+        client_id=client_id,
+        draft_id=payload.draftId.strip(),
+    )
+    if not draft:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shopify theme template draft not found.",
+        )
+    version = drafts_repo.get_latest_version(draft_id=str(draft.id))
+    if not version:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shopify theme template draft has no versions to export.",
+        )
+
+    serialized_version = _serialize_shopify_theme_template_draft_version(version=version)
+    draft_data = serialized_version.data
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=draft_data.shopDomain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify connection is not ready for template export: "
+                f"{status_payload['message']}"
+            ),
+        )
+
+    component_image_asset_map = _normalize_theme_template_component_image_asset_map(
+        draft_data.componentImageAssetMap
+    )
+    component_text_values = _normalize_theme_template_component_text_values(
+        draft_data.componentTextValues
+    )
+    component_image_urls = _resolve_component_image_urls_from_asset_map(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        component_image_asset_map=component_image_asset_map,
+    )
+
+    exported = export_client_shopify_theme_brand(
+        client_id=client_id,
+        workspace_name=draft_data.workspaceName,
+        brand_name=draft_data.brandName,
+        logo_url=draft_data.logoUrl,
+        css_vars=draft_data.cssVars,
+        font_urls=draft_data.fontUrls,
+        data_theme=draft_data.dataTheme,
+        component_image_urls=component_image_urls,
+        component_text_values=component_text_values,
+        auto_component_image_urls=[],
+        theme_id=draft_data.themeId,
+        theme_name=None,
+        shop_domain=draft_data.shopDomain,
+    )
+
+    exported_files = exported["files"]
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        for file_entry in exported_files:
+            filename = file_entry["filename"].strip()
+            if not filename:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Shopify export returned a file with an empty filename.",
+                )
+            zip_file.writestr(filename, file_entry["content"])
+
+        manifest_payload = {
+            "generatedAt": datetime.now(timezone.utc).isoformat(),
+            "workspaceId": client_id,
+            "draftId": str(draft.id),
+            "draftVersionId": str(version.id),
+            "draftVersionNumber": int(version.version_number),
+            "shopDomain": exported["shopDomain"],
+            "themeId": exported["themeId"],
+            "themeName": exported["themeName"],
+            "themeRole": exported["themeRole"],
+            "layoutFilename": exported["layoutFilename"],
+            "cssFilename": exported["cssFilename"],
+            "settingsFilename": exported.get("settingsFilename"),
+            "coverage": exported["coverage"],
+            "settingsSync": exported["settingsSync"],
+            "exportedFiles": [entry["filename"] for entry in exported_files],
+            "componentImageAssetMap": component_image_asset_map,
+            "componentImageUrls": component_image_urls,
+            "componentTextValues": component_text_values,
+        }
+        zip_file.writestr(
+            "mos-template-export/manifest.json",
+            json.dumps(manifest_payload, indent=2, sort_keys=True),
+        )
+
+    zip_buffer.seek(0)
+    filename_workspace = _slugify_theme_export_token(draft_data.workspaceName)
+    filename_theme = _slugify_theme_export_token(draft_data.themeName)
+    archive_filename = (
+        f"{filename_workspace}-{filename_theme}-template-v{version.version_number}.zip"
+    )
+    headers = {"Content-Disposition": f'attachment; filename="{archive_filename}"'}
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers=headers,
+    )
+
+
 def _run_client_shopify_theme_template_build_job(job_id: str) -> None:
     session = SessionLocal()
     progress_token = None
@@ -4559,6 +4690,24 @@ def get_client_shopify_theme_template_generate_images_job_status_route(
         updatedAt=job.updated_at,
         startedAt=job.started_at,
         finishedAt=job.finished_at,
+    )
+
+
+@router.post(
+    "/{client_id}/shopify/theme/brand/template/export-zip",
+)
+def export_client_shopify_theme_template_zip_route(
+    client_id: str,
+    payload: ShopifyThemeTemplatePublishRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    _require_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    return _build_shopify_theme_template_export_zip_response(
+        client_id=client_id,
+        payload=payload,
+        auth=auth,
+        session=session,
     )
 
 

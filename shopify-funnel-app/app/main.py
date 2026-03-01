@@ -25,6 +25,7 @@ from app.schemas import (
     CreatedCatalogVariant,
     CreateCheckoutRequest,
     CreateCheckoutResponse,
+    ExportThemeBrandResponse,
     ForwardOrderPayload,
     GetProductRequest,
     GetProductResponse,
@@ -750,6 +751,63 @@ async def sync_theme_brand(
         jobId=synced.get("jobId"),
         coverage=synced["coverage"],
         settingsSync=synced["settingsSync"],
+    )
+
+
+@app.post(
+    "/v1/themes/brand/export",
+    response_model=ExportThemeBrandResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def export_theme_brand(
+    payload: SyncThemeBrandRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        exported = await shopify_api.sync_theme_brand(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            workspace_name=payload.workspaceName,
+            brand_name=payload.brandName,
+            logo_url=payload.logoUrl,
+            css_vars=payload.cssVars,
+            font_urls=payload.fontUrls,
+            component_image_urls=payload.componentImageUrls,
+            component_text_values=payload.componentTextValues,
+            auto_component_image_urls=payload.autoComponentImageUrls,
+            data_theme=payload.dataTheme,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+            upsert_theme_files=False,
+            include_file_payloads=True,
+            include_all_theme_text_files=True,
+            resolve_external_images_to_shopify_files=False,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Unexpected theme export error ({type(exc).__name__}): {exc}",
+        ) from exc
+
+    return ExportThemeBrandResponse(
+        shopDomain=installation.shop_domain,
+        themeId=exported["themeId"],
+        themeName=exported["themeName"],
+        themeRole=exported["themeRole"],
+        layoutFilename=exported["layoutFilename"],
+        cssFilename=exported["cssFilename"],
+        settingsFilename=exported.get("settingsFilename"),
+        jobId=exported.get("jobId"),
+        coverage=exported["coverage"],
+        settingsSync=exported["settingsSync"],
+        files=exported["files"],
     )
 
 

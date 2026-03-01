@@ -1,7 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
 import { useApiClient, type ApiError } from "@/api/client";
 import type { Client } from "@/types/common";
 import { toast } from "@/components/ui/toast";
+
+const defaultBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8008";
+const clerkTokenTemplate = import.meta.env.VITE_CLERK_JWT_TEMPLATE || "backend";
 
 export type ShopifyConnectionState =
   | "not_connected"
@@ -796,6 +800,79 @@ export function usePublishClientShopifyThemeTemplateDraft(clientId?: string) {
     onError: (err: ApiError | Error) => {
       const message =
         "message" in err ? err.message : err?.message || "Failed to publish Shopify template draft";
+      toast.error(message);
+    },
+  });
+}
+
+function parseFilenameFromContentDisposition(contentDisposition: string | null): string | null {
+  if (!contentDisposition) return null;
+  const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+  if (!filenameMatch?.[1]) return null;
+  try {
+    return decodeURIComponent(filenameMatch[1].trim().replace(/^\"|\"$/g, ""));
+  } catch {
+    return filenameMatch[1].trim().replace(/^\"|\"$/g, "");
+  }
+}
+
+async function parseDownloadError(resp: Response): Promise<Error> {
+  try {
+    const raw = await resp.clone().json();
+    const detail = (raw as { detail?: unknown })?.detail;
+    if (typeof detail === "string" && detail.trim()) return new Error(detail);
+    const message = (raw as { message?: unknown })?.message;
+    if (typeof message === "string" && message.trim()) return new Error(message);
+  } catch {
+    // Fall through to text parsing.
+  }
+  const text = (await resp.text()).trim();
+  if (text) return new Error(text);
+  return new Error(resp.statusText || "Failed to download Shopify template ZIP");
+}
+
+export function useDownloadClientShopifyThemeTemplateZip(clientId?: string) {
+  const { getToken } = useAuth();
+
+  return useMutation({
+    mutationFn: async (payload: ClientShopifyThemeTemplatePublishPayload) => {
+      if (!clientId) throw new Error("Client ID is required.");
+      if (!payload.draftId?.trim()) throw new Error("Draft ID is required.");
+      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const headers = new Headers({ "Content-Type": "application/json" });
+      if (token) headers.set("Authorization", `Bearer ${token}`);
+      const response = await fetch(
+        `${defaultBaseUrl}/clients/${clientId}/shopify/theme/brand/template/export-zip`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payload),
+        },
+      );
+      if (!response.ok) {
+        throw await parseDownloadError(response);
+      }
+      const blob = await response.blob();
+      const fileNameFromHeader = parseFilenameFromContentDisposition(
+        response.headers.get("Content-Disposition"),
+      );
+      const filename = fileNameFromHeader || `shopify-template-${payload.draftId}.zip`;
+      return { blob, filename };
+    },
+    onSuccess: ({ blob, filename }) => {
+      const downloadUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = downloadUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(downloadUrl);
+      toast.success(`Downloaded ${filename}`);
+    },
+    onError: (err: ApiError | Error) => {
+      const message =
+        "message" in err ? err.message : err?.message || "Failed to download Shopify template ZIP";
       toast.error(message);
     },
   });
