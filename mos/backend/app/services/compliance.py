@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from html import escape
 import re
 from typing import Any
 
@@ -811,6 +812,64 @@ def get_policy_page_handle(*, page_key: str) -> str:
     if page_key not in _POLICY_TEMPLATES:
         raise KeyError(f"Unknown policy template key: {page_key}")
     return page_key.replace("_", "-")
+
+
+def markdown_to_shopify_html(markdown: str) -> str:
+    lines = [line.rstrip() for line in markdown.splitlines()]
+    output: list[str] = []
+    paragraph_lines: list[str] = []
+    list_items: list[str] = []
+
+    def flush_paragraph() -> None:
+        if not paragraph_lines:
+            return
+        text = " ".join(part.strip() for part in paragraph_lines if part.strip())
+        if text:
+            output.append(f"<p>{escape(text)}</p>")
+        paragraph_lines.clear()
+
+    def flush_list() -> None:
+        if not list_items:
+            return
+        output.append("<ul>")
+        output.extend(list_items)
+        output.append("</ul>")
+        list_items.clear()
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            flush_list()
+            continue
+
+        if line.startswith("# "):
+            flush_paragraph()
+            flush_list()
+            output.append(f"<h1>{escape(line[2:].strip())}</h1>")
+            continue
+
+        if line.startswith("## "):
+            flush_paragraph()
+            flush_list()
+            output.append(f"<h2>{escape(line[3:].strip())}</h2>")
+            continue
+
+        if line.startswith("- "):
+            flush_paragraph()
+            list_items.append(f"<li>{escape(line[2:].strip())}</li>")
+            continue
+
+        flush_list()
+        paragraph_lines.append(line)
+
+    flush_paragraph()
+    flush_list()
+
+    rendered = "\n".join(output).strip()
+    if not rendered:
+        raise ValueError("Rendered policy content is empty and cannot be synced.")
+    return rendered
 
 
 def render_policy_template_markdown(

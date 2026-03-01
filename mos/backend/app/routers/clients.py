@@ -23,8 +23,11 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.base import SessionLocal
 from app.db.deps import get_session
-from app.db.models import ClientUserPreference, Product
+from app.db.models import ClientComplianceProfile, ClientUserPreference, Product
 from app.db.repositories.assets import AssetsRepository
+from app.db.repositories.client_compliance_profiles import (
+    ClientComplianceProfilesRepository,
+)
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.design_systems import DesignSystemsRepository
 from app.db.repositories.jobs import (
@@ -88,6 +91,14 @@ from app.services.design_system_generation import (
     DesignSystemGenerationError,
     validate_design_system_tokens,
 )
+from app.services.compliance import (
+    build_page_requirements,
+    get_policy_page_handle,
+    get_policy_template,
+    get_profile_url_field_for_page_key,
+    markdown_to_shopify_html,
+    render_policy_template_markdown,
+)
 from app.services.funnels import (
     create_funnel_image_asset,
     create_funnel_unsplash_asset,
@@ -108,6 +119,7 @@ from app.services.shopify_connection import (
     normalize_shop_domain,
     set_client_shopify_storefront_token,
     sync_client_shopify_theme_brand,
+    upsert_client_shopify_policy_pages,
 )
 from app.services.shopify_theme_copy_agent import (
     generate_shopify_theme_component_copy,
@@ -3254,6 +3266,206 @@ def _slugify_theme_export_token(value: str) -> str:
     return normalized or "template"
 
 
+def _website_url_from_shop_domain(*, shop_domain: str | None) -> str | None:
+    if not isinstance(shop_domain, str):
+        return None
+    cleaned = shop_domain.strip().lower()
+    if not cleaned:
+        return None
+    return f"https://{cleaned}"
+
+
+def _compliance_profile_page_urls(
+    *, profile: ClientComplianceProfile
+) -> dict[str, str | None]:
+    return {
+        "privacy_policy": profile.privacy_policy_url,
+        "terms_of_service": profile.terms_of_service_url,
+        "returns_refunds_policy": profile.returns_refunds_policy_url,
+        "shipping_policy": profile.shipping_policy_url,
+        "contact_support": profile.contact_support_url,
+        "company_information": profile.company_information_url,
+        "subscription_terms_and_cancellation": profile.subscription_terms_and_cancellation_url,
+    }
+
+
+def _compliance_profile_placeholder_values(
+    *, profile: ClientComplianceProfile
+) -> dict[str, str]:
+    values: dict[str, str] = {}
+    scalar_fields = {
+        "legal_business_name": profile.legal_business_name,
+        "operating_entity_name": profile.operating_entity_name,
+        "company_address_text": profile.company_address_text,
+        "business_license_identifier": profile.business_license_identifier,
+        "support_email": profile.support_email,
+        "support_phone": profile.support_phone,
+        "support_hours_text": profile.support_hours_text,
+        "response_time_commitment": profile.response_time_commitment,
+    }
+    for key, value in scalar_fields.items():
+        if isinstance(value, str) and value.strip():
+            values[key] = value.strip()
+
+    metadata = profile.metadata_json if isinstance(profile.metadata_json, dict) else {}
+    for key, raw_value in metadata.items():
+        if not isinstance(key, str):
+            continue
+        placeholder_key = key.strip()
+        if not placeholder_key:
+            continue
+        if raw_value is None:
+            continue
+        if isinstance(raw_value, str):
+            cleaned = raw_value.strip()
+            if not cleaned:
+                continue
+            values[placeholder_key] = cleaned
+            continue
+        if isinstance(raw_value, (int, float, bool)):
+            values[placeholder_key] = str(raw_value)
+    return values
+
+
+def _select_compliance_page_keys_for_template_export(
+    *, requirements: dict[str, Any]
+) -> list[str]:
+    selected_by_ruleset: list[str] = []
+    for page in requirements["pages"]:
+        classification = page["classification"]
+        if classification == "required":
+            selected_by_ruleset.append(page["pageKey"])
+            continue
+        if classification == "strongly_recommended":
+            selected_by_ruleset.append(page["pageKey"])
+    if not selected_by_ruleset:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "No required or strongly recommended compliance pages are applicable for this workspace "
+                "profile. Update the compliance profile business models first."
+            ),
+        )
+    return selected_by_ruleset
+
+
+def _sync_compliance_policy_pages_for_template_export(
+    *,
+    client_id: str,
+    shop_domain: str | None,
+    auth: AuthContext,
+    session: Session,
+) -> dict[str, Any]:
+    profile_repo = ClientComplianceProfilesRepository(session)
+    profile = profile_repo.get(org_id=auth.org_id, client_id=client_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Cannot export template ZIP because the compliance profile is missing for this workspace. "
+                f"Create it first via PUT /clients/{client_id}/compliance/profile."
+            ),
+        )
+
+    try:
+        requirements = build_page_requirements(
+            ruleset_version=profile.ruleset_version,
+            business_models=profile.business_models,
+            page_urls=_compliance_profile_page_urls(profile=profile),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    page_keys_to_sync = _select_compliance_page_keys_for_template_export(
+        requirements=requirements
+    )
+
+    effective_shop_domain = shop_domain
+
+    placeholders = _compliance_profile_placeholder_values(profile=profile)
+    website_url = _website_url_from_shop_domain(shop_domain=effective_shop_domain)
+    if website_url is not None:
+        placeholders["website_url"] = website_url
+    sync_pages_payload: list[dict[str, str]] = []
+    rendered_pages_payload: list[dict[str, str]] = []
+    for page_key in page_keys_to_sync:
+        template = get_policy_template(page_key=page_key)
+        try:
+            rendered_markdown = render_policy_template_markdown(
+                page_key=page_key,
+                placeholder_values=placeholders,
+            )
+            rendered_html = markdown_to_shopify_html(rendered_markdown)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+        handle = get_policy_page_handle(page_key=page_key)
+        sync_pages_payload.append(
+            {
+                "pageKey": page_key,
+                "title": template["title"],
+                "handle": handle,
+                "bodyHtml": rendered_html,
+            }
+        )
+        rendered_pages_payload.append(
+            {
+                "pageKey": page_key,
+                "title": template["title"],
+                "handle": handle,
+                "markdown": rendered_markdown,
+            }
+        )
+
+    sync_payload = upsert_client_shopify_policy_pages(
+        client_id=client_id,
+        pages=sync_pages_payload,
+        shop_domain=effective_shop_domain,
+    )
+    synced_pages = sync_payload["pages"]
+    returned_page_keys = {item["pageKey"] for item in synced_pages}
+    expected_page_keys = set(page_keys_to_sync)
+    if returned_page_keys != expected_page_keys:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Shopify policy-page sync returned an unexpected page set during template ZIP export. "
+                f"expected={sorted(expected_page_keys)} got={sorted(returned_page_keys)}"
+            ),
+        )
+
+    synced_pages_by_key = {item["pageKey"]: item for item in synced_pages}
+    for rendered_page in rendered_pages_payload:
+        synced_page = synced_pages_by_key.get(rendered_page["pageKey"])
+        if not synced_page:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Policy page sync payload was missing a rendered page entry while preparing "
+                    "template ZIP export."
+                ),
+            )
+        rendered_page["url"] = synced_page["url"]
+
+    updated_profile_urls: dict[str, str] = {}
+    for page in synced_pages:
+        page_key = page["pageKey"]
+        profile_url_field = get_profile_url_field_for_page_key(page_key=page_key)
+        setattr(profile, profile_url_field, page["url"])
+        updated_profile_urls[profile_url_field] = page["url"]
+
+    profile.updated_at = func.now()
+    session.add(profile)
+    session.commit()
+
+    return {
+        "rulesetVersion": profile.ruleset_version,
+        "shopDomain": sync_payload["shopDomain"],
+        "pages": synced_pages,
+        "updatedProfileUrls": updated_profile_urls,
+        "renderedPages": rendered_pages_payload,
+    }
+
+
 def _build_shopify_theme_template_export_zip_response(
     *,
     client_id: str,
@@ -3294,6 +3506,13 @@ def _build_shopify_theme_template_export_zip_response(
             ),
         )
 
+    policy_sync_payload = _sync_compliance_policy_pages_for_template_export(
+        client_id=client_id,
+        shop_domain=draft_data.shopDomain,
+        auth=auth,
+        session=session,
+    )
+
     component_image_asset_map = _normalize_theme_template_component_image_asset_map(
         draft_data.componentImageAssetMap
     )
@@ -3324,6 +3543,7 @@ def _build_shopify_theme_template_export_zip_response(
     )
 
     exported_files = exported["files"]
+    compliance_policy_file_paths: list[str] = []
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
         for file_entry in exported_files:
@@ -3334,6 +3554,11 @@ def _build_shopify_theme_template_export_zip_response(
                     detail="Shopify export returned a file with an empty filename.",
                 )
             zip_file.writestr(filename, file_entry["content"])
+
+        for rendered_page in policy_sync_payload["renderedPages"]:
+            file_path = f"mos-template-export/policies/{rendered_page['handle']}.md"
+            zip_file.writestr(file_path, rendered_page["markdown"])
+            compliance_policy_file_paths.append(file_path)
 
         manifest_payload = {
             "generatedAt": datetime.now(timezone.utc).isoformat(),
@@ -3354,6 +3579,13 @@ def _build_shopify_theme_template_export_zip_response(
             "componentImageAssetMap": component_image_asset_map,
             "componentImageUrls": component_image_urls,
             "componentTextValues": component_text_values,
+            "compliancePolicyFiles": compliance_policy_file_paths,
+            "compliancePolicySync": {
+                "rulesetVersion": policy_sync_payload["rulesetVersion"],
+                "shopDomain": policy_sync_payload["shopDomain"],
+                "pages": policy_sync_payload["pages"],
+                "updatedProfileUrls": policy_sync_payload["updatedProfileUrls"],
+            },
         }
         zip_file.writestr(
             "mos-template-export/manifest.json",

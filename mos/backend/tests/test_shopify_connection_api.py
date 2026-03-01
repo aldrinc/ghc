@@ -830,8 +830,51 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
             ],
         }
 
+    def fake_sync_compliance_for_export(
+        *,
+        client_id: str,
+        shop_domain: str | None,
+        auth,
+        session,
+    ):
+        assert client_id
+        assert shop_domain == "example.myshopify.com"
+        assert auth.user_id == "test-user"
+        assert session is not None
+        return {
+            "rulesetVersion": "meta_tiktok_compliance_ruleset_v1",
+            "shopDomain": "example.myshopify.com",
+            "pages": [
+                {
+                    "pageKey": "privacy_policy",
+                    "pageId": "gid://shopify/Page/101",
+                    "title": "Privacy Policy",
+                    "handle": "privacy-policy",
+                    "url": "https://example.myshopify.com/pages/privacy-policy",
+                    "operation": "created",
+                }
+            ],
+            "updatedProfileUrls": {
+                "privacy_policy_url": "https://example.myshopify.com/pages/privacy-policy"
+            },
+            "renderedPages": [
+                {
+                    "pageKey": "privacy_policy",
+                    "title": "Privacy Policy",
+                    "handle": "privacy-policy",
+                    "markdown": "# Privacy Policy\n\nGenerated copy.",
+                    "url": "https://example.myshopify.com/pages/privacy-policy",
+                }
+            ],
+        }
+
     monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
     monkeypatch.setattr(clients_router, "export_client_shopify_theme_brand", fake_export_theme_brand)
+    monkeypatch.setattr(
+        clients_router,
+        "_sync_compliance_policy_pages_for_template_export",
+        fake_sync_compliance_for_export,
+    )
 
     response = api_client.post(
         f"/clients/{client_id}/shopify/theme/brand/template/export-zip",
@@ -848,6 +891,7 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     assert "layout/theme.liquid" in namelist
     assert "templates/index.json" in namelist
     assert "mos-template-export/manifest.json" in namelist
+    assert "mos-template-export/policies/privacy-policy.md" in namelist
 
     manifest = json.loads(archive.read("mos-template-export/manifest.json").decode("utf-8"))
     assert manifest["draftId"] == str(draft.id)
@@ -859,6 +903,11 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         "assets/acme-workspace-workspace-brand.css",
         "templates/index.json",
     ]
+    assert manifest["compliancePolicyFiles"] == [
+        "mos-template-export/policies/privacy-policy.md"
+    ]
+    assert manifest["compliancePolicySync"]["rulesetVersion"] == "meta_tiktok_compliance_ruleset_v1"
+    assert manifest["compliancePolicySync"]["shopDomain"] == "example.myshopify.com"
 
 
 def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):
