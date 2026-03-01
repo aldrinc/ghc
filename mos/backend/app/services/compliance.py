@@ -347,7 +347,10 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "pageKey": "privacy_policy",
         "title": "Privacy Policy",
         "templateVersion": "v1",
-        "description": "Data collection, usage, sharing, and rights disclosures for website visitors and customers.",
+        "description": (
+            "Ecommerce privacy disclosures with explicit data-use, marketing, and user-rights sections "
+            "modeled after current production policy structure."
+        ),
         "requiredSections": [
             {"sectionKey": "owner_identity", "title": "Owner and Controller Identity"},
             {"sectionKey": "data_collected", "title": "Data We Collect"},
@@ -359,6 +362,8 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             {"sectionKey": "policy_updates", "title": "Policy Updates and Effective Date"},
         ],
         "placeholders": [
+            "brand_name",
+            "website_url",
             "legal_business_name",
             "support_email",
             "company_address_text",
@@ -372,22 +377,36 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
         "templateMarkdown": (
             "# Privacy Policy\n\n"
+            "This Privacy Policy explains how {{legal_business_name}} (\"{{brand_name}}\", \"we\", \"us\") collects, "
+            "uses, and shares personal information when you visit or make a purchase from {{website_url}}.\n\n"
+            "**Brand:** {{brand_name}}  \n"
             "**Operator:** {{legal_business_name}}  \n"
             "**Contact:** {{support_email}}  \n"
             "**Address:** {{company_address_text}}  \n"
             "**Effective date:** {{effective_date}}\n\n"
             "## Owner and Controller Identity\n"
-            "{{legal_business_name}} is responsible for the collection and use of personal information described on "
-            "this page.\n\n"
+            "{{legal_business_name}} is the data controller responsible for personal information handled for "
+            "{{brand_name}}.\n\n"
             "## Data We Collect\n"
+            "We may collect order, account, support, payment-confirmation, device, and browsing information, "
+            "including through cookies and similar technologies.\n\n"
             "{{privacy_data_collected}}\n\n"
             "## How We Use Data\n"
+            "We use personal information to provide products/services, process transactions, fulfill orders, "
+            "communicate with customers, prevent fraud, and improve site and marketing performance.\n\n"
             "{{privacy_data_usage}}\n\n"
             "## How We Share Data\n"
+            "We share data only as needed to operate the business (for example: commerce platform, payment processor, "
+            "shipping partners, analytics, and customer support providers) or when legally required.\n\n"
             "{{privacy_data_sharing}}\n\n"
             "## User Choices and Controls\n"
+            "Depending on location, users may have rights to access, correct, delete, or opt out of certain data "
+            "uses such as targeted advertising. Users can also manage cookie preferences and marketing "
+            "subscriptions where available.\n\n"
             "{{privacy_user_choices}}\n\n"
             "## Security and Retention\n"
+            "We apply reasonable technical and organizational safeguards and retain personal information only for as "
+            "long as needed for legitimate business and legal purposes.\n\n"
             "{{privacy_security_retention}}\n\n"
             "## Privacy Contact\n"
             "For privacy questions or requests, contact {{support_email}}.\n\n"
@@ -400,7 +419,10 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "pageKey": "terms_of_service",
         "title": "Terms of Service",
         "templateVersion": "v1",
-        "description": "Commercial terms that must remain consistent with ad claims, pricing, and offer constraints.",
+        "description": (
+            "Storefront terms based on current production structure, including order controls, disputes, "
+            "and governing-law disclosures."
+        ),
         "requiredSections": [
             {"sectionKey": "business_identity", "title": "Business Identity"},
             {"sectionKey": "offer_scope", "title": "Offer Scope and Eligibility"},
@@ -412,6 +434,8 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             {"sectionKey": "effective_date", "title": "Effective Date"},
         ],
         "placeholders": [
+            "brand_name",
+            "website_url",
             "legal_business_name",
             "company_address_text",
             "support_email",
@@ -422,26 +446,41 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             "terms_fulfillment_access",
             "terms_refund_cancellation",
             "terms_disclaimers",
+            "terms_dispute_resolution",
+            "terms_governing_law",
         ],
         "templateMarkdown": (
             "# Terms of Service\n\n"
-            "These terms govern purchases from {{legal_business_name}}.\n\n"
+            "These Terms of Service (\"Terms\") govern your access to and use of {{website_url}}, operated by "
+            "{{legal_business_name}} (\"{{brand_name}}\", \"we\", \"us\"). By visiting the site or purchasing a "
+            "product/service, you agree to these Terms.\n\n"
             "## Business Identity\n"
+            "**Brand:** {{brand_name}}  \n"
             "**Legal business name:** {{legal_business_name}}  \n"
             "**Business address:** {{company_address_text}}\n\n"
             "## Offer Scope and Eligibility\n"
             "{{terms_offer_scope}}\n\n"
             "{{terms_eligibility}}\n\n"
             "## Pricing and Billing Terms\n"
+            "Prices, promotions, and availability can change without notice unless required by law. Payment "
+            "authorization is required before order fulfillment.\n\n"
             "{{terms_pricing_billing}}\n\n"
             "## Fulfillment and Access Terms\n"
+            "We may limit, refuse, or cancel orders when necessary (for example suspected fraud, abuse, or inventory "
+            "constraints), and we may update or discontinue portions of the service.\n\n"
             "{{terms_fulfillment_access}}\n\n"
             "## Refund and Cancellation Links\n"
+            "Review applicable refund, cancellation, shipping, and subscription policy pages before purchase.\n\n"
             "{{terms_refund_cancellation}}\n\n"
             "## Limitations and Disclaimers\n"
+            "The service and content are provided on an \"as-is\" and \"as-available\" basis except where prohibited "
+            "by law.\n\n"
             "{{terms_disclaimers}}\n\n"
             "## Support Contact\n"
             "Contact: {{support_email}}\n\n"
+            "## Dispute Resolution and Governing Law\n"
+            "{{terms_dispute_resolution}}\n\n"
+            "{{terms_governing_law}}\n\n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },
@@ -449,7 +488,10 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "pageKey": "returns_refunds_policy",
         "title": "Returns and Refunds Policy",
         "templateVersion": "v1",
-        "description": "Eligibility, time windows, process, and payout method for refunds/returns.",
+        "description": (
+            "Returns and refunds terms modeled after current production policy flow, including cancellation windows, "
+            "condition checks, and processing timelines."
+        ),
         "requiredSections": [
             {"sectionKey": "eligibility", "title": "Eligibility"},
             {"sectionKey": "window", "title": "Return/Refund Window"},
@@ -460,6 +502,8 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             {"sectionKey": "support_contact", "title": "Support Contact"},
         ],
         "placeholders": [
+            "brand_name",
+            "website_url",
             "legal_business_name",
             "support_email",
             "effective_date",
@@ -472,21 +516,30 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
         "templateMarkdown": (
             "# Returns and Refunds Policy\n\n"
-            "This policy applies to purchases from {{legal_business_name}}.\n\n"
+            "This policy explains return, exchange, cancellation, and refund terms for purchases from {{brand_name}} "
+            "({{legal_business_name}}) on {{website_url}}.\n\n"
             "## Eligibility\n"
+            "Returned items must satisfy the condition requirements in this section and may be denied if they do not "
+            "meet policy criteria.\n\n"
             "{{refund_eligibility}}\n\n"
             "## Return/Refund Window\n"
+            "Cancellation and return/refund requests must be submitted within the policy windows below.\n\n"
             "{{refund_window_policy}}\n\n"
             "## How to Request\n"
+            "Submit requests through the official support channel and include order-identifying details.\n\n"
             "{{refund_request_steps}}\n\n"
             "## Refund Method and Timing\n"
+            "Approved refunds are issued to the original payment method unless required otherwise by law.\n\n"
             "{{refund_method_timing}}\n\n"
             "## Fees and Deductions\n"
+            "Shipping charges, handling costs, or condition-based deductions may apply where disclosed.\n\n"
             "{{refund_fees_deductions}}\n\n"
             "## Exceptions\n"
+            "Certain purchases (for example final-sale, custom, or abuse-related orders) may be excluded except where "
+            "required by law.\n\n"
             "{{refund_exceptions}}\n\n"
             "## Support Contact\n"
-            "{{support_email}}\n\n"
+            "For return authorization or refund support, contact {{support_email}}.\n\n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },
@@ -494,7 +547,10 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "pageKey": "shipping_policy",
         "title": "Shipping Policy",
         "templateVersion": "v1",
-        "description": "Coverage, shipping charges, fulfillment timelines, and issue handling.",
+        "description": (
+            "Shipping terms aligned with current production flow for processing windows, delivery expectations, "
+            "tracking, and exceptions."
+        ),
         "requiredSections": [
             {"sectionKey": "coverage", "title": "Shipping Regions"},
             {"sectionKey": "processing_time", "title": "Processing Time"},
@@ -509,6 +565,8 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             {"sectionKey": "effective_date", "title": "Effective Date"},
         ],
         "placeholders": [
+            "brand_name",
+            "website_url",
             "support_email",
             "effective_date",
             "shipping_regions",
@@ -523,26 +581,37 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         ],
         "templateMarkdown": (
             "# Shipping Policy\n\n"
+            "This policy describes shipping timelines, delivery expectations, and issue handling for orders placed "
+            "with {{brand_name}} on {{website_url}}.\n\n"
             "## Shipping Regions\n"
             "{{shipping_regions}}\n\n"
             "## Processing Time\n"
+            "Orders are processed on business days and can be affected by weekends, holidays, or high-volume periods.\n\n"
             "{{shipping_processing_time}}\n\n"
             "## Shipping Options and Costs\n"
+            "Available shipping methods and charges are shown at checkout before payment.\n\n"
             "{{shipping_options_costs}}\n\n"
             "## Delivery Estimates\n"
+            "Delivery windows begin after dispatch and are estimates, not guarantees.\n\n"
             "{{shipping_delivery_estimates}}\n\n"
             "## Tracking\n"
+            "Tracking details are provided after dispatch when available.\n\n"
             "{{shipping_tracking}}\n\n"
             "## Address Changes\n"
+            "Address or cancellation requests are time-sensitive and may be unavailable after fulfillment starts.\n\n"
             "{{shipping_address_changes}}\n\n"
             "## Lost or Damaged Packages\n"
+            "Customers should report lost, delayed, or damaged shipments promptly so investigation or claim workflows "
+            "can begin.\n\n"
             "{{shipping_lost_damaged}}\n\n"
             "## Customs and Duties\n"
+            "Customs processing, import duties, and local taxes for international shipments are governed by destination "
+            "country requirements.\n\n"
             "{{shipping_customs_duties}}\n\n"
             "## Return Address\n"
             "{{shipping_return_address}}\n\n"
             "## Shipping Support Contact\n"
-            "{{support_email}}\n\n"
+            "For shipping support, contact {{support_email}}.\n\n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },

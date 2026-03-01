@@ -38,6 +38,8 @@ Each template response includes:
 
 Required placeholders:
 
+- `brand_name`
+- `website_url`
 - `legal_business_name`
 - `support_email`
 - `company_address_text`
@@ -62,6 +64,8 @@ Required placeholders:
 
 Required placeholders:
 
+- `brand_name`
+- `website_url`
 - `legal_business_name`
 - `company_address_text`
 - `support_email`
@@ -72,6 +76,8 @@ Required placeholders:
 - `terms_fulfillment_access`
 - `terms_refund_cancellation`
 - `terms_disclaimers`
+- `terms_dispute_resolution`
+- `terms_governing_law`
 
 ### `returns_refunds_policy`
 
@@ -85,6 +91,8 @@ Required placeholders:
 
 Required placeholders:
 
+- `brand_name`
+- `website_url`
 - `legal_business_name`
 - `support_email`
 - `effective_date`
@@ -111,6 +119,8 @@ Required placeholders:
 
 Required placeholders:
 
+- `brand_name`
+- `website_url`
 - `support_email`
 - `effective_date`
 - `shipping_regions`

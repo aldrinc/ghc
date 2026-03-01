@@ -37,6 +37,7 @@ def _sync_ready_profile_payload() -> dict:
         "owner": "ops",
         "effective_date": "2026-02-27",
         "brand_name": "Acme Labs",
+        "website_url": "https://acme.test",
         "privacy_data_collected": (
             "We collect contact, checkout, account, support, and device data including analytics/pixel events."
         ),
@@ -65,6 +66,10 @@ def _sync_ready_profile_payload() -> dict:
             "Refund and cancellation rights are described in our Returns and Refunds Policy and Subscription Terms pages."
         ),
         "terms_disclaimers": "Availability, delivery timelines, and promotional terms are subject to stated conditions.",
+        "terms_dispute_resolution": (
+            "Disputes are resolved through binding arbitration or small-claims court as permitted by law."
+        ),
+        "terms_governing_law": "These Terms are governed by the laws of the United States.",
         "refund_eligibility": (
             "Eligible requests require order details and compliance with item condition requirements where applicable."
         ),
