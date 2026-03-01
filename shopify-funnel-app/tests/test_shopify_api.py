@@ -4971,3 +4971,156 @@ def test_sync_theme_brand_errors_when_settings_data_is_empty():
                 theme_name="futrgroup2-0theme",
             )
         )
+
+
+def test_sync_theme_brand_export_includes_url_backed_theme_file():
+    client = ShopifyApiClient()
+    settings_json = _build_minimal_theme_settings_json()
+    downloaded_theme_file_urls: list[tuple[str, str]] = []
+
+    async def fake_download_theme_file_text_body_from_url(
+        *,
+        filename: str,
+        body_url: str,
+    ) -> bytes:
+        downloaded_theme_file_urls.append((filename, body_url))
+        assert filename == "assets/theme.css"
+        assert body_url == "https://cdn.example.com/assets/theme.css"
+        return b"/* downloaded from URL-backed body */\nbody { color: #101010; }\n"
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "layout/theme.liquid":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "layout/theme.liquid",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": (
+                                            "<html><head>\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                            "old content\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                            "</head><body></body></html>"
+                                        ),
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+        if "query themeTextFilesForExport" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": "<html><head></head><body>legacy layout</body></html>",
+                                },
+                            },
+                            {
+                                "filename": "config/settings_data.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": settings_json,
+                                },
+                            },
+                            {
+                                "filename": "assets/theme.css",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyUrl",
+                                    "url": "https://cdn.example.com/assets/theme.css",
+                                },
+                            },
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._download_theme_file_text_body_from_url = (  # type: ignore[method-assign]
+        fake_download_theme_file_text_body_from_url
+    )
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            font_urls=[],
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+            upsert_theme_files=False,
+            include_file_payloads=True,
+            include_all_theme_text_files=True,
+            resolve_external_images_to_shopify_files=False,
+        )
+    )
+
+    assert downloaded_theme_file_urls == [
+        ("assets/theme.css", "https://cdn.example.com/assets/theme.css")
+    ]
+    exported_files = {
+        file_entry["filename"]: file_entry["content"] for file_entry in result["files"]
+    }
+    assert "assets/theme.css" in exported_files
+    assert "downloaded from URL-backed body" in exported_files["assets/theme.css"]
+    assert "layout/theme.liquid" in exported_files
+    assert "assets/acme-workspace-workspace-brand.css" in exported_files

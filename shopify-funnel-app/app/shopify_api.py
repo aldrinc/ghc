@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import base64
+import binascii
 from copy import deepcopy
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -7033,6 +7035,12 @@ class ShopifyApiClient:
                             ... on OnlineStoreThemeFileBodyText {
                                 content
                             }
+                            ... on OnlineStoreThemeFileBodyBase64 {
+                                contentBase64
+                            }
+                            ... on OnlineStoreThemeFileBodyUrl {
+                                url
+                            }
                         }
                     }
                     pageInfo {
@@ -7048,7 +7056,7 @@ class ShopifyApiClient:
         }
         """
         files_by_filename: dict[str, str] = {}
-        non_text_filenames: set[str] = set()
+        unsupported_body_types_by_name: dict[str, list[str]] = {}
         after: str | None = None
 
         for _ in range(40):
@@ -7109,18 +7117,82 @@ class ShopifyApiClient:
                 cleaned_filename = filename.strip()
                 body = node.get("body")
                 typename = body.get("__typename") if isinstance(body, dict) else None
-                if typename != "OnlineStoreThemeFileBodyText":
-                    non_text_filenames.add(cleaned_filename)
-                    continue
-                content = body.get("content") if isinstance(body, dict) else None
-                if not isinstance(content, str):
-                    raise ShopifyApiError(
-                        message=(
-                            "theme text files export query returned an invalid text body "
-                            f"for filename={cleaned_filename}."
-                        ),
-                        status_code=409,
+                if typename == "OnlineStoreThemeFileBodyText":
+                    content = body.get("content") if isinstance(body, dict) else None
+                    if not isinstance(content, str):
+                        raise ShopifyApiError(
+                            message=(
+                                "theme text files export query returned an invalid text body "
+                                f"for filename={cleaned_filename}."
+                            ),
+                            status_code=409,
+                        )
+                elif typename == "OnlineStoreThemeFileBodyBase64":
+                    content_base64 = (
+                        body.get("contentBase64") if isinstance(body, dict) else None
                     )
+                    if not isinstance(content_base64, str) or not content_base64.strip():
+                        raise ShopifyApiError(
+                            message=(
+                                "theme text files export query returned an invalid base64 body "
+                                f"for filename={cleaned_filename}."
+                            ),
+                            status_code=409,
+                        )
+                    try:
+                        decoded_bytes = base64.b64decode(
+                            content_base64, validate=True
+                        )
+                    except (binascii.Error, ValueError) as exc:
+                        raise ShopifyApiError(
+                            message=(
+                                "theme text files export query returned malformed base64 content "
+                                f"for filename={cleaned_filename}."
+                            ),
+                            status_code=409,
+                        ) from exc
+                    try:
+                        content = decoded_bytes.decode("utf-8-sig")
+                    except UnicodeDecodeError as exc:
+                        raise ShopifyApiError(
+                            message=(
+                                "Theme export only supports UTF-8 text files, but base64 content was "
+                                f"not UTF-8 decodable for filename={cleaned_filename}."
+                            ),
+                            status_code=409,
+                        ) from exc
+                elif typename == "OnlineStoreThemeFileBodyUrl":
+                    body_url = body.get("url") if isinstance(body, dict) else None
+                    if not isinstance(body_url, str) or not body_url.strip():
+                        raise ShopifyApiError(
+                            message=(
+                                "theme text files export query returned an invalid body URL "
+                                f"for filename={cleaned_filename}."
+                            ),
+                            status_code=409,
+                        )
+                    downloaded_bytes = await self._download_theme_file_text_body_from_url(
+                        filename=cleaned_filename,
+                        body_url=body_url.strip(),
+                    )
+                    try:
+                        content = downloaded_bytes.decode("utf-8-sig")
+                    except UnicodeDecodeError as exc:
+                        raise ShopifyApiError(
+                            message=(
+                                "Theme export only supports UTF-8 text files, but downloaded URL content was "
+                                f"not UTF-8 decodable for filename={cleaned_filename}."
+                            ),
+                            status_code=409,
+                        ) from exc
+                else:
+                    normalized_type = (
+                        typename if isinstance(typename, str) and typename else "UNKNOWN"
+                    )
+                    unsupported_body_types_by_name.setdefault(normalized_type, []).append(
+                        cleaned_filename
+                    )
+                    continue
                 files_by_filename[cleaned_filename] = content
 
             page_info = files.get("pageInfo")
@@ -7137,13 +7209,18 @@ class ShopifyApiClient:
                     )
                 )
             if not has_next_page:
-                if non_text_filenames:
-                    sample = ", ".join(sorted(non_text_filenames)[:10])
+                if unsupported_body_types_by_name:
+                    samples: list[str] = []
+                    for body_type in sorted(unsupported_body_types_by_name.keys()):
+                        filenames = sorted(unsupported_body_types_by_name[body_type])
+                        sample_filenames = ", ".join(filenames[:3])
+                        if len(filenames) > 3:
+                            sample_filenames = f"{sample_filenames}, ..."
+                        samples.append(f"{body_type}: {sample_filenames}")
                     raise ShopifyApiError(
                         message=(
-                            "Theme export requires every file body to be text-backed, but non-text files "
-                            f"were detected ({len(non_text_filenames)}): {sample}. "
-                            "Binary theme file export is not supported by this endpoint."
+                            "Theme export encountered unsupported theme file body types: "
+                            f"{'; '.join(samples)}."
                         ),
                         status_code=409,
                     )
@@ -7176,6 +7253,59 @@ class ShopifyApiClient:
             ),
             status_code=409,
         )
+
+    async def _download_theme_file_text_body_from_url(
+        self,
+        *,
+        filename: str,
+        body_url: str,
+    ) -> bytes:
+        parsed = urlparse(body_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ShopifyApiError(
+                message=(
+                    "Theme export received an invalid file body URL for "
+                    f"filename={filename}: {body_url!r}."
+                ),
+                status_code=409,
+            )
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                response = await client.get(body_url)
+        except httpx.InvalidURL as exc:
+            raise ShopifyApiError(
+                message=(
+                    "Theme export received an invalid file body URL for "
+                    f"filename={filename}: {body_url!r}."
+                ),
+                status_code=409,
+            ) from exc
+        except httpx.RequestError as exc:
+            raise ShopifyApiError(
+                message=(
+                    "Theme export failed to download file body URL for "
+                    f"filename={filename}: {exc}"
+                ),
+                status_code=409,
+            ) from exc
+
+        if response.status_code != 200:
+            raise ShopifyApiError(
+                message=(
+                    "Theme export failed to download file body URL for "
+                    f"filename={filename} (status={response.status_code})."
+                ),
+                status_code=409,
+            )
+        if not response.content:
+            raise ShopifyApiError(
+                message=(
+                    "Theme export downloaded an empty file body URL for "
+                    f"filename={filename}."
+                ),
+                status_code=409,
+            )
+        return response.content
 
     async def _upsert_theme_files(
         self,
