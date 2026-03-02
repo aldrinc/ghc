@@ -2269,7 +2269,7 @@ export function BrandDesignSystemPage() {
                               ) : null}
                               {selectedAssetPublicId ? (
                                 <div className="space-y-1 rounded-md border border-border bg-surface-2 p-2">
-                                  <div className="rounded-md border border-border bg-white p-1">
+                                  <div className="rounded-md border border-border bg-surface p-1">
                                     {selectedImageUrl && !selectedImageErrored ? (
                                       <img
                                         src={selectedImageUrl}
@@ -2321,7 +2321,7 @@ export function BrandDesignSystemPage() {
                                 key={asset.id}
                                 className="grid grid-cols-[88px_minmax(0,1fr)] gap-2 rounded-md border border-border bg-surface p-2"
                               >
-                                <div className="rounded-md border border-border bg-white p-1">
+                                <div className="rounded-md border border-border bg-surface p-1">
                                   {assetImageUrl && !assetImageErrored ? (
                                     <img
                                       src={assetImageUrl}
@@ -3215,7 +3215,7 @@ export function BrandDesignSystemPage() {
                               <img
                                 src={imageUrl}
                                 alt={item.path}
-                                className="h-44 w-full rounded object-contain bg-white"
+                                className="h-44 w-full rounded object-contain bg-surface"
                                 onError={() =>
                                   setTemplatePreviewImageErrorsByPath((current) => ({
                                     ...current,
