@@ -20,10 +20,19 @@ from app.config import settings
 _THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
 _THEME_BRAND_SETTINGS_FILENAME = "config/settings_data.json"
 _THEME_FOOTER_GROUP_FILENAME = "sections/footer-group.json"
+_THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
 _THEME_TEMPLATE_JSON_FILENAME_RE = re.compile(r"^(?:templates|sections)/.+\.json$")
 _THEME_COMPONENT_SETTINGS_SYNC_THEME_NAMES = frozenset({"futrgroup2-0theme"})
+_THEME_CATALOG_DETAILS_MENU_ITEM_RE = re.compile(
+    r"<li>\s*<details\b[^>]*>.*?<summary[^>]*>\s*Catalog\s*</summary>.*?</details>\s*</li>",
+    re.IGNORECASE | re.DOTALL,
+)
+_THEME_CATALOG_LINK_MENU_ITEM_RE = re.compile(
+    r"<li>\s*<a\b[^>]*>\s*Catalog\s*</a>\s*</li>",
+    re.IGNORECASE | re.DOTALL,
+)
 _THEME_LOGO_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 _DEFAULT_THEME_VAR_SCOPE_SELECTORS: tuple[str, ...] = (":root",)
 _THEME_VAR_SCOPE_SELECTORS_BY_NAME: dict[str, tuple[str, ...]] = {
@@ -6099,6 +6108,15 @@ class ShopifyApiClient:
         return text_value
 
     @classmethod
+    def _strip_catalog_navigation_from_header_drawer(
+        cls,
+        *,
+        content: str,
+    ) -> str:
+        without_catalog_details = _THEME_CATALOG_DETAILS_MENU_ITEM_RE.sub("", content)
+        return _THEME_CATALOG_LINK_MENU_ITEM_RE.sub("", without_catalog_details)
+
+    @classmethod
     def _sync_theme_template_component_image_settings_data(
         cls,
         *,
@@ -8681,6 +8699,18 @@ class ShopifyApiClient:
                     {"filename": filename, "content": merged_by_filename[filename]}
                     for filename in sorted(merged_by_filename.keys())
                 ]
+            for file_entry in response_files:
+                filename = file_entry.get("filename")
+                content = file_entry.get("content")
+                if (
+                    filename == _THEME_HEADER_DRAWER_FILENAME
+                    and isinstance(content, str)
+                ):
+                    file_entry["content"] = (
+                        self._strip_catalog_navigation_from_header_drawer(
+                            content=content
+                        )
+                    )
             response["files"] = response_files
         return response
 
