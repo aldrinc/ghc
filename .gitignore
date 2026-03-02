@@ -21,6 +21,12 @@ __pycache__/
 !.env.example
 !.env.production.example
 
+# Explicit local dev runtime config
+mos/backend/.env
+shopify-funnel-app/.env
+mos/frontend/.env.local
+mos/backend/.venv.py*.bak.*/
+
 # Editor directories and files
 .idea
 .vscode
