@@ -5083,6 +5083,22 @@ def test_sync_theme_brand_export_includes_url_backed_theme_file():
                                     "url": "https://cdn.example.com/assets/theme.css",
                                 },
                             },
+                            {
+                                "filename": "snippets/header-drawer.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        '<ul role="list">'
+                                        '<li><a href="/">Home</a></li>'
+                                        '<li><details is="menu-details">'
+                                        '<summary aria-expanded="false">Catalog</summary>'
+                                        '<div><button type="button">Catalog</button></div>'
+                                        "</details></li>"
+                                        '<li><a href="/pages/contact">Contact</a></li>'
+                                        "</ul>"
+                                    ),
+                                },
+                            },
                         ],
                         "pageInfo": {"hasNextPage": False, "endCursor": None},
                         "userErrors": [],
@@ -5124,3 +5140,5 @@ def test_sync_theme_brand_export_includes_url_backed_theme_file():
     assert "downloaded from URL-backed body" in exported_files["assets/theme.css"]
     assert "layout/theme.liquid" in exported_files
     assert "assets/acme-workspace-workspace-brand.css" in exported_files
+    assert "snippets/header-drawer.liquid" in exported_files
+    assert "Catalog" not in exported_files["snippets/header-drawer.liquid"]
