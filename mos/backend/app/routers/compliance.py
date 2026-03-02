@@ -43,10 +43,11 @@ from app.services.shopify_connection import upsert_client_shopify_policy_pages
 router = APIRouter(tags=["compliance"])
 
 
-def _ensure_client_exists(*, session: Session, org_id: str, client_id: str) -> None:
+def _get_client_or_404(*, session: Session, org_id: str, client_id: str):
     client = ClientsRepository(session).get(org_id=org_id, client_id=client_id)
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    return client
 
 
 def _missing_compliance_profile_exception(*, client_id: str) -> HTTPException:
@@ -138,7 +139,9 @@ def _get_selected_shop_domain(*, session: Session, org_id: str, client_id: str, 
     return selected.strip().lower()
 
 
-def _profile_placeholder_values(profile: ClientComplianceProfile) -> dict[str, str]:
+def _profile_placeholder_values(
+    profile: ClientComplianceProfile, *, workspace_name: str
+) -> dict[str, str]:
     values: dict[str, str] = {}
     scalar_fields = {
         "legal_business_name": profile.legal_business_name,
@@ -171,6 +174,7 @@ def _profile_placeholder_values(profile: ClientComplianceProfile) -> dict[str, s
             continue
         if isinstance(raw_value, (int, float, bool)):
             values[placeholder_key] = str(raw_value)
+    values["brand_name"] = workspace_name
     return values
 
 
@@ -294,7 +298,7 @@ def get_client_compliance_profile(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    _ensure_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
     repo = ClientComplianceProfilesRepository(session)
     profile = repo.get(org_id=auth.org_id, client_id=client_id)
     if not profile:
@@ -309,7 +313,7 @@ def upsert_client_compliance_profile(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    _ensure_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
 
     if payload.rulesetVersion != RULESET_VERSION:
         raise HTTPException(
@@ -373,7 +377,7 @@ def get_client_compliance_requirements(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    _ensure_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
 
     repo = ClientComplianceProfilesRepository(session)
     profile = repo.get(org_id=auth.org_id, client_id=client_id)
@@ -398,7 +402,13 @@ def sync_client_compliance_policy_pages_to_shopify(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    _ensure_client_exists(session=session, org_id=auth.org_id, client_id=client_id)
+    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    workspace_name = str(client.name).strip()
+    if not workspace_name:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace name is required to sync compliance policy pages.",
+        )
 
     repo = ClientComplianceProfilesRepository(session)
     profile = repo.get(org_id=auth.org_id, client_id=client_id)
@@ -423,7 +433,10 @@ def sync_client_compliance_policy_pages_to_shopify(
         user_external_id=auth.user_id,
     )
 
-    placeholders = _profile_placeholder_values(profile)
+    placeholders = _profile_placeholder_values(
+        profile,
+        workspace_name=workspace_name,
+    )
     website_url = _website_url_from_shop_domain(shop_domain=selected_shop_domain)
     if website_url is not None:
         placeholders["website_url"] = website_url

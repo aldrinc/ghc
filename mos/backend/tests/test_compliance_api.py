@@ -218,6 +218,7 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
         observed["client_id"] = client_id
         observed["shop_domain"] = shop_domain
         observed["page_keys"] = [page["pageKey"] for page in pages]
+        observed["pages"] = pages
         return {
             "shopDomain": "example.myshopify.com",
             "pages": [
@@ -293,6 +294,8 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
         "contact_support",
         "company_information",
     }
+    page_map = {page["pageKey"]: page for page in observed["pages"]}  # type: ignore[index]
+    assert "Compliance Workspace" in page_map["privacy_policy"]["bodyHtml"]
 
     profile_response = api_client.get(f"/clients/{client_id}/compliance/profile")
     assert profile_response.status_code == 200
@@ -317,6 +320,80 @@ def test_sync_compliance_policy_pages_requires_placeholder_values(api_client):
     )
     assert sync_response.status_code == 400
     assert "Missing placeholder values" in sync_response.json()["detail"]
+
+
+def test_sync_compliance_policy_pages_uses_workspace_name_for_brand(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Workspace Brand Alpha")
+    profile_payload = _sync_ready_profile_payload()
+    profile_payload["legalBusinessName"] = "Legal Entity LLC"
+    profile_payload["operatingEntityName"] = "Legal Entity LLC"
+    profile_payload["metadata"]["brand_name"] = "Do Not Use This Brand"
+    upsert_response = api_client.put(f"/clients/{client_id}/compliance/profile", json=profile_payload)
+    assert upsert_response.status_code == 200
+
+    observed: dict[str, object] = {}
+
+    def fake_sync(*, client_id: str, pages: list[dict], shop_domain: str | None):
+        observed["page_html_by_key"] = {
+            page["pageKey"]: page["bodyHtml"] for page in pages
+        }
+        return {
+            "shopDomain": "example.myshopify.com",
+            "pages": _shopify_sync_response_pages(pages=pages),
+        }
+
+    monkeypatch.setattr(compliance_router, "upsert_client_shopify_policy_pages", fake_sync)
+
+    sync_response = api_client.post(
+        f"/clients/{client_id}/compliance/shopify/policy-pages/sync",
+        json={"pageKeys": ["privacy_policy"], "shopDomain": "example.myshopify.com"},
+    )
+    assert sync_response.status_code == 200
+    page_html_by_key = observed["page_html_by_key"]  # type: ignore[assignment]
+    assert "Workspace Brand Alpha" in page_html_by_key["privacy_policy"]  # type: ignore[index]
+    assert "Do Not Use This Brand" not in page_html_by_key["privacy_policy"]  # type: ignore[index]
+
+
+def test_sync_compliance_policy_pages_uses_default_placeholder_values(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Default Policy Workspace")
+    profile_payload = _base_profile_payload()
+    profile_payload["metadata"] = {"owner": "ops"}
+    upsert_response = api_client.put(f"/clients/{client_id}/compliance/profile", json=profile_payload)
+    assert upsert_response.status_code == 200
+
+    observed: dict[str, object] = {}
+
+    def fake_sync(*, client_id: str, pages: list[dict], shop_domain: str | None):
+        observed["page_html_by_key"] = {
+            page["pageKey"]: page["bodyHtml"] for page in pages
+        }
+        return {
+            "shopDomain": "example.myshopify.com",
+            "pages": _shopify_sync_response_pages(pages=pages),
+        }
+
+    monkeypatch.setattr(compliance_router, "upsert_client_shopify_policy_pages", fake_sync)
+
+    sync_response = api_client.post(
+        f"/clients/{client_id}/compliance/shopify/policy-pages/sync",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "pageKeys": [
+                "privacy_policy",
+                "terms_of_service",
+                "returns_refunds_policy",
+                "shipping_policy",
+                "contact_support",
+            ],
+        },
+    )
+    assert sync_response.status_code == 200
+    page_html_by_key = observed["page_html_by_key"]  # type: ignore[assignment]
+    assert "device details, browsing activity" in page_html_by_key["privacy_policy"]  # type: ignore[index]
+    assert "binding arbitration in the United States" in page_html_by_key["terms_of_service"]  # type: ignore[index]
+    assert "within 90 days of delivery" in page_html_by_key["returns_refunds_policy"]  # type: ignore[index]
+    assert "United States and Australia, with worldwide tracked shipping" in page_html_by_key["shipping_policy"]  # type: ignore[index]
+    assert "/pages/track-your-order" in page_html_by_key["contact_support"]  # type: ignore[index]
 
 
 def test_sync_compliance_policy_pages_requires_existing_profile(api_client):

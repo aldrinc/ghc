@@ -44,6 +44,121 @@ _PAGE_ORDER = [
 
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
 
+_DEFAULT_POLICY_PLACEHOLDER_VALUES: dict[str, str] = {
+    "effective_date": "2026-02-27",
+    "privacy_data_collected": (
+        "We collect device details, browsing activity, order information (including contact, billing, and "
+        "shipping details), and support interactions, including analytics and ad-attribution events."
+    ),
+    "privacy_data_usage": (
+        "Personal information is used to operate the store, process payments and shipping, provide support, "
+        "screen orders for risk or fraud, and improve site and marketing performance."
+    ),
+    "privacy_data_sharing": (
+        "Data is shared only with service providers that support checkout, fulfillment, analytics, and messaging, "
+        "or when required by law."
+    ),
+    "privacy_user_choices": (
+        "Customers can opt out of marketing where available and can request access, correction, or deletion by "
+        "contacting support."
+    ),
+    "privacy_security_retention": (
+        "Reasonable technical and organizational safeguards are applied, and data is retained only as long as needed "
+        "for business and legal purposes."
+    ),
+    "privacy_update_notice": (
+        "This policy may be updated periodically to reflect operational, legal, or regulatory changes, and updates "
+        "are published on this page."
+    ),
+    "terms_offer_scope": (
+        "Use of this website and related services is conditioned on acceptance of these Terms and posted "
+        "policy notices."
+    ),
+    "terms_eligibility": (
+        "By using the site or placing an order, customers agree to these Terms and confirm they will comply "
+        "with applicable laws."
+    ),
+    "terms_pricing_billing": (
+        "Prices and charges are shown before purchase confirmation, and payment authorization is required before "
+        "order fulfillment."
+    ),
+    "terms_fulfillment_access": (
+        "Order acceptance, shipping, and service access remain subject to availability, fraud screening, and "
+        "operational constraints."
+    ),
+    "terms_refund_cancellation": (
+        "Refund and cancellation terms are defined in the Returns and Refunds Policy and Shipping Policy available "
+        "in the site footer."
+    ),
+    "terms_disclaimers": (
+        "Services are provided on an as-is and as-available basis to the fullest extent permitted by law."
+    ),
+    "terms_dispute_resolution": (
+        "To the fullest extent permitted by law, disputes arising from these Terms are resolved through binding "
+        "arbitration in the United States before one arbitrator."
+    ),
+    "terms_governing_law": "These Terms are governed by the laws of the United States.",
+    "refund_eligibility": (
+        "Returns are eligible within 90 days when items are unused, in original packaging, and include proof "
+        "of purchase."
+    ),
+    "refund_window_policy": (
+        "Returns can be requested within 90 days of delivery, and cancellations requested within 12 hours are "
+        "eligible for full refund when fulfillment has not started."
+    ),
+    "refund_request_steps": (
+        "Contact support with order details and return reason before sending any item back; unauthorized returns "
+        "are not accepted."
+    ),
+    "refund_method_timing": (
+        "Approved refunds are issued to the original payment method after review and may take up to 5 business "
+        "days to post."
+    ),
+    "refund_fees_deductions": (
+        "Return shipping charges are customer responsibility unless the item was incorrect or defective; "
+        "non-refundable service charges may apply after fulfillment."
+    ),
+    "refund_exceptions": (
+        "Final-sale, refused-delivery, abuse-related, and certain post-delivery loss claims may be excluded or "
+        "resolved at the business's discretion where law allows."
+    ),
+    "shipping_regions": (
+        "We ship to the United States and Australia, with worldwide tracked shipping available for many regions."
+    ),
+    "shipping_processing_time": (
+        "Typical delivery windows are: USA 1-3 business days, Australia 1-4 business days, Worldwide tracked "
+        "4-13 business days, and PO Box or military addresses 4-30 business days."
+    ),
+    "shipping_options_costs": (
+        "Shipping options and costs are shown at checkout, including free shipping routes where available."
+    ),
+    "shipping_delivery_estimates": (
+        "Estimated delivery windows vary by destination, including domestic and international ranges shown at "
+        "checkout."
+    ),
+    "shipping_tracking": (
+        "Tracked shipping updates are provided once an order has been dispatched."
+    ),
+    "shipping_address_changes": (
+        "Address changes and cancellation requests must be submitted promptly and cannot be guaranteed after "
+        "fulfillment begins."
+    ),
+    "shipping_lost_damaged": (
+        "Lost, delayed, or damaged delivery issues should be reported to support promptly for claim review and next "
+        "steps."
+    ),
+    "shipping_customs_duties": (
+        "International customs duties, import taxes, and related fees are the customer's responsibility unless "
+        "explicitly stated otherwise."
+    ),
+    "shipping_return_address": (
+        "Return shipments must be sent to the return address provided by support after return authorization."
+    ),
+    "support_order_help_links": (
+        "Order tracking: /pages/track-your-order | FAQ: /pages/faqs | Contact support: /pages/contact"
+    ),
+}
+
 _RULESET: dict[str, Any] = {
     "version": RULESET_VERSION,
     "effectiveDate": RULESET_EFFECTIVE_DATE,
@@ -885,6 +1000,8 @@ def render_policy_template_markdown(
     normalized_values: dict[str, str] = {}
     for placeholder in expected_placeholders:
         raw_value = placeholder_values.get(placeholder)
+        if raw_value is None or not raw_value.strip():
+            raw_value = _DEFAULT_POLICY_PLACEHOLDER_VALUES.get(placeholder)
         if raw_value is None or not raw_value.strip():
             missing_placeholders.append(placeholder)
             continue
