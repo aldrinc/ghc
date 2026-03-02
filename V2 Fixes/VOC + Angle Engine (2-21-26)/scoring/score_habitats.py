@@ -32,6 +32,62 @@ import sys
 from typing import Dict, List, Tuple, Optional
 
 
+def _coerce_yes_no(value: object) -> str:
+    if isinstance(value, str):
+        normalized = value.strip().upper()
+        if normalized in {"Y", "N"}:
+            return normalized
+    if isinstance(value, bool):
+        return "Y" if value else "N"
+    return "N"
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
+
+
+def apply_video_modifiers(base_components: Dict[str, float], video_obs: Dict) -> Tuple[Dict[str, float], Dict]:
+    """
+    Apply deterministic video-habitat modifiers to base component values.
+    """
+    updated = dict(base_components)
+    modifier_deltas: Dict[str, float] = {}
+    has_video_fields = any(
+        key in video_obs
+        for key in (
+            "viral_videos_found",
+            "comment_sections_active",
+            "contains_purchase_intent",
+            "creator_diversity",
+            "video_count_scraped",
+            "median_view_count",
+            "viral_video_count",
+        )
+    )
+    if not has_video_fields:
+        return updated, {"applied": False, "modifiers": {}}
+
+    if _coerce_yes_no(video_obs.get("viral_videos_found")) == "Y":
+        updated["emotional_depth"] = _clamp01(updated["emotional_depth"] + 0.08)
+        modifier_deltas["emotional_depth"] = 0.08
+    if _coerce_yes_no(video_obs.get("comment_sections_active")) == "Y":
+        updated["language_quality"] = _clamp01(updated["language_quality"] + 0.10)
+        modifier_deltas["language_quality"] = 0.10
+    if _coerce_yes_no(video_obs.get("contains_purchase_intent")) == "Y":
+        updated["buyer_density"] = _clamp01(updated["buyer_density"] + 0.08)
+        modifier_deltas["buyer_density"] = 0.08
+
+    creator_diversity = str(video_obs.get("creator_diversity", "")).strip().upper()
+    if creator_diversity == "SINGLE":
+        updated["signal_to_noise"] = _clamp01(updated["signal_to_noise"] - 0.10)
+        modifier_deltas["signal_to_noise"] = modifier_deltas.get("signal_to_noise", 0.0) - 0.10
+    elif creator_diversity == "MANY":
+        updated["signal_to_noise"] = _clamp01(updated["signal_to_noise"] + 0.07)
+        modifier_deltas["signal_to_noise"] = modifier_deltas.get("signal_to_noise", 0.0) + 0.07
+
+    return updated, {"applied": bool(modifier_deltas), "modifiers": modifier_deltas}
+
+
 def score_habitat(obs: Dict) -> Dict:
     """
     Score a single habitat from its observation sheet.
@@ -217,13 +273,34 @@ def score_habitat(obs: Dict) -> Dict:
     # Engineering safety factors — a promising habitat you can't
     # actually mine is worthless. Hard gate at 0.5.
     # ============================================================
+    publicly_accessible_ok = _coerce_yes_no(obs.get('publicly_accessible')) == 'Y'
+    text_based_content_ok = _coerce_yes_no(obs.get('text_based_content')) == 'Y'
+    target_language_ok = _coerce_yes_no(obs.get('target_language')) == 'Y'
+    no_rate_limiting_ok = _coerce_yes_no(obs.get('no_rate_limiting')) == 'Y'
+
+    # Language can only be judged when extractable text exists.
+    effective_target_language_ok = target_language_ok if text_based_content_ok else True
     feasibility_checks = [
-        obs.get('publicly_accessible') == 'Y',
-        obs.get('text_based_content') == 'Y',
-        obs.get('target_language') == 'Y',
-        obs.get('no_rate_limiting') == 'Y'
+        publicly_accessible_ok,
+        text_based_content_ok,
+        effective_target_language_ok,
+        no_rate_limiting_ok,
     ]
     mining_feasibility = sum(feasibility_checks) / len(feasibility_checks)
+
+    base_components = {
+        'volume': volume_points,
+        'recency': recency_score,
+        'specificity': specificity_score,
+        'emotional_depth': depth_score,
+        'buyer_density': buyer_density,
+        'language_quality': language_quality,
+        'signal_to_noise': habitat_snr,
+        'competitor_whitespace': competitor_whitespace,
+        'market_timing': market_timing,
+        'mining_feasibility': mining_feasibility,
+    }
+    components, video_modifier_diagnostics = apply_video_modifiers(base_components, obs)
 
     # ============================================================
     # === COMPOSITE HABITAT SCORE ===
@@ -233,28 +310,37 @@ def score_habitat(obs: Dict) -> Dict:
     # Everything else = supporting signals
     # ============================================================
     composite = (
-        volume_points       * 0.05 +
-        recency_score       * 0.10 +
-        specificity_score   * 0.14 +
-        depth_score         * 0.18 +
-        buyer_density       * 0.13 +
-        language_quality    * 0.14 +
-        habitat_snr         * 0.07 +
-        competitor_whitespace * 0.07 +
-        market_timing       * 0.06 +
-        mining_feasibility  * 0.06
+        components['volume']               * 0.05 +
+        components['recency']              * 0.10 +
+        components['specificity']          * 0.14 +
+        components['emotional_depth']      * 0.18 +
+        components['buyer_density']        * 0.13 +
+        components['language_quality']     * 0.14 +
+        components['signal_to_noise']      * 0.07 +
+        components['competitor_whitespace'] * 0.07 +
+        components['market_timing']        * 0.06 +
+        components['mining_feasibility']   * 0.06
     )
 
     habitat_final_score = round(composite * 100, 1)
 
     # ============================================================
     # MINING RISK HARD GATE (Engineering Safety Factor)
-    # If feasibility < 0.5, cap score at 25 regardless of other
-    # components. This mirrors a circuit breaker — it doesn't
-    # matter how good the signal is if you can't access it.
+    # If any mining-risk requirement fails, cap score at 25 regardless
+    # of other components. This mirrors a circuit breaker: inaccessible
+    # habitats cannot be prioritized.
     # ============================================================
+    mining_gate_failures: List[str] = []
+    if not publicly_accessible_ok:
+        mining_gate_failures.append('publicly_accessible')
+    if not text_based_content_ok:
+        mining_gate_failures.append('text_based_content')
+    if text_based_content_ok and not target_language_ok:
+        mining_gate_failures.append('target_language')
+    if not no_rate_limiting_ok:
+        mining_gate_failures.append('no_rate_limiting')
     mining_gate_applied = False
-    if mining_feasibility < 0.5:
+    if mining_gate_failures:
         habitat_final_score = min(25.0, habitat_final_score)
         mining_gate_applied = True
 
@@ -290,21 +376,23 @@ def score_habitat(obs: Dict) -> Dict:
         'final_score': habitat_final_score,
         'confidence_range': (confidence_low, confidence_high),
         'mining_gate_applied': mining_gate_applied,
+        'mining_gate_failures': mining_gate_failures,
         'lifecycle_stage': lifecycle_stage,
         'reusability': obs.get('reusability', 'UNKNOWN'),
         'components': {
-            'volume': round(volume_points * 100, 1),
-            'recency': round(recency_score * 100, 1),
-            'specificity': round(specificity_score * 100, 1),
-            'emotional_depth': round(depth_score * 100, 1),
-            'buyer_density': round(buyer_density * 100, 1),
-            'language_quality': round(language_quality * 100, 1),
-            'signal_to_noise': round(habitat_snr * 100, 1),
-            'competitor_whitespace': round(competitor_whitespace * 100, 1),
-            'market_timing': round(market_timing * 100, 1),
-            'mining_feasibility': round(mining_feasibility * 100, 1)
+            'volume': round(components['volume'] * 100, 1),
+            'recency': round(components['recency'] * 100, 1),
+            'specificity': round(components['specificity'] * 100, 1),
+            'emotional_depth': round(components['emotional_depth'] * 100, 1),
+            'buyer_density': round(components['buyer_density'] * 100, 1),
+            'language_quality': round(components['language_quality'] * 100, 1),
+            'signal_to_noise': round(components['signal_to_noise'] * 100, 1),
+            'competitor_whitespace': round(components['competitor_whitespace'] * 100, 1),
+            'market_timing': round(components['market_timing'] * 100, 1),
+            'mining_feasibility': round(components['mining_feasibility'] * 100, 1)
         },
-        'evidence_completeness': round(evidence_completeness, 2)
+        'evidence_completeness': round(evidence_completeness, 2),
+        'video_modifiers_applied': video_modifier_diagnostics,
     }
 
 

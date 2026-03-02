@@ -1129,43 +1129,116 @@ All API calls use the token in the Authorization header. Token is NEVER stored i
 
 ### 8.2 Actor Configuration Schemas
 
-Each Apify actor accepts a specific input schema. The `apify_configs.json` file from Agent 0/0b contains the complete input for each actor. Key parameters per actor:
+Each Apify actor accepts a specific input schema. The strategy outputs from Agent 0/0b are treated as the base run plan, then expanded by deterministic runtime stages:
 
-**Reddit Scraper (`apify/reddit-scraper`):**
+1. **Base strategy runs** (exact Agent 0/0b configs)
+2. **Discovery fan-out runs** (Google SERP URLs -> destination pages/videos)
+3. **Comment enrichment runs** (post/video URLs -> comment-capable actors)
+
+Current default global fetch cap:
+- `STRATEGY_V2_APIFY_MAX_ITEMS_PER_DATASET=500`
+
+Key parameters per actor:
+
+**Reddit Scraper (`practicaltools/apify-reddit-api`):**
 ```json
 {
-  "startUrls": ["https://reddit.com/r/..."],
-  "searchQueries": ["query1", "query2"],
-  "sort": "new",
-  "maxItems": 500,
-  "includeComments": true,
-  "maxComments": 50,
-  "proxy": { "useApifyProxy": true }
+  "startUrls": [{"url": "https://www.reddit.com/r/..."}],
+  "maxItems": 100
 }
 ```
 
 **TikTok Scraper (`clockworks/tiktok-scraper`):**
 ```json
 {
-  "searchQueries": ["keyword1", "keyword2"],
-  "hashtags": ["#hashtag1"],
-  "resultsPerPage": 100,
-  "shouldDownloadVideos": false,
-  "shouldDownloadComments": true,
-  "maxComments": 100
+  "profiles": ["https://www.tiktok.com/@account"],
+  "postURLs": ["https://www.tiktok.com/@account/video/..."],
+  "hashtags": ["keyword"],
+  "maxItems": 200
+}
+```
+
+**Instagram Scraper (`apify/instagram-scraper`):**
+```json
+{
+  "directUrls": ["https://www.instagram.com/explore/tags/herbalism/"],
+  "resultsLimit": 200
 }
 ```
 
 **YouTube Scraper (`streamers/youtube-scraper`):**
 ```json
 {
-  "searchQueries": ["keyword1"],
-  "maxResults": 50,
-  "includeComments": true,
-  "maxComments": 200,
-  "sortBy": "relevance"
+  "startUrls": [{"url": "https://www.youtube.com/results?search_query=..."}],
+  "maxResults": 200
 }
 ```
+
+**YouTube Comments Scraper (`streamers/youtube-comments-scraper`):**
+```json
+{
+  "startUrls": [{"url": "https://www.youtube.com/watch?v=..."}],
+  "maxComments": 120
+}
+```
+
+**Web Scraper (`apify/web-scraper`):**
+```json
+{
+  "startUrls": [{"url": "https://target-page.example"}],
+  "maxCrawlPages": 200,
+  "maxResultsPerCrawl": 200
+}
+```
+
+### 8.2a Discovery Fan-out Contract
+
+Discovery fan-out is enabled by default and converts SERP output into destination scrape runs.
+
+- `STRATEGY_V2_APIFY_DISCOVERY_FANOUT_ENABLED=true`
+- `...MAX_URLS_TOTAL=240`
+- `...MAX_URLS_PER_QUERY=8`
+- `...MAX_URLS_PER_DOMAIN=30`
+- `...MAX_URLS_PER_RUN=25`
+
+Rules:
+- Canonicalize and de-duplicate URLs
+- Remove tracking parameters (`utm_*`, click IDs)
+- Reject search/result aggregator URLs as final destinations
+- Map destinations to the best-fit actor (Reddit/YouTube/TikTok/Instagram/Web)
+
+### 8.2b Comment Enrichment Contract
+
+Comment enrichment is enabled by default and runs after base + fan-out execution.
+
+- `STRATEGY_V2_APIFY_COMMENT_ENRICHMENT_ENABLED=true`
+- `...MAX_VIDEOS_PER_PLATFORM=20`
+- `...MAX_COMMENTS_PER_VIDEO=120`
+- `STRATEGY_V2_APIFY_YOUTUBE_COMMENTS_ACTOR_ID=streamers/youtube-comments-scraper`
+
+Behavior:
+- Rank candidate video assets by comment/view signal
+- Select per-platform top URLs
+- Execute comment-capable actor runs for TikTok, Instagram, and YouTube
+
+### 8.2c Run Counter Contract
+
+Downstream stages must treat these counters as distinct:
+
+- `strategy_config_run_count`: number of base strategy configs from Agent 0/0b
+- `planned_actor_run_count`: total planned runs after fan-out + comment enrichment
+- `executed_actor_run_count`: terminal runs executed
+- `failed_actor_run_count`: executed runs with non-success terminal status
+
+`strategy_config_run_count` is validated against strategy handoff size. `planned_actor_run_count` may exceed it by design.
+
+### 8.2d Prompt Runtime File Delivery
+
+For Agent 1/2A/3 runtime, large JSON blocks are uploaded via OpenAI `files.create` and exposed through:
+
+- `OPENAI_CODE_INTERPRETER_FILE_IDS_JSON` (logical key -> `file_id`)
+
+Agents must load canonical runtime inputs from uploaded files instead of relying on inline JSON text blocks.
 
 ### 8.3 Rate Limiting Considerations
 

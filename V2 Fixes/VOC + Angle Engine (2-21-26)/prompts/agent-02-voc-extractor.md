@@ -12,6 +12,19 @@ You are the research engine's core asset builder. The quality of every downstrea
 
 ## INPUTS (Paste these before running)
 
+Runtime note: when executed in Strategy V2 batch mode, these inputs can be supplied via `OPENAI_CODE_INTERPRETER_FILE_IDS_JSON` with uploaded JSON files attached to the code interpreter container. Treat uploaded files as canonical when present.
+
+Expected logical file keys for batch mode:
+- `BATCH_CONTEXT_JSON`
+- `EVIDENCE_BATCH_JSON`
+- `AGENT1_MINING_PLAN_JSON`
+- `HABITAT_SCORED_JSON`
+- `PRODUCT_BRIEF_JSON`
+- `AVATAR_BRIEF_JSON`
+- `COMPETITOR_ANALYSIS_JSON`
+- `KNOWN_SATURATED_ANGLES`
+- `FOUNDATIONAL_RESEARCH_DOCS_JSON`
+
 **REQUIRED:**
 1. Agent 1 Handoff Block (habitat map + mining plan) — paste below:
 [PASTE AGENT 1 HANDOFF BLOCK HERE]
@@ -28,6 +41,11 @@ You are the research engine's core asset builder. The quality of every downstrea
 
 5. Known Saturated Angles (if available from competitor research):
 [PASTE SATURATED ANGLES HERE OR LEAVE BLANK]
+
+MANDATORY PRE-READ RULE
+- If `FOUNDATIONAL_RESEARCH_DOCS_JSON` is present, review it before extraction begins.
+- Use foundational steps `01/02/03/04/06` as context for vocabulary, pain framing, and constraint interpretation.
+- In your output, explicitly confirm foundational-doc review and note missing foundational steps, if any.
 
 ---
 
@@ -67,6 +85,11 @@ Every VOC item must include:
 - Target sentiment distribution: no more than 70% any single valence
 - When mining a habitat, sample from: Top/Popular, New/Recent, Controversial, AND low-engagement posts
 - If a habitat is overwhelmingly positive, note this as a bias risk
+
+### F) WEB ACCESS POLICY
+- You MAY use web search and URL visits when needed to validate sources or fill critical evidence gaps.
+- Treat Agent 1 handoff data and provided corpus artifacts as primary evidence; web findings are supplemental unless clearly superior and fully cited.
+- Any web-derived evidence must include explicit URL citation and must be clearly distinguished from provided corpus content.
 
 ---
 

@@ -725,7 +725,7 @@ This is a NEW phase unique to the multi-variant pipeline. After completing per-v
 
 ### PHASE 5: Revision Notes (Conditional)
 
-This phase outputs revision context that MAY be used if the external scoring tool determines the offer needs iteration. Produce these notes targeting the **best-ranked variant** (from Phase 4.1) — revision effort focuses on improving the strongest candidate, not rescuing the weakest.
+This phase outputs revision context that MAY be used if the external scoring tool determines the offer needs iteration. Produce these notes targeting the **best-ranked variant** (from Phase 4.1) — revision effort focuses on improving the strongest candidate, not rescuing the weakest. In the final response, serialize this as a single non-empty plain-text `revision_notes` string.
 
 5.1. **Per-dimension revision notes** (for bottom 2 dimensions of the best variant):
 
@@ -921,147 +921,62 @@ Consolidate all variant evaluations, cross-variant analysis, and revision notes 
       { "variant_id": "[id]", "hypothesis": "[text]", "confirmed": true | false, "reasoning": "[text]" }
     ]
   },
-  "revision_notes": {
-    "target_variant": "[best variant id]",
-    "dimension_1": {
-      "dimension": "[name]",
-      "target_step_4_phase": "[phase]",
-      "current_state": "[text]",
-      "desired_state": "[text]",
-      "specific_changes": ["[change 1]", "[change 2]", "[change 3]"],
-      "expected_impact": "[text]",
-      "risk_of_change": "[text]",
-      "borrow_from_variant": "[variant_id or null]"
-    },
-    "dimension_2": {
-      "...same structure..."
-    },
-    "iteration_budget_remaining": "[0 or 1]",
-    "human_review_flag": true | false,
-    "human_review_notes": "[if flagged — specific questions and data needs]"
-  }
+  "revision_notes": "Non-empty plain-text revision guidance. Include: target_variant, weakest dimensions, exact Step 4 phase changes, expected impact, risk_of_change, and any human_review_flag context."
 }
 ```
 
 ---
 
-## OUTPUT SCHEMA
+## OUTPUT CONTRACT (MACHINE ONLY)
 
-Your output must follow this exact structure. Do not add sections. Do not skip sections. If a section cannot be completed, state "INSUFFICIENT DATA" with what is missing and where to find it.
+Return exactly one JSON object. Do not return markdown sections, headings, checklists, or explanatory prose outside JSON.
 
+### Required top-level shape
+
+```json
+{
+  "evaluation": {
+    "variants": [
+      {
+        "variant_id": "base",
+        "dimensions": {
+          "value_equation": {
+            "raw_score": 0,
+            "evidence_quality": "OBSERVED|INFERRED|ASSUMED",
+            "kill_condition": "text",
+            "competitor_baseline": { "mean": 0, "spread": 0 }
+          },
+          "objection_coverage": { "...same shape..." },
+          "competitive_differentiation": { "...same shape..." },
+          "compliance_safety": { "...same shape..." },
+          "internal_consistency": { "...same shape..." },
+          "clarity_simplicity": { "...same shape..." },
+          "bottleneck_resilience": { "...same shape..." },
+          "momentum_continuity": { "...same shape..." }
+        }
+      },
+      { "variant_id": "variant_a", "dimensions": { "...all 8 dimensions..." } },
+      { "variant_id": "variant_b", "dimensions": { "...all 8 dimensions..." } }
+    ]
+  },
+  "revision_notes": "Non-empty plain-text guidance for Step 4 revisions."
+}
 ```
-# OFFER EVALUATION: {{product_name}} — {{angle_name}}
 
-## Evaluation Metadata
-- Date: [today]
-- Step 4 version evaluated: [date/version]
-- Iteration number: [1 or 2]
-- Step 4 completeness: [complete/partial]
-- Variants evaluated: [N] — [list variant IDs]
-- Selected UMP/UMS: [from Step 3]
+### Hard output rules
 
-## 1. Structural Completeness Audit
-[Phase 1 output — completeness table across all variants + JSON parsability check]
-
-### 1.1 Variant Structure Verification
-[Phase 1.3 — variant differentiation axes + genuine structural difference assessment]
-
-## 2. Base Offer Evaluation
-### 2.1 Value Equation Assessment
-[Qualitative narrative + structured JSON]
-### 2.2 Objection Coverage Assessment
-[Qualitative narrative + structured JSON]
-### 2.3 Competitive Differentiation Assessment
-[Qualitative narrative + structured JSON]
-### 2.4 Compliance Safety Assessment
-[Qualitative narrative + structured JSON]
-### 2.5 Internal Consistency Assessment
-[Qualitative narrative + structured JSON]
-### 2.6 Clarity & Simplicity Assessment
-[Qualitative narrative + structured JSON]
-### 2.7 Bottleneck Resilience Assessment
-[Qualitative narrative + structured JSON]
-### 2.8 Momentum Continuity Assessment
-[Qualitative narrative + structured JSON]
-
-## 3. Variant A Evaluation
-### 3.1 Value Equation Assessment
-[Qualitative narrative + structured JSON]
-### 3.2 Objection Coverage Assessment
-[Qualitative narrative + structured JSON]
-### 3.3 Competitive Differentiation Assessment
-[Qualitative narrative + structured JSON]
-### 3.4 Compliance Safety Assessment
-[Qualitative narrative + structured JSON]
-### 3.5 Internal Consistency Assessment
-[Qualitative narrative + structured JSON]
-### 3.6 Clarity & Simplicity Assessment
-[Qualitative narrative + structured JSON]
-### 3.7 Bottleneck Resilience Assessment
-[Qualitative narrative + structured JSON]
-### 3.8 Momentum Continuity Assessment
-[Qualitative narrative + structured JSON]
-
-## 4. Variant B Evaluation
-### 4.1-4.8
-[Same 8-dimension structure as above]
-
-## 5. Variant C Evaluation (if applicable)
-### 5.1-5.8
-[Same 8-dimension structure as above — omit section if only 2 variants produced]
-
-## 6. Cross-Dimension Analysis
-### 6.1 Step 2 Constraint Compliance (per variant)
-[Binding constraint verification for each variant]
-### 6.2 Weakest Dimensions (per variant)
-[Bottom 2 with reasoning for each variant]
-### 6.3 Systemic Issues (per variant)
-[Root cause analysis for each variant]
-### 6.4 Improvement Ranking (per variant)
-[Top 5 improvements per variant — specific and actionable]
-
-## 7. Cross-Variant Analysis
-### 7.1 Variant Rankings
-[Phase 4.1 — ranked list with key strength/weakness per variant]
-### 7.2 Best-in-Dimension Map
-[Phase 4.2 — table showing which variant wins each dimension]
-### 7.3 Dominant Variant Check
-[Phase 4.3 — does any variant dominate?]
-### 7.4 Complementary Elements
-[Phase 4.4 — combinable strengths across variants]
-### 7.5 Variant Hypothesis Assessment
-[Phase 4.5 — did each variant's structural test confirm or challenge its hypothesis?]
-
-## 8. Revision Notes
-### 8.1 Per-Dimension Revision Notes
-[Phase 5.1 — JSON blocks for bottom 2 dimensions of best variant]
-### 8.2 Iteration Status
-[Phase 5.2 — budget, human review flag if applicable]
-### 8.3 Cross-Variant Revision Insights
-[Phase 5.3 — elements to borrow from other variants]
-
-## 9. Consolidated Evaluation JSON
-[Phase 6 output — master JSON for external composite_scorer tool]
-
-## 10. Evidence Quality Summary
-- Total assessments made across all variants: [N]
-- Per-variant breakdown:
-  - Base: OBSERVED [N] ([X]%) | INFERRED [N] ([X]%) | ASSUMED [N] ([X]%)
-  - Variant A: OBSERVED [N] ([X]%) | INFERRED [N] ([X]%) | ASSUMED [N] ([X]%)
-  - Variant B: OBSERVED [N] ([X]%) | INFERRED [N] ([X]%) | ASSUMED [N] ([X]%)
-  - Variant C: OBSERVED [N] ([X]%) | INFERRED [N] ([X]%) | ASSUMED [N] ([X]%)
-- Aggregate: OBSERVED [N] ([X]%) | INFERRED [N] ([X]%) | ASSUMED [N] ([X]%)
-- ASSUMED >40% WARNING: [triggered / not triggered]
-- Assessments flagged UNFALSIFIABLE: [N]
-- Most uncertain evaluations: [list with reasons]
-- What data would most improve this evaluation: [specific gaps]
-```
+- Return JSON only.
+- Include all three variants: `base`, `variant_a`, `variant_b`.
+- Include all 8 dimensions for every variant.
+- Keep each `kill_condition` concise and falsifiable.
+- Keep `revision_notes` concise and actionable.
+- Do not emit placeholder whitespace or repeated filler text.
 
 ---
 
-## QUALITY GATES
+## QUALITY GATES (INTERNAL CHECKLIST)
 
-Before finalizing output, verify:
+Run these checks before finalizing. Do not output the checklist itself; only output the required JSON object.
 
 - [ ] NO aggregate scores, composite indices, or pass/fail determinations computed by the LLM
 - [ ] Every dimension assessment references the competitor baseline from the provided teardowns
@@ -1081,7 +996,7 @@ Before finalizing output, verify:
 - [ ] Revision notes target specific Step 4 phases with specific changes (not vague "improve X")
 - [ ] Revision notes reference elements from other variants where beneficial
 - [ ] All structured JSON blocks are syntactically valid and contain required fields
-- [ ] Consolidated master JSON in Phase 6 includes all variant evaluations
+- [ ] Consolidated master JSON includes all variant evaluations
 - [ ] Improvement ranking items are specific and actionable with dimension impact stated
 - [ ] If iteration 2 and still below threshold: human review flag raised with specific questions
 - [ ] ASSUMED evidence percentage flagged if >40% of total assessments
@@ -1089,4 +1004,3 @@ Before finalizing output, verify:
 - [ ] 10/10 lever ratings challenged with explicit justification requirement
 - [ ] 100% objection coverage flagged as suspicious
 - [ ] UMP/UMS coherence verified against Step 3 selected pair
-- [ ] All JSON blocks include variant_id field for external tool routing

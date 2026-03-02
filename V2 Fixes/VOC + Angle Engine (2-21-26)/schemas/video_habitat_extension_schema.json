@@ -1,17 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Video Habitat Observation Extension",
-  "description": "11 additional fields for video-sourced habitats (TikTok, IG, YouTube). Applied ON TOP of the base 52-field habitat observation sheet.",
+  "description": "11 additional fields for video-sourced habitats (TikTok, IG, YouTube). Applied on top of the base habitat observation sheet.",
   "type": "object",
+  "additionalProperties": false,
   "properties": {
     "video_count_scraped": {
-      "type": "string",
-      "enum": ["UNDER_20", "20_TO_100", "100_TO_500", "OVER_500"],
+      "type": "integer",
+      "minimum": 0,
       "description": "Volume of video content found for this habitat"
     },
     "median_view_count": {
-      "type": "string",
-      "enum": ["UNDER_1K", "1K_TO_10K", "10K_TO_100K", "OVER_100K"],
+      "type": "integer",
+      "minimum": 0,
       "description": "Typical reach of videos in this habitat"
     },
     "viral_videos_found": {
@@ -21,6 +22,7 @@
     },
     "viral_video_count": {
       "type": "integer",
+      "minimum": 0,
       "description": "Number of VIRAL-tier videos (computed by score_virality.py, not by agent)"
     },
     "comment_sections_active": {
@@ -30,7 +32,7 @@
     },
     "comment_avg_length": {
       "type": "string",
-      "enum": ["SHORT_EMOJI", "ONE_LINER", "PARAGRAPH", "DETAILED"],
+      "enum": ["SHORT", "MEDIUM", "LONG"],
       "description": "Average comment quality/length indicator"
     },
     "hook_formats_identifiable": {
@@ -40,7 +42,7 @@
     },
     "creator_diversity": {
       "type": "string",
-      "enum": ["SINGLE_CREATOR", "FEW", "MANY"],
+      "enum": ["SINGLE", "FEW", "MANY"],
       "description": "Content not dominated by a single account"
     },
     "contains_testimonial_language": {
@@ -58,5 +60,18 @@
       "enum": ["Y", "N"],
       "description": "Comments mention buying, trying, or recommending products"
     }
-  }
+  },
+  "required": [
+    "video_count_scraped",
+    "median_view_count",
+    "viral_videos_found",
+    "viral_video_count",
+    "comment_sections_active",
+    "comment_avg_length",
+    "hook_formats_identifiable",
+    "creator_diversity",
+    "contains_testimonial_language",
+    "contains_objection_language",
+    "contains_purchase_intent"
+  ]
 }
