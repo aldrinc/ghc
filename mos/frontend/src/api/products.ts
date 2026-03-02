@@ -209,6 +209,72 @@ export function useUploadProductAssets(productId: string) {
   });
 }
 
+export function useUploadProductAssetsById() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ productId, files }: { productId: string; files: File[] }) => {
+      if (!productId) throw new Error("Product ID is required to upload assets.");
+      if (!files.length) throw new Error("No files selected for upload.");
+
+      const token = await getToken({ template: clerkTokenTemplate, skipCache: true });
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+
+      const resp = await fetch(`${defaultBaseUrl}/products/${productId}/assets`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        body: formData,
+      });
+      if (!resp.ok) {
+        const message = await readUploadError(resp);
+        throw new Error(message);
+      }
+      const data = (await resp.json()) as { assets?: ProductAsset[] };
+      if (!data.assets || !Array.isArray(data.assets)) {
+        throw new Error("Upload succeeded but response is missing assets.");
+      }
+      return data.assets;
+    },
+    onSuccess: (_assets, vars) => {
+      toast.success("Assets uploaded");
+      queryClient.invalidateQueries({ queryKey: ["products", "assets", vars.productId] });
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", vars.productId] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to upload assets";
+      toast.error(message);
+    },
+  });
+}
+
+export function useSetProductPrimaryAssetById() {
+  const { request } = useApiClient();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ productId, primaryAssetId }: { productId: string; primaryAssetId: string }) => {
+      if (!productId) throw new Error("Product ID is required.");
+      if (!primaryAssetId) throw new Error("Primary asset ID is required.");
+      return request<Product>(`/products/${productId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ primaryAssetId }),
+      });
+    },
+    onSuccess: (product) => {
+      toast.success("Primary product image set");
+      queryClient.invalidateQueries({ queryKey: ["products", "list", product.client_id] });
+      queryClient.invalidateQueries({ queryKey: ["products", "detail", product.id] });
+      queryClient.invalidateQueries({ queryKey: ["products", "assets", product.id] });
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to set primary product image";
+      toast.error(message);
+    },
+  });
+}
+
 export function useCreateVariant(productId: string) {
   const { post } = useApiClient();
   const queryClient = useQueryClient();

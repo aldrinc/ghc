@@ -141,6 +141,26 @@ function parseArtifactIdFromRef(value: unknown): string | null {
   return null;
 }
 
+function resolveStepPayloadArtifactId(
+  artifactRefs: Record<string, unknown>,
+  stepKey: string,
+): string | null {
+  // Fallback state shape: artifact_refs[stepKey] = "artifact://<id>" | "<uuid>"
+  const direct = parseArtifactIdFromRef(artifactRefs[stepKey]);
+  if (direct) return direct;
+
+  // Live workflow query shape: artifact_refs.step_payload_artifact_ids[stepKey] = "<uuid>"
+  const nested = artifactRefs.step_payload_artifact_ids;
+  if (isRecord(nested)) {
+    const nestedId = parseArtifactIdFromRef(nested[stepKey]);
+    if (nestedId) return nestedId;
+  }
+
+  // Live workflow query denormalized key: step_payload_v2_02i_artifact_id
+  const normalizedStepKey = stepKey.replace(/-/g, "_");
+  return parseArtifactIdFromRef(artifactRefs[`step_payload_${normalizedStepKey}_artifact_id`]);
+}
+
 function toErrorMessage(error: unknown): string {
   if (typeof error === "string") return error;
   if (error && typeof error === "object") {
@@ -179,8 +199,14 @@ function inferCompletedGateCount(currentStage?: string | null, runStatus?: strin
   if (runStatus === "completed") return GATE_SEQUENCE.length;
   if (!currentStage) return 0;
   if (currentStage === "completed") return GATE_SEQUENCE.length;
+  if (currentStage === "v2-02.foundation") return 0;
   if (currentStage === "v2-02a") return 0;
   if (currentStage === "v2-02b") return 1;
+  if (currentStage === "v2-02") return 2;
+  if (currentStage === "v2-03") return 2;
+  if (currentStage === "v2-04") return 2;
+  if (currentStage === "v2-05") return 2;
+  if (currentStage === "v2-06") return 2;
   if (currentStage === "v2-03..v2-06") return 2;
   if (currentStage === "v2-07") return 2;
   if (currentStage === "v2-08") return 3;
@@ -343,7 +369,7 @@ export function StrategyV2ReviewWorkspace({
     const files: ReviewFile[] = [];
 
     const pushStepPayloadFile = (stepKey: string, title: string, required = true) => {
-      const artifactId = parseArtifactIdFromRef(artifactRefs[stepKey]);
+      const artifactId = resolveStepPayloadArtifactId(artifactRefs, stepKey);
       files.push({
         id: `artifact-${stepKey}`,
         title,

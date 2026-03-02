@@ -20,6 +20,11 @@ function isCanonArtifactRef(value: unknown): value is CanonArtifactRef {
   );
 }
 
+function isExternalDocUrl(value?: string): boolean {
+  if (!value) return false;
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
 function toJsonMarkdown(title: string, value: unknown): string {
   let body = "";
   try {
@@ -107,6 +112,7 @@ export function ResearchDetailPage() {
   const hasFullContent = Boolean(fullContent.trim());
 
   const docUrl = artifact?.doc_url || canonArtifactRef?.doc_url || fullArtifact?.doc_url;
+  const canOpenExternalDoc = isExternalDocUrl(docUrl);
   const resolvedTitle = (artifact?.title || canonArtifactRef?.title || fullArtifact?.title || "").trim();
   const hasTitle = Boolean(resolvedTitle);
   const summary = artifact?.summary || stepSummaries[resolvedStepKey] || fullArtifact?.summary || "";
@@ -152,10 +158,10 @@ export function ResearchDetailPage() {
           description={
             missingTitle
               ? `Missing title for step ${resolvedStepKey || "—"}.`
-              : `Step ${resolvedStepKey || "—"} • Full research output captured during pre-canon.`
+              : `Step ${resolvedStepKey || "—"} • Full research output captured during this workflow run.`
           }
           actions={
-            hasFullContent || docUrl ? (
+            hasFullContent || canOpenExternalDoc ? (
               <div className="flex items-center gap-2">
                 {hasFullContent ? (
                   <Button
@@ -175,7 +181,7 @@ export function ResearchDetailPage() {
                     Copied
                   </span>
                 ) : null}
-                {docUrl ? (
+                {canOpenExternalDoc ? (
                   <Button
                     asChild
                     variant="ghost"

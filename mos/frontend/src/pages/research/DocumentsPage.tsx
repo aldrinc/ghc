@@ -48,6 +48,11 @@ function isCanonArtifactRef(value: unknown): value is CanonArtifactRef {
   );
 }
 
+function isExternalDocUrl(value?: string): boolean {
+  if (!value) return false;
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
 export function DocumentsPage() {
   const navigate = useNavigate();
   const { workspace } = useWorkspace();
@@ -63,6 +68,8 @@ export function DocumentsPage() {
     const workspaceRuns = workflows
       .filter((wf) => wf.client_id === workspace?.id && (!product?.id || wf.product_id === product.id))
       .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+    const strategyV2Run = workspaceRuns.find((wf) => wf.kind === "strategy_v2");
+    if (strategyV2Run) return strategyV2Run;
     const onboarding = workspaceRuns.find((wf) => wf.kind === "client_onboarding");
     return onboarding || workspaceRuns[0];
   }, [workflows, workspace?.id, product?.id]);
@@ -177,7 +184,7 @@ export function DocumentsPage() {
     const message = getErrorMessage(isWorkflowsError ? workflowsError : workflowDetailError);
     return (
       <div className="space-y-4">
-        <PageHeader title="Documents" description={`Research docs captured during onboarding for ${product.title}.`} />
+        <PageHeader title="Documents" description={`Research docs captured for ${product.title}.`} />
         <div className="max-w-6xl mx-auto space-y-3">
           <EmptyState title="Failed to load documents" description={message} />
           <div className="flex justify-center">
@@ -200,7 +207,7 @@ export function DocumentsPage() {
   if (rowsError) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Documents" description={`Research docs captured during onboarding for ${product.title}.`} />
+        <PageHeader title="Documents" description={`Research docs captured for ${product.title}.`} />
         <div className="max-w-6xl mx-auto space-y-3">
           <EmptyState title="Failed to build document list" description={rowsError} />
           <div className="flex justify-center">
@@ -224,7 +231,7 @@ export function DocumentsPage() {
     <div className="space-y-4">
       <PageHeader
         title="Documents"
-        description={`Research docs captured during onboarding for ${product.title}.`}
+        description={`Research docs captured for ${product.title}.`}
       />
 
       <div className="max-w-6xl mx-auto">
@@ -310,9 +317,9 @@ export function DocumentsPage() {
                         >
                           View
                         </Button>
-                        {row.docUrl ? (
+                        {isExternalDocUrl(row.docUrl) ? (
                           <a
-                            href={row.docUrl}
+                            href={row.docUrl as string}
                             target="_blank"
                             rel="noreferrer"
                             className="text-xs text-primary underline"

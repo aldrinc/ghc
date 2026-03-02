@@ -53,6 +53,24 @@ export interface StrategyV2State {
   artifact_refs?: Record<string, string> | null;
 }
 
+export interface StrategyV2LaunchRecord {
+  id: string;
+  launch_type: "initial_angle" | "additional_ums" | "additional_angle";
+  launch_key: string;
+  campaign_id?: string | null;
+  funnel_id?: string | null;
+  angle_id: string;
+  angle_run_id: string;
+  selected_ums_id?: string | null;
+  selected_variant_id?: string | null;
+  launch_index?: number | null;
+  launch_workflow_run_id?: string | null;
+  launch_temporal_workflow_id?: string | null;
+  launch_status?: string | null;
+  created_by_user?: string | null;
+  created_at: string;
+}
+
 export interface ActivityLog {
   id: string;
   workflow_run_id: string;
@@ -139,4 +157,5 @@ export interface WorkflowDetail {
   strategy_v2_copy_canonical?: Record<string, unknown> | null;
   strategy_v2_copy_context?: Artifact | null;
   strategy_v2_awareness_angle_matrix?: Artifact | null;
+  strategy_v2_launches?: StrategyV2LaunchRecord[] | null;
 }

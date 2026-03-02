@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FieldControl, FieldDescription, FieldError, FieldLabel, FieldRoot, FormRoot } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { useCreateClient, useStartOnboarding } from "@/api/clients";
+import { useSetProductPrimaryAssetById, useUploadProductAssetsById } from "@/api/products";
 import { toast } from "@/components/ui/toast";
 import type { Client } from "@/types/common";
 
@@ -45,6 +46,7 @@ type ProductDraft = {
   disclaimers: string;
   goals: string;
   competitor_urls: string;
+  primary_image_file: File | null;
 };
 
 const emptyProductDraft: ProductDraft = {
@@ -57,6 +59,7 @@ const emptyProductDraft: ProductDraft = {
   disclaimers: "",
   goals: "",
   competitor_urls: "",
+  primary_image_file: null,
 };
 
 type WizardState = {
@@ -138,6 +141,8 @@ export function OnboardingWizard({
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
   const onboarding = useStartOnboarding();
   const createClient = useCreateClient();
+  const uploadProductAssetsById = useUploadProductAssetsById();
+  const setProductPrimaryAssetById = useSetProductPrimaryAssetById();
 
   useEffect(() => {
     if (!open && !isPage) {
@@ -153,7 +158,11 @@ export function OnboardingWizard({
   const currentStep = steps[stepIndex];
   const progress = Math.round(((stepIndex + 1) / steps.length) * 100);
   const requiresClientName = !activeClientId;
-  const isSubmitting = onboarding.isPending || createClient.isPending;
+  const isSubmitting =
+    onboarding.isPending ||
+    createClient.isPending ||
+    uploadProductAssetsById.isPending ||
+    setProductPrimaryAssetById.isPending;
 
   const canNext = useMemo(() => {
     if (currentStep.key === "basics") {
@@ -164,7 +173,11 @@ export function OnboardingWizard({
     }
     if (currentStep.key === "product") {
       if (state.products.length !== 1) return false;
-      return Boolean(state.products[0]?.product_name?.trim());
+      return (
+        Boolean(state.products[0]?.product_name?.trim()) &&
+        Boolean(state.products[0]?.product_description?.trim()) &&
+        Boolean(state.products[0]?.primary_image_file)
+      );
     }
     if (currentStep.key === "funnel") {
       if (!state.business_model.trim()) return false;
@@ -205,6 +218,7 @@ export function OnboardingWizard({
     const created = (await createClient.mutateAsync({
       name: state.client_name.trim(),
       industry: state.client_industry.trim() || undefined,
+      strategyV2Enabled: true,
     })) as Client;
     if (!created?.id) {
       throw new Error("Client creation failed");
@@ -221,6 +235,14 @@ export function OnboardingWizard({
     }
     if (state.products.length !== 1 || !firstProduct?.product_name?.trim()) {
       toast.error("Add exactly one product (product name is required).");
+      return;
+    }
+    if (!firstProduct?.product_description?.trim()) {
+      toast.error("Product description is required.");
+      return;
+    }
+    if (!firstProduct?.primary_image_file) {
+      toast.error("A primary product image is required.");
       return;
     }
     if (requiresClientName && !state.client_name.trim()) {
@@ -266,7 +288,7 @@ export function OnboardingWizard({
       existing_proof_assets: existingProofAssets,
       brand_voice_notes: state.brand_voice_notes.trim(),
       compliance_notes: state.compliance_notes.trim() || undefined,
-      product_description: firstProduct.product_description.trim() || undefined,
+      product_description: firstProduct.product_description.trim(),
       product_category: firstProduct.product_category.trim() || undefined,
       primary_benefits: firstProduct.primary_benefits.trim()
         ? firstProduct.primary_benefits.split(",").map((item) => item.trim()).filter(Boolean)
@@ -309,6 +331,20 @@ export function OnboardingWizard({
         toast.error("Onboarding started but no product ID was returned.");
         return;
       }
+
+      const uploadedAssets = await uploadProductAssetsById.mutateAsync({
+        productId,
+        files: [firstProduct.primary_image_file],
+      });
+      const primaryImageAsset = uploadedAssets.find((asset) => asset.asset_kind === "image");
+      if (!primaryImageAsset?.id) {
+        throw new Error("Product image upload did not return an image asset.");
+      }
+      await setProductPrimaryAssetById.mutateAsync({
+        productId,
+        primaryAssetId: primaryImageAsset.id,
+      });
+
       resetWizard();
       setOpen(false);
       onCompleted?.({
@@ -354,6 +390,14 @@ export function OnboardingWizard({
       toast.error("Product name is required.");
       return;
     }
+    if (!productDraft.product_description.trim()) {
+      toast.error("Product description is required.");
+      return;
+    }
+    if (!productDraft.primary_image_file) {
+      toast.error("Primary product image is required.");
+      return;
+    }
     if (editingProductIndex === null && state.products.length >= 1) {
       toast.error("Only one product is supported right now.");
       return;
@@ -361,6 +405,7 @@ export function OnboardingWizard({
     const nextDraft: ProductDraft = {
       ...productDraft,
       product_name: productDraft.product_name.trim(),
+      product_description: productDraft.product_description.trim(),
     };
     setState((s) => {
       const nextProducts = [...s.products];
@@ -451,7 +496,7 @@ export function OnboardingWizard({
           </FieldRoot>
           <FieldRoot name="brand_story">
             <FieldLabel>Brand story / context</FieldLabel>
-            <FieldDescription>Required. What should we know before generating canon/metrics?</FieldDescription>
+            <FieldDescription>Required. What should we know before generating Strategy V2 outputs?</FieldDescription>
             <FieldControl
               value={state.brand_story}
               onChange={(e) => setState((s) => ({ ...s, brand_story: e.target.value }))}
@@ -482,6 +527,9 @@ export function OnboardingWizard({
                       <div className="mt-1 text-xs text-content-muted">
                         {product.product_category ? product.product_category : "Category not set"}
                       </div>
+                      <div className="mt-1 text-xs text-content-muted">
+                        Primary image: {product.primary_image_file?.name || "Missing"}
+                      </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Button variant="secondary" size="xs" onClick={() => openEditProduct(idx)} disabled={isSubmitting}>
@@ -505,7 +553,7 @@ export function OnboardingWizard({
                     {editingProductIndex === null ? "Add product" : "Edit product"}
                   </div>
                   <div className="mt-1 text-xs text-content-muted">
-                    Product details help generate canon, strategy, and angles.
+                    Product details help generate strategy, offer, and copy outputs.
                   </div>
                 </div>
                 <Badge tone="neutral" className="shrink-0">
@@ -553,7 +601,7 @@ export function OnboardingWizard({
 
                 <FieldRoot name="product_description" className="md:col-span-2">
                   <FieldLabel>Description</FieldLabel>
-                  <FieldDescription>Optional short description of the product.</FieldDescription>
+                  <FieldDescription>Required short description of the product.</FieldDescription>
                   <FieldControl
                     value={productDraft.product_description}
                     onChange={(e) => setProductDraft((draft) => ({ ...draft, product_description: e.target.value }))}
@@ -622,6 +670,35 @@ export function OnboardingWizard({
                       <Textarea {...props} rows={4} placeholder="https://competitor1.com\nhttps://competitor2.com" />
                     )}
                   />
+                  <FieldError />
+                </FieldRoot>
+
+                <FieldRoot name="primary_image_file" className="md:col-span-2">
+                  <FieldLabel>Primary product image</FieldLabel>
+                  <FieldDescription>Required. Upload the product image used for downstream generation.</FieldDescription>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      if (!file) {
+                        setProductDraft((draft) => ({ ...draft, primary_image_file: null }));
+                        return;
+                      }
+                      if (!file.type.startsWith("image/")) {
+                        toast.error("Primary product image must be an image file.");
+                        e.currentTarget.value = "";
+                        return;
+                      }
+                      setProductDraft((draft) => ({ ...draft, primary_image_file: file }));
+                    }}
+                    disabled={isSubmitting}
+                  />
+                  <div className="mt-1 text-xs text-content-muted">
+                    {productDraft.primary_image_file
+                      ? `Selected: ${productDraft.primary_image_file.name}`
+                      : "No primary image selected."}
+                  </div>
                   <FieldError />
                 </FieldRoot>
               </div>
@@ -800,11 +877,9 @@ export function OnboardingWizard({
                 <p>
                   <strong>Product name:</strong> {state.products[0].product_name}
                 </p>
-                {state.products[0].product_description ? (
-                  <p>
-                    <strong>Description:</strong> {state.products[0].product_description}
-                  </p>
-                ) : null}
+                <p>
+                  <strong>Description:</strong> {state.products[0].product_description || "Missing"}
+                </p>
                 {state.products[0].product_category ? (
                   <p>
                     <strong>Category:</strong> {state.products[0].product_category}
@@ -840,6 +915,9 @@ export function OnboardingWizard({
                     <strong>Competitor URLs:</strong> {state.products[0].competitor_urls}
                   </p>
                 ) : null}
+                <p>
+                  <strong>Primary image:</strong> {state.products[0].primary_image_file?.name || "Missing"}
+                </p>
               </>
             ) : null}
             {state.funnel_notes ? (

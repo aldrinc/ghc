@@ -972,7 +972,8 @@ export function useCreateClient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { name: string; industry?: string }) => post<Client>("/clients", payload),
+    mutationFn: (payload: { name: string; industry?: string; strategyV2Enabled?: boolean }) =>
+      post<Client>("/clients", payload),
     onSuccess: () => {
       toast.success("Client created");
       queryClient.invalidateQueries({ queryKey: ["clients"] });

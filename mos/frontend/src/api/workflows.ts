@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useApiClient, type ApiError } from "@/api/client";
-import type { ActivityLog, ResearchArtifactRef, WorkflowDetail, WorkflowRun } from "@/types/common";
+import type {
+  ActivityLog,
+  ResearchArtifactRef,
+  StrategyV2LaunchRecord,
+  WorkflowDetail,
+  WorkflowRun,
+} from "@/types/common";
 import { toast } from "@/components/ui/toast";
 
 export function useWorkflows(filters?: { clientId?: string; productId?: string; campaignId?: string }) {
@@ -91,6 +97,104 @@ export function useStopWorkflow() {
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to stop workflow";
+      toast.error(message);
+    },
+  });
+}
+
+export type StrategyV2LaunchActionResponse = {
+  launch_workflow_run_id: string;
+  launch_temporal_workflow_id: string;
+  campaign_ids: string[];
+  funnel_workflow_run_ids: string[];
+  launch_records: StrategyV2LaunchRecord[];
+};
+
+type StrategyV2LaunchAngleCampaignRequest = {
+  channels: string[];
+  assetBriefTypes: string[];
+  experimentVariantPolicy: string;
+};
+
+type StrategyV2LaunchAdditionalUmsRequest = {
+  campaignId: string;
+  umsSelectionIds: string[];
+  launchNamePrefix: string;
+  channels?: string[];
+  assetBriefTypes?: string[];
+};
+
+type StrategyV2LaunchAdditionalAngleRequest = {
+  selectedAngleIds: string[];
+  channels: string[];
+  assetBriefTypes: string[];
+};
+
+export function useStrategyV2LaunchAngleCampaign(workflowId?: string) {
+  const queryClient = useQueryClient();
+  const { post } = useApiClient();
+  return useMutation({
+    mutationFn: async (payload: StrategyV2LaunchAngleCampaignRequest) => {
+      if (!workflowId) throw new Error("Workflow ID is required");
+      return post<StrategyV2LaunchActionResponse>(
+        `/workflows/${workflowId}/actions/strategy-v2/launch-angle-campaign`,
+        payload,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast.success("Angle campaign launch started");
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to launch angle campaign";
+      toast.error(message);
+    },
+  });
+}
+
+export function useStrategyV2LaunchAdditionalUms(workflowId?: string) {
+  const queryClient = useQueryClient();
+  const { post } = useApiClient();
+  return useMutation({
+    mutationFn: async (payload: StrategyV2LaunchAdditionalUmsRequest) => {
+      if (!workflowId) throw new Error("Workflow ID is required");
+      return post<StrategyV2LaunchActionResponse>(
+        `/workflows/${workflowId}/actions/strategy-v2/launch-additional-ums`,
+        payload,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      queryClient.invalidateQueries({ queryKey: ["funnels"] });
+      toast.success("Additional UMS launch started");
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to launch additional UMS funnels";
+      toast.error(message);
+    },
+  });
+}
+
+export function useStrategyV2LaunchAdditionalAngle(workflowId?: string) {
+  const queryClient = useQueryClient();
+  const { post } = useApiClient();
+  return useMutation({
+    mutationFn: async (payload: StrategyV2LaunchAdditionalAngleRequest) => {
+      if (!workflowId) throw new Error("Workflow ID is required");
+      return post<StrategyV2LaunchActionResponse>(
+        `/workflows/${workflowId}/actions/strategy-v2/launch-additional-angle`,
+        payload,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] });
+      toast.success("Additional angle launch started");
+    },
+    onError: (err: ApiError | Error) => {
+      const message = "message" in err ? err.message : err?.message || "Failed to launch additional angles";
       toast.error(message);
     },
   });
