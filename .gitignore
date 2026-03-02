@@ -67,3 +67,4 @@ mos/frontend/node_modules/
 mos/backend/*.csv
 mos/backend/app/*.zip
 mos/backend/app/**/Archive.zip
+exports/
