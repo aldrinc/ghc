@@ -357,6 +357,8 @@ def test_sync_compliance_policy_pages_uses_workspace_name_for_brand(api_client, 
 def test_sync_compliance_policy_pages_uses_default_placeholder_values(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Default Policy Workspace")
     profile_payload = _base_profile_payload()
+    profile_payload["supportHoursText"] = None
+    profile_payload["responseTimeCommitment"] = None
     profile_payload["metadata"] = {"owner": "ops"}
     upsert_response = api_client.put(f"/clients/{client_id}/compliance/profile", json=profile_payload)
     assert upsert_response.status_code == 200
@@ -394,6 +396,8 @@ def test_sync_compliance_policy_pages_uses_default_placeholder_values(api_client
     assert "within 90 days of delivery" in page_html_by_key["returns_refunds_policy"]  # type: ignore[index]
     assert "United States and Australia, with worldwide tracked shipping" in page_html_by_key["shipping_policy"]  # type: ignore[index]
     assert "/pages/track-your-order" in page_html_by_key["contact_support"]  # type: ignore[index]
+    assert "24/7" in page_html_by_key["contact_support"]  # type: ignore[index]
+    assert "30 minutes" in page_html_by_key["contact_support"]  # type: ignore[index]
 
 
 def test_sync_compliance_policy_pages_requires_existing_profile(api_client):

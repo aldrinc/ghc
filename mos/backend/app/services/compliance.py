@@ -43,6 +43,7 @@ _PAGE_ORDER = [
 ]
 
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
+_STRONG_RE = re.compile(r"\*\*(.+?)\*\*")
 
 _DEFAULT_POLICY_PLACEHOLDER_VALUES: dict[str, str] = {
     "effective_date": "2026-02-27",
@@ -157,6 +158,8 @@ _DEFAULT_POLICY_PLACEHOLDER_VALUES: dict[str, str] = {
     "support_order_help_links": (
         "Order tracking: /pages/track-your-order | FAQ: /pages/faqs | Contact support: /pages/contact"
     ),
+    "support_hours_text": "24/7",
+    "response_time_commitment": "30 minutes",
 }
 
 _RULESET: dict[str, Any] = {
@@ -930,17 +933,45 @@ def get_policy_page_handle(*, page_key: str) -> str:
 
 
 def markdown_to_shopify_html(markdown: str) -> str:
-    lines = [line.rstrip() for line in markdown.splitlines()]
+    lines = markdown.splitlines()
     output: list[str] = []
     paragraph_lines: list[str] = []
     list_items: list[str] = []
 
+    def render_inline_markdown(text: str) -> str:
+        rendered_parts: list[str] = []
+        cursor = 0
+        for match in _STRONG_RE.finditer(text):
+            start, end = match.span()
+            if start > cursor:
+                rendered_parts.append(escape(text[cursor:start]))
+            strong_text = match.group(1).strip()
+            if not strong_text:
+                rendered_parts.append(escape(match.group(0)))
+            else:
+                rendered_parts.append(f"<strong>{escape(strong_text)}</strong>")
+            cursor = end
+        if cursor < len(text):
+            rendered_parts.append(escape(text[cursor:]))
+        return "".join(rendered_parts)
+
     def flush_paragraph() -> None:
         if not paragraph_lines:
             return
-        text = " ".join(part.strip() for part in paragraph_lines if part.strip())
+        text_parts: list[str] = []
+        for index, part in enumerate(paragraph_lines):
+            stripped = part.strip()
+            if not stripped:
+                continue
+            text_parts.append(render_inline_markdown(stripped))
+            if part.endswith("  "):
+                text_parts.append("<br/>")
+                continue
+            if index < len(paragraph_lines) - 1:
+                text_parts.append(" ")
+        text = "".join(text_parts).strip()
         if text:
-            output.append(f"<p>{escape(text)}</p>")
+            output.append(f"<p>{text}</p>")
         paragraph_lines.clear()
 
     def flush_list() -> None:
@@ -952,31 +983,31 @@ def markdown_to_shopify_html(markdown: str) -> str:
         list_items.clear()
 
     for raw_line in lines:
-        line = raw_line.strip()
-        if not line:
+        stripped_line = raw_line.strip()
+        if not stripped_line:
             flush_paragraph()
             flush_list()
             continue
 
-        if line.startswith("# "):
+        if stripped_line.startswith("# "):
             flush_paragraph()
             flush_list()
-            output.append(f"<h1>{escape(line[2:].strip())}</h1>")
+            output.append(f"<h1>{render_inline_markdown(stripped_line[2:].strip())}</h1>")
             continue
 
-        if line.startswith("## "):
+        if stripped_line.startswith("## "):
             flush_paragraph()
             flush_list()
-            output.append(f"<h2>{escape(line[3:].strip())}</h2>")
+            output.append(f"<h2>{render_inline_markdown(stripped_line[3:].strip())}</h2>")
             continue
 
-        if line.startswith("- "):
+        if stripped_line.startswith("- "):
             flush_paragraph()
-            list_items.append(f"<li>{escape(line[2:].strip())}</li>")
+            list_items.append(f"<li>{render_inline_markdown(stripped_line[2:].strip())}</li>")
             continue
 
         flush_list()
-        paragraph_lines.append(line)
+        paragraph_lines.append(raw_line)
 
     flush_paragraph()
     flush_list()
