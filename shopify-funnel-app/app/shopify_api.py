@@ -297,6 +297,7 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
 }
 _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
     "futrgroup2-0theme": {
+        "hero_background": "--hero-bg",
         "background": "--color-page-bg",
         "foreground": "--color-text",
         "text": "--color-text",
@@ -312,7 +313,7 @@ _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
         "shadow": "--color-muted",
         "image_background": "--color-bg",
         "footer_background": "--footer-bg",
-        "footer_text": "--color-text",
+        "footer_text": "--footer-text-color",
         "copy": "--color-text",
         "input": "--color-text",
         "input_placeholder": "--color-muted",
@@ -3716,6 +3717,10 @@ class ShopifyApiClient:
     def _escape_css_string(raw_value: str) -> str:
         return raw_value.replace("\\", "\\\\").replace('"', '\\"')
 
+    @staticmethod
+    def _normalize_css_value_for_comparison(raw_value: str) -> str:
+        return re.sub(r"\s+", "", raw_value.strip().lower())
+
     @classmethod
     def _resolve_theme_brand_profile(cls, *, theme_name: str) -> ThemeBrandProfile:
         normalized_theme_name = theme_name.strip().lower()
@@ -3775,6 +3780,34 @@ class ShopifyApiClient:
                 if alias_key in expanded:
                     continue
                 expanded[alias_key] = f"var({source_key})"
+
+        if profile.theme_name == "futrgroup2-0theme":
+            # Hero-adjacent component backgrounds should track hero bg even when
+            # the source token omitted it.
+            if "--hero-bg" not in expanded and "--color-page-bg" in expanded:
+                expanded["--hero-bg"] = expanded["--color-page-bg"]
+
+            footer_text = expanded.get("--color-text")
+            footer_bg = expanded.get("--footer-bg")
+            if isinstance(footer_text, str) and footer_text.strip():
+                resolved_footer_text = footer_text
+                if (
+                    isinstance(footer_bg, str)
+                    and footer_bg.strip()
+                    and cls._normalize_css_value_for_comparison(footer_bg)
+                    == cls._normalize_css_value_for_comparison(footer_text)
+                ):
+                    for candidate_key in ("--color-page-bg", "--color-bg", "--color-brand"):
+                        candidate_value = expanded.get(candidate_key)
+                        if (
+                            isinstance(candidate_value, str)
+                            and candidate_value.strip()
+                            and cls._normalize_css_value_for_comparison(candidate_value)
+                            != cls._normalize_css_value_for_comparison(footer_bg)
+                        ):
+                            resolved_footer_text = candidate_value
+                            break
+                expanded["--footer-text-color"] = resolved_footer_text
         return expanded
 
     @classmethod
@@ -4187,6 +4220,23 @@ class ShopifyApiClient:
             and ({"color", "text", "foreground"} & key_tokens)
         ):
             return "footer_text"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
+            and ({"copy", "input", "text"} & key_tokens)
+            and ({"color", "text", "foreground"} & key_tokens)
+            and not ({"background", "bg", "border"} & key_tokens)
+            and "placeholder" not in key_tokens
+        ):
+            return "footer_text"
+        if (
+            "hero_background" in semantic_source_vars
+            and ({"hero", "banner"} & path_tokens)
+            and ({"background", "bg"} & key_tokens)
+            and "border" not in key_tokens
+            and not ({"button", "submit", "cta"} & key_tokens)
+        ):
+            return "hero_background"
         if (
             "button" in semantic_source_vars
             and "announcement" in path_tokens

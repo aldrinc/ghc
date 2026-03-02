@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useProductContext } from "@/contexts/ProductContext";
 import {
   useDesignSystems,
   useCreateDesignSystem,
@@ -32,7 +33,7 @@ import {
   type ComplianceShopifyPolicySyncResponse,
 } from "@/api/compliance";
 import { useAssets } from "@/api/assets";
-import { useProducts, useUploadProductAssets } from "@/api/products";
+import { useUploadProductAssets } from "@/api/products";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -699,6 +700,7 @@ function buildTextSlotReadableLabelMap(
 
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
+  const { product: activeWorkspaceProduct, products: workspaceProducts } = useProductContext();
   const { data: client } = useClient(workspace?.id);
   const {
     data: shopifyStatus,
@@ -728,7 +730,6 @@ export function BrandDesignSystemPage() {
     data: shopifyThemeTemplateDrafts = [],
     refetch: refetchShopifyThemeTemplateDrafts,
   } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
-  const { data: workspaceProducts = [] } = useProducts(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
     { enabled: Boolean(workspace?.id) }
@@ -1023,7 +1024,13 @@ export function BrandDesignSystemPage() {
       return;
     }
     setTemplateAssetUploadProductId((current) => {
-      if (current && workspaceProducts.some((product) => product.id === current)) return current;
+      const activeWorkspaceProductId = activeWorkspaceProduct?.id?.trim() || "";
+      if (
+        activeWorkspaceProductId &&
+        workspaceProducts.some((product) => product.id === activeWorkspaceProductId)
+      ) {
+        return activeWorkspaceProductId;
+      }
       const draftProductId =
         selectedTemplateDraft?.productId ||
         selectedTemplateDraft?.latestVersion?.data.productId ||
@@ -1031,9 +1038,11 @@ export function BrandDesignSystemPage() {
       if (draftProductId && workspaceProducts.some((product) => product.id === draftProductId)) {
         return draftProductId;
       }
+      if (current && workspaceProducts.some((product) => product.id === current)) return current;
       return workspaceProducts[0]?.id || "";
     });
   }, [
+    activeWorkspaceProduct?.id,
     workspaceProducts,
     selectedTemplateDraft?.id,
     selectedTemplateDraft?.productId,
@@ -1420,7 +1429,10 @@ export function BrandDesignSystemPage() {
     } = {
       draftId: selectedTemplateDraftId,
     };
-    const explicitProductId = templateAssetUploadProductId.trim() || themeSyncProductId.trim();
+    const explicitProductId =
+      activeWorkspaceProduct?.id?.trim() ||
+      templateAssetUploadProductId.trim() ||
+      themeSyncProductId.trim();
     if (explicitProductId) payload.productId = explicitProductId;
     if (parsedSlotPathList.value.length) payload.slotPaths = parsedSlotPathList.value;
     setTemplateDraftEditError(null);
