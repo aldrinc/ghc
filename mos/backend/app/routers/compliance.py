@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from html import escape
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -28,6 +27,7 @@ from app.services.compliance import (
     RULESET_VERSION,
     build_page_requirements,
     get_policy_page_handle,
+    markdown_to_shopify_html,
     get_profile_url_field_for_page_key,
     get_policy_template,
     get_ruleset,
@@ -174,6 +174,15 @@ def _profile_placeholder_values(profile: ClientComplianceProfile) -> dict[str, s
     return values
 
 
+def _website_url_from_shop_domain(*, shop_domain: str | None) -> str | None:
+    if not isinstance(shop_domain, str):
+        return None
+    cleaned = shop_domain.strip().lower()
+    if not cleaned:
+        return None
+    return f"https://{cleaned}"
+
+
 def _select_page_keys_for_sync(
     *,
     requested_page_keys: list[str],
@@ -237,67 +246,6 @@ def _select_page_keys_for_sync(
             detail="No required or strongly recommended compliance pages are applicable for this profile.",
         )
     return selected_by_ruleset
-
-
-def _markdown_to_shopify_html(markdown: str) -> str:
-    lines = [line.rstrip() for line in markdown.splitlines()]
-    output: list[str] = []
-    paragraph_lines: list[str] = []
-    list_items: list[str] = []
-
-    def flush_paragraph() -> None:
-        if not paragraph_lines:
-            return
-        text = " ".join(part.strip() for part in paragraph_lines if part.strip())
-        if text:
-            output.append(f"<p>{escape(text)}</p>")
-        paragraph_lines.clear()
-
-    def flush_list() -> None:
-        if not list_items:
-            return
-        output.append("<ul>")
-        output.extend(list_items)
-        output.append("</ul>")
-        list_items.clear()
-
-    for raw_line in lines:
-        line = raw_line.strip()
-        if not line:
-            flush_paragraph()
-            flush_list()
-            continue
-
-        if line.startswith("# "):
-            flush_paragraph()
-            flush_list()
-            output.append(f"<h1>{escape(line[2:].strip())}</h1>")
-            continue
-
-        if line.startswith("## "):
-            flush_paragraph()
-            flush_list()
-            output.append(f"<h2>{escape(line[3:].strip())}</h2>")
-            continue
-
-        if line.startswith("- "):
-            flush_paragraph()
-            list_items.append(f"<li>{escape(line[2:].strip())}</li>")
-            continue
-
-        flush_list()
-        paragraph_lines.append(line)
-
-    flush_paragraph()
-    flush_list()
-
-    rendered = "\n".join(output).strip()
-    if not rendered:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Rendered policy content is empty and cannot be synced.",
-        )
-    return rendered
 
 
 @router.get("/compliance/rulesets", response_model=list[ComplianceRulesetSummaryResponse])
@@ -468,7 +416,17 @@ def sync_client_compliance_policy_pages_to_shopify(
         requirements=requirements,
     )
 
+    selected_shop_domain = payload.shopDomain or _get_selected_shop_domain(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        user_external_id=auth.user_id,
+    )
+
     placeholders = _profile_placeholder_values(profile)
+    website_url = _website_url_from_shop_domain(shop_domain=selected_shop_domain)
+    if website_url is not None:
+        placeholders["website_url"] = website_url
     sync_pages_payload: list[dict[str, str]] = []
     for page_key in page_keys_to_sync:
         template = get_policy_template(page_key=page_key)
@@ -477,6 +435,7 @@ def sync_client_compliance_policy_pages_to_shopify(
                 page_key=page_key,
                 placeholder_values=placeholders,
             )
+            rendered_html = markdown_to_shopify_html(rendered_markdown)
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -485,16 +444,10 @@ def sync_client_compliance_policy_pages_to_shopify(
                 "pageKey": page_key,
                 "title": template["title"],
                 "handle": get_policy_page_handle(page_key=page_key),
-                "bodyHtml": _markdown_to_shopify_html(rendered_markdown),
+                "bodyHtml": rendered_html,
             }
         )
 
-    selected_shop_domain = payload.shopDomain or _get_selected_shop_domain(
-        session=session,
-        org_id=auth.org_id,
-        client_id=client_id,
-        user_external_id=auth.user_id,
-    )
     sync_payload = upsert_client_shopify_policy_pages(
         client_id=client_id,
         pages=sync_pages_payload,

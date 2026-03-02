@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Literal
+from datetime import datetime
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ShopifyInstallUrlRequest(BaseModel):
@@ -22,6 +23,12 @@ class ShopifyInstallationUpdateRequest(BaseModel):
 
     shopDomain: str = Field(..., min_length=1)
     storefrontAccessToken: str = Field(..., min_length=1)
+
+
+class ShopifyInstallationAutoStorefrontTokenRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str = Field(..., min_length=1)
 
 
 class ShopifyInstallationDisconnectRequest(BaseModel):
@@ -110,6 +117,399 @@ class ShopifyProductCreateResponse(BaseModel):
     handle: str
     status: str
     variants: list[ShopifyCreatedVariant] = Field(default_factory=list)
+
+
+class ShopifyThemeBrandSyncRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str | None = None
+    designSystemId: str | None = Field(default=None, min_length=1)
+    productId: str | None = Field(default=None, min_length=1)
+    componentImageAssetMap: dict[str, str] = Field(default_factory=dict)
+    componentTextValues: dict[str, str] = Field(default_factory=dict)
+    toneGuidelines: list[str] = Field(default_factory=list, max_length=20)
+    mustAvoidClaims: list[str] = Field(default_factory=list, max_length=20)
+    ctaStyle: Literal["direct", "benefit", "urgent", "soft"] | None = None
+    readingLevel: Literal["grade_5", "grade_8", "grade_10", "general"] | None = None
+    locale: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=16,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_theme_selector(self) -> "ShopifyThemeBrandSyncRequest":
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class ShopifyThemeCoverageSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    requiredSourceVars: list[str] = Field(default_factory=list)
+    requiredThemeVars: list[str] = Field(default_factory=list)
+    missingSourceVars: list[str] = Field(default_factory=list)
+    missingThemeVars: list[str] = Field(default_factory=list)
+
+
+class ShopifyThemeSettingsSyncSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    settingsFilename: str | None = None
+    expectedPaths: list[str] = Field(default_factory=list)
+    updatedPaths: list[str] = Field(default_factory=list)
+    missingPaths: list[str] = Field(default_factory=list)
+    requiredMissingPaths: list[str] = Field(default_factory=list)
+    semanticUpdatedPaths: list[str] = Field(default_factory=list)
+    unmappedColorPaths: list[str] = Field(default_factory=list)
+    semanticTypographyUpdatedPaths: list[str] = Field(default_factory=list)
+    unmappedTypographyPaths: list[str] = Field(default_factory=list)
+
+
+class ShopifyThemeSettingsAuditSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    settingsFilename: str | None = None
+    expectedPaths: list[str] = Field(default_factory=list)
+    syncedPaths: list[str] = Field(default_factory=list)
+    mismatchedPaths: list[str] = Field(default_factory=list)
+    missingPaths: list[str] = Field(default_factory=list)
+    requiredMissingPaths: list[str] = Field(default_factory=list)
+    requiredMismatchedPaths: list[str] = Field(default_factory=list)
+    semanticSyncedPaths: list[str] = Field(default_factory=list)
+    semanticMismatchedPaths: list[str] = Field(default_factory=list)
+    unmappedColorPaths: list[str] = Field(default_factory=list)
+    semanticTypographySyncedPaths: list[str] = Field(default_factory=list)
+    semanticTypographyMismatchedPaths: list[str] = Field(default_factory=list)
+    unmappedTypographyPaths: list[str] = Field(default_factory=list)
+
+
+class ShopifyThemeBrandSyncResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str
+    workspaceName: str
+    designSystemId: str
+    designSystemName: str
+    brandName: str
+    logoAssetPublicId: str
+    logoUrl: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    layoutFilename: str
+    cssFilename: str
+    settingsFilename: str | None = None
+    jobId: str | None = None
+    coverage: ShopifyThemeCoverageSummary
+    settingsSync: ShopifyThemeSettingsSyncSummary
+
+
+class ShopifyThemeBrandSyncJobStartResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    statusPath: str
+
+
+class ShopifyThemeBrandSyncJobProgress(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    stage: str | None = None
+    message: str | None = None
+    totalImageSlots: int | None = None
+    completedImageSlots: int | None = None
+    generatedImageCount: int | None = None
+    skippedImageCount: int | None = None
+    updatedAt: str | None = None
+
+
+class ShopifyThemeBrandSyncJobStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    error: str | None = None
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    result: ShopifyThemeBrandSyncResponse | None = None
+    createdAt: datetime
+    updatedAt: datetime
+    startedAt: datetime | None = None
+    finishedAt: datetime | None = None
+
+
+class ShopifyThemeTemplateBuildRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draftId: str | None = Field(default=None, min_length=1)
+    shopDomain: str | None = None
+    designSystemId: str | None = Field(default=None, min_length=1)
+    productId: str | None = Field(default=None, min_length=1)
+    componentImageAssetMap: dict[str, str] = Field(default_factory=dict)
+    componentTextValues: dict[str, str] = Field(default_factory=dict)
+    toneGuidelines: list[str] = Field(default_factory=list, max_length=20)
+    mustAvoidClaims: list[str] = Field(default_factory=list, max_length=20)
+    ctaStyle: Literal["direct", "benefit", "urgent", "soft"] | None = None
+    readingLevel: Literal["grade_5", "grade_8", "grade_10", "general"] | None = None
+    locale: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=16,
+        pattern=r"^[A-Za-z0-9_-]+$",
+    )
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_theme_selector(self) -> "ShopifyThemeTemplateBuildRequest":
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class ShopifyThemeTemplateImageSlot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    key: str
+    role: str
+    recommendedAspect: str
+    currentValue: str | None = None
+
+
+class ShopifyThemeTemplateTextSlot(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+    key: str
+    currentValue: str | None = None
+
+
+class ShopifyThemeTemplateDraftData(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str
+    workspaceName: str
+    designSystemId: str
+    designSystemName: str
+    brandName: str
+    logoAssetPublicId: str
+    logoUrl: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    cssVars: dict[str, str] = Field(default_factory=dict)
+    fontUrls: list[str] = Field(default_factory=list)
+    dataTheme: str
+    productId: str | None = None
+    componentImageAssetMap: dict[str, str] = Field(default_factory=dict)
+    componentTextValues: dict[str, str] = Field(default_factory=dict)
+    imageSlots: list[ShopifyThemeTemplateImageSlot] = Field(default_factory=list)
+    textSlots: list[ShopifyThemeTemplateTextSlot] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ShopifyThemeTemplateDraftVersionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    draftId: str
+    versionNumber: int
+    source: str
+    notes: str | None = None
+    createdByUserExternalId: str | None = None
+    createdAt: datetime
+    data: ShopifyThemeTemplateDraftData
+
+
+class ShopifyThemeTemplateDraftResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    status: str
+    shopDomain: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    designSystemId: str | None = None
+    productId: str | None = None
+    createdByUserExternalId: str | None = None
+    createdAt: datetime
+    updatedAt: datetime
+    publishedAt: datetime | None = None
+    latestVersion: ShopifyThemeTemplateDraftVersionResponse | None = None
+
+
+class ShopifyThemeTemplateBuildResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draft: ShopifyThemeTemplateDraftResponse
+    version: ShopifyThemeTemplateDraftVersionResponse
+
+
+class ShopifyThemeTemplateDraftUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    componentImageAssetMap: dict[str, str] | None = None
+    componentTextValues: dict[str, str] | None = None
+    notes: str | None = None
+
+
+class ShopifyThemeTemplateGenerateImagesRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draftId: str = Field(..., min_length=1)
+    productId: str | None = Field(default=None, min_length=1)
+    slotPaths: list[str] = Field(default_factory=list)
+
+
+class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draft: ShopifyThemeTemplateDraftResponse
+    version: ShopifyThemeTemplateDraftVersionResponse
+    generatedImageCount: int
+    generatedTextCount: int = 0
+    copyAgentModel: str | None = None
+    requestedImageModel: str | None = None
+    requestedImageModelSource: str | None = None
+    generatedSlotPaths: list[str] = Field(default_factory=list)
+    imageModels: list[str] = Field(default_factory=list)
+    imageModelBySlotPath: dict[str, str] = Field(default_factory=dict)
+    imageSourceBySlotPath: dict[str, str] = Field(default_factory=dict)
+    promptTokenCountBySlotPath: dict[str, int] = Field(default_factory=dict)
+    promptTokenCountTotal: int = 0
+    rateLimitedSlotPaths: list[str] = Field(default_factory=list)
+    remainingSlotPaths: list[str] = Field(default_factory=list)
+    quotaExhaustedSlotPaths: list[str] = Field(default_factory=list)
+    slotErrorsByPath: dict[str, str] = Field(default_factory=dict)
+
+
+class ShopifyThemeTemplateGenerateImagesJobStartResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    statusPath: str
+
+
+class ShopifyThemeTemplateGenerateImagesJobStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    error: str | None = None
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    result: ShopifyThemeTemplateGenerateImagesResponse | None = None
+    createdAt: datetime
+    updatedAt: datetime
+    startedAt: datetime | None = None
+    finishedAt: datetime | None = None
+
+
+class ShopifyThemeTemplateBuildJobStartResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    statusPath: str
+
+
+class ShopifyThemeTemplateBuildJobStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    error: str | None = None
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    result: ShopifyThemeTemplateBuildResponse | None = None
+    createdAt: datetime
+    updatedAt: datetime
+    startedAt: datetime | None = None
+    finishedAt: datetime | None = None
+
+
+class ShopifyThemeTemplatePublishRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draftId: str = Field(..., min_length=1)
+
+
+class ShopifyThemeTemplatePublishResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    draft: ShopifyThemeTemplateDraftResponse
+    version: ShopifyThemeTemplateDraftVersionResponse
+    sync: ShopifyThemeBrandSyncResponse
+
+
+class ShopifyThemeTemplatePublishJobStartResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    statusPath: str
+
+
+class ShopifyThemeTemplatePublishJobStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    jobId: str
+    status: Literal["queued", "running", "succeeded", "failed"]
+    error: str | None = None
+    progress: ShopifyThemeBrandSyncJobProgress | None = None
+    result: ShopifyThemeTemplatePublishResponse | None = None
+    createdAt: datetime
+    updatedAt: datetime
+    startedAt: datetime | None = None
+    finishedAt: datetime | None = None
+
+
+class ShopifyThemeBrandAuditRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str | None = None
+    designSystemId: str | None = Field(default=None, min_length=1)
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_theme_selector(self) -> "ShopifyThemeBrandAuditRequest":
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class ShopifyThemeBrandAuditResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    shopDomain: str
+    workspaceName: str
+    designSystemId: str
+    designSystemName: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    layoutFilename: str
+    cssFilename: str
+    settingsFilename: str | None = None
+    hasManagedMarkerBlock: bool
+    layoutIncludesManagedCssAsset: bool
+    managedCssAssetExists: bool
+    coverage: ShopifyThemeCoverageSummary
+    settingsAudit: ShopifyThemeSettingsAuditSummary
+    isReady: bool
 
 
 class ShopifySyncProductVariantsRequest(BaseModel):

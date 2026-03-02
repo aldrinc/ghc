@@ -1,3 +1,7 @@
+from typing import Any
+
+import httpx
+
 from app.services import shopify_connection
 from app.services.shopify_connection import ShopifyInstallation
 from fastapi import HTTPException
@@ -207,8 +211,50 @@ def test_status_write_scopes_imply_read_scopes(monkeypatch):
     assert status["missingScopes"] == []
 
 
+def test_bridge_request_returns_504_on_timeout(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "_require_checkout_service_config",
+        lambda: ("https://bridge.example.com", "internal-token"),
+    )
+    monkeypatch.setattr(
+        shopify_connection.settings, "SHOPIFY_CHECKOUT_REQUEST_TIMEOUT_SECONDS", 42.0
+    )
+
+    class FakeClient:
+        def __init__(self, *args, **kwargs):
+            timeout = kwargs.get("timeout")
+            assert isinstance(timeout, httpx.Timeout)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def request(self, method, url, headers=None, json=None):  # noqa: A002
+            raise httpx.ReadTimeout("The read operation timed out")
+
+    monkeypatch.setattr(shopify_connection.httpx, "Client", FakeClient)
+
+    try:
+        shopify_connection._bridge_request(
+            method="POST",
+            path="/v1/themes/brand/sync",
+            json_body={"clientId": "client_1"},
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 504
+        assert (
+            exc.detail
+            == "Shopify checkout app request timed out after 42.0s (POST /v1/themes/brand/sync)."
+        )
+    else:
+        raise AssertionError("Expected _bridge_request to raise timeout HTTPException")
+
+
 def test_list_client_shopify_products_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/catalog/products/list"
         assert json_body["clientId"] == "client_1"
@@ -226,7 +272,9 @@ def test_list_client_shopify_products_parses_response(monkeypatch):
 
     monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
 
-    response = shopify_connection.list_client_shopify_products(client_id="client_1", query="alp", limit=20)
+    response = shopify_connection.list_client_shopify_products(
+        client_id="client_1", query="alp", limit=20
+    )
 
     assert response["shopDomain"] == "example.myshopify.com"
     assert response["products"][0]["productGid"] == "gid://shopify/Product/1"
@@ -243,7 +291,7 @@ def test_list_client_shopify_products_rejects_out_of_range_limit():
 
 
 def test_get_client_shopify_product_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/catalog/products/get"
         assert json_body["clientId"] == "client_1"
@@ -301,7 +349,7 @@ def test_get_client_shopify_product_rejects_invalid_product_gid():
 
 
 def test_create_client_shopify_product_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/catalog/products/create"
         assert json_body["clientId"] == "client_1"
@@ -336,7 +384,7 @@ def test_create_client_shopify_product_parses_response(monkeypatch):
 
 
 def test_update_client_shopify_variant_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "PATCH"
         assert path == "/v1/catalog/variants"
         assert json_body["clientId"] == "client_1"
@@ -362,7 +410,7 @@ def test_update_client_shopify_variant_parses_response(monkeypatch):
 
 
 def test_update_client_shopify_variant_sends_inventory_related_fields(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "PATCH"
         assert path == "/v1/catalog/variants"
         assert json_body["clientId"] == "client_1"
@@ -420,7 +468,97 @@ def test_update_client_shopify_variant_rejects_invalid_inventory_management():
         assert exc.status_code == 400
         assert "inventoryManagement must be null or 'shopify'" in exc.detail
     else:
-        raise AssertionError("Expected update_client_shopify_variant to reject invalid inventoryManagement")
+        raise AssertionError(
+            "Expected update_client_shopify_variant to reject invalid inventoryManagement"
+        )
+
+
+def test_auto_provision_client_shopify_storefront_token_posts_to_bridge(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="example.myshopify.com",
+                client_id="client_1",
+                has_storefront_access_token=False,
+                scopes=[],
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    observed: dict[str, object] = {}
+
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        observed["method"] = method
+        observed["path"] = path
+        observed["json_body"] = json_body
+        return {"ok": True}
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    shopify_connection.auto_provision_client_shopify_storefront_token(
+        client_id="client_1",
+        shop_domain="example.myshopify.com",
+    )
+
+    assert observed == {
+        "method": "POST",
+        "path": "/admin/installations/example.myshopify.com/storefront-token/auto",
+        "json_body": {"clientId": "client_1"},
+    }
+
+
+def test_auto_provision_client_shopify_storefront_token_requires_installation(monkeypatch):
+    monkeypatch.setattr(shopify_connection, "list_shopify_installations", lambda: [])
+
+    try:
+        shopify_connection.auto_provision_client_shopify_storefront_token(
+            client_id="client_1",
+            shop_domain="example.myshopify.com",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 404
+        assert exc.detail == "Shopify installation not found for this store."
+    else:
+        raise AssertionError(
+            "Expected auto_provision_client_shopify_storefront_token to require installation"
+        )
+
+
+def test_auto_provision_client_shopify_storefront_token_requires_matching_workspace(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="example.myshopify.com",
+                client_id="client_other",
+                has_storefront_access_token=False,
+                scopes=[],
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    try:
+        shopify_connection.auto_provision_client_shopify_storefront_token(
+            client_id="client_1",
+            shop_domain="example.myshopify.com",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert (
+            exc.detail
+            == "This Shopify store is already connected to a different workspace."
+        )
+    else:
+        raise AssertionError(
+            "Expected auto_provision_client_shopify_storefront_token to reject workspace mismatch"
+        )
 
 
 def test_disconnect_client_shopify_store_unlinks_workspace(monkeypatch):
@@ -440,7 +578,7 @@ def test_disconnect_client_shopify_store_unlinks_workspace(monkeypatch):
 
     observed: dict[str, object] = {}
 
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         observed["method"] = method
         observed["path"] = path
         observed["json_body"] = json_body
@@ -482,13 +620,18 @@ def test_disconnect_client_shopify_store_requires_matching_workspace(monkeypatch
         )
     except HTTPException as exc:
         assert exc.status_code == 409
-        assert exc.detail == "This Shopify store is not connected to this workspace. connectedWorkspaceId=client_other"
+        assert (
+            exc.detail
+            == "This Shopify store is not connected to this workspace. connectedWorkspaceId=client_other"
+        )
     else:
-        raise AssertionError("Expected disconnect_client_shopify_store to reject mismatched workspace")
+        raise AssertionError(
+            "Expected disconnect_client_shopify_store to reject mismatched workspace"
+        )
 
 
 def test_upsert_client_shopify_policy_pages_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
         assert method == "POST"
         assert path == "/v1/policies/pages/upsert"
         assert json_body["clientId"] == "client_1"
@@ -534,3 +677,465 @@ def test_upsert_client_shopify_policy_pages_rejects_empty_pages():
         assert exc.detail == "pages must contain at least one policy page."
     else:
         raise AssertionError("Expected upsert_client_shopify_policy_pages to reject empty pages")
+
+
+def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/sync"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
+        assert json_body["clientId"] == "client_1"
+        assert json_body["workspaceName"] == "Acme Workspace"
+        assert json_body["brandName"] == "Acme"
+        assert json_body["themeName"] == "futrgroup2-0theme"
+        assert json_body["logoUrl"] == "https://assets.example.com/public/assets/logo-1"
+        assert json_body["cssVars"]["--color-brand"] == "#123456"
+        assert json_body["componentImageUrls"] == {
+            "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-image-1",
+        }
+        assert json_body["componentTextValues"] == {
+            "templates/index.json.sections.hero.settings.heading": "Sleep Better Tonight",
+        }
+        assert json_body["autoComponentImageUrls"] == [
+            "https://assets.example.com/public/assets/product-image-1",
+            "https://assets.example.com/public/assets/product-image-2",
+        ]
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.sync_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        css_vars={"--color-brand": "#123456"},
+        font_urls=["https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap"],
+        data_theme="light",
+        component_image_urls={
+            "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-image-1",
+        },
+        component_text_values={
+            "templates/index.json.sections.hero.settings.heading": "Sleep Better Tonight",
+        },
+        auto_component_image_urls=[
+            "https://assets.example.com/public/assets/product-image-1",
+            "https://assets.example.com/public/assets/product-image-2",
+        ],
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert response == {
+        "shopDomain": "example.myshopify.com",
+        "themeId": "gid://shopify/OnlineStoreTheme/1",
+        "themeName": "Main Theme",
+        "themeRole": "MAIN",
+        "layoutFilename": "layout/theme.liquid",
+        "cssFilename": "assets/acme-workspace-workspace-brand.css",
+        "settingsFilename": "config/settings_data.json",
+        "jobId": "gid://shopify/Job/1",
+        "coverage": {
+            "requiredSourceVars": [],
+            "requiredThemeVars": [],
+            "missingSourceVars": [],
+            "missingThemeVars": [],
+        },
+        "settingsSync": {
+            "settingsFilename": "config/settings_data.json",
+            "expectedPaths": [],
+            "updatedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+            "semanticUpdatedPaths": [],
+            "unmappedColorPaths": [],
+            "semanticTypographyUpdatedPaths": [],
+            "unmappedTypographyPaths": [],
+        },
+    }
+
+
+def test_sync_client_shopify_theme_brand_batches_component_images(monkeypatch):
+    observed_requests: list[dict[str, Any]] = []
+    image_paths = [
+        f"templates/index.json.sections.hero.blocks.image_{idx}.settings.image"
+        for idx in range(1, 6)
+    ]
+    component_image_urls = {
+        path: f"https://assets.example.com/public/assets/image-{idx}"
+        for idx, path in enumerate(image_paths, start=1)
+    }
+
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/sync"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
+        assert isinstance(json_body, dict)
+        observed_requests.append(json_body)
+        request_index = len(observed_requests)
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": f"Main Theme {request_index}",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": "gid://shopify/Job/1",
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+        }
+
+    monkeypatch.setattr(
+        shopify_connection.settings,
+        "SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE",
+        2,
+    )
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.sync_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        css_vars={"--color-brand": "#123456"},
+        component_image_urls=component_image_urls,
+        component_text_values={
+            "templates/index.json.sections.hero.settings.heading": "Sleep Better Tonight",
+        },
+        auto_component_image_urls=[
+            "https://assets.example.com/public/assets/product-image-1",
+            "https://assets.example.com/public/assets/product-image-2",
+        ],
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert len(observed_requests) == 3
+    assert list(observed_requests[0]["componentImageUrls"].keys()) == image_paths[:2]
+    assert list(observed_requests[1]["componentImageUrls"].keys()) == image_paths[2:4]
+    assert list(observed_requests[2]["componentImageUrls"].keys()) == image_paths[4:]
+    assert "componentTextValues" in observed_requests[0]
+    assert "autoComponentImageUrls" in observed_requests[0]
+    assert "componentTextValues" not in observed_requests[1]
+    assert "autoComponentImageUrls" not in observed_requests[1]
+    assert "componentTextValues" not in observed_requests[2]
+    assert "autoComponentImageUrls" not in observed_requests[2]
+    assert response["themeName"] == "Main Theme 3"
+
+
+def test_sync_client_shopify_theme_brand_rejects_invalid_css_key():
+    try:
+        shopify_connection.sync_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"color-brand": "#123456"},
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "cssVars keys must be valid CSS custom properties" in exc.detail
+    else:
+        raise AssertionError(
+            "Expected sync_client_shopify_theme_brand to reject invalid cssVars keys"
+        )
+
+
+def test_sync_client_shopify_theme_brand_rejects_invalid_component_image_path():
+    try:
+        shopify_connection.sync_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"--color-brand": "#123456"},
+            component_image_urls={
+                "current.sections.hero.settings.image": "https://assets.example.com/public/assets/1"
+            },
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "componentImageUrls keys must target template or section JSON files" in exc.detail
+    else:
+        raise AssertionError(
+            "Expected sync_client_shopify_theme_brand to reject invalid componentImageUrls keys"
+        )
+
+
+def test_sync_client_shopify_theme_brand_rejects_invalid_component_text_path():
+    try:
+        shopify_connection.sync_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"--color-brand": "#123456"},
+            component_text_values={
+                "current.sections.hero.settings.heading": "Sleep Better Tonight"
+            },
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "componentTextValues keys must target template or section JSON files" in exc.detail
+    else:
+        raise AssertionError(
+            "Expected sync_client_shopify_theme_brand to reject invalid componentTextValues keys"
+        )
+
+
+def test_sync_client_shopify_theme_brand_rejects_invalid_auto_component_image_url():
+    try:
+        shopify_connection.sync_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars={"--color-brand": "#123456"},
+            auto_component_image_urls=["/relative/path.png"],
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 400
+        assert "autoComponentImageUrls entries must be absolute http(s) URLs" in exc.detail
+    else:
+        raise AssertionError(
+            "Expected sync_client_shopify_theme_brand to reject invalid autoComponentImageUrls"
+        )
+
+
+def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/sync"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": None,
+            "jobId": None,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": None,
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.sync_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        css_vars={"--color-brand": "#123456"},
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert response["jobId"] is None
+
+
+def test_audit_client_shopify_theme_brand_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/audit"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
+        assert json_body["clientId"] == "client_1"
+        assert json_body["workspaceName"] == "Acme Workspace"
+        assert json_body["themeName"] == "futrgroup2-0theme"
+        assert json_body["cssVars"]["--color-brand"] == "#123456"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "hasManagedMarkerBlock": True,
+            "layoutIncludesManagedCssAsset": True,
+            "managedCssAssetExists": True,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsAudit": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "syncedPaths": [],
+                "mismatchedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "requiredMismatchedPaths": [],
+                "semanticSyncedPaths": [],
+                "semanticMismatchedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographySyncedPaths": [],
+                "semanticTypographyMismatchedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+            "isReady": True,
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.audit_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        css_vars={"--color-brand": "#123456"},
+        data_theme="light",
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert response == {
+        "shopDomain": "example.myshopify.com",
+        "themeId": "gid://shopify/OnlineStoreTheme/1",
+        "themeName": "Main Theme",
+        "themeRole": "MAIN",
+        "layoutFilename": "layout/theme.liquid",
+        "cssFilename": "assets/acme-workspace-workspace-brand.css",
+        "settingsFilename": "config/settings_data.json",
+        "hasManagedMarkerBlock": True,
+        "layoutIncludesManagedCssAsset": True,
+        "managedCssAssetExists": True,
+        "coverage": {
+            "requiredSourceVars": [],
+            "requiredThemeVars": [],
+            "missingSourceVars": [],
+            "missingThemeVars": [],
+        },
+        "settingsAudit": {
+            "settingsFilename": "config/settings_data.json",
+            "expectedPaths": [],
+            "syncedPaths": [],
+            "mismatchedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+            "requiredMismatchedPaths": [],
+            "semanticSyncedPaths": [],
+            "semanticMismatchedPaths": [],
+            "unmappedColorPaths": [],
+            "semanticTypographySyncedPaths": [],
+            "semanticTypographyMismatchedPaths": [],
+            "unmappedTypographyPaths": [],
+        },
+        "isReady": True,
+    }
+
+
+def test_audit_client_shopify_theme_brand_rejects_invalid_marker_flag(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/audit"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "hasManagedMarkerBlock": "yes",
+            "layoutIncludesManagedCssAsset": True,
+            "managedCssAssetExists": True,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsAudit": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "syncedPaths": [],
+                "mismatchedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "requiredMismatchedPaths": [],
+                "semanticSyncedPaths": [],
+                "semanticMismatchedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographySyncedPaths": [],
+                "semanticTypographyMismatchedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+            "isReady": True,
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    try:
+        shopify_connection.audit_client_shopify_theme_brand(
+            client_id="client_1",
+            workspace_name="Acme Workspace",
+            css_vars={"--color-brand": "#123456"},
+            theme_name="futrgroup2-0theme",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 502
+        assert "invalid hasManagedMarkerBlock" in exc.detail
+    else:
+        raise AssertionError(
+            "Expected audit_client_shopify_theme_brand to reject invalid marker flag"
+        )

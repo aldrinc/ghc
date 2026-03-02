@@ -92,6 +92,19 @@ class JobsRepository(Repository):
             self.session.commit()
         return job
 
+    def set_output(self, job_id: str, *, output: dict[str, Any]) -> Optional[Job]:
+        now = datetime.now(timezone.utc)
+        stmt = (
+            update(Job)
+            .where(Job.id == job_id)
+            .values(output=output, updated_at=now)
+            .returning(Job)
+        )
+        job = self.session.execute(stmt).scalar_one_or_none()
+        if job:
+            self.session.commit()
+        return job
+
     def mark_succeeded(
         self,
         job_id: str,
@@ -136,4 +149,3 @@ class JobsRepository(Repository):
         if job:
             self.session.commit()
         return job
-

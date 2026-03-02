@@ -62,7 +62,8 @@ Connection states:
 
 2. `installed_missing_storefront_token`
 - App installed, but storefront token missing.
-- CTA: `Set storefront token`.
+- CTA: `Retry automatic token setup`.
+- Secondary action: `Enter token manually`.
 
 3. `multiple_installations_conflict`
 - More than one active shop linked to same workspace/client.
@@ -118,8 +119,9 @@ Frontend return:
 If app is installed but not fully configured:
 
 - Require storefront token (`storefrontAccessToken`) before checkout readiness.
-- Show `Set storefront token` action that hits backend patch endpoint.
-- Re-check status after patch.
+- First try `Retry automatic token setup` via backend auto endpoint.
+- Keep manual token entry (`PATCH /clients/{client_id}/shopify/installation`) as explicit fallback.
+- Re-check status after retry or manual patch.
 
 ### D) Product mapping
 
@@ -204,7 +206,19 @@ Errors:
 - `404` installation not found
 - `409` ambiguous installation
 
-### 4) `POST /clients/{client_id}/shopify/verify-product`
+### 4) `POST /clients/{client_id}/shopify/installation/auto-storefront-token`
+
+Input:
+- `shopDomain`
+
+Returns updated status payload.
+
+Errors:
+- `404` installation not found
+- `409` ownership mismatch/ambiguous installation
+- `502` Shopify auto-token upstream failure
+
+### 5) `POST /clients/{client_id}/shopify/verify-product`
 
 Input:
 - `productGid`
@@ -218,7 +232,7 @@ Errors:
 - `404` no installation
 - `409` not found in shop / conflict
 
-### 5) `POST /clients/{client_id}/shopify/products`
+### 6) `POST /clients/{client_id}/shopify/products`
 
 Input:
 - create payload (title + at least one variant)
@@ -246,7 +260,8 @@ In `ProductDetailPage`:
 - Actions based on state:
   - `Connect Shopify`
   - `Disconnect Shopify` (unlinks store from current workspace)
-  - `Set storefront token`
+  - `Retry automatic token setup`
+  - `Enter token manually` (secondary)
   - `Refresh status`
   - `Choose default shop` (when conflict)
 

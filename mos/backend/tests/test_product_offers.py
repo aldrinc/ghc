@@ -801,6 +801,75 @@ def test_sync_shopify_variants_for_product_imports_and_updates_variants(api_clie
     assert updated_existing["shopify_last_sync_error"] is None
 
 
+def test_sync_shopify_variants_for_product_accepts_short_product_id(api_client, monkeypatch):
+    client_id = _create_client(api_client, name="Shopify Variant Pull Short ID")
+    product_id = _create_product(
+        api_client,
+        client_id=client_id,
+        title="Primary Product",
+        shopify_product_gid="gid://shopify/Product/910",
+    )
+    short_product_id = product_id.split("-", 1)[0]
+    assert short_product_id
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_get_product(*, client_id: str, product_gid: str, shop_domain: str | None = None):
+        assert client_id
+        assert product_gid == "gid://shopify/Product/910"
+        assert shop_domain == "example.myshopify.com"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "productGid": "gid://shopify/Product/910",
+            "title": "Primary Product",
+            "handle": "primary-product",
+            "status": "ACTIVE",
+            "variants": [
+                {
+                    "variantGid": "gid://shopify/ProductVariant/911",
+                    "title": "Starter",
+                    "priceCents": 4999,
+                    "currency": "USD",
+                    "compareAtPriceCents": None,
+                    "sku": "SKU-STARTER",
+                    "barcode": None,
+                    "taxable": True,
+                    "requiresShipping": True,
+                    "inventoryPolicy": "continue",
+                    "inventoryManagement": "shopify",
+                    "inventoryQuantity": 10,
+                    "optionValues": {"Title": "Starter"},
+                }
+            ],
+        }
+
+    monkeypatch.setattr(products_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(products_router, "get_client_shopify_product", fake_get_product)
+
+    sync_resp = api_client.post(f"/products/{short_product_id}/shopify/sync-variants", json={})
+    assert sync_resp.status_code == 200
+    payload = sync_resp.json()
+    assert payload["createdCount"] == 1
+    assert payload["updatedCount"] == 0
+    assert payload["totalFetched"] == 1
+
+    detail_resp = api_client.get(f"/products/{product_id}")
+    assert detail_resp.status_code == 200
+    variants = detail_resp.json().get("variants") or []
+    assert len(variants) == 1
+    assert variants[0]["external_price_id"] == "gid://shopify/ProductVariant/911"
+    assert variants[0]["title"] == "Starter"
+
+
 def test_create_shopify_product_for_product_imports_shopify_variants(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Shopify Product Import")
     product_id = _create_product(api_client, client_id=client_id, title="Primary Product")

@@ -552,9 +552,8 @@ def sync_shopify_variants_for_product(
     auth: AuthContext = Depends(get_current_user),
     session: Session = Depends(get_session),
 ):
-    product = session.scalars(
-        select(Product).where(Product.id == product_id, Product.org_id == auth.org_id)
-    ).first()
+    products_repo = ProductsRepository(session)
+    product = products_repo.get(org_id=auth.org_id, product_id=product_id)
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     if not product.shopify_product_gid:

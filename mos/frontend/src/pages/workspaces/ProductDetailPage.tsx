@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -10,11 +9,7 @@ import { useProductContext } from "@/contexts/ProductContext";
 import { shortUuidRouteToken } from "@/funnels/runtimeRouting";
 import {
   useClientShopifyStatus,
-  useCreateClientShopifyInstallUrl,
-  useDisconnectClientShopifyInstallation,
   useListClientShopifyProducts,
-  useSetClientShopifyDefaultShop,
-  useUpdateClientShopifyInstallation,
 } from "@/api/clients";
 import {
   useAddOfferBonus,
@@ -137,17 +132,8 @@ export function ProductDetailPage() {
   const { data: productDetail, isLoading: isLoadingDetail } = useProduct(productId);
   const { data: productAssets = [], isLoading: isLoadingAssets } = useProductAssets(productId);
   const productClientId = productDetail?.client_id;
-  const {
-    data: shopifyStatus,
-    isLoading: isLoadingShopifyStatus,
-    refetch: refetchShopifyStatus,
-    error: shopifyStatusError,
-  } = useClientShopifyStatus(productClientId);
-  const createShopifyInstallUrl = useCreateClientShopifyInstallUrl(productClientId || "");
+  const { data: shopifyStatus } = useClientShopifyStatus(productClientId);
   const listShopifyProducts = useListClientShopifyProducts(productClientId || "");
-  const setDefaultShop = useSetClientShopifyDefaultShop(productClientId || "");
-  const updateShopifyInstallation = useUpdateClientShopifyInstallation(productClientId || "");
-  const disconnectShopifyInstallation = useDisconnectClientShopifyInstallation(productClientId || "");
   const updateProduct = useUpdateProduct(productId || "");
   const createShopifyProductForProduct = useCreateShopifyProductForProduct(productId || "");
   const syncShopifyVariants = useSyncShopifyVariantsForProduct(productId || "");
@@ -177,9 +163,6 @@ export function ProductDetailPage() {
   const [variantExternalId, setVariantExternalId] = useState("");
   const [variantOptionValues, setVariantOptionValues] = useState("");
   const [shopifyProductGidDraft, setShopifyProductGidDraft] = useState("");
-  const [shopifyShopDomainDraft, setShopifyShopDomainDraft] = useState("");
-  const [defaultShopDomainDraft, setDefaultShopDomainDraft] = useState("");
-  const [storefrontAccessTokenDraft, setStorefrontAccessTokenDraft] = useState("");
   const [shopifyProductSearchQuery, setShopifyProductSearchQuery] = useState("");
   const [selectedShopifyProductGid, setSelectedShopifyProductGid] = useState("");
   const [createShopifyTitleDraft, setCreateShopifyTitleDraft] = useState("");
@@ -216,20 +199,6 @@ export function ProductDetailPage() {
     if (!canonicalRouteToken || productId === canonicalRouteToken) return;
     navigate(`/workspaces/products/${canonicalRouteToken}`, { replace: true });
   }, [navigate, productDetail?.id, productId]);
-
-  useEffect(() => {
-    if (!shopifyStatus?.shopDomain) return;
-    setShopifyShopDomainDraft((current) => (current.trim() ? current : shopifyStatus.shopDomain || ""));
-  }, [shopifyStatus?.shopDomain]);
-
-  useEffect(() => {
-    if (!shopifyStatus?.shopDomains?.length) return;
-    setDefaultShopDomainDraft((current) => {
-      if (current.trim()) return current;
-      if (shopifyStatus.selectedShopDomain) return shopifyStatus.selectedShopDomain;
-      return shopifyStatus.shopDomains[0] || "";
-    });
-  }, [shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomains]);
 
   useEffect(() => {
     if (!productDetail) return;
@@ -451,75 +420,6 @@ export function ProductDetailPage() {
     }
     const next = shopifyProductGidDraft.trim();
     updateProduct.mutate({ shopifyProductGid: next || null });
-  };
-
-  const handleConnectShopify = async () => {
-    if (!productClientId) {
-      toast.error("Select a product before connecting Shopify.");
-      return;
-    }
-    const nextDomain = shopifyShopDomainDraft.trim();
-    if (!nextDomain) {
-      toast.error("Shop domain is required.");
-      return;
-    }
-    const response = await createShopifyInstallUrl.mutateAsync({ shopDomain: nextDomain });
-    if (!response.installUrl) {
-      throw new Error("Install URL is missing from response.");
-    }
-    window.location.assign(response.installUrl);
-  };
-
-  const handleSetStorefrontToken = async () => {
-    if (!productClientId) {
-      toast.error("Select a product before updating Shopify installation.");
-      return;
-    }
-    const nextDomain = shopifyShopDomainDraft.trim();
-    if (!nextDomain) {
-      toast.error("Shop domain is required.");
-      return;
-    }
-    const nextToken = storefrontAccessTokenDraft.trim();
-    if (!nextToken) {
-      toast.error("Storefront access token is required.");
-      return;
-    }
-    await updateShopifyInstallation.mutateAsync({
-      shopDomain: nextDomain,
-      storefrontAccessToken: nextToken,
-    });
-    setStorefrontAccessTokenDraft("");
-    await refetchShopifyStatus();
-  };
-
-  const handleSetDefaultShop = async () => {
-    if (!productClientId) {
-      toast.error("Select a product before setting default Shopify store.");
-      return;
-    }
-    const nextDomain = defaultShopDomainDraft.trim();
-    if (!nextDomain) {
-      toast.error("Select a Shopify shop domain.");
-      return;
-    }
-    await setDefaultShop.mutateAsync({ shopDomain: nextDomain });
-    await refetchShopifyStatus();
-  };
-
-  const handleDisconnectShopify = async () => {
-    if (!productClientId) {
-      toast.error("Select a product before disconnecting Shopify.");
-      return;
-    }
-    const nextDomain = shopifyShopDomainDraft.trim();
-    if (!nextDomain) {
-      toast.error("Shop domain is required.");
-      return;
-    }
-    await disconnectShopifyInstallation.mutateAsync({ shopDomain: nextDomain });
-    setStorefrontAccessTokenDraft("");
-    await refetchShopifyStatus();
   };
 
   const handleCreateShopifyProduct = async () => {
@@ -768,37 +668,10 @@ export function ProductDetailPage() {
       ),
     [productDetail?.variants],
   );
-  const shopifyState = shopifyStatus?.state || "error";
-  const shopifyStatusTone = useMemo(() => {
-    if (shopifyState === "ready") return "success" as const;
-    if (shopifyState === "not_connected" || shopifyState === "installed_missing_storefront_token") return "neutral" as const;
-    return "danger" as const;
-  }, [shopifyState]);
-  const shopifyStatusLabel = useMemo(() => {
-    if (shopifyState === "ready") return "Ready";
-    if (shopifyState === "not_connected") return "Not connected";
-    if (shopifyState === "installed_missing_storefront_token") return "Missing token";
-    if (shopifyState === "multiple_installations_conflict") return "Store conflict";
-    return "Error";
-  }, [shopifyState]);
-  const shopifyStatusMessage = useMemo(() => {
-    if (shopifyStatus?.message) return shopifyStatus.message;
-    if (shopifyStatusError && typeof shopifyStatusError === "object" && "message" in shopifyStatusError) {
-      const message = (shopifyStatusError as { message?: unknown }).message;
-      if (typeof message === "string" && message.trim()) return message;
-    }
-    if (typeof shopifyStatusError === "string" && shopifyStatusError.trim()) return shopifyStatusError;
-    return "Checking Shopify connection status.";
-  }, [shopifyStatus?.message, shopifyStatusError]);
-  const isShopifyConnectionMutating =
-    createShopifyInstallUrl.isPending ||
-    updateShopifyInstallation.isPending ||
-    disconnectShopifyInstallation.isPending ||
-    setDefaultShop.isPending;
   const isSavingOffer = createOffer.isPending || updateOffer.isPending;
   const isSavingVariant = createVariant.isPending || updateVariant.isPending;
   const isDeletingVariant = deleteVariant.isPending;
-  const isShopifyReady = shopifyState === "ready";
+  const isShopifyReady = shopifyStatus?.state === "ready";
   const hasMappedShopifyProduct = Boolean((productDetail?.shopify_product_gid || "").trim());
 
   if (!workspace) {
@@ -863,108 +736,6 @@ export function ProductDetailPage() {
                   <div className="font-semibold text-content">Disclaimers</div>
                   {productDetail.disclaimers?.length ? productDetail.disclaimers.join(", ") : "—"}
                 </div>
-              </div>
-            </div>
-
-            <div className="rounded-md border border-border bg-surface-2 p-4 space-y-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs font-semibold uppercase text-content-muted">Shopify Connection</div>
-                  <div className="text-xs text-content-muted">
-                    Connect the store and verify setup before mapping products.
-                  </div>
-                </div>
-                <Badge tone={shopifyStatusTone}>{isLoadingShopifyStatus ? "Checking…" : shopifyStatusLabel}</Badge>
-              </div>
-              <div className="text-xs text-content-muted">
-                {shopifyStatusMessage}
-              </div>
-              {shopifyStatus?.missingScopes?.length ? (
-                <div className="text-xs text-danger">Missing scopes: {shopifyStatus.missingScopes.join(", ")}</div>
-              ) : null}
-              {shopifyStatus?.shopDomains?.length ? (
-                <div className="text-xs text-content-muted">Connected stores: {shopifyStatus.shopDomains.join(", ")}</div>
-              ) : null}
-              {shopifyState === "multiple_installations_conflict" && shopifyStatus?.shopDomains?.length ? (
-                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                  <select
-                    className="w-full rounded-md border border-input-border bg-input px-3 py-2 text-sm text-content shadow-sm"
-                    value={defaultShopDomainDraft}
-                    onChange={(e) => setDefaultShopDomainDraft(e.target.value)}
-                    disabled={setDefaultShop.isPending || disconnectShopifyInstallation.isPending}
-                  >
-                    {shopifyStatus.shopDomains.map((shopDomain) => (
-                      <option key={shopDomain} value={shopDomain}>
-                        {shopDomain}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => void handleSetDefaultShop()}
-                    disabled={!defaultShopDomainDraft.trim() || setDefaultShop.isPending || disconnectShopifyInstallation.isPending}
-                  >
-                    {setDefaultShop.isPending ? "Saving…" : "Set default shop"}
-                  </Button>
-                </div>
-              ) : null}
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
-                <Input
-                  placeholder="example-shop.myshopify.com"
-                  value={shopifyShopDomainDraft}
-                  onChange={(e) => setShopifyShopDomainDraft(e.target.value)}
-                  disabled={isShopifyConnectionMutating}
-                />
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void refetchShopifyStatus()}
-                  disabled={isLoadingShopifyStatus || isShopifyConnectionMutating}
-                >
-                  Refresh
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => void handleConnectShopify()}
-                  disabled={
-                    !productClientId ||
-                    !shopifyShopDomainDraft.trim() ||
-                    isShopifyConnectionMutating
-                  }
-                >
-                  {createShopifyInstallUrl.isPending ? "Redirecting…" : "Connect Shopify"}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => void handleDisconnectShopify()}
-                  disabled={!productClientId || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
-                >
-                  {disconnectShopifyInstallation.isPending ? "Disconnecting…" : "Disconnect Shopify"}
-                </Button>
-              </div>
-              <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                <Input
-                  type="password"
-                  placeholder="Storefront access token"
-                  value={storefrontAccessTokenDraft}
-                  onChange={(e) => setStorefrontAccessTokenDraft(e.target.value)}
-                  disabled={isShopifyConnectionMutating}
-                />
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void handleSetStorefrontToken()}
-                  disabled={
-                    !productClientId ||
-                    !shopifyShopDomainDraft.trim() ||
-                    !storefrontAccessTokenDraft.trim() ||
-                    isShopifyConnectionMutating
-                  }
-                >
-                  {updateShopifyInstallation.isPending ? "Saving…" : "Set storefront token"}
-                </Button>
               </div>
             </div>
 

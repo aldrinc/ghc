@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from html import escape
 import re
 from typing import Any
 
 RULESET_VERSION = "meta_tiktok_compliance_ruleset_v1"
-RULESET_EFFECTIVE_DATE = "2026-02-19"
+RULESET_EFFECTIVE_DATE = "2026-02-27"
 
 ALLOWED_BUSINESS_MODELS = {
     "ecommerce",
@@ -59,6 +60,13 @@ _RULESET: dict[str, Any] = {
             "lastUpdated": "2026-01",
         },
         {
+            "sourceId": "tiktok.landing_page_best_practices",
+            "platform": "tiktok",
+            "title": "Best practices for your landing page",
+            "url": "https://ads.tiktok.com/help/article/ad-review-checklist-landing-page?lang=en",
+            "lastUpdated": "2025-09",
+        },
+        {
             "sourceId": "tiktok.data_collection_standards",
             "platform": "tiktok",
             "title": "Data Collection Standards",
@@ -80,6 +88,20 @@ _RULESET: dict[str, Any] = {
             "lastUpdated": "2025-11",
         },
         {
+            "sourceId": "tiktok.lead_ads_privacy_practices",
+            "platform": "tiktok",
+            "title": "About privacy policies for lead generation ads",
+            "url": "https://ads.tiktok.com/help/article/explaining-privacy-practices-to-lead-generation-ads-users?lang=en",
+            "lastUpdated": None,
+        },
+        {
+            "sourceId": "tiktok.instant_form_requirements",
+            "platform": "tiktok",
+            "title": "How to create an Instant Form",
+            "url": "https://ads.tiktok.com/help/article/build-instant-form",
+            "lastUpdated": None,
+        },
+        {
             "sourceId": "meta.ads_policies_intro",
             "platform": "meta",
             "title": "Introduction to the Advertising Standards",
@@ -99,6 +121,27 @@ _RULESET: dict[str, Any] = {
             "title": "Unacceptable Business Practices | Transparency Center",
             "url": "https://transparency.meta.com/policies/ad-standards/fraud-scams/unacceptable-business-practices/",
             "lastUpdated": "2024-07-25",
+        },
+        {
+            "sourceId": "meta.fraud_scams_deceptive_practices",
+            "platform": "meta",
+            "title": "Fraud, Scams and Deceptive Practices | Transparency Center",
+            "url": "https://transparency.meta.com/policies/ad-standards/fraud-scams/fraud-scams-deceptive-practices/",
+            "lastUpdated": "2025-11-12",
+        },
+        {
+            "sourceId": "meta.privacy_violations_personal_attributes",
+            "platform": "meta",
+            "title": "Privacy Violations and Personal Attributes | Transparency Center",
+            "url": "https://transparency.meta.com/policies/ad-standards/objectionable-content/privacy-violations-personal-attributes/",
+            "lastUpdated": "2024-06-26",
+        },
+        {
+            "sourceId": "meta.spam",
+            "platform": "meta",
+            "title": "Spam | Transparency Center",
+            "url": "https://transparency.meta.com/policies/ad-standards/business-assets/spam/",
+            "lastUpdated": None,
         },
         {
             "sourceId": "meta.lead_ads_privacy",
@@ -143,6 +186,52 @@ _RULESET: dict[str, Any] = {
             "sourceIds": ["tiktok.data_collection_standards"],
         },
         {
+            "ruleId": "tiktok.lead_gen.privacy_policy_link",
+            "platform": "tiktok",
+            "classification": "required",
+            "summary": "Lead ads and instant forms must clearly link to the advertiser privacy policy.",
+            "appliesToModels": ["lead_generation"],
+            "pageKeys": ["privacy_policy"],
+            "sourceIds": [
+                "tiktok.ad_format_and_functionality",
+                "tiktok.lead_ads_privacy_practices",
+                "tiktok.instant_form_requirements",
+            ],
+        },
+        {
+            "ruleId": "tiktok.landing_page.functionality_and_access",
+            "platform": "tiktok",
+            "classification": "required",
+            "summary": (
+                "Landing pages must be functional, not under construction, and must not gate core content behind "
+                "personal-info collection or forced software downloads."
+            ),
+            "appliesToModels": [
+                "ecommerce",
+                "saas_subscription",
+                "digital_product",
+                "online_service",
+                "lead_generation",
+            ],
+            "pageKeys": [],
+            "sourceIds": ["tiktok.ad_format_and_functionality"],
+        },
+        {
+            "ruleId": "tiktok.landing_page.mobile_identity_best_practice",
+            "platform": "tiktok",
+            "classification": "strongly_recommended",
+            "summary": "Landing pages should be mobile-friendly and include visible company/policy identity in footer.",
+            "appliesToModels": [
+                "ecommerce",
+                "saas_subscription",
+                "digital_product",
+                "online_service",
+                "lead_generation",
+            ],
+            "pageKeys": ["company_information", "contact_support", "privacy_policy", "terms_of_service"],
+            "sourceIds": ["tiktok.landing_page_best_practices"],
+        },
+        {
             "ruleId": "tiktok.subscriptions.recurring_disclosure",
             "platform": "tiktok",
             "classification": "required",
@@ -170,6 +259,21 @@ _RULESET: dict[str, Any] = {
             "sourceIds": ["tiktok.misleading_and_false_content"],
         },
         {
+            "ruleId": "meta.ad_to_landing.match",
+            "platform": "meta",
+            "classification": "required",
+            "summary": "Products and services promoted in ads must match the corresponding landing page.",
+            "appliesToModels": [
+                "ecommerce",
+                "saas_subscription",
+                "digital_product",
+                "online_service",
+                "lead_generation",
+            ],
+            "pageKeys": ["terms_of_service"],
+            "sourceIds": ["meta.ads_policies_intro"],
+        },
+        {
             "ruleId": "meta.lead_ads.privacy_policy",
             "platform": "meta",
             "classification": "required",
@@ -188,6 +292,21 @@ _RULESET: dict[str, Any] = {
             "sourceIds": ["meta.subscription_services"],
         },
         {
+            "ruleId": "meta.privacy.no_private_info_abuse",
+            "platform": "meta",
+            "classification": "required",
+            "summary": "Ads must avoid privacy violations and abusive collection/use of private information.",
+            "appliesToModels": [
+                "ecommerce",
+                "saas_subscription",
+                "digital_product",
+                "online_service",
+                "lead_generation",
+            ],
+            "pageKeys": ["privacy_policy"],
+            "sourceIds": ["meta.privacy_violations_personal_attributes"],
+        },
+        {
             "ruleId": "meta.legitimacy.business_transparency",
             "platform": "meta",
             "classification": "strongly_recommended",
@@ -200,7 +319,26 @@ _RULESET: dict[str, Any] = {
                 "lead_generation",
             ],
             "pageKeys": ["company_information", "contact_support", "terms_of_service"],
-            "sourceIds": ["meta.unacceptable_business_practices", "meta.ads_policies_intro"],
+            "sourceIds": [
+                "meta.unacceptable_business_practices",
+                "meta.fraud_scams_deceptive_practices",
+                "meta.ads_policies_intro",
+            ],
+        },
+        {
+            "ruleId": "meta.spam.deceptive_links_guardrail",
+            "platform": "meta",
+            "classification": "strongly_recommended",
+            "summary": "Landing pages and links should avoid spam-like or deceptive-link behavior.",
+            "appliesToModels": [
+                "ecommerce",
+                "saas_subscription",
+                "digital_product",
+                "online_service",
+                "lead_generation",
+            ],
+            "pageKeys": ["contact_support", "terms_of_service", "privacy_policy"],
+            "sourceIds": ["meta.spam"],
         },
     ],
 }
@@ -210,60 +348,140 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "pageKey": "privacy_policy",
         "title": "Privacy Policy",
         "templateVersion": "v1",
-        "description": "Data collection, usage, sharing, and rights disclosures for website visitors and customers.",
+        "description": (
+            "Ecommerce privacy disclosures with explicit data-use, marketing, and user-rights sections "
+            "modeled after current production policy structure."
+        ),
         "requiredSections": [
-            {"sectionKey": "data_collected", "title": "What We Collect"},
+            {"sectionKey": "owner_identity", "title": "Owner and Controller Identity"},
+            {"sectionKey": "data_collected", "title": "Data We Collect"},
             {"sectionKey": "data_usage", "title": "How We Use Data"},
             {"sectionKey": "data_sharing", "title": "How We Share Data"},
+            {"sectionKey": "user_choices", "title": "User Choices and Controls"},
+            {"sectionKey": "security_retention", "title": "Security and Retention"},
             {"sectionKey": "privacy_contact", "title": "Privacy Contact"},
-            {"sectionKey": "effective_date", "title": "Effective Date"},
+            {"sectionKey": "policy_updates", "title": "Policy Updates and Effective Date"},
         ],
         "placeholders": [
+            "brand_name",
+            "website_url",
             "legal_business_name",
             "support_email",
             "company_address_text",
             "effective_date",
+            "privacy_data_collected",
+            "privacy_data_usage",
+            "privacy_data_sharing",
+            "privacy_user_choices",
+            "privacy_security_retention",
+            "privacy_update_notice",
         ],
         "templateMarkdown": (
             "# Privacy Policy\n\n"
+            "This Privacy Policy explains how {{legal_business_name}} (\"{{brand_name}}\", \"we\", \"us\") collects, "
+            "uses, and shares personal information when you visit or make a purchase from {{website_url}}.\n\n"
+            "**Brand:** {{brand_name}}  \n"
             "**Operator:** {{legal_business_name}}  \n"
             "**Contact:** {{support_email}}  \n"
             "**Address:** {{company_address_text}}  \n"
             "**Effective date:** {{effective_date}}\n\n"
-            "## What We Collect\n"
-            "Document the data categories you collect through forms, checkout, analytics, and ad pixels.\n\n"
+            "## Owner and Controller Identity\n"
+            "{{legal_business_name}} is the data controller responsible for personal information handled for "
+            "{{brand_name}}.\n\n"
+            "## Data We Collect\n"
+            "We may collect order, account, support, payment-confirmation, device, and browsing information, "
+            "including through cookies and similar technologies.\n\n"
+            "{{privacy_data_collected}}\n\n"
             "## How We Use Data\n"
-            "Document each purpose (fulfillment, support, fraud prevention, analytics, marketing, legal).\n\n"
+            "We use personal information to provide products/services, process transactions, fulfill orders, "
+            "communicate with customers, prevent fraud, and improve site and marketing performance.\n\n"
+            "{{privacy_data_usage}}\n\n"
             "## How We Share Data\n"
-            "List recipient categories and why each category receives data.\n\n"
+            "We share data only as needed to operate the business (for example: commerce platform, payment processor, "
+            "shipping partners, analytics, and customer support providers) or when legally required.\n\n"
+            "{{privacy_data_sharing}}\n\n"
+            "## User Choices and Controls\n"
+            "Depending on location, users may have rights to access, correct, delete, or opt out of certain data "
+            "uses such as targeted advertising. Users can also manage cookie preferences and marketing "
+            "subscriptions where available.\n\n"
+            "{{privacy_user_choices}}\n\n"
+            "## Security and Retention\n"
+            "We apply reasonable technical and organizational safeguards and retain personal information only for as "
+            "long as needed for legitimate business and legal purposes.\n\n"
+            "{{privacy_security_retention}}\n\n"
             "## Privacy Contact\n"
-            "State how users can submit privacy requests and expected response timeframe.\n"
+            "For privacy questions or requests, contact {{support_email}}.\n\n"
+            "## Policy Updates and Effective Date\n"
+            "{{privacy_update_notice}}\n\n"
+            "**Effective date:** {{effective_date}}\n"
         ),
     },
     "terms_of_service": {
         "pageKey": "terms_of_service",
         "title": "Terms of Service",
         "templateVersion": "v1",
-        "description": "Commercial terms that must remain consistent with ad claims, pricing, and offer constraints.",
+        "description": (
+            "Storefront terms based on current production structure, including order controls, disputes, "
+            "and governing-law disclosures."
+        ),
         "requiredSections": [
-            {"sectionKey": "offer_scope", "title": "Offer Scope"},
+            {"sectionKey": "business_identity", "title": "Business Identity"},
+            {"sectionKey": "offer_scope", "title": "Offer Scope and Eligibility"},
             {"sectionKey": "pricing_terms", "title": "Pricing and Billing Terms"},
             {"sectionKey": "fulfillment_terms", "title": "Fulfillment and Access Terms"},
-            {"sectionKey": "dispute_contact", "title": "Support and Disputes"},
+            {"sectionKey": "refund_cancellation_links", "title": "Refund and Cancellation Links"},
+            {"sectionKey": "disclaimers", "title": "Limitations and Disclaimers"},
+            {"sectionKey": "dispute_contact", "title": "Support Contact"},
             {"sectionKey": "effective_date", "title": "Effective Date"},
         ],
-        "placeholders": ["legal_business_name", "support_email", "effective_date"],
+        "placeholders": [
+            "brand_name",
+            "website_url",
+            "legal_business_name",
+            "company_address_text",
+            "support_email",
+            "effective_date",
+            "terms_offer_scope",
+            "terms_eligibility",
+            "terms_pricing_billing",
+            "terms_fulfillment_access",
+            "terms_refund_cancellation",
+            "terms_disclaimers",
+            "terms_dispute_resolution",
+            "terms_governing_law",
+        ],
         "templateMarkdown": (
             "# Terms of Service\n\n"
-            "These terms govern purchases from {{legal_business_name}}.\n\n"
-            "## Offer Scope\n"
-            "Define what the customer receives, eligibility rules, and exclusions.\n\n"
+            "These Terms of Service (\"Terms\") govern your access to and use of {{website_url}}, operated by "
+            "{{legal_business_name}} (\"{{brand_name}}\", \"we\", \"us\"). By visiting the site or purchasing a "
+            "product/service, you agree to these Terms.\n\n"
+            "## Business Identity\n"
+            "**Brand:** {{brand_name}}  \n"
+            "**Legal business name:** {{legal_business_name}}  \n"
+            "**Business address:** {{company_address_text}}\n\n"
+            "## Offer Scope and Eligibility\n"
+            "{{terms_offer_scope}}\n\n"
+            "{{terms_eligibility}}\n\n"
             "## Pricing and Billing Terms\n"
-            "State currency, taxes/fees handling, discount constraints, and billing timing.\n\n"
+            "Prices, promotions, and availability can change without notice unless required by law. Payment "
+            "authorization is required before order fulfillment.\n\n"
+            "{{terms_pricing_billing}}\n\n"
             "## Fulfillment and Access Terms\n"
-            "State delivery/access method and timing by product type.\n\n"
-            "## Support and Disputes\n"
-            "State support channel(s) and dispute path. Contact: {{support_email}}.\n\n"
+            "We may limit, refuse, or cancel orders when necessary (for example suspected fraud, abuse, or inventory "
+            "constraints), and we may update or discontinue portions of the service.\n\n"
+            "{{terms_fulfillment_access}}\n\n"
+            "## Refund and Cancellation Links\n"
+            "Review applicable refund, cancellation, shipping, and subscription policy pages before purchase.\n\n"
+            "{{terms_refund_cancellation}}\n\n"
+            "## Limitations and Disclaimers\n"
+            "The service and content are provided on an \"as-is\" and \"as-available\" basis except where prohibited "
+            "by law.\n\n"
+            "{{terms_disclaimers}}\n\n"
+            "## Support Contact\n"
+            "Contact: {{support_email}}\n\n"
+            "## Dispute Resolution and Governing Law\n"
+            "{{terms_dispute_resolution}}\n\n"
+            "{{terms_governing_law}}\n\n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },
@@ -271,28 +489,58 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "pageKey": "returns_refunds_policy",
         "title": "Returns and Refunds Policy",
         "templateVersion": "v1",
-        "description": "Eligibility, time windows, process, and payout method for refunds/returns.",
+        "description": (
+            "Returns and refunds terms modeled after current production policy flow, including cancellation windows, "
+            "condition checks, and processing timelines."
+        ),
         "requiredSections": [
             {"sectionKey": "eligibility", "title": "Eligibility"},
             {"sectionKey": "window", "title": "Return/Refund Window"},
-            {"sectionKey": "method", "title": "Refund Method"},
             {"sectionKey": "process", "title": "How to Request"},
+            {"sectionKey": "method_timing", "title": "Refund Method and Timing"},
+            {"sectionKey": "fees", "title": "Fees and Deductions"},
             {"sectionKey": "exceptions", "title": "Exceptions"},
+            {"sectionKey": "support_contact", "title": "Support Contact"},
         ],
-        "placeholders": ["legal_business_name", "support_email", "refund_window_days", "effective_date"],
+        "placeholders": [
+            "brand_name",
+            "website_url",
+            "legal_business_name",
+            "support_email",
+            "effective_date",
+            "refund_eligibility",
+            "refund_window_policy",
+            "refund_request_steps",
+            "refund_method_timing",
+            "refund_fees_deductions",
+            "refund_exceptions",
+        ],
         "templateMarkdown": (
             "# Returns and Refunds Policy\n\n"
-            "This policy applies to purchases from {{legal_business_name}}.\n\n"
+            "This policy explains return, exchange, cancellation, and refund terms for purchases from {{brand_name}} "
+            "({{legal_business_name}}) on {{website_url}}.\n\n"
             "## Eligibility\n"
-            "State what qualifies for return/refund and required condition.\n\n"
+            "Returned items must satisfy the condition requirements in this section and may be denied if they do not "
+            "meet policy criteria.\n\n"
+            "{{refund_eligibility}}\n\n"
             "## Return/Refund Window\n"
-            "State the exact timeframe (for example: {{refund_window_days}} days from delivery/purchase).\n\n"
-            "## Refund Method\n"
-            "State whether refunds return to original payment method, store credit, or both.\n\n"
+            "Cancellation and return/refund requests must be submitted within the policy windows below.\n\n"
+            "{{refund_window_policy}}\n\n"
             "## How to Request\n"
-            "State exact steps and primary support contact: {{support_email}}.\n\n"
+            "Submit requests through the official support channel and include order-identifying details.\n\n"
+            "{{refund_request_steps}}\n\n"
+            "## Refund Method and Timing\n"
+            "Approved refunds are issued to the original payment method unless required otherwise by law.\n\n"
+            "{{refund_method_timing}}\n\n"
+            "## Fees and Deductions\n"
+            "Shipping charges, handling costs, or condition-based deductions may apply where disclosed.\n\n"
+            "{{refund_fees_deductions}}\n\n"
             "## Exceptions\n"
-            "State non-refundable categories and legal exceptions.\n\n"
+            "Certain purchases (for example final-sale, custom, or abuse-related orders) may be excluded except where "
+            "required by law.\n\n"
+            "{{refund_exceptions}}\n\n"
+            "## Support Contact\n"
+            "For return authorization or refund support, contact {{support_email}}.\n\n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },
@@ -300,27 +548,71 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "pageKey": "shipping_policy",
         "title": "Shipping Policy",
         "templateVersion": "v1",
-        "description": "Coverage, shipping charges, fulfillment timelines, and issue handling.",
+        "description": (
+            "Shipping terms aligned with current production flow for processing windows, delivery expectations, "
+            "tracking, and exceptions."
+        ),
         "requiredSections": [
-            {"sectionKey": "coverage", "title": "Shipping Coverage"},
-            {"sectionKey": "costs", "title": "Shipping Costs"},
-            {"sectionKey": "timelines", "title": "Processing and Delivery Timelines"},
-            {"sectionKey": "tracking", "title": "Tracking and Carrier Notes"},
-            {"sectionKey": "issue_handling", "title": "Lost/Late Package Support"},
+            {"sectionKey": "coverage", "title": "Shipping Regions"},
+            {"sectionKey": "processing_time", "title": "Processing Time"},
+            {"sectionKey": "options_costs", "title": "Shipping Options and Costs"},
+            {"sectionKey": "delivery_estimates", "title": "Delivery Estimates"},
+            {"sectionKey": "tracking", "title": "Tracking"},
+            {"sectionKey": "address_changes", "title": "Address Changes"},
+            {"sectionKey": "lost_damaged", "title": "Lost or Damaged Packages"},
+            {"sectionKey": "customs_duties", "title": "Customs and Duties"},
+            {"sectionKey": "return_address", "title": "Return Address"},
+            {"sectionKey": "support_contact", "title": "Shipping Support Contact"},
+            {"sectionKey": "effective_date", "title": "Effective Date"},
         ],
-        "placeholders": ["support_email", "effective_date", "fulfillment_window"],
+        "placeholders": [
+            "brand_name",
+            "website_url",
+            "support_email",
+            "effective_date",
+            "shipping_regions",
+            "shipping_processing_time",
+            "shipping_options_costs",
+            "shipping_delivery_estimates",
+            "shipping_tracking",
+            "shipping_address_changes",
+            "shipping_lost_damaged",
+            "shipping_customs_duties",
+            "shipping_return_address",
+        ],
         "templateMarkdown": (
             "# Shipping Policy\n\n"
-            "## Shipping Coverage\n"
-            "List supported regions/countries and unsupported destinations.\n\n"
-            "## Shipping Costs\n"
-            "Explain the shipping cost model (flat/free/weight/rate table).\n\n"
-            "## Processing and Delivery Timelines\n"
-            "State processing and estimated delivery range (for example: {{fulfillment_window}}).\n\n"
-            "## Tracking and Carrier Notes\n"
-            "State tracking availability and where updates are visible.\n\n"
-            "## Lost/Late Package Support\n"
-            "State escalation path and contact: {{support_email}}.\n\n"
+            "This policy describes shipping timelines, delivery expectations, and issue handling for orders placed "
+            "with {{brand_name}} on {{website_url}}.\n\n"
+            "## Shipping Regions\n"
+            "{{shipping_regions}}\n\n"
+            "## Processing Time\n"
+            "Orders are processed on business days and can be affected by weekends, holidays, or high-volume periods.\n\n"
+            "{{shipping_processing_time}}\n\n"
+            "## Shipping Options and Costs\n"
+            "Available shipping methods and charges are shown at checkout before payment.\n\n"
+            "{{shipping_options_costs}}\n\n"
+            "## Delivery Estimates\n"
+            "Delivery windows begin after dispatch and are estimates, not guarantees.\n\n"
+            "{{shipping_delivery_estimates}}\n\n"
+            "## Tracking\n"
+            "Tracking details are provided after dispatch when available.\n\n"
+            "{{shipping_tracking}}\n\n"
+            "## Address Changes\n"
+            "Address or cancellation requests are time-sensitive and may be unavailable after fulfillment starts.\n\n"
+            "{{shipping_address_changes}}\n\n"
+            "## Lost or Damaged Packages\n"
+            "Customers should report lost, delayed, or damaged shipments promptly so investigation or claim workflows "
+            "can begin.\n\n"
+            "{{shipping_lost_damaged}}\n\n"
+            "## Customs and Duties\n"
+            "Customs processing, import duties, and local taxes for international shipments are governed by destination "
+            "country requirements.\n\n"
+            "{{shipping_customs_duties}}\n\n"
+            "## Return Address\n"
+            "{{shipping_return_address}}\n\n"
+            "## Shipping Support Contact\n"
+            "For shipping support, contact {{support_email}}.\n\n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },
@@ -333,9 +625,18 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             {"sectionKey": "contact_channels", "title": "Contact Channels"},
             {"sectionKey": "support_hours", "title": "Support Hours"},
             {"sectionKey": "response_sla", "title": "Expected Response Time"},
+            {"sectionKey": "order_help", "title": "Order and Account Help"},
+            {"sectionKey": "business_address", "title": "Business Address"},
             {"sectionKey": "policy_links", "title": "Related Policy Links"},
         ],
-        "placeholders": ["support_email", "support_phone", "support_hours_text", "response_time_commitment"],
+        "placeholders": [
+            "support_email",
+            "support_phone",
+            "support_hours_text",
+            "response_time_commitment",
+            "support_order_help_links",
+            "company_address_text",
+        ],
         "templateMarkdown": (
             "# Contact and Support\n\n"
             "## Contact Channels\n"
@@ -345,6 +646,10 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             "{{support_hours_text}}\n\n"
             "## Expected Response Time\n"
             "{{response_time_commitment}}\n\n"
+            "## Order and Account Help\n"
+            "{{support_order_help_links}}\n\n"
+            "## Business Address\n"
+            "{{company_address_text}}\n\n"
             "## Related Policy Links\n"
             "Link to returns/refunds, shipping, privacy, and subscription terms (if applicable).\n"
         ),
@@ -357,14 +662,19 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "requiredSections": [
             {"sectionKey": "legal_identity", "title": "Legal Entity"},
             {"sectionKey": "address", "title": "Registered/Business Address"},
+            {"sectionKey": "brand_name", "title": "Customer-Facing Brand Name"},
             {"sectionKey": "ownership", "title": "Ownership/Operator"},
             {"sectionKey": "license", "title": "Business License (Where Required)"},
+            {"sectionKey": "support_contact", "title": "Support Contact"},
         ],
         "placeholders": [
             "legal_business_name",
             "company_address_text",
+            "brand_name",
             "operating_entity_name",
             "business_license_identifier",
+            "support_email",
+            "support_phone",
         ],
         "templateMarkdown": (
             "# Company Information\n\n"
@@ -372,10 +682,15 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
             "{{legal_business_name}}\n\n"
             "## Registered/Business Address\n"
             "{{company_address_text}}\n\n"
+            "## Customer-Facing Brand Name\n"
+            "{{brand_name}}\n\n"
             "## Ownership/Operator\n"
             "{{operating_entity_name}}\n\n"
             "## Business License (Where Required)\n"
-            "{{business_license_identifier}}\n"
+            "{{business_license_identifier}}\n\n"
+            "## Support Contact\n"
+            "Email: {{support_email}}  \n"
+            "Phone: {{support_phone}}\n"
         ),
     },
     "subscription_terms_and_cancellation": {
@@ -384,33 +699,49 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
         "templateVersion": "v1",
         "description": "Recurring billing disclosures, consent mechanics, renewal behavior, and cancellation process.",
         "requiredSections": [
-            {"sectionKey": "plans", "title": "Plans and Billing Interval"},
-            {"sectionKey": "renewal", "title": "Renewal Behavior"},
+            {"sectionKey": "included_features", "title": "Included Features"},
+            {"sectionKey": "plans", "title": "Plans, Price, and Billing Interval"},
+            {"sectionKey": "renewal", "title": "Auto-Renew Behavior"},
+            {"sectionKey": "trial_terms", "title": "Trial Terms"},
             {"sectionKey": "consent", "title": "Recurring Billing Consent"},
             {"sectionKey": "cancellation", "title": "Cancellation Steps"},
             {"sectionKey": "subscription_refunds", "title": "Subscription Refund Rules"},
+            {"sectionKey": "billing_support", "title": "Billing Support Contact"},
+            {"sectionKey": "effective_date", "title": "Effective Date"},
         ],
         "placeholders": [
             "legal_business_name",
+            "subscription_included_features",
             "subscription_plan_table",
+            "subscription_auto_renew_terms",
+            "subscription_trial_terms",
+            "subscription_explicit_consent",
             "cancellation_steps",
+            "subscription_refund_rules",
+            "subscription_billing_support",
             "support_email",
             "effective_date",
         ],
         "templateMarkdown": (
             "# Subscription Terms and Cancellation\n\n"
             "These terms apply to recurring services provided by {{legal_business_name}}.\n\n"
-            "## Plans and Billing Interval\n"
+            "## Included Features\n"
+            "{{subscription_included_features}}\n\n"
+            "## Plans, Price, and Billing Interval\n"
             "{{subscription_plan_table}}\n\n"
-            "## Renewal Behavior\n"
-            "State whether plans auto-renew and when charges are applied.\n\n"
+            "## Auto-Renew Behavior\n"
+            "{{subscription_auto_renew_terms}}\n\n"
+            "## Trial Terms\n"
+            "{{subscription_trial_terms}}\n\n"
             "## Recurring Billing Consent\n"
-            "State how explicit consent is captured before checkout completion.\n\n"
+            "{{subscription_explicit_consent}}\n\n"
             "## Cancellation Steps\n"
             "{{cancellation_steps}}\n\n"
             "## Subscription Refund Rules\n"
-            "State refund and proration rules for subscription purchases.\n\n"
-            "Contact: {{support_email}}  \n"
+            "{{subscription_refund_rules}}\n\n"
+            "## Billing Support Contact\n"
+            "{{subscription_billing_support}}\n\n"
+            "Primary support email: {{support_email}}  \n"
             "**Effective date:** {{effective_date}}\n"
         ),
     },
@@ -481,6 +812,64 @@ def get_policy_page_handle(*, page_key: str) -> str:
     if page_key not in _POLICY_TEMPLATES:
         raise KeyError(f"Unknown policy template key: {page_key}")
     return page_key.replace("_", "-")
+
+
+def markdown_to_shopify_html(markdown: str) -> str:
+    lines = [line.rstrip() for line in markdown.splitlines()]
+    output: list[str] = []
+    paragraph_lines: list[str] = []
+    list_items: list[str] = []
+
+    def flush_paragraph() -> None:
+        if not paragraph_lines:
+            return
+        text = " ".join(part.strip() for part in paragraph_lines if part.strip())
+        if text:
+            output.append(f"<p>{escape(text)}</p>")
+        paragraph_lines.clear()
+
+    def flush_list() -> None:
+        if not list_items:
+            return
+        output.append("<ul>")
+        output.extend(list_items)
+        output.append("</ul>")
+        list_items.clear()
+
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line:
+            flush_paragraph()
+            flush_list()
+            continue
+
+        if line.startswith("# "):
+            flush_paragraph()
+            flush_list()
+            output.append(f"<h1>{escape(line[2:].strip())}</h1>")
+            continue
+
+        if line.startswith("## "):
+            flush_paragraph()
+            flush_list()
+            output.append(f"<h2>{escape(line[3:].strip())}</h2>")
+            continue
+
+        if line.startswith("- "):
+            flush_paragraph()
+            list_items.append(f"<li>{escape(line[2:].strip())}</li>")
+            continue
+
+        flush_list()
+        paragraph_lines.append(line)
+
+    flush_paragraph()
+    flush_list()
+
+    rendered = "\n".join(output).strip()
+    if not rendered:
+        raise ValueError("Rendered policy content is empty and cannot be synced.")
+    return rendered
 
 
 def render_policy_template_markdown(

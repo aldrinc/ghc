@@ -249,9 +249,180 @@ class UpsertPolicyPagesResponse(BaseModel):
     pages: list[UpsertedPolicyPage]
 
 
+class SyncThemeBrandRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    workspaceName: str = Field(min_length=1)
+    brandName: str = Field(min_length=1)
+    logoUrl: str = Field(min_length=1)
+    cssVars: dict[str, str] = Field(default_factory=dict, min_length=1)
+    fontUrls: list[str] = Field(default_factory=list)
+    componentImageUrls: dict[str, str] = Field(default_factory=dict)
+    componentTextValues: dict[str, str] = Field(default_factory=dict)
+    autoComponentImageUrls: list[str] = Field(default_factory=list)
+    dataTheme: str | None = None
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "SyncThemeBrandRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class ThemeBrandCoverageSummary(BaseModel):
+    requiredSourceVars: list[str] = Field(default_factory=list)
+    requiredThemeVars: list[str] = Field(default_factory=list)
+    missingSourceVars: list[str] = Field(default_factory=list)
+    missingThemeVars: list[str] = Field(default_factory=list)
+
+
+class ThemeBrandSettingsSyncSummary(BaseModel):
+    settingsFilename: str | None = None
+    expectedPaths: list[str] = Field(default_factory=list)
+    updatedPaths: list[str] = Field(default_factory=list)
+    missingPaths: list[str] = Field(default_factory=list)
+    requiredMissingPaths: list[str] = Field(default_factory=list)
+    semanticUpdatedPaths: list[str] = Field(default_factory=list)
+    unmappedColorPaths: list[str] = Field(default_factory=list)
+    semanticTypographyUpdatedPaths: list[str] = Field(default_factory=list)
+    unmappedTypographyPaths: list[str] = Field(default_factory=list)
+
+
+class ThemeBrandSettingsAuditSummary(BaseModel):
+    settingsFilename: str | None = None
+    expectedPaths: list[str] = Field(default_factory=list)
+    syncedPaths: list[str] = Field(default_factory=list)
+    mismatchedPaths: list[str] = Field(default_factory=list)
+    missingPaths: list[str] = Field(default_factory=list)
+    requiredMissingPaths: list[str] = Field(default_factory=list)
+    requiredMismatchedPaths: list[str] = Field(default_factory=list)
+    semanticSyncedPaths: list[str] = Field(default_factory=list)
+    semanticMismatchedPaths: list[str] = Field(default_factory=list)
+    unmappedColorPaths: list[str] = Field(default_factory=list)
+    semanticTypographySyncedPaths: list[str] = Field(default_factory=list)
+    semanticTypographyMismatchedPaths: list[str] = Field(default_factory=list)
+    unmappedTypographyPaths: list[str] = Field(default_factory=list)
+
+
+class SyncThemeBrandResponse(BaseModel):
+    shopDomain: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    layoutFilename: str
+    cssFilename: str
+    settingsFilename: str | None = None
+    jobId: str | None = None
+    coverage: ThemeBrandCoverageSummary
+    settingsSync: ThemeBrandSettingsSyncSummary
+
+
+class ThemeBrandExportFile(BaseModel):
+    filename: str
+    content: str
+
+
+class ExportThemeBrandResponse(SyncThemeBrandResponse):
+    files: list[ThemeBrandExportFile] = Field(default_factory=list)
+
+
+class ListThemeBrandTemplateSlotsRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "ListThemeBrandTemplateSlotsRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class ThemeTemplateImageSlot(BaseModel):
+    path: str
+    key: str
+    currentValue: str | None = None
+    role: str
+    recommendedAspect: Literal["landscape", "portrait", "square", "any"]
+
+
+class ThemeTemplateTextSlot(BaseModel):
+    path: str
+    key: str
+    currentValue: str | None = None
+    role: str
+    maxLength: int
+
+
+class ListThemeBrandTemplateSlotsResponse(BaseModel):
+    shopDomain: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    imageSlots: list[ThemeTemplateImageSlot] = Field(default_factory=list)
+    textSlots: list[ThemeTemplateTextSlot] = Field(default_factory=list)
+
+
+class AuditThemeBrandRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    workspaceName: str = Field(min_length=1)
+    cssVars: dict[str, str] = Field(default_factory=dict, min_length=1)
+    dataTheme: str | None = None
+    themeId: str | None = None
+    themeName: str | None = None
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "AuditThemeBrandRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        has_theme_id = bool(self.themeId and self.themeId.strip())
+        has_theme_name = bool(self.themeName and self.themeName.strip())
+        if has_theme_id == has_theme_name:
+            raise ValueError("Exactly one of themeId or themeName is required")
+        return self
+
+
+class AuditThemeBrandResponse(BaseModel):
+    shopDomain: str
+    themeId: str
+    themeName: str
+    themeRole: str
+    layoutFilename: str
+    cssFilename: str
+    settingsFilename: str | None = None
+    hasManagedMarkerBlock: bool
+    layoutIncludesManagedCssAsset: bool
+    managedCssAssetExists: bool
+    coverage: ThemeBrandCoverageSummary
+    settingsAudit: ThemeBrandSettingsAuditSummary
+    isReady: bool
+
+
 class UpdateInstallationRequest(BaseModel):
     clientId: str | None = None
     storefrontAccessToken: str | None = None
+
+
+class AutoProvisionStorefrontTokenRequest(BaseModel):
+    clientId: str | None = None
 
 
 class InstallationResponse(BaseModel):

@@ -15,6 +15,9 @@ from app.config import settings
 from app.db import get_session, init_db
 from app.models import OAuthState, ProcessedWebhookEvent, ShopInstallation
 from app.schemas import (
+    AuditThemeBrandRequest,
+    AuditThemeBrandResponse,
+    AutoProvisionStorefrontTokenRequest,
     CatalogProductVariant,
     CatalogProductSummary,
     CreateCatalogProductRequest,
@@ -22,12 +25,19 @@ from app.schemas import (
     CreatedCatalogVariant,
     CreateCheckoutRequest,
     CreateCheckoutResponse,
+    ExportThemeBrandResponse,
     ForwardOrderPayload,
     GetProductRequest,
     GetProductResponse,
     InstallationResponse,
+    ListThemeBrandTemplateSlotsRequest,
+    ListThemeBrandTemplateSlotsResponse,
+    ThemeTemplateImageSlot,
+    ThemeTemplateTextSlot,
     ListProductsRequest,
     ListProductsResponse,
+    SyncThemeBrandRequest,
+    SyncThemeBrandResponse,
     UpsertedPolicyPage,
     UpsertPolicyPagesRequest,
     UpsertPolicyPagesResponse,
@@ -60,7 +70,9 @@ def health() -> dict[str, bool]:
 
 
 def _serialize_installation(installation: ShopInstallation) -> InstallationResponse:
-    scopes = [scope.strip() for scope in installation.scopes.split(",") if scope.strip()]
+    scopes = [
+        scope.strip() for scope in installation.scopes.split(",") if scope.strip()
+    ]
     return InstallationResponse(
         shopDomain=installation.shop_domain,
         clientId=installation.client_id,
@@ -84,12 +96,16 @@ def _build_shopify_oauth_url(*, shop_domain: str, state: str) -> str:
     return f"https://{shop_domain}/admin/oauth/authorize?{query}"
 
 
-async def _register_required_webhooks(*, shop_domain: str, admin_access_token: str) -> None:
+async def _register_required_webhooks(
+    *, shop_domain: str, admin_access_token: str
+) -> None:
     webhooks: list[tuple[str, str]] = [
         ("APP_UNINSTALLED", f"{settings.app_base_url}/webhooks/app/uninstalled"),
     ]
     if settings.SHOPIFY_ENABLE_ORDER_FORWARDING:
-        webhooks.append(("ORDERS_CREATE", f"{settings.app_base_url}/webhooks/orders/create"))
+        webhooks.append(
+            ("ORDERS_CREATE", f"{settings.app_base_url}/webhooks/orders/create")
+        )
 
     for topic, callback_url in webhooks:
         await shopify_api.register_webhook(
@@ -98,6 +114,35 @@ async def _register_required_webhooks(*, shop_domain: str, admin_access_token: s
             topic=topic,
             callback_url=callback_url,
         )
+
+
+async def _provision_storefront_token_if_missing(
+    *,
+    installation: ShopInstallation,
+    session: Session,
+) -> bool:
+    if installation.storefront_access_token:
+        return False
+
+    if not installation.admin_access_token:
+        raise ShopifyApiError(
+            message=(
+                "Cannot auto-provision storefront token because installation "
+                "admin_access_token is missing."
+            ),
+            status_code=409,
+        )
+
+    storefront_access_token = await shopify_api.create_storefront_access_token(
+        shop_domain=installation.shop_domain,
+        access_token=installation.admin_access_token,
+    )
+    installation.storefront_access_token = storefront_access_token
+    installation.updated_at = datetime.now(timezone.utc)
+    session.add(installation)
+    session.commit()
+    session.refresh(installation)
+    return True
 
 
 @app.get("/auth/install")
@@ -112,14 +157,19 @@ def auth_install(
     session.add(oauth_state)
     session.commit()
 
-    return RedirectResponse(url=_build_shopify_oauth_url(shop_domain=shop_domain, state=state), status_code=302)
+    return RedirectResponse(
+        url=_build_shopify_oauth_url(shop_domain=shop_domain, state=state),
+        status_code=302,
+    )
 
 
 @app.get("/auth/callback")
 async def auth_callback(request: Request, session: Session = Depends(get_session)):
     query_items = list(request.query_params.multi_items())
     if not verify_oauth_hmac(query_items):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth HMAC")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth HMAC"
+        )
 
     shop = request.query_params.get("shop")
     code = request.query_params.get("code")
@@ -133,17 +183,23 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
     shop_domain = normalize_shop_domain(shop)
     oauth_state = session.get(OAuthState, state_value)
     if not oauth_state:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state"
+        )
     if oauth_state.shop_domain != shop_domain:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="OAuth state does not match the shop domain",
         )
 
+    auto_provision_error: str | None = None
+    auto_provisioned = False
     try:
-        admin_access_token, scopes_csv = await shopify_api.exchange_code_for_access_token(
-            shop_domain=shop_domain,
-            code=code,
+        admin_access_token, scopes_csv = (
+            await shopify_api.exchange_code_for_access_token(
+                shop_domain=shop_domain,
+                code=code,
+            )
         )
 
         installation = session.scalars(
@@ -172,32 +228,64 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
         )
         session.delete(oauth_state)
         session.commit()
+        session.refresh(installation)
 
     except ShopifyApiError as exc:
         session.rollback()
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
+    try:
+        auto_provisioned = await _provision_storefront_token_if_missing(
+            installation=installation,
+            session=session,
+        )
+    except ShopifyApiError as exc:
+        session.rollback()
+        auto_provision_error = str(exc)
+
     if settings.SHOPIFY_INSTALL_SUCCESS_REDIRECT_URL:
+        redirect_query: dict[str, str] = {"shop": shop_domain}
+        if auto_provision_error:
+            redirect_query["storefront_token_status"] = "failed"
+        elif installation.storefront_access_token:
+            redirect_query["storefront_token_status"] = "ready"
         success_url = (
             f"{str(settings.SHOPIFY_INSTALL_SUCCESS_REDIRECT_URL).rstrip('/')}"
-            f"?shop={shop_domain}"
+            f"?{urlencode(redirect_query)}"
         )
         return RedirectResponse(url=success_url, status_code=302)
+
+    if auto_provision_error:
+        next_step = (
+            "Storefront token auto-provisioning failed. "
+            f"Retry via POST /admin/installations/{shop_domain}/storefront-token/auto "
+            "or set manually via PATCH /admin/installations/{shop_domain}."
+        )
+    elif installation.storefront_access_token:
+        next_step = "Shopify installation is ready for checkout."
+    else:
+        next_step = (
+            "Set storefrontAccessToken via PATCH /admin/installations/{shop_domain} "
+            "before creating checkouts."
+        )
 
     return {
         "ok": True,
         "shopDomain": shop_domain,
         "clientId": installation.client_id,
         "scopes": [scope.strip() for scope in scopes_csv.split(",") if scope.strip()],
-        "next": (
-            "Set storefrontAccessToken via PATCH /admin/installations/{shop_domain} before creating checkouts."
-        ),
+        "hasStorefrontAccessToken": bool(installation.storefront_access_token),
+        "storefrontTokenAutoProvisioned": auto_provisioned,
+        "storefrontTokenAutoProvisioningError": auto_provision_error,
+        "next": next_step,
     }
 
 
 @app.get("/admin/installations", dependencies=[Depends(require_internal_api_token)])
 def list_installations(session: Session = Depends(get_session)):
-    installations = session.scalars(select(ShopInstallation).order_by(ShopInstallation.updated_at.desc())).all()
+    installations = session.scalars(
+        select(ShopInstallation).order_by(ShopInstallation.updated_at.desc())
+    ).all()
     return [_serialize_installation(installation) for installation in installations]
 
 
@@ -215,7 +303,9 @@ def update_installation(
         select(ShopInstallation).where(ShopInstallation.shop_domain == normalized_shop)
     ).first()
     if not installation:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shop installation not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Shop installation not found"
+        )
 
     fields_set = payload.model_fields_set
     if "clientId" in fields_set:
@@ -231,6 +321,61 @@ def update_installation(
     session.add(installation)
     session.commit()
     session.refresh(installation)
+    return _serialize_installation(installation)
+
+
+@app.post(
+    "/admin/installations/{shop_domain}/storefront-token/auto",
+    response_model=InstallationResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def auto_provision_installation_storefront_token(
+    shop_domain: str,
+    payload: AutoProvisionStorefrontTokenRequest,
+    session: Session = Depends(get_session),
+):
+    normalized_shop = normalize_shop_domain(shop_domain)
+    installation = session.scalars(
+        select(ShopInstallation).where(ShopInstallation.shop_domain == normalized_shop)
+    ).first()
+    if not installation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Shop installation not found"
+        )
+    if installation.uninstalled_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Shop installation is not active.",
+        )
+
+    requested_client_id = (
+        payload.clientId.strip() if isinstance(payload.clientId, str) else None
+    )
+    if requested_client_id:
+        if installation.client_id and installation.client_id != requested_client_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This Shopify store is already connected to a different workspace. "
+                    f"connectedWorkspaceId={installation.client_id}"
+                ),
+            )
+        if installation.client_id != requested_client_id:
+            installation.client_id = requested_client_id
+            installation.updated_at = datetime.now(timezone.utc)
+            session.add(installation)
+            session.commit()
+            session.refresh(installation)
+
+    try:
+        await _provision_storefront_token_if_missing(
+            installation=installation,
+            session=session,
+        )
+    except ShopifyApiError as exc:
+        session.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
     return _serialize_installation(installation)
 
 
@@ -293,7 +438,8 @@ def _resolve_checkout_installation(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
                 "Installation is missing storefront_access_token. "
-                "Set it via PATCH /admin/installations/{shop_domain}."
+                "Retry auto setup via POST /admin/installations/{shop_domain}/storefront-token/auto "
+                "or set it via PATCH /admin/installations/{shop_domain}."
             ),
         )
     return installation
@@ -556,13 +702,221 @@ async def upsert_policy_pages(
     )
 
 
+@app.post(
+    "/v1/themes/brand/sync",
+    response_model=SyncThemeBrandResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def sync_theme_brand(
+    payload: SyncThemeBrandRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        synced = await shopify_api.sync_theme_brand(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            workspace_name=payload.workspaceName,
+            brand_name=payload.brandName,
+            logo_url=payload.logoUrl,
+            css_vars=payload.cssVars,
+            font_urls=payload.fontUrls,
+            component_image_urls=payload.componentImageUrls,
+            component_text_values=payload.componentTextValues,
+            auto_component_image_urls=payload.autoComponentImageUrls,
+            data_theme=payload.dataTheme,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Unexpected theme sync error ({type(exc).__name__}): {exc}",
+        ) from exc
+
+    return SyncThemeBrandResponse(
+        shopDomain=installation.shop_domain,
+        themeId=synced["themeId"],
+        themeName=synced["themeName"],
+        themeRole=synced["themeRole"],
+        layoutFilename=synced["layoutFilename"],
+        cssFilename=synced["cssFilename"],
+        settingsFilename=synced.get("settingsFilename"),
+        jobId=synced.get("jobId"),
+        coverage=synced["coverage"],
+        settingsSync=synced["settingsSync"],
+    )
+
+
+@app.post(
+    "/v1/themes/brand/export",
+    response_model=ExportThemeBrandResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def export_theme_brand(
+    payload: SyncThemeBrandRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        exported = await shopify_api.sync_theme_brand(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            workspace_name=payload.workspaceName,
+            brand_name=payload.brandName,
+            logo_url=payload.logoUrl,
+            css_vars=payload.cssVars,
+            font_urls=payload.fontUrls,
+            component_image_urls=payload.componentImageUrls,
+            component_text_values=payload.componentTextValues,
+            auto_component_image_urls=payload.autoComponentImageUrls,
+            data_theme=payload.dataTheme,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+            upsert_theme_files=False,
+            include_file_payloads=True,
+            include_all_theme_text_files=True,
+            resolve_external_images_to_shopify_files=False,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Unexpected theme export error ({type(exc).__name__}): {exc}",
+        ) from exc
+
+    return ExportThemeBrandResponse(
+        shopDomain=installation.shop_domain,
+        themeId=exported["themeId"],
+        themeName=exported["themeName"],
+        themeRole=exported["themeRole"],
+        layoutFilename=exported["layoutFilename"],
+        cssFilename=exported["cssFilename"],
+        settingsFilename=exported.get("settingsFilename"),
+        jobId=exported.get("jobId"),
+        coverage=exported["coverage"],
+        settingsSync=exported["settingsSync"],
+        files=exported["files"],
+    )
+
+
+@app.post(
+    "/v1/themes/brand/template-slots",
+    response_model=ListThemeBrandTemplateSlotsResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def list_theme_brand_template_slots(
+    payload: ListThemeBrandTemplateSlotsRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        discovered = await shopify_api.list_theme_brand_template_slots(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return ListThemeBrandTemplateSlotsResponse(
+        shopDomain=installation.shop_domain,
+        themeId=discovered["themeId"],
+        themeName=discovered["themeName"],
+        themeRole=discovered["themeRole"],
+        imageSlots=[
+            ThemeTemplateImageSlot(
+                path=item["path"],
+                key=item["key"],
+                currentValue=item.get("currentValue"),
+                role=item["role"],
+                recommendedAspect=item["recommendedAspect"],
+            )
+            for item in discovered["imageSlots"]
+        ],
+        textSlots=[
+            ThemeTemplateTextSlot(
+                path=item["path"],
+                key=item["key"],
+                currentValue=item.get("currentValue"),
+                role=item["role"],
+                maxLength=item["maxLength"],
+            )
+            for item in discovered["textSlots"]
+        ],
+    )
+
+
+@app.post(
+    "/v1/themes/brand/audit",
+    response_model=AuditThemeBrandResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def audit_theme_brand(
+    payload: AuditThemeBrandRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        audited = await shopify_api.audit_theme_brand(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            workspace_name=payload.workspaceName,
+            css_vars=payload.cssVars,
+            data_theme=payload.dataTheme,
+            theme_id=payload.themeId,
+            theme_name=payload.themeName,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return AuditThemeBrandResponse(
+        shopDomain=installation.shop_domain,
+        themeId=audited["themeId"],
+        themeName=audited["themeName"],
+        themeRole=audited["themeRole"],
+        layoutFilename=audited["layoutFilename"],
+        cssFilename=audited["cssFilename"],
+        settingsFilename=audited.get("settingsFilename"),
+        hasManagedMarkerBlock=audited["hasManagedMarkerBlock"],
+        layoutIncludesManagedCssAsset=audited["layoutIncludesManagedCssAsset"],
+        managedCssAssetExists=audited["managedCssAssetExists"],
+        coverage=audited["coverage"],
+        settingsAudit=audited["settingsAudit"],
+        isReady=audited["isReady"],
+    )
+
+
 def _coerce_attribute_map(attributes: dict[str, str]) -> list[dict[str, str]]:
     serialized: list[dict[str, str]] = []
     for key, value in sorted(attributes.items()):
         cleaned_key = key.strip()
         cleaned_value = value.strip()
         if not cleaned_key:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cart attribute key cannot be empty")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cart attribute key cannot be empty",
+            )
         serialized.append({"key": cleaned_key, "value": cleaned_value})
     return serialized
 
@@ -679,16 +1033,24 @@ async def _forward_order_to_mos(payload: ForwardOrderPayload) -> None:
     if not settings.SHOPIFY_ENABLE_ORDER_FORWARDING:
         return
 
-    forward_url = f"{str(settings.MOS_BACKEND_BASE_URL).rstrip('/')}/shopify/orders/webhook"
+    forward_url = (
+        f"{str(settings.MOS_BACKEND_BASE_URL).rstrip('/')}/shopify/orders/webhook"
+    )
     headers = {
         "Content-Type": "application/json",
         "x-marketi-webhook-secret": settings.MOS_WEBHOOK_SHARED_SECRET or "",
     }
     try:
-        async with httpx.AsyncClient(timeout=settings.SHOPIFY_REQUEST_TIMEOUT_SECONDS) as client:
-            response = await client.post(forward_url, json=payload.model_dump(), headers=headers)
+        async with httpx.AsyncClient(
+            timeout=settings.SHOPIFY_REQUEST_TIMEOUT_SECONDS
+        ) as client:
+            response = await client.post(
+                forward_url, json=payload.model_dump(), headers=headers
+            )
     except httpx.RequestError as exc:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
+        ) from exc
 
     if response.status_code >= 400:
         raise HTTPException(
@@ -701,10 +1063,16 @@ async def _forward_order_to_mos(payload: ForwardOrderPayload) -> None:
 
 
 @app.post("/webhooks/orders/create")
-async def orders_create_webhook(request: Request, session: Session = Depends(get_session)):
+async def orders_create_webhook(
+    request: Request, session: Session = Depends(get_session)
+):
     body = await request.body()
-    if not verify_webhook_hmac(body=body, supplied_hmac=request.headers.get("x-shopify-hmac-sha256")):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC")
+    if not verify_webhook_hmac(
+        body=body, supplied_hmac=request.headers.get("x-shopify-hmac-sha256")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC"
+        )
 
     shop_header = request.headers.get("x-shopify-shop-domain")
     event_id = request.headers.get("x-shopify-event-id")
@@ -734,7 +1102,9 @@ async def orders_create_webhook(request: Request, session: Session = Depends(get
     try:
         payload = await request.json()
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload") from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload"
+        ) from exc
     if not isinstance(payload, dict):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -789,10 +1159,16 @@ async def orders_create_webhook(request: Request, session: Session = Depends(get
 
 
 @app.post("/webhooks/app/uninstalled")
-async def app_uninstalled_webhook(request: Request, session: Session = Depends(get_session)):
+async def app_uninstalled_webhook(
+    request: Request, session: Session = Depends(get_session)
+):
     body = await request.body()
-    if not verify_webhook_hmac(body=body, supplied_hmac=request.headers.get("x-shopify-hmac-sha256")):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC")
+    if not verify_webhook_hmac(
+        body=body, supplied_hmac=request.headers.get("x-shopify-hmac-sha256")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC"
+        )
 
     shop_header = request.headers.get("x-shopify-shop-domain")
     if not shop_header:
