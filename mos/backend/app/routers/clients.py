@@ -3290,7 +3290,7 @@ def _compliance_profile_page_urls(
 
 
 def _compliance_profile_placeholder_values(
-    *, profile: ClientComplianceProfile
+    *, profile: ClientComplianceProfile, workspace_name: str
 ) -> dict[str, str]:
     values: dict[str, str] = {}
     scalar_fields = {
@@ -3324,6 +3324,7 @@ def _compliance_profile_placeholder_values(
             continue
         if isinstance(raw_value, (int, float, bool)):
             values[placeholder_key] = str(raw_value)
+    values["brand_name"] = workspace_name
     return values
 
 
@@ -3356,6 +3357,14 @@ def _sync_compliance_policy_pages_for_template_export(
     auth: AuthContext,
     session: Session,
 ) -> dict[str, Any]:
+    client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
+    workspace_name = str(client.name).strip()
+    if not workspace_name:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Workspace name is required to export compliance policy pages.",
+        )
+
     profile_repo = ClientComplianceProfilesRepository(session)
     profile = profile_repo.get(org_id=auth.org_id, client_id=client_id)
     if not profile:
@@ -3381,7 +3390,10 @@ def _sync_compliance_policy_pages_for_template_export(
 
     effective_shop_domain = shop_domain
 
-    placeholders = _compliance_profile_placeholder_values(profile=profile)
+    placeholders = _compliance_profile_placeholder_values(
+        profile=profile,
+        workspace_name=workspace_name,
+    )
     website_url = _website_url_from_shop_domain(shop_domain=effective_shop_domain)
     if website_url is not None:
         placeholders["website_url"] = website_url
