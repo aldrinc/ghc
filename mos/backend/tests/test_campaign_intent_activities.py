@@ -4,6 +4,7 @@ from app.temporal.activities.campaign_intent_activities import (
     _collect_image_generation_errors,
     _is_empty_page_generation_error,
     _run_generate_page_draft_with_retries,
+    _should_run_funnel_ai_processing,
 )
 
 
@@ -115,3 +116,26 @@ def test_collect_image_generation_errors_ignores_non_list_inputs():
         template_id=None,
     )
     assert errors == []
+
+
+@pytest.mark.parametrize(
+    ("generate_ai_drafts", "strategy_v2_payload_applied", "expected"),
+    [
+        (False, False, False),
+        (True, False, True),
+        (False, True, True),
+        (True, True, True),
+    ],
+)
+def test_should_run_funnel_ai_processing(
+    generate_ai_drafts: bool,
+    strategy_v2_payload_applied: bool,
+    expected: bool,
+):
+    assert (
+        _should_run_funnel_ai_processing(
+            generate_ai_drafts=generate_ai_drafts,
+            strategy_v2_payload_applied=strategy_v2_payload_applied,
+        )
+        is expected
+    )

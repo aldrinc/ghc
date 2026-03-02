@@ -1,5 +1,6 @@
 import json
 from datetime import datetime, timezone
+import hashlib
 import os
 from typing import Any
 from uuid import UUID, uuid4
@@ -13,12 +14,20 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
 from app.db.enums import ArtifactTypeEnum, AssetStatusEnum, WorkflowKindEnum, WorkflowStatusEnum
-from app.db.models import Asset
+from app.db.models import Asset, WorkflowRun
 from app.db.repositories.artifacts import ArtifactsRepository
+from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.clients import ClientsRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.research_artifacts import ResearchArtifactsRepository
+from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
+from app.schemas.workflow_launches import (
+    StrategyV2LaunchActionResponse,
+    StrategyV2LaunchAdditionalAngleRequest,
+    StrategyV2LaunchAdditionalUmsRequest,
+    StrategyV2LaunchAngleCampaignRequest,
+)
 from app.google_clients import download_drive_text_file
 from app.strategy_v2.contracts import (
     AngleSelectionDecision,
@@ -29,9 +38,25 @@ from app.strategy_v2.contracts import (
     UmpUmsSelectionDecision,
 )
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
+from app.strategy_v2.launches import (
+    StrategyV2SourceContext,
+    build_angle_campaign_name,
+    build_launch_key,
+    find_ranked_angle_payload,
+    list_ranked_angle_ids,
+    load_strategy_v2_source_context,
+    resolve_ums_selection_map,
+)
 from app.temporal.client import get_temporal_client
+from app.temporal.workflows.strategy_v2_launch import (
+    StrategyV2AngleCampaignLaunchInput,
+    StrategyV2AngleCampaignLaunchWorkflow,
+    StrategyV2AngleIterationInput,
+    StrategyV2AngleIterationWorkflow,
+)
 from app.temporal.workflows.strategy_v2 import StrategyV2Input, StrategyV2Workflow
 from temporalio.api.enums.v1 import WorkflowExecutionStatus
+from temporalio.exceptions import WorkflowAlreadyStartedError
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -156,6 +181,25 @@ def _resolve_workflow_run(
     return run
 
 
+def _normalize_angle_gate_candidates(rows: Any) -> list[dict[str, Any]]:
+    if not isinstance(rows, list):
+        return []
+    normalized: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        raw_angle = row.get("angle")
+        if isinstance(raw_angle, dict):
+            angle = raw_angle
+        else:
+            angle = row
+        angle_id = angle.get("angle_id")
+        if not isinstance(angle_id, str) or not angle_id.strip():
+            continue
+        normalized.append(dict(angle))
+    return normalized
+
+
 def _strategy_v2_state_from_research_artifacts(
     *,
     session: Session,
@@ -214,8 +258,20 @@ def _strategy_v2_state_from_research_artifacts(
     elif "v2-06" in step_payloads:
         current_stage = "v2-07"
         pending_signal_type = "strategy_v2_select_angle"
+    elif "v2-05" in step_payloads:
+        current_stage = "v2-06"
+    elif "v2-04" in step_payloads:
+        current_stage = "v2-05"
+    elif "v2-03c" in step_payloads:
+        current_stage = "v2-04"
+    elif "v2-03b" in step_payloads:
+        current_stage = "v2-03c"
+    elif "v2-03" in step_payloads:
+        current_stage = "v2-03b"
+    elif "v2-02" in step_payloads:
+        current_stage = "v2-03"
     elif "v2-02b" in step_payloads:
-        current_stage = "v2-03..v2-06"
+        current_stage = "v2-02"
     elif "v2-02a" in step_payloads:
         current_stage = "v2-02b"
         pending_signal_type = "strategy_v2_confirm_competitor_assets"
@@ -258,7 +314,7 @@ def _strategy_v2_state_from_research_artifacts(
         }
     elif pending_signal_type == "strategy_v2_select_angle":
         pending_decision_payload = {
-            "candidates": candidate_summaries.get("angles") or [],
+            "candidates": _normalize_angle_gate_candidates(candidate_summaries.get("angles")),
         }
     elif pending_signal_type == "strategy_v2_select_ump_ums":
         proof_asset_candidates = v2_08.get("proof_asset_candidates") if isinstance(v2_08, dict) else None
@@ -287,6 +343,42 @@ def _strategy_v2_state_from_research_artifacts(
         "scored_candidate_summaries": candidate_summaries,
         "artifact_refs": artifact_refs,
     }
+
+
+def _normalize_strategy_v2_artifact_refs(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    normalized = dict(value)
+    nested = value.get("step_payload_artifact_ids")
+    if not isinstance(nested, dict):
+        return normalized
+    for raw_step_key, raw_artifact_id in nested.items():
+        if not isinstance(raw_step_key, str):
+            continue
+        step_key = raw_step_key.strip()
+        if not step_key:
+            continue
+        if not isinstance(raw_artifact_id, str):
+            continue
+        artifact_id = raw_artifact_id.strip()
+        if not artifact_id:
+            continue
+        normalized.setdefault(step_key, artifact_id)
+        normalized.setdefault(f"step_payload_{step_key.replace('-', '_')}_artifact_id", artifact_id)
+    return normalized
+
+
+def _normalize_strategy_v2_state_for_api(state: Any) -> dict[str, Any] | None:
+    if not isinstance(state, dict):
+        return None
+    normalized_state = dict(state)
+    pending_signal_type = normalized_state.get("pending_signal_type")
+    pending_payload = normalized_state.get("pending_decision_payload")
+    if pending_signal_type == "strategy_v2_select_angle" and isinstance(pending_payload, dict):
+        normalized_payload = dict(pending_payload)
+        normalized_payload["candidates"] = _normalize_angle_gate_candidates(pending_payload.get("candidates"))
+        normalized_state["pending_decision_payload"] = normalized_payload
+    return normalized_state
 
 
 def _require_nonempty_string(*, value: Any, field_name: str) -> str:
@@ -369,6 +461,152 @@ def _normalize_strategy_v2_copy_payload(copy_artifact: Any) -> dict[str, Any] | 
     return payload
 
 
+def _normalize_required_string_list(*, value: list[str], field_name: str) -> list[str]:
+    if not isinstance(value, list) or not value:
+        raise HTTPException(status_code=400, detail=f"{field_name} must include at least one non-empty value.")
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise HTTPException(status_code=400, detail=f"{field_name} must contain non-empty strings.")
+        cleaned = item.strip()
+        if cleaned in seen:
+            continue
+        seen.add(cleaned)
+        normalized.append(cleaned)
+    if not normalized:
+        raise HTTPException(status_code=400, detail=f"{field_name} must include at least one non-empty value.")
+    return normalized
+
+
+def _strategy_v2_launch_record_to_payload(row: Any, *, launch_status: str | None = None) -> dict[str, Any]:
+    launch_type_raw = str(getattr(row, "launch_type", "") or "").strip()
+    if launch_type_raw not in {"initial_angle", "additional_ums", "additional_angle"}:
+        launch_type = "initial_angle"
+    else:
+        launch_type = launch_type_raw
+    created_at = getattr(row, "created_at", None)
+    created_at_iso = created_at.isoformat() if isinstance(created_at, datetime) else ""
+    return {
+        "id": str(getattr(row, "id")),
+        "launch_type": launch_type,
+        "launch_key": str(getattr(row, "launch_key", "") or ""),
+        "campaign_id": str(getattr(row, "campaign_id")) if getattr(row, "campaign_id", None) else None,
+        "funnel_id": str(getattr(row, "funnel_id")) if getattr(row, "funnel_id", None) else None,
+        "angle_id": str(getattr(row, "angle_id", "") or ""),
+        "angle_run_id": str(getattr(row, "angle_run_id", "") or ""),
+        "selected_ums_id": str(getattr(row, "selected_ums_id")) if getattr(row, "selected_ums_id", None) else None,
+        "selected_variant_id": (
+            str(getattr(row, "selected_variant_id")) if getattr(row, "selected_variant_id", None) else None
+        ),
+        "launch_index": int(getattr(row, "launch_index")) if getattr(row, "launch_index", None) is not None else None,
+        "launch_workflow_run_id": (
+            str(getattr(row, "launch_workflow_run_id")) if getattr(row, "launch_workflow_run_id", None) else None
+        ),
+        "launch_temporal_workflow_id": (
+            str(getattr(row, "launch_temporal_workflow_id"))
+            if getattr(row, "launch_temporal_workflow_id", None)
+            else None
+        ),
+        "launch_status": launch_status,
+        "created_by_user": str(getattr(row, "created_by_user")) if getattr(row, "created_by_user", None) else None,
+        "created_at": created_at_iso,
+    }
+
+
+def _compose_launch_action_response(
+    *,
+    run_id: str,
+    temporal_workflow_id: str,
+    launch_records: list[dict[str, Any]],
+) -> dict[str, Any]:
+    campaign_ids: list[str] = []
+    funnel_workflow_run_ids = [run_id]
+    for row in launch_records:
+        campaign_id = row.get("campaign_id")
+        if isinstance(campaign_id, str) and campaign_id and campaign_id not in campaign_ids:
+            campaign_ids.append(campaign_id)
+    return StrategyV2LaunchActionResponse(
+        launch_workflow_run_id=run_id,
+        launch_temporal_workflow_id=temporal_workflow_id,
+        campaign_ids=campaign_ids,
+        funnel_workflow_run_ids=funnel_workflow_run_ids,
+        launch_records=launch_records,
+    ).model_dump(mode="python")
+
+
+def _launch_index_for_angle(
+    *,
+    launches_repo: StrategyV2LaunchesRepository,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    angle_id: str,
+    angle_id_counts: dict[str, int],
+) -> int:
+    if angle_id not in angle_id_counts:
+        base_index = launches_repo.next_launch_index(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            angle_id=angle_id,
+        )
+        angle_id_counts[angle_id] = base_index
+    next_index = angle_id_counts[angle_id]
+    angle_id_counts[angle_id] = next_index + 1
+    return next_index
+
+
+def _idempotent_launch_response_from_rows(rows: list[Any]) -> dict[str, Any]:
+    if not rows:
+        raise RuntimeError("No launch rows were provided for idempotent response.")
+    first = rows[0]
+    launch_workflow_run_id = str(getattr(first, "launch_workflow_run_id", "") or "").strip()
+    launch_temporal_workflow_id = str(getattr(first, "launch_temporal_workflow_id", "") or "").strip()
+    if not launch_workflow_run_id or not launch_temporal_workflow_id:
+        raise RuntimeError(
+            "Existing launch record is missing launch workflow metadata and cannot satisfy idempotent response."
+        )
+    payload_rows = [_strategy_v2_launch_record_to_payload(row) for row in rows]
+    return _compose_launch_action_response(
+        run_id=launch_workflow_run_id,
+        temporal_workflow_id=launch_temporal_workflow_id,
+        launch_records=payload_rows,
+    )
+
+
+def _load_source_context_or_409(
+    *,
+    session: Session,
+    org_id: str,
+    source_run: Any,
+) -> StrategyV2SourceContext:
+    try:
+        return load_strategy_v2_source_context(
+            session=session,
+            org_id=org_id,
+            source_run=source_run,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+def _build_deterministic_launch_temporal_workflow_id(
+    *,
+    prefix: str,
+    org_id: str,
+    source_run_id: str,
+    launch_keys: list[str],
+) -> str:
+    normalized = sorted({key.strip() for key in launch_keys if isinstance(key, str) and key.strip()})
+    if not normalized:
+        raise RuntimeError("At least one launch key is required to build deterministic launch workflow id.")
+    digest = hashlib.sha256(
+        json.dumps(normalized, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()[:20]
+    return f"{prefix}-{org_id}-{source_run_id}-{digest}"
+
+
 @router.get("")
 def list_workflows(
     clientId: str | None = None,
@@ -416,6 +654,20 @@ async def start_strategy_v2_workflow(
             status_code=400,
             detail="product_id does not belong to client_id.",
         )
+    stage0_overrides_raw = body.get("stage0_overrides", {})
+    if not isinstance(stage0_overrides_raw, dict):
+        raise HTTPException(status_code=400, detail="stage0_overrides must be an object.")
+    override_description = stage0_overrides_raw.get("description")
+    has_override_description = isinstance(override_description, str) and override_description.strip()
+    if not isinstance(product.description, str) or not product.description.strip():
+        if not has_override_description:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Product description is required for Strategy V2 stage0 translation. "
+                    "Update product.description or provide stage0_overrides.description before starting Strategy V2."
+                ),
+            )
 
     if not is_strategy_v2_enabled(session=session, org_id=auth.org_id, client_id=client_id):
         raise HTTPException(
@@ -455,9 +707,7 @@ async def start_strategy_v2_workflow(
             ),
         )
 
-    stage0_overrides = body.get("stage0_overrides", {})
-    if not isinstance(stage0_overrides, dict):
-        raise HTTPException(status_code=400, detail="stage0_overrides must be an object.")
+    stage0_overrides = stage0_overrides_raw
 
     business_model = _require_nonempty_string(value=body.get("business_model"), field_name="business_model")
     funnel_position = _require_nonempty_string(value=body.get("funnel_position"), field_name="funnel_position")
@@ -696,6 +946,41 @@ async def get_workflow_run(
             client_id=str(run.client_id) if run.client_id else None,
             product_id=str(run.product_id) if run.product_id else None,
         )
+    if run.kind == WorkflowKindEnum.strategy_v2:
+        strategy_v2_state = _normalize_strategy_v2_state_for_api(strategy_v2_state)
+    if run.kind == WorkflowKindEnum.strategy_v2 and isinstance(strategy_v2_state, dict):
+        strategy_v2_state["artifact_refs"] = _normalize_strategy_v2_artifact_refs(
+            strategy_v2_state.get("artifact_refs")
+        )
+
+    strategy_v2_launches: list[dict[str, Any]] = []
+    if run.kind == WorkflowKindEnum.strategy_v2:
+        launches_repo = StrategyV2LaunchesRepository(session)
+        launch_rows = launches_repo.list_for_source_run(
+            org_id=auth.org_id,
+            source_strategy_v2_workflow_run_id=canonical_run_id,
+        )
+        launch_status_by_run_id: dict[str, str | None] = {}
+        for row in launch_rows:
+            launch_run_id_raw = getattr(row, "launch_workflow_run_id", None)
+            if launch_run_id_raw is None:
+                continue
+            launch_run_id = str(launch_run_id_raw)
+            if launch_run_id in launch_status_by_run_id:
+                continue
+            linked_run = repo.get(org_id=auth.org_id, workflow_run_id=launch_run_id)
+            launch_status_by_run_id[launch_run_id] = linked_run.status.value if linked_run else None
+        strategy_v2_launches = []
+        for row in launch_rows:
+            launch_run_id_raw = getattr(row, "launch_workflow_run_id", None)
+            launch_status = (
+                launch_status_by_run_id.get(str(launch_run_id_raw))
+                if launch_run_id_raw is not None
+                else None
+            )
+            strategy_v2_launches.append(
+                _strategy_v2_launch_record_to_payload(row, launch_status=launch_status)
+            )
 
     return jsonable_encoder(
         {
@@ -718,6 +1003,7 @@ async def get_workflow_run(
             "strategy_v2_copy_canonical": strategy_v2_copy_canonical,
             "strategy_v2_copy_context": strategy_v2_copy_context,
             "strategy_v2_awareness_angle_matrix": strategy_v2_awareness_matrix,
+            "strategy_v2_launches": strategy_v2_launches,
         }
     )
 
@@ -1120,6 +1406,565 @@ async def strategy_v2_approve_final_copy(
         payload_in=payload,
     )
     return {"ok": True}
+
+
+@router.post(
+    "/{workflow_run_id}/actions/strategy-v2/launch-angle-campaign",
+    response_model=StrategyV2LaunchActionResponse,
+)
+async def strategy_v2_launch_angle_campaign(
+    workflow_run_id: str,
+    body: StrategyV2LaunchAngleCampaignRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = WorkflowsRepository(session)
+    source_run = _resolve_workflow_run(
+        repo=repo,
+        org_id=auth.org_id,
+        workflow_run_id_or_temporal_id=workflow_run_id,
+    )
+    if not source_run:
+        raise HTTPException(status_code=404, detail="Workflow run not found.")
+    source_context = _load_source_context_or_409(session=session, org_id=auth.org_id, source_run=source_run)
+    effective_source_run = getattr(source_context, "source_run", source_run)
+
+    channels = _normalize_required_string_list(value=body.channels, field_name="channels")
+    asset_brief_types = _normalize_required_string_list(
+        value=body.asset_brief_types,
+        field_name="assetBriefTypes",
+    )
+    experiment_variant_policy = body.experiment_variant_policy.strip()
+    launches_repo = StrategyV2LaunchesRepository(session)
+    launch_index = _launch_index_for_angle(
+        launches_repo=launches_repo,
+        org_id=auth.org_id,
+        client_id=str(effective_source_run.client_id),
+        product_id=str(effective_source_run.product_id),
+        angle_id=source_context.selected_angle_id,
+        angle_id_counts={},
+    )
+    campaign_name = build_angle_campaign_name(
+        angle_id=source_context.selected_angle_id,
+        angle_name=source_context.selected_angle_name,
+        launch_index=launch_index,
+    )
+    selected_ums_id_raw = source_context.source_stage3.get("ums")
+    selected_ums_id = selected_ums_id_raw.strip() if isinstance(selected_ums_id_raw, str) and selected_ums_id_raw.strip() else None
+    selected_variant_id_raw = source_context.source_stage3.get("variant_selected")
+    selected_variant_id = (
+        selected_variant_id_raw.strip()
+        if isinstance(selected_variant_id_raw, str) and selected_variant_id_raw.strip()
+        else None
+    )
+    launch_key = build_launch_key(
+        source_strategy_v2_workflow_run_id=str(effective_source_run.id),
+        launch_type="initial_angle",
+        angle_id=source_context.selected_angle_id,
+        campaign_id=None,
+        selected_ums_id=selected_ums_id,
+        channels=channels,
+        asset_brief_types=asset_brief_types,
+        experiment_variant_policy=experiment_variant_policy,
+    )
+    existing = launches_repo.get_by_launch_key(org_id=auth.org_id, launch_key=launch_key)
+    if existing:
+        return _idempotent_launch_response_from_rows([existing])
+
+    temporal = await get_temporal_client()
+    temporal_workflow_id = _build_deterministic_launch_temporal_workflow_id(
+        prefix="strategy-v2-angle-launch",
+        org_id=auth.org_id,
+        source_run_id=str(effective_source_run.id),
+        launch_keys=[launch_key],
+    )
+    launch_run = WorkflowRun(
+        org_id=auth.org_id,
+        client_id=str(effective_source_run.client_id),
+        product_id=str(effective_source_run.product_id),
+        campaign_id=None,
+        temporal_workflow_id=temporal_workflow_id,
+        temporal_run_id="pending",
+        kind=WorkflowKindEnum.strategy_v2_angle_launch,
+    )
+    session.add(launch_run)
+    session.commit()
+    session.refresh(launch_run)
+    launch_items = [
+        {
+            "launch_type": "initial_angle",
+            "launch_key": launch_key,
+            "campaign_name": campaign_name,
+            "launch_index": launch_index,
+            "angle": source_context.selected_angle,
+            "angle_run_id": source_context.angle_run_id,
+            "selected_ums_id": selected_ums_id,
+            "selected_variant_id": selected_variant_id,
+            "strategy_v2_packet": source_context.source_downstream_packet,
+            "strategy_v2_copy_context": source_context.source_copy_context,
+            "source_stage3_artifact_id": source_context.source_stage3_artifact_id,
+            "source_offer_artifact_id": source_context.source_offer_artifact_id,
+            "source_copy_artifact_id": source_context.source_copy_artifact_id,
+            "source_copy_context_artifact_id": source_context.source_copy_context_artifact_id,
+        }
+    ]
+    try:
+        handle = await temporal.start_workflow(
+            StrategyV2AngleCampaignLaunchWorkflow.run,
+            StrategyV2AngleCampaignLaunchInput(
+                org_id=auth.org_id,
+                client_id=str(effective_source_run.client_id),
+                product_id=str(effective_source_run.product_id),
+                source_strategy_v2_workflow_run_id=str(effective_source_run.id),
+                source_strategy_v2_temporal_workflow_id=source_context.source_temporal_workflow_id,
+                launch_workflow_run_id=str(launch_run.id),
+                operator_user_id=auth.user_id,
+                channels=channels,
+                asset_brief_types=asset_brief_types,
+                experiment_variant_policy=experiment_variant_policy,
+                launch_items=launch_items,
+            ),
+            id=temporal_workflow_id,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+        )
+    except WorkflowAlreadyStartedError as exc:
+        session.delete(launch_run)
+        session.commit()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "A Strategy V2 angle launch is already running for this launch key set. "
+                "Wait for the existing launch workflow to finish."
+            ),
+        ) from exc
+    except Exception as exc:
+        session.delete(launch_run)
+        session.commit()
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to start Strategy V2 angle launch workflow.",
+        ) from exc
+
+    launch_run.temporal_run_id = handle.first_execution_run_id
+    session.commit()
+    session.refresh(launch_run)
+
+    repo.log_activity(
+        workflow_run_id=str(launch_run.id),
+        step="strategy_v2_angle_launch",
+        status="started",
+        payload_in={
+            "source_strategy_v2_workflow_run_id": str(effective_source_run.id),
+            "source_strategy_v2_temporal_workflow_id": source_context.source_temporal_workflow_id,
+            "channels": channels,
+            "asset_brief_types": asset_brief_types,
+            "experiment_variant_policy": experiment_variant_policy,
+            "naming_policy": "angle_standard_v1",
+            "launch_keys": [launch_key],
+        },
+    )
+    return _compose_launch_action_response(
+        run_id=str(launch_run.id),
+        temporal_workflow_id=handle.id,
+        launch_records=[],
+    )
+
+
+@router.post(
+    "/{workflow_run_id}/actions/strategy-v2/launch-additional-ums",
+    response_model=StrategyV2LaunchActionResponse,
+)
+async def strategy_v2_launch_additional_ums(
+    workflow_run_id: str,
+    body: StrategyV2LaunchAdditionalUmsRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = WorkflowsRepository(session)
+    source_run = _resolve_workflow_run(
+        repo=repo,
+        org_id=auth.org_id,
+        workflow_run_id_or_temporal_id=workflow_run_id,
+    )
+    if not source_run:
+        raise HTTPException(status_code=404, detail="Workflow run not found.")
+    source_context = _load_source_context_or_409(session=session, org_id=auth.org_id, source_run=source_run)
+    effective_source_run = getattr(source_context, "source_run", source_run)
+
+    campaign = CampaignsRepository(session).get(org_id=auth.org_id, campaign_id=body.campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found.")
+    if str(campaign.client_id) != str(effective_source_run.client_id) or str(campaign.product_id) != str(effective_source_run.product_id):
+        raise HTTPException(
+            status_code=409,
+            detail="Campaign does not match source Strategy V2 client/product scope.",
+        )
+
+    channels = (
+        _normalize_required_string_list(value=body.channels, field_name="channels")
+        if body.channels is not None
+        else _normalize_required_string_list(value=list(campaign.channels or []), field_name="campaign.channels")
+    )
+    asset_brief_types = (
+        _normalize_required_string_list(value=body.asset_brief_types, field_name="assetBriefTypes")
+        if body.asset_brief_types is not None
+        else _normalize_required_string_list(
+            value=list(campaign.asset_brief_types or []),
+            field_name="campaign.asset_brief_types",
+        )
+    )
+    ums_selection_ids = _normalize_required_string_list(value=body.ums_selection_ids, field_name="umsSelectionIds")
+    launch_name_prefix = body.launch_name_prefix.strip()
+
+    ums_lookup = resolve_ums_selection_map(source_context.offer_pipeline_payload)
+    launches_repo = StrategyV2LaunchesRepository(session)
+    launch_rows_by_key: list[Any] = []
+    launch_items: list[dict[str, Any]] = []
+
+    for selected_ums_id in ums_selection_ids:
+        pair = ums_lookup.get(selected_ums_id)
+        if pair is None:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"Invalid UMS selection '{selected_ums_id}'. "
+                    "Remediation: choose ids from v2-08 pair_scoring ranked_pairs."
+                ),
+            )
+        selected_ums_id_from_pair = pair.get("ums_id")
+        canonical_selected_ums_id = (
+            selected_ums_id_from_pair.strip()
+            if isinstance(selected_ums_id_from_pair, str) and selected_ums_id_from_pair.strip()
+            else selected_ums_id
+        )
+        launch_key = build_launch_key(
+            source_strategy_v2_workflow_run_id=str(effective_source_run.id),
+            launch_type="additional_ums",
+            angle_id=source_context.selected_angle_id,
+            campaign_id=str(campaign.id),
+            selected_ums_id=canonical_selected_ums_id,
+            channels=channels,
+            asset_brief_types=asset_brief_types,
+            experiment_variant_policy="ums_iteration_standard_v1",
+        )
+        existing_by_key = launches_repo.get_by_launch_key(org_id=auth.org_id, launch_key=launch_key)
+        if existing_by_key:
+            launch_rows_by_key.append(existing_by_key)
+            continue
+        existing_by_angle_ums = launches_repo.get_by_angle_run_and_ums(
+            org_id=auth.org_id,
+            angle_run_id=source_context.angle_run_id,
+            selected_ums_id=canonical_selected_ums_id,
+        )
+        if existing_by_angle_ums:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"UMS selection '{canonical_selected_ums_id}' already launched for angle_run_id '{source_context.angle_run_id}'. "
+                    "Use launch history to inspect prior outputs."
+                ),
+            )
+        launch_items.append(
+            {
+                "selected_ums_id": canonical_selected_ums_id,
+                "pair": pair,
+                "launch_key": launch_key,
+            }
+        )
+
+    if launch_rows_by_key and not launch_items:
+        return _idempotent_launch_response_from_rows(launch_rows_by_key)
+
+    temporal = await get_temporal_client()
+    launch_keys = [str(item.get("launch_key", "")).strip() for item in launch_items if str(item.get("launch_key", "")).strip()]
+    temporal_workflow_id = _build_deterministic_launch_temporal_workflow_id(
+        prefix="strategy-v2-angle-iteration",
+        org_id=auth.org_id,
+        source_run_id=str(effective_source_run.id),
+        launch_keys=launch_keys,
+    )
+    launch_run = WorkflowRun(
+        org_id=auth.org_id,
+        client_id=str(effective_source_run.client_id),
+        product_id=str(effective_source_run.product_id),
+        campaign_id=str(campaign.id),
+        temporal_workflow_id=temporal_workflow_id,
+        temporal_run_id="pending",
+        kind=WorkflowKindEnum.strategy_v2_angle_iteration,
+    )
+    session.add(launch_run)
+    session.commit()
+    session.refresh(launch_run)
+
+    try:
+        handle = await temporal.start_workflow(
+            StrategyV2AngleIterationWorkflow.run,
+            StrategyV2AngleIterationInput(
+                org_id=auth.org_id,
+                client_id=str(effective_source_run.client_id),
+                product_id=str(effective_source_run.product_id),
+                source_strategy_v2_workflow_run_id=str(effective_source_run.id),
+                source_strategy_v2_temporal_workflow_id=source_context.source_temporal_workflow_id,
+                launch_workflow_run_id=str(launch_run.id),
+                operator_user_id=auth.user_id,
+                campaign_id=str(campaign.id),
+                channels=channels,
+                asset_brief_types=asset_brief_types,
+                launch_name_prefix=launch_name_prefix,
+                experiment_variant_policy="ums_iteration_standard_v1",
+                base_angle_run_id=source_context.angle_run_id,
+                selected_angle=source_context.selected_angle,
+                stage1=source_context.stage1,
+                ranked_angle_candidates=source_context.ranked_angle_candidates,
+                offer_pipeline_payload=source_context.offer_pipeline_payload,
+                offer_operator_inputs=source_context.offer_operator_inputs,
+                angle_synthesis_payload=source_context.angle_synthesis_payload,
+                onboarding_payload_id=source_context.offer_winner_onboarding_payload_id,
+                ums_launch_items=launch_items,
+            ),
+            id=temporal_workflow_id,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+        )
+    except WorkflowAlreadyStartedError as exc:
+        session.delete(launch_run)
+        session.commit()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "A Strategy V2 additional UMS launch is already running for this launch key set. "
+                "Wait for the existing launch workflow to finish."
+            ),
+        ) from exc
+    except Exception as exc:
+        session.delete(launch_run)
+        session.commit()
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to start Strategy V2 additional UMS launch workflow.",
+        ) from exc
+
+    launch_run.temporal_run_id = handle.first_execution_run_id
+    session.commit()
+    session.refresh(launch_run)
+
+    repo.log_activity(
+        workflow_run_id=str(launch_run.id),
+        step="strategy_v2_angle_iteration",
+        status="started",
+        payload_in={
+            "source_strategy_v2_workflow_run_id": str(effective_source_run.id),
+            "campaign_id": str(campaign.id),
+            "ums_selection_ids": ums_selection_ids,
+            "launch_name_prefix": launch_name_prefix,
+            "channels": channels,
+            "asset_brief_types": asset_brief_types,
+            "experiment_variant_policy": "ums_iteration_standard_v1",
+            "launch_keys": launch_keys,
+        },
+    )
+    return _compose_launch_action_response(
+        run_id=str(launch_run.id),
+        temporal_workflow_id=handle.id,
+        launch_records=[],
+    )
+
+
+@router.post(
+    "/{workflow_run_id}/actions/strategy-v2/launch-additional-angle",
+    response_model=StrategyV2LaunchActionResponse,
+)
+async def strategy_v2_launch_additional_angle(
+    workflow_run_id: str,
+    body: StrategyV2LaunchAdditionalAngleRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = WorkflowsRepository(session)
+    source_run = _resolve_workflow_run(
+        repo=repo,
+        org_id=auth.org_id,
+        workflow_run_id_or_temporal_id=workflow_run_id,
+    )
+    if not source_run:
+        raise HTTPException(status_code=404, detail="Workflow run not found.")
+    source_context = _load_source_context_or_409(session=session, org_id=auth.org_id, source_run=source_run)
+    effective_source_run = getattr(source_context, "source_run", source_run)
+    if source_context.competitor_analysis is None:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Source run is missing pinned competitor_analysis for additional-angle launch replay. "
+                "Remediation: rerun source Strategy V2 with foundational competitor analysis persistence."
+            ),
+        )
+    if not source_context.voc_observations or not source_context.voc_scored:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Source run is missing v2-05 VOC payload required for additional-angle launch replay."
+            ),
+        )
+
+    channels = _normalize_required_string_list(value=body.channels, field_name="channels")
+    asset_brief_types = _normalize_required_string_list(value=body.asset_brief_types, field_name="assetBriefTypes")
+    selected_angle_ids = _normalize_required_string_list(value=body.selected_angle_ids, field_name="selectedAngleIds")
+    eligible_angle_ids = list_ranked_angle_ids(source_context.ranked_angle_candidates)
+    invalid_angles = sorted(set(selected_angle_ids) - eligible_angle_ids)
+    if invalid_angles:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Invalid additional angle selection. "
+                f"Selected IDs were not present in reviewed v2-06 candidates: {invalid_angles}"
+            ),
+        )
+
+    launches_repo = StrategyV2LaunchesRepository(session)
+    launch_rows_by_key: list[Any] = []
+    launch_items: list[dict[str, Any]] = []
+    angle_counts: dict[str, int] = {}
+
+    for angle_id in selected_angle_ids:
+        angle_payload = find_ranked_angle_payload(
+            ranked_candidates=source_context.ranked_angle_candidates,
+            angle_id=angle_id,
+        )
+        if angle_payload is None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Missing angle payload for selected angle_id '{angle_id}'.",
+            )
+        angle_name = _require_nonempty_string(angle_payload.get("angle_name"), field_name="selected_angle.angle_name")
+        launch_index = _launch_index_for_angle(
+            launches_repo=launches_repo,
+            org_id=auth.org_id,
+            client_id=str(effective_source_run.client_id),
+            product_id=str(effective_source_run.product_id),
+            angle_id=angle_id,
+            angle_id_counts=angle_counts,
+        )
+        campaign_name = build_angle_campaign_name(
+            angle_id=angle_id,
+            angle_name=angle_name,
+            launch_index=launch_index,
+        )
+        launch_key = build_launch_key(
+            source_strategy_v2_workflow_run_id=str(effective_source_run.id),
+            launch_type="additional_angle",
+            angle_id=angle_id,
+            campaign_id=None,
+            selected_ums_id=None,
+            channels=channels,
+            asset_brief_types=asset_brief_types,
+            experiment_variant_policy="angle_branch_standard_v1",
+        )
+        existing = launches_repo.get_by_launch_key(org_id=auth.org_id, launch_key=launch_key)
+        if existing:
+            launch_rows_by_key.append(existing)
+            continue
+        launch_items.append(
+            {
+                "launch_type": "additional_angle",
+                "launch_key": launch_key,
+                "campaign_name": campaign_name,
+                "launch_index": launch_index,
+                "angle": angle_payload,
+            }
+        )
+
+    if launch_rows_by_key and not launch_items:
+        return _idempotent_launch_response_from_rows(launch_rows_by_key)
+
+    temporal = await get_temporal_client()
+    launch_keys = [str(item.get("launch_key", "")).strip() for item in launch_items if str(item.get("launch_key", "")).strip()]
+    temporal_workflow_id = _build_deterministic_launch_temporal_workflow_id(
+        prefix="strategy-v2-angle-launch",
+        org_id=auth.org_id,
+        source_run_id=str(effective_source_run.id),
+        launch_keys=launch_keys,
+    )
+    launch_run = WorkflowRun(
+        org_id=auth.org_id,
+        client_id=str(effective_source_run.client_id),
+        product_id=str(effective_source_run.product_id),
+        campaign_id=None,
+        temporal_workflow_id=temporal_workflow_id,
+        temporal_run_id="pending",
+        kind=WorkflowKindEnum.strategy_v2_angle_launch,
+    )
+    session.add(launch_run)
+    session.commit()
+    session.refresh(launch_run)
+
+    try:
+        handle = await temporal.start_workflow(
+            StrategyV2AngleCampaignLaunchWorkflow.run,
+            StrategyV2AngleCampaignLaunchInput(
+                org_id=auth.org_id,
+                client_id=str(effective_source_run.client_id),
+                product_id=str(effective_source_run.product_id),
+                source_strategy_v2_workflow_run_id=str(effective_source_run.id),
+                source_strategy_v2_temporal_workflow_id=source_context.source_temporal_workflow_id,
+                launch_workflow_run_id=str(launch_run.id),
+                operator_user_id=auth.user_id,
+                channels=channels,
+                asset_brief_types=asset_brief_types,
+                experiment_variant_policy="angle_branch_standard_v1",
+                launch_items=launch_items,
+                stage1=source_context.stage1,
+                ranked_angle_candidates=source_context.ranked_angle_candidates,
+                competitor_analysis=source_context.competitor_analysis,
+                voc_scored=source_context.voc_scored,
+                voc_observations=source_context.voc_observations,
+                proof_asset_candidates=source_context.proof_asset_candidates,
+                angle_synthesis_payload=source_context.angle_synthesis_payload,
+                offer_operator_inputs=source_context.offer_operator_inputs,
+                onboarding_payload_id=source_context.offer_winner_onboarding_payload_id,
+            ),
+            id=temporal_workflow_id,
+            task_queue=settings.TEMPORAL_TASK_QUEUE,
+        )
+    except WorkflowAlreadyStartedError as exc:
+        session.delete(launch_run)
+        session.commit()
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "A Strategy V2 additional-angle launch is already running for this launch key set. "
+                "Wait for the existing launch workflow to finish."
+            ),
+        ) from exc
+    except Exception as exc:
+        session.delete(launch_run)
+        session.commit()
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to start Strategy V2 additional-angle launch workflow.",
+        ) from exc
+
+    launch_run.temporal_run_id = handle.first_execution_run_id
+    session.commit()
+    session.refresh(launch_run)
+
+    repo.log_activity(
+        workflow_run_id=str(launch_run.id),
+        step="strategy_v2_angle_launch",
+        status="started",
+        payload_in={
+            "source_strategy_v2_workflow_run_id": str(effective_source_run.id),
+            "selected_angle_ids": selected_angle_ids,
+            "channels": channels,
+            "asset_brief_types": asset_brief_types,
+            "experiment_variant_policy": "angle_branch_standard_v1",
+            "naming_policy": "angle_standard_v1",
+            "launch_keys": launch_keys,
+        },
+    )
+    return _compose_launch_action_response(
+        run_id=str(launch_run.id),
+        temporal_workflow_id=handle.id,
+        launch_records=[],
+    )
 
 
 @router.post("/{workflow_run_id}/signals/stop")

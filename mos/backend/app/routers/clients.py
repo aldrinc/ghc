@@ -6152,6 +6152,11 @@ async def start_client_onboarding(
     client = clients_repo.get(org_id=auth.org_id, client_id=client_id)
     if not client:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    if not is_strategy_v2_enabled(session=session, org_id=auth.org_id, client_id=client_id):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Strategy V2 is disabled for this tenant/client. Enable strategy_v2_enabled before onboarding.",
+        )
 
     product_fields: dict[str, object] = {"title": payload.product_name}
     if payload.product_description is not None:

@@ -15,7 +15,7 @@ class OnboardingStartRequest(BaseModel):
     existing_proof_assets: List[str] = Field(..., min_length=1)
     brand_voice_notes: str = Field(..., min_length=1)
     compliance_notes: Optional[str] = None
-    product_description: Optional[str] = None
+    product_description: str = Field(..., min_length=1)
     product_category: Optional[str] = None
     primary_benefits: Optional[List[str]] = None
     feature_bullets: Optional[List[str]] = None

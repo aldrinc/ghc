@@ -43,9 +43,17 @@ def build_strategy_v2_downstream_packet(
 
     selected_angle = stage3.get("selected_angle") if isinstance(stage3.get("selected_angle"), dict) else {}
     offer_decision = offer.get("decision") if isinstance(offer.get("decision"), dict) else {}
+    selected_variant = offer.get("selected_variant") if isinstance(offer.get("selected_variant"), dict) else {}
+    selected_variant_score = (
+        offer.get("selected_variant_score")
+        if isinstance(offer.get("selected_variant_score"), dict)
+        else None
+    )
+    product_offer = offer.get("product_offer") if isinstance(offer.get("product_offer"), dict) else None
     copy_decision = None
     if isinstance(copy.get("decision"), dict):
         copy_decision = copy.get("decision")
+    template_payloads = copy.get("template_payloads") if isinstance(copy.get("template_payloads"), dict) else None
 
     return {
         "selected_angle": {
@@ -62,6 +70,10 @@ def build_strategy_v2_downstream_packet(
             "pricing_rationale": stage3.get("pricing_rationale"),
             "variant_selected": stage3.get("variant_selected"),
             "composite_score": stage3.get("composite_score"),
+            "selected_variant": selected_variant,
+            "selected_variant_score": selected_variant_score,
+            "product_offer_id": offer.get("product_offer_id"),
+            "product_offer": product_offer,
         },
         "copy": {
             "headline": copy.get("headline"),
@@ -71,9 +83,12 @@ def build_strategy_v2_downstream_packet(
             "quality_gate_report": copy.get("quality_gate_report"),
             "semantic_gates": copy.get("semantic_gates"),
             "congruency": copy.get("congruency"),
+            "template_payloads": template_payloads,
+            "angle_run_id": copy.get("angle_run_id"),
         },
         "copy_context": copy_context,
         "awareness_angle_matrix": awareness_angle_matrix,
+        "template_payloads": template_payloads,
         "decision_metadata": {
             "offer_winner": offer_decision,
             "final_copy_approval": copy_decision,

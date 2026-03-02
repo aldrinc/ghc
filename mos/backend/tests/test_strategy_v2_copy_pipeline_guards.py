@@ -19,6 +19,7 @@ from app.strategy_v2.errors import (
     StrategyV2SchemaValidationError,
 )
 from app.temporal.activities.strategy_v2_activities import (
+    _CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS,
     _build_headline_candidate_pool,
     _build_copy_repair_directives,
     _llm_generate_text,
@@ -807,7 +808,7 @@ def test_llm_generate_text_uses_claude_structured_output_when_schema_requested(m
 
     assert captured["model"] == "claude-haiku-4-5-20251001"
     assert captured["temperature"] == 0.0
-    assert captured["max_tokens"] == 4096
+    assert captured["max_tokens"] == _CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS
     assert captured["system"] is None
     assert captured["user_content"] == [{"type": "text", "text": "Return one headline JSON object."}]
     assert isinstance(captured["output_schema"], dict)
@@ -881,5 +882,5 @@ def test_llm_generate_text_uses_explicit_claude_messages_when_provided(monkeypat
     assert captured["messages"] == conversation_messages
     assert captured["user_content"] is None
     assert captured["temperature"] == 0.0
-    assert captured["max_tokens"] == 4096
+    assert captured["max_tokens"] == _CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS
     assert json.loads(output) == {"headline": "Rewritten headline"}

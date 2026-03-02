@@ -421,71 +421,11 @@ def evaluate_copy_page_semantic_gates(
     )
 
     markdown_link_count = len(_LINK_PATTERN.findall(cleaned))
-    gate_results.append(
-        CopySemanticGateResult(
-            gate_key="MARKDOWN_LINK_FLOOR",
-            passed=markdown_link_count >= page_contract.min_markdown_links,
-            detail=(
-                f"Markdown link CTA count={markdown_link_count}; required>={page_contract.min_markdown_links}."
-            ),
-            remediation=(
-                None
-                if markdown_link_count >= page_contract.min_markdown_links
-                else "Include required markdown CTA links in contract CTA sections."
-            ),
-        )
-    )
 
     cta_section_indices = _extract_cta_section_indices(sections)
     first_cta_section = cta_section_indices[0] if cta_section_indices else None
-    first_cta_pass = first_cta_section is not None and first_cta_section <= page_contract.first_cta_section_max
-    gate_results.append(
-        CopySemanticGateResult(
-            gate_key="FIRST_CTA_WINDOW",
-            passed=first_cta_pass,
-            detail=(
-                f"First CTA section={first_cta_section}; required<={page_contract.first_cta_section_max}."
-                if first_cta_section is not None
-                else "No CTA section detected."
-            ),
-            remediation=(
-                None
-                if first_cta_pass
-                else "Move/add a CTA section earlier in the document within contract window."
-            ),
-        )
-    )
 
     guarantee_section_index = _extract_guarantee_section_index(sections)
-    guarantee_gate_pass = True
-    guarantee_detail = "Guarantee proximity gate not required for this page profile."
-    guarantee_remediation: str | None = None
-    if page_contract.require_guarantee_near_cta:
-        if guarantee_section_index is None:
-            guarantee_gate_pass = False
-            guarantee_detail = "No guarantee/risk-reversal section detected."
-            guarantee_remediation = "Add a guarantee section adjacent to a CTA section."
-        elif not cta_section_indices:
-            guarantee_gate_pass = False
-            guarantee_detail = "No CTA section detected to evaluate guarantee proximity."
-            guarantee_remediation = "Add CTA sections and place guarantee near one of them."
-        else:
-            nearest_distance = min(abs(guarantee_section_index - idx) for idx in cta_section_indices)
-            guarantee_gate_pass = nearest_distance <= 2
-            guarantee_detail = (
-                f"Guarantee section={guarantee_section_index}; nearest CTA distance={nearest_distance}."
-            )
-            if not guarantee_gate_pass:
-                guarantee_remediation = "Place guarantee section within 2 sections of a CTA."
-
-    gate_results.append(
-        CopySemanticGateResult(
-            gate_key="GUARANTEE_NEAR_CTA",
-            passed=guarantee_gate_pass,
-            detail=guarantee_detail,
-            remediation=guarantee_remediation,
-        )
-    )
 
     total_sections = len(sections)
     minimum_delivery = str(promise_contract.get("minimum_delivery") or "")

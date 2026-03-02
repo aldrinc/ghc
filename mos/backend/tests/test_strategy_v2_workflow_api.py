@@ -1,13 +1,15 @@
 from contextlib import contextmanager
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
 import pytest
 
 from app.db.enums import ArtifactTypeEnum, WorkflowKindEnum
-from app.db.models import Artifact, Campaign, OnboardingPayload, ResearchArtifact, WorkflowRun
+from app.db.models import Artifact, Campaign, OnboardingPayload, ProductOffer, ResearchArtifact, WorkflowRun
+from app.routers.workflows import _normalize_strategy_v2_artifact_refs
 from app.strategy_v2.errors import (
     StrategyV2DecisionError,
     StrategyV2MissingContextError,
@@ -236,6 +238,34 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "url_pattern": "reddit.com/r/sleep",
                     }
                 ],
+                "apify_configs_tier1": [
+                    {
+                        "config_id": "tier1_reddit_sleep",
+                        "actor_id": "practicaltools/apify-reddit-api",
+                        "input": {
+                            "startUrls": [{"url": "https://www.reddit.com/r/sleep"}],
+                            "maxItems": 15,
+                        },
+                        "metadata": {
+                            "target_id": "HT-001",
+                            "platform": "reddit",
+                            "mode": "subreddit_search",
+                            "habitat_name": "reddit.com/r/sleep",
+                            "habitat_type": "TEXT_COMMUNITY",
+                        },
+                    }
+                ],
+                "apify_configs_tier2": [
+                    {
+                        "config_id": "tier2_web_sleep",
+                        "actor_id": "practicaltools/apify-reddit-api",
+                        "input": {
+                            "startUrls": [{"url": "https://www.reddit.com/r/Parenting"}],
+                            "maxItems": 12,
+                        },
+                        "metadata": {"tier": "tier2", "intent": "community_discovery"},
+                    }
+                ],
                 "manual_queries": ["sleep routine collapse", "bedtime routine fails"],
                 "handoff_block": "Target caregiver communities with high frustration density.",
             }
@@ -247,13 +277,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "config_id": "tiktok_viral_01",
                         "platform": "tiktok",
                         "mode": "VIRAL_DISCOVERY",
+                        "actor_id": "clockworks/tiktok-scraper",
+                        "input": {
+                            "profiles": ["https://www.tiktok.com/@duolingo"],
+                            "maxItems": 20,
+                        },
+                        "metadata": {"priority": "high"},
                         "hook_theme": "timing failure",
-                    },
-                    {
-                        "config_id": "instagram_topic_01",
-                        "platform": "instagram",
-                        "mode": "TOPIC_MINING",
-                        "hook_theme": "routine reset",
                     },
                 ],
                 "handoff_block": "Focus on high-retention short-form educational clips.",
@@ -261,18 +291,50 @@ def _stub_prompt_chain_runtime(monkeypatch):
         elif context == "strategy_v2.agent1_output":
             payload = {
                 "habitat_observations": [
+                    _agent1_habitat_observation_payload(
+                        habitat_name="reddit.com/r/sleep",
+                        habitat_type="TEXT_COMMUNITY",
+                        source_file="reddit_sleep.json",
+                    ),
+                    _agent1_habitat_observation_payload(
+                        habitat_name="forum.sleephelp.com",
+                        habitat_type="FORUM",
+                        source_file="forum_sleephelp.json",
+                    ),
+                ],
+                "excluded_source_files": [],
+                "mining_plan": [
                     {
                         "habitat_name": "reddit.com/r/sleep",
                         "habitat_type": "TEXT_COMMUNITY",
-                        "url_pattern": "reddit.com/r/sleep",
-                    },
-                    {
-                        "habitat_name": "forum.sleephelp.com",
-                        "habitat_type": "FORUM",
-                        "url_pattern": "forum.sleephelp.com",
-                    },
+                        "source_file": "reddit_sleep.json",
+                        "priority_rank": 1,
+                        "rank_score": 12,
+                        "target_voc_types": ["PAIN_LANGUAGE"],
+                        "estimated_yield": 20,
+                        "sampling_strategy": "Process chronologically across high-detail items first.",
+                        "platform_behavior_note": "Long-form narratives with high detail density.",
+                        "compliance_flags": "",
+                        "observation_sheet": _agent1_habitat_observation_payload(
+                            habitat_name="reddit.com/r/sleep",
+                            habitat_type="TEXT_COMMUNITY",
+                            source_file="reddit_sleep.json",
+                        )["observation_sheet"],
+                        "language_samples": [],
+                        "video_extension": None,
+                        "competitive_overlap": _agent1_habitat_observation_payload(
+                            habitat_name="reddit.com/r/sleep",
+                            habitat_type="TEXT_COMMUNITY",
+                            source_file="reddit_sleep.json",
+                        )["competitive_overlap"],
+                        "trend_lifecycle": _agent1_habitat_observation_payload(
+                            habitat_name="reddit.com/r/sleep",
+                            habitat_type="TEXT_COMMUNITY",
+                            source_file="reddit_sleep.json",
+                        )["trend_lifecycle"],
+                        "evidence_refs": ["/apify_output/raw_scraped_data/reddit_sleep.json::item[0]"],
+                    }
                 ],
-                "mining_plan": [{"source": "reddit.com/r/sleep", "priority": "high"}],
             }
         elif context == "strategy_v2.agent2_output":
             payload = {
@@ -423,7 +485,62 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "## Transition CTA\n"
                     "See the full offer and next-step system details now.\n"
                     "[Continue to the offer](/sales-page)."
-                )
+                ),
+                "template_payload": {
+                    "hero": {
+                        "title": "Approved Headline",
+                        "subtitle": "Predictable evenings are possible with a mechanism-first approach.",
+                        "badges": [
+                            {"label": "Mechanism-first"},
+                            {"label": "Evidence-backed"},
+                            {"label": "Practical nightly use"},
+                        ],
+                    },
+                    "reasons": [
+                        {
+                            "number": 1,
+                            "title": "Random fixes miss the real bottleneck",
+                            "body": "Mechanism mismatch keeps restarting the same nightly stress loop.",
+                        }
+                    ],
+                    "marquee": [
+                        "Mechanism-first",
+                        "Evidence-backed",
+                        "Practical steps",
+                    ],
+                    "pitch": {
+                        "title": "See the full implementation offer",
+                        "bullets": [
+                            "Checklist for nightly execution",
+                            "Decision support for common setbacks",
+                        ],
+                        "cta_label": "Continue to the offer",
+                    },
+                    "reviews": [
+                        {
+                            "text": "We stopped guessing and the evening rhythm is finally stable.",
+                            "author": "K. Parent",
+                            "rating": 5,
+                        },
+                        {
+                            "text": "The step-by-step flow made execution much easier for our routine.",
+                            "author": "D. Caregiver",
+                            "rating": 5,
+                        },
+                        {
+                            "text": "Clear boundaries and practical guidance reduced our nightly stress fast.",
+                            "author": "M. Family",
+                            "rating": 5,
+                        },
+                    ],
+                    "review_wall": {
+                        "title": "What readers report after switching approach",
+                        "button_label": "Open full review examples",
+                    },
+                    "floating_cta": {
+                        "label": "Continue to offer",
+                    },
+                },
             }
         elif context == "strategy_v2.copy.sales_page":
             payload = {
@@ -457,7 +574,95 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "## CTA #3 + P.S.\n"
                     "Final offer step: start today. Price: $49 one-time.\n"
                     "[Complete checkout](/checkout)."
-                )
+                ),
+                "template_payload": {
+                    "hero": {
+                        "purchase_title": "Start the mechanism-first evening system",
+                        "primary_cta_label": "Claim the system",
+                        "primary_cta_subbullets": [
+                            "Fast implementation path",
+                            "30-day confidence guarantee",
+                        ],
+                    },
+                    "problem": {
+                        "title": "Nightly friction keeps repeating",
+                        "paragraphs": [
+                            "Most routines fail because they optimize effort instead of sequence.",
+                        ],
+                        "emphasis_line": "When sequence is wrong, consistency collapses.",
+                    },
+                    "mechanism": {
+                        "title": "Fix the sequence, then the outcomes follow",
+                        "paragraphs": [
+                            "The system targets trigger timing and removes guesswork.",
+                        ],
+                        "bullets": [
+                            {"title": "Trigger map", "body": "Identify sequence breakpoints before they cascade."},
+                            {"title": "Execution order", "body": "Apply steps in a repeatable nightly progression."},
+                            {"title": "Recovery branch", "body": "Handle misses without resetting the full routine."},
+                            {"title": "Progress markers", "body": "Track wins and frictions with simple checkpoints."},
+                        ],
+                        "callout": {
+                            "left_title": "Why old routines fail",
+                            "left_body": "They describe tasks but ignore trigger order.",
+                            "right_title": "What this changes",
+                            "right_body": "It aligns actions to sequence so consistency compounds.",
+                        },
+                        "comparison": {
+                            "badge": "Side-by-side",
+                            "title": "Mechanism-first system vs generic routines",
+                            "swipe_hint": "Swipe to compare",
+                            "columns": {
+                                "pup": "Mechanism-first",
+                                "disposable": "Generic routine",
+                            },
+                            "rows": [
+                                {
+                                    "label": "Predictability",
+                                    "pup": "High once sequence is set",
+                                    "disposable": "Inconsistent",
+                                }
+                            ],
+                        },
+                    },
+                    "social_proof": {
+                        "badge": "Verified",
+                        "title": "Customer-backed clarity",
+                        "rating_label": "4.9 average confidence",
+                        "summary": "Families report fewer resets and calmer evenings.",
+                    },
+                    "whats_inside": {
+                        "benefits": [
+                            "Implementation checklist",
+                            "Timeline map",
+                            "Decision support prompts",
+                        ],
+                        "offer_helper_text": "Everything needed to execute without guesswork.",
+                    },
+                    "bonus": {
+                        "free_gifts_title": "Included bonus assets",
+                        "free_gifts_body": "Rapid-start templates and scenario walkthroughs.",
+                    },
+                    "guarantee": {
+                        "title": "30-day confidence guarantee",
+                        "paragraphs": [
+                            "Run the system and evaluate fit using measurable checkpoints.",
+                        ],
+                        "why_title": "Why this guarantee exists",
+                        "why_body": "The process is practical, testable, and low-friction.",
+                        "closing_line": "You can adopt this with clear downside protection.",
+                    },
+                    "faq": {
+                        "title": "Frequently asked questions",
+                        "items": [
+                            {
+                                "question": "How quickly can we start?",
+                                "answer": "Most families can run the first sequence tonight.",
+                            }
+                        ],
+                    },
+                    "cta_close": "Start now and lock in consistent evenings.",
+                },
             }
         else:
             raise AssertionError(f"Unexpected prompt context in test stub: {context}")
@@ -476,7 +681,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
     monkeypatch.setattr(strategy_v2_activities, "_run_prompt_json_object", _fake_run_prompt_json_object)
 
 
-def _create_client_and_product(*, api_client, suffix: str, strategy_v2_enabled: bool) -> tuple[str, str]:
+def _create_client_and_product(
+    *,
+    api_client,
+    suffix: str,
+    strategy_v2_enabled: bool,
+    include_description: bool = True,
+) -> tuple[str, str]:
     client_resp = api_client.post(
         "/clients",
         json={
@@ -488,14 +699,13 @@ def _create_client_and_product(*, api_client, suffix: str, strategy_v2_enabled: 
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
-    product_resp = api_client.post(
-        "/products",
-        json={
-            "clientId": client_id,
-            "title": f"Product {suffix}",
-            "description": "Product description",
-        },
-    )
+    product_payload = {
+        "clientId": client_id,
+        "title": f"Product {suffix}",
+    }
+    if include_description:
+        product_payload["description"] = "Product description"
+    product_resp = api_client.post("/products", json=product_payload)
     assert product_resp.status_code == 201
     product_id = product_resp.json()["id"]
     return client_id, product_id
@@ -593,7 +803,19 @@ def _agent2_voc_observations_payload() -> list[dict[str, Any]]:
         rows.append(
             {
                 "voc_id": f"V{index + 1:03d}",
-                "source": "reddit.com/r/sleep" if index % 2 == 0 else "forum.sleephelp.com",
+                "source": "https://www.reddit.com/r/sleep" if index % 2 == 0 else "https://forum.sleephelp.com/thread",
+                "source_type": "REDDIT" if index % 2 == 0 else "FORUM",
+                "source_url": "https://www.reddit.com/r/sleep" if index % 2 == 0 else "https://forum.sleephelp.com/thread",
+                "source_author": f"user_{index + 1}",
+                "source_date": "2026-02-20",
+                "is_hook": "N",
+                "hook_format": "NONE",
+                "hook_word_count": 0,
+                "video_virality_tier": "BASELINE",
+                "video_view_count": 0,
+                "competitor_saturation": [],
+                "in_whitespace": "Y",
+                "evidence_ref": f"evidence::item[{index}]",
                 "quote": quote,
                 "specific_number": "Y" if "$" in quote else "N",
                 "specific_product_brand": "N",
@@ -633,6 +855,87 @@ def _agent2_voc_observations_payload() -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _agent1_habitat_observation_payload(*, habitat_name: str, habitat_type: str, source_file: str) -> dict[str, Any]:
+    observation_sheet = {
+        "threads_50_plus": "Y",
+        "threads_200_plus": "N",
+        "threads_1000_plus": "N",
+        "posts_last_3mo": "Y",
+        "posts_last_6mo": "Y",
+        "posts_last_12mo": "Y",
+        "recency_ratio": "MAJORITY_RECENT",
+        "exact_category": "Y",
+        "purchasing_comparing": "Y",
+        "personal_usage": "Y",
+        "adjacent_only": "N",
+        "first_person_narratives": "Y",
+        "trigger_events": "Y",
+        "fear_frustration_shame": "Y",
+        "specific_dollar_or_time": "Y",
+        "long_detailed_posts": "Y",
+        "comparison_discussions": "Y",
+        "price_value_mentions": "Y",
+        "post_purchase_experience": "Y",
+        "relevance_pct": "OVER_50_PCT",
+        "dominated_by_offtopic": "N",
+        "competitor_brands_mentioned": "Y",
+        "competitor_brand_count": "1-3",
+        "competitor_ads_present": "N",
+        "trend_direction": "HIGHER",
+        "seasonal_patterns": "N",
+        "seasonal_description": "N/A",
+        "habitat_age": "3_TO_7YR",
+        "membership_trend": "GROWING",
+        "post_frequency_trend": "INCREASING",
+        "publicly_accessible": "Y",
+        "text_based_content": "Y",
+        "target_language": "Y",
+        "no_rate_limiting": "Y",
+        "purchase_intent_density": "SOME",
+        "discusses_spending": "Y",
+        "recommendation_threads": "Y",
+        "reusability": "PATTERN_REUSABLE",
+    }
+    return {
+        "habitat_name": habitat_name,
+        "habitat_type": habitat_type,
+        "url_pattern": habitat_name,
+        "source_file": source_file,
+        "items_in_file": 120,
+        "data_quality": "CLEAN",
+        "observation_sheet": observation_sheet,
+        "language_samples": [
+            {
+                "sample_id": "S1",
+                "evidence_ref": f"{source_file}::item[0]",
+                "word_count": 180,
+                "has_trigger_event": "Y",
+                "has_failed_solution": "Y",
+                "has_identity_language": "Y",
+                "has_specific_outcome": "Y",
+            }
+        ],
+        "video_extension": None,
+        "competitive_overlap": {
+            "competitors_in_data": ["Competitor A"],
+            "overlap_level": "LOW",
+            "whitespace_opportunity": "Y",
+        },
+        "trend_lifecycle": {
+            "trend_direction": "HIGHER",
+            "lifecycle_stage": "GROWING",
+        },
+        "mining_gate": {
+            "status": "PASS",
+            "failed_fields": [],
+            "reason": "All mining requirements satisfied.",
+        },
+        "rank_score": 81,
+        "estimated_yield": 28,
+        "evidence_refs": [f"{source_file}::item[0]"],
+    }
 
 
 def _agent3_angle_observations_payload(min_count: int = 10) -> list[dict[str, Any]]:
@@ -678,6 +981,7 @@ def _agent3_angle_observations_payload(min_count: int = 10) -> list[dict[str, An
                 "trigger_seasonality": "ONGOING",
                 "competitor_count_using_angle": "1-2",
                 "recent_competitor_entry": "Y" if index % 3 == 0 else "N",
+                "competitor_angle_overlap": "N",
                 "pain_structural": "Y",
                 "news_cycle_dependent": "N",
                 "competitor_behavior_dependent": "N",
@@ -870,6 +1174,60 @@ def test_start_strategy_v2_requires_feature_flag(api_client, fake_temporal):
     assert response.status_code == 409
     assert "Strategy V2 is disabled" in response.json()["detail"]
     assert fake_temporal.started == []
+
+
+def test_start_strategy_v2_requires_product_description_or_override(api_client, fake_temporal):
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="MissingDescription",
+        strategy_v2_enabled=True,
+        include_description=False,
+    )
+    response = api_client.post(
+        "/workflows/strategy-v2/start",
+        json={
+            "client_id": client_id,
+            "product_id": product_id,
+            "stage0_overrides": {"product_customizable": True},
+            "business_model": "one-time",
+            "funnel_position": "cold_traffic",
+            "target_platforms": ["Meta"],
+            "target_regions": ["US"],
+            "existing_proof_assets": ["Customer testimonials"],
+            "brand_voice_notes": "Direct, clear, non-hype voice.",
+        },
+    )
+    assert response.status_code == 409
+    assert "Product description is required" in response.json()["detail"]
+    assert fake_temporal.started == []
+
+
+def test_start_strategy_v2_allows_stage0_description_override(api_client, fake_temporal):
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="OverrideDescription",
+        strategy_v2_enabled=True,
+        include_description=False,
+    )
+    start = api_client.post(
+        "/workflows/strategy-v2/start",
+        json={
+            "client_id": client_id,
+            "product_id": product_id,
+            "stage0_overrides": {
+                "description": "Clear product description supplied at start.",
+                "product_customizable": True,
+            },
+            "business_model": "one-time",
+            "funnel_position": "cold_traffic",
+            "target_platforms": ["Meta"],
+            "target_regions": ["US"],
+            "existing_proof_assets": ["Customer testimonials"],
+            "brand_voice_notes": "Direct, clear, non-hype voice.",
+        },
+    )
+    assert start.status_code == 200
+    assert fake_temporal.started
 
 
 def test_start_strategy_v2_and_send_all_hitl_signals(api_client, fake_temporal):
@@ -1150,8 +1508,674 @@ def test_strategy_v2_state_from_research_artifacts(api_client, db_session, auth_
     assert state["required_signal_type"] == "strategy_v2_select_angle"
     assert state["pending_signal_type"] == "strategy_v2_select_angle"
     assert state["scored_candidate_summaries"]["angles"]
+    pending_payload = state["pending_decision_payload"]
+    assert isinstance(pending_payload, dict)
+    assert isinstance(pending_payload.get("candidates"), list)
+    assert pending_payload["candidates"][0]["angle_id"] == "A01"
+    assert pending_payload["candidates"][0]["angle_name"] == "Mechanism-first relief"
+    assert "score" not in pending_payload["candidates"][0]
     assert "pending_activity_progress" in payload
     assert isinstance(payload["pending_activity_progress"], list)
+
+
+@pytest.mark.parametrize(
+    ("step_key", "expected_stage", "expected_signal"),
+    [
+        ("v2-02b", "v2-02", None),
+        ("v2-02", "v2-03", None),
+        ("v2-03", "v2-03b", None),
+        ("v2-03b", "v2-03c", None),
+        ("v2-03c", "v2-04", None),
+        ("v2-04", "v2-05", None),
+        ("v2-05", "v2-06", None),
+    ],
+)
+def test_strategy_v2_state_from_research_artifacts_uses_explicit_stage2b_checkpoints(
+    api_client,
+    db_session,
+    auth_context,
+    step_key,
+    expected_stage,
+    expected_signal,
+):
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix=f"Stage2B{step_key}",
+        strategy_v2_enabled=True,
+    )
+    org_uuid = UUID(auth_context.org_id)
+    client_uuid = UUID(client_id)
+    product_uuid = UUID(product_id)
+
+    workflow_run = WorkflowRun(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        temporal_workflow_id=f"strategy-v2-{step_key}-workflow",
+        temporal_run_id=f"strategy-v2-{step_key}-run",
+        kind=WorkflowKindEnum.strategy_v2,
+    )
+    db_session.add(workflow_run)
+    db_session.commit()
+    db_session.refresh(workflow_run)
+
+    step_artifact = Artifact(
+        org_id=org_uuid,
+        client_id=client_uuid,
+        product_id=product_uuid,
+        campaign_id=None,
+        type=ArtifactTypeEnum.strategy_v2_step_payload,
+        data={"payload": {"checkpoint": step_key}},
+    )
+    db_session.add(step_artifact)
+    db_session.commit()
+    db_session.refresh(step_artifact)
+
+    research = ResearchArtifact(
+        org_id=org_uuid,
+        workflow_run_id=workflow_run.id,
+        step_key=step_key,
+        title=f"{step_key} payload",
+        doc_id=str(step_artifact.id),
+        doc_url=f"artifact://{step_artifact.id}",
+        prompt_sha256=None,
+        summary=f"{step_key} complete",
+    )
+    db_session.add(research)
+    db_session.commit()
+
+    response = api_client.get(f"/workflows/{workflow_run.id}")
+    assert response.status_code == 200
+    state = response.json()["strategy_v2_state"]
+    assert state["current_stage"] == expected_stage
+    assert state["required_signal_type"] == expected_signal
+    assert state["pending_signal_type"] == expected_signal
+
+
+def _stage2b_shared_context_stub() -> dict[str, Any]:
+    return {
+        "stage0": {"product_name": "Product"},
+        "stage1": SimpleNamespace(
+            category_niche="Sleep Support",
+            competitor_urls=["https://competitor-a.example"],
+        ),
+        "stage1_data": {
+            "category_niche": "Sleep Support",
+            "competitor_urls": ["https://competitor-a.example"],
+        },
+        "precanon_research": {},
+        "foundational_step_contents": {
+            "01": "step01",
+            "02": "{\"asset_observation_sheets\": [], \"compliance_landscape\": {\"red_pct\": 0, \"yellow_pct\": 0}}",
+            "03": "step03",
+            "04": "SOURCE: forum.example\n\"Quote\"",
+            "06": "Avatar summary",
+        },
+        "foundational_step_summaries": {"06": "Avatar summary"},
+        "confirmed_competitor_assets": [
+            "https://competitor-a.example/asset-1",
+            "https://competitor-b.example/asset-2",
+            "https://competitor-c.example/asset-3",
+        ],
+        "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
+        "avatar_brief_payload": {"summary": "avatar"},
+    }
+
+
+def _stage2b_foundational_artifact_ids() -> dict[str, str]:
+    return {
+        "v2-02.foundation.01": "artifact-01",
+        "v2-02.foundation.02": "artifact-02",
+        "v2-02.foundation.03": "artifact-03",
+        "v2-02.foundation.04": "artifact-04",
+        "v2-02.foundation.06": "artifact-06",
+    }
+
+
+def _agent1_scraped_manifest_stub(*, run_count: int = 1, item_count: int = 1) -> dict[str, Any]:
+    runs = [
+        {
+            "actor_id": "practicaltools/apify-reddit-api",
+            "run_id": f"run-{idx + 1}",
+            "dataset_id": f"dataset-{idx + 1}",
+            "config_id": f"cfg-{idx + 1}",
+            "strategy_target_id": "HT-008",
+            "status": "SUCCEEDED",
+            "item_count": item_count,
+            "requested_refs": ["https://www.reddit.com/r/herbalism/"],
+            "virtual_path": f"/apify_output/raw_scraped_data/text_habitats/run-{idx + 1}.json",
+        }
+        for idx in range(run_count)
+    ]
+    raw_files = [
+        {
+            "file_name": f"run-{idx + 1}.json",
+            "virtual_path": f"/apify_output/raw_scraped_data/text_habitats/run-{idx + 1}.json",
+            "actor_id": "practicaltools/apify-reddit-api",
+            "run_id": f"run-{idx + 1}",
+            "dataset_id": f"dataset-{idx + 1}",
+            "config_id": f"cfg-{idx + 1}",
+            "strategy_target_id": "HT-008",
+            "item_count": item_count,
+            "requested_refs": ["https://www.reddit.com/r/herbalism/"],
+            "items": [{"title": "sample", "source_url": "https://www.reddit.com/r/herbalism/"}],
+        }
+        for idx in range(run_count)
+    ]
+    return {
+        "scraped_data_root": "/apify_output/",
+        "raw_scraped_data_files": raw_files,
+        "run_count": run_count,
+        "total_run_count": run_count,
+        "runs": runs,
+        "candidate_asset_count": run_count,
+        "social_video_observation_count": 0,
+        "external_voc_row_count": 0,
+        "competitor_asset_sheet_count": 0,
+        "platform_breakdown": {"REDDIT": run_count},
+    }
+
+
+def _postprocess_manifest_stub() -> dict[str, Any]:
+    return {
+        "run_count": 1,
+        "total_run_count": 1,
+        "runs": [
+            {
+                "actor_id": "practicaltools/apify-reddit-api",
+                "run_id": "run-1",
+                "dataset_id": "dataset-1",
+                "config_id": "cfg-1",
+                "item_count": 1,
+                "strategy_target_id": "HT-008",
+            }
+        ],
+        "raw_scraped_data_files": [
+            {
+                "actor_id": "practicaltools/apify-reddit-api",
+                "run_id": "run-1",
+                "dataset_id": "dataset-1",
+                "config_id": "cfg-1",
+                "item_count": 1,
+                "strategy_target_id": "HT-008",
+            }
+        ],
+    }
+
+
+def test_strategy_v2_apify_postprocess_uses_existing_collection_artifact_without_recollection(monkeypatch):
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ensure_foundational_step_payload_artifact_ids",
+        lambda **kwargs: kwargs["existing_step_payload_artifact_ids"],
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_require_step_payload_artifact_prerequisites", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00b_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_extract_apify_configs_from_agent_strategies",
+        lambda **_kwargs: [{"config_id": "cfg-1"}],
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_load_apify_collection_payload_for_postprocess",
+        lambda **_kwargs: {
+            "strategy_apify_configs": [{"config_id": "cfg-1"}],
+            "apify_context": {
+                "raw_runs": [
+                    {
+                        "actor_id": "practicaltools/apify-reddit-api",
+                        "run_id": "run-1",
+                        "dataset_id": "dataset-1",
+                        "config_id": "cfg-1",
+                        "status": "SUCCEEDED",
+                        "items": [{"title": "sample"}],
+                    }
+                ],
+                "social_video_observations": [],
+                "external_voc_corpus": [],
+                "proof_asset_candidates": [],
+            },
+            "strategy_config_run_count": 1,
+            "planned_actor_run_count": 1,
+            "executed_actor_run_count": 1,
+            "failed_actor_run_count": 0,
+        },
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ingest_strategy_v2_asset_data",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not recollect apify runs during postprocess")),
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_validate_reddit_target_alignment", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_extract_step4_entries", lambda _content: [])
+    monkeypatch.setattr(strategy_v2_activities, "_extract_video_observations", lambda _analysis: [])
+    monkeypatch.setattr(strategy_v2_activities, "_extract_video_source_allowlist", lambda _agent00b: [])
+    monkeypatch.setattr(strategy_v2_activities, "_build_video_topic_keywords", lambda **_kwargs: [])
+    monkeypatch.setattr(strategy_v2_activities, "_filter_metric_video_rows_for_scoring", lambda **_kwargs: ([], {}))
+    monkeypatch.setattr(strategy_v2_activities, "_normalize_video_scored_rows", lambda rows: rows)
+    monkeypatch.setattr(strategy_v2_activities, "transform_step4_entries_to_agent2_corpus", lambda _entries: [])
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_merge_voc_corpus_for_agent2",
+        lambda **_kwargs: {"prompt_rows": [], "artifact_rows": [], "summary": {}},
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_build_proof_candidates_from_voc", lambda **_kwargs: [])
+    monkeypatch.setattr(strategy_v2_activities, "_build_scraped_data_manifest", lambda **_kwargs: _postprocess_manifest_stub())
+    monkeypatch.setattr(strategy_v2_activities, "_record_agent_run", lambda **_kwargs: "agent-run-1")
+    monkeypatch.setattr(strategy_v2_activities, "_persist_step_payload", lambda **_kwargs: "artifact-v2-03c")
+
+    @contextmanager
+    def _fake_session_scope():
+        yield object()
+
+    monkeypatch.setattr(strategy_v2_activities, "session_scope", _fake_session_scope)
+
+    result = strategy_v2_activities.run_strategy_v2_voc_agent0b_apify_ingestion_activity(
+        {
+            "org_id": "org-1",
+            "client_id": "client-1",
+            "product_id": "product-1",
+            "campaign_id": None,
+            "workflow_run_id": "workflow-run-1",
+            "operator_user_id": "operator-1",
+            "stage0": {"product_name": "Product"},
+            "stage1": {"category_niche": "Sleep Support"},
+            "precanon_research": {"step_contents": {}, "step_summaries": {}},
+            "stage1_artifact_id": "stage1-artifact-id",
+            "confirmed_competitor_assets": [
+                "https://competitor-a.example/asset-1",
+                "https://competitor-b.example/asset-2",
+                "https://competitor-c.example/asset-3",
+            ],
+            "existing_step_payload_artifact_ids": {
+                **_stage2b_foundational_artifact_ids(),
+                "v2-02": "artifact-v2-02",
+                "v2-03": "artifact-v2-03",
+                "v2-03b": "artifact-v2-03b",
+            },
+            "agent00_output": {"ok": True},
+            "agent00b_output": {"ok": True},
+            "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
+            "apify_collection_artifact_id": "artifact-v2-03b",
+        }
+    )
+    assert result["step_payload_artifact_id"] == "artifact-v2-03c"
+    assert result["planned_actor_run_count"] == 1
+    assert result["executed_actor_run_count"] == 1
+    assert result["failed_actor_run_count"] == 0
+    assert result["handoff_audit"]["manifest_total_run_count"] == 1
+
+
+def test_strategy_v2_apify_postprocess_fails_when_collection_strategy_count_mismatches(monkeypatch):
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ensure_foundational_step_payload_artifact_ids",
+        lambda **kwargs: kwargs["existing_step_payload_artifact_ids"],
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_require_step_payload_artifact_prerequisites", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_extract_step4_entries", lambda _content: [])
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00b_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_extract_apify_configs_from_agent_strategies",
+        lambda **_kwargs: [{"config_id": "cfg-1"}, {"config_id": "cfg-2"}],
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_load_apify_collection_payload_for_postprocess",
+        lambda **_kwargs: {
+            "strategy_apify_configs": [{"config_id": "cfg-1"}],
+            "apify_context": {
+                "raw_runs": [
+                    {
+                        "actor_id": "practicaltools/apify-reddit-api",
+                        "run_id": "run-1",
+                        "dataset_id": "dataset-1",
+                        "config_id": "cfg-1",
+                        "status": "SUCCEEDED",
+                        "items": [{"title": "sample"}],
+                    }
+                ],
+            },
+            "strategy_config_run_count": 1,
+            "planned_actor_run_count": 1,
+            "executed_actor_run_count": 1,
+            "failed_actor_run_count": 0,
+        },
+    )
+
+    with pytest.raises(StrategyV2SchemaValidationError, match="strategy_config_run_count does not match current strategy config count"):
+        strategy_v2_activities.run_strategy_v2_voc_agent0b_apify_ingestion_activity(
+            {
+                "org_id": "org-1",
+                "client_id": "client-1",
+                "product_id": "product-1",
+                "campaign_id": None,
+                "workflow_run_id": "workflow-run-1",
+                "operator_user_id": "operator-1",
+                "stage0": {"product_name": "Product"},
+                "stage1": {"category_niche": "Sleep Support"},
+                "precanon_research": {"step_contents": {}, "step_summaries": {}},
+                "stage1_artifact_id": "stage1-artifact-id",
+                "confirmed_competitor_assets": [
+                    "https://competitor-a.example/asset-1",
+                    "https://competitor-b.example/asset-2",
+                    "https://competitor-c.example/asset-3",
+                ],
+                "existing_step_payload_artifact_ids": {
+                    **_stage2b_foundational_artifact_ids(),
+                    "v2-02": "artifact-v2-02",
+                    "v2-03": "artifact-v2-03",
+                    "v2-03b": "artifact-v2-03b",
+                },
+                "agent00_output": {"ok": True},
+                "agent00b_output": {"ok": True},
+                "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
+                "apify_collection_artifact_id": "artifact-v2-03b",
+            }
+        )
+
+
+def test_strategy_v2_manifest_selection_prefers_platform_diversity(monkeypatch):
+    def _run(actor_id: str, run_id: str, source_url: str) -> dict[str, Any]:
+        return {
+            "actor_id": actor_id,
+            "run_id": run_id,
+            "dataset_id": f"dataset-{run_id}",
+            "status": "SUCCEEDED",
+            "input_payload": {"startUrls": [{"url": source_url}]},
+            "items": [{"title": f"title-{run_id}", "source_url": source_url}],
+        }
+
+    manifest = strategy_v2_activities._build_scraped_data_manifest(
+        apify_context={
+            "raw_runs": [
+                _run("practicaltools/apify-reddit-api", "r1", "https://www.reddit.com/r/herbalism/"),
+                _run("practicaltools/apify-reddit-api", "r2", "https://www.reddit.com/r/Perimenopause/"),
+                _run("clockworks/tiktok-scraper", "t1", "https://www.tiktok.com/@herbalacademy/video/1"),
+                _run("apify/instagram-scraper", "i1", "https://www.instagram.com/explore/tags/herbalism/"),
+                _run("streamers/youtube-scraper", "y1", "https://www.youtube.com/watch?v=abc123"),
+                _run("apify/web-scraper", "w1", "https://example.com/article"),
+            ],
+            "candidate_assets": [],
+            "social_video_observations": [],
+            "external_voc_corpus": [],
+        },
+        competitor_analysis={"asset_observation_sheets": []},
+    )
+
+    actors = [
+        row.get("actor_id")
+        for row in manifest.get("runs", [])
+        if isinstance(row, dict) and isinstance(row.get("actor_id"), str)
+    ]
+    assert manifest["run_count"] == 6
+    assert manifest["total_run_count"] == 6
+    assert "practicaltools/apify-reddit-api" in actors
+    assert "clockworks/tiktok-scraper" in actors
+    assert "apify/instagram-scraper" in actors
+    assert "streamers/youtube-scraper" in actors
+    assert "apify/web-scraper" in actors
+
+
+def test_strategy_v2_checkpoint_c1_fails_when_agent0_configs_missing(monkeypatch):
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
+    monkeypatch.setattr(strategy_v2_activities, "_validate_step_payload_lineage_prerequisites", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_extract_step4_entries", lambda _content: [{"source": "forum.example"}])
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_prompt_json_object",
+        lambda **_kwargs: (
+            {"category_classification": {"primary": "sleep-support"}},
+            "raw-output",
+            {"prompt": "stub"},
+        ),
+    )
+
+    with pytest.raises(StrategyV2SchemaValidationError, match="apify_configs"):
+        strategy_v2_activities.run_strategy_v2_voc_agent0_habitat_strategy_activity(
+            {
+                "org_id": "org-1",
+                "client_id": "client-1",
+                "product_id": "product-1",
+                "campaign_id": None,
+                "workflow_run_id": "workflow-run-1",
+                "operator_user_id": "operator-1",
+                "stage0": {"product_name": "Product"},
+                "stage1": {"category_niche": "Sleep Support"},
+                "precanon_research": {"step_contents": {}, "step_summaries": {}},
+                "stage1_artifact_id": "stage1-artifact-id",
+                "confirmed_competitor_assets": [
+                    "https://competitor-a.example/asset-1",
+                    "https://competitor-b.example/asset-2",
+                    "https://competitor-c.example/asset-3",
+                ],
+                "existing_step_payload_artifact_ids": _stage2b_foundational_artifact_ids(),
+            }
+        )
+
+
+def test_strategy_v2_checkpoint_c3_requires_scraped_manifest(monkeypatch):
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
+    monkeypatch.setattr(strategy_v2_activities, "_validate_step_payload_lineage_prerequisites", lambda **_kwargs: None)
+
+    with pytest.raises(StrategyV2MissingContextError, match="raw_scraped_data_files"):
+        strategy_v2_activities.run_strategy_v2_voc_agent1_habitat_qualifier_activity(
+            {
+                "org_id": "org-1",
+                "client_id": "client-1",
+                "product_id": "product-1",
+                "campaign_id": None,
+                "workflow_run_id": "workflow-run-1",
+                "operator_user_id": "operator-1",
+                "stage0": {"product_name": "Product"},
+                "stage1": {"category_niche": "Sleep Support"},
+                "precanon_research": {"step_contents": {}, "step_summaries": {}},
+                "stage1_artifact_id": "stage1-artifact-id",
+                "confirmed_competitor_assets": [
+                    "https://competitor-a.example/asset-1",
+                    "https://competitor-b.example/asset-2",
+                    "https://competitor-c.example/asset-3",
+                ],
+                "existing_step_payload_artifact_ids": {
+                    **_stage2b_foundational_artifact_ids(),
+                    "v2-02": "artifact-v2-02",
+                    "v2-03": "artifact-v2-03",
+                    "v2-03b": "artifact-v2-03b",
+                    "v2-03c": "artifact-v2-03c",
+                },
+                "agent00_output": {"apify_configs_tier1": [{}], "apify_configs_tier2": [{}]},
+                "agent00b_output": {"configurations": [{}]},
+                "scraped_data_manifest": {},
+                "video_scored": [],
+                "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
+            }
+        )
+
+
+def test_strategy_v2_checkpoint_c3_rejects_manifest_count_mismatch(monkeypatch):
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
+    monkeypatch.setattr(strategy_v2_activities, "_validate_step_payload_lineage_prerequisites", lambda **_kwargs: None)
+
+    with pytest.raises(StrategyV2SchemaValidationError, match="total_run_count mismatch for Agent 1 handoff"):
+        strategy_v2_activities.run_strategy_v2_voc_agent1_habitat_qualifier_activity(
+            {
+                "org_id": "org-1",
+                "client_id": "client-1",
+                "product_id": "product-1",
+                "campaign_id": None,
+                "workflow_run_id": "workflow-run-1",
+                "operator_user_id": "operator-1",
+                "stage0": {"product_name": "Product"},
+                "stage1": {"category_niche": "Sleep Support"},
+                "precanon_research": {"step_contents": {}, "step_summaries": {}},
+                "stage1_artifact_id": "stage1-artifact-id",
+                "confirmed_competitor_assets": [
+                    "https://competitor-a.example/asset-1",
+                    "https://competitor-b.example/asset-2",
+                    "https://competitor-c.example/asset-3",
+                ],
+                "existing_step_payload_artifact_ids": {
+                    **_stage2b_foundational_artifact_ids(),
+                    "v2-02": "artifact-v2-02",
+                    "v2-03": "artifact-v2-03",
+                    "v2-03b": "artifact-v2-03b",
+                    "v2-03c": "artifact-v2-03c",
+                },
+                "agent00_output": {"apify_configs_tier1": [{}], "apify_configs_tier2": [{}]},
+                "agent00b_output": {"configurations": [{}]},
+                "scraped_data_manifest": _agent1_scraped_manifest_stub(run_count=1, item_count=1),
+                "video_scored": [],
+                "strategy_config_run_count": 0,
+                "planned_actor_run_count": 101,
+                "executed_actor_run_count": 101,
+                "failed_actor_run_count": 0,
+                "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
+            }
+        )
+
+
+def test_strategy_v2_checkpoint_c3_payload_upload_path_reaches_prompt_call(monkeypatch):
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
+    monkeypatch.setattr(strategy_v2_activities, "_validate_step_payload_lineage_prerequisites", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_AGENT1_HABITAT_STRATEGY_MAX_CHARS", 32)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_prompt_json_object",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("_run_prompt_json_object reached")),
+    )
+
+    with pytest.raises(AssertionError, match="_run_prompt_json_object reached"):
+        strategy_v2_activities.run_strategy_v2_voc_agent1_habitat_qualifier_activity(
+            {
+                "org_id": "org-1",
+                "client_id": "client-1",
+                "product_id": "product-1",
+                "campaign_id": None,
+                "workflow_run_id": "workflow-run-1",
+                "operator_user_id": "operator-1",
+                "stage0": {"product_name": "Product"},
+                "stage1": {"category_niche": "Sleep Support"},
+                "precanon_research": {"step_contents": {}, "step_summaries": {}},
+                "stage1_artifact_id": "stage1-artifact-id",
+                "confirmed_competitor_assets": [
+                    "https://competitor-a.example/asset-1",
+                    "https://competitor-b.example/asset-2",
+                    "https://competitor-c.example/asset-3",
+                ],
+                "existing_step_payload_artifact_ids": {
+                    **_stage2b_foundational_artifact_ids(),
+                    "v2-02": "artifact-v2-02",
+                    "v2-03": "artifact-v2-03",
+                    "v2-03b": "artifact-v2-03b",
+                    "v2-03c": "artifact-v2-03c",
+                },
+                "agent00_output": {"large": "x" * 256},
+                "agent00b_output": {"configurations": [{}]},
+                "scraped_data_manifest": _agent1_scraped_manifest_stub(run_count=1, item_count=1),
+                "video_scored": [],
+                "strategy_config_run_count": 0,
+                "planned_actor_run_count": 1,
+                "executed_actor_run_count": 1,
+                "failed_actor_run_count": 0,
+                "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
+            }
+        )
+
+
+def test_strategy_v2_checkpoint_c4_requires_agent1_handoff(monkeypatch):
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
+    monkeypatch.setattr(strategy_v2_activities, "_validate_step_payload_lineage_prerequisites", lambda **_kwargs: None)
+
+    with pytest.raises(StrategyV2SchemaValidationError, match="agent01_output"):
+        strategy_v2_activities.run_strategy_v2_voc_agent2_extraction_activity(
+            {
+                "org_id": "org-1",
+                "client_id": "client-1",
+                "product_id": "product-1",
+                "campaign_id": None,
+                "workflow_run_id": "workflow-run-1",
+                "operator_user_id": "operator-1",
+                "stage0": {"product_name": "Product"},
+                "stage1": {"category_niche": "Sleep Support"},
+                "precanon_research": {"step_contents": {}, "step_summaries": {}},
+                "stage1_artifact_id": "stage1-artifact-id",
+                "confirmed_competitor_assets": [
+                    "https://competitor-a.example/asset-1",
+                    "https://competitor-b.example/asset-2",
+                    "https://competitor-c.example/asset-3",
+                ],
+                "existing_step_payload_artifact_ids": {
+                    **_stage2b_foundational_artifact_ids(),
+                    "v2-03": "artifact-v2-03",
+                    "v2-03b": "artifact-v2-03b",
+                    "v2-03c": "artifact-v2-03c",
+                    "v2-04": "artifact-v2-04",
+                },
+                "agent01_output": None,
+                "habitat_scored": {},
+                "existing_corpus": [{"voc_id": "v1", "quote": "Quote", "source_url": "https://source.example"}],
+                "merged_voc_artifact_rows": [],
+                "corpus_selection_summary": {},
+                "external_corpus_count": 0,
+                "proof_asset_candidates": [],
+                "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
+            }
+        )
+
+
+def test_strategy_v2_checkpoint_c5_requires_voc_scored(monkeypatch):
+    monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
+    monkeypatch.setattr(strategy_v2_activities, "_validate_step_payload_lineage_prerequisites", lambda **_kwargs: None)
+
+    with pytest.raises(StrategyV2SchemaValidationError, match="voc_scored"):
+        strategy_v2_activities.run_strategy_v2_voc_agent3_synthesis_activity(
+            {
+                "org_id": "org-1",
+                "client_id": "client-1",
+                "product_id": "product-1",
+                "campaign_id": None,
+                "workflow_run_id": "workflow-run-1",
+                "operator_user_id": "operator-1",
+                "stage0": {"product_name": "Product"},
+                "stage1": {"category_niche": "Sleep Support"},
+                "precanon_research": {"step_contents": {}, "step_summaries": {}},
+                "stage1_artifact_id": "stage1-artifact-id",
+                "confirmed_competitor_assets": [
+                    "https://competitor-a.example/asset-1",
+                    "https://competitor-b.example/asset-2",
+                    "https://competitor-c.example/asset-3",
+                ],
+                "existing_step_payload_artifact_ids": {
+                    **_stage2b_foundational_artifact_ids(),
+                    "v2-05": "artifact-v2-05",
+                },
+                "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
+                "voc_observations": [{"voc_id": "V001", "quote": "Quote", "source_url": "https://source.example"}],
+                "voc_scored": None,
+            }
+        )
+
+
+def test_normalize_strategy_v2_artifact_refs_promotes_nested_step_payload_ids():
+    normalized = _normalize_strategy_v2_artifact_refs(
+        {
+            "step_payload_artifact_ids": {
+                "v2-02i": "artifact-id-02i",
+                "v2-06": "artifact-id-06",
+            },
+            "step_payload_v2_02i_artifact_id": "artifact-id-02i",
+        }
+    )
+    assert normalized["v2-02i"] == "artifact-id-02i"
+    assert normalized["v2-06"] == "artifact-id-06"
+    assert normalized["step_payload_v2_06_artifact_id"] == "artifact-id-06"
 
 
 def test_strategy_v2_state_includes_h2_candidates_from_ingestion_artifact(api_client, db_session, auth_context):
@@ -1571,6 +2595,46 @@ def test_strategy_v2_voc_pipeline_accepts_precanon_research_without_client_canon
         "score_angles",
         lambda angle_observations, saturated_count: _mock_scored_angles(),
     )
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00b_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_filter_metric_video_rows_for_scoring",
+        lambda **kwargs: (
+            [row for row in kwargs.get("video_rows", []) if isinstance(row, dict)],
+            {
+                "input_rows": len(kwargs.get("video_rows", [])),
+                "missing_metrics": 0,
+                "off_target_source": 0,
+                "off_topic": 0,
+                "kept_rows": len([row for row in kwargs.get("video_rows", []) if isinstance(row, dict)]),
+            },
+        ),
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_AGENT1_COMPACTION_THRESHOLD", 200000)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_agent2_extractor",
+        lambda **_kwargs: {
+            "mode": "DUAL",
+            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "rejected_items": [],
+            "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
+            "prompt_provenance": {},
+            "raw_outputs_preview": [],
+        },
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "score_voc_items",
+        lambda rows: {
+            "items": [{"adjusted_score": 1.0, "zero_evidence_gate": False} for _ in rows] or [{"adjusted_score": 1.0, "zero_evidence_gate": False}],
+            "summary": {"count": len(rows)},
+        },
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_require_voc_transition_quality", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_validate_agent1_output_source_file_grounding", lambda **_kwargs: None)
 
     client_id, product_id = _create_client_and_product(
         api_client=api_client,
@@ -1716,6 +2780,46 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
         "score_angles",
         lambda angle_observations, saturated_count: _mock_scored_angles(),
     )
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00b_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_filter_metric_video_rows_for_scoring",
+        lambda **kwargs: (
+            [row for row in kwargs.get("video_rows", []) if isinstance(row, dict)],
+            {
+                "input_rows": len(kwargs.get("video_rows", [])),
+                "missing_metrics": 0,
+                "off_target_source": 0,
+                "off_topic": 0,
+                "kept_rows": len([row for row in kwargs.get("video_rows", []) if isinstance(row, dict)]),
+            },
+        ),
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_AGENT1_COMPACTION_THRESHOLD", 200000)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_agent2_extractor",
+        lambda **_kwargs: {
+            "mode": "DUAL",
+            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "rejected_items": [],
+            "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
+            "prompt_provenance": {},
+            "raw_outputs_preview": [],
+        },
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "score_voc_items",
+        lambda rows: {
+            "items": [{"adjusted_score": 1.0, "zero_evidence_gate": False} for _ in rows] or [{"adjusted_score": 1.0, "zero_evidence_gate": False}],
+            "summary": {"count": len(rows)},
+        },
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_require_voc_transition_quality", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_validate_agent1_output_source_file_grounding", lambda **_kwargs: None)
     monkeypatch.setattr(
         strategy_v2_activities,
         "_run_foundational_research_from_onboarding",
@@ -1845,7 +2949,7 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
     assert stage1["category_niche"] == "Health & Wellness"
     assert voc_angle_result["ranked_angle_candidates"]
     assert isinstance(voc_angle_result["competitor_analysis"].get("compliance_landscape"), dict)
-    assert isinstance(voc_angle_result["video_scored"], dict)
+    assert isinstance(voc_angle_result["video_scored"], list)
     foundational_ids = {
         step_key: artifact_id
         for step_key, artifact_id in voc_angle_result["step_payload_artifact_ids"].items()
@@ -1869,6 +2973,166 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
         .all()
     )
     assert {row.step_key for row in foundational_rows} == set(foundational_ids.keys())
+
+
+def test_build_offer_variants_requires_nonempty_revision_notes(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    @contextmanager
+    def _session_scope_override():
+        yield db_session
+
+    monkeypatch.setattr(strategy_v2_activities, "session_scope", _session_scope_override)
+
+    original_run_prompt_json_object = strategy_v2_activities._run_prompt_json_object
+
+    def _run_prompt_json_object_with_blank_revision_notes(*args, **kwargs):
+        payload, raw_output, provenance = original_run_prompt_json_object(*args, **kwargs)
+        if kwargs.get("context") == "strategy_v2.offer.step05":
+            payload = dict(payload)
+            payload["revision_notes"] = "   "
+            raw_output = json.dumps(payload)
+            provenance = dict(provenance)
+            provenance["openai_response_id"] = "resp_test_step05"
+        return payload, raw_output, provenance
+
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_prompt_json_object",
+        _run_prompt_json_object_with_blank_revision_notes,
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "composite_scorer",
+        lambda _evaluation, _config: {"any_passing": False},
+    )
+
+    client_id, product_id = _create_client_and_product(
+        api_client=api_client,
+        suffix="OfferVariantRevisionNotes",
+        strategy_v2_enabled=True,
+    )
+    ensure_run = strategy_v2_activities.ensure_strategy_v2_workflow_run_activity(
+        {
+            "org_id": auth_context.org_id,
+            "client_id": client_id,
+            "product_id": product_id,
+            "campaign_id": None,
+            "temporal_workflow_id": "strategy-v2-offer-variants-revision-notes",
+            "temporal_run_id": "strategy-v2-offer-variants-revision-notes-run",
+        }
+    )
+    workflow_run_id = ensure_run["workflow_run_id"]
+
+    stage2_payload = {
+        "schema_version": "2.0.0",
+        "stage": 2,
+        "product_name": "Offer Variant Product",
+        "description": "A detailed product description",
+        "price": "$49",
+        "competitor_urls": ["https://competitor-a.example"],
+        "product_customizable": True,
+        "category_niche": "Sleep Support",
+        "product_category_keywords": ["sleep", "routine"],
+        "market_maturity_stage": "Growth",
+        "primary_segment": {
+            "name": "Caregivers",
+            "size_estimate": "Large",
+            "key_differentiator": "Night routine instability",
+        },
+        "bottleneck": "No reliable night sequence",
+        "positioning_gaps": ["Most offers ignore sequencing"],
+        "competitor_count_validated": 3,
+        "primary_icps": ["Working parents"],
+        "selected_angle": _selected_angle_payload(),
+        "compliance_constraints": {
+            "overall_risk": "YELLOW",
+            "red_flag_patterns": [],
+            "platform_notes": "Avoid medical cure language.",
+        },
+        "buyer_behavior_archetype": "HIGH_TRUST",
+        "purchase_emotion": "MIXED",
+        "price_sensitivity": "medium",
+    }
+
+    offer_pipeline_output = {
+        "pair_scoring": {
+            "ranked_pairs": [
+                {
+                    "pair_id": "pair-a",
+                    "ump_name": "Mechanism Gap",
+                    "ums_name": "Evidence Protocol",
+                }
+            ]
+        },
+        "offer_input": {
+            "product_brief": {
+                "name": "Offer Variant Product",
+                "description": "A detailed product description",
+                "category": "Sleep Support",
+                "price_cents": 4900,
+                "currency": "USD",
+                "business_model": "one-time",
+                "funnel_position": "cold_traffic",
+                "target_platforms": ["Meta"],
+                "target_regions": ["US"],
+                "product_customizable": True,
+                "constraints": {
+                    "compliance_sensitivity": "medium",
+                    "existing_proof_assets": [],
+                    "brand_voice_notes": "Direct and concrete.",
+                },
+            },
+            "competitor_teardowns": "{}",
+            "voc_research": "{}",
+            "purple_ocean_research": "Purple ocean whitespace analysis.",
+            "config": {
+                "llm_model": "gpt-5.2-2025-12-11",
+                "max_iterations": 2,
+                "score_threshold": 8.5,
+            },
+        },
+        "offer_prompt_chain": {
+            "orchestrator_prompt_provenance": {
+                "prompt_path": "V2 Fixes/Offer Agent — Final/prompts/pipeline-orchestrator.md",
+                "prompt_sha256": "sha",
+                "model_name": "gpt-5.2-2025-12-11",
+                "input_contract_version": "2.0.0",
+                "output_contract_version": "2.0.0",
+            },
+            "orchestrator_spec_excerpt": "Offer orchestrator contract excerpt.",
+            "step_01_output": "Avatar findings",
+            "step_02_output": "Market calibration findings",
+        },
+    }
+
+    with pytest.raises(
+        StrategyV2SchemaValidationError,
+        match=r"response_id=resp_test_step05",
+    ):
+        strategy_v2_activities.build_strategy_v2_offer_variants_activity(
+            {
+                "org_id": auth_context.org_id,
+                "client_id": client_id,
+                "product_id": product_id,
+                "campaign_id": None,
+                "workflow_run_id": workflow_run_id,
+                "stage2": stage2_payload,
+                "offer_pipeline_output": offer_pipeline_output,
+                "ump_ums_selection_decision": {
+                    "operator_user_id": "operator-1",
+                    "pair_id": "pair-a",
+                    "rejected_pair_ids": [],
+                    "reviewed_candidate_ids": ["pair-a"],
+                    **_manual_hitl_fields(
+                        operator_note="Reviewed pair evidence and selected pair-a for highest plausibility.",
+                    ),
+                },
+            }
+        )
 
 
 def test_strategy_v2_activity_integration_stage0_to_final_copy(
@@ -1956,6 +3220,46 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
         "score_angles",
         lambda angle_observations, saturated_count: _mock_scored_angles(),
     )
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(strategy_v2_activities, "_require_agent00b_executable_configs", lambda _payload: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_filter_metric_video_rows_for_scoring",
+        lambda **kwargs: (
+            [row for row in kwargs.get("video_rows", []) if isinstance(row, dict)],
+            {
+                "input_rows": len(kwargs.get("video_rows", [])),
+                "missing_metrics": 0,
+                "off_target_source": 0,
+                "off_topic": 0,
+                "kept_rows": len([row for row in kwargs.get("video_rows", []) if isinstance(row, dict)]),
+            },
+        ),
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_AGENT1_COMPACTION_THRESHOLD", 200000)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_agent2_extractor",
+        lambda **_kwargs: {
+            "mode": "DUAL",
+            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "rejected_items": [],
+            "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
+            "prompt_provenance": {},
+            "raw_outputs_preview": [],
+        },
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "score_voc_items",
+        lambda rows: {
+            "items": [{"adjusted_score": 1.0, "zero_evidence_gate": False} for _ in rows] or [{"adjusted_score": 1.0, "zero_evidence_gate": False}],
+            "summary": {"count": len(rows)},
+        },
+    )
+    monkeypatch.setattr(strategy_v2_activities, "_require_voc_transition_quality", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_validate_agent1_output_source_file_grounding", lambda **_kwargs: None)
 
     client_id, product_id = _create_client_and_product(
         api_client=api_client,
@@ -2183,6 +3487,19 @@ SEGMENT_HINT: parents
         }
     )
     assert stage3_result["awareness_matrix_artifact_id"]
+    assert stage3_result.get("product_offer_id")
+    synced_offer = db_session.query(ProductOffer).filter(
+        ProductOffer.org_id == org_uuid,
+        ProductOffer.id == UUID(stage3_result["product_offer_id"]),
+    ).first()
+    assert synced_offer is not None
+    assert str(synced_offer.client_id) == client_id
+    assert str(synced_offer.product_id) == product_id
+    assert synced_offer.name == stage3_result["stage3"]["core_promise"]
+    assert synced_offer.options_schema is not None
+    assert synced_offer.options_schema.get("strategyV2Offer", {}).get("variant_id") == stage3_result["stage3"][
+        "variant_selected"
+    ]
     copy_result = strategy_v2_activities.run_strategy_v2_copy_pipeline_activity(
         {
             "org_id": auth_context.org_id,

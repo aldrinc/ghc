@@ -48,8 +48,8 @@ class Settings(BaseSettings):
     STRATEGY_V2_COPY_QA_MODEL: str = "claude-sonnet-4-20250514"
     STRATEGY_V2_APIFY_ENABLED: bool = False
     STRATEGY_V2_APIFY_MAX_WAIT_SECONDS: int = 900
-    STRATEGY_V2_APIFY_MAX_ITEMS_PER_DATASET: int = 80
-    STRATEGY_V2_APIFY_MAX_ACTOR_RUNS: int = 6
+    STRATEGY_V2_APIFY_MAX_ITEMS_PER_DATASET: int = 500
+    STRATEGY_V2_APIFY_MAX_ACTOR_RUNS: int = 100
     STRATEGY_V2_APIFY_ALLOWED_ACTOR_IDS: str = ""
     STRATEGY_V2_APIFY_META_ACTOR_ID: str = "curious_coder~facebook-ads-library-scraper"
     STRATEGY_V2_APIFY_TIKTOK_ACTOR_ID: str = "clockworks/tiktok-scraper"
@@ -132,6 +132,13 @@ class Settings(BaseSettings):
     CREATIVE_SERVICE_ASSETS_PER_BRIEF: int = 6
     CREATIVE_SERVICE_RETENTION_DAYS: int = 60
     CREATIVE_SERVICE_PRODUCT_ASSET_CONTEXT_LIMIT: int = 6
+    IMAGE_RENDER_PROVIDER: str = "higgsfield"
+    HIGGSFIELD_BASE_URL: str = "https://platform.higgsfield.ai"
+    HF_KEY: str | None = None
+    HF_API_KEY: str | None = None
+    HF_API_SECRET: str | None = None
+    HIGGSFIELD_DEFAULT_MODEL: str = "nano-banana-pro"
+    HIGGSFIELD_DEFAULT_RESOLUTION: str = "1k"
 
     MEDIA_STORAGE_BUCKET: str | None = None
     MEDIA_STORAGE_PREVIEW_BUCKET: str | None = None

@@ -1438,6 +1438,65 @@ class WorkflowRun(Base):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class StrategyV2Launch(Base):
+    __tablename__ = "strategy_v2_launches"
+    __table_args__ = (
+        UniqueConstraint("org_id", "launch_key", name="uq_strategy_v2_launches_org_launch_key"),
+        UniqueConstraint(
+            "org_id",
+            "angle_run_id",
+            "selected_ums_id",
+            name="uq_strategy_v2_launches_org_angle_run_ums",
+        ),
+        sa.Index("idx_strategy_v2_launches_source_run", "org_id", "source_strategy_v2_workflow_run_id"),
+        sa.Index("idx_strategy_v2_launches_campaign", "org_id", "campaign_id"),
+        sa.Index("idx_strategy_v2_launches_angle", "org_id", "client_id", "product_id", "angle_id"),
+        sa.Index("idx_strategy_v2_launches_created_at", "created_at"),
+    )
+
+    id: Mapped[str] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
+    org_id: Mapped[str] = mapped_column(ForeignKey("orgs.id", ondelete="CASCADE"), nullable=False)
+    source_strategy_v2_workflow_run_id: Mapped[str] = mapped_column(
+        ForeignKey("workflow_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    source_strategy_v2_temporal_workflow_id: Mapped[str] = mapped_column(Text, nullable=False)
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[str] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    campaign_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True
+    )
+    funnel_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("funnels.id", ondelete="SET NULL"), nullable=True
+    )
+    angle_id: Mapped[str] = mapped_column(Text, nullable=False)
+    angle_run_id: Mapped[str] = mapped_column(Text, nullable=False)
+    selected_ums_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    selected_variant_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source_stage3_artifact_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+    source_offer_artifact_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+    source_copy_artifact_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+    source_copy_context_artifact_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True
+    )
+    launch_type: Mapped[str] = mapped_column(Text, nullable=False)
+    launch_key: Mapped[str] = mapped_column(Text, nullable=False)
+    launch_index: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    launch_workflow_run_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    launch_temporal_workflow_id: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_by_user: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class ActivityLog(Base):
     __tablename__ = "activity_logs"
 

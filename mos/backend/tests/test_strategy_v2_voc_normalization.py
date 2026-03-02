@@ -8,6 +8,18 @@ def _base_voc_row() -> dict[str, object]:
     return {
         "voc_id": "V001",
         "source": "https://www.reddit.com/r/herbalism/comments/example",
+        "source_type": "REDDIT",
+        "source_url": "https://www.reddit.com/r/herbalism/comments/example",
+        "source_author": "user_01",
+        "source_date": "2026-02-20",
+        "is_hook": "N",
+        "hook_format": "NONE",
+        "hook_word_count": 0,
+        "video_virality_tier": "BASELINE",
+        "video_view_count": 0,
+        "competitor_saturation": [],
+        "in_whitespace": "Y",
+        "evidence_ref": "reddit_01::item[0]",
         "quote": (
             "I keep seeing conflicting advice because every guide says something different, "
             "and I'm anxious about making a mistake for my family."

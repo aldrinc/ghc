@@ -386,6 +386,21 @@ def render_copy_page_runtime_instruction(
             f"- Include at least {page_contract.min_markdown_links} markdown links using `[text](url)` format.\n"
             "- Use section headings that map clearly to the required page contract sections."
         )
+        template_payload_rules = (
+            "## Template Payload Rules (strict)\n"
+            "- `template_payload` must match `pre-sales-listicle` shape exactly.\n"
+            "- Required keys: hero, reasons, marquee, pitch, reviews, review_wall, floating_cta.\n"
+            "- `hero` requires non-empty title, subtitle, and `badges` (array of {label, optional value}).\n"
+            "- `reasons` items require integer number + non-empty title/body.\n"
+            "- `reviews` requires at least 3 objects with non-empty `text` and `author` (optional `rating`, `verified`).\n"
+            "- `pitch` requires title, bullets array, and cta_label.\n"
+            "- `review_wall` requires `title` and `button_label`.\n"
+            "- Return only real copy content; do not invent placeholders."
+        )
+        runtime_output_contract = (
+            "Return JSON with keys `markdown` and `template_payload`. "
+            "Use section headings that align to PAGE_SECTION_CONTRACT_JSON."
+        )
     else:
         hard_quality_constraints = (
             f"- Output {quality_profile.word_floor}-{quality_profile.word_ceiling} total words.\n"
@@ -395,6 +410,20 @@ def render_copy_page_runtime_instruction(
             f"- Include at least {quality_profile.guarantee_depth_floor or 0} words in guarantee/risk-reversal sections.\n"
             f"- Include at least {page_contract.min_markdown_links} markdown links using `[text](url)` format.\n"
             "- Use section headings that map clearly to the required page contract sections."
+        )
+        template_payload_rules = (
+            "## Template Payload Rules (strict)\n"
+            "- `template_payload` must match `sales-pdp` shape exactly.\n"
+            "- `hero.primary_cta_subbullets` must contain exactly 2 concise bullets.\n"
+            "- `mechanism.bullets` must be 4-6 objects with `title` + `body`.\n"
+            "- `mechanism.callout` must include left_title/left_body/right_title/right_body.\n"
+            "- `mechanism.comparison` must include badge/title/swipe_hint/columns/rows.\n"
+            "- Keep `whats_inside.benefits` and `bonus.free_gifts_body` concise and scannable.\n"
+            "- Return only real copy content; do not invent placeholders."
+        )
+        runtime_output_contract = (
+            "Return JSON with keys `markdown` and `template_payload`. "
+            "Use section headings that align to PAGE_SECTION_CONTRACT_JSON."
         )
 
     cta_budget_rules = (
@@ -445,9 +474,10 @@ def render_copy_page_runtime_instruction(
         f"{cta_budget_rules}\n\n"
         f"{heading_rules}\n\n"
         f"{promise_timing_rules}\n\n"
+        f"{template_payload_rules}\n\n"
         f"{repair_block}"
         "## Runtime Output Contract\n"
-        "Return JSON with `markdown` only. Use section headings that align to PAGE_SECTION_CONTRACT_JSON."
+        f"{runtime_output_contract}"
     )
 
 

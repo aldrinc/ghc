@@ -125,8 +125,37 @@ def test_auth_creates_org_and_allows_client_create(db_session, monkeypatch):
         app.dependency_overrides.clear()
 
 
-def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, auth_context):
+def test_onboarding_requires_strategy_v2_enabled(api_client):
     client_resp = api_client.post("/clients", json={"name": "Client API", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    onboarding_resp = api_client.post(
+        f"/clients/{client_id}/onboarding",
+        json={
+            "business_type": "new",
+            "brand_story": "Brand story for testing",
+            "product_name": "Test Product",
+            "product_customizable": True,
+            "business_model": "one_time",
+            "funnel_position": "top_of_funnel",
+            "target_platforms": ["meta"],
+            "target_regions": ["US"],
+            "existing_proof_assets": ["customer testimonials"],
+            "brand_voice_notes": "Clear and practical voice.",
+            "product_description": "A simple test product for onboarding.",
+            "goals": ["grow"],
+        },
+    )
+    assert onboarding_resp.status_code == 409
+    assert "Strategy V2 is disabled" in onboarding_resp.json()["detail"]
+
+
+def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, auth_context):
+    client_resp = api_client.post(
+        "/clients",
+        json={"name": "Client API", "industry": "SaaS", "strategyV2Enabled": True},
+    )
     assert client_resp.status_code == 201
     client_id = client_resp.json()["id"]
 
@@ -140,6 +169,12 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
             "brand_story": "Brand story for testing",
             "product_name": "Test Product",
             "product_customizable": True,
+            "business_model": "one_time",
+            "funnel_position": "top_of_funnel",
+            "target_platforms": ["meta"],
+            "target_regions": ["US"],
+            "existing_proof_assets": ["customer testimonials"],
+            "brand_voice_notes": "Clear and practical voice.",
             "product_description": "A simple test product for onboarding.",
             "goals": ["grow"],
         },
@@ -184,6 +219,42 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
             product_id=product_uuid,
             type=ArtifactTypeEnum.metric_schema,
             data={"kpis": [{"id": "kpi-1", "name": "CTR"}]},
+        )
+    )
+    db_session.add(
+        Artifact(
+            org_id=org_id,
+            client_id=client_uuid,
+            product_id=product_uuid,
+            type=ArtifactTypeEnum.strategy_v2_stage3,
+            data={"core_promise": "Test core promise", "variant_selected": "variant-a"},
+        )
+    )
+    db_session.add(
+        Artifact(
+            org_id=org_id,
+            client_id=client_uuid,
+            product_id=product_uuid,
+            type=ArtifactTypeEnum.strategy_v2_offer,
+            data={"variant_selected": "variant-a"},
+        )
+    )
+    db_session.add(
+        Artifact(
+            org_id=org_id,
+            client_id=client_uuid,
+            product_id=product_uuid,
+            type=ArtifactTypeEnum.strategy_v2_copy,
+            data={"headline": "Test headline", "presell_markdown": "presell", "sales_page_markdown": "sales"},
+        )
+    )
+    db_session.add(
+        Artifact(
+            org_id=org_id,
+            client_id=client_uuid,
+            product_id=product_uuid,
+            type=ArtifactTypeEnum.strategy_v2_copy_context,
+            data={"angle_name": "Test angle"},
         )
     )
     db_session.commit()

@@ -52,8 +52,10 @@ def _default_allowed_actor_ids() -> str:
             "apify/instagram-scraper",
             "streamers/youtube-scraper",
             "practicaltools/apify-reddit-api",
-            "trudax/reddit-scraper",
             "apify/web-scraper",
+            "apify/google-search-scraper",
+            "emastra/trustpilot-scraper",
+            "junglee/amazon-reviews-scraper",
         ]
     )
 

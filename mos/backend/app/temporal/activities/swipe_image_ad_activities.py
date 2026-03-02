@@ -40,6 +40,10 @@ from app.services.creative_service_client import (
     CreativeServiceConfigError,
     CreativeServiceRequestError,
 )
+from app.services.image_render_client import (
+    build_image_render_client,
+    get_image_render_provider,
+)
 from app.services.gemini_file_search import (
     ensure_uploaded_to_gemini_file_search,
     is_gemini_file_search_enabled,
@@ -683,7 +687,7 @@ def _resolve_gemini_file_search_store_names(
 
 def _poll_image_job(
     *,
-    creative_client: CreativeServiceClient,
+    creative_client: Any,
     job_id: str,
 ) -> Any:
     poll_interval = float(settings.CREATIVE_SERVICE_POLL_INTERVAL_SECONDS or 2.0)
@@ -851,6 +855,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 error=error,
             )
 
+    render_provider = get_image_render_provider()
     log_activity(
         "swipe_image_ad",
         "started",
@@ -862,6 +867,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "model": model_name,
             "render_model_id_requested": requested_render_model_id,
             "render_model_id_used": render_model_id,
+            "render_provider": render_provider,
             "count": count,
             "render_count": render_count,
             "aspect_ratio": aspect_ratio,
@@ -870,7 +876,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     )
 
     try:
-        creative_client = CreativeServiceClient()
+        render_client = build_image_render_client()
     except CreativeServiceConfigError as exc:
         raise RuntimeError(str(exc)) from exc
 
@@ -947,22 +953,49 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "pricePoints": [],
         }
 
-        # Final image generation must include real product image references.
-        product_reference_assets = _select_product_reference_assets(
-            session=session,
-            org_id=org_id,
-            product_id=product_id,
+        # Product references are optional for this flow. If no product image exists, continue as text-to-image.
+        try:
+            product_reference_assets = _select_product_reference_assets(
+                session=session,
+                org_id=org_id,
+                product_id=product_id,
+            )
+        except ValueError as exc:
+            if "No active source product images are available" in str(exc):
+                product_reference_assets = []
+            else:
+                raise
+        product_reference_remote_ids: list[str] = []
+        if render_provider == "creative_service" and product_reference_assets:
+            try:
+                reference_client = CreativeServiceClient()
+            except CreativeServiceConfigError as exc:
+                raise RuntimeError(str(exc)) from exc
+            product_reference_remote_ids = _ensure_remote_reference_asset_ids(
+                session=session,
+                org_id=org_id,
+                creative_client=reference_client,
+                references=product_reference_assets,
+            )
+        image_reference_text = _build_image_reference_text(product_reference_assets) if product_reference_assets else ""
+        all_product_reference_image_urls = [
+            reference.primary_url
+            for reference in product_reference_assets
+            if isinstance(reference.primary_url, str) and reference.primary_url.strip()
+        ]
+        product_reference_image_urls = (
+            all_product_reference_image_urls[:1] if render_provider == "higgsfield" else all_product_reference_image_urls
         )
-        product_reference_remote_ids = _ensure_remote_reference_asset_ids(
-            session=session,
-            org_id=org_id,
-            creative_client=creative_client,
-            references=product_reference_assets,
+        reference_signature_parts = (
+            product_reference_remote_ids
+            if product_reference_remote_ids
+            else [reference.local_asset_id for reference in product_reference_assets]
         )
-        image_reference_text = _build_image_reference_text(product_reference_assets)
+        if not reference_signature_parts:
+            reference_signature_parts = ["no_product_reference_assets"]
         product_reference_signature = _stable_idempotency_key(
             "swipe_product_references_v1",
-            *product_reference_remote_ids,
+            *reference_signature_parts,
         )
         prompt_assets_value = _prompt_assets_value(
             product_reference_assets=product_reference_assets,
@@ -978,6 +1011,14 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             must_avoid_claims=must_avoid_claims,
             assets_value=prompt_assets_value,
         )
+        if product_reference_image_urls:
+            rendered_prompt_template = (
+                f"{rendered_prompt_template}\n\n"
+                "<product_packshot_image>\n"
+                "Product packshot image is attached below as image input. Use it as the source of truth for "
+                "product silhouette, proportions, and visible hardware details.\n"
+                "</product_packshot_image>"
+            )
         rendered_prompt_signature = _stable_idempotency_key(
             "swipe_prompt_input_v1",
             rendered_prompt_template,
@@ -992,6 +1033,20 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         )
         swipe_image_sha256 = hashlib.sha256(swipe_bytes).hexdigest()
         swipe_image_size_bytes = len(swipe_bytes)
+        product_prompt_image_bytes: bytes | None = None
+        product_prompt_image_mime_type: str | None = None
+        product_prompt_image_source_url: str | None = None
+        product_prompt_image_sha256: str | None = None
+        product_prompt_image_size_bytes: int | None = None
+        if product_reference_image_urls:
+            product_prompt_image_source_url = product_reference_image_urls[0]
+            product_prompt_image_bytes, product_prompt_image_mime_type = _download_bytes(
+                product_prompt_image_source_url,
+                max_bytes=int(os.getenv("SWIPE_IMAGE_MAX_BYTES", str(18 * 1024 * 1024))),
+                timeout_seconds=float(os.getenv("SWIPE_IMAGE_DOWNLOAD_TIMEOUT", "30")),
+            )
+            product_prompt_image_sha256 = hashlib.sha256(product_prompt_image_bytes).hexdigest()
+            product_prompt_image_size_bytes = len(product_prompt_image_bytes)
 
         # The Gemini input must be only the rendered swipe prompt template plus the competitor image.
         # File Search still attaches foundational stores as an external tool context.
@@ -1018,11 +1073,16 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "temperature": 0.2,
             "max_output_tokens": max_output_tokens,
             "stores_attached": len(gemini_store_names),
+            "product_reference_images_attached": 1 if product_prompt_image_bytes is not None else 0,
         }
         contents: List[Any] = [
             rendered_prompt_template,
             genai_types.Part.from_bytes(data=swipe_bytes, mime_type=swipe_mime_type),
         ]
+        if product_prompt_image_bytes is not None and product_prompt_image_mime_type is not None:
+            contents.append(
+                genai_types.Part.from_bytes(data=product_prompt_image_bytes, mime_type=product_prompt_image_mime_type)
+            )
         generate_config = genai_types.GenerateContentConfig(
             temperature=0.2,
             max_output_tokens=max_output_tokens,
@@ -1112,6 +1172,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             str(company_swipe_id or swipe_source_url or ""),
             aspect_ratio,
             str(render_count),
+            render_provider,
             model_name,
             str(render_model_id or ""),
             prompt_sha,
@@ -1129,6 +1190,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 prompt=image_prompt,
                 reference_text=image_reference_text,
                 reference_asset_ids=product_reference_remote_ids,
+                reference_image_urls=product_reference_image_urls,
                 count=render_count,
                 aspect_ratio=aspect_ratio,
                 model_id=render_model_id,
@@ -1136,7 +1198,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             )
 
             try:
-                created_job = creative_client.create_image_ads(
+                created_job = render_client.create_image_ads(
                     payload=image_payload,
                     idempotency_key=attempt_idempotency_key,
                 )
@@ -1146,7 +1208,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     continue
                 raise RuntimeError(last_render_error) from exc
 
-            completed_job = _poll_image_job(creative_client=creative_client, job_id=created_job.id)
+            completed_job = _poll_image_job(creative_client=render_client, job_id=created_job.id)
             if completed_job.status == "succeeded":
                 break
 
@@ -1186,6 +1248,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipePromptModel": model_name,
                 "swipeRenderModelIdRequested": requested_render_model_id,
                 "swipeRenderModelIdUsed": getattr(completed_job, "model_id", None) or render_model_id,
+                "swipeRenderProvider": render_provider,
                 "swipeGeminiStoreNames": gemini_store_names,
                 "swipePromptTemplateKey": "prompts/swipe/swipe_to_image_ad.md",
                 "swipePromptTemplateSha256": prompt_sha,
@@ -1195,6 +1258,11 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipePromptImageMimeType": swipe_mime_type,
                 "swipePromptImageSizeBytes": swipe_image_size_bytes,
                 "swipePromptImageSha256": swipe_image_sha256,
+                "swipePromptProductImageAttached": product_prompt_image_bytes is not None,
+                "swipePromptProductImageSourceUrl": product_prompt_image_source_url,
+                "swipePromptProductImageMimeType": product_prompt_image_mime_type,
+                "swipePromptProductImageSizeBytes": product_prompt_image_size_bytes,
+                "swipePromptProductImageSha256": product_prompt_image_sha256,
                 "swipeOfferId": offer_context_metadata.get("offerId"),
                 "swipeOfferName": offer_context_metadata.get("offerName"),
                 "swipeOfferPricePoints": offer_context_metadata.get("pricePoints"),
@@ -1209,6 +1277,13 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     reference.title for reference in product_reference_assets if isinstance(reference.title, str)
                 ],
                 "swipeProductReferenceText": image_reference_text,
+                "swipeProductReferenceImageUrlsSelected": product_reference_image_urls,
+                "swipeProductReferenceImageUrlsAvailable": all_product_reference_image_urls,
+                "swipeRenderReferenceImageUrlsUsed": [
+                    ref.primary_url
+                    for ref in (getattr(completed_job, "references", []) or [])
+                    if isinstance(ref.primary_url, str) and ref.primary_url.strip()
+                ],
             }
 
             local_asset_id = _create_generated_asset_from_url(
@@ -1244,6 +1319,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "job_id": completed_job.id,
                 "swipe_prompt_model": model_name,
                 "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
+                "swipe_render_provider": render_provider,
                 "prompt_template_sha256": prompt_sha,
                 "stores_attached": len(gemini_store_names),
             },
@@ -1256,6 +1332,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_prompt_markdown": raw_output,
             "swipe_prompt_model": model_name,
             "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
+            "swipe_render_provider": render_provider,
             "stores_attached": len(gemini_store_names),
             "prompt_template_sha256": prompt_sha,
         }

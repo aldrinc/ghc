@@ -230,12 +230,29 @@ class VocEngagement(StrictContract):
 
 class ExternalVocCorpusItem(StrictContract):
     voc_id: str = Field(min_length=1)
-    source_type: str = Field(min_length=1)
+    source_type: Literal[
+        "REDDIT",
+        "FORUM",
+        "BLOG_COMMENT",
+        "REVIEW_SITE",
+        "QA",
+        "TIKTOK_COMMENT",
+        "IG_COMMENT",
+        "YT_COMMENT",
+        "VIDEO_HOOK",
+    ]
+    source_role: Literal["COMMENT", "HOOK"]
+    source_role_reason: str | None = None
     source_url: str = Field(min_length=1)
     platform: str = Field(min_length=1)
     author: str = "Unknown"
     date: str = "Unknown"
     quote: str = Field(min_length=1)
+    is_hook: Literal["Y", "N"] = "N"
+    hook_format: Literal["QUESTION", "STATEMENT", "STORY", "STATISTIC", "CONTRARIAN", "DEMONSTRATION", "NONE"] = "NONE"
+    hook_word_count: int = Field(default=0, ge=0)
+    video_virality_tier: Literal["VIRAL", "HIGH_PERFORMING", "ABOVE_AVERAGE", "BASELINE"] | None = None
+    video_view_count: int | None = Field(default=None, ge=0)
     thread_title: str | None = None
     engagement: VocEngagement = Field(default_factory=VocEngagement)
     compliance_risk: Literal["GREEN", "YELLOW", "RED"] = "YELLOW"

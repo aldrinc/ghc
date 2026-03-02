@@ -16,6 +16,7 @@ class CreativeServiceImageAdsCreateIn(BaseModel):
     prompt: str
     reference_text: str | None = None
     reference_asset_ids: list[str] = Field(default_factory=list)
+    reference_image_urls: list[str] = Field(default_factory=list)
     count: int = Field(..., ge=1)
     aspect_ratio: str | None = None
     model_id: str | None = None

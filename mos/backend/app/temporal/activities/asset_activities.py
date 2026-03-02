@@ -833,10 +833,7 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
         payload_in={"asset_brief_id": asset_brief_id, "campaign_id": campaign_id, "product_id": product_id},
     )
 
-    try:
-        creative_client = CreativeServiceClient()
-    except CreativeServiceConfigError as exc:
-        raise RuntimeError(str(exc)) from exc
+    creative_client: CreativeServiceClient | None = None
 
     with session_scope() as session:
         artifacts_repo = ArtifactsRepository(session)
@@ -1133,6 +1130,12 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                     status="queued",
                     payload=image_payload.model_dump(mode="json"),
                 )
+
+                if creative_client is None:
+                    try:
+                        creative_client = CreativeServiceClient()
+                    except CreativeServiceConfigError as exc:
+                        raise RuntimeError(str(exc)) from exc
 
                 try:
                     created_job = creative_client.create_image_ads(

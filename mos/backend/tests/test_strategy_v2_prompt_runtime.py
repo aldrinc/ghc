@@ -77,6 +77,43 @@ def test_run_prompt_json_object_returns_parsed_payload_and_provenance(monkeypatc
     assert provenance["model_name"] == "gpt-5.2-2025-12-11"
 
 
+def test_run_prompt_json_object_rejects_over_budget_gpt_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    asset = resolve_prompt_asset(
+        pattern="Copywriting Agent */04_prompt_templates/promise_contract_extraction.md",
+        context="promise template",
+    )
+
+    monkeypatch.setattr(strategy_v2_activities, "_model_prompt_input_token_budget", lambda **_kwargs: 100)
+    monkeypatch.setattr(strategy_v2_activities, "_estimate_prompt_input_tokens", lambda _prompt: 101)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_llm_generate_text",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("_llm_generate_text should not be called")),
+    )
+
+    with pytest.raises(StrategyV2MissingContextError, match="Prompt input exceeds model budget"):
+        strategy_v2_activities._run_prompt_json_object(
+            asset=asset,
+            context="strategy_v2.copy.promise_contract",
+            model="gpt-5.2-2025-12-11",
+            runtime_instruction="Return promise contract JSON.",
+            schema_name="strategy_v2_copy_promise_contract_test",
+            schema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "loop_question": {"type": "string"},
+                    "specific_promise": {"type": "string"},
+                    "delivery_test": {"type": "string"},
+                    "minimum_delivery": {"type": "string"},
+                },
+                "required": ["loop_question", "specific_promise", "delivery_test", "minimum_delivery"],
+            },
+            use_reasoning=False,
+            use_web_search=False,
+        )
+
+
 def test_run_prompt_json_object_persists_claude_conversation_turns(monkeypatch: pytest.MonkeyPatch) -> None:
     asset = resolve_prompt_asset(
         pattern="Copywriting Agent */04_prompt_templates/promise_contract_extraction.md",
@@ -126,6 +163,135 @@ def test_run_prompt_json_object_persists_claude_conversation_turns(monkeypatch: 
     assert len(conversation_messages) == 4
     assert conversation_messages[-2]["role"] == "user"
     assert conversation_messages[-1]["role"] == "assistant"
+
+
+def test_enforce_strict_openai_json_schema_preserves_explicit_object_constraints() -> None:
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["dimensions"],
+        "properties": {
+            "dimensions": {
+                "type": "object",
+                "additionalProperties": True,
+            }
+        },
+    }
+
+    normalized = strategy_v2_activities._enforce_strict_openai_json_schema(schema)
+    dimensions = normalized["properties"]["dimensions"]
+
+    assert dimensions["additionalProperties"] is True
+    assert "required" not in dimensions
+    assert normalized["required"] == ["dimensions"]
+
+
+def test_offer_step05_response_schema_enforces_bounded_compact_contract() -> None:
+    schema = strategy_v2_activities._offer_step05_response_schema()
+    revision_notes = schema["properties"]["revision_notes"]
+
+    assert revision_notes["maxLength"] == strategy_v2_activities._STEP05_REVISION_NOTES_MAX_CHARS
+    assert revision_notes["minLength"] == 1
+
+    variants = schema["properties"]["evaluation"]["properties"]["variants"]
+    assert variants["minItems"] == len(strategy_v2_activities._OFFER_VARIANT_IDS)
+    assert variants["maxItems"] == len(strategy_v2_activities._OFFER_VARIANT_IDS)
+
+    dimensions = variants["items"]["properties"]["dimensions"]
+    assert dimensions["additionalProperties"] is False
+    assert dimensions["required"] == list(strategy_v2_activities._OFFER_COMPOSITE_DIMENSIONS)
+
+    for dimension_name in strategy_v2_activities._OFFER_COMPOSITE_DIMENSIONS:
+        dimension_schema = dimensions["properties"][dimension_name]
+        kill_condition = dimension_schema["properties"]["kill_condition"]
+        assert kill_condition["maxLength"] == strategy_v2_activities._STEP05_KILL_CONDITION_MAX_CHARS
+        assert dimension_schema["required"] == [
+            "raw_score",
+            "evidence_quality",
+            "kill_condition",
+            "competitor_baseline",
+        ]
+
+
+def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.MonkeyPatch) -> None:
+    agent02_asset = resolve_prompt_asset(
+        pattern="VOC + Angle Engine (2-21-26)/prompts/agent-02b-voc-extractor.md",
+        context="agent2 extractor",
+    )
+
+    monkeypatch.setattr(strategy_v2_activities.activity, "heartbeat", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_upload_openai_prompt_json_files",
+        lambda **_kwargs: ({"EVIDENCE_ROWS_JSON": "file_test_123"}, ["file_test_123"]),
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_cleanup_openai_prompt_files",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_prompt_json_object",
+        lambda **_kwargs: (
+            {
+                "mode": "DUAL",
+                "input_count": 1,
+                "output_count": 2,
+                "voc_observations": [
+                    {
+                        "source_type": "REDDIT_THREAD",
+                        "source_url": "https://example.com/post/1",
+                        "source_author": "user-1",
+                        "source_date": "2026-02-01",
+                        "evidence_ref": "row-1",
+                        "quote": "I need safer guidance.",
+                        "source": "",
+                    }
+                ],
+                "rejected_items": [],
+                "validation_errors": [],
+            },
+            "{}",
+            {"prompt_path": agent02_asset.relative_path, "prompt_sha256": agent02_asset.sha256, "model_name": "gpt-test"},
+        ),
+    )
+
+    result = strategy_v2_activities._run_agent2_extractor(
+        agent02_asset=agent02_asset,
+        model="gpt-test",
+        workflow_run_id="wf_test_001",
+        mode="DUAL",
+        evidence_rows=[
+            {
+                "evidence_id": "EVIDENCE-001",
+                "source_type": "REDDIT_THREAD",
+                "source_url": "https://example.com/post/1",
+                "source_author": "user-1",
+                "source_date": "2026-02-01",
+                "context": "Example context",
+                "verbatim": "I need safer guidance.",
+                "evidence_ref": "row-1",
+                "habitat_name": "reddit.com/r/example",
+                "habitat_type": "Reddit",
+                "strategy_target_id": "HT-001",
+            }
+        ],
+        agent01_output={"mining_plan": []},
+        habitat_scored={},
+        stage1_data={},
+        avatar_brief_payload={},
+        competitor_analysis={},
+        saturated_angles=[],
+        activity_name="strategy_v2.run_voc_agent2_extraction",
+    )
+
+    assert result["mode"] == "DUAL"
+    assert len(result["voc_observations"]) == 1
+    assert result["voc_observations"][0]["voc_id"] == "V0001"
+    assert result["voc_observations"][0]["source"] == "REDDIT_THREAD | https://example.com/post/1"
+    assert result["extraction_summary"]["input_count"] == 1
+    assert result["extraction_summary"]["output_count"] == 1
 
 
 def test_transform_step4_entries_to_agent2_corpus_maps_dimensions() -> None:
@@ -230,7 +396,7 @@ def test_competitor_analysis_schema_uses_strict_required_fields(monkeypatch: pyt
     assert saturation_item["required"] == ["angle", "angle_name", "driver", "status", "competitor_count"]
 
 
-def test_json_schema_response_format_enforces_openai_strict_rules() -> None:
+def test_json_schema_response_format_preserves_explicit_object_constraints() -> None:
     response_format = strategy_v2_activities._json_schema_response_format(
         name="strategy_v2_schema_guard_test",
         schema={
@@ -254,15 +420,15 @@ def test_json_schema_response_format_enforces_openai_strict_rules() -> None:
         },
     )
     schema = response_format["json_schema"]["schema"]
-    assert schema["additionalProperties"] is False
-    assert schema["required"] == ["alpha", "nested", "freeform"]
+    assert schema["additionalProperties"] is True
+    assert schema["required"] == ["alpha"]
     nested = schema["properties"]["nested"]
-    assert nested["additionalProperties"] is False
+    assert nested["additionalProperties"] is True
     assert nested["required"] == ["inner"]
     freeform = schema["properties"]["freeform"]
-    assert freeform["additionalProperties"] is False
+    assert freeform["additionalProperties"] is True
     assert freeform["properties"] == {}
-    assert freeform["required"] == []
+    assert "required" not in freeform
 
 
 def _build_stage2_with_price(price: str) -> ProductBriefStage2:

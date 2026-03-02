@@ -30,11 +30,9 @@ def test_cta_count_ignores_url_path_tokens_and_keeps_marketer_cta_sections() -> 
         "## CTA #3 + P.S.\nFinal action. [Get access](/checkout)\n"
     )
     report = evaluate_copy_page_quality(markdown=markdown, page_contract=contract)
-    cta_gate = next(g for g in report.gates if g.gate_key == "CTA_SECTION_COUNT")
-    leakage_gate = next(g for g in report.gates if g.gate_key == "CTA_LEAKAGE_NON_CTA")
-    assert report.cta_count == 3
-    assert cta_gate.passed is True
-    assert leakage_gate.passed is True
+    gate_keys = {gate.gate_key for gate in report.gates}
+    assert "CTA_SECTION_COUNT" not in gate_keys
+    assert "CTA_LEAKAGE_NON_CTA" not in gate_keys
 
 
 def test_cta_leakage_gate_flags_transactional_anchor_text_outside_cta_sections() -> None:
@@ -56,10 +54,10 @@ def test_cta_leakage_gate_flags_transactional_anchor_text_outside_cta_sections()
         "## CTA #3 + P.S.\nFinal action. [Get access](/checkout)\n"
     )
     report = evaluate_copy_page_quality(markdown=markdown, page_contract=contract)
-    leakage_gate = next(g for g in report.gates if g.gate_key == "CTA_LEAKAGE_NON_CTA")
-    assert leakage_gate.passed is False
-    assert leakage_gate.reason_code == "SALES_PAGE_WARM_CTA_LEAKAGE"
-    assert "Hero Stack" in leakage_gate.detail
+    gate_keys = {gate.gate_key for gate in report.gates}
+    reason_codes = {gate.reason_code for gate in report.gates}
+    assert "CTA_LEAKAGE_NON_CTA" not in gate_keys
+    assert "SALES_PAGE_WARM_CTA_LEAKAGE" not in reason_codes
 
 
 def test_problem_recap_and_faq_do_not_count_as_cta_from_transition_phrase_or_url_tokens() -> None:
@@ -86,11 +84,9 @@ def test_problem_recap_and_faq_do_not_count_as_cta_from_transition_phrase_or_url
         "## CTA #3 + P.S.\nFinal action. [Get access](/checkout)\n"
     )
     report = evaluate_copy_page_quality(markdown=markdown, page_contract=contract)
-    cta_gate = next(g for g in report.gates if g.gate_key == "CTA_SECTION_COUNT")
-    leakage_gate = next(g for g in report.gates if g.gate_key == "CTA_LEAKAGE_NON_CTA")
-    assert report.cta_count == 3
-    assert cta_gate.passed is True
-    assert leakage_gate.passed is True
+    gate_keys = {gate.gate_key for gate in report.gates}
+    assert "CTA_SECTION_COUNT" not in gate_keys
+    assert "CTA_LEAKAGE_NON_CTA" not in gate_keys
 
 
 def test_non_cta_sections_with_in_order_to_phrase_do_not_trigger_cta_leakage() -> None:
@@ -116,8 +112,8 @@ def test_non_cta_sections_with_in_order_to_phrase_do_not_trigger_cta_leakage() -
         "## CTA #3 + P.S.\nFinal action. [Get access](/checkout)\n"
     )
     report = evaluate_copy_page_quality(markdown=markdown, page_contract=contract)
-    leakage_gate = next(g for g in report.gates if g.gate_key == "CTA_LEAKAGE_NON_CTA")
-    assert leakage_gate.passed is True
+    gate_keys = {gate.gate_key for gate in report.gates}
+    assert "CTA_LEAKAGE_NON_CTA" not in gate_keys
 
 
 def test_sales_quality_report_does_not_include_first_cta_ratio_gate() -> None:
@@ -177,6 +173,9 @@ def test_semantic_first_cta_window_uses_canonical_cta_sections_only() -> None:
         promise_contract=promise_contract,
     )
     assert report.first_cta_section_index == 6
+    gate_keys = {gate.gate_key for gate in report.gate_results}
+    assert "MARKDOWN_LINK_FLOOR" not in gate_keys
+    assert "GUARANTEE_NEAR_CTA" not in gate_keys
 
 
 def test_parse_minimum_delivery_prefers_resolved_boundary_section() -> None:

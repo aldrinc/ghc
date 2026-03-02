@@ -39,7 +39,7 @@ class SwipeImageAdGenerateRequest(BaseModel):
     max_output_tokens: int | None = Field(
         None,
         ge=256,
-        le=24000,
+        le=32000,
         validation_alias="maxOutputTokens",
         serialization_alias="maxOutputTokens",
     )

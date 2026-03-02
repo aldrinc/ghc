@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 CLAUDE_API_BASE_URL = os.getenv("ANTHROPIC_API_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
 CLAUDE_HTTP_TIMEOUT = int(os.getenv("ANTHROPIC_HTTP_TIMEOUT", "300"))
 CLAUDE_DEFAULT_MODEL = os.getenv("CLAUDE_DEFAULT_MODEL", "claude-3-5-sonnet-20241022")
+CLAUDE_STRUCTURED_HTTP_TIMEOUT = int(os.getenv("ANTHROPIC_STRUCTURED_HTTP_TIMEOUT", "900"))
+CLAUDE_STRUCTURED_MAX_ATTEMPTS = max(1, int(os.getenv("ANTHROPIC_STRUCTURED_MAX_ATTEMPTS", "3")))
+CLAUDE_STRUCTURED_RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504, 529}
 
 
 @dataclass
@@ -279,6 +283,14 @@ def _is_output_format_unsupported(exc: httpx.HTTPStatusError) -> bool:
         return False
 
 
+def _is_retryable_structured_transport_error(exc: Exception) -> bool:
+    if isinstance(exc, (httpx.ReadError, httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError)):
+        return True
+
+    lowered = str(exc).lower()
+    return "sslv3_alert_bad_record_mac" in lowered or "bad record mac" in lowered
+
+
 def _extract_first_json_object(text: str) -> Dict[str, Any]:
     """
     Extract and parse the first top-level JSON object from an arbitrary text blob.
@@ -485,7 +497,7 @@ def call_claude_structured_message(
     user_content: Optional[List[Dict[str, Any]]] = None,
     messages: Optional[List[Dict[str, Any]]] = None,
     output_schema: Dict[str, Any],
-    max_tokens: int = 4096,
+    max_tokens: int = 32000,
     temperature: float = 0.0,
 ) -> Dict[str, Any]:
     """
@@ -552,29 +564,71 @@ def call_claude_structured_message(
         trace_name="llm.workflow",
     ) as generation:
         request_id: str | None = None
-        try:
-            with httpx.Client(timeout=CLAUDE_HTTP_TIMEOUT) as client:
-                response = client.post(url, headers=headers, json=body)
-                response.raise_for_status()
-                payload = response.json()
-                request_id = _extract_request_id_from_headers(response.headers)
-        except httpx.HTTPStatusError as exc:
-            request_id = _extract_request_id_from_headers(exc.response.headers if exc.response is not None else None)
-            request_id_suffix = f", request_id={request_id}" if request_id else ""
-            if _is_model_not_found(exc):
-                raise RuntimeError(f"Claude model not found: {candidate_model}{request_id_suffix}") from exc
-            if _is_output_format_unsupported(exc):
+        payload: Dict[str, Any] | None = None
+        last_retryable_error: Exception | None = None
+
+        for attempt in range(1, CLAUDE_STRUCTURED_MAX_ATTEMPTS + 1):
+            try:
+                with httpx.Client(timeout=CLAUDE_STRUCTURED_HTTP_TIMEOUT) as client:
+                    response = client.post(url, headers=headers, json=body)
+                    response.raise_for_status()
+                    payload = response.json()
+                    request_id = _extract_request_id_from_headers(response.headers)
+                    break
+            except httpx.HTTPStatusError as exc:
+                request_id = _extract_request_id_from_headers(exc.response.headers if exc.response is not None else None)
+                request_id_suffix = f", request_id={request_id}" if request_id else ""
+                if _is_model_not_found(exc):
+                    raise RuntimeError(f"Claude model not found: {candidate_model}{request_id_suffix}") from exc
+                if _is_output_format_unsupported(exc):
+                    raise RuntimeError(
+                        "Claude model does not support structured outputs (output_format=json_schema): "
+                        f"{candidate_model}{request_id_suffix}"
+                    ) from exc
+
+                status_code = exc.response.status_code if exc.response else None
+                if status_code in CLAUDE_STRUCTURED_RETRYABLE_STATUS_CODES and attempt < CLAUDE_STRUCTURED_MAX_ATTEMPTS:
+                    last_retryable_error = exc
+                    logger.warning(
+                        "claude_structured_message_retry_status",
+                        extra={
+                            "status_code": status_code,
+                            "attempt": attempt,
+                            "max_attempts": CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+                            "request_id": request_id,
+                            "model": candidate_model,
+                        },
+                    )
+                    time.sleep(min(2 ** (attempt - 1), 8))
+                    continue
+
+                body_text = exc.response.text if exc.response else ""
+                status = exc.response.status_code if exc.response else "unknown"
                 raise RuntimeError(
-                    "Claude model does not support structured outputs (output_format=json_schema): "
-                    f"{candidate_model}{request_id_suffix}"
+                    f"Claude structured message failed (status={status}{request_id_suffix}): {body_text}"
                 ) from exc
-            body_text = exc.response.text if exc.response else ""
-            status = exc.response.status_code if exc.response else "unknown"
+            except Exception as exc:  # noqa: BLE001
+                if _is_retryable_structured_transport_error(exc) and attempt < CLAUDE_STRUCTURED_MAX_ATTEMPTS:
+                    last_retryable_error = exc
+                    logger.warning(
+                        "claude_structured_message_retry_transport",
+                        extra={
+                            "attempt": attempt,
+                            "max_attempts": CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+                            "model": candidate_model,
+                            "error": str(exc),
+                        },
+                    )
+                    time.sleep(min(2 ** (attempt - 1), 8))
+                    continue
+                raise RuntimeError(f"Claude structured message failed: {exc}") from exc
+
+        if payload is None:
+            terminal_error = last_retryable_error or RuntimeError("unknown Claude structured message error")
             raise RuntimeError(
-                f"Claude structured message failed (status={status}{request_id_suffix}): {body_text}"
-            ) from exc
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Claude structured message failed: {exc}") from exc
+                "Claude structured message failed after retry budget exhausted. "
+                f"attempts={CLAUDE_STRUCTURED_MAX_ATTEMPTS} error={terminal_error}"
+            ) from terminal_error
 
         parsed = None
         output_block = payload.get("output")

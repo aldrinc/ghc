@@ -50,6 +50,7 @@ from app.strategy_v2.copy_quality import (
 )
 from app.strategy_v2.errors import (
     StrategyV2DecisionError,
+    StrategyV2ExternalDependencyError,
     StrategyV2Error,
     StrategyV2MissingContextError,
     StrategyV2ScorerError,
@@ -126,6 +127,7 @@ __all__ = [
     "SelectedAngleContract",
     "SocialVideoObservation",
     "StrategyV2DecisionError",
+    "StrategyV2ExternalDependencyError",
     "StrategyV2Error",
     "StrategyV2MissingContextError",
     "StrategyV2ScorerError",

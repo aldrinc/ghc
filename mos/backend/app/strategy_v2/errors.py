@@ -13,6 +13,10 @@ class StrategyV2MissingContextError(StrategyV2Error):
     """Raised when required upstream context is missing."""
 
 
+class StrategyV2ExternalDependencyError(StrategyV2Error):
+    """Raised when external providers fail or time out."""
+
+
 class StrategyV2ScorerError(StrategyV2Error):
     """Raised when deterministic scorer execution fails."""
 

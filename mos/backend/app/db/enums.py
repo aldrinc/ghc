@@ -107,6 +107,8 @@ class WorkflowKindEnum(str, Enum):
     client_onboarding = "client_onboarding"
     campaign_intent = "campaign_intent"
     campaign_funnel_generation = "campaign_funnel_generation"
+    strategy_v2_angle_launch = "strategy_v2_angle_launch"
+    strategy_v2_angle_iteration = "strategy_v2_angle_iteration"
     campaign_planning = "campaign_planning"
     creative_production = "creative_production"
     experiment_cycle = "experiment_cycle"

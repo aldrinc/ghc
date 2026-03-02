@@ -619,7 +619,7 @@ def generate_design_system_tokens(
     *,
     ctx: DesignSystemGenerationContext,
     model: str | None = None,
-    max_output_tokens: int = 9000,
+    max_output_tokens: int = 32000,
     mode: str = "template_patch",
 ) -> dict[str, Any]:
     mode_clean = (mode or "").strip().lower()

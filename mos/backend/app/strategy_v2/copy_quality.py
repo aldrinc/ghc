@@ -238,41 +238,6 @@ def evaluate_copy_page_quality(
         )
     )
 
-    cta_min = int(profile.cta_min)
-    cta_max = int(profile.cta_max)
-    gates.append(
-        CopyQualityGateResult(
-            gate_key="CTA_SECTION_COUNT",
-            reason_code=f"{page_contract.page_type.upper()}_CTA_COUNT",
-            passed=cta_min <= cta_count <= cta_max,
-            detail=f"cta_count={cta_count}, required_range=[{cta_min},{cta_max}]",
-            remediation=None
-            if cta_min <= cta_count <= cta_max
-            else "Adjust CTA cadence to the page profile requirements.",
-        )
-    )
-    gates.append(
-        CopyQualityGateResult(
-            gate_key="CTA_LEAKAGE_NON_CTA",
-            reason_code=f"{page_contract.page_type.upper()}_CTA_LEAKAGE",
-            passed=not non_cta_leak_sections,
-            detail=(
-                "No CTA-intent language leaked into non-CTA sections."
-                if not non_cta_leak_sections
-                else (
-                    f"non_cta_cta_intent_sections={len(non_cta_leak_sections)}, "
-                    f"allowed=0, sections={non_cta_leak_sections}"
-                )
-            ),
-            remediation=None
-            if not non_cta_leak_sections
-            else (
-                "Keep transactional CTA language in canonical CTA sections only. "
-                "URL path tokens alone do not count as CTA intent."
-            ),
-        )
-    )
-
     if page_contract.page_type == "presell_advertorial":
         mechanism_depth = _words_for_keyword_sections(
             sections=sections,

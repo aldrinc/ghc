@@ -3,14 +3,16 @@ from __future__ import annotations
 from collections import Counter
 from copy import deepcopy
 from datetime import datetime, timezone
+import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 import re
 import time
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Sequence
 import urllib.request
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from sqlalchemy import select
 from temporalio import activity
@@ -22,6 +24,7 @@ from app.db.models import Product, WorkflowRun
 from app.db.repositories.agent_runs import AgentRunsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
+from app.db.repositories.products import ProductOffersRepository, ProductVariantsRepository
 from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.llm import LLMClient, LLMGenerationParams
@@ -81,7 +84,11 @@ from app.strategy_v2.contracts import (
     validate_stage2,
     validate_stage3,
 )
-from app.strategy_v2.errors import StrategyV2Error, StrategyV2SchemaValidationError
+from app.strategy_v2.errors import (
+    StrategyV2Error,
+    StrategyV2ExternalDependencyError,
+    StrategyV2SchemaValidationError,
+)
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from app.strategy_v2.copy_quality import evaluate_copy_page_quality
 from app.strategy_v2.copy_input_packet import parse_minimum_delivery_section_index
@@ -93,8 +100,15 @@ from app.strategy_v2.prompt_runtime import (
     render_prompt_template as render_prompt_template_strict,
     resolve_prompt_asset,
 )
+from app.strategy_v2.template_bridge import (
+    build_strategy_v2_template_patch_operations,
+    validate_strategy_v2_template_payload_fields,
+)
 from app.services.claude_files import call_claude_structured_message
 from app.strategy_v2.step_keys import (
+    V2_STEP_APIFY_COLLECTION,
+    V2_STEP_APIFY_INGESTION,
+    V2_STEP_APIFY_POSTPROCESS,
     V2_STEP_ANGLE_SELECTION_HITL,
     V2_STEP_ANGLE_SYNTHESIS,
     V2_STEP_ASSET_DATA_INGESTION,
@@ -138,16 +152,1139 @@ _FOUNDTN_STEP01_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP01_MODEL", setti
 _FOUNDTN_STEP03_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP03_MODEL", settings.STRATEGY_V2_VOC_MODEL)
 _FOUNDTN_STEP04_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP04_MODEL", settings.STRATEGY_V2_VOC_MODEL)
 _FOUNDTN_STEP06_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP06_MODEL", settings.STRATEGY_V2_VOC_MODEL)
-_FOUNDTN_STEP04_MAX_TOKENS = int(os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP04_MAX_TOKENS", "12000"))
+_FOUNDTN_STEP04_MAX_TOKENS = int(os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP04_MAX_TOKENS", "64000"))
+_COPY_PIPELINE_MAX_TOKENS = int(os.getenv("STRATEGY_V2_COPY_MAX_TOKENS", "128000"))
+_CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS = int(
+    os.getenv("STRATEGY_V2_CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS", "64000")
+)
 
 _VOC_AGENT00_PROMPT_PATTERN = "VOC + Angle Engine (2-21-26)/prompts/agent-00-habitat-strategist.md"
 _VOC_AGENT00B_PROMPT_PATTERN = "VOC + Angle Engine (2-21-26)/prompts/agent-00b-social-video-strategist.md"
 _VOC_AGENT01_PROMPT_PATTERN = "VOC + Angle Engine (2-21-26)/prompts/agent-01-habitat-qualifier.md"
-_VOC_AGENT02_PROMPT_PATTERN = "VOC + Angle Engine (2-21-26)/prompts/agent-02-voc-extractor.md"
+_VOC_AGENT02_PROMPT_PATTERN = "VOC + Angle Engine (2-21-26)/prompts/agent-02b-voc-extractor.md"
 _VOC_AGENT03_PROMPT_PATTERN = "VOC + Angle Engine (2-21-26)/prompts/agent-03-shadow-angle-clusterer.md"
 _VOC_COMPETITOR_ANALYZER_PROMPT_PATTERN = (
     "VOC + Angle Engine (2-21-26)/prompts/agent-pre-competitor-asset-analyzer.md"
 )
+_OPENAI_CODE_INTERPRETER_TOOL = {"type": "code_interpreter", "container": {"type": "auto"}}
+_APIFY_PLACEHOLDER_SENTINELS = frozenset(
+    {
+        "NA",
+        "NONE",
+        "NULL",
+        "UNKNOWN",
+        "UNSPECIFIED",
+        "TBD",
+        "CANNOTDETERMINE",
+    }
+)
+_APIFY_URL_ITEM_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "url": {"type": "string", "minLength": 1},
+    },
+    "required": ["url"],
+}
+_APIFY_EXEC_INPUT_SCHEMA: dict[str, Any] = {
+    "anyOf": [
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "startUrls": {"type": "array", "minItems": 1, "items": _APIFY_URL_ITEM_SCHEMA},
+                "maxItems": {"type": "integer", "minimum": 1},
+            },
+            "required": ["startUrls", "maxItems"],
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "profiles": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+                "maxItems": {"type": "integer", "minimum": 1},
+            },
+            "required": ["profiles", "maxItems"],
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "directUrls": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+                "resultsLimit": {"type": "integer", "minimum": 1},
+            },
+            "required": ["directUrls", "resultsLimit"],
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "startUrls": {"type": "array", "minItems": 1, "items": _APIFY_URL_ITEM_SCHEMA},
+                "maxResults": {"type": "integer", "minimum": 1},
+            },
+            "required": ["startUrls", "maxResults"],
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "startUrls": {"type": "array", "minItems": 1, "items": _APIFY_URL_ITEM_SCHEMA},
+                "maxCrawlPages": {"type": "integer", "minimum": 1},
+                "maxResultsPerCrawl": {"type": "integer", "minimum": 1},
+            },
+            "required": ["startUrls", "maxCrawlPages", "maxResultsPerCrawl"],
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "startUrls": {"type": "array", "minItems": 1, "items": _APIFY_URL_ITEM_SCHEMA},
+                "pageFunction": {"type": "string", "minLength": 1},
+                "maxRequestsPerCrawl": {"type": "integer", "minimum": 1},
+                "maxCrawlingDepth": {"type": "integer", "minimum": 1},
+            },
+            "required": ["startUrls", "pageFunction", "maxRequestsPerCrawl", "maxCrawlingDepth"],
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "queries": {"type": "string", "minLength": 1},
+                "maxPagesPerQuery": {"type": "integer", "minimum": 1},
+                "countryCode": {"type": "string", "minLength": 1},
+                "languageCode": {"type": "string", "minLength": 1},
+            },
+            "required": ["queries", "maxPagesPerQuery", "countryCode", "languageCode"],
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "companyName": {"type": "string", "minLength": 1},
+                "maxReviews": {"type": "integer", "minimum": 1},
+                "sortBy": {"type": "string", "minLength": 1},
+            },
+            "required": ["companyName", "maxReviews", "sortBy"],
+        },
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "productUrls": {"type": "array", "minItems": 1, "items": _APIFY_URL_ITEM_SCHEMA},
+                "maxReviews": {"type": "integer", "minimum": 1},
+                "sortBy": {"type": "string", "minLength": 1},
+            },
+            "required": ["productUrls", "maxReviews", "sortBy"],
+        },
+    ],
+}
+_VOC_AGENT00_DIRECT_METADATA_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "habitat_category": {"type": "string", "minLength": 1},
+        "habitat_name": {"type": "string", "minLength": 1},
+        "target_id": {"type": "string", "minLength": 1},
+        "avatar_alignment": {"type": "string", "minLength": 1},
+        "competitor_whitespace": {"type": "string", "enum": ["Y", "N", "UNKNOWN"]},
+        "search_query_origin": {"type": "string", "minLength": 1},
+    },
+    "required": [
+        "habitat_category",
+        "habitat_name",
+        "target_id",
+        "avatar_alignment",
+        "competitor_whitespace",
+        "search_query_origin",
+    ],
+}
+_VOC_AGENT00_DISCOVERY_METADATA_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "target_id": {"type": "string", "minLength": 1},
+        "habitat_category": {"type": "string", "minLength": 1},
+        "purpose": {"type": "string", "minLength": 1},
+        "feeds_category": {"type": "string", "minLength": 1},
+        "search_query_origin": {"type": "string", "minLength": 1},
+        "expected_result_type": {"type": "string", "minLength": 1},
+    },
+    "required": [
+        "target_id",
+        "habitat_category",
+        "purpose",
+        "feeds_category",
+        "search_query_origin",
+        "expected_result_type",
+    ],
+}
+_VOC_AGENT00_APIFY_CONFIG_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "config_id": {"type": "string", "minLength": 1},
+        "actor_id": {"type": "string", "minLength": 1},
+        "input": _APIFY_EXEC_INPUT_SCHEMA,
+        "metadata": {
+            "anyOf": [
+                _VOC_AGENT00_DIRECT_METADATA_SCHEMA,
+                _VOC_AGENT00_DISCOVERY_METADATA_SCHEMA,
+            ]
+        },
+    },
+    "required": ["config_id", "actor_id", "input", "metadata"],
+}
+_VOC_AGENT00_HANDOFF_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "schema_version": {"type": "string", "minLength": 1},
+        "generated_at": {"type": "string", "minLength": 1},
+        "product_classification": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "buyer_behavior": {"type": "string", "minLength": 1},
+                "purchase_emotion": {"type": "string", "minLength": 1},
+                "compliance_sensitivity": {"type": "string", "minLength": 1},
+                "price_sensitivity": {"type": "string", "minLength": 1},
+                "strategy_implications": {"type": "string", "minLength": 1},
+            },
+            "required": [
+                "buyer_behavior",
+                "purchase_emotion",
+                "compliance_sensitivity",
+                "price_sensitivity",
+                "strategy_implications",
+            ],
+        },
+        "prior_declaration": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "expected_richest_categories": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                },
+                "expected_sparse_categories": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                },
+                "expected_total_targets": {"type": ["number", "null"]},
+                "expected_competitor_overlap_pattern": {"type": "string", "minLength": 1},
+            },
+            "required": [
+                "expected_richest_categories",
+                "expected_sparse_categories",
+                "expected_total_targets",
+                "expected_competitor_overlap_pattern",
+            ],
+        },
+        "analysis_order": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "randomized_category_order_1_to_8": {"type": "array", "items": {"type": "integer"}},
+                "method": {"type": "string", "minLength": 1},
+            },
+            "required": ["randomized_category_order_1_to_8", "method"],
+        },
+        "habitat_categories": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "category_id": {"type": "integer"},
+                    "category_name": {"type": "string", "minLength": 1},
+                    "identified_targets": {
+                        "type": "array",
+                        "items": {"type": "string", "minLength": 1},
+                    },
+                },
+                "required": ["category_id", "category_name", "identified_targets"],
+            },
+        },
+        "habitat_targets": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "target_id": {"type": "string", "minLength": 1},
+                    "habitat_category": {"type": "string", "minLength": 1},
+                    "habitat_name": {"type": "string", "minLength": 1},
+                    "status": {"type": "string", "enum": ["CONFIRMED", "INFERRED"]},
+                    "competitor_whitespace": {"type": "string", "enum": ["Y", "N", "UNKNOWN"]},
+                    "apify_config_id": {"type": "string", "minLength": 1},
+                    "manual_queries": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                },
+                "required": [
+                    "target_id",
+                    "habitat_category",
+                    "habitat_name",
+                    "status",
+                    "competitor_whitespace",
+                    "apify_config_id",
+                    "manual_queries",
+                ],
+            },
+        },
+        "whitespace_map": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "category_name": {"type": "string", "minLength": 1},
+                    "competitor_occupied": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "target_id": {"type": "string", "minLength": 1},
+                            },
+                            "required": ["target_id"],
+                        },
+                    },
+                    "whitespace": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "target_id": {"type": "string", "minLength": 1},
+                            },
+                            "required": ["target_id"],
+                        },
+                    },
+                    "ambiguous": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "target_id": {"type": "string", "minLength": 1},
+                            },
+                            "required": ["target_id"],
+                        },
+                    },
+                },
+                "required": ["category_name", "competitor_occupied", "whitespace", "ambiguous"],
+            },
+        },
+        "whitespace_summary_table": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "category_name": {"type": "string", "minLength": 1},
+                    "occupied_count": {"type": "integer", "minimum": 0},
+                    "whitespace_count": {"type": "integer", "minimum": 0},
+                    "ambiguous_count": {"type": "integer", "minimum": 0},
+                },
+                "required": ["category_name", "occupied_count", "whitespace_count", "ambiguous_count"],
+            },
+        },
+        "manual_search_queries_by_category": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "category_name": {"type": "string", "minLength": 1},
+                    "primary": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "query": {"type": "string", "minLength": 1},
+                                "targets": {"type": "string", "minLength": 1},
+                            },
+                            "required": ["query", "targets"],
+                        },
+                    },
+                    "secondary": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "query": {"type": "string", "minLength": 1},
+                                "targets": {"type": "string", "minLength": 1},
+                                "adjacent_because": {"type": "string", "minLength": 1},
+                            },
+                            "required": ["query", "targets", "adjacent_because"],
+                        },
+                    },
+                    "competitor_specific": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "competitor": {"type": "string", "minLength": 1},
+                                "queries": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {"type": "string", "minLength": 1},
+                                },
+                            },
+                            "required": ["competitor", "queries"],
+                        },
+                    },
+                    "problem_specific": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "query": {"type": "string", "minLength": 1},
+                                "source_quote": {"type": "string", "minLength": 1},
+                            },
+                            "required": ["query", "source_quote"],
+                        },
+                    },
+                },
+                "required": [
+                    "category_name",
+                    "primary",
+                    "secondary",
+                    "competitor_specific",
+                    "problem_specific",
+                ],
+            },
+        },
+        "apify_configs": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "tier1_direct": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": _VOC_AGENT00_APIFY_CONFIG_SCHEMA,
+                },
+                "tier2_discovery": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": _VOC_AGENT00_APIFY_CONFIG_SCHEMA,
+                },
+            },
+            "required": ["tier1_direct", "tier2_discovery"],
+        },
+        "prior_vs_actual": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "confirmed": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                "wrong_or_weaker_than_expected": {
+                    "type": "array",
+                    "items": {"type": "string", "minLength": 1},
+                },
+                "surprises": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            },
+            "required": ["confirmed", "wrong_or_weaker_than_expected", "surprises"],
+        },
+        "limitations_confidence": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "confidence_level": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW"]},
+                "limitations": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                "document_gaps": {"type": "array", "items": {"type": "string", "minLength": 1}},
+                "platform_blindspots": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            },
+            "required": ["confidence_level", "limitations", "document_gaps", "platform_blindspots"],
+        },
+        "disconfirmation": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "reason": {"type": "string", "minLength": 1},
+                    "evidence_to_confirm": {"type": "string", "minLength": 1},
+                    "evidence_to_disconfirm": {"type": "string", "minLength": 1},
+                    "operator_check_action": {"type": "string", "minLength": 1},
+                },
+                "required": [
+                    "reason",
+                    "evidence_to_confirm",
+                    "evidence_to_disconfirm",
+                    "operator_check_action",
+                ],
+            },
+        },
+        "tool_call_outputs": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "prioritization": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "method": {"type": "string", "minLength": 1},
+                        "habitat_observations": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "target_id": {"type": "string", "minLength": 1},
+                                    "habitat_name": {"type": "string", "minLength": 1},
+                                    "habitat_category": {"type": "string", "minLength": 1},
+                                },
+                                "required": ["target_id", "habitat_name", "habitat_category"],
+                            },
+                        },
+                        "ranked_list": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "rank": {"type": "integer", "minimum": 1},
+                                    "target_id": {"type": "string", "minLength": 1},
+                                    "habitat_name": {"type": "string", "minLength": 1},
+                                    "category": {"type": "string", "minLength": 1},
+                                    "priority_score": {"type": "number"},
+                                    "apify_config_id": {"type": "string", "minLength": 1},
+                                },
+                                "required": [
+                                    "rank",
+                                    "target_id",
+                                    "habitat_name",
+                                    "category",
+                                    "priority_score",
+                                    "apify_config_id",
+                                ],
+                            },
+                        },
+                    },
+                    "required": ["method", "habitat_observations", "ranked_list"],
+                }
+            },
+            "required": ["prioritization"],
+        },
+        "validation": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "errors": {"type": "array", "items": {"type": "string"}},
+            },
+            "required": ["errors"],
+        },
+    },
+    "required": [
+        "schema_version",
+        "generated_at",
+        "product_classification",
+        "prior_declaration",
+        "analysis_order",
+        "habitat_categories",
+        "habitat_targets",
+        "whitespace_map",
+        "whitespace_summary_table",
+        "manual_search_queries_by_category",
+        "apify_configs",
+        "prior_vs_actual",
+        "limitations_confidence",
+        "disconfirmation",
+        "tool_call_outputs",
+        "validation",
+    ],
+}
+
+_VOC_YN_CD_ENUM = ["Y", "N", "CANNOT_DETERMINE"]
+_VOC_AGENT01_OBSERVATION_SHEET_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "threads_50_plus": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "threads_200_plus": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "threads_1000_plus": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "posts_last_3mo": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "posts_last_6mo": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "posts_last_12mo": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "recency_ratio": {
+            "type": "string",
+            "enum": ["MAJORITY_RECENT", "BALANCED", "MAJORITY_OLD", "CANNOT_DETERMINE"],
+        },
+        "exact_category": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "purchasing_comparing": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "personal_usage": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "adjacent_only": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "first_person_narratives": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "trigger_events": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "fear_frustration_shame": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "specific_dollar_or_time": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "long_detailed_posts": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "comparison_discussions": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "price_value_mentions": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "post_purchase_experience": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "relevance_pct": {
+            "type": "string",
+            "enum": ["OVER_50_PCT", "25_TO_50_PCT", "10_TO_25_PCT", "UNDER_10_PCT", "CANNOT_DETERMINE"],
+        },
+        "dominated_by_offtopic": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "competitor_brands_mentioned": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "competitor_brand_count": {"type": "string", "enum": ["0", "1-3", "4-7", "8+", "CANNOT_DETERMINE"]},
+        "competitor_ads_present": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "trend_direction": {"type": "string", "enum": ["HIGHER", "SAME", "LOWER", "CANNOT_DETERMINE"]},
+        "seasonal_patterns": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "seasonal_description": {"type": "string"},
+        "habitat_age": {
+            "type": "string",
+            "enum": ["UNDER_1YR", "1_TO_3YR", "3_TO_7YR", "OVER_7YR", "CANNOT_DETERMINE"],
+        },
+        "membership_trend": {"type": "string", "enum": ["GROWING", "STABLE", "DECLINING", "CANNOT_DETERMINE"]},
+        "post_frequency_trend": {
+            "type": "string",
+            "enum": ["INCREASING", "SAME", "DECREASING", "CANNOT_DETERMINE"],
+        },
+        "publicly_accessible": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "text_based_content": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "target_language": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "no_rate_limiting": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "purchase_intent_density": {"type": "string", "enum": ["MOST", "SOME", "FEW", "NONE", "CANNOT_DETERMINE"]},
+        "discusses_spending": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "recommendation_threads": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "reusability": {"type": "string", "enum": ["PRODUCT_SPECIFIC", "PATTERN_REUSABLE", "CANNOT_DETERMINE"]},
+    },
+    "required": [
+        "threads_50_plus",
+        "threads_200_plus",
+        "threads_1000_plus",
+        "posts_last_3mo",
+        "posts_last_6mo",
+        "posts_last_12mo",
+        "recency_ratio",
+        "exact_category",
+        "purchasing_comparing",
+        "personal_usage",
+        "adjacent_only",
+        "first_person_narratives",
+        "trigger_events",
+        "fear_frustration_shame",
+        "specific_dollar_or_time",
+        "long_detailed_posts",
+        "comparison_discussions",
+        "price_value_mentions",
+        "post_purchase_experience",
+        "relevance_pct",
+        "dominated_by_offtopic",
+        "competitor_brands_mentioned",
+        "competitor_brand_count",
+        "competitor_ads_present",
+        "trend_direction",
+        "seasonal_patterns",
+        "seasonal_description",
+        "habitat_age",
+        "membership_trend",
+        "post_frequency_trend",
+        "publicly_accessible",
+        "text_based_content",
+        "target_language",
+        "no_rate_limiting",
+        "purchase_intent_density",
+        "discusses_spending",
+        "recommendation_threads",
+        "reusability",
+    ],
+}
+_VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "sample_id": {"type": "string", "minLength": 1},
+        "evidence_ref": {"type": "string", "minLength": 1},
+        "word_count": {"type": "integer", "minimum": 0},
+        "has_trigger_event": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "has_failed_solution": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "has_identity_language": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "has_specific_outcome": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+    },
+    "required": [
+        "sample_id",
+        "evidence_ref",
+        "word_count",
+        "has_trigger_event",
+        "has_failed_solution",
+        "has_identity_language",
+        "has_specific_outcome",
+    ],
+}
+_VOC_AGENT01_VIDEO_EXTENSION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "video_count_scraped": {"anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "median_view_count": {"anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "viral_videos_found": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "viral_video_count": {"anyOf": [{"type": "integer", "minimum": 0}, {"type": "null"}]},
+        "comment_sections_active": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "comment_avg_length": {
+            "type": "string",
+            "enum": ["SHORT", "MEDIUM", "LONG"],
+        },
+        "hook_formats_identifiable": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "creator_diversity": {"type": "string", "enum": ["SINGLE", "FEW", "MANY"]},
+        "contains_testimonial_language": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "contains_objection_language": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+        "contains_purchase_intent": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+    },
+    "required": [
+        "video_count_scraped",
+        "median_view_count",
+        "viral_videos_found",
+        "viral_video_count",
+        "comment_sections_active",
+        "comment_avg_length",
+        "hook_formats_identifiable",
+        "creator_diversity",
+        "contains_testimonial_language",
+        "contains_objection_language",
+        "contains_purchase_intent",
+    ],
+}
+_VOC_AGENT01_COMPETITIVE_OVERLAP_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "competitors_in_data": {"type": "array", "items": {"type": "string"}},
+        "overlap_level": {"type": "string", "enum": ["HIGH", "MEDIUM", "LOW", "NONE", "CANNOT_DETERMINE"]},
+        "whitespace_opportunity": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+    },
+    "required": ["competitors_in_data", "overlap_level", "whitespace_opportunity"],
+}
+_VOC_AGENT01_TREND_LIFECYCLE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "trend_direction": {"type": "string", "enum": ["HIGHER", "SAME", "LOWER", "CANNOT_DETERMINE"]},
+        "lifecycle_stage": {
+            "type": "string",
+            "enum": ["EMERGING", "GROWING", "MATURE", "DECLINING", "ARCHIVED", "CANNOT_DETERMINE"],
+        },
+    },
+    "required": ["trend_direction", "lifecycle_stage"],
+}
+_VOC_AGENT01_MINING_GATE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "status": {"type": "string", "enum": ["PASS", "GATE_FAIL"]},
+        "failed_fields": {"type": "array", "items": {"type": "string"}},
+        "reason": {"type": "string"},
+    },
+    "required": ["status", "failed_fields", "reason"],
+}
+_VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "habitat_name": {"type": "string", "minLength": 1},
+        "habitat_type": {"type": "string", "minLength": 1},
+        "url_pattern": {"type": "string", "minLength": 1},
+        "source_file": {"type": "string", "minLength": 1},
+        "items_in_file": {"type": "integer", "minimum": 0},
+        "data_quality": {
+            "type": "string",
+            "enum": ["CLEAN", "MINOR_ISSUES", "MAJOR_ISSUES", "UNUSABLE"],
+        },
+        "observation_sheet": _VOC_AGENT01_OBSERVATION_SHEET_SCHEMA,
+        "language_samples": {
+            "type": "array",
+            "items": _VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA,
+        },
+        "video_extension": {
+            "anyOf": [
+                _VOC_AGENT01_VIDEO_EXTENSION_SCHEMA,
+                {"type": "null"},
+            ]
+        },
+        "competitive_overlap": _VOC_AGENT01_COMPETITIVE_OVERLAP_SCHEMA,
+        "trend_lifecycle": _VOC_AGENT01_TREND_LIFECYCLE_SCHEMA,
+        "mining_gate": _VOC_AGENT01_MINING_GATE_SCHEMA,
+        "rank_score": {"type": "integer"},
+        "estimated_yield": {"type": "integer", "minimum": 0},
+        "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1},
+        },
+    },
+    "required": [
+        "habitat_name",
+        "habitat_type",
+        "url_pattern",
+        "source_file",
+        "items_in_file",
+        "data_quality",
+        "observation_sheet",
+        "language_samples",
+        "video_extension",
+        "competitive_overlap",
+        "trend_lifecycle",
+        "mining_gate",
+        "rank_score",
+        "estimated_yield",
+        "evidence_refs",
+    ],
+}
+_VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "habitat_name": {"type": "string", "minLength": 1},
+        "habitat_type": {"type": "string", "minLength": 1},
+        "source_file": {"type": "string", "minLength": 1},
+        "priority_rank": {"type": "integer", "minimum": 1, "maximum": 12},
+        "rank_score": {"type": "integer"},
+        "target_voc_types": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "string",
+                "enum": [
+                    "PAIN_LANGUAGE",
+                    "TRIGGER_EVENTS",
+                    "FAILED_SOLUTIONS",
+                    "BUYER_COMPARISONS",
+                    "DESIRED_OUTCOMES",
+                    "IDENTITY_LANGUAGE",
+                    "OBJECTIONS",
+                    "PROOF_DEMANDS",
+                    "POST_PURCHASE",
+                ],
+            },
+        },
+        "estimated_yield": {"type": "integer", "minimum": 0},
+        "sampling_strategy": {"type": "string", "minLength": 1},
+        "platform_behavior_note": {"type": "string", "minLength": 1},
+        "compliance_flags": {"type": "string"},
+        "observation_sheet": _VOC_AGENT01_OBSERVATION_SHEET_SCHEMA,
+        "language_samples": {"type": "array", "items": _VOC_AGENT01_LANGUAGE_SAMPLE_SCHEMA},
+        "video_extension": {
+            "anyOf": [
+                _VOC_AGENT01_VIDEO_EXTENSION_SCHEMA,
+                {"type": "null"},
+            ]
+        },
+        "competitive_overlap": _VOC_AGENT01_COMPETITIVE_OVERLAP_SCHEMA,
+        "trend_lifecycle": _VOC_AGENT01_TREND_LIFECYCLE_SCHEMA,
+        "evidence_refs": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1},
+        },
+    },
+    "required": [
+        "habitat_name",
+        "habitat_type",
+        "source_file",
+        "priority_rank",
+        "rank_score",
+        "target_voc_types",
+        "estimated_yield",
+        "sampling_strategy",
+        "platform_behavior_note",
+        "compliance_flags",
+        "observation_sheet",
+        "language_samples",
+        "video_extension",
+        "competitive_overlap",
+        "trend_lifecycle",
+        "evidence_refs",
+    ],
+}
+_VOC_AGENT01_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "report_markdown": {"type": "string", "minLength": 1},
+        "agent_id": {"type": "string", "minLength": 1},
+        "agent_version": {"type": "string", "minLength": 1},
+        "timestamp": {"type": "string", "format": "date-time"},
+        "product_classification": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "buyer_behavior": {
+                    "type": "string",
+                    "enum": ["IMPULSE", "CONSIDERED", "HIGH_TRUST", "SUBSCRIPTION", "ONE_TIME"],
+                },
+                "purchase_emotion": {
+                    "type": "string",
+                    "enum": ["PRIMARILY_EMOTIONAL", "PRIMARILY_RATIONAL", "MIXED"],
+                },
+                "compliance_sensitivity": {
+                    "type": "string",
+                    "enum": ["LOW", "MEDIUM", "HIGH", "REGULATED"],
+                },
+                "price_sensitivity": {
+                    "type": "string",
+                    "enum": ["LOW_TICKET_UNDER_30", "MID_TICKET_30_TO_100", "HIGH_TICKET_OVER_100"],
+                },
+            },
+            "required": [
+                "buyer_behavior",
+                "purchase_emotion",
+                "compliance_sensitivity",
+                "price_sensitivity",
+            ],
+        },
+        "excluded_source_files": {
+            "type": "array",
+            "items": {"type": "string", "minLength": 1},
+        },
+        "habitat_observations": {
+            "type": "array",
+            "minItems": 1,
+            "items": _VOC_AGENT01_HABITAT_OBSERVATION_SCHEMA,
+        },
+        "mining_plan": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": _VOC_AGENT01_MINING_PLAN_ENTRY_SCHEMA,
+        },
+        "gate_failures": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "habitat_name": {"type": "string", "minLength": 1},
+                    "gate_failed": {
+                        "type": "string",
+                        "enum": [
+                            "publicly_accessible",
+                            "text_based_content",
+                            "target_language",
+                            "no_rate_limiting",
+                            "multiple",
+                        ],
+                    },
+                    "reason": {"type": "string", "minLength": 1},
+                },
+                "required": ["habitat_name", "gate_failed", "reason"],
+            },
+        },
+        "disconfirmation_flags": {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {"type": "string", "minLength": 1},
+        },
+    },
+    "required": [
+        "report_markdown",
+        "agent_id",
+        "agent_version",
+        "timestamp",
+        "product_classification",
+        "excluded_source_files",
+        "habitat_observations",
+        "mining_plan",
+        "gate_failures",
+        "disconfirmation_flags",
+    ],
+}
+_VOC_AGENT02_YN_SCHEMA: dict[str, Any] = {"type": "string", "enum": ["Y", "N"]}
+_VOC_AGENT02_VOC_OBSERVATION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "voc_id": {"type": "string", "minLength": 1},
+        "source": {"type": "string", "minLength": 1},
+        "source_type": {
+            "type": "string",
+            "enum": [
+                "REDDIT",
+                "FORUM",
+                "BLOG_COMMENT",
+                "REVIEW_SITE",
+                "QA",
+                "TIKTOK_COMMENT",
+                "IG_COMMENT",
+                "YT_COMMENT",
+                "VIDEO_HOOK",
+            ],
+        },
+        "source_url": {"type": "string", "minLength": 1},
+        "source_author": {"type": "string", "minLength": 1},
+        "source_date": {"type": "string", "minLength": 1},
+        "is_hook": _VOC_AGENT02_YN_SCHEMA,
+        "hook_format": {
+            "type": "string",
+            "enum": ["QUESTION", "STATEMENT", "STORY", "STATISTIC", "CONTRARIAN", "DEMONSTRATION", "NONE"],
+        },
+        "hook_word_count": {"type": "integer", "minimum": 0},
+        "video_virality_tier": {
+            "type": "string",
+            "enum": ["VIRAL", "HIGH_PERFORMING", "ABOVE_AVERAGE", "BASELINE"],
+        },
+        "video_view_count": {"type": "integer", "minimum": 0},
+        "competitor_saturation": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "in_whitespace": _VOC_AGENT02_YN_SCHEMA,
+        "evidence_ref": {"type": "string", "minLength": 1},
+        "quote": {"type": "string", "minLength": 1},
+        "specific_number": _VOC_AGENT02_YN_SCHEMA,
+        "specific_product_brand": _VOC_AGENT02_YN_SCHEMA,
+        "specific_event_moment": _VOC_AGENT02_YN_SCHEMA,
+        "specific_body_symptom": _VOC_AGENT02_YN_SCHEMA,
+        "before_after_comparison": _VOC_AGENT02_YN_SCHEMA,
+        "crisis_language": _VOC_AGENT02_YN_SCHEMA,
+        "profanity_extreme_punctuation": _VOC_AGENT02_YN_SCHEMA,
+        "physical_sensation": _VOC_AGENT02_YN_SCHEMA,
+        "identity_change_desire": _VOC_AGENT02_YN_SCHEMA,
+        "word_count": {"type": "integer", "minimum": 1},
+        "clear_trigger_event": _VOC_AGENT02_YN_SCHEMA,
+        "named_enemy": _VOC_AGENT02_YN_SCHEMA,
+        "shiftable_belief": _VOC_AGENT02_YN_SCHEMA,
+        "expectation_vs_reality": _VOC_AGENT02_YN_SCHEMA,
+        "headline_ready": _VOC_AGENT02_YN_SCHEMA,
+        "usable_content_pct": {
+            "type": "string",
+            "enum": ["OVER_75_PCT", "50_TO_75_PCT", "25_TO_50_PCT", "UNDER_25_PCT"],
+        },
+        "personal_context": _VOC_AGENT02_YN_SCHEMA,
+        "long_narrative": _VOC_AGENT02_YN_SCHEMA,
+        "engagement_received": _VOC_AGENT02_YN_SCHEMA,
+        "real_person_signals": _VOC_AGENT02_YN_SCHEMA,
+        "moderated_community": _VOC_AGENT02_YN_SCHEMA,
+        "trigger_event": {"type": "string", "minLength": 1},
+        "pain_problem": {"type": "string", "minLength": 1},
+        "desired_outcome": {"type": "string", "minLength": 1},
+        "failed_prior_solution": {"type": "string", "minLength": 1},
+        "enemy_blame": {"type": "string", "minLength": 1},
+        "identity_role": {"type": "string", "minLength": 1},
+        "fear_risk": {"type": "string", "minLength": 1},
+        "emotional_valence": {
+            "type": "string",
+            "enum": [
+                "RELIEF",
+                "RAGE",
+                "SHAME",
+                "PRIDE",
+                "ANXIETY",
+                "HOPE",
+                "FRUSTRATION",
+                "NEUTRAL",
+            ],
+        },
+        "durable_psychology": _VOC_AGENT02_YN_SCHEMA,
+        "market_specific": _VOC_AGENT02_YN_SCHEMA,
+        "date_bracket": {
+            "type": "string",
+            "enum": ["LAST_3MO", "LAST_6MO", "LAST_12MO", "LAST_24MO", "OLDER", "UNKNOWN"],
+        },
+        "buyer_stage": {"type": "string", "minLength": 1},
+        "solution_sophistication": {
+            "type": "string",
+            "enum": ["NOVICE", "EXPERIENCED", "EXHAUSTED", "UNKNOWN"],
+        },
+        "compliance_risk": {"type": "string", "enum": ["GREEN", "YELLOW", "RED"]},
+    },
+    "required": [
+        "voc_id",
+        "source",
+        "source_type",
+        "source_url",
+        "source_author",
+        "source_date",
+        "is_hook",
+        "hook_format",
+        "hook_word_count",
+        "video_virality_tier",
+        "video_view_count",
+        "competitor_saturation",
+        "in_whitespace",
+        "evidence_ref",
+        "quote",
+        "specific_number",
+        "specific_product_brand",
+        "specific_event_moment",
+        "specific_body_symptom",
+        "before_after_comparison",
+        "crisis_language",
+        "profanity_extreme_punctuation",
+        "physical_sensation",
+        "identity_change_desire",
+        "word_count",
+        "clear_trigger_event",
+        "named_enemy",
+        "shiftable_belief",
+        "expectation_vs_reality",
+        "headline_ready",
+        "usable_content_pct",
+        "personal_context",
+        "long_narrative",
+        "engagement_received",
+        "real_person_signals",
+        "moderated_community",
+        "trigger_event",
+        "pain_problem",
+        "desired_outcome",
+        "failed_prior_solution",
+        "enemy_blame",
+        "identity_role",
+        "fear_risk",
+        "emotional_valence",
+        "durable_psychology",
+        "market_specific",
+        "date_bracket",
+        "buyer_stage",
+        "solution_sophistication",
+        "compliance_risk",
+    ],
+}
+_VOC_AGENT02_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "mode": {"type": "string", "enum": ["DUAL", "FRESH"]},
+        "input_count": {"type": "integer", "minimum": 0},
+        "output_count": {"type": "integer", "minimum": 0},
+        "voc_observations": {
+            "type": "array",
+            "items": _VOC_AGENT02_VOC_OBSERVATION_SCHEMA,
+        },
+        "rejected_items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "evidence_id": {"type": "string", "minLength": 1},
+                    "reason": {
+                        "type": "string",
+                        "enum": ["NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"],
+                    },
+                    "note": {"type": "string"},
+                },
+                "required": ["evidence_id", "reason", "note"],
+            },
+        },
+        "validation_errors": {"type": "array", "items": {"type": "string"}},
+    },
+    "required": [
+        "mode",
+        "input_count",
+        "output_count",
+        "voc_observations",
+        "rejected_items",
+        "validation_errors",
+    ],
+}
 
 _OFFER_STEP01_PROMPT_PATTERN = "Offer Agent */prompts/step-01-avatar-brief.md"
 _OFFER_STEP02_PROMPT_PATTERN = "Offer Agent */prompts/step-02-market-calibration.md"
@@ -162,6 +1299,8 @@ _COPY_ADVERTORIAL_PROMPT_PATTERN = "Copywriting Agent */04_prompt_templates/adve
 _COPY_SALES_PROMPT_PATTERN = "Copywriting Agent */04_prompt_templates/sales_page_writing.md"
 _COPY_PAGE_REPAIR_MAX_ATTEMPTS = int(os.getenv("STRATEGY_V2_COPY_PAGE_REPAIR_MAX_ATTEMPTS", "5"))
 _COPY_HEADLINE_MAX_CANDIDATES = int(os.getenv("STRATEGY_V2_COPY_HEADLINE_MAX_CANDIDATES", "15"))
+_COPY_HEADLINE_EVALUATION_LIMIT = int(os.getenv("STRATEGY_V2_COPY_HEADLINE_EVALUATION_LIMIT", "10"))
+_COPY_HEADLINE_EVALUATION_OFFSET = int(os.getenv("STRATEGY_V2_COPY_HEADLINE_EVALUATION_OFFSET", "0"))
 _COPY_HEADLINE_QA_MAX_ITERATIONS = int(os.getenv("STRATEGY_V2_COPY_HEADLINE_QA_MAX_ITERATIONS", "6"))
 _COPY_HEADLINE_TRANSIENT_FAIL_FAST_THRESHOLD = int(
     os.getenv("STRATEGY_V2_COPY_HEADLINE_TRANSIENT_FAIL_FAST_THRESHOLD", "6")
@@ -169,6 +1308,290 @@ _COPY_HEADLINE_TRANSIENT_FAIL_FAST_THRESHOLD = int(
 _COPY_DEBUG_CAPTURE_MARKDOWN = os.getenv("STRATEGY_V2_COPY_DEBUG_CAPTURE_MARKDOWN", "0").strip() == "1"
 _COPY_DEBUG_CAPTURE_THREADS = os.getenv("STRATEGY_V2_COPY_DEBUG_CAPTURE_THREADS", "0").strip() == "1"
 _COPY_DEBUG_CAPTURE_FULL_MARKDOWN = os.getenv("STRATEGY_V2_COPY_DEBUG_CAPTURE_FULL_MARKDOWN", "0").strip() == "1"
+_PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "hero": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "subtitle": {"type": "string", "minLength": 1},
+                "badges": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "label": {"type": "string", "minLength": 1},
+                            "value": {"type": "string", "minLength": 1},
+                        },
+                        "required": ["label"],
+                    },
+                },
+            },
+            "required": ["title", "subtitle", "badges"],
+        },
+        "reasons": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "number": {"type": "integer", "minimum": 1},
+                    "title": {"type": "string", "minLength": 1},
+                    "body": {"type": "string", "minLength": 1},
+                },
+                "required": ["number", "title", "body"],
+            },
+        },
+        "marquee": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1},
+        },
+        "pitch": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "bullets": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string", "minLength": 1},
+                },
+                "cta_label": {"type": "string", "minLength": 1},
+            },
+            "required": ["title", "bullets", "cta_label"],
+        },
+        "reviews": {
+            "type": "array",
+            "minItems": 3,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "text": {"type": "string", "minLength": 1},
+                    "author": {"type": "string", "minLength": 1},
+                    "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+                    "verified": {"type": "boolean"},
+                },
+                "required": ["text", "author"],
+            },
+        },
+        "review_wall": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "button_label": {"type": "string", "minLength": 1},
+            },
+            "required": ["title", "button_label"],
+        },
+        "floating_cta": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "label": {"type": "string", "minLength": 1},
+            },
+            "required": ["label"],
+        },
+    },
+    "required": ["hero", "reasons", "marquee", "pitch", "reviews", "review_wall", "floating_cta"],
+}
+_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "hero": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "purchase_title": {"type": "string", "minLength": 1},
+                "primary_cta_label": {"type": "string", "minLength": 1},
+                "primary_cta_subbullets": {
+                    "type": "array",
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 90},
+                },
+            },
+            "required": ["purchase_title", "primary_cta_label", "primary_cta_subbullets"],
+        },
+        "problem": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "paragraphs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string", "minLength": 1},
+                },
+                "emphasis_line": {"type": "string", "minLength": 1},
+            },
+            "required": ["title", "paragraphs", "emphasis_line"],
+        },
+        "mechanism": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "paragraphs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string", "minLength": 1},
+                },
+                "bullets": {
+                    "type": "array",
+                    "minItems": 4,
+                    "maxItems": 6,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "title": {"type": "string", "minLength": 1, "maxLength": 90},
+                            "body": {"type": "string", "minLength": 1, "maxLength": 240},
+                        },
+                        "required": ["title", "body"],
+                    },
+                },
+                "callout": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "left_title": {"type": "string", "minLength": 1, "maxLength": 120},
+                        "left_body": {"type": "string", "minLength": 1, "maxLength": 240},
+                        "right_title": {"type": "string", "minLength": 1, "maxLength": 120},
+                        "right_body": {"type": "string", "minLength": 1, "maxLength": 240},
+                    },
+                    "required": ["left_title", "left_body", "right_title", "right_body"],
+                },
+                "comparison": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "badge": {"type": "string", "minLength": 1, "maxLength": 120},
+                        "title": {"type": "string", "minLength": 1, "maxLength": 160},
+                        "swipe_hint": {"type": "string", "minLength": 1, "maxLength": 120},
+                        "columns": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "pup": {"type": "string", "minLength": 1, "maxLength": 80},
+                                "disposable": {"type": "string", "minLength": 1, "maxLength": 80},
+                            },
+                            "required": ["pup", "disposable"],
+                        },
+                        "rows": {
+                            "type": "array",
+                            "minItems": 1,
+                            "maxItems": 8,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "label": {"type": "string", "minLength": 1, "maxLength": 80},
+                                    "pup": {"type": "string", "minLength": 1, "maxLength": 180},
+                                    "disposable": {"type": "string", "minLength": 1, "maxLength": 180},
+                                },
+                                "required": ["label", "pup", "disposable"],
+                            },
+                        },
+                    },
+                    "required": ["badge", "title", "swipe_hint", "columns", "rows"],
+                },
+            },
+            "required": ["title", "paragraphs", "bullets", "callout", "comparison"],
+        },
+        "social_proof": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "badge": {"type": "string", "minLength": 1},
+                "title": {"type": "string", "minLength": 1},
+                "rating_label": {"type": "string", "minLength": 1},
+                "summary": {"type": "string", "minLength": 1},
+            },
+            "required": ["badge", "title", "rating_label", "summary"],
+        },
+        "whats_inside": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "benefits": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 6,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 140},
+                },
+                "offer_helper_text": {"type": "string", "minLength": 1},
+            },
+            "required": ["benefits", "offer_helper_text"],
+        },
+        "bonus": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "free_gifts_title": {"type": "string", "minLength": 1},
+                "free_gifts_body": {"type": "string", "minLength": 1, "maxLength": 220},
+            },
+            "required": ["free_gifts_title", "free_gifts_body"],
+        },
+        "guarantee": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "paragraphs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string", "minLength": 1},
+                },
+                "why_title": {"type": "string", "minLength": 1},
+                "why_body": {"type": "string", "minLength": 1},
+                "closing_line": {"type": "string", "minLength": 1},
+            },
+            "required": ["title", "paragraphs", "why_title", "why_body", "closing_line"],
+        },
+        "faq": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "title": {"type": "string", "minLength": 1},
+                "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "question": {"type": "string", "minLength": 1},
+                            "answer": {"type": "string", "minLength": 1},
+                        },
+                        "required": ["question", "answer"],
+                    },
+                },
+            },
+            "required": ["title", "items"],
+        },
+        "cta_close": {"type": "string", "minLength": 1},
+    },
+    "required": [
+        "hero",
+        "problem",
+        "mechanism",
+        "social_proof",
+        "whats_inside",
+        "bonus",
+        "guarantee",
+        "faq",
+        "cta_close",
+    ],
+}
 _COPY_WORD_FLOOR_ERROR_RE = re.compile(
     r"(?P<reason>[A-Z_]+_WORD_FLOOR):\s*total_words=(?P<current>\d+),\s*required>=(?P<min>\d+)",
     re.IGNORECASE,
@@ -318,6 +1741,19 @@ _UMP_UMS_DIMENSIONS = (
 )
 
 _OFFER_VARIANT_IDS = ("base", "variant_a", "variant_b")
+_OFFER_COMPOSITE_DIMENSIONS = (
+    "value_equation",
+    "objection_coverage",
+    "competitive_differentiation",
+    "compliance_safety",
+    "internal_consistency",
+    "clarity_simplicity",
+    "bottleneck_resilience",
+    "momentum_continuity",
+)
+_OFFER_EVIDENCE_QUALITY_LEVELS = ("OBSERVED", "INFERRED", "ASSUMED")
+_STEP05_REVISION_NOTES_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP05_REVISION_NOTES_MAX_CHARS", "4000"))
+_STEP05_KILL_CONDITION_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP05_KILL_CONDITION_MAX_CHARS", "800"))
 _OFFER_ORCHESTRATOR_REQUIRED_STEP_PROMPTS = (
     "step-01-avatar-brief.md",
     "step-02-market-calibration.md",
@@ -336,9 +1772,34 @@ _AGENT3_TOP_QUOTES_PER_CANDIDATE = 5
 _AGENT3_HOOK_STARTERS_PER_CANDIDATE = 3
 _AGENT3_MAX_TEXT_CHARS = 280
 _AGENT3_MAX_QUOTE_CHARS = 320
-_AGENT1_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT1_MAX_TOKENS", "16000"))
-_AGENT2_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT2_MAX_TOKENS", "64000"))
-_AGENT3_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT3_MAX_TOKENS", "32000"))
+_AGENT1_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT1_MAX_TOKENS", "128000"))
+_AGENT2_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT2_MAX_TOKENS", "128000"))
+_AGENT3_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT3_MAX_TOKENS", "64000"))
+_AGENT2_AGENT1_HANDOFF_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT2_AGENT1_HANDOFF_MAX_CHARS", "20000"))
+_AGENT2_HABITAT_SCORED_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT2_HABITAT_SCORED_MAX_CHARS", "20000"))
+_AGENT2_PRODUCT_BRIEF_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT2_PRODUCT_BRIEF_MAX_CHARS", "9000"))
+_AGENT2_AVATAR_BRIEF_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT2_AVATAR_BRIEF_MAX_CHARS", "9000"))
+_AGENT2_KNOWN_SATURATED_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT2_KNOWN_SATURATED_MAX_CHARS", "8000"))
+_AGENT2_COMPETITOR_ANALYSIS_MAX_CHARS = int(
+    os.getenv("STRATEGY_V2_AGENT2_COMPETITOR_ANALYSIS_MAX_CHARS", "24000")
+)
+_AGENT1_HABITAT_STRATEGY_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT1_HABITAT_STRATEGY_MAX_CHARS", "60000"))
+_AGENT1_VIDEO_STRATEGY_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT1_VIDEO_STRATEGY_MAX_CHARS", "120000"))
+_AGENT1_SCORED_VIDEO_DATA_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT1_SCORED_VIDEO_DATA_MAX_CHARS", "60000"))
+_AGENT1_PRODUCT_BRIEF_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT1_PRODUCT_BRIEF_MAX_CHARS", "30000"))
+_AGENT1_AVATAR_BRIEF_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT1_AVATAR_BRIEF_MAX_CHARS", "30000"))
+_AGENT1_COMPETITOR_ANALYSIS_MAX_CHARS = int(
+    os.getenv("STRATEGY_V2_AGENT1_COMPETITOR_ANALYSIS_MAX_CHARS", "40000")
+)
+_AGENT1_COMPACTION_THRESHOLD = int(os.getenv("STRATEGY_V2_AGENT1_COMPACTION_THRESHOLD", "200000"))
+_REDDIT_TARGET_ALIGNMENT_MIN_RATIO = float(
+    os.getenv("STRATEGY_V2_REDDIT_TARGET_ALIGNMENT_MIN_RATIO", "0.5")
+)
+_REDDIT_TARGET_ALIGNMENT_MIN_ITEMS = int(
+    os.getenv("STRATEGY_V2_REDDIT_TARGET_ALIGNMENT_MIN_ITEMS", "5")
+)
+_GPT52_CONTEXT_WINDOW_TOKENS = int(os.getenv("STRATEGY_V2_GPT52_CONTEXT_WINDOW_TOKENS", "400000"))
+_PROMPT_INPUT_TOKEN_SAFETY_BUFFER = int(os.getenv("STRATEGY_V2_PROMPT_INPUT_TOKEN_SAFETY_BUFFER", "16000"))
 
 _H2_MAX_CANDIDATE_ASSETS = int(os.getenv("STRATEGY_V2_H2_MAX_CANDIDATE_ASSETS", "40"))
 _H2_MAX_CANDIDATES_PER_COMPETITOR = int(os.getenv("STRATEGY_V2_H2_MAX_CANDIDATES_PER_COMPETITOR", "3"))
@@ -355,6 +1816,8 @@ _VOC_MIN_OBSERVATIONS_GATE = int(os.getenv("STRATEGY_V2_VOC_MIN_OBSERVATIONS_GAT
 _VOC_MIN_NON_ZERO_SCORE_RATIO = float(os.getenv("STRATEGY_V2_VOC_MIN_NON_ZERO_SCORE_RATIO", "0.35"))
 _VOC_MAX_ZERO_EVIDENCE_RATIO = float(os.getenv("STRATEGY_V2_VOC_MAX_ZERO_EVIDENCE_RATIO", "0.60"))
 _VOC_MIN_SOURCE_BUCKETS = int(os.getenv("STRATEGY_V2_VOC_MIN_SOURCE_BUCKETS", "2"))
+
+_LOGGER = logging.getLogger(__name__)
 
 _ANGLE_MIN_STD_SCORE = float(os.getenv("STRATEGY_V2_ANGLE_MIN_STD_SCORE", "0.5"))
 _ANGLE_MIN_NON_FLOOR_CANDIDATES = int(os.getenv("STRATEGY_V2_ANGLE_MIN_NON_FLOOR_CANDIDATES", "3"))
@@ -435,6 +1898,14 @@ _AVATAR_PLATFORM_TOKENS = (
 _NON_SCRAPEABLE_SOURCE_HOSTS = {
     "apify.com",
     "www.apify.com",
+    "brandsearch.co",
+    "www.brandsearch.co",
+    "crunchbase.com",
+    "www.crunchbase.com",
+    "en.wikipedia.org",
+    "wikipedia.org",
+    "hypestat.com",
+    "www.hypestat.com",
     "google.com",
     "www.google.com",
     "bing.com",
@@ -442,6 +1913,23 @@ _NON_SCRAPEABLE_SOURCE_HOSTS = {
     "duckduckgo.com",
     "www.duckduckgo.com",
     "docs.google.com",
+    "scam-detector.com",
+    "www.scam-detector.com",
+    "semrush.com",
+    "www.semrush.com",
+}
+_TRACKING_QUERY_PREFIXES = ("utm_",)
+_TRACKING_QUERY_KEYS = {
+    "fbclid",
+    "gclid",
+    "igshid",
+    "mc_cid",
+    "mc_eid",
+    "ref_src",
+}
+_PLATFORM_QUERY_KEYS: dict[str, frozenset[str]] = {
+    "youtube.com": frozenset({"v", "list", "t"}),
+    "youtu.be": frozenset({"t"}),
 }
 
 
@@ -743,6 +2231,10 @@ def _extract_block_markers_from_payload(payload: Any) -> list[str]:
                         for token in _BLOCKED_PROMPT_OUTPUT_TOKENS:
                             if token in upper_value:
                                 findings.append(f"{key}={token}")
+                    if key in {"habitat_name", "url_pattern", "source", "title"}:
+                        for token in _BLOCKED_PROMPT_OUTPUT_TOKENS:
+                            if token in upper_value:
+                                findings.append(f"{key}={token}")
                     if key in {"missing_required_inputs", "required_inputs_missing"} and value.strip():
                         findings.append(f"{key}=present")
                 elif key in {"missing_required_inputs", "required_inputs_missing"} and isinstance(value, list) and value:
@@ -764,6 +2256,296 @@ def _raise_if_blocked_prompt_output(
         raise StrategyV2DecisionError(
             f"{stage_label} returned blocked/cannot-proceed output ({'; '.join(sorted(set(findings)))}). "
             f"Remediation: {remediation}"
+        )
+
+
+def _build_manifest_config_target_id_map(*, apify_context: Mapping[str, Any]) -> dict[str, str]:
+    config_target_map: dict[str, str] = {}
+    config_blocks = (
+        apify_context.get("ingestion_apify_configs"),
+        apify_context.get("strategy_apify_configs"),
+        apify_context.get("apify_configs"),
+    )
+    for block in config_blocks:
+        if not isinstance(block, list):
+            continue
+        for row in block:
+            if not isinstance(row, Mapping):
+                continue
+            config_id = str(row.get("config_id") or "").strip()
+            if not config_id:
+                continue
+            metadata = row.get("metadata") if isinstance(row.get("metadata"), Mapping) else {}
+            config_metadata = (
+                row.get("config_metadata")
+                if isinstance(row.get("config_metadata"), Mapping)
+                else {}
+            )
+            candidate_target = (
+                str(metadata.get("target_id") or "").strip()
+                or str(config_metadata.get("target_id") or "").strip()
+                or str(row.get("target_id") or "").strip()
+                or str(row.get("strategy_target_id") or "").strip()
+            )
+            if candidate_target:
+                config_target_map[config_id] = candidate_target
+    return config_target_map
+
+
+def _resolve_manifest_strategy_target_id(
+    *,
+    row_target_id: str,
+    config_id: str,
+    actor_id: str,
+    source_platform: str,
+    row_index: int,
+    config_target_map: Mapping[str, str],
+) -> tuple[str, bool]:
+    normalized_row_target_id = row_target_id.strip()
+    if normalized_row_target_id:
+        return normalized_row_target_id, False
+
+    mapped_target_id = str(config_target_map.get(config_id) or "").strip()
+    if mapped_target_id:
+        return mapped_target_id, True
+
+    normalized_config_id = config_id.strip() or f"UNKNOWN_CONFIG_{row_index + 1}"
+    actor_lower = actor_id.lower()
+    if "comment" in actor_lower:
+        platform_token = re.sub(r"[^A-Z0-9]+", "_", source_platform.upper()).strip("_") or "UNKNOWN"
+        return f"COMMENT_ENRICHMENT_{platform_token}", True
+    if any(token in actor_lower for token in ("youtube", "instagram", "tiktok")):
+        return f"SV-{normalized_config_id}", True
+    return f"DISC-{normalized_config_id}", True
+
+
+def _infer_manifest_source_platform(*, actor_id: str, requested_refs: Sequence[str]) -> str:
+    lowered_actor = actor_id.lower()
+    if "reddit" in lowered_actor:
+        return "Reddit"
+    if "tiktok" in lowered_actor:
+        return "TikTok"
+    if "instagram" in lowered_actor:
+        return "Instagram"
+    if "youtube" in lowered_actor:
+        return "YouTube"
+    if "google-search" in lowered_actor:
+        return "Discovery"
+    if "web-scraper" in lowered_actor:
+        return "Web"
+
+    for ref in requested_refs:
+        lowered_ref = ref.lower()
+        if "reddit.com" in lowered_ref:
+            return "Reddit"
+        if "tiktok.com" in lowered_ref:
+            return "TikTok"
+        if "instagram.com" in lowered_ref:
+            return "Instagram"
+        if "youtube.com" in lowered_ref or "youtu.be" in lowered_ref:
+            return "YouTube"
+    return "Other"
+
+
+def _extract_manifest_date_range(items: Sequence[Mapping[str, Any]]) -> dict[str, str] | str:
+    def _coerce_timestamp(value: Any) -> str:
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            candidate = value.strip()
+            return candidate
+        if isinstance(value, (int, float)):
+            try:
+                return datetime.fromtimestamp(float(value), tz=timezone.utc).isoformat().replace("+00:00", "Z")
+            except Exception:
+                return ""
+        return ""
+
+    date_candidates: list[str] = []
+    for item in items:
+        nested_mappings: list[Mapping[str, Any]] = [item]
+        nested_post = item.get("post")
+        nested_snapshot = item.get("snapshot")
+        if isinstance(nested_post, Mapping):
+            nested_mappings.append(nested_post)
+        if isinstance(nested_snapshot, Mapping):
+            nested_mappings.append(nested_snapshot)
+        for mapping in nested_mappings:
+            for field_name in (
+                "created_utc",
+                "createdAt",
+                "created_at",
+                "timestamp",
+                "publishedAt",
+                "published_at",
+                "date",
+                "time",
+                "createTimeISO",
+                "createTime",
+            ):
+                candidate = _coerce_timestamp(mapping.get(field_name))
+                if candidate:
+                    date_candidates.append(candidate)
+    if not date_candidates:
+        return "CANNOT_DETERMINE"
+    sorted_dates = sorted(date_candidates)
+    return {"earliest": sorted_dates[0], "latest": sorted_dates[-1]}
+
+
+def _manifest_item_has_text_signal(item: Mapping[str, Any]) -> bool:
+    normalized = _normalize_scraped_item_for_manifest(item)
+    text_keys = ("title", "body", "comments_sample", "posts_sample", "organic_results_sample")
+    return any(
+        bool(normalized.get(key))
+        for key in text_keys
+    )
+
+
+def _manifest_item_has_hard_error(item: Mapping[str, Any]) -> bool:
+    hard_error_keys = ("error", "errorDescription")
+    for key in hard_error_keys:
+        value = item.get(key)
+        if isinstance(value, str) and value.strip():
+            return True
+    hash_error = item.get("#error")
+    if isinstance(hash_error, bool):
+        return hash_error
+    if isinstance(hash_error, str):
+        return hash_error.strip().lower() in {"1", "true", "yes"}
+    return False
+
+
+def _classify_manifest_run_exclusion_reason(
+    *,
+    actor_id: str,
+    source_platform: str,
+    raw_items: Sequence[Mapping[str, Any]],
+) -> str:
+    if any(_manifest_item_has_hard_error(item) for item in raw_items):
+        return "RUN_CONTAINS_ERROR_PAYLOAD"
+    has_text_signal = any(_manifest_item_has_text_signal(item) for item in raw_items)
+    if has_text_signal:
+        return ""
+    lowered_actor = actor_id.lower()
+    if source_platform == "Web" or "web-scraper" in lowered_actor:
+        return "WEB_SCRAPER_EMPTY_TEXT"
+    return "NO_EXTRACTABLE_TEXT"
+
+
+def _extract_reddit_subreddit_from_value(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    candidate = value.strip()
+    if not candidate:
+        return ""
+    if "reddit.com" in candidate.lower() or candidate.startswith("/r/"):
+        match = re.search(r"/r/([A-Za-z0-9_]+)/?", candidate, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).lower()
+    return ""
+
+
+def _validate_reddit_target_alignment(*, run_rows: Sequence[Mapping[str, Any]]) -> None:
+    mismatches: list[str] = []
+    missing_evidence: list[str] = []
+
+    for row in run_rows:
+        actor_id = str(row.get("actor_id") or "").strip().lower()
+        if "reddit" not in actor_id:
+            continue
+
+        input_payload = row.get("input_payload")
+        config_metadata = row.get("config_metadata")
+        if not isinstance(input_payload, Mapping):
+            continue
+        metadata = dict(config_metadata) if isinstance(config_metadata, Mapping) else {}
+        expected_subreddit = ""
+
+        direct_subreddit = input_payload.get("subreddit")
+        if isinstance(direct_subreddit, str) and direct_subreddit.strip():
+            expected_subreddit = direct_subreddit.strip().lower().lstrip("r/").replace("/", "")
+
+        if not expected_subreddit:
+            for value in (metadata.get("url_pattern"), metadata.get("target_id")):
+                extracted = _extract_reddit_subreddit_from_value(value)
+                if extracted:
+                    expected_subreddit = extracted
+                    break
+
+        if not expected_subreddit:
+            for key in ("startUrls", "urls", "postURLs", "directUrls"):
+                raw_urls = input_payload.get(key)
+                if not isinstance(raw_urls, list):
+                    continue
+                for entry in raw_urls:
+                    if isinstance(entry, Mapping):
+                        extracted = _extract_reddit_subreddit_from_value(entry.get("url"))
+                    else:
+                        extracted = _extract_reddit_subreddit_from_value(entry)
+                    if extracted:
+                        expected_subreddit = extracted
+                        break
+                if expected_subreddit:
+                    break
+
+        if not expected_subreddit:
+            continue
+
+        raw_items = [item for item in row.get("items", []) if isinstance(item, Mapping)] if isinstance(row.get("items"), list) else []
+        if not raw_items:
+            continue
+
+        observed_subreddits: Counter[str] = Counter()
+        for item in raw_items:
+            for field_name in ("subreddit",):
+                value = item.get(field_name)
+                if isinstance(value, str) and value.strip():
+                    observed_subreddits[value.strip().lower().lstrip("r/")] += 1
+            for field_name in ("source_url", "url", "permalink", "postUrl"):
+                extracted = _extract_reddit_subreddit_from_value(item.get(field_name))
+                if extracted:
+                    observed_subreddits[extracted] += 1
+            nested_post = item.get("post")
+            if isinstance(nested_post, Mapping):
+                nested_subreddit = nested_post.get("subreddit")
+                if isinstance(nested_subreddit, str) and nested_subreddit.strip():
+                    observed_subreddits[nested_subreddit.strip().lower().lstrip("r/")] += 1
+                for field_name in ("url", "permalink"):
+                    extracted = _extract_reddit_subreddit_from_value(nested_post.get(field_name))
+                    if extracted:
+                        observed_subreddits[extracted] += 1
+
+        evidence_rows = int(sum(observed_subreddits.values()))
+        run_id = str(row.get("run_id") or "")
+        config_id = str(row.get("config_id") or "")
+        if evidence_rows == 0:
+            missing_evidence.append(f"config_id={config_id or 'unknown'} run_id={run_id or 'unknown'}")
+            continue
+
+        matched_rows = int(observed_subreddits.get(expected_subreddit, 0))
+        alignment_ratio = matched_rows / max(evidence_rows, 1)
+        if evidence_rows >= max(_REDDIT_TARGET_ALIGNMENT_MIN_ITEMS, 1) and alignment_ratio < _REDDIT_TARGET_ALIGNMENT_MIN_RATIO:
+            top_seen = ", ".join(
+                f"{name}:{count}"
+                for name, count in observed_subreddits.most_common(3)
+            )
+            mismatches.append(
+                f"config_id={config_id or 'unknown'} run_id={run_id or 'unknown'} expected=r/{expected_subreddit} "
+                f"matched={matched_rows}/{evidence_rows} observed=[{top_seen}]"
+            )
+
+    if missing_evidence:
+        preview = "; ".join(missing_evidence[:5])
+        raise StrategyV2DecisionError(
+            "Reddit target-to-data consistency check failed: scraped rows did not contain subreddit/url evidence "
+            "needed to validate target alignment. "
+            f"Runs: {preview}."
+        )
+    if mismatches:
+        preview = "; ".join(mismatches[:5])
+        raise StrategyV2DecisionError(
+            "Reddit target-to-data consistency check failed: scraped datasets do not align with configured subreddit targets. "
+            f"Runs: {preview}."
         )
 
 
@@ -795,7 +2577,14 @@ def _build_scraped_data_manifest(
         else []
     )
     summarized_runs: list[dict[str, Any]] = []
-    for row in run_rows:
+    scraped_data_files: list[dict[str, Any]] = []
+    excluded_runs: list[dict[str, Any]] = []
+    platform_breakdown: Counter[str] = Counter()
+    config_target_map = _build_manifest_config_target_id_map(apify_context=apify_context)
+    missing_target_id_before_backfill = 0
+    backfilled_target_id_count = 0
+    missing_target_id_after_backfill = 0
+    for idx, row in enumerate(run_rows):
         input_payload = row.get("input_payload")
         requested_refs: list[str] = []
         if isinstance(input_payload, dict):
@@ -810,41 +2599,398 @@ def _build_scraped_data_manifest(
                         url_value = item.get("url")
                         if isinstance(url_value, str) and url_value.strip():
                             requested_refs.append(url_value.strip())
+        actor_id = str(row.get("actor_id") or "")
+        run_id = str(row.get("run_id") or "")
+        dataset_id = str(row.get("dataset_id") or "")
+        status = str(row.get("status") or "")
+        config_id = str(row.get("config_id") or "")
+        config_metadata = (
+            dict(row.get("config_metadata"))
+            if isinstance(row.get("config_metadata"), Mapping)
+            else {}
+        )
+        habitat_name = str(config_metadata.get("habitat_name") or "").strip()
+        habitat_type = str(
+            config_metadata.get("habitat_type")
+            or config_metadata.get("platform")
+            or "Other"
+        ).strip()
+        raw_items = [item for item in row.get("items", []) if isinstance(item, dict)] if isinstance(row.get("items"), list) else []
+        source_platform = _infer_manifest_source_platform(actor_id=actor_id, requested_refs=requested_refs)
+        raw_target_id = str(config_metadata.get("target_id") or "").strip()
+        if not raw_target_id:
+            missing_target_id_before_backfill += 1
+        strategy_target_id, was_backfilled = _resolve_manifest_strategy_target_id(
+            row_target_id=raw_target_id,
+            config_id=config_id,
+            actor_id=actor_id,
+            source_platform=source_platform,
+            row_index=idx,
+            config_target_map=config_target_map,
+        )
+        if was_backfilled:
+            backfilled_target_id_count += 1
+        if not strategy_target_id.strip():
+            missing_target_id_after_backfill += 1
+            strategy_target_id = "CANNOT_DETERMINE"
+        exclusion_reason = _classify_manifest_run_exclusion_reason(
+            actor_id=actor_id,
+            source_platform=source_platform,
+            raw_items=raw_items,
+        )
+        actor_label = (
+            actor_id.replace("/", "_").replace("~", "_")
+            if actor_id
+            else f"unknown_actor_{idx + 1}"
+        )
+        filename = f"{actor_label}_{run_id or idx + 1}.json"
+        lowered_actor = actor_id.lower()
+        is_video_actor = any(token in lowered_actor for token in ("tiktok", "instagram", "youtube"))
+        virtual_path = (
+            f"/apify_output/raw_scraped_data/social_video/{filename}"
+            if is_video_actor
+            else f"/apify_output/raw_scraped_data/text_habitats/{filename}"
+        )
+        normalized_items = [
+            _normalize_scraped_item_for_manifest(
+                item,
+                item_index=item_index,
+            )
+            for item_index, item in enumerate(raw_items)
+        ]
+        date_range = _extract_manifest_date_range(raw_items)
+        if exclusion_reason:
+            excluded_row = {
+                "actor_id": actor_id,
+                "run_id": run_id,
+                "dataset_id": dataset_id,
+                "status": status,
+                "config_id": config_id,
+                "strategy_target_id": strategy_target_id,
+                "habitat_name": habitat_name,
+                "habitat_type": habitat_type,
+                "source_platform": source_platform,
+                "item_count": len(raw_items),
+                "exclusion_reason": exclusion_reason,
+                "virtual_path": virtual_path,
+            }
+            excluded_runs.append(excluded_row)
+            if exclusion_reason == "WEB_SCRAPER_EMPTY_TEXT":
+                _LOGGER.warning(
+                    "strategy_v2.web_scraper_empty_text_detected",
+                    extra={
+                        "actor_id": actor_id,
+                        "config_id": config_id,
+                        "run_id": run_id,
+                        "dataset_id": dataset_id,
+                        "source_platform": source_platform,
+                    },
+                )
+            continue
+        for item in normalized_items:
+            source_url = str(item.get("source_url") or item.get("url") or "").lower()
+            if "reddit.com" in source_url:
+                platform_breakdown["REDDIT"] += 1
+            elif "tiktok.com" in source_url:
+                platform_breakdown["TIKTOK"] += 1
+            elif "instagram.com" in source_url:
+                platform_breakdown["INSTAGRAM"] += 1
+            elif "youtube.com" in source_url or "youtu.be" in source_url:
+                platform_breakdown["YOUTUBE"] += 1
+            else:
+                platform_breakdown["WEB"] += 1
+
         summarized_runs.append(
             {
-                "actor_id": str(row.get("actor_id") or ""),
-                "run_id": str(row.get("run_id") or ""),
-                "dataset_id": str(row.get("dataset_id") or ""),
-                "status": str(row.get("status") or ""),
-                "item_count": len(row.get("items")) if isinstance(row.get("items"), list) else 0,
+                "actor_id": actor_id,
+                "run_id": run_id,
+                "dataset_id": dataset_id,
+                "status": status,
+                "config_id": config_id,
+                "strategy_target_id": strategy_target_id,
+                "habitat_name": habitat_name,
+                "habitat_type": habitat_type,
+                "source_platform": source_platform,
+                "item_count": len(raw_items),
+                "date_range": date_range,
                 "requested_refs": requested_refs[:20],
+                "virtual_path": virtual_path,
+            }
+        )
+        scraped_data_files.append(
+            {
+                "file_name": filename,
+                "virtual_path": virtual_path,
+                "actor_id": actor_id,
+                "run_id": run_id,
+                "dataset_id": dataset_id,
+                "config_id": config_id,
+                "strategy_target_id": strategy_target_id,
+                "habitat_name": habitat_name,
+                "habitat_type": habitat_type,
+                "source_platform": source_platform,
+                "item_count": len(raw_items),
+                "date_range": date_range,
+                "requested_refs": requested_refs[:20],
+                "items": normalized_items,
+            }
+        )
+    candidate_assets_preview: list[dict[str, Any]] = []
+    for row in candidate_assets[:20]:
+        metrics = row.get("metrics") if isinstance(row.get("metrics"), dict) else {}
+        candidate_assets_preview.append(
+            {
+                "source_ref": str(row.get("source_ref") or ""),
+                "platform": str(row.get("platform") or ""),
+                "source_type": str(row.get("source_type") or ""),
+                "asset_kind": str(row.get("asset_kind") or ""),
+                "headline_or_caption": str(row.get("headline_or_caption") or "")[:260],
+                "metrics": metrics,
+            }
+        )
+    social_video_preview: list[dict[str, Any]] = []
+    for row in social_video_observations[:20]:
+        social_video_preview.append(
+            {
+                "video_id": str(row.get("video_id") or ""),
+                "source_ref": str(row.get("source_ref") or ""),
+                "platform": str(row.get("platform") or ""),
+                "views": row.get("views"),
+                "followers": row.get("followers"),
+                "comments": row.get("comments"),
+                "shares": row.get("shares"),
+                "likes": row.get("likes"),
+                "days_since_posted": row.get("days_since_posted"),
+                "headline_or_caption": str(row.get("headline_or_caption") or "")[:260],
+            }
+        )
+    external_voc_preview: list[dict[str, Any]] = []
+    for row in external_voc_corpus[:30]:
+        external_voc_preview.append(
+            {
+                "voc_id": str(row.get("voc_id") or ""),
+                "source_type": str(row.get("source_type") or ""),
+                "source_url": str(row.get("source_url") or ""),
+                "quote": str(row.get("quote") or "")[:320],
+                "metadata": row.get("metadata") if isinstance(row.get("metadata"), dict) else {},
+            }
+        )
+    competitor_sheet_preview: list[dict[str, Any]] = []
+    for row in competitor_sheets[:20]:
+        competitor_sheet_preview.append(
+            {
+                "source_ref": str(row.get("source_ref") or ""),
+                "platform": str(row.get("platform") or ""),
+                "asset_kind": str(row.get("asset_kind") or ""),
+                "headline_or_caption": str(row.get("headline_or_caption") or "")[:260],
+                "cta_style": str(row.get("cta_style") or ""),
+                "key_hook": str(row.get("key_hook") or "")[:220],
             }
         )
     manifest = {
+        "scraped_data_root": "/apify_output/",
+        "raw_scraped_data_files": scraped_data_files,
         "run_count": len(summarized_runs),
+        "total_run_count": len(run_rows),
+        "excluded_runs": excluded_runs,
+        "excluded_run_count": len(excluded_runs),
+        "target_id_mapping_diagnostics": {
+            "missing_target_id_before_backfill": missing_target_id_before_backfill,
+            "missing_target_id_after_backfill": missing_target_id_after_backfill,
+            "backfilled_target_id_count": backfilled_target_id_count,
+        },
         "runs": summarized_runs,
         "candidate_asset_count": len(candidate_assets),
         "social_video_observation_count": len(social_video_observations),
         "external_voc_row_count": len(external_voc_corpus),
         "competitor_asset_sheet_count": len(competitor_sheets),
+        "platform_breakdown": dict(platform_breakdown),
         "candidate_asset_refs": [
             str(row.get("source_ref"))
             for row in candidate_assets[:30]
             if isinstance(row.get("source_ref"), str) and str(row.get("source_ref")).strip()
         ],
+        # Inline scraped content for prompt-chain consumers that cannot read local files.
+        "candidate_assets_preview": candidate_assets_preview,
+        "social_video_observations_preview": social_video_preview,
+        "external_voc_corpus_preview": external_voc_preview,
+        "competitor_asset_observation_preview": competitor_sheet_preview,
     }
-    if (
-        manifest["run_count"] == 0
-        and manifest["candidate_asset_count"] == 0
-        and manifest["social_video_observation_count"] == 0
-        and manifest["external_voc_row_count"] == 0
-        and manifest["competitor_asset_sheet_count"] == 0
-    ):
+    if len(scraped_data_files) == 0 or manifest["run_count"] == 0:
+        exclusion_preview = ", ".join(
+            str(row.get("exclusion_reason") or "")
+            for row in excluded_runs[:5]
+            if str(row.get("exclusion_reason") or "").strip()
+        )
         raise StrategyV2MissingContextError(
-            "Agent 1 requires scraped-data context manifest, but no Apify/competitor dataset metadata was available. "
-            "Remediation: run asset ingestion and pass apify_context with candidate/social/VOC rows."
+            "Agent 1 requires Stage 2B Apify raw-run output with extractable text, "
+            "but all runs were excluded by deterministic eligibility checks. "
+            f"excluded_run_count={len(excluded_runs)}; sample_reasons={exclusion_preview or 'none'}. "
+            "Remediation: ensure Stage 2B sources return text-bearing, non-error payloads."
+        )
+    has_apify_observations = (
+        any(
+            isinstance(row.get("item_count"), int) and int(row.get("item_count")) > 0
+            for row in scraped_data_files
+        )
+        or manifest["candidate_asset_count"] > 0
+        or manifest["social_video_observation_count"] > 0
+        or manifest["external_voc_row_count"] > 0
+    )
+    if not has_apify_observations:
+        raise StrategyV2MissingContextError(
+            "Agent 1 requires non-empty Apify observations, but Stage 2B returned zero usable rows. "
+            "Remediation: verify actor inputs and rerun Stage 2B before v2-04."
+        )
+    if missing_target_id_after_backfill > 0:
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest target-id backfill integrity check failed "
+            f"(missing_target_id_after_backfill={missing_target_id_after_backfill}). "
+            "Remediation: ensure config_id->target_id mapping is available before v2-04."
         )
     return manifest
+
+
+def _validate_agent1_scraped_manifest_integrity(
+    *,
+    scraped_data_manifest: Mapping[str, Any],
+    planned_actor_run_count: int,
+    executed_actor_run_count: int,
+    failed_actor_run_count: int,
+) -> None:
+    if planned_actor_run_count < 0:
+        raise StrategyV2SchemaValidationError("planned_actor_run_count must be >= 0 for v2-04 Agent 1.")
+    if executed_actor_run_count < 0:
+        raise StrategyV2SchemaValidationError("executed_actor_run_count must be >= 0 for v2-04 Agent 1.")
+    if failed_actor_run_count < 0:
+        raise StrategyV2SchemaValidationError("failed_actor_run_count must be >= 0 for v2-04 Agent 1.")
+    if failed_actor_run_count > executed_actor_run_count:
+        raise StrategyV2SchemaValidationError(
+            "failed_actor_run_count cannot exceed executed_actor_run_count for v2-04 Agent 1."
+        )
+    if planned_actor_run_count < executed_actor_run_count:
+        raise StrategyV2SchemaValidationError(
+            "planned_actor_run_count cannot be less than executed_actor_run_count for v2-04 Agent 1."
+        )
+
+    manifest_run_count = scraped_data_manifest.get("run_count")
+    if not isinstance(manifest_run_count, int) or manifest_run_count < 0:
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.run_count must be a non-negative integer for v2-04 Agent 1."
+        )
+    runs_payload = scraped_data_manifest.get("runs")
+    if not isinstance(runs_payload, list):
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.runs must be an array for v2-04 Agent 1."
+        )
+    raw_files_payload = scraped_data_manifest.get("raw_scraped_data_files")
+    if not isinstance(raw_files_payload, list):
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.raw_scraped_data_files must be an array for v2-04 Agent 1."
+        )
+
+    if manifest_run_count != len(runs_payload) or manifest_run_count != len(raw_files_payload):
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest run_count does not match runs/raw_scraped_data_files lengths "
+            f"(run_count={manifest_run_count}, runs={len(runs_payload)}, files={len(raw_files_payload)})."
+        )
+
+    if manifest_run_count <= 0:
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.run_count must be greater than zero for v2-04 Agent 1."
+        )
+    if manifest_run_count > executed_actor_run_count:
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.run_count cannot exceed executed_actor_run_count for Agent 1 handoff "
+            f"(run_count={manifest_run_count}, executed_actor_run_count={executed_actor_run_count})."
+        )
+    manifest_total_run_count = scraped_data_manifest.get("total_run_count")
+    if not isinstance(manifest_total_run_count, int) or manifest_total_run_count < 0:
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.total_run_count is required and must be a non-negative integer for v2-04 Agent 1."
+        )
+    if manifest_total_run_count != executed_actor_run_count:
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.total_run_count mismatch for Agent 1 handoff "
+            f"(total_run_count={manifest_total_run_count}, executed_actor_run_count={executed_actor_run_count})."
+        )
+    if manifest_run_count > manifest_total_run_count:
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.run_count cannot exceed scraped_data_manifest.total_run_count."
+        )
+    excluded_run_count = scraped_data_manifest.get("excluded_run_count")
+    if excluded_run_count is not None and (not isinstance(excluded_run_count, int) or excluded_run_count < 0):
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.excluded_run_count must be a non-negative integer when provided."
+        )
+    excluded_runs_payload = scraped_data_manifest.get("excluded_runs")
+    if excluded_runs_payload is not None and not isinstance(excluded_runs_payload, list):
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.excluded_runs must be an array when provided."
+        )
+    if isinstance(excluded_run_count, int):
+        expected_total = manifest_run_count + excluded_run_count
+        if expected_total != manifest_total_run_count:
+            raise StrategyV2SchemaValidationError(
+                "scraped_data_manifest run partition mismatch "
+                f"(run_count={manifest_run_count}, excluded_run_count={excluded_run_count}, "
+                f"total_run_count={manifest_total_run_count})."
+            )
+        if isinstance(excluded_runs_payload, list) and len(excluded_runs_payload) != excluded_run_count:
+            raise StrategyV2SchemaValidationError(
+                "scraped_data_manifest.excluded_runs length must match excluded_run_count "
+                f"(excluded_runs={len(excluded_runs_payload)}, excluded_run_count={excluded_run_count})."
+            )
+
+    for index, (run_row, file_row) in enumerate(zip(runs_payload, raw_files_payload), start=1):
+        if not isinstance(run_row, dict):
+            raise StrategyV2SchemaValidationError(
+                f"scraped_data_manifest.runs[{index - 1}] must be an object for v2-04 Agent 1."
+            )
+        if not isinstance(file_row, dict):
+            raise StrategyV2SchemaValidationError(
+                f"scraped_data_manifest.raw_scraped_data_files[{index - 1}] must be an object for v2-04 Agent 1."
+            )
+
+        run_item_count = run_row.get("item_count")
+        file_item_count = file_row.get("item_count")
+        if not isinstance(run_item_count, int) or run_item_count < 0:
+            raise StrategyV2SchemaValidationError(
+                f"scraped_data_manifest.runs[{index - 1}].item_count must be a non-negative integer."
+            )
+        if not isinstance(file_item_count, int) or file_item_count < 0:
+            raise StrategyV2SchemaValidationError(
+                "scraped_data_manifest.raw_scraped_data_files"
+                f"[{index - 1}].item_count must be a non-negative integer."
+            )
+        if run_item_count != file_item_count:
+            raise StrategyV2SchemaValidationError(
+                "scraped_data_manifest item_count mismatch between runs and raw_scraped_data_files "
+                f"at index {index - 1} (run_item_count={run_item_count}, file_item_count={file_item_count})."
+            )
+
+        for key in ("actor_id", "run_id", "dataset_id", "config_id"):
+            run_value = str(run_row.get(key) or "").strip()
+            file_value = str(file_row.get(key) or "").strip()
+            if run_value != file_value:
+                raise StrategyV2SchemaValidationError(
+                    "scraped_data_manifest metadata mismatch between runs and raw_scraped_data_files "
+                    f"at index {index - 1} for '{key}' (run='{run_value}', file='{file_value}')."
+                )
+
+        strategy_target_id = str(file_row.get("strategy_target_id") or "").strip()
+        if not strategy_target_id:
+            raise StrategyV2SchemaValidationError(
+                "scraped_data_manifest.raw_scraped_data_files"
+                f"[{index - 1}].strategy_target_id must be non-empty (use CANNOT_DETERMINE when unknown)."
+            )
+        run_strategy_target_id = str(run_row.get("strategy_target_id") or "").strip()
+        if run_strategy_target_id != strategy_target_id:
+            raise StrategyV2SchemaValidationError(
+                "scraped_data_manifest metadata mismatch between runs and raw_scraped_data_files "
+                f"at index {index - 1} for 'strategy_target_id' "
+                f"(run='{run_strategy_target_id}', file='{strategy_target_id}')."
+            )
 
 
 def _require_voc_transition_quality(
@@ -1039,7 +3185,8 @@ def _require_congruency_quality(*, congruency: Mapping[str, Any], page_name: str
             f"{page_name} congruency failed threshold/hard-gate composite checks."
         )
 
-    for dimension, test_id in (("bh", "BH1"), ("bh", "BH3"), ("pc", "PC2")):
+    # CTA-alignment congruency checks are intentionally not hard-gated.
+    for dimension, test_id in (("bh", "BH1"), ("pc", "PC2")):
         passed, detail = _extract_congruency_test_outcome(
             congruency=congruency,
             dimension=dimension,
@@ -1048,7 +3195,7 @@ def _require_congruency_quality(*, congruency: Mapping[str, Any], page_name: str
         if "N/A" in detail:
             raise StrategyV2DecisionError(
                 f"{page_name} congruency test {test_id} is non-applicable ('{detail}'). "
-                "Remediation: include required structure/CTA/content so hard gates are truly evaluated."
+                "Remediation: include required structure/content so hard gates are truly evaluated."
             )
         if not passed:
             raise StrategyV2DecisionError(
@@ -1116,14 +3263,119 @@ def _append_tagged_output_guardrails(*, prompt_text: str, include_step4_prompt: 
     return tagged
 
 
+def _is_openai_model_name(model: str) -> bool:
+    lower = model.strip().lower()
+    return lower.startswith(("gpt-", "chatgpt-", "o", "omni-"))
+
+
+def _normalize_openai_prompt_file_name_component(value: str, *, max_chars: int = 40) -> str:
+    normalized = re.sub(r"[^a-zA-Z0-9._-]+", "-", value.strip().lower()).strip(".-")
+    if not normalized:
+        return "na"
+    return normalized[:max_chars]
+
+
+def _build_openai_prompt_json_filename(
+    *,
+    workflow_run_id: str,
+    stage_label: str,
+    logical_name: str,
+) -> str:
+    workflow_component = _normalize_openai_prompt_file_name_component(workflow_run_id, max_chars=28)
+    stage_component = _normalize_openai_prompt_file_name_component(stage_label, max_chars=28)
+    logical_component = _normalize_openai_prompt_file_name_component(logical_name, max_chars=48)
+    return f"strategy-v2-{workflow_component}-{stage_component}-{logical_component}.json"
+
+
+def _upload_openai_prompt_json_files(
+    *,
+    model: str,
+    workflow_run_id: str,
+    stage_label: str,
+    logical_payloads: Mapping[str, Any],
+) -> tuple[dict[str, str], list[str]]:
+    if not _is_openai_model_name(model):
+        raise StrategyV2MissingContextError(
+            "Prompt runtime JSON file uploads require an OpenAI model because files.create + code_interpreter "
+            f"are OpenAI-only (model='{model}'). Remediation: set STRATEGY_V2_VOC_MODEL to an OpenAI model."
+        )
+
+    llm = LLMClient(default_model=model)
+    file_id_map: dict[str, str] = {}
+    uploaded_file_ids: list[str] = []
+    for logical_name, payload in logical_payloads.items():
+        serialized = json.dumps(payload, ensure_ascii=True, indent=2)
+        filename = _build_openai_prompt_json_filename(
+            workflow_run_id=workflow_run_id,
+            stage_label=stage_label,
+            logical_name=logical_name,
+        )
+        file_id = llm.upload_openai_file_bytes(
+            filename=filename,
+            content_bytes=serialized.encode("utf-8"),
+            purpose="assistants",
+        )
+        file_id_map[str(logical_name)] = file_id
+        uploaded_file_ids.append(file_id)
+    return file_id_map, uploaded_file_ids
+
+
+def _cleanup_openai_prompt_files(*, model: str, file_ids: Sequence[str]) -> None:
+    if not _is_openai_model_name(model):
+        return
+    normalized_file_ids = [
+        file_id.strip()
+        for file_id in file_ids
+        if isinstance(file_id, str) and file_id.strip()
+    ]
+    if not normalized_file_ids:
+        return
+    llm = LLMClient(default_model=model)
+    for file_id in normalized_file_ids:
+        try:
+            llm.delete_openai_file(file_id=file_id)
+        except Exception as exc:  # pragma: no cover - best-effort cleanup
+            activity.logger.warning(
+                "strategy_v2.openai_prompt_file_cleanup_failed",
+                extra={"model": model, "file_id": file_id, "error": str(exc)},
+            )
+
+
+def _openai_python_tool_resources(
+    model: str,
+    *,
+    file_ids: Sequence[str] | None = None,
+) -> list[dict[str, Any]] | None:
+    if not _is_openai_model_name(model):
+        return None
+    code_interpreter_tool = deepcopy(_OPENAI_CODE_INTERPRETER_TOOL)
+    normalized_file_ids = [
+        file_id.strip()
+        for file_id in (file_ids or [])
+        if isinstance(file_id, str) and file_id.strip()
+    ]
+    if normalized_file_ids:
+        container = code_interpreter_tool.get("container")
+        if not isinstance(container, dict):
+            raise StrategyV2SchemaValidationError(
+                "OpenAI code_interpreter tool must include a container object before file_ids can be attached."
+            )
+        container["file_ids"] = normalized_file_ids
+    return [code_interpreter_tool]
+
+
 def _llm_generate_text(
     *,
     prompt: str,
     model: str,
     use_reasoning: bool = False,
+    reasoning_effort: str | None = None,
     use_web_search: bool = False,
     max_tokens: int | None = None,
     response_format: dict[str, Any] | None = None,
+    openai_tools: list[dict[str, Any]] | None = None,
+    openai_tool_choice: Any | None = None,
+    openai_context_management: list[dict[str, Any]] | None = None,
     claude_messages: list[dict[str, Any]] | None = None,
     heartbeat_context: dict[str, Any] | None = None,
     progress_sink: dict[str, Any] | None = None,
@@ -1160,7 +3412,7 @@ def _llm_generate_text(
             "model": model,
             "system": None,
             "output_schema": schema,
-            "max_tokens": max_tokens or 4096,
+            "max_tokens": max_tokens or _CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS,
             "temperature": 0.0,
         }
         if claude_messages is not None:
@@ -1214,8 +3466,12 @@ def _llm_generate_text(
         model=model,
         max_tokens=max_tokens,
         use_reasoning=use_reasoning,
+        reasoning_effort=reasoning_effort,
         use_web_search=use_web_search,
         response_format=response_format,
+        openai_tools=openai_tools,
+        openai_tool_choice=openai_tool_choice,
+        openai_context_management=openai_context_management,
         progress_callback=progress_callback,
     )
     output = llm.generate_text(prompt, params)
@@ -1253,8 +3509,13 @@ def _enforce_strict_openai_json_schema(node: Any) -> Any:
         raw_properties = normalized.get("properties")
         properties = raw_properties if isinstance(raw_properties, dict) else {}
         normalized["properties"] = properties
-        normalized["additionalProperties"] = False
-        normalized["required"] = [key for key in properties.keys()]
+        if "additionalProperties" not in normalized:
+            normalized["additionalProperties"] = False
+        elif isinstance(normalized["additionalProperties"], dict):
+            normalized["additionalProperties"] = _enforce_strict_openai_json_schema(normalized["additionalProperties"])
+
+        if "required" not in normalized and properties:
+            normalized["required"] = [key for key in properties.keys()]
 
     for combiner_key in ("anyOf", "oneOf", "allOf"):
         combiner = normalized.get(combiner_key)
@@ -1280,6 +3541,89 @@ def _json_schema_response_format(*, name: str, schema: dict[str, Any]) -> dict[s
     }
 
 
+def _offer_step05_dimension_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "raw_score": {
+                "type": "number",
+                "minimum": 0.0,
+                "maximum": 10.0,
+            },
+            "evidence_quality": {
+                "type": "string",
+                "enum": list(_OFFER_EVIDENCE_QUALITY_LEVELS),
+            },
+            "kill_condition": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": _STEP05_KILL_CONDITION_MAX_CHARS,
+                "pattern": ".*\\S.*",
+            },
+            "competitor_baseline": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "mean": {"type": "number"},
+                    "spread": {"type": "number", "minimum": 0.0},
+                },
+                "required": ["mean", "spread"],
+            },
+        },
+        "required": ["raw_score", "evidence_quality", "kill_condition", "competitor_baseline"],
+    }
+
+
+def _offer_step05_response_schema() -> dict[str, Any]:
+    dimension_schema = _offer_step05_dimension_schema()
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "evaluation": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "variants": {
+                        "type": "array",
+                        "minItems": len(_OFFER_VARIANT_IDS),
+                        "maxItems": len(_OFFER_VARIANT_IDS),
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "variant_id": {
+                                    "type": "string",
+                                    "enum": list(_OFFER_VARIANT_IDS),
+                                },
+                                "dimensions": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        dimension: deepcopy(dimension_schema)
+                                        for dimension in _OFFER_COMPOSITE_DIMENSIONS
+                                    },
+                                    "required": list(_OFFER_COMPOSITE_DIMENSIONS),
+                                },
+                            },
+                            "required": ["variant_id", "dimensions"],
+                        },
+                    }
+                },
+                "required": ["variants"],
+            },
+            "revision_notes": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": _STEP05_REVISION_NOTES_MAX_CHARS,
+                "pattern": ".*\\S.*",
+            },
+        },
+        "required": ["evaluation", "revision_notes"],
+    }
+
+
 def _render_prompt_asset(
     *,
     asset: PromptAsset,
@@ -1301,21 +3645,33 @@ def _run_prompt_json_object(
     schema: dict[str, Any],
     variables: Mapping[str, str] | None = None,
     use_reasoning: bool = True,
+    reasoning_effort: str | None = None,
     use_web_search: bool = False,
     max_tokens: int | None = None,
+    openai_tools: list[dict[str, Any]] | None = None,
+    openai_tool_choice: Any | None = None,
+    openai_context_management: list[dict[str, Any]] | None = None,
     conversation_messages: list[dict[str, Any]] | None = None,
     log_metadata: Mapping[str, Any] | None = None,
     heartbeat_context: dict[str, Any] | None = None,
     llm_call_log: list[dict[str, Any]] | None = None,
     llm_call_label: str | None = None,
+    append_schema_instruction: bool = True,
 ) -> tuple[dict[str, Any], str, dict[str, str]]:
-    rendered = _render_prompt_asset(asset=asset, context=context, variables=variables)
-    prompt = (
-        rendered.rstrip()
-        + "\n\n"
-        + runtime_instruction.strip()
-        + "\n\nReturn ONLY valid JSON matching the required schema."
-    )
+    rendered = _render_prompt_asset(asset=asset, context=context, variables=variables).rstrip()
+    instruction_block = runtime_instruction.strip()
+    prompt = rendered + ("\n\n" + instruction_block if instruction_block else "")
+    if append_schema_instruction:
+        prompt += "\n\nReturn ONLY valid JSON matching the required schema."
+    input_token_budget = _model_prompt_input_token_budget(model=model, max_tokens=max_tokens)
+    if input_token_budget is not None:
+        estimated_input_tokens = _estimate_prompt_input_tokens(prompt)
+        if estimated_input_tokens > input_token_budget:
+            raise StrategyV2MissingContextError(
+                "Prompt input exceeds model budget "
+                f"(estimated_input_tokens={estimated_input_tokens}, budget_tokens={input_token_budget}, model='{model}'). "
+                "Remediation: reduce runtime payload size and retry."
+            )
     claude_messages: list[dict[str, Any]] | None = None
     claude_user_turn: dict[str, Any] | None = None
     if conversation_messages is not None:
@@ -1335,9 +3691,13 @@ def _run_prompt_json_object(
         prompt=prompt,
         model=model,
         use_reasoning=use_reasoning,
+        reasoning_effort=reasoning_effort,
         use_web_search=use_web_search,
         max_tokens=max_tokens,
         response_format=_json_schema_response_format(name=schema_name, schema=schema),
+        openai_tools=openai_tools,
+        openai_tool_choice=openai_tool_choice,
+        openai_context_management=openai_context_management,
         claude_messages=claude_messages,
         heartbeat_context=heartbeat_context,
         progress_sink=llm_progress,
@@ -1389,6 +3749,12 @@ def _run_prompt_json_object(
         input_contract_version="2.0.0",
         output_contract_version="2.0.0",
     ).to_dict()
+    response_id = llm_progress.get("response_id")
+    if isinstance(response_id, str) and response_id.strip():
+        provenance["openai_response_id"] = response_id.strip()
+    request_id = llm_progress.get("request_id")
+    if isinstance(request_id, str) and request_id.strip():
+        provenance["openai_request_id"] = request_id.strip()
     return parsed, raw_output, provenance
 
 
@@ -1402,21 +3768,24 @@ def _run_prompt_json_array(
     schema: dict[str, Any],
     variables: Mapping[str, str] | None = None,
     use_reasoning: bool = True,
+    reasoning_effort: str | None = None,
     use_web_search: bool = False,
     max_tokens: int | None = None,
+    openai_tools: list[dict[str, Any]] | None = None,
+    openai_tool_choice: Any | None = None,
+    openai_context_management: list[dict[str, Any]] | None = None,
     conversation_messages: list[dict[str, Any]] | None = None,
     log_metadata: Mapping[str, Any] | None = None,
     heartbeat_context: dict[str, Any] | None = None,
     llm_call_log: list[dict[str, Any]] | None = None,
     llm_call_label: str | None = None,
+    append_schema_instruction: bool = True,
 ) -> tuple[list[Any], str, dict[str, str]]:
-    rendered = _render_prompt_asset(asset=asset, context=context, variables=variables)
-    prompt = (
-        rendered.rstrip()
-        + "\n\n"
-        + runtime_instruction.strip()
-        + "\n\nReturn ONLY valid JSON matching the required schema."
-    )
+    rendered = _render_prompt_asset(asset=asset, context=context, variables=variables).rstrip()
+    instruction_block = runtime_instruction.strip()
+    prompt = rendered + ("\n\n" + instruction_block if instruction_block else "")
+    if append_schema_instruction:
+        prompt += "\n\nReturn ONLY valid JSON matching the required schema."
     claude_messages: list[dict[str, Any]] | None = None
     if conversation_messages is not None:
         if not model.lower().startswith("claude"):
@@ -1436,9 +3805,13 @@ def _run_prompt_json_array(
         prompt=prompt,
         model=model,
         use_reasoning=use_reasoning,
+        reasoning_effort=reasoning_effort,
         use_web_search=use_web_search,
         max_tokens=max_tokens,
         response_format=_json_schema_response_format(name=schema_name, schema=schema),
+        openai_tools=openai_tools,
+        openai_tool_choice=openai_tool_choice,
+        openai_context_management=openai_context_management,
         claude_messages=claude_messages,
         heartbeat_context=heartbeat_context,
         progress_sink=llm_progress,
@@ -1482,6 +3855,12 @@ def _run_prompt_json_array(
         input_contract_version="2.0.0",
         output_contract_version="2.0.0",
     ).to_dict()
+    response_id = llm_progress.get("response_id")
+    if isinstance(response_id, str) and response_id.strip():
+        provenance["openai_response_id"] = response_id.strip()
+    request_id = llm_progress.get("request_id")
+    if isinstance(request_id, str) and request_id.strip():
+        provenance["openai_request_id"] = request_id.strip()
     return parsed, raw_output, provenance
 
 
@@ -1658,15 +4037,28 @@ def _persist_step_payload(
     prompt_version: str,
     schema_version: str,
     agent_run_id: str | None,
+    lineage: Mapping[str, Any] | None = None,
 ) -> str:
     artifacts_repo = ArtifactsRepository(session)
     research_repo = ResearchArtifactsRepository(session)
     workflows_repo = WorkflowsRepository(session)
 
+    lineage_payload: dict[str, Any]
+    if lineage is None:
+        lineage_payload = {
+            "producer": step_key,
+            "producer_version": prompt_version,
+            "timestamp": _now_iso(),
+            "inputs_received": sorted([str(key) for key in payload.keys()]),
+            "input_validation": "PASS",
+        }
+    else:
+        lineage_payload = dict(lineage)
     envelope: dict[str, Any] = {
         "step_key": step_key,
         "title": title,
         "summary": summary,
+        "lineage": lineage_payload,
         "payload": payload,
         "model": model_name,
         "prompt_version": prompt_version,
@@ -1855,6 +4247,116 @@ def _extract_step4_entries(step4_content: str) -> list[dict[str, str]]:
     return entries
 
 
+def _coerce_video_metric_int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value >= 0 else None
+    if isinstance(value, float):
+        return int(value) if value >= 0 else None
+    if isinstance(value, str):
+        cleaned = value.strip().replace(",", "")
+        if not cleaned:
+            return None
+        try:
+            parsed = float(cleaned)
+        except ValueError:
+            return None
+        return int(parsed) if parsed >= 0 else None
+    return None
+
+
+def _coerce_days_since_posted(row: Mapping[str, Any]) -> int | None:
+    for field_name in ("days_since_posted", "daysSincePosted", "post_age_days"):
+        value = _coerce_video_metric_int(row.get(field_name))
+        if value is not None:
+            return value
+
+    for field_name in (
+        "timestamp",
+        "publishedAt",
+        "published_at",
+        "createdAt",
+        "created_at",
+        "createTimeISO",
+        "createTime",
+    ):
+        timestamp_text = _coerce_manifest_timestamp(row.get(field_name))
+        if not timestamp_text:
+            continue
+        try:
+            dt = datetime.fromisoformat(timestamp_text.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return max(int((datetime.now(timezone.utc) - dt).total_seconds() // 86_400), 0)
+        except Exception:
+            continue
+    return None
+
+
+def _normalize_video_platform_name(*, raw_platform: Any, source_ref: str) -> str:
+    platform = str(raw_platform or "").strip().upper()
+    if platform:
+        if "YOUTUBE" in platform:
+            return "YOUTUBE"
+        if "TIKTOK" in platform:
+            return "TIKTOK"
+        if "INSTAGRAM" in platform:
+            return "INSTAGRAM"
+        return platform
+    lowered_ref = source_ref.lower()
+    if "youtube.com" in lowered_ref or "youtu.be" in lowered_ref:
+        return "YOUTUBE"
+    if "tiktok.com" in lowered_ref:
+        return "TIKTOK"
+    if "instagram.com" in lowered_ref:
+        return "INSTAGRAM"
+    return "UNKNOWN"
+
+
+def _normalize_video_metrics_for_scoring(*, row: Mapping[str, Any]) -> dict[str, Any]:
+    normalized = dict(row)
+
+    def _first_int(*field_names: str) -> int | None:
+        for field_name in field_names:
+            candidate = _coerce_video_metric_int(normalized.get(field_name))
+            if candidate is not None:
+                return candidate
+        return None
+
+    views = _first_int("views", "view_count", "viewCount", "playCount", "videoPlayCount", "videoViewCount")
+    followers = _first_int(
+        "followers",
+        "account_followers",
+        "numberOfSubscribers",
+        "subscriberCount",
+        "channelSubscriberCount",
+    )
+    comments = _first_int("comments", "comment_count", "commentsCount")
+    shares = _first_int("shares", "share_count", "shareCount")
+    likes = _first_int("likes", "like_count", "likesCount")
+    days_since_posted = _coerce_days_since_posted(normalized)
+
+    if views is not None:
+        normalized["views"] = views
+    if followers is not None:
+        normalized["followers"] = followers
+    if comments is not None:
+        normalized["comments"] = comments
+    if shares is not None:
+        normalized["shares"] = shares
+    if likes is not None:
+        normalized["likes"] = likes
+    if days_since_posted is not None:
+        normalized["days_since_posted"] = days_since_posted
+
+    normalized["platform"] = _normalize_video_platform_name(
+        raw_platform=normalized.get("platform"),
+        source_ref=str(normalized.get("source_ref") or ""),
+    )
+    return normalized
+
+
 def _extract_video_observations(competitor_analysis: Mapping[str, Any]) -> list[dict[str, Any]]:
     sheets = competitor_analysis.get("asset_observation_sheets")
     if not isinstance(sheets, list):
@@ -1868,16 +4370,17 @@ def _extract_video_observations(competitor_analysis: Mapping[str, Any]) -> list[
         if not any(name in platform_value for name in ("tiktok", "youtube", "instagram")):
             continue
 
-        views = sheet.get("views") or sheet.get("view_count")
-        followers = sheet.get("followers") or sheet.get("account_followers")
-        comments = sheet.get("comments") or sheet.get("comment_count") or 0
-        shares = sheet.get("shares") or sheet.get("share_count") or 0
-        likes = sheet.get("likes") or sheet.get("like_count") or 0
-        days = sheet.get("days_since_posted") or sheet.get("post_age_days") or 30
+        normalized_sheet = _normalize_video_metrics_for_scoring(row=sheet)
+        views = normalized_sheet.get("views")
+        followers = normalized_sheet.get("followers")
+        comments = normalized_sheet.get("comments")
+        shares = normalized_sheet.get("shares")
+        likes = normalized_sheet.get("likes")
+        days = normalized_sheet.get("days_since_posted")
         description = str(sheet.get("core_claim") or sheet.get("headline") or "").strip()
         author = str(sheet.get("competitor_name") or sheet.get("brand") or f"source-{index}").strip()
 
-        if not isinstance(views, (int, float)) or not isinstance(followers, (int, float)):
+        if not isinstance(views, int) or not isinstance(followers, int):
             continue
 
         videos.append(
@@ -1886,10 +4389,10 @@ def _extract_video_observations(competitor_analysis: Mapping[str, Any]) -> list[
                 "platform": platform_value or "unknown",
                 "views": int(views),
                 "followers": int(followers),
-                "comments": int(comments) if isinstance(comments, (int, float)) else 0,
-                "shares": int(shares) if isinstance(shares, (int, float)) else 0,
-                "likes": int(likes) if isinstance(likes, (int, float)) else 0,
-                "days_since_posted": int(days) if isinstance(days, (int, float)) else 30,
+                "comments": int(comments) if isinstance(comments, int) else 0,
+                "shares": int(shares) if isinstance(shares, int) else 0,
+                "likes": int(likes) if isinstance(likes, int) else 0,
+                "days_since_posted": int(days) if isinstance(days, int) else 0,
                 "description": description,
                 "author": author,
                 "source_ref": str(sheet.get("source_ref") or ""),
@@ -1897,6 +4400,229 @@ def _extract_video_observations(competitor_analysis: Mapping[str, Any]) -> list[
         )
 
     return videos
+
+
+def _extract_config_input_urls(input_payload: Mapping[str, Any]) -> list[str]:
+    refs: list[str] = []
+    for key in ("startUrls", "urls", "directUrls", "profiles", "postURLs"):
+        raw_value = input_payload.get(key)
+        if not isinstance(raw_value, list):
+            continue
+        for item in raw_value:
+            if isinstance(item, str) and item.strip():
+                refs.append(item.strip())
+            elif isinstance(item, Mapping):
+                url_value = item.get("url")
+                if isinstance(url_value, str) and url_value.strip():
+                    refs.append(url_value.strip())
+    return refs
+
+
+def _canonical_social_source_key(source_ref: str) -> str:
+    canonical = _canonicalize_source_ref_for_ingestion(source_ref)
+    if not canonical:
+        return ""
+    parsed = urlsplit(canonical)
+    host = parsed.netloc.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = parsed.path.rstrip("/")
+    if "tiktok.com" in host:
+        handle_match = re.search(r"/@([A-Za-z0-9_.-]+)", path, flags=re.IGNORECASE)
+        if handle_match:
+            return f"{host}/@{handle_match.group(1).lower()}"
+    if "instagram.com" in host:
+        handle_match = re.match(r"/([A-Za-z0-9_.-]+)", path)
+        if handle_match:
+            return f"{host}/{handle_match.group(1).lower()}"
+    if "youtube.com" in host:
+        channel_match = re.search(r"/(@[A-Za-z0-9_.-]+|channel/[A-Za-z0-9_-]+)", path, flags=re.IGNORECASE)
+        if channel_match:
+            return f"{host}/{channel_match.group(1).lower()}"
+    if "youtu.be" in host:
+        return "youtube.com"
+    return f"{host}{path.lower()}"
+
+
+def _extract_video_source_allowlist(video_strategy: Mapping[str, Any]) -> set[str]:
+    allowlist: set[str] = set()
+    configurations = video_strategy.get("configurations")
+    if not isinstance(configurations, list):
+        return allowlist
+    for row in configurations:
+        if not isinstance(row, Mapping):
+            continue
+        platform = str(row.get("platform") or "").strip().upper()
+        if platform not in {"TIKTOK", "INSTAGRAM", "YOUTUBE", "YOUTUBE_SHORTS"}:
+            continue
+        input_payload = row.get("input")
+        if not isinstance(input_payload, Mapping):
+            continue
+        for ref in _extract_config_input_urls(input_payload):
+            key = _canonical_social_source_key(ref)
+            if key:
+                allowlist.add(key)
+    return allowlist
+
+
+def _source_matches_allowlist(*, source_ref: str, allowlist: set[str]) -> bool:
+    if not allowlist:
+        return True
+    source_key = _canonical_social_source_key(source_ref)
+    if not source_key:
+        return False
+    source_host = source_key.split("/", 1)[0]
+    for allowed in allowlist:
+        if source_key == allowed or source_key.startswith(f"{allowed}/"):
+            return True
+        # Discovery strategy inputs (search/tag URLs) intentionally fan out into
+        # post URLs that won't prefix-match the seed discovery URL path.
+        if allowed.startswith("instagram.com/explore") and source_host == "instagram.com":
+            return True
+        if allowed.startswith("youtube.com/results") and source_host in {"youtube.com", "youtu.be"}:
+            return True
+        if allowed.startswith("tiktok.com/tag/") and source_host == "tiktok.com":
+            return True
+    return False
+
+
+def _build_video_topic_keywords(*, stage1: ProductBriefStage1) -> list[str]:
+    keywords: list[str] = []
+    seen: set[str] = set()
+    for raw in [*stage1.product_category_keywords, stage1.category_niche, stage1.product_name]:
+        if not isinstance(raw, str):
+            continue
+        for part in re.split(r"[^a-zA-Z0-9]+", raw.lower()):
+            token = part.strip()
+            if len(token) < 4:
+                continue
+            if token in seen:
+                continue
+            seen.add(token)
+            keywords.append(token)
+    return keywords
+
+
+def _video_row_matches_topic(*, row: Mapping[str, Any], topic_keywords: Sequence[str]) -> bool:
+    if not topic_keywords:
+        return True
+    haystack = " ".join(
+        [
+            str(row.get("description") or ""),
+            str(row.get("author") or ""),
+            str(row.get("source_ref") or ""),
+        ]
+    ).lower()
+    return any(keyword in haystack for keyword in topic_keywords)
+
+
+def _filter_metric_video_rows_for_scoring(
+    *,
+    video_rows: Sequence[Mapping[str, Any]],
+    source_allowlist: set[str],
+    topic_keywords: Sequence[str],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    diagnostics: dict[str, Any] = {
+        "input_rows": len(video_rows),
+        "missing_metrics": 0,
+        "off_target_source": 0,
+        "off_topic": 0,
+        "kept_rows": 0,
+        "by_platform": {},
+    }
+    filtered: list[dict[str, Any]] = []
+    for row in video_rows:
+        if not isinstance(row, Mapping):
+            continue
+        normalized_row = _normalize_video_metrics_for_scoring(row=row)
+        platform = _normalize_video_platform_name(
+            raw_platform=normalized_row.get("platform"),
+            source_ref=str(normalized_row.get("source_ref") or ""),
+        )
+        platform_diag = diagnostics["by_platform"].setdefault(
+            platform,
+            {
+                "input_rows": 0,
+                "missing_metrics": 0,
+                "off_target_source": 0,
+                "off_topic": 0,
+                "kept_rows": 0,
+            },
+        )
+        platform_diag["input_rows"] += 1
+        if not isinstance(normalized_row.get("followers"), int):
+            normalized_row["followers"] = 0
+        metrics_present = (
+            isinstance(normalized_row.get("views"), int)
+            and isinstance(normalized_row.get("comments"), int)
+            and isinstance(normalized_row.get("shares"), int)
+            and isinstance(normalized_row.get("likes"), int)
+            and isinstance(normalized_row.get("days_since_posted"), int)
+        )
+        if not metrics_present:
+            diagnostics["missing_metrics"] += 1
+            platform_diag["missing_metrics"] += 1
+            continue
+        source_ref = str(normalized_row.get("source_ref") or "").strip()
+        if not source_ref or not _source_matches_allowlist(source_ref=source_ref, allowlist=source_allowlist):
+            diagnostics["off_target_source"] += 1
+            platform_diag["off_target_source"] += 1
+            continue
+        if not _video_row_matches_topic(row=normalized_row, topic_keywords=topic_keywords):
+            diagnostics["off_topic"] += 1
+            platform_diag["off_topic"] += 1
+            continue
+        filtered.append(dict(normalized_row))
+        platform_diag["kept_rows"] += 1
+    diagnostics["kept_rows"] = len(filtered)
+    return filtered, diagnostics
+
+
+def _normalize_video_scored_rows(video_scored: object) -> list[dict[str, Any]]:
+    if isinstance(video_scored, list):
+        return [row for row in video_scored if isinstance(row, dict)]
+    if isinstance(video_scored, Mapping):
+        raw_rows = video_scored.get("videos")
+        if isinstance(raw_rows, list):
+            return [row for row in raw_rows if isinstance(row, dict)]
+    return []
+
+
+def _build_video_scoring_audit(
+    *,
+    video_observation_count: int,
+    metric_video_observation_count: int,
+    video_scored: Sequence[Mapping[str, Any]],
+    video_filter_diagnostics: Mapping[str, Any],
+) -> dict[str, Any]:
+    top_scored: list[dict[str, Any]] = []
+    scored_rows = [row for row in video_scored if isinstance(row, Mapping)]
+    for row in scored_rows[:10]:
+        top_scored.append(
+            {
+                "video_id": str(row.get("video_id") or row.get("source_ref") or "").strip(),
+                "source_ref": str(row.get("source_ref") or "").strip(),
+                "platform": str(row.get("platform") or "").strip(),
+                "rank": row.get("rank"),
+                "viral_score": row.get("viral_score"),
+            }
+        )
+    return {
+        "video_observation_count": int(video_observation_count),
+        "metric_video_observation_count": int(metric_video_observation_count),
+        "video_scored_count": int(len(scored_rows)),
+        "exclusion_counts": {
+            "missing_metrics": int(video_filter_diagnostics.get("missing_metrics") or 0),
+            "off_target_source": int(video_filter_diagnostics.get("off_target_source") or 0),
+            "off_topic": int(video_filter_diagnostics.get("off_topic") or 0),
+        },
+        "platform_diagnostics": (
+            dict(video_filter_diagnostics.get("by_platform"))
+            if isinstance(video_filter_diagnostics.get("by_platform"), Mapping)
+            else {}
+        ),
+        "top_scored_videos": top_scored,
+    }
 
 
 def _map_buyer_stage(raw_stage: str) -> str:
@@ -1960,8 +4686,218 @@ def _coerce_string_list(raw: object) -> list[str]:
     return values
 
 
+def _resolve_offer_business_model(
+    *,
+    offer_pipeline_output: Mapping[str, Any],
+    fallback_business_model: str | None = None,
+) -> str:
+    offer_input = offer_pipeline_output.get("offer_input")
+    if isinstance(offer_input, dict):
+        product_brief = offer_input.get("product_brief")
+        if isinstance(product_brief, dict):
+            business_model = str(product_brief.get("business_model") or "").strip()
+            if business_model:
+                return business_model
+    if isinstance(fallback_business_model, str) and fallback_business_model.strip():
+        return fallback_business_model.strip()
+    raise StrategyV2MissingContextError(
+        "Offer business_model is missing in offer_pipeline_output.offer_input.product_brief. "
+        "Remediation: ensure v2-08 Offer pipeline output includes product_brief.business_model."
+    )
+
+
+def _resolve_offer_price_cents_and_currency(
+    *,
+    offer_pipeline_output: Mapping[str, Any],
+) -> tuple[int, str]:
+    offer_input = offer_pipeline_output.get("offer_input")
+    if not isinstance(offer_input, dict):
+        raise StrategyV2MissingContextError(
+            "offer_pipeline_output.offer_input is missing for product variant sync. "
+            "Remediation: ensure v2-08 Offer pipeline output includes offer_input.product_brief."
+        )
+    product_brief = offer_input.get("product_brief")
+    if not isinstance(product_brief, dict):
+        raise StrategyV2MissingContextError(
+            "offer_pipeline_output.offer_input.product_brief is missing for product variant sync. "
+            "Remediation: ensure v2-08 Offer pipeline output includes product_brief."
+        )
+    price_cents_raw = product_brief.get("price_cents")
+    if not isinstance(price_cents_raw, int) or price_cents_raw < 0:
+        raise StrategyV2MissingContextError(
+            "Offer product_brief.price_cents is missing or invalid for product variant sync. "
+            "Remediation: ensure v2-08 Offer pipeline output includes non-negative integer product_brief.price_cents."
+        )
+    currency = str(product_brief.get("currency") or "").strip().upper()
+    if len(currency) != 3:
+        raise StrategyV2MissingContextError(
+            "Offer product_brief.currency is missing or invalid for product variant sync. "
+            "Remediation: ensure v2-08 Offer pipeline output includes 3-letter product_brief.currency."
+        )
+    return price_cents_raw, currency
+
+
+def _serialize_product_offer_for_strategy(offer: Any) -> dict[str, Any]:
+    return {
+        "id": str(offer.id),
+        "org_id": str(offer.org_id),
+        "client_id": str(offer.client_id),
+        "product_id": str(offer.product_id) if offer.product_id else None,
+        "name": str(offer.name),
+        "description": str(offer.description) if isinstance(offer.description, str) else None,
+        "business_model": str(offer.business_model),
+        "differentiation_bullets": list(offer.differentiation_bullets or []),
+        "guarantee_text": str(offer.guarantee_text) if isinstance(offer.guarantee_text, str) else None,
+        "options_schema": offer.options_schema if isinstance(offer.options_schema, dict) else None,
+        "created_at": offer.created_at.isoformat() if getattr(offer, "created_at", None) else None,
+    }
+
+
+def _sync_product_offer_from_strategy_output(
+    *,
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    onboarding_payload: Mapping[str, Any] | None,
+    offer_pipeline_output: Mapping[str, Any],
+    stage3_data: Mapping[str, Any],
+    selected_variant: Mapping[str, Any],
+    selected_variant_score: Mapping[str, Any],
+    decision_payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    offers_repo = ProductOffersRepository(session)
+    variants_repo = ProductVariantsRepository(session)
+    product_offers = offers_repo.list_by_product(product_id=product_id)
+
+    target_offer = None
+    default_offer_id_raw = (
+        onboarding_payload.get("default_offer_id")
+        if isinstance(onboarding_payload, Mapping)
+        else None
+    )
+    default_offer_id = str(default_offer_id_raw or "").strip() if default_offer_id_raw is not None else ""
+    if default_offer_id:
+        target_offer = offers_repo.get(offer_id=default_offer_id)
+        if not target_offer:
+            raise StrategyV2MissingContextError(
+                "Onboarding payload default_offer_id does not exist. "
+                "Remediation: recreate onboarding payload or provide a valid default_offer_id."
+            )
+        if (
+            str(target_offer.org_id) != org_id
+            or str(target_offer.client_id) != client_id
+            or str(target_offer.product_id or "") != product_id
+        ):
+            raise StrategyV2MissingContextError(
+                "Onboarding payload default_offer_id does not belong to the current org/client/product. "
+                "Remediation: fix onboarding payload default_offer_id mapping."
+            )
+    elif len(product_offers) == 1:
+        target_offer = product_offers[0]
+    elif len(product_offers) > 1:
+        raise StrategyV2MissingContextError(
+            "Multiple product offers exist and no onboarding default_offer_id was provided. "
+            "Remediation: rerun onboarding with a default offer or reduce to a single product offer."
+        )
+
+    offer_name = str(stage3_data.get("core_promise") or "").strip()
+    if not offer_name:
+        raise StrategyV2MissingContextError(
+            "Stage3 core_promise is required to sync product offer data. "
+            "Remediation: rerun Offer winner selection and ensure core_promise is present."
+        )
+
+    pricing_rationale = str(stage3_data.get("pricing_rationale") or "").strip()
+    business_model = _resolve_offer_business_model(
+        offer_pipeline_output=offer_pipeline_output,
+        fallback_business_model=(
+            str(target_offer.business_model) if target_offer is not None else None
+        ),
+    )
+    differentiation_bullets = _coerce_string_list(stage3_data.get("value_stack_summary"))
+    guarantee_text = str(stage3_data.get("guarantee_type") or "").strip() or None
+
+    strategy_v2_offer_payload = {
+        "source": "strategy_v2",
+        "variant_id": str(stage3_data.get("variant_selected") or ""),
+        "ump": str(stage3_data.get("ump") or ""),
+        "ums": str(stage3_data.get("ums") or ""),
+        "core_promise": offer_name,
+        "value_stack_summary": differentiation_bullets,
+        "pricing_rationale": pricing_rationale or None,
+        "guarantee_type": guarantee_text,
+        "composite_score": stage3_data.get("composite_score"),
+        "selected_variant": dict(selected_variant),
+        "selected_variant_score": dict(selected_variant_score),
+        "decision": dict(decision_payload),
+    }
+
+    base_options_schema = (
+        dict(target_offer.options_schema)
+        if target_offer is not None and isinstance(target_offer.options_schema, dict)
+        else {}
+    )
+    base_options_schema["strategyV2Offer"] = strategy_v2_offer_payload
+
+    if target_offer is None:
+        target_offer = offers_repo.create(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            name=offer_name,
+            description=pricing_rationale or None,
+            business_model=business_model,
+            differentiation_bullets=differentiation_bullets,
+            guarantee_text=guarantee_text,
+            options_schema=base_options_schema,
+        )
+    else:
+        target_offer = offers_repo.update(
+            offer_id=str(target_offer.id),
+            name=offer_name,
+            description=pricing_rationale or None,
+            business_model=business_model,
+            differentiation_bullets=differentiation_bullets,
+            guarantee_text=guarantee_text,
+            options_schema=base_options_schema,
+        )
+        if target_offer is None:
+            raise StrategyV2MissingContextError(
+                "Failed to update product offer from Strategy V2 output. "
+                "Remediation: verify product offer exists and retry Offer winner finalization."
+            )
+
+    offer_variant_rows = [
+        row
+        for row in variants_repo.list_by_product(product_id=product_id)
+        if str(row.offer_id or "") == str(target_offer.id)
+    ]
+    if not offer_variant_rows:
+        variant_id = str(stage3_data.get("variant_selected") or "").strip()
+        if not variant_id:
+            raise StrategyV2MissingContextError(
+                "Stage3 variant_selected is required to sync product variants. "
+                "Remediation: rerun Offer winner selection and ensure variant_selected is present."
+            )
+        price_cents, currency = _resolve_offer_price_cents_and_currency(
+            offer_pipeline_output=offer_pipeline_output,
+        )
+        variants_repo.create(
+            product_id=product_id,
+            offer_id=str(target_offer.id),
+            title=offer_name,
+            price=price_cents,
+            currency=currency,
+            option_values={"offerId": variant_id},
+        )
+
+    return _serialize_product_offer_for_strategy(target_offer)
+
+
 def _is_scrapeable_source_ref(source_ref: str) -> tuple[bool, str | None]:
-    parsed = urlsplit(source_ref.strip())
+    canonical_source_ref = _canonicalize_source_ref_for_ingestion(source_ref)
+    parsed = urlsplit(canonical_source_ref)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return False, "invalid_url"
 
@@ -2001,6 +4937,765 @@ def _is_scrapeable_source_ref(source_ref: str) -> tuple[bool, str | None]:
     return True, None
 
 
+def _canonicalize_source_ref_for_ingestion(source_ref: str) -> str:
+    parsed = urlsplit(source_ref.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return ""
+
+    host = parsed.netloc.lower()
+    if ":" in host:
+        host = host.split(":", 1)[0]
+    if host.startswith("www."):
+        host = host[4:]
+
+    path = parsed.path or "/"
+    if path != "/":
+        path = path.rstrip("/")
+
+    keep_query_keys = _PLATFORM_QUERY_KEYS.get(host, frozenset())
+    normalized_query_pairs: list[tuple[str, str]] = []
+    for key, value in parse_qsl(parsed.query, keep_blank_values=False):
+        lowered_key = key.lower()
+        if lowered_key.startswith(_TRACKING_QUERY_PREFIXES):
+            continue
+        if lowered_key in _TRACKING_QUERY_KEYS:
+            continue
+        if keep_query_keys and lowered_key not in keep_query_keys:
+            continue
+        normalized_query_pairs.append((lowered_key, value))
+    normalized_query_pairs.sort(key=lambda row: (row[0], row[1]))
+    query = urlencode(normalized_query_pairs, doseq=True)
+    return urlunsplit((parsed.scheme.lower(), host, path, query, ""))
+
+
+def _normalize_scraped_item_for_manifest(
+    item: Mapping[str, Any],
+    *,
+    item_index: int | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    nested_post = item.get("post")
+    nested_snapshot = item.get("snapshot")
+    nested_mappings: list[Mapping[str, Any]] = [item]
+    if isinstance(nested_post, Mapping):
+        nested_mappings.append(nested_post)
+    if isinstance(nested_snapshot, Mapping):
+        nested_mappings.append(nested_snapshot)
+
+    def _text_value(*field_names: str) -> str:
+        for mapping in nested_mappings:
+            for field_name in field_names:
+                value = mapping.get(field_name)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        return ""
+
+    def _number_value(*field_names: str) -> int | float | None:
+        for mapping in nested_mappings:
+            for field_name in field_names:
+                value = mapping.get(field_name)
+                if isinstance(value, (int, float)):
+                    return value
+        return None
+
+    def _timestamp_value(*field_names: str) -> str:
+        for mapping in nested_mappings:
+            for field_name in field_names:
+                value = mapping.get(field_name)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+                if isinstance(value, (int, float)):
+                    try:
+                        return datetime.fromtimestamp(float(value), tz=timezone.utc).isoformat().replace("+00:00", "Z")
+                    except Exception:
+                        continue
+        return ""
+
+    if isinstance(item_index, int) and item_index >= 0:
+        payload["item_index"] = item_index
+
+    item_id = _text_value(
+        "id",
+        "post_id",
+        "video_id",
+        "comment_id",
+        "asset_id",
+        "item_id",
+    )
+    if item_id:
+        payload["item_id"] = item_id
+
+    permalink = _text_value("permalink", "postUrl")
+    source_url = _text_value(
+        "source_url",
+        "sourceUrl",
+        "url",
+        "videoUrl",
+        "link",
+        "canonical_url",
+        "source_ref",
+    )
+    if not source_url and permalink:
+        subreddit = _text_value("subreddit")
+        if permalink.startswith("/r/") or subreddit:
+            normalized_permalink = permalink if permalink.startswith("/") else f"/{permalink}"
+            source_url = f"https://www.reddit.com{normalized_permalink}"
+    if source_url:
+        payload["source_url"] = source_url
+    if permalink:
+        payload["permalink"] = permalink
+
+    title = _text_value("title", "headline", "link_title")
+    if title:
+        payload["title"] = title
+
+    body = _text_value(
+        "mainText",
+        "selftext",
+        "bodyText",
+        "body",
+        "text",
+        "content",
+        "quote",
+        "caption",
+        "description",
+        "commentText",
+        "comment",
+    )
+    if body:
+        payload["body"] = body
+
+    organic_results = item.get("organicResults")
+    if isinstance(organic_results, list):
+        organic_rows: list[dict[str, str]] = []
+        for result in organic_results:
+            if not isinstance(result, Mapping):
+                continue
+            organic_title = str(result.get("title") or "").strip()
+            organic_description = str(result.get("description") or "").strip()
+            organic_url = str(result.get("url") or "").strip()
+            if not organic_title and not organic_description:
+                continue
+            organic_rows.append(
+                {
+                    "title": organic_title,
+                    "description": organic_description,
+                    "url": organic_url,
+                }
+            )
+        if organic_rows:
+            payload["organic_results_sample"] = organic_rows
+            if "title" not in payload:
+                first_title = str(organic_rows[0].get("title") or "").strip()
+                if first_title:
+                    payload["title"] = first_title
+            if "body" not in payload:
+                snippet_segments: list[str] = []
+                for row in organic_rows[:3]:
+                    title_segment = str(row.get("title") or "").strip()
+                    description_segment = str(row.get("description") or "").strip()
+                    if title_segment:
+                        snippet_segments.append(title_segment)
+                    if description_segment:
+                        snippet_segments.append(description_segment)
+                if snippet_segments:
+                    payload["body"] = " | ".join(snippet_segments)
+            if "source_url" not in payload:
+                first_url = str(organic_rows[0].get("url") or "").strip()
+                if first_url:
+                    payload["source_url"] = first_url
+    posts_sample = item.get("postsSample")
+    if isinstance(posts_sample, list):
+        sample_rows = [
+            str(value).strip()
+            for value in posts_sample
+            if isinstance(value, str) and str(value).strip()
+        ]
+        if sample_rows:
+            payload["posts_sample"] = sample_rows
+    comments = item.get("comments")
+    if isinstance(comments, list):
+        comment_rows = []
+        for value in comments:
+            if isinstance(value, Mapping):
+                comment_text = ""
+                for field_name in ("comment", "commentText", "text", "body", "content"):
+                    raw_text = value.get(field_name)
+                    if isinstance(raw_text, str) and raw_text.strip():
+                        comment_text = raw_text.strip()
+                        break
+                if comment_text:
+                    comment_rows.append(comment_text)
+            elif isinstance(value, str) and value.strip():
+                comment_rows.append(value.strip())
+        if comment_rows:
+            payload["comments_sample"] = comment_rows
+
+    author = _text_value("author", "username", "ownerUsername", "userName")
+    if author:
+        payload["author"] = author
+    subreddit = _text_value("subreddit")
+    if subreddit:
+        payload["subreddit"] = subreddit
+
+    timestamp = _timestamp_value(
+        "created_utc",
+        "createdAt",
+        "created_at",
+        "createTimeISO",
+        "createTime",
+        "publishedAt",
+        "published_at",
+        "date",
+        "time",
+        "timestamp",
+    )
+    if timestamp:
+        payload["timestamp"] = timestamp
+
+    for metric_key, aliases in (
+        ("views", ("views", "view_count", "playCount", "videoPlayCount", "viewCount")),
+        ("likes", ("likes", "like_count")),
+        ("comments", ("comments", "comment_count", "commentsCount")),
+        ("shares", ("shares", "share_count")),
+        ("followers", ("followers", "account_followers", "numberOfSubscribers")),
+        ("score", ("score", "upvotes")),
+        ("days_since_posted", ("days_since_posted", "post_age_days")),
+    ):
+        metric_value = _number_value(*aliases)
+        if metric_value is not None:
+            payload[metric_key] = metric_value
+
+    hashtags = item.get("hashtags")
+    if isinstance(hashtags, list):
+        payload["hashtags"] = [
+            str(value).strip()
+            for value in hashtags
+            if isinstance(value, str) and str(value).strip()
+        ]
+
+    engagement = item.get("engagement")
+    if isinstance(engagement, Mapping):
+        compact_engagement: dict[str, Any] = {}
+        for key in ("views", "likes", "comments", "shares", "saves", "upvotes"):
+            value = engagement.get(key)
+            if isinstance(value, (int, float)):
+                compact_engagement[key] = value
+        if compact_engagement:
+            payload["engagement"] = compact_engagement
+
+    if len(payload) <= (1 if "item_index" in payload else 0):
+        payload["raw"] = json.dumps(item, ensure_ascii=False)
+    return payload
+
+
+def _extract_source_refs_from_agent_strategies(
+    *,
+    habitat_strategy: Mapping[str, Any],
+    video_strategy: Mapping[str, Any],
+) -> list[str]:
+    refs: list[str] = []
+
+    strategy_habitats = habitat_strategy.get("strategy_habitats")
+    if isinstance(strategy_habitats, list):
+        for row in strategy_habitats:
+            if not isinstance(row, dict):
+                continue
+            url_pattern = row.get("url_pattern")
+            if isinstance(url_pattern, str) and url_pattern.strip():
+                refs.append(url_pattern.strip())
+
+    def _walk(value: Any) -> None:
+        if isinstance(value, dict):
+            for child in value.values():
+                _walk(child)
+            return
+        if isinstance(value, list):
+            for child in value:
+                _walk(child)
+            return
+        if isinstance(value, str):
+            candidate = value.strip()
+            if candidate.lower().startswith(("http://", "https://")):
+                refs.append(candidate)
+
+    _walk(video_strategy.get("configurations"))
+
+    deduped: list[str] = []
+    seen: set[str] = set()
+    for ref in refs:
+        normalized = _canonicalize_source_ref_for_ingestion(ref)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return deduped
+
+
+def _collect_manual_queries_from_agent00_handoff(agent00_output: Mapping[str, Any]) -> list[str]:
+    queries: list[str] = []
+    seen: set[str] = set()
+
+    def _add_query(value: Any) -> None:
+        if not isinstance(value, str):
+            return
+        candidate = value.strip()
+        if not candidate:
+            return
+        if candidate in seen:
+            return
+        seen.add(candidate)
+        queries.append(candidate)
+
+    manual_by_category = agent00_output.get("manual_search_queries_by_category")
+    if isinstance(manual_by_category, list):
+        for row in manual_by_category:
+            if not isinstance(row, Mapping):
+                continue
+            for field_name in ("primary", "secondary", "problem_specific"):
+                entries = row.get(field_name)
+                if not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    if isinstance(entry, Mapping):
+                        _add_query(entry.get("query"))
+            competitor_specific = row.get("competitor_specific")
+            if isinstance(competitor_specific, list):
+                for entry in competitor_specific:
+                    if not isinstance(entry, Mapping):
+                        continue
+                    values = entry.get("queries")
+                    if isinstance(values, list):
+                        for query in values:
+                            _add_query(query)
+
+    habitat_targets = agent00_output.get("habitat_targets")
+    if isinstance(habitat_targets, list):
+        for row in habitat_targets:
+            if not isinstance(row, Mapping):
+                continue
+            target_queries = row.get("manual_queries")
+            if isinstance(target_queries, list):
+                for query in target_queries:
+                    _add_query(query)
+    return queries
+
+
+def _infer_locator_from_apify_input(input_payload: Mapping[str, Any]) -> str:
+    url_like_array_fields = ("startUrls", "productUrls")
+    for field_name in url_like_array_fields:
+        raw_urls = input_payload.get(field_name)
+        if not isinstance(raw_urls, list):
+            continue
+        for item in raw_urls:
+            if isinstance(item, Mapping):
+                url = str(item.get("url") or "").strip()
+                if url:
+                    return url
+
+    direct_url_fields = ("directUrls", "profiles")
+    for field_name in direct_url_fields:
+        raw_urls = input_payload.get(field_name)
+        if not isinstance(raw_urls, list):
+            continue
+        for item in raw_urls:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+
+    for field_name, prefix in (
+        ("queries", "search://"),
+        ("companyName", "trustpilot://"),
+        ("subreddit", "reddit://"),
+    ):
+        value = input_payload.get(field_name)
+        if isinstance(value, str) and value.strip():
+            return f"{prefix}{value.strip()}"
+
+    return "source://unknown"
+
+
+def _normalize_agent00_handoff_output(agent00_output: Mapping[str, Any]) -> dict[str, Any]:
+    tier1_rows_legacy = agent00_output.get("apify_configs_tier1")
+    tier2_rows_legacy = agent00_output.get("apify_configs_tier2")
+    if isinstance(tier1_rows_legacy, list) and isinstance(tier2_rows_legacy, list):
+        return dict(agent00_output)
+
+    apify_configs = agent00_output.get("apify_configs")
+    if not isinstance(apify_configs, Mapping):
+        raise StrategyV2SchemaValidationError(
+            "Agent 0 output must include apify_configs object in Section 10 handoff JSON."
+        )
+
+    tier1_rows_raw = apify_configs.get("tier1_direct")
+    tier2_rows_raw = apify_configs.get("tier2_discovery")
+    if not isinstance(tier1_rows_raw, list) or not tier1_rows_raw:
+        raise StrategyV2SchemaValidationError(
+            "Agent 0 handoff JSON must include non-empty apify_configs.tier1_direct array."
+        )
+    if not isinstance(tier2_rows_raw, list) or not tier2_rows_raw:
+        raise StrategyV2SchemaValidationError(
+            "Agent 0 handoff JSON must include non-empty apify_configs.tier2_discovery array."
+        )
+
+    tier1_rows = [dict(row) for row in tier1_rows_raw if isinstance(row, Mapping)]
+    tier2_rows = [dict(row) for row in tier2_rows_raw if isinstance(row, Mapping)]
+    if len(tier1_rows) != len(tier1_rows_raw) or len(tier2_rows) != len(tier2_rows_raw):
+        raise StrategyV2SchemaValidationError(
+            "Agent 0 handoff JSON apify config arrays must contain only objects."
+        )
+
+    apify_config_index: dict[str, Mapping[str, Any]] = {}
+    for row in tier1_rows + tier2_rows:
+        config_id = str(row.get("config_id") or "").strip()
+        if config_id:
+            apify_config_index[config_id] = row
+
+    strategy_habitats: list[dict[str, str]] = []
+    seen_habitats: set[tuple[str, str, str, str, str]] = set()
+    habitat_targets = agent00_output.get("habitat_targets")
+    if isinstance(habitat_targets, list):
+        for row in habitat_targets:
+            if not isinstance(row, Mapping):
+                continue
+            habitat_name = str(row.get("habitat_name") or "").strip()
+            habitat_type = str(row.get("habitat_category") or "").strip()
+            config_id = str(row.get("apify_config_id") or "").strip()
+            target_id = str(row.get("target_id") or "").strip()
+            locator = ""
+            config_row = apify_config_index.get(config_id)
+            if isinstance(config_row, Mapping):
+                config_metadata = config_row.get("metadata")
+                if not target_id and isinstance(config_metadata, Mapping):
+                    target_id = str(config_metadata.get("target_id") or "").strip()
+                input_payload = config_row.get("input")
+                if isinstance(input_payload, Mapping):
+                    locator = _infer_locator_from_apify_input(input_payload)
+            if not locator:
+                manual_queries = row.get("manual_queries")
+                if isinstance(manual_queries, list):
+                    for candidate in manual_queries:
+                        if isinstance(candidate, str) and candidate.strip():
+                            locator = f"query://{candidate.strip()}"
+                            break
+            if not locator:
+                locator = f"target://{str(row.get('target_id') or config_id or 'unknown')}"
+            if not habitat_name or not habitat_type:
+                continue
+            habitat_key = (habitat_name, habitat_type, locator, target_id, config_id)
+            if habitat_key in seen_habitats:
+                continue
+            seen_habitats.add(habitat_key)
+            habitat_row: dict[str, str] = {
+                "habitat_name": habitat_name,
+                "habitat_type": habitat_type,
+                "url_pattern": locator,
+            }
+            if target_id:
+                habitat_row["target_id"] = target_id
+            if config_id:
+                habitat_row["apify_config_id"] = config_id
+            strategy_habitats.append(habitat_row)
+
+    if not strategy_habitats:
+        habitat_categories = agent00_output.get("habitat_categories")
+        if isinstance(habitat_categories, list):
+            for row in habitat_categories:
+                if not isinstance(row, Mapping):
+                    continue
+                category_name = str(row.get("category_name") or "").strip()
+                if not category_name:
+                    continue
+                strategy_habitats.append(
+                    {
+                        "habitat_name": category_name,
+                        "habitat_type": category_name,
+                        "url_pattern": f"category://{category_name}",
+                    }
+                )
+
+    category_classification_raw = agent00_output.get("product_classification")
+    category_classification = (
+        dict(category_classification_raw)
+        if isinstance(category_classification_raw, Mapping)
+        else {}
+    )
+
+    normalized_output: dict[str, Any] = {
+        "category_classification": category_classification,
+        "strategy_habitats": strategy_habitats,
+        "apify_configs_tier1": tier1_rows,
+        "apify_configs_tier2": tier2_rows,
+        "manual_queries": _collect_manual_queries_from_agent00_handoff(agent00_output),
+        "handoff_block": "",
+    }
+    return normalized_output
+
+
+def _normalize_strategy_apify_config_row(
+    *,
+    row: Mapping[str, Any],
+    source_label: str,
+    index: int,
+    require_platform_mode: bool,
+    defaults: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    def _is_placeholder_text(value: str) -> bool:
+        normalized = re.sub(r"[^A-Z0-9]+", "", str(value or "").strip().upper())
+        return bool(normalized) and normalized in _APIFY_PLACEHOLDER_SENTINELS
+
+    def _assert_non_placeholder_text(*, value: Any, field_label: str) -> str:
+        text_value = str(value or "").strip()
+        if not text_value:
+            raise StrategyV2SchemaValidationError(
+                f"{source_label}[{index}] is missing non-empty {field_label}."
+            )
+        if _is_placeholder_text(text_value):
+            raise StrategyV2SchemaValidationError(
+                f"{source_label}[{index}] has placeholder {field_label}={text_value!r}. "
+                "Remediation: provide concrete strategy config values."
+            )
+        return text_value
+
+    def _assert_non_placeholder_input_strings(*, input_data: Mapping[str, Any]) -> None:
+        start_urls = input_data.get("startUrls")
+        if isinstance(start_urls, list):
+            for url_idx, start_url_entry in enumerate(start_urls):
+                if isinstance(start_url_entry, Mapping):
+                    _assert_non_placeholder_text(
+                        value=start_url_entry.get("url"),
+                        field_label=f"input.startUrls[{url_idx}].url",
+                    )
+        for field_name in ("directUrls", "productUrls", "profiles"):
+            values = input_data.get(field_name)
+            if not isinstance(values, list):
+                continue
+            for value_idx, candidate in enumerate(values):
+                _assert_non_placeholder_text(
+                    value=candidate,
+                    field_label=f"input.{field_name}[{value_idx}]",
+                )
+
+    config_id = str(row.get("config_id") or "").strip()
+    actor_id = _assert_non_placeholder_text(value=row.get("actor_id"), field_label="actor_id")
+    input_payload = row.get("input")
+    metadata_payload = row.get("metadata")
+    if not config_id:
+        raise StrategyV2SchemaValidationError(
+            f"{source_label}[{index}] is missing non-empty config_id."
+        )
+    if not isinstance(input_payload, Mapping) or not dict(input_payload):
+        raise StrategyV2SchemaValidationError(
+            f"{source_label}[{index}] must include non-empty object input payload."
+        )
+    _assert_non_placeholder_input_strings(input_data=input_payload)
+    if metadata_payload is not None and not isinstance(metadata_payload, Mapping):
+        raise StrategyV2SchemaValidationError(
+            f"{source_label}[{index}].metadata must be an object when provided."
+        )
+
+    metadata: dict[str, Any] = dict(metadata_payload) if isinstance(metadata_payload, Mapping) else {}
+    passthrough_metadata_fields = (
+        "target_id",
+        "platform",
+        "mode",
+        "habitat_name",
+        "habitat_type",
+        "url_pattern",
+        "tier",
+    )
+    for field_name in passthrough_metadata_fields:
+        value = row.get(field_name)
+        if isinstance(value, str) and value.strip():
+            metadata.setdefault(field_name, value.strip())
+    if defaults:
+        for key, value in defaults.items():
+            metadata.setdefault(key, value)
+
+    target_id = str(metadata.get("target_id") or row.get("target_id") or "").strip()
+    if not target_id:
+        default_tier = str((defaults or {}).get("tier") or "").strip().lower()
+        default_stage = str((defaults or {}).get("source_stage") or "").strip().lower()
+        if default_tier == "tier2":
+            target_id = f"DISC-{config_id}"
+        elif default_stage == "agent0b":
+            target_id = f"SV-{config_id}"
+        else:
+            raise StrategyV2SchemaValidationError(
+                f"{source_label}[{index}] is missing target_id metadata. "
+                "Remediation: include metadata.target_id in strategy configs."
+            )
+    metadata["target_id"] = target_id
+
+    if require_platform_mode:
+        platform = str(row.get("platform") or "").strip()
+        mode = str(row.get("mode") or "").strip()
+        if not platform:
+            raise StrategyV2SchemaValidationError(
+                f"{source_label}[{index}] is missing non-empty platform."
+            )
+        if not mode:
+            raise StrategyV2SchemaValidationError(
+                f"{source_label}[{index}] is missing non-empty mode."
+            )
+        metadata.setdefault("platform", platform)
+        metadata.setdefault("mode", mode)
+
+    return {
+        "config_id": config_id,
+        "actor_id": actor_id,
+        "input": dict(input_payload),
+        "metadata": metadata,
+    }
+
+
+def _is_placeholder_apify_config_error(error: StrategyV2SchemaValidationError) -> bool:
+    message = str(error)
+    return " has placeholder " in message
+
+
+def _extract_apify_configs_from_agent_strategies(
+    *,
+    habitat_strategy: Mapping[str, Any],
+    video_strategy: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    tier1_rows = habitat_strategy.get("apify_configs_tier1")
+    tier2_rows = habitat_strategy.get("apify_configs_tier2")
+    video_config_rows = video_strategy.get("configurations")
+    if not isinstance(tier1_rows, list) or not tier1_rows:
+        raise StrategyV2SchemaValidationError(
+            "Agent 0 output must include non-empty apify_configs_tier1 array."
+        )
+    if not isinstance(tier2_rows, list) or not tier2_rows:
+        raise StrategyV2SchemaValidationError(
+            "Agent 0 output must include non-empty apify_configs_tier2 array."
+        )
+    if not isinstance(video_config_rows, list) or not video_config_rows:
+        raise StrategyV2SchemaValidationError(
+            "Agent 0b output must include non-empty configurations array."
+        )
+
+    normalized: list[dict[str, Any]] = []
+    seen_config_ids: set[str] = set()
+
+    def _append_rows(
+        *,
+        rows: list[Any],
+        source_label: str,
+        require_platform_mode: bool,
+        defaults: Mapping[str, str] | None = None,
+    ) -> None:
+        for idx, row in enumerate(rows):
+            if not isinstance(row, Mapping):
+                raise StrategyV2SchemaValidationError(
+                    f"{source_label}[{idx}] must be an object."
+                )
+            try:
+                normalized_row = _normalize_strategy_apify_config_row(
+                    row=row,
+                    source_label=source_label,
+                    index=idx,
+                    require_platform_mode=require_platform_mode,
+                    defaults=defaults,
+                )
+            except StrategyV2SchemaValidationError as exc:
+                if _is_placeholder_apify_config_error(exc):
+                    continue
+                raise
+            config_id = str(normalized_row["config_id"])
+            if config_id in seen_config_ids:
+                raise StrategyV2SchemaValidationError(
+                    f"Duplicate Apify config_id '{config_id}' detected across Agent 0/0b outputs."
+                )
+            seen_config_ids.add(config_id)
+            normalized.append(normalized_row)
+
+    _append_rows(
+        rows=tier1_rows,
+        source_label="agent0.apify_configs_tier1",
+        require_platform_mode=False,
+        defaults={"source_stage": "agent0", "tier": "tier1"},
+    )
+    _append_rows(
+        rows=tier2_rows,
+        source_label="agent0.apify_configs_tier2",
+        require_platform_mode=False,
+        defaults={"source_stage": "agent0", "tier": "tier2"},
+    )
+    _append_rows(
+        rows=video_config_rows,
+        source_label="agent0b.configurations",
+        require_platform_mode=True,
+        defaults={"source_stage": "agent0b"},
+    )
+
+    if not normalized:
+        raise StrategyV2SchemaValidationError(
+            "Stage 2B requires at least one executable Apify configuration."
+        )
+    return normalized
+
+
+def _require_agent00_executable_configs(agent00_output: Mapping[str, Any]) -> None:
+    executable_config_count = 0
+    for field_name in ("apify_configs_tier1", "apify_configs_tier2"):
+        rows = agent00_output.get(field_name)
+        if not isinstance(rows, list) or not rows:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 0 output must include non-empty {field_name} array."
+            )
+        for idx, row in enumerate(rows):
+            if not isinstance(row, Mapping):
+                raise StrategyV2SchemaValidationError(
+                    f"agent0.{field_name}[{idx}] must be an object."
+                )
+            try:
+                _normalize_strategy_apify_config_row(
+                    row=row,
+                    source_label=f"agent0.{field_name}",
+                    index=idx,
+                    require_platform_mode=False,
+                    defaults={"source_stage": "agent0"},
+                )
+            except StrategyV2SchemaValidationError as exc:
+                if _is_placeholder_apify_config_error(exc):
+                    continue
+                raise
+            executable_config_count += 1
+    if executable_config_count <= 0:
+        raise StrategyV2SchemaValidationError(
+            "Agent 0 output has zero executable configurations after filtering placeholder rows. "
+            "Remediation: provide at least one concrete Agent 0 Apify config."
+        )
+
+
+def _require_agent00b_executable_configs(agent00b_output: Mapping[str, Any]) -> None:
+    rows = agent00b_output.get("configurations")
+    if not isinstance(rows, list) or not rows:
+        raise StrategyV2SchemaValidationError(
+            "Agent 0b output must include non-empty configurations array."
+        )
+    executable_config_count = 0
+    for idx, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise StrategyV2SchemaValidationError(
+                f"agent0b.configurations[{idx}] must be an object."
+            )
+        try:
+            _normalize_strategy_apify_config_row(
+                row=row,
+                source_label="agent0b.configurations",
+                index=idx,
+                require_platform_mode=True,
+                defaults={"source_stage": "agent0b"},
+            )
+        except StrategyV2SchemaValidationError as exc:
+            if _is_placeholder_apify_config_error(exc):
+                continue
+            raise
+        executable_config_count += 1
+    _ = executable_config_count
+
+
 def _partition_source_refs_for_ingestion(source_refs: list[str]) -> tuple[list[str], list[dict[str, str]]]:
     scrapeable: list[str] = []
     excluded: list[dict[str, str]] = []
@@ -2009,14 +5704,18 @@ def _partition_source_refs_for_ingestion(source_refs: list[str]) -> tuple[list[s
         ref = str(raw_ref or "").strip()
         if not ref:
             continue
-        if ref in seen:
+        canonical_ref = _canonicalize_source_ref_for_ingestion(ref)
+        if not canonical_ref:
+            excluded.append({"source_ref": ref, "reason": "invalid_url"})
             continue
-        seen.add(ref)
-        allowed, reason = _is_scrapeable_source_ref(ref)
+        if canonical_ref in seen:
+            continue
+        seen.add(canonical_ref)
+        allowed, reason = _is_scrapeable_source_ref(canonical_ref)
         if allowed:
-            scrapeable.append(ref)
+            scrapeable.append(canonical_ref)
             continue
-        excluded.append({"source_ref": ref, "reason": reason or "unsupported"})
+        excluded.append({"source_ref": canonical_ref, "reason": reason or "unsupported"})
     if not scrapeable:
         raise StrategyV2MissingContextError(
             "Strategy V2 ingestion source filtering produced zero scrapeable refs. "
@@ -2027,22 +5726,42 @@ def _partition_source_refs_for_ingestion(source_refs: list[str]) -> tuple[list[s
 
 def _ingest_strategy_v2_asset_data(
     *,
-    source_refs: list[str],
+    source_refs: list[str] | None = None,
+    apify_configs: list[Mapping[str, Any]] | None = None,
     include_ads_context: bool,
     include_social_video: bool,
     include_external_voc: bool,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    if not source_refs and not apify_configs:
+        raise StrategyV2MissingContextError(
+            "Strategy V2 Apify ingestion requires non-empty source_refs or apify_configs."
+        )
     try:
         payload = run_strategy_v2_apify_ingestion(
             source_refs=source_refs,
+            apify_configs=apify_configs,
             include_ads_context=include_ads_context,
             include_social_video=include_social_video,
             include_external_voc=include_external_voc,
+            progress_callback=progress_callback,
         )
+    except TimeoutError as exc:
+        raise StrategyV2ExternalDependencyError(
+            "Strategy V2 Apify ingestion timed out before actor completion. "
+            "Remediation: increase STRATEGY_V2_APIFY_MAX_WAIT_SECONDS or reduce heavy/duplicate source refs."
+        ) from exc
+    except ConnectionError as exc:
+        raise StrategyV2ExternalDependencyError(
+            "Strategy V2 Apify ingestion failed due to a network connectivity error. "
+            "Remediation: verify outbound connectivity and Apify API availability."
+        ) from exc
+    except StrategyV2Error:
+        raise
     except Exception as exc:
-        raise StrategyV2MissingContextError(
+        raise StrategyV2ExternalDependencyError(
             "Strategy V2 Apify ingestion failed. "
-            f"Remediation: verify Apify actor config/token and source refs. Root cause: {exc}"
+            f"Remediation: verify Apify actor config/token and ingestion inputs. Root cause: {exc}"
         ) from exc
     if not isinstance(payload, dict):
         raise StrategyV2SchemaValidationError(
@@ -2487,8 +6206,8 @@ def _generate_competitor_analysis_json(
         use_reasoning=True,
         use_web_search=False,
         heartbeat_context={
-            "activity": "strategy_v2.run_voc_angle_pipeline",
-            "phase": "foundational",
+            "activity": "strategy_v2.generate_competitor_analysis",
+            "phase": "competitor_analysis",
             "step_key": "02",
             "model": settings.STRATEGY_V2_VOC_MODEL,
         },
@@ -3003,6 +6722,18 @@ def _coerce_yes_no(value: object, *, default: str = "N") -> str:
 _VOC_REQUIRED_FIELDS = (
     "voc_id",
     "source",
+    "source_type",
+    "source_url",
+    "source_author",
+    "source_date",
+    "is_hook",
+    "hook_format",
+    "hook_word_count",
+    "video_virality_tier",
+    "video_view_count",
+    "competitor_saturation",
+    "in_whitespace",
+    "evidence_ref",
     "quote",
     "specific_number",
     "specific_product_brand",
@@ -3132,9 +6863,102 @@ def _enrich_voc_observation_signal(*, row: dict[str, Any]) -> dict[str, Any]:
 def _normalize_habitat_observations(raw_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     observations: list[dict[str, Any]] = []
     for index, row in enumerate(raw_rows):
+        row_name = f"Agent 1 habitat observation[{index}]"
         name = str(row.get("habitat_name") or row.get("name") or f"Habitat {index + 1}").strip()
         habitat_type = str(row.get("habitat_type") or "TEXT_COMMUNITY").strip()
         url_pattern = str(row.get("url_pattern") or row.get("source") or name).strip()
+        if not name:
+            raise StrategyV2SchemaValidationError(f"{row_name} must include non-empty habitat_name.")
+        if not url_pattern:
+            raise StrategyV2SchemaValidationError(f"{row_name} must include non-empty url_pattern.")
+        observation_sheet = row.get("observation_sheet")
+        if not isinstance(observation_sheet, Mapping):
+            raise StrategyV2SchemaValidationError(
+                f"{row_name} must include observation_sheet object for deterministic scoring."
+            )
+        _require_row_fields(
+            row=row,
+            required_fields=("source_file", "items_in_file", "data_quality", "mining_gate", "evidence_refs"),
+            row_name=row_name,
+        )
+        sheet = observation_sheet
+        required_sheet_fields = _VOC_AGENT01_OBSERVATION_SHEET_SCHEMA.get("required", [])
+        if isinstance(required_sheet_fields, list):
+            _require_row_fields(
+                row=sheet,
+                required_fields=tuple(str(field) for field in required_sheet_fields if isinstance(field, str)),
+                row_name=f"{row_name}.observation_sheet",
+            )
+
+        def _sheet_value(field_name: str) -> Any:
+            if field_name in sheet:
+                return sheet.get(field_name)
+            return row.get(field_name)
+
+        def _required_yes_no(field_name: str) -> str:
+            value = _sheet_value(field_name)
+            if value is None:
+                raise StrategyV2SchemaValidationError(f"{row_name} is missing required field '{field_name}'.")
+            if isinstance(value, str):
+                normalized_text = value.strip().upper()
+                if normalized_text in {"CANNOT_DETERMINE", "UNKNOWN"}:
+                    return "CANNOT_DETERMINE"
+            normalized = _coerce_yes_no(value, default="")
+            if normalized not in {"Y", "N"}:
+                raise StrategyV2SchemaValidationError(
+                    f"{row_name} field '{field_name}' must be Y, N, or CANNOT_DETERMINE."
+                )
+            return normalized
+
+        mining_gate_raw = row.get("mining_gate")
+        if not isinstance(mining_gate_raw, Mapping):
+            raise StrategyV2SchemaValidationError(f"{row_name}.mining_gate must be an object.")
+        mining_gate = dict(mining_gate_raw)
+        required_mining_gate_fields = _VOC_AGENT01_MINING_GATE_SCHEMA.get("required", [])
+        if isinstance(required_mining_gate_fields, list):
+            _require_row_fields(
+                row=mining_gate,
+                required_fields=tuple(
+                    str(field)
+                    for field in required_mining_gate_fields
+                    if isinstance(field, str) and str(field) != "reason"
+                ),
+                row_name=f"{row_name}.mining_gate",
+            )
+        mining_gate_status = str(mining_gate.get("status") or "").strip().upper()
+        if mining_gate_status not in {"PASS", "GATE_FAIL"}:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.mining_gate.status must be PASS or GATE_FAIL."
+            )
+        mining_gate["status"] = mining_gate_status
+        failed_fields_raw = mining_gate.get("failed_fields")
+        if not isinstance(failed_fields_raw, list):
+            raise StrategyV2SchemaValidationError(f"{row_name}.mining_gate.failed_fields must be an array.")
+        mining_gate["failed_fields"] = [str(field).strip() for field in failed_fields_raw if str(field).strip()]
+        mining_gate_reason = str(mining_gate.get("reason") or "").strip()
+        if not mining_gate_reason:
+            if mining_gate_status == "PASS":
+                mining_gate_reason = "Hard gate passed: all mining risk observables satisfied."
+            elif mining_gate["failed_fields"]:
+                mining_gate_reason = (
+                    "Hard gate failed due to: " + ", ".join(mining_gate["failed_fields"])
+                )
+            else:
+                mining_gate_reason = (
+                    "Hard gate failed: upstream output omitted reason and failed_fields details."
+                )
+        mining_gate["reason"] = mining_gate_reason
+
+        evidence_refs_raw = row.get("evidence_refs")
+        if not isinstance(evidence_refs_raw, list) or not evidence_refs_raw:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.evidence_refs must be a non-empty array of evidence pointers."
+            )
+        evidence_refs = [str(ref).strip() for ref in evidence_refs_raw if str(ref).strip()]
+        if not evidence_refs:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.evidence_refs must contain at least one non-empty evidence pointer."
+            )
 
         samples_raw = row.get("language_samples")
         samples: list[dict[str, Any]] = []
@@ -3151,50 +6975,320 @@ def _normalize_habitat_observations(raw_rows: list[dict[str, Any]]) -> list[dict
                         "has_specific_outcome": _coerce_yes_no(sample.get("has_specific_outcome")),
                     }
                 )
+        video_extension_raw = row.get("video_extension")
+        video_extension = dict(video_extension_raw) if isinstance(video_extension_raw, Mapping) else None
+        if isinstance(video_extension, dict):
+            required_video_fields = _VOC_AGENT01_VIDEO_EXTENSION_SCHEMA.get("required", [])
+            if isinstance(required_video_fields, list):
+                _require_row_fields(
+                    row=video_extension,
+                    required_fields=tuple(str(field) for field in required_video_fields if isinstance(field, str)),
+                    row_name=f"{row_name}.video_extension",
+                )
+        data_quality = str(row.get("data_quality") or "").strip().upper()
+        if data_quality not in {"CLEAN", "MINOR_ISSUES", "MAJOR_ISSUES", "UNUSABLE"}:
+            raise StrategyV2SchemaValidationError(
+                f"{row_name}.data_quality must be one of CLEAN|MINOR_ISSUES|MAJOR_ISSUES|UNUSABLE."
+            )
         observations.append(
             {
                 "habitat_name": name,
                 "habitat_type": habitat_type or "TEXT_COMMUNITY",
                 "url_pattern": url_pattern or name,
-                "threads_50_plus": _coerce_yes_no(row.get("threads_50_plus")),
-                "threads_200_plus": _coerce_yes_no(row.get("threads_200_plus")),
-                "threads_1000_plus": _coerce_yes_no(row.get("threads_1000_plus")),
-                "posts_last_3mo": _coerce_yes_no(row.get("posts_last_3mo")),
-                "posts_last_6mo": _coerce_yes_no(row.get("posts_last_6mo")),
-                "posts_last_12mo": _coerce_yes_no(row.get("posts_last_12mo")),
-                "recency_ratio": str(row.get("recency_ratio") or "CANNOT_DETERMINE"),
-                "exact_category": _coerce_yes_no(row.get("exact_category"), default="Y"),
-                "purchasing_comparing": _coerce_yes_no(row.get("purchasing_comparing")),
-                "personal_usage": _coerce_yes_no(row.get("personal_usage")),
-                "adjacent_only": _coerce_yes_no(row.get("adjacent_only")),
-                "first_person_narratives": _coerce_yes_no(row.get("first_person_narratives")),
-                "trigger_events": _coerce_yes_no(row.get("trigger_events")),
-                "fear_frustration_shame": _coerce_yes_no(row.get("fear_frustration_shame")),
-                "specific_dollar_or_time": _coerce_yes_no(row.get("specific_dollar_or_time")),
-                "long_detailed_posts": _coerce_yes_no(row.get("long_detailed_posts")),
+                "source_file": str(row.get("source_file") or "").strip(),
+                "items_in_file": int(row.get("items_in_file") or 0),
+                "data_quality": data_quality,
+                "observation_sheet": dict(sheet),
+                "threads_50_plus": _required_yes_no("threads_50_plus"),
+                "threads_200_plus": _required_yes_no("threads_200_plus"),
+                "threads_1000_plus": _required_yes_no("threads_1000_plus"),
+                "posts_last_3mo": _required_yes_no("posts_last_3mo"),
+                "posts_last_6mo": _required_yes_no("posts_last_6mo"),
+                "posts_last_12mo": _required_yes_no("posts_last_12mo"),
+                "recency_ratio": str(_sheet_value("recency_ratio") or "").strip(),
+                "exact_category": _required_yes_no("exact_category"),
+                "purchasing_comparing": _required_yes_no("purchasing_comparing"),
+                "personal_usage": _required_yes_no("personal_usage"),
+                "adjacent_only": _required_yes_no("adjacent_only"),
+                "first_person_narratives": _required_yes_no("first_person_narratives"),
+                "trigger_events": _required_yes_no("trigger_events"),
+                "fear_frustration_shame": _required_yes_no("fear_frustration_shame"),
+                "specific_dollar_or_time": _required_yes_no("specific_dollar_or_time"),
+                "long_detailed_posts": _required_yes_no("long_detailed_posts"),
                 "language_samples": samples,
-                "purchase_intent_density": str(row.get("purchase_intent_density") or "SOME"),
-                "discusses_spending": _coerce_yes_no(row.get("discusses_spending")),
-                "recommendation_threads": _coerce_yes_no(row.get("recommendation_threads")),
-                "relevance_pct": str(row.get("relevance_pct") or "25_TO_50_PCT"),
-                "dominated_by_offtopic": _coerce_yes_no(row.get("dominated_by_offtopic")),
-                "competitor_brand_count": str(row.get("competitor_brand_count") or "0"),
-                "competitor_ads_present": _coerce_yes_no(row.get("competitor_ads_present")),
-                "trend_direction": str(row.get("trend_direction") or "CANNOT_DETERMINE"),
-                "habitat_age": str(row.get("habitat_age") or "CANNOT_DETERMINE"),
-                "membership_trend": str(row.get("membership_trend") or "CANNOT_DETERMINE"),
-                "post_frequency_trend": str(row.get("post_frequency_trend") or "CANNOT_DETERMINE"),
-                "publicly_accessible": _coerce_yes_no(row.get("publicly_accessible"), default="Y"),
-                "text_based_content": _coerce_yes_no(row.get("text_based_content"), default="Y"),
-                "target_language": _coerce_yes_no(row.get("target_language"), default="Y"),
-                "no_rate_limiting": _coerce_yes_no(row.get("no_rate_limiting"), default="Y"),
+                "purchase_intent_density": str(_sheet_value("purchase_intent_density") or "").strip(),
+                "discusses_spending": _required_yes_no("discusses_spending"),
+                "recommendation_threads": _required_yes_no("recommendation_threads"),
+                "relevance_pct": str(_sheet_value("relevance_pct") or "").strip(),
+                "dominated_by_offtopic": _required_yes_no("dominated_by_offtopic"),
+                "competitor_brands_mentioned": _required_yes_no("competitor_brands_mentioned"),
+                "competitor_brand_count": str(_sheet_value("competitor_brand_count") or "").strip(),
+                "competitor_ads_present": _required_yes_no("competitor_ads_present"),
+                "trend_direction": str(_sheet_value("trend_direction") or "").strip(),
+                "seasonal_patterns": _required_yes_no("seasonal_patterns"),
+                "seasonal_description": str(_sheet_value("seasonal_description") or "").strip(),
+                "habitat_age": str(_sheet_value("habitat_age") or "").strip(),
+                "membership_trend": str(_sheet_value("membership_trend") or "").strip(),
+                "post_frequency_trend": str(_sheet_value("post_frequency_trend") or "").strip(),
+                "publicly_accessible": _required_yes_no("publicly_accessible"),
+                "text_based_content": _required_yes_no("text_based_content"),
+                "target_language": _required_yes_no("target_language"),
+                "no_rate_limiting": _required_yes_no("no_rate_limiting"),
+                "reusability": str(_sheet_value("reusability") or "").strip(),
+                "video_extension": video_extension,
+                "competitive_overlap": (
+                    dict(row.get("competitive_overlap"))
+                    if isinstance(row.get("competitive_overlap"), Mapping)
+                    else {}
+                ),
+                "trend_lifecycle": (
+                    dict(row.get("trend_lifecycle"))
+                    if isinstance(row.get("trend_lifecycle"), Mapping)
+                    else {}
+                ),
+                "mining_gate": mining_gate,
+                "rank_score": int(row.get("rank_score") or 0),
+                "estimated_yield": int(row.get("estimated_yield") or 0),
+                "evidence_refs": evidence_refs,
             }
         )
+        if isinstance(video_extension, dict):
+            def _required_video_yes_no(field_name: str) -> str:
+                value = video_extension.get(field_name)
+                if isinstance(value, str):
+                    normalized_text = value.strip().upper()
+                    if normalized_text in {"CANNOT_DETERMINE", "UNKNOWN"}:
+                        return "CANNOT_DETERMINE"
+                normalized = _coerce_yes_no(value, default="")
+                if normalized not in {"Y", "N"}:
+                    raise StrategyV2SchemaValidationError(
+                        f"{row_name}.video_extension field '{field_name}' must be Y, N, or CANNOT_DETERMINE."
+                    )
+                return normalized
+
+            def _optional_video_metric_int(field_name: str) -> int | None:
+                value = video_extension.get(field_name)
+                if value is None:
+                    return None
+                if isinstance(value, str):
+                    normalized_text = value.strip().upper()
+                    if not normalized_text or normalized_text in {"CANNOT_DETERMINE", "UNKNOWN", "N/A", "NULL", "NONE"}:
+                        return None
+                if isinstance(value, bool):
+                    raise StrategyV2SchemaValidationError(
+                        f"{row_name}.video_extension field '{field_name}' must be integer or null."
+                    )
+                try:
+                    parsed = int(value)
+                except (TypeError, ValueError) as exc:
+                    raise StrategyV2SchemaValidationError(
+                        f"{row_name}.video_extension field '{field_name}' must be integer or null."
+                    ) from exc
+                if parsed < 0:
+                    raise StrategyV2SchemaValidationError(
+                        f"{row_name}.video_extension field '{field_name}' must be >= 0 when provided."
+                    )
+                return parsed
+
+            observations[-1]["video_count_scraped"] = _optional_video_metric_int("video_count_scraped")
+            observations[-1]["median_view_count"] = _optional_video_metric_int("median_view_count")
+            observations[-1]["viral_videos_found"] = _required_video_yes_no("viral_videos_found")
+            observations[-1]["viral_video_count"] = _optional_video_metric_int("viral_video_count")
+            observations[-1]["comment_sections_active"] = _required_video_yes_no("comment_sections_active")
+            observations[-1]["comment_avg_length"] = str(video_extension.get("comment_avg_length") or "").strip()
+            observations[-1]["hook_formats_identifiable"] = _required_video_yes_no("hook_formats_identifiable")
+            observations[-1]["creator_diversity"] = str(video_extension.get("creator_diversity") or "").strip()
+            observations[-1]["contains_testimonial_language"] = _required_video_yes_no("contains_testimonial_language")
+            observations[-1]["contains_objection_language"] = _required_video_yes_no("contains_objection_language")
+            observations[-1]["contains_purchase_intent"] = _required_video_yes_no("contains_purchase_intent")
     if not observations:
         raise StrategyV2SchemaValidationError(
             "Prompt-chain Agent 1 did not return any habitat observations."
         )
     return observations
+
+
+def _build_agent1_runtime_file_inventory(scraped_data_manifest: Mapping[str, Any]) -> dict[str, Any]:
+    raw_files = scraped_data_manifest.get("raw_scraped_data_files")
+    file_rows = [row for row in raw_files if isinstance(row, Mapping)] if isinstance(raw_files, list) else []
+    file_names: list[str] = []
+    for row in file_rows:
+        filename = str(row.get("file_name") or "").strip()
+        if not filename:
+            continue
+        file_names.append(filename)
+    return {
+        "total_files": len(file_names),
+        "file_names": file_names,
+    }
+
+
+def _validate_agent1_output_source_file_grounding(
+    *,
+    agent01_output: Mapping[str, Any],
+    scraped_data_manifest: Mapping[str, Any],
+) -> None:
+    raw_files = scraped_data_manifest.get("raw_scraped_data_files")
+    raw_file_rows = [row for row in raw_files if isinstance(row, Mapping)] if isinstance(raw_files, list) else []
+    allowed_file_names = {
+        str(row.get("file_name") or "").strip()
+        for row in raw_file_rows
+        if str(row.get("file_name") or "").strip()
+    }
+    if not allowed_file_names:
+        raise StrategyV2SchemaValidationError(
+            "scraped_data_manifest.raw_scraped_data_files must include at least one file_name for Agent 1 grounding."
+        )
+
+    def _collect_source_files(rows: Any) -> set[str]:
+        source_files: set[str] = set()
+        if not isinstance(rows, list):
+            return source_files
+        for row in rows:
+            if not isinstance(row, Mapping):
+                continue
+            source_file = str(row.get("source_file") or "").strip()
+            if not source_file:
+                continue
+            source_files.add(source_file)
+        return source_files
+
+    observed_source_files = _collect_source_files(agent01_output.get("habitat_observations"))
+    mining_plan_source_files = _collect_source_files(agent01_output.get("mining_plan"))
+    excluded_source_files_raw = agent01_output.get("excluded_source_files")
+    if not isinstance(excluded_source_files_raw, list):
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output must include excluded_source_files array for strict file-coverage validation."
+        )
+    excluded_source_files_values = [
+        str(value).strip()
+        for value in excluded_source_files_raw
+        if isinstance(value, str) and str(value).strip()
+    ]
+    if len(excluded_source_files_values) != len(set(excluded_source_files_values)):
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output excluded_source_files must not contain duplicate filenames."
+        )
+    excluded_source_files = set(excluded_source_files_values)
+
+    unknown = sorted(
+        (observed_source_files | mining_plan_source_files | excluded_source_files) - allowed_file_names
+    )
+    if unknown:
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output referenced source_file values not present in SCRAPED_DATA_FILES_JSON.raw_scraped_data_files. "
+            f"Unknown source_file entries: {unknown[:8]}. "
+            "Remediation: reference only filenames provided at runtime in SCRAPED_FILE_INVENTORY_JSON."
+        )
+
+    mining_not_observed = sorted(mining_plan_source_files - observed_source_files)
+    if mining_not_observed:
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output mining_plan must be a subset of habitat_observations by source_file. "
+            f"source_file entries present in mining_plan but missing from habitat_observations: {mining_not_observed[:8]}."
+        )
+
+    overlap = sorted(observed_source_files & excluded_source_files)
+    if overlap:
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output cannot list the same source_file in both habitat_observations and excluded_source_files. "
+            f"Overlapping source_file entries: {overlap[:8]}."
+        )
+
+    coverage_union = observed_source_files | excluded_source_files
+    if coverage_union != allowed_file_names:
+        missing = sorted(allowed_file_names - coverage_union)
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output must provide exact source-file coverage: "
+            "(habitat_observations.source_file U excluded_source_files) == SCRAPED_DATA_FILES_JSON.raw_scraped_data_files.file_name. "
+            f"Missing source_file entries: {missing[:8]}."
+        )
+
+
+def _normalize_voc_source_type(raw_value: object) -> str:
+    value = str(raw_value or "").strip().upper()
+    if not value:
+        raise StrategyV2SchemaValidationError("Agent 2 VOC observation has empty source_type.")
+    source_map = {
+        "TIKTOK": "TIKTOK_COMMENT",
+        "TIKTOK_COMMENT": "TIKTOK_COMMENT",
+        "INSTAGRAM": "IG_COMMENT",
+        "IG": "IG_COMMENT",
+        "IG_COMMENT": "IG_COMMENT",
+        "YOUTUBE": "YT_COMMENT",
+        "YT": "YT_COMMENT",
+        "YT_COMMENT": "YT_COMMENT",
+        "VIDEO_HOOK": "VIDEO_HOOK",
+        "REDDIT": "REDDIT",
+        "FORUM": "FORUM",
+        "REVIEW": "REVIEW_SITE",
+        "REVIEW_SITE": "REVIEW_SITE",
+        "QA": "QA",
+        "BLOG": "BLOG_COMMENT",
+        "BLOG_COMMENT": "BLOG_COMMENT",
+    }
+    normalized = source_map.get(value, value)
+    allowed = {
+        "REDDIT",
+        "FORUM",
+        "BLOG_COMMENT",
+        "REVIEW_SITE",
+        "QA",
+        "TIKTOK_COMMENT",
+        "IG_COMMENT",
+        "YT_COMMENT",
+        "VIDEO_HOOK",
+    }
+    if normalized not in allowed:
+        raise StrategyV2SchemaValidationError(
+            f"Agent 2 VOC observation has invalid source_type='{value}'."
+        )
+    return normalized
+
+
+def _normalize_hook_format(raw_value: object) -> str:
+    value = str(raw_value or "").strip().upper()
+    if not value:
+        raise StrategyV2SchemaValidationError("Agent 2 VOC observation has empty hook_format.")
+    aliases = {
+        "STORY_OPEN": "STORY",
+        "CONTROVERSY": "CONTRARIAN",
+        "PATTERN_INTERRUPT": "DEMONSTRATION",
+    }
+    normalized = aliases.get(value, value)
+    allowed = {"QUESTION", "STATEMENT", "STORY", "STATISTIC", "CONTRARIAN", "DEMONSTRATION", "NONE"}
+    if normalized not in allowed:
+        raise StrategyV2SchemaValidationError(f"Agent 2 VOC observation has invalid hook_format='{value}'.")
+    return normalized
+
+
+def _normalize_video_virality_tier(raw_value: object) -> str:
+    value = str(raw_value or "").strip().upper()
+    if not value:
+        raise StrategyV2SchemaValidationError("Agent 2 VOC observation has empty video_virality_tier.")
+    aliases = {"HIGH_AUTHORITY": "HIGH_PERFORMING"}
+    normalized = aliases.get(value, value)
+    allowed = {"VIRAL", "HIGH_PERFORMING", "ABOVE_AVERAGE", "BASELINE"}
+    if normalized not in allowed:
+        raise StrategyV2SchemaValidationError(
+            f"Agent 2 VOC observation has invalid video_virality_tier='{value}'."
+        )
+    return normalized
+
+
+def _normalize_competitor_saturation(raw_value: object, *, row_index: int) -> list[str]:
+    if not isinstance(raw_value, list):
+        raise StrategyV2SchemaValidationError(
+            f"Agent 2 VOC observation[{row_index}] must include competitor_saturation as array."
+        )
+    normalized: list[str] = []
+    for item in raw_value:
+        text = str(item or "").strip()
+        if not text:
+            continue
+        if text not in normalized:
+            normalized.append(text)
+    return normalized
 
 
 def _normalize_voc_observations(raw_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -3211,6 +7305,7 @@ def _normalize_voc_observations(raw_rows: list[dict[str, Any]]) -> list[dict[str
 
         quote = str(row_payload.get("quote") or "").strip()
         source = str(row_payload.get("source") or "").strip()
+        source_type = _normalize_voc_source_type(row_payload.get("source_type"))
         buyer_stage = _map_buyer_stage(str(row_payload.get("buyer_stage") or "UNKNOWN"))
         solution_sophistication = str(row_payload.get("solution_sophistication") or "UNKNOWN").strip().upper()
         if solution_sophistication not in {"NOVICE", "EXPERIENCED", "EXHAUSTED"}:
@@ -3252,11 +7347,69 @@ def _normalize_voc_observations(raw_rows: list[dict[str, Any]]) -> list[dict[str
             raise StrategyV2SchemaValidationError(
                 f"Agent 2 VOC observation[{index}] has invalid emotional_valence='{emotional_valence}'."
             )
+        is_hook = _coerce_yes_no(row_payload.get("is_hook"))
+        hook_format = _normalize_hook_format(row_payload.get("hook_format"))
+        try:
+            hook_word_count = int(row_payload.get("hook_word_count") or 0)
+        except Exception as exc:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 VOC observation[{index}] has invalid hook_word_count."
+            ) from exc
+        if hook_word_count < 0:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 VOC observation[{index}] requires hook_word_count >= 0."
+            )
+        video_virality_tier = _normalize_video_virality_tier(row_payload.get("video_virality_tier"))
+        try:
+            video_view_count = int(row_payload.get("video_view_count") or 0)
+        except Exception as exc:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 VOC observation[{index}] has invalid video_view_count."
+            ) from exc
+        if video_view_count < 0:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 VOC observation[{index}] requires video_view_count >= 0."
+            )
+        competitor_saturation = _normalize_competitor_saturation(
+            row_payload.get("competitor_saturation"),
+            row_index=index,
+        )
+        in_whitespace = _coerce_yes_no(row_payload.get("in_whitespace"))
+        if source_type == "VIDEO_HOOK":
+            if is_hook != "Y":
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 VOC observation[{index}] source_type=VIDEO_HOOK requires is_hook='Y'."
+                )
+            if hook_format == "NONE":
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 VOC observation[{index}] source_type=VIDEO_HOOK requires hook_format != 'NONE'."
+                )
+        elif is_hook == "Y":
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 VOC observation[{index}] has is_hook='Y' but source_type='{source_type}'."
+            )
 
         normalized_row = _enrich_voc_observation_signal(
             row={
                 "voc_id": str(row_payload.get("voc_id") or f"V{index + 1:03d}"),
                 "source": source,
+                "source_type": source_type,
+                "source_url": str(row_payload.get("source_url") or source).strip(),
+                "source_author": str(row_payload.get("source_author") or row_payload.get("author") or "Anonymous").strip()
+                or "Anonymous",
+                "source_date": str(row_payload.get("source_date") or row_payload.get("date") or "Unknown").strip()
+                or "Unknown",
+                "is_hook": is_hook,
+                "hook_format": hook_format,
+                "hook_word_count": hook_word_count,
+                "video_virality_tier": video_virality_tier,
+                "video_view_count": video_view_count,
+                "competitor_saturation": competitor_saturation,
+                "in_whitespace": in_whitespace,
+                "evidence_ref": str(
+                    row_payload.get("evidence_ref") or row_payload.get("voc_id") or f"voc::item[{index}]"
+                ).strip()
+                or f"voc::item[{index}]",
                 "quote": quote,
                 "specific_number": _coerce_yes_no(row_payload.get("specific_number")),
                 "specific_product_brand": _coerce_yes_no(row_payload.get("specific_product_brand")),
@@ -3301,6 +7454,392 @@ def _normalize_voc_observations(raw_rows: list[dict[str, Any]]) -> list[dict[str
             "Prompt-chain Agent 2 did not return any VOC observations."
         )
     return observations
+
+
+def _normalize_agent2_evidence_text(value: object, *, max_chars: int = 900) -> str:
+    if not isinstance(value, str):
+        return ""
+    cleaned = re.sub(r"\s+", " ", value).strip()
+    if not cleaned:
+        return ""
+    return cleaned[:max_chars]
+
+
+def _build_agent2_evidence_id(*, source_url: str, verbatim: str, evidence_ref: str) -> str:
+    digest = hashlib.sha256(
+        f"{source_url}::{verbatim[:280]}::{evidence_ref}".encode("utf-8")
+    ).hexdigest()
+    return f"E{digest[:16].upper()}"
+
+
+def _build_agent2_evidence_rows(
+    *,
+    existing_corpus: Sequence[Mapping[str, Any]],
+    merged_voc_artifact_rows: Sequence[Mapping[str, Any]],
+    scraped_data_manifest: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    rows: list[dict[str, Any]] = []
+    diagnostics: dict[str, int] = {
+        "existing_rows_in": len(existing_corpus),
+        "merged_rows_in": len(merged_voc_artifact_rows),
+        "scraped_rows_in": 0,
+        "accepted_rows": 0,
+        "dropped_missing_required": 0,
+        "dropped_duplicates": 0,
+    }
+    seen_keys: set[str] = set()
+
+    def _normalize_agent2_evidence_source_type(raw_value: str) -> str:
+        value = str(raw_value or "").strip().upper()
+        source_map = {
+            "REDDIT": "REDDIT",
+            "FORUM": "FORUM",
+            "BLOG": "BLOG_COMMENT",
+            "BLOG_COMMENT": "BLOG_COMMENT",
+            "REVIEW": "REVIEW_SITE",
+            "REVIEW_SITE": "REVIEW_SITE",
+            "QA": "QA",
+            "TIKTOK": "TIKTOK_COMMENT",
+            "TIKTOK_COMMENT": "TIKTOK_COMMENT",
+            "INSTAGRAM": "IG_COMMENT",
+            "IG": "IG_COMMENT",
+            "IG_COMMENT": "IG_COMMENT",
+            "YOUTUBE": "YT_COMMENT",
+            "YT": "YT_COMMENT",
+            "YT_COMMENT": "YT_COMMENT",
+            "VIDEO_HOOK": "VIDEO_HOOK",
+            "EXISTING_CORPUS": "FORUM",
+            "MERGED_CORPUS": "FORUM",
+            "SCRAPED": "FORUM",
+            "DISCOVERY": "FORUM",
+            "WEB": "FORUM",
+            "OTHER": "FORUM",
+            "LANDING_PAGE": "FORUM",
+        }
+        normalized = source_map.get(value)
+        if not normalized:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 evidence source_type '{raw_value}' is unsupported. "
+                "Remediation: normalize upstream source taxonomy before v2-05."
+            )
+        return normalized
+
+    def _canonical_source_url(candidate: str) -> str:
+        stripped = candidate.strip()
+        if not stripped:
+            return ""
+        canonical = _canonicalize_source_ref_for_ingestion(stripped)
+        return canonical or stripped
+
+    def _add_row(
+        *,
+        source_type: str,
+        source_url: str,
+        author: str,
+        date: str,
+        context: str,
+        verbatim: str,
+        evidence_ref: str,
+        habitat_name: str,
+        habitat_type: str,
+        strategy_target_id: str,
+    ) -> None:
+        normalized_source_url = _canonical_source_url(source_url)
+        normalized_verbatim = _normalize_agent2_evidence_text(verbatim, max_chars=900)
+        if not normalized_source_url or not normalized_verbatim:
+            diagnostics["dropped_missing_required"] += 1
+            return
+        dedupe_key = f"{normalized_source_url}::{normalized_verbatim[:240]}"
+        if dedupe_key in seen_keys:
+            diagnostics["dropped_duplicates"] += 1
+            return
+        seen_keys.add(dedupe_key)
+        normalized_context = _normalize_agent2_evidence_text(context, max_chars=280)
+        normalized_author = _normalize_agent2_evidence_text(author, max_chars=120) or "Anonymous"
+        normalized_date = _normalize_agent2_evidence_text(date, max_chars=120) or "Unknown"
+        normalized_source_type = _normalize_agent2_evidence_source_type(
+            _normalize_agent2_evidence_text(source_type, max_chars=80)
+        )
+        normalized_ref = _normalize_agent2_evidence_text(evidence_ref, max_chars=240) or "evidence://unknown"
+        rows.append(
+            {
+                "evidence_id": _build_agent2_evidence_id(
+                    source_url=normalized_source_url,
+                    verbatim=normalized_verbatim,
+                    evidence_ref=normalized_ref,
+                ),
+                "source_type": normalized_source_type,
+                "source_url": normalized_source_url,
+                "author": normalized_author,
+                "date": normalized_date,
+                "context": normalized_context or "Unknown context",
+                "verbatim": normalized_verbatim,
+                "evidence_ref": normalized_ref,
+                "habitat_name": _normalize_agent2_evidence_text(habitat_name, max_chars=160) or "Unknown habitat",
+                "habitat_type": _normalize_agent2_evidence_text(habitat_type, max_chars=80) or "Unknown",
+                "strategy_target_id": _normalize_agent2_evidence_text(
+                    strategy_target_id, max_chars=160
+                )
+                or "CANNOT_DETERMINE",
+            }
+        )
+        diagnostics["accepted_rows"] += 1
+
+    for index, row in enumerate(existing_corpus):
+        if not isinstance(row, Mapping):
+            continue
+        _add_row(
+            source_type=str(row.get("platform") or row.get("source_type") or "EXISTING_CORPUS"),
+            source_url=str(row.get("source_url") or row.get("source") or ""),
+            author=str(row.get("author") or "Anonymous"),
+            date=str(row.get("date") or "Unknown"),
+            context=str(row.get("thread_title") or row.get("context") or "Existing corpus item"),
+            verbatim=str(row.get("quote") or row.get("verbatim") or ""),
+            evidence_ref=str(row.get("voc_id") or f"existing_corpus::item[{index}]"),
+            habitat_name=str(row.get("habitat_name") or "Existing corpus"),
+            habitat_type=str(row.get("habitat_type") or row.get("platform") or "Existing_Corpus"),
+            strategy_target_id=str(row.get("strategy_target_id") or "CANNOT_DETERMINE"),
+        )
+
+    for index, row in enumerate(merged_voc_artifact_rows):
+        if not isinstance(row, Mapping):
+            continue
+        _add_row(
+            source_type=str(row.get("platform") or row.get("source_type") or "MERGED_CORPUS"),
+            source_url=str(row.get("source_url") or row.get("source") or ""),
+            author=str(row.get("author") or "Anonymous"),
+            date=str(row.get("date") or "Unknown"),
+            context=str(row.get("thread_title") or row.get("context") or "Merged corpus item"),
+            verbatim=str(row.get("quote") or row.get("verbatim") or ""),
+            evidence_ref=str(row.get("voc_id") or f"merged_corpus::item[{index}]"),
+            habitat_name=str(row.get("habitat_name") or "Merged corpus"),
+            habitat_type=str(row.get("habitat_type") or row.get("platform") or "Merged_Corpus"),
+            strategy_target_id=str(row.get("strategy_target_id") or "CANNOT_DETERMINE"),
+        )
+
+    raw_files = scraped_data_manifest.get("raw_scraped_data_files")
+    raw_file_rows = [row for row in raw_files if isinstance(row, Mapping)] if isinstance(raw_files, list) else []
+    for file_index, file_row in enumerate(raw_file_rows):
+        virtual_path = str(file_row.get("virtual_path") or f"/apify_output/raw_scraped_data/file[{file_index}]")
+        habitat_name = str(file_row.get("habitat_name") or file_row.get("file_name") or "Scraped habitat")
+        habitat_type = str(file_row.get("habitat_type") or file_row.get("source_platform") or "Scraped")
+        strategy_target_id = str(file_row.get("strategy_target_id") or "CANNOT_DETERMINE")
+        source_type = str(file_row.get("source_platform") or "SCRAPED")
+        items = file_row.get("items")
+        item_rows = [item for item in items if isinstance(item, Mapping)] if isinstance(items, list) else []
+        diagnostics["scraped_rows_in"] += len(item_rows)
+        for item_index, item in enumerate(item_rows):
+            item_id = _normalize_agent2_evidence_text(str(item.get("item_id") or ""), max_chars=120)
+            evidence_ref = (
+                f"{virtual_path}::{item_id}"
+                if item_id
+                else f"{virtual_path}::item[{int(item.get('item_index') if isinstance(item.get('item_index'), int) else item_index)}]"
+            )
+            _add_row(
+                source_type=source_type,
+                source_url=str(item.get("source_url") or item.get("url") or ""),
+                author=str(item.get("author") or "Anonymous"),
+                date=str(item.get("timestamp") or "Unknown"),
+                context=str(item.get("title") or item.get("permalink") or habitat_name),
+                verbatim=str(item.get("body") or item.get("title") or item.get("raw") or ""),
+                evidence_ref=evidence_ref,
+                habitat_name=habitat_name,
+                habitat_type=habitat_type,
+                strategy_target_id=strategy_target_id,
+            )
+
+    if not rows:
+        raise StrategyV2MissingContextError(
+            "Agent 2 requires usable evidence rows, but normalization produced zero rows with source_url + verbatim. "
+            "Remediation: provide valid existing corpus rows and/or scraped manifest items with source_url and text."
+        )
+    rows.sort(key=lambda row: (str(row.get("strategy_target_id") or ""), str(row.get("evidence_id") or "")))
+    return rows, diagnostics
+
+
+def _run_agent2_extractor(
+    *,
+    agent02_asset: PromptAsset,
+    model: str,
+    workflow_run_id: str,
+    mode: str,
+    evidence_rows: Sequence[Mapping[str, Any]],
+    agent01_output: Mapping[str, Any],
+    habitat_scored: Mapping[str, Any],
+    stage1_data: Mapping[str, Any],
+    avatar_brief_payload: Mapping[str, Any],
+    competitor_analysis: Mapping[str, Any],
+    saturated_angles: Sequence[Any],
+    foundational_step_contents: Mapping[str, Any],
+    foundational_step_summaries: Mapping[str, Any],
+    activity_name: str,
+) -> dict[str, Any]:
+    all_voc_rows: list[dict[str, Any]] = []
+    all_rejected_items: list[dict[str, Any]] = []
+    raw_outputs_preview: list[str] = []
+    static_file_id_map, static_file_ids = _upload_openai_prompt_json_files(
+        model=model,
+        workflow_run_id=workflow_run_id,
+        stage_label="agent2-extractor",
+        logical_payloads={
+            "EVIDENCE_ROWS_JSON": [dict(row) for row in evidence_rows if isinstance(row, Mapping)],
+            "AGENT1_MINING_PLAN_JSON": agent01_output.get("mining_plan", []),
+            "HABITAT_SCORED_JSON": habitat_scored,
+            "PRODUCT_BRIEF_JSON": stage1_data,
+            "AVATAR_BRIEF_JSON": avatar_brief_payload,
+            "COMPETITOR_ANALYSIS_JSON": competitor_analysis,
+            "KNOWN_SATURATED_ANGLES": list(saturated_angles),
+            "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                "step_contents": {
+                    step_key: str(foundational_step_contents.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+                "step_summaries": {
+                    step_key: str(foundational_step_summaries.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+            },
+        },
+    )
+
+    try:
+        combined_file_ids = list(static_file_id_map.values())
+        activity.heartbeat(
+            {
+                "activity": activity_name,
+                "phase": "agent2_prompt",
+                "status": "in_progress",
+                "input_count": len(evidence_rows),
+            }
+        )
+        output, raw_output, prompt_provenance = _run_prompt_json_object(
+            asset=agent02_asset,
+            context="strategy_v2.agent2_output",
+            model=model,
+            runtime_instruction=(
+                "## Runtime Input Block\n"
+                f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(static_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+                "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before extracting VOC evidence rows.\n"
+                "Treat EVIDENCE_ROWS_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as the primary source of truth.\n"
+                "Return one extraction object only."
+            ),
+            schema_name="strategy_v2_voc_agent02_output",
+            schema=_VOC_AGENT02_OUTPUT_SCHEMA,
+            use_reasoning=True,
+            use_web_search=False,
+            max_tokens=_AGENT2_MAX_TOKENS,
+            openai_tools=_openai_python_tool_resources(model, file_ids=combined_file_ids),
+            openai_tool_choice="auto",
+            heartbeat_context={
+                "activity": activity_name,
+                "phase": "agent2_prompt",
+                "model": model,
+            },
+        )
+        _raise_if_blocked_prompt_output(
+            stage_label="v2-05 Agent 2 extractor",
+            parsed_output=output,
+            raw_output=raw_output,
+            remediation=(
+                "provide complete evidence rows and Agent 1 mining plan context before rerunning v2-05."
+            ),
+        )
+        raw_outputs_preview.append(raw_output[:2000])
+
+        output_mode = str(output.get("mode") or "").strip().upper()
+        if output_mode != mode:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 mode mismatch (expected='{mode}', actual='{output_mode}')."
+            )
+
+        def _coerce_output_int(field_name: str) -> int:
+            if field_name not in output:
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 output is missing required integer field '{field_name}'."
+                )
+            raw_value = output.get(field_name)
+            if isinstance(raw_value, bool):
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 field '{field_name}' must be an integer, received boolean."
+                )
+            try:
+                return int(raw_value)
+            except (TypeError, ValueError) as exc:
+                raise StrategyV2SchemaValidationError(
+                    f"Agent 2 field '{field_name}' must be an integer."
+                ) from exc
+
+        validation_errors = output.get("validation_errors")
+        if isinstance(validation_errors, list) and validation_errors:
+            raise StrategyV2DecisionError(
+                "Agent 2 extraction returned validation_errors: "
+                + ", ".join(str(item) for item in validation_errors[:10])
+            )
+        output_input_count = _coerce_output_int("input_count")
+        if output_input_count != len(evidence_rows):
+            raise StrategyV2SchemaValidationError(
+                "Agent 2 input_count mismatch "
+                f"(expected={len(evidence_rows)}, actual={output_input_count})."
+            )
+        voc_rows = output.get("voc_observations")
+        if not isinstance(voc_rows, list):
+            raise StrategyV2SchemaValidationError("Agent 2 output must include voc_observations array.")
+        output_count = _coerce_output_int("output_count")
+        if output_count != len(voc_rows):
+            logging.getLogger(__name__).warning(
+                "Agent 2 output_count mismatch; using actual voc_observations length "
+                "(reported=%s, actual=%s).",
+                output_count,
+                len(voc_rows),
+            )
+        rejected_rows = output.get("rejected_items")
+        if not isinstance(rejected_rows, list):
+            raise StrategyV2SchemaValidationError("Agent 2 output must include rejected_items array.")
+
+        all_voc_rows.extend([dict(row) for row in voc_rows if isinstance(row, dict)])
+        all_rejected_items.extend([dict(row) for row in rejected_rows if isinstance(row, dict)])
+    finally:
+        _cleanup_openai_prompt_files(model=model, file_ids=static_file_ids)
+
+    deduped_rows: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    for row in all_voc_rows:
+        source_url = str(row.get("source_url") or row.get("source") or "").strip()
+        quote = str(row.get("quote") or "").strip()
+        evidence_ref = str(row.get("evidence_ref") or "").strip()
+        if not source_url or not quote:
+            continue
+        dedupe_key = f"{source_url}::{quote[:240]}::{evidence_ref}"
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+        normalized_row = dict(row)
+        if not str(normalized_row.get("source") or "").strip():
+            source_type = str(normalized_row.get("source_type") or "UNKNOWN").strip()
+            normalized_row["source"] = f"{source_type} | {source_url}"
+        deduped_rows.append(normalized_row)
+
+    if not deduped_rows:
+        raise StrategyV2DecisionError(
+            "Agent 2 extraction produced zero usable voc_observations after deduplication."
+        )
+
+    for index, row in enumerate(deduped_rows, start=1):
+        row["voc_id"] = f"V{index:04d}"
+
+    return {
+        "mode": mode,
+        "voc_observations": deduped_rows,
+        "rejected_items": all_rejected_items,
+        "extraction_summary": {
+            "input_count": len(evidence_rows),
+            "output_count": len(deduped_rows),
+            "rejected_count": len(all_rejected_items),
+        },
+        "raw_outputs_preview": raw_outputs_preview,
+        "prompt_provenance": prompt_provenance,
+    }
 
 
 def _derive_angle_observation_seed_from_candidate(candidate: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -3497,6 +8036,7 @@ def _normalize_angle_observations(
             "trigger_seasonality": str(row.get("trigger_seasonality") or "ONGOING"),
             "competitor_count_using_angle": str(row.get("competitor_count_using_angle") or "1-2"),
             "recent_competitor_entry": _coerce_yes_no(row.get("recent_competitor_entry"), default="N"),
+            "competitor_angle_overlap": _coerce_yes_no(row.get("competitor_angle_overlap"), default="N"),
             "pain_structural": _coerce_yes_no(row.get("pain_structural"), default="Y"),
             "news_cycle_dependent": _coerce_yes_no(row.get("news_cycle_dependent"), default="N"),
             "competitor_behavior_dependent": _coerce_yes_no(row.get("competitor_behavior_dependent"), default="N"),
@@ -3573,6 +8113,32 @@ def _dump_prompt_json(payload: object, *, max_chars: int) -> str:
     if len(serialized) <= max_chars:
         return serialized
     return serialized[:max_chars]
+
+
+def _dump_prompt_json_required(payload: object, *, max_chars: int, field_name: str) -> str:
+    serialized = json.dumps(payload, ensure_ascii=True, indent=2)
+    if len(serialized) <= max_chars:
+        return serialized
+    raise StrategyV2MissingContextError(
+        f"{field_name} exceeds prompt size limit ({len(serialized)} > {max_chars}). "
+        "Remediation: reduce payload size or increase the configured STRATEGY_V2_*_MAX_CHARS limit; "
+        "truncation is disabled for required runtime inputs."
+    )
+
+
+def _estimate_prompt_input_tokens(prompt: str) -> int:
+    # Conservative heuristic for preflight budget checks.
+    # Real tokenizer usage varies by content and model, so this must remain an estimate.
+    return max(1, (len(prompt) + 3) // 4)
+
+
+def _model_prompt_input_token_budget(*, model: str, max_tokens: int | None) -> int | None:
+    normalized = model.strip().lower()
+    if normalized.startswith("gpt-5.2"):
+        reserved_output_tokens = max_tokens if isinstance(max_tokens, int) and max_tokens > 0 else _AGENT1_MAX_TOKENS
+        budget = _GPT52_CONTEXT_WINDOW_TOKENS - reserved_output_tokens - _PROMPT_INPUT_TOKEN_SAFETY_BUFFER
+        return max(budget, 1)
+    return None
 
 
 def _resolve_price_from_reference_urls(*, urls: list[str]) -> str:
@@ -3974,12 +8540,7 @@ def build_strategy_v2_foundational_research_activity(params: dict[str, Any]) -> 
         for key, value in existing_step_payload_artifact_ids_raw.items():
             if isinstance(key, str) and isinstance(value, str) and value.strip():
                 existing_step_payload_artifact_ids[key] = value.strip()
-    apify_context_raw = params.get("apify_context")
-    apify_context: dict[str, Any] = (
-        _require_dict(payload=apify_context_raw, field_name="apify_context")
-        if apify_context_raw is not None
-        else {}
-    )
+    apify_context: dict[str, Any] = {}
 
     with session_scope() as session:
         if precanon_research is None:
@@ -4072,6 +8633,2197 @@ def build_strategy_v2_foundational_research_activity(params: dict[str, Any]) -> 
         }
 
 
+def _parse_step_payload_artifact_ids(
+    *,
+    payload: Any,
+    field_name: str,
+) -> dict[str, str]:
+    if not isinstance(payload, dict):
+        raise StrategyV2MissingContextError(
+            f"{field_name} is required and must be an object keyed by step key -> artifact id. "
+            "Remediation: pass workflow artifact_refs.step_payload_artifact_ids into checkpoint activity inputs."
+        )
+    parsed: dict[str, str] = {}
+    for raw_step_key, raw_artifact_id in payload.items():
+        if not isinstance(raw_step_key, str) or not raw_step_key.strip():
+            continue
+        if not isinstance(raw_artifact_id, str) or not raw_artifact_id.strip():
+            continue
+        parsed[raw_step_key.strip()] = raw_artifact_id.strip()
+    return parsed
+
+
+def _require_step_payload_artifact_prerequisites(
+    *,
+    checkpoint_label: str,
+    step_payload_artifact_ids: Mapping[str, Any],
+    required_step_keys: list[str],
+    org_id: str | None = None,
+    validate_lineage: bool = False,
+) -> None:
+    missing: list[str] = []
+    for step_key in required_step_keys:
+        artifact_id = step_payload_artifact_ids.get(step_key)
+        if not isinstance(artifact_id, str) or not artifact_id.strip():
+            missing.append(step_key)
+    if missing:
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} is missing prerequisite step payload artifact ids: {missing}. "
+            "Remediation: rerun from the prior checkpoint so required handoff artifacts are rebuilt."
+        )
+    if validate_lineage:
+        if not isinstance(org_id, str) or not org_id.strip():
+            raise StrategyV2MissingContextError(
+                f"{checkpoint_label} requires org_id for lineage validation."
+            )
+        _validate_step_payload_lineage_prerequisites(
+            checkpoint_label=checkpoint_label,
+            org_id=org_id,
+            step_payload_artifact_ids=step_payload_artifact_ids,
+            required_step_keys=required_step_keys,
+        )
+
+
+def _validate_step_payload_lineage_payload(
+    *,
+    checkpoint_label: str,
+    required_step_key: str,
+    artifact_id: str,
+    artifact_data: Mapping[str, Any],
+) -> None:
+    step_key = str(artifact_data.get("step_key") or "").strip()
+    if step_key != required_step_key:
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} artifact lineage mismatch for step '{required_step_key}' "
+            f"(artifact_id={artifact_id}, actual_step_key='{step_key or 'missing'}')."
+        )
+    lineage = artifact_data.get("lineage")
+    if not isinstance(lineage, Mapping):
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} artifact '{required_step_key}' missing lineage metadata "
+            f"(artifact_id={artifact_id})."
+        )
+    producer = str(lineage.get("producer") or "").strip()
+    producer_version = str(lineage.get("producer_version") or "").strip()
+    timestamp = str(lineage.get("timestamp") or "").strip()
+    inputs_received = lineage.get("inputs_received")
+    input_validation = str(lineage.get("input_validation") or "").strip()
+    if producer != required_step_key:
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} lineage producer mismatch for '{required_step_key}' "
+            f"(artifact_id={artifact_id}, producer='{producer or 'missing'}')."
+        )
+    if not producer_version:
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} lineage missing producer_version for '{required_step_key}' "
+            f"(artifact_id={artifact_id})."
+        )
+    if not timestamp:
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} lineage missing timestamp for '{required_step_key}' "
+            f"(artifact_id={artifact_id})."
+        )
+    if not isinstance(inputs_received, list) or not all(isinstance(item, str) and item.strip() for item in inputs_received):
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} lineage has invalid inputs_received for '{required_step_key}' "
+            f"(artifact_id={artifact_id})."
+        )
+    if not input_validation:
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} lineage missing input_validation for '{required_step_key}' "
+            f"(artifact_id={artifact_id})."
+        )
+
+
+def _validate_step_payload_lineage_prerequisites(
+    *,
+    checkpoint_label: str,
+    org_id: str,
+    step_payload_artifact_ids: Mapping[str, Any],
+    required_step_keys: list[str],
+) -> None:
+    with session_scope() as session:
+        artifacts_repo = ArtifactsRepository(session)
+        for step_key in required_step_keys:
+            artifact_id = str(step_payload_artifact_ids.get(step_key) or "").strip()
+            if not artifact_id:
+                continue
+            artifact = artifacts_repo.get(org_id=org_id, artifact_id=artifact_id)
+            if artifact is None or not isinstance(artifact.data, Mapping):
+                raise StrategyV2MissingContextError(
+                    f"{checkpoint_label} missing step payload artifact data for '{step_key}' "
+                    f"(artifact_id={artifact_id})."
+                )
+            _validate_step_payload_lineage_payload(
+                checkpoint_label=checkpoint_label,
+                required_step_key=step_key,
+                artifact_id=artifact_id,
+                artifact_data=artifact.data,
+            )
+
+
+def _require_stage1_artifact_id(*, params: Mapping[str, Any]) -> str:
+    stage1_artifact_id = str(params.get("stage1_artifact_id") or "").strip()
+    if not stage1_artifact_id:
+        raise StrategyV2MissingContextError(
+            "stage1_artifact_id is required for Stage 2B checkpoint integrity. "
+            "Remediation: pass foundational stage1_artifact_id into downstream checkpoint activity inputs."
+        )
+    return stage1_artifact_id
+
+
+def _require_stage2b_shared_context(*, params: Mapping[str, Any]) -> dict[str, Any]:
+    stage0 = ProductBriefStage0.model_validate(_require_dict(payload=params["stage0"], field_name="stage0"))
+    stage1 = ProductBriefStage1.model_validate(_require_dict(payload=params["stage1"], field_name="stage1"))
+    _require_stage1_quality(stage1)
+    precanon_research = _require_dict(payload=params["precanon_research"], field_name="precanon_research")
+
+    confirmed_competitor_assets_raw = params.get("confirmed_competitor_assets")
+    if not isinstance(confirmed_competitor_assets_raw, list):
+        raise StrategyV2MissingContextError(
+            "confirmed_competitor_assets is required for Stage 2B checkpoint execution. "
+            "Remediation: complete H2 and pass 3+ confirmed competitor asset refs."
+        )
+    confirmed_competitor_assets = [
+        str(item).strip()
+        for item in confirmed_competitor_assets_raw
+        if isinstance(item, str) and item.strip()
+    ]
+    if len(confirmed_competitor_assets) < 3:
+        raise StrategyV2MissingContextError(
+            "Stage 2B requires at least 3 confirmed competitor assets in shared immutable context. "
+            "Remediation: complete H2 with 3+ confirmed competitor asset refs."
+        )
+
+    step_contents_raw = _require_dict(
+        payload=precanon_research.get("step_contents"),
+        field_name="precanon_research.step_contents",
+    )
+    step_summaries_raw = _require_dict(
+        payload=precanon_research.get("step_summaries", {}),
+        field_name="precanon_research.step_summaries",
+    )
+    has_step02 = isinstance(step_contents_raw.get("02"), str) and str(step_contents_raw.get("02")).strip() != ""
+    if not has_step02:
+        step1_content_raw = step_contents_raw.get("01")
+        if not isinstance(step1_content_raw, str) or not step1_content_raw.strip():
+            raise StrategyV2MissingContextError(
+                "Foundational step 01 content is missing; cannot generate competitor analysis for step 02. "
+                "Remediation: rerun foundational stage and persist step 01 output."
+            )
+        step1_summary = (
+            str(step_summaries_raw.get("01")).strip()
+            if isinstance(step_summaries_raw.get("01"), str)
+            else step1_content_raw[:2000]
+        )
+        category_niche = str(stage1.category_niche or stage0.product_name).strip() or stage0.product_name
+        competitor_analysis_generated = _generate_competitor_analysis_json(
+            stage0=stage0,
+            category_niche=category_niche,
+            step1_summary=step1_summary,
+            step1_content=step1_content_raw,
+            confirmed_competitor_assets=confirmed_competitor_assets,
+        )
+        updated_step_contents = dict(step_contents_raw)
+        updated_step_contents["02"] = json.dumps(competitor_analysis_generated, ensure_ascii=True)
+        updated_step_summaries = dict(step_summaries_raw)
+        updated_step_summaries["02"] = (
+            f"competitors={len(competitor_analysis_generated.get('competitor_urls', []))}; "
+            f"assets={len(competitor_analysis_generated.get('asset_observation_sheets', []))}"
+        )
+        precanon_research = dict(precanon_research)
+        precanon_research["step_contents"] = updated_step_contents
+        precanon_research["step_summaries"] = updated_step_summaries
+
+    foundational_step_contents = _require_foundational_step_contents(precanon_research=precanon_research)
+    foundational_step_summaries = _require_dict(
+        payload=precanon_research.get("step_summaries", {}),
+        field_name="precanon_research.step_summaries",
+    )
+    competitor_analysis = extract_competitor_analysis(precanon_research)
+    avatar_brief_payload = _build_avatar_brief_runtime_payload(
+        step6_content=foundational_step_contents["06"],
+        step6_summary=str(foundational_step_summaries.get("06") or ""),
+    )
+
+    return {
+        "stage0": stage0,
+        "stage1": stage1,
+        "stage1_data": stage1.model_dump(mode="python"),
+        "precanon_research": precanon_research,
+        "foundational_step_contents": foundational_step_contents,
+        "foundational_step_summaries": foundational_step_summaries,
+        "confirmed_competitor_assets": confirmed_competitor_assets,
+        "competitor_analysis": competitor_analysis,
+        "avatar_brief_payload": avatar_brief_payload,
+    }
+
+
+def _updated_step_payload_artifact_ids(
+    *,
+    existing_step_payload_artifact_ids: Mapping[str, str],
+    step_key: str,
+    artifact_id: str,
+) -> dict[str, str]:
+    updated = dict(existing_step_payload_artifact_ids)
+    updated[step_key] = artifact_id
+    return updated
+
+
+def _ensure_foundational_step_payload_artifact_ids(
+    *,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    campaign_id: str | None,
+    workflow_run_id: str,
+    foundational_step_contents: Mapping[str, str],
+    foundational_step_summaries: Mapping[str, Any],
+    existing_step_payload_artifact_ids: Mapping[str, str],
+) -> dict[str, str]:
+    updated_step_payload_artifact_ids = dict(existing_step_payload_artifact_ids)
+    missing_foundational_step_contents = {
+        step_key: foundational_step_contents[step_key]
+        for step_key in _FOUNDATIONAL_STEP_KEYS
+        if f"v2-02.foundation.{step_key}" not in updated_step_payload_artifact_ids
+    }
+    if not missing_foundational_step_contents:
+        return updated_step_payload_artifact_ids
+
+    with session_scope() as session:
+        persisted_foundational_ids = _persist_foundational_step_payloads(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_contents=missing_foundational_step_contents,
+            step_summaries=foundational_step_summaries,
+        )
+    updated_step_payload_artifact_ids.update(persisted_foundational_ids)
+    return updated_step_payload_artifact_ids
+
+
+@activity.defn(name="strategy_v2.run_voc_agent0_habitat_strategy")
+def run_strategy_v2_voc_agent0_habitat_strategy_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    operator_user_id = str(params.get("operator_user_id") or "system")
+
+    stage1_artifact_id = _require_stage1_artifact_id(params=params)
+    shared_context = _require_stage2b_shared_context(params=params)
+    existing_step_payload_artifact_ids = _parse_step_payload_artifact_ids(
+        payload=params.get("existing_step_payload_artifact_ids"),
+        field_name="existing_step_payload_artifact_ids",
+    )
+
+    stage1 = shared_context["stage1"]
+    stage1_data = shared_context["stage1_data"]
+    foundational_step_contents = shared_context["foundational_step_contents"]
+    foundational_step_summaries = shared_context["foundational_step_summaries"]
+    competitor_analysis = shared_context["competitor_analysis"]
+    avatar_brief_payload = shared_context["avatar_brief_payload"]
+    step4_content = foundational_step_contents["04"].strip()
+    entries = _extract_step4_entries(step4_content)
+
+    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        workflow_run_id=workflow_run_id,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    )
+    _require_step_payload_artifact_prerequisites(
+        checkpoint_label="v2-02 Agent 0 habitat strategy",
+        step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        required_step_keys=[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+        org_id=org_id,
+        validate_lineage=True,
+    )
+
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0_habitat_strategy",
+            "phase": "agent0_prompt",
+            "status": "started",
+        }
+    )
+    agent00_asset = resolve_prompt_asset(
+        pattern=_VOC_AGENT00_PROMPT_PATTERN,
+        context="VOC Agent 0 habitat strategist",
+    )
+    agent00_file_id_map, agent00_uploaded_file_ids = _upload_openai_prompt_json_files(
+        model=settings.STRATEGY_V2_VOC_MODEL,
+        workflow_run_id=workflow_run_id,
+        stage_label="agent0",
+        logical_payloads={
+            "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                "step_contents": {
+                    step_key: str(foundational_step_contents.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+                "step_summaries": {
+                    step_key: str(foundational_step_summaries.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+            }
+        },
+    )
+    try:
+        agent00_runtime_base = (
+            "## Runtime Input Block\n"
+            f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent00_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+            "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+            "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before generating habitat strategy.\n\n"
+            f"PRODUCT_BRIEF:\n{_dump_prompt_json(stage1_data, max_chars=12000)}\n\n"
+            f"AVATAR_BRIEF:\n{_dump_prompt_json(avatar_brief_payload, max_chars=12000)}\n\n"
+            f"COMPETITOR_RESEARCH:\n{str(foundational_step_contents.get('01') or '')[:20000]}\n\n"
+            f"COMPETITOR_ANALYSIS_JSON:\n{_dump_prompt_json(competitor_analysis, max_chars=16000)}\n\n"
+            f"KNOWN_HABITAT_URLS:\n{_dump_prompt_json([], max_chars=4000)}\n\n"
+            f"PLATFORM_RESTRICTIONS:\n{_dump_prompt_json(None, max_chars=2000)}\n\n"
+            f"GEOGRAPHIC_TARGET:\n{_dump_prompt_json(None, max_chars=2000)}\n"
+        )
+        agent00_handoff_output, agent00_raw, agent00_provenance = _run_prompt_json_object(
+            asset=agent00_asset,
+            context="strategy_v2.agent0_output",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            runtime_instruction=agent00_runtime_base,
+            schema_name="strategy_v2_voc_agent00_handoff",
+            schema=_VOC_AGENT00_HANDOFF_SCHEMA,
+            use_reasoning=True,
+            reasoning_effort="xhigh",
+            use_web_search=True,
+            openai_tools=_openai_python_tool_resources(
+                settings.STRATEGY_V2_VOC_MODEL,
+                file_ids=list(agent00_file_id_map.values()),
+            ),
+            openai_tool_choice="auto",
+            heartbeat_context={
+                "activity": "strategy_v2.run_voc_agent0_habitat_strategy",
+                "phase": "agent0_prompt",
+                "model": settings.STRATEGY_V2_VOC_MODEL,
+            },
+            append_schema_instruction=False,
+        )
+    finally:
+        _cleanup_openai_prompt_files(
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            file_ids=agent00_uploaded_file_ids,
+        )
+    _raise_if_blocked_prompt_output(
+        stage_label="v2-02 Agent 0 habitat strategist",
+        parsed_output=agent00_handoff_output,
+        raw_output=agent00_raw,
+        remediation=(
+            "provide complete PRODUCT_BRIEF, AVATAR_BRIEF, and COMPETITOR_ANALYSIS "
+            "inputs before rerunning v2-02."
+        ),
+    )
+    agent00_output = _normalize_agent00_handoff_output(agent00_handoff_output)
+    _require_agent00_executable_configs(agent00_output)
+
+    habitat_strategy_payload = {
+        "category_niche": stage1.category_niche,
+        "competitor_urls": stage1.competitor_urls,
+        "source_count": len({entry["source"] for entry in entries}),
+        "foundational_step_summaries": {
+            key: value
+            for key, value in foundational_step_summaries.items()
+            if key in {"01", "03", "04", "06"} and isinstance(value, str)
+        },
+        "agent_output": agent00_output,
+        "agent_handoff_json": agent00_handoff_output,
+        "prompt_provenance": agent00_provenance,
+        "raw_output": agent00_raw[:20000],
+    }
+
+    with session_scope() as session:
+        habitat_agent_run_id = _record_agent_run(
+            session=session,
+            org_id=org_id,
+            user_id=operator_user_id,
+            client_id=client_id,
+            objective_type="strategy_v2.agent0_habitat_strategy.prompt_chain",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            inputs_json={"stage1": stage1_data},
+            outputs_json=habitat_strategy_payload,
+        )
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_HABITAT_STRATEGY,
+            title="Strategy V2 Habitat Strategy",
+            summary="Agent 0 prompt-chain habitat strategy prepared from foundational context.",
+            payload=habitat_strategy_payload,
+            model_name=settings.STRATEGY_V2_VOC_MODEL,
+            prompt_version="strategy_v2.agent0.prompt_chain.v2",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=habitat_agent_run_id,
+        )
+
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0_habitat_strategy",
+            "phase": "agent0_prompt",
+            "status": "completed",
+            "step_payload_artifact_id": step_payload_artifact_id,
+        }
+    )
+    updated_step_payload_artifact_ids = _updated_step_payload_artifact_ids(
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        step_key=V2_STEP_HABITAT_STRATEGY,
+        artifact_id=step_payload_artifact_id,
+    )
+    return {
+        "stage1": stage1_data,
+        "stage1_artifact_id": stage1_artifact_id,
+        "agent00_output": agent00_output,
+        "competitor_analysis": competitor_analysis,
+        "step_payload_artifact_id": step_payload_artifact_id,
+        "step_payload_artifact_ids": updated_step_payload_artifact_ids,
+    }
+
+
+@activity.defn(name="strategy_v2.run_voc_agent0b_social_video_strategy")
+def run_strategy_v2_voc_agent0b_social_video_strategy_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    operator_user_id = str(params.get("operator_user_id") or "system")
+
+    stage1_artifact_id = _require_stage1_artifact_id(params=params)
+    shared_context = _require_stage2b_shared_context(params=params)
+    stage1 = shared_context["stage1"]
+    existing_step_payload_artifact_ids = _parse_step_payload_artifact_ids(
+        payload=params.get("existing_step_payload_artifact_ids"),
+        field_name="existing_step_payload_artifact_ids",
+    )
+    foundational_step_contents = shared_context["foundational_step_contents"]
+    foundational_step_summaries = shared_context["foundational_step_summaries"]
+    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        workflow_run_id=workflow_run_id,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    )
+    _require_step_payload_artifact_prerequisites(
+        checkpoint_label="v2-03 Agent 0b social video strategy",
+        step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        required_step_keys=[
+            *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+            V2_STEP_HABITAT_STRATEGY,
+        ],
+        org_id=org_id,
+        validate_lineage=True,
+    )
+
+    stage1 = shared_context["stage1"]
+    stage1_data = shared_context["stage1_data"]
+    competitor_analysis = _require_dict(
+        payload=params.get("competitor_analysis"),
+        field_name="competitor_analysis",
+    )
+    avatar_brief_payload = shared_context["avatar_brief_payload"]
+    step4_content = foundational_step_contents["04"].strip()
+    entries = _extract_step4_entries(step4_content)
+
+    agent00_output = _require_dict(
+        payload=params.get("agent00_output"),
+        field_name="agent00_output",
+    )
+    _require_agent00_executable_configs(agent00_output)
+    product_category_keywords = _require_stage1_product_category_keywords(stage1)
+
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_social_video_strategy",
+            "phase": "agent0b_prompt",
+            "status": "started",
+        }
+    )
+    agent00b_asset = resolve_prompt_asset(
+        pattern=_VOC_AGENT00B_PROMPT_PATTERN,
+        context="VOC Agent 0b social video strategist",
+    )
+    agent00b_file_id_map, agent00b_uploaded_file_ids = _upload_openai_prompt_json_files(
+        model=settings.STRATEGY_V2_VOC_MODEL,
+        workflow_run_id=workflow_run_id,
+        stage_label="agent0b",
+        logical_payloads={
+            "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                "step_contents": {
+                    step_key: str(foundational_step_contents.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+                "step_summaries": {
+                    step_key: str(foundational_step_summaries.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+            }
+        },
+    )
+    try:
+        agent00b_output, agent00b_raw, agent00b_provenance = _run_prompt_json_object(
+            asset=agent00b_asset,
+            context="strategy_v2.agent0b_output",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            runtime_instruction=(
+                "## Runtime Input Block\n"
+                f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent00b_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+                "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before generating video strategy.\n\n"
+                f"PRODUCT_BRIEF:\n{_dump_prompt_json(stage1_data, max_chars=12000)}\n\n"
+                f"AVATAR_BRIEF:\n{_dump_prompt_json(avatar_brief_payload, max_chars=12000)}\n\n"
+                f"COMPETITOR_ANALYSIS:\n{_dump_prompt_json(competitor_analysis, max_chars=16000)}\n\n"
+                f"PRODUCT_CATEGORY_KEYWORDS:\n{', '.join(product_category_keywords)}\n\n"
+                f"KNOWN_COMPETITOR_SOCIAL_ACCOUNTS:\n{_dump_prompt_json(stage1.competitor_urls, max_chars=6000)}\n"
+            ),
+            schema_name="strategy_v2_voc_agent00b",
+            schema={
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "platform_priorities": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {"type": "string", "minLength": 1},
+                    },
+                    "configurations": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": True,
+                            "properties": {
+                                "config_id": {"type": "string", "minLength": 1},
+                                "platform": {"type": "string", "minLength": 1},
+                                "mode": {"type": "string", "minLength": 1},
+                                "actor_id": {"type": "string", "minLength": 1},
+                                "input": _APIFY_EXEC_INPUT_SCHEMA,
+                                "metadata": {"type": "object", "additionalProperties": True},
+                            },
+                            "required": ["config_id", "platform", "mode", "actor_id", "input"],
+                        },
+                    },
+                    "handoff_block": {"type": "string"},
+                },
+                "required": ["platform_priorities", "configurations"],
+            },
+            use_reasoning=True,
+            reasoning_effort="xhigh",
+            use_web_search=True,
+            openai_tools=_openai_python_tool_resources(
+                settings.STRATEGY_V2_VOC_MODEL,
+                file_ids=list(agent00b_file_id_map.values()),
+            ),
+            openai_tool_choice="auto",
+            heartbeat_context={
+                "activity": "strategy_v2.run_voc_agent0b_social_video_strategy",
+                "phase": "agent0b_prompt",
+                "model": settings.STRATEGY_V2_VOC_MODEL,
+            },
+            append_schema_instruction=False,
+        )
+    finally:
+        _cleanup_openai_prompt_files(
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            file_ids=agent00b_uploaded_file_ids,
+        )
+    _raise_if_blocked_prompt_output(
+        stage_label="v2-03 Agent 0b social video strategist",
+        parsed_output=agent00b_output,
+        raw_output=agent00b_raw,
+        remediation=(
+            "supply PRODUCT_BRIEF, structured AVATAR_BRIEF, COMPETITOR_ANALYSIS, "
+            "and PRODUCT_CATEGORY_KEYWORDS before rerunning v2-03."
+        ),
+    )
+    _require_agent00b_executable_configs(agent00b_output)
+
+    strategy_apify_configs = _extract_apify_configs_from_agent_strategies(
+        habitat_strategy=agent00_output,
+        video_strategy=agent00b_output,
+    )
+
+    with session_scope() as session:
+        video_strategy_agent_run_id = _record_agent_run(
+            session=session,
+            org_id=org_id,
+            user_id=operator_user_id,
+            client_id=client_id,
+            objective_type="strategy_v2.agent0b_social_video_strategy.prompt_chain",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            inputs_json={
+                "planned_actor_run_count": len(strategy_apify_configs),
+                "max_actor_runs_configured": int(settings.STRATEGY_V2_APIFY_MAX_ACTOR_RUNS),
+            },
+            outputs_json={
+                "video_strategy": agent00b_output,
+                "platform_priorities": agent00b_output.get("platform_priorities"),
+            },
+        )
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_SCRAPE_VIRALITY,
+            title="Strategy V2 Social Video Strategy",
+            summary="Agent 0b prompt-chain social video strategy prepared for downstream Apify execution.",
+            payload={
+                "video_strategy": agent00b_output,
+                "planned_actor_run_count": len(strategy_apify_configs),
+                "max_actor_runs_configured": int(settings.STRATEGY_V2_APIFY_MAX_ACTOR_RUNS),
+                "prompt_provenance": agent00b_provenance,
+                "raw_output": agent00b_raw[:20000],
+            },
+            model_name=settings.STRATEGY_V2_VOC_MODEL,
+            prompt_version="strategy_v2.agent0b.prompt_chain.v2",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=video_strategy_agent_run_id,
+        )
+
+    updated_step_payload_artifact_ids = _updated_step_payload_artifact_ids(
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        step_key=V2_STEP_SCRAPE_VIRALITY,
+        artifact_id=step_payload_artifact_id,
+    )
+    return {
+        "stage1": stage1_data,
+        "stage1_artifact_id": stage1_artifact_id,
+        "agent00b_output": agent00b_output,
+        "step_payload_artifact_id": step_payload_artifact_id,
+        "step_payload_artifact_ids": updated_step_payload_artifact_ids,
+    }
+
+
+def _load_apify_collection_payload_for_postprocess(
+    *,
+    org_id: str,
+    apify_collection_artifact_id: str,
+) -> dict[str, Any]:
+    with session_scope() as session:
+        artifacts_repo = ArtifactsRepository(session)
+        artifact = artifacts_repo.get(org_id=org_id, artifact_id=apify_collection_artifact_id)
+        if artifact is None or not isinstance(artifact.data, dict):
+            raise StrategyV2MissingContextError(
+                "Missing apify collection artifact for Stage 2B postprocess. "
+                f"artifact_id={apify_collection_artifact_id}. "
+                "Remediation: rerun v2-03b apify_collection before v2-03c/v2-03b postprocess."
+            )
+        _validate_step_payload_lineage_payload(
+            checkpoint_label="v2-03c Apify postprocess + virality",
+            required_step_key=V2_STEP_APIFY_COLLECTION,
+            artifact_id=apify_collection_artifact_id,
+            artifact_data=artifact.data,
+        )
+        payload = artifact.data.get("payload")
+        if not isinstance(payload, dict):
+            raise StrategyV2SchemaValidationError(
+                "Invalid apify collection artifact payload envelope. "
+                f"artifact_id={apify_collection_artifact_id}."
+            )
+        collection_payload = payload.get("apify_collection")
+        if not isinstance(collection_payload, dict):
+            raise StrategyV2SchemaValidationError(
+                "Apify collection artifact is missing required apify_collection payload. "
+                f"artifact_id={apify_collection_artifact_id}."
+            )
+        apify_context = collection_payload.get("apify_context")
+        if not isinstance(apify_context, dict):
+            raise StrategyV2SchemaValidationError(
+                "Apify collection artifact is missing required apify_context object. "
+                f"artifact_id={apify_collection_artifact_id}."
+            )
+        raw_runs = apify_context.get("raw_runs")
+        if not isinstance(raw_runs, list) or not raw_runs:
+            raise StrategyV2SchemaValidationError(
+                "Apify collection artifact is missing full raw_runs data required for deterministic postprocess. "
+                f"artifact_id={apify_collection_artifact_id}. "
+                "Remediation: rerun apify collection without preview-only payloads."
+            )
+        return collection_payload
+
+
+@activity.defn(name="strategy_v2.run_voc_agent0b_apify_collection")
+def run_strategy_v2_voc_agent0b_apify_collection_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    operator_user_id = str(params.get("operator_user_id") or "system")
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_collection",
+            "phase": "context_hydration",
+            "status": "started",
+        }
+    )
+
+    stage1_artifact_id = _require_stage1_artifact_id(params=params)
+    _ = stage1_artifact_id
+    shared_context = _require_stage2b_shared_context(params=params)
+    existing_step_payload_artifact_ids = _parse_step_payload_artifact_ids(
+        payload=params.get("existing_step_payload_artifact_ids"),
+        field_name="existing_step_payload_artifact_ids",
+    )
+    foundational_step_contents = shared_context["foundational_step_contents"]
+    foundational_step_summaries = shared_context["foundational_step_summaries"]
+    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        workflow_run_id=workflow_run_id,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    )
+    _require_step_payload_artifact_prerequisites(
+        checkpoint_label="v2-03b Apify collection",
+        step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        required_step_keys=[
+            *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+            V2_STEP_HABITAT_STRATEGY,
+            V2_STEP_SCRAPE_VIRALITY,
+        ],
+        org_id=org_id,
+        validate_lineage=True,
+    )
+
+    agent00_output = _require_dict(
+        payload=params.get("agent00_output"),
+        field_name="agent00_output",
+    )
+    _require_agent00_executable_configs(agent00_output)
+    agent00b_output = _require_dict(
+        payload=params.get("agent00b_output"),
+        field_name="agent00b_output",
+    )
+    _require_agent00b_executable_configs(agent00b_output)
+
+    strategy_apify_configs = _extract_apify_configs_from_agent_strategies(
+        habitat_strategy=agent00_output,
+        video_strategy=agent00b_output,
+    )
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_collection",
+            "phase": "context_hydration",
+            "status": "completed",
+            "config_count": len(strategy_apify_configs),
+        }
+    )
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_collection",
+            "phase": "apify_execution_layer",
+            "status": "started",
+            "config_count": len(strategy_apify_configs),
+        }
+    )
+
+    def _apify_progress_heartbeat(event: dict[str, Any]) -> None:
+        heartbeat_payload: dict[str, Any] = {
+            "activity": "strategy_v2.run_voc_agent0b_apify_collection",
+            "phase": "apify_execution_layer",
+            "status": "in_progress",
+            "progress_event": str(event.get("event") or "unknown"),
+            "config_count": len(strategy_apify_configs),
+        }
+        for field_name in (
+            "actor_id",
+            "config_id",
+            "run_id",
+            "run_index",
+            "planned_run_count",
+            "elapsed_seconds",
+            "status",
+        ):
+            field_value = event.get(field_name)
+            if field_value is not None:
+                if field_name == "status":
+                    heartbeat_payload["actor_run_status"] = field_value
+                else:
+                    heartbeat_payload[field_name] = field_value
+        activity.heartbeat(heartbeat_payload)
+
+    apify_context = _ingest_strategy_v2_asset_data(
+        apify_configs=strategy_apify_configs,
+        include_ads_context=False,
+        include_social_video=True,
+        include_external_voc=True,
+        progress_callback=_apify_progress_heartbeat,
+    )
+    apify_context["ingestion_apify_configs"] = strategy_apify_configs
+    apify_context["ingestion_source_refs"] = []
+    apify_context["excluded_source_refs"] = []
+
+    raw_runs = apify_context.get("raw_runs")
+    raw_run_rows = [row for row in raw_runs if isinstance(row, dict)] if isinstance(raw_runs, list) else []
+    executed_actor_run_count = len(raw_run_rows)
+    failed_actor_run_count = len(
+        [row for row in raw_run_rows if str(row.get("status") or "").upper() != "SUCCEEDED"]
+    )
+    _validate_reddit_target_alignment(run_rows=raw_run_rows)
+    apify_summary = _require_dict(
+        payload=apify_context.get("summary"),
+        field_name="apify_context.summary",
+    )
+    strategy_config_run_count = apify_summary.get("strategy_config_run_count")
+    planned_actor_run_count = apify_summary.get("planned_actor_run_count")
+    if not isinstance(strategy_config_run_count, int) or strategy_config_run_count < 0:
+        raise StrategyV2SchemaValidationError(
+            "apify_context.summary.strategy_config_run_count must be a non-negative integer."
+        )
+    if strategy_config_run_count != len(strategy_apify_configs):
+        raise StrategyV2SchemaValidationError(
+            "apify_context.summary.strategy_config_run_count mismatch "
+            f"(summary={strategy_config_run_count}, expected_strategy_configs={len(strategy_apify_configs)})."
+        )
+    if not isinstance(planned_actor_run_count, int) or planned_actor_run_count < 0:
+        raise StrategyV2SchemaValidationError(
+            "apify_context.summary.planned_actor_run_count must be a non-negative integer."
+        )
+    if planned_actor_run_count < executed_actor_run_count:
+        raise StrategyV2SchemaValidationError(
+            "apify_context.summary.planned_actor_run_count cannot be less than executed_actor_run_count "
+            f"(planned={planned_actor_run_count}, executed={executed_actor_run_count})."
+        )
+    ingestion_summary = {
+        **apify_summary,
+        "strategy_config_run_count": strategy_config_run_count,
+        "planned_actor_run_count": planned_actor_run_count,
+        "max_actor_runs_configured": int(settings.STRATEGY_V2_APIFY_MAX_ACTOR_RUNS),
+        "executed_actor_run_count": executed_actor_run_count,
+        "failed_actor_run_count": failed_actor_run_count,
+        "excluded_source_refs": (
+            apify_context.get("excluded_source_refs")
+            if isinstance(apify_context.get("excluded_source_refs"), list)
+            else []
+        ),
+    }
+    apify_context["summary"] = ingestion_summary
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_collection",
+            "phase": "apify_execution_layer",
+            "status": "completed",
+            "strategy_config_run_count": strategy_config_run_count,
+            "planned_actor_run_count": planned_actor_run_count,
+            "executed_actor_run_count": executed_actor_run_count,
+        }
+    )
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_collection",
+            "phase": "persist_step_payload",
+            "status": "started",
+        }
+    )
+
+    with session_scope() as session:
+        ingestion_agent_run_id = _record_agent_run(
+            session=session,
+            org_id=org_id,
+            user_id=operator_user_id,
+            client_id=client_id,
+            objective_type="strategy_v2.agent0b_apify_ingestion.execution_layer",
+            model="deterministic",
+            inputs_json={
+                "strategy_config_run_count": strategy_config_run_count,
+                "planned_actor_run_count": planned_actor_run_count,
+                "max_actor_runs_configured": int(settings.STRATEGY_V2_APIFY_MAX_ACTOR_RUNS),
+            },
+            outputs_json={
+                "step": "apify_collection",
+                "ingestion_summary": ingestion_summary,
+            },
+        )
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_APIFY_COLLECTION,
+            title="Strategy V2 Apify Collection",
+            summary="Paid Apify actor execution completed and raw run payload persisted for deterministic postprocess.",
+            payload={
+                "apify_collection": {
+                    "strategy_apify_configs": strategy_apify_configs,
+                    "apify_context": apify_context,
+                    "ingestion_summary": ingestion_summary,
+                    "strategy_config_run_count": strategy_config_run_count,
+                    "planned_actor_run_count": planned_actor_run_count,
+                    "executed_actor_run_count": executed_actor_run_count,
+                    "failed_actor_run_count": failed_actor_run_count,
+                },
+                "ingestion_summary": ingestion_summary,
+            },
+            model_name="deterministic",
+            prompt_version="strategy_v2.agent0b.apify_collection.v1",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=ingestion_agent_run_id,
+        )
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_collection",
+            "phase": "persist_step_payload",
+            "status": "completed",
+            "step_payload_artifact_id": step_payload_artifact_id,
+        }
+    )
+
+    updated_step_payload_artifact_ids = _updated_step_payload_artifact_ids(
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        step_key=V2_STEP_APIFY_COLLECTION,
+        artifact_id=step_payload_artifact_id,
+    )
+    return {
+        "apify_collection_artifact_id": step_payload_artifact_id,
+        "strategy_config_run_count": strategy_config_run_count,
+        "planned_actor_run_count": planned_actor_run_count,
+        "executed_actor_run_count": executed_actor_run_count,
+        "failed_actor_run_count": failed_actor_run_count,
+        "step_payload_artifact_id": step_payload_artifact_id,
+        "step_payload_artifact_ids": updated_step_payload_artifact_ids,
+    }
+
+
+@activity.defn(name="strategy_v2.run_voc_agent0b_apify_ingestion")
+def run_strategy_v2_voc_agent0b_apify_ingestion_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    operator_user_id = str(params.get("operator_user_id") or "system")
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+            "phase": "context_hydration",
+            "status": "started",
+        }
+    )
+
+    stage1_artifact_id = _require_stage1_artifact_id(params=params)
+    _ = stage1_artifact_id
+    shared_context = _require_stage2b_shared_context(params=params)
+    existing_step_payload_artifact_ids = _parse_step_payload_artifact_ids(
+        payload=params.get("existing_step_payload_artifact_ids"),
+        field_name="existing_step_payload_artifact_ids",
+    )
+    stage1 = shared_context["stage1"]
+    foundational_step_contents = shared_context["foundational_step_contents"]
+    foundational_step_summaries = shared_context["foundational_step_summaries"]
+    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        workflow_run_id=workflow_run_id,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    )
+    _require_step_payload_artifact_prerequisites(
+        checkpoint_label="v2-03c Apify postprocess + virality",
+        step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        required_step_keys=[
+            *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+            V2_STEP_HABITAT_STRATEGY,
+            V2_STEP_SCRAPE_VIRALITY,
+            V2_STEP_APIFY_COLLECTION,
+        ],
+        org_id=org_id,
+        validate_lineage=True,
+    )
+    competitor_analysis = _require_dict(
+        payload=params.get("competitor_analysis"),
+        field_name="competitor_analysis",
+    )
+    step4_content = foundational_step_contents["04"].strip()
+    entries = _extract_step4_entries(step4_content)
+    agent00_output = _require_dict(
+        payload=params.get("agent00_output"),
+        field_name="agent00_output",
+    )
+    _require_agent00_executable_configs(agent00_output)
+    agent00b_output = _require_dict(
+        payload=params.get("agent00b_output"),
+        field_name="agent00b_output",
+    )
+    _require_agent00b_executable_configs(agent00b_output)
+    apify_collection_artifact_id = str(params.get("apify_collection_artifact_id") or "").strip()
+    if not apify_collection_artifact_id:
+        raise StrategyV2MissingContextError(
+            "Missing required apify_collection_artifact_id for Stage 2B postprocess. "
+            "Remediation: run v2-03b apify_collection first and pass its artifact id."
+        )
+
+    collection_payload = _load_apify_collection_payload_for_postprocess(
+        org_id=org_id,
+        apify_collection_artifact_id=apify_collection_artifact_id,
+    )
+    strategy_apify_configs = collection_payload.get("strategy_apify_configs")
+    if not isinstance(strategy_apify_configs, list):
+        raise StrategyV2SchemaValidationError(
+            "apify collection payload missing strategy_apify_configs array required for postprocess."
+        )
+    apify_context = _require_dict(
+        payload=collection_payload.get("apify_context"),
+        field_name="apify_collection.apify_context",
+    )
+    strategy_config_run_count = collection_payload.get("strategy_config_run_count")
+    planned_actor_run_count = collection_payload.get("planned_actor_run_count")
+    executed_actor_run_count = collection_payload.get("executed_actor_run_count")
+    failed_actor_run_count = collection_payload.get("failed_actor_run_count")
+    if (
+        not isinstance(strategy_config_run_count, int)
+        or not isinstance(planned_actor_run_count, int)
+        or not isinstance(executed_actor_run_count, int)
+        or not isinstance(failed_actor_run_count, int)
+    ):
+        raise StrategyV2SchemaValidationError(
+            "apify collection payload missing required run counters "
+            "(strategy_config_run_count/planned_actor_run_count/executed_actor_run_count/failed_actor_run_count). "
+            "Remediation: rerun v2-03b with current code."
+        )
+    if (
+        strategy_config_run_count < 0
+        or planned_actor_run_count < 0
+        or executed_actor_run_count < 0
+        or failed_actor_run_count < 0
+    ):
+        raise StrategyV2SchemaValidationError(
+            "apify collection run counters must be non-negative integers."
+        )
+    expected_strategy_apify_configs = _extract_apify_configs_from_agent_strategies(
+        habitat_strategy=agent00_output,
+        video_strategy=agent00b_output,
+    )
+    expected_strategy_apify_config_count = len(expected_strategy_apify_configs)
+    if strategy_config_run_count != expected_strategy_apify_config_count:
+        raise StrategyV2SchemaValidationError(
+            "apify collection payload strategy_config_run_count does not match current strategy config count "
+            f"(strategy_config_run_count={strategy_config_run_count}, expected_strategy_apify_config_count={expected_strategy_apify_config_count}). "
+            "Remediation: rerun v2-03b apify_collection for this exact strategy handoff."
+        )
+    if planned_actor_run_count < strategy_config_run_count:
+        raise StrategyV2SchemaValidationError(
+            "apify collection payload planned_actor_run_count cannot be less than strategy_config_run_count "
+            f"(planned_actor_run_count={planned_actor_run_count}, strategy_config_run_count={strategy_config_run_count})."
+        )
+
+    raw_runs = apify_context.get("raw_runs")
+    raw_run_rows = [row for row in raw_runs if isinstance(row, dict)] if isinstance(raw_runs, list) else []
+    if len(raw_run_rows) != executed_actor_run_count:
+        raise StrategyV2SchemaValidationError(
+            "apify collection payload raw run count mismatch "
+            f"(len(raw_runs)={len(raw_run_rows)}, executed_actor_run_count={executed_actor_run_count})."
+        )
+    _validate_reddit_target_alignment(run_rows=raw_run_rows)
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+            "phase": "context_hydration",
+            "status": "completed",
+            "apify_collection_artifact_id": apify_collection_artifact_id,
+            "executed_actor_run_count": executed_actor_run_count,
+        }
+    )
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+            "phase": "post_apify_transform",
+            "status": "started",
+            "planned_actor_run_count": planned_actor_run_count,
+            "executed_actor_run_count": executed_actor_run_count,
+        }
+    )
+
+    video_observations = _extract_video_observations(competitor_analysis)
+    apify_video_raw = apify_context.get("social_video_observations")
+    apify_video_rows = [row for row in apify_video_raw if isinstance(row, dict)] if isinstance(apify_video_raw, list) else []
+    seen_video_ids: set[str] = {
+        str(row.get("video_id") or row.get("source_ref") or "").strip()
+        for row in video_observations
+        if isinstance(row, dict)
+    }
+    for row in apify_video_rows:
+        video_id = str(row.get("video_id") or row.get("source_ref") or "").strip()
+        if not video_id or video_id in seen_video_ids:
+            continue
+        seen_video_ids.add(video_id)
+        video_observations.append(row)
+
+    source_allowlist = _extract_video_source_allowlist(agent00b_output)
+    topic_keywords = _build_video_topic_keywords(stage1=stage1)
+    metric_video_rows, video_filter_diagnostics = _filter_metric_video_rows_for_scoring(
+        video_rows=video_observations,
+        source_allowlist=source_allowlist,
+        topic_keywords=topic_keywords,
+    )
+    video_scoring_status = "scored"
+    if not metric_video_rows:
+        if video_observations:
+            raise StrategyV2DecisionError(
+                "Video scoring aborted: no topic-aligned social video rows remained after source/topic validation. "
+                f"Diagnostics={video_filter_diagnostics}"
+            )
+        video_scoring_status = "skipped_no_metric_video_rows"
+    video_scored = _normalize_video_scored_rows(score_videos(metric_video_rows) if metric_video_rows else [])
+    scoring_audit = _build_video_scoring_audit(
+        video_observation_count=len(video_observations),
+        metric_video_observation_count=len(metric_video_rows),
+        video_scored=video_scored,
+        video_filter_diagnostics=video_filter_diagnostics,
+    )
+
+    external_voc_corpus_raw = apify_context.get("external_voc_corpus")
+    external_voc_corpus = (
+        [row for row in external_voc_corpus_raw if isinstance(row, dict)]
+        if isinstance(external_voc_corpus_raw, list)
+        else []
+    )
+    step4_corpus = transform_step4_entries_to_agent2_corpus(entries)
+    merged_voc = _merge_voc_corpus_for_agent2(
+        step4_rows=step4_corpus,
+        external_rows=external_voc_corpus,
+    )
+    existing_corpus = merged_voc["prompt_rows"]
+    merged_voc_artifact_rows = merged_voc["artifact_rows"]
+    proof_asset_candidates_raw = apify_context.get("proof_asset_candidates")
+    proof_asset_candidates = (
+        [row for row in proof_asset_candidates_raw if isinstance(row, dict)]
+        if isinstance(proof_asset_candidates_raw, list)
+        else []
+    )
+    if not proof_asset_candidates:
+        proof_asset_candidates = _build_proof_candidates_from_voc(
+            voc_rows=merged_voc_artifact_rows,
+            competitor_analysis=competitor_analysis,
+        )
+
+    scraped_data_manifest = _build_scraped_data_manifest(
+        apify_context=apify_context,
+        competitor_analysis=competitor_analysis,
+    )
+    _validate_agent1_scraped_manifest_integrity(
+        scraped_data_manifest=scraped_data_manifest,
+        planned_actor_run_count=planned_actor_run_count,
+        executed_actor_run_count=executed_actor_run_count,
+        failed_actor_run_count=failed_actor_run_count,
+    )
+    handoff_audit = {
+        "strategy_config_run_count": strategy_config_run_count,
+        "planned_actor_run_count": planned_actor_run_count,
+        "executed_actor_run_count": executed_actor_run_count,
+        "failed_actor_run_count": failed_actor_run_count,
+        "manifest_run_count": int(scraped_data_manifest.get("run_count") or 0),
+        "manifest_total_run_count": int(scraped_data_manifest.get("total_run_count") or 0),
+        "raw_files_len": len(scraped_data_manifest.get("raw_scraped_data_files") or []),
+        "excluded_runs_len": len(scraped_data_manifest.get("excluded_runs") or []),
+        "excluded_run_count": int(scraped_data_manifest.get("excluded_run_count") or 0),
+        "target_id_mapping_diagnostics": (
+            dict(scraped_data_manifest.get("target_id_mapping_diagnostics"))
+            if isinstance(scraped_data_manifest.get("target_id_mapping_diagnostics"), Mapping)
+            else {}
+        ),
+        "scoring_audit": scoring_audit,
+    }
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+            "phase": "post_apify_transform",
+            "status": "completed",
+            "video_scored_count": len(video_scored),
+            "existing_corpus_count": len(existing_corpus),
+            "handoff_audit": handoff_audit,
+        }
+    )
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+            "phase": "persist_step_payload",
+            "status": "started",
+        }
+    )
+    with session_scope() as session:
+        ingestion_agent_run_id = _record_agent_run(
+            session=session,
+            org_id=org_id,
+            user_id=operator_user_id,
+            client_id=client_id,
+            objective_type="strategy_v2.agent0b_apify_postprocess.execution_layer",
+            model="deterministic",
+            inputs_json={
+                "apify_collection_artifact_id": apify_collection_artifact_id,
+                "strategy_config_run_count": strategy_config_run_count,
+                "planned_actor_run_count": planned_actor_run_count,
+                "executed_actor_run_count": executed_actor_run_count,
+                "failed_actor_run_count": failed_actor_run_count,
+            },
+            outputs_json={
+                "video_scoring_status": video_scoring_status,
+                "video_filter_diagnostics": video_filter_diagnostics,
+                "video_scored": video_scored,
+                "scoring_audit": scoring_audit,
+                "handoff_audit": handoff_audit,
+            },
+        )
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_APIFY_POSTPROCESS,
+            title="Strategy V2 Apify Postprocess + Virality",
+            summary="Deterministic postprocess from immutable Apify collection artifact.",
+            payload={
+                "apify_collection_artifact_id": apify_collection_artifact_id,
+                "video_scoring_status": video_scoring_status,
+                "video_observation_count": len(video_observations),
+                "metric_video_observation_count": len(metric_video_rows),
+                "apify_video_observation_count": len(apify_video_rows),
+                "video_filter_diagnostics": video_filter_diagnostics,
+                "video_scored": video_scored,
+                "scoring_audit": scoring_audit,
+                "ingestion_summary": {
+                    "strategy_config_run_count": strategy_config_run_count,
+                    "planned_actor_run_count": planned_actor_run_count,
+                    "executed_actor_run_count": executed_actor_run_count,
+                    "failed_actor_run_count": failed_actor_run_count,
+                },
+                "handoff_audit": handoff_audit,
+            },
+            model_name="deterministic",
+            prompt_version="strategy_v2.agent0b.apify_postprocess.v1",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=ingestion_agent_run_id,
+        )
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+            "phase": "persist_step_payload",
+            "status": "completed",
+            "step_payload_artifact_id": step_payload_artifact_id,
+        }
+    )
+    updated_step_payload_artifact_ids = _updated_step_payload_artifact_ids(
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        step_key=V2_STEP_APIFY_POSTPROCESS,
+        artifact_id=step_payload_artifact_id,
+    )
+    return {
+        "scraped_data_manifest": scraped_data_manifest,
+        "video_scored": video_scored,
+        "existing_corpus": existing_corpus,
+        "merged_voc_artifact_rows": merged_voc_artifact_rows,
+        "corpus_selection_summary": merged_voc["summary"],
+        "external_corpus_count": len(external_voc_corpus),
+        "strategy_config_run_count": strategy_config_run_count,
+        "planned_actor_run_count": planned_actor_run_count,
+        "executed_actor_run_count": executed_actor_run_count,
+        "failed_actor_run_count": failed_actor_run_count,
+        "proof_asset_candidates": proof_asset_candidates,
+        "handoff_audit": handoff_audit,
+        "scoring_audit": scoring_audit,
+        "step_payload_artifact_id": step_payload_artifact_id,
+        "step_payload_artifact_ids": updated_step_payload_artifact_ids,
+    }
+
+
+@activity.defn(name="strategy_v2.run_voc_agent1_habitat_qualifier")
+def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    operator_user_id = str(params.get("operator_user_id") or "system")
+
+    _ = _require_stage1_artifact_id(params=params)
+    shared_context = _require_stage2b_shared_context(params=params)
+    existing_step_payload_artifact_ids = _parse_step_payload_artifact_ids(
+        payload=params.get("existing_step_payload_artifact_ids"),
+        field_name="existing_step_payload_artifact_ids",
+    )
+    foundational_step_contents = shared_context["foundational_step_contents"]
+    foundational_step_summaries = shared_context["foundational_step_summaries"]
+    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        workflow_run_id=workflow_run_id,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    )
+    _require_step_payload_artifact_prerequisites(
+        checkpoint_label="v2-04 Agent 1 habitat qualifier",
+        step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        required_step_keys=[
+            *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+            V2_STEP_HABITAT_STRATEGY,
+            V2_STEP_SCRAPE_VIRALITY,
+            V2_STEP_APIFY_COLLECTION,
+            V2_STEP_APIFY_INGESTION,
+        ],
+        org_id=org_id,
+        validate_lineage=True,
+    )
+
+    stage1_data = shared_context["stage1_data"]
+    avatar_brief_payload = shared_context["avatar_brief_payload"]
+    competitor_analysis = _require_dict(
+        payload=params.get("competitor_analysis"),
+        field_name="competitor_analysis",
+    )
+    agent00_output = _require_dict(
+        payload=params.get("agent00_output"),
+        field_name="agent00_output",
+    )
+    agent00b_output = _require_dict(
+        payload=params.get("agent00b_output"),
+        field_name="agent00b_output",
+    )
+    scraped_data_manifest = _require_dict(
+        payload=params.get("scraped_data_manifest"),
+        field_name="scraped_data_manifest",
+    )
+    scraped_data_files = scraped_data_manifest.get("raw_scraped_data_files")
+    if not isinstance(scraped_data_files, list) or not scraped_data_files:
+        raise StrategyV2MissingContextError(
+            "scraped_data_manifest.raw_scraped_data_files is required for Agent 1 habitat qualification. "
+            "Remediation: ensure v2-03 returns scraped-data manifest before invoking v2-04."
+        )
+    video_scored = params.get("video_scored")
+    if not isinstance(video_scored, list):
+        raise StrategyV2SchemaValidationError("video_scored must be an array for v2-04 Agent 1 qualification.")
+    scoring_audit = params.get("scoring_audit")
+    if scoring_audit is not None and not isinstance(scoring_audit, dict):
+        raise StrategyV2SchemaValidationError(
+            "scoring_audit must be an object when provided for v2-04 Agent 1 qualification."
+        )
+    scoring_audit = dict(scoring_audit) if isinstance(scoring_audit, dict) else {}
+    strategy_config_run_count = params.get("strategy_config_run_count")
+    if not isinstance(strategy_config_run_count, int):
+        # Compatibility for pre-contract histories where this counter was not persisted.
+        strategy_apify_configs = _extract_apify_configs_from_agent_strategies(
+            habitat_strategy=agent00_output,
+            video_strategy=agent00b_output,
+        )
+        strategy_config_run_count = len(strategy_apify_configs)
+    planned_actor_run_count = params.get("planned_actor_run_count")
+    if not isinstance(planned_actor_run_count, int):
+        raise StrategyV2SchemaValidationError(
+            "planned_actor_run_count must be a non-negative integer for v2-04 Agent 1 qualification."
+        )
+    executed_actor_run_count = params.get("executed_actor_run_count")
+    if not isinstance(executed_actor_run_count, int):
+        raise StrategyV2SchemaValidationError(
+            "executed_actor_run_count must be a non-negative integer for v2-04 Agent 1 qualification."
+        )
+    failed_actor_run_count = params.get("failed_actor_run_count")
+    if not isinstance(failed_actor_run_count, int):
+        raise StrategyV2SchemaValidationError(
+            "failed_actor_run_count must be a non-negative integer for v2-04 Agent 1 qualification."
+        )
+    if strategy_config_run_count < 0:
+        raise StrategyV2SchemaValidationError(
+            "strategy_config_run_count must be a non-negative integer for v2-04 Agent 1 qualification."
+        )
+    if strategy_config_run_count > planned_actor_run_count:
+        raise StrategyV2SchemaValidationError(
+            "strategy_config_run_count cannot exceed planned_actor_run_count for v2-04 Agent 1 qualification."
+        )
+    handoff_audit = params.get("handoff_audit")
+    if handoff_audit is not None and not isinstance(handoff_audit, dict):
+        raise StrategyV2SchemaValidationError(
+            "handoff_audit must be an object when provided for v2-04 Agent 1 qualification."
+        )
+    if isinstance(handoff_audit, dict):
+        handoff_audit = dict(handoff_audit)
+    else:
+        handoff_audit = {}
+    handoff_audit.setdefault("strategy_config_run_count", strategy_config_run_count)
+    handoff_audit.setdefault("planned_actor_run_count", planned_actor_run_count)
+    handoff_audit.setdefault("executed_actor_run_count", executed_actor_run_count)
+    handoff_audit.setdefault("failed_actor_run_count", failed_actor_run_count)
+    handoff_audit.setdefault("manifest_run_count", int(scraped_data_manifest.get("run_count") or 0))
+    handoff_audit.setdefault("manifest_total_run_count", int(scraped_data_manifest.get("total_run_count") or 0))
+    handoff_audit.setdefault("excluded_run_count", int(scraped_data_manifest.get("excluded_run_count") or 0))
+    handoff_audit.setdefault("raw_files_len", len(scraped_data_manifest.get("raw_scraped_data_files") or []))
+    handoff_audit.setdefault("excluded_runs_len", len(scraped_data_manifest.get("excluded_runs") or []))
+    handoff_audit.setdefault(
+        "target_id_mapping_diagnostics",
+        (
+            dict(scraped_data_manifest.get("target_id_mapping_diagnostics"))
+            if isinstance(scraped_data_manifest.get("target_id_mapping_diagnostics"), Mapping)
+            else {}
+        ),
+    )
+    handoff_audit.setdefault("scoring_audit", scoring_audit)
+    _validate_agent1_scraped_manifest_integrity(
+        scraped_data_manifest=scraped_data_manifest,
+        planned_actor_run_count=planned_actor_run_count,
+        executed_actor_run_count=executed_actor_run_count,
+        failed_actor_run_count=failed_actor_run_count,
+    )
+    if _AGENT1_COMPACTION_THRESHOLD < 1:
+        raise StrategyV2SchemaValidationError(
+            "STRATEGY_V2_AGENT1_COMPACTION_THRESHOLD must be an integer greater than zero."
+        )
+    agent1_context_management = [
+        {
+            "type": "compaction",
+            "compact_threshold": _AGENT1_COMPACTION_THRESHOLD,
+        }
+    ]
+
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent1_habitat_qualifier",
+            "phase": "agent1_prompt",
+            "status": "started",
+            "manifest_file_count": len(scraped_data_files),
+            "compaction_threshold": _AGENT1_COMPACTION_THRESHOLD,
+        }
+    )
+    agent01_asset = resolve_prompt_asset(
+        pattern=_VOC_AGENT01_PROMPT_PATTERN,
+        context="VOC Agent 1 habitat qualifier",
+    )
+    scraped_file_inventory = _build_agent1_runtime_file_inventory(scraped_data_manifest)
+    agent01_file_id_map, agent01_uploaded_file_ids = _upload_openai_prompt_json_files(
+        model=settings.STRATEGY_V2_VOC_MODEL,
+        workflow_run_id=workflow_run_id,
+        stage_label="agent1-prompt-chain",
+        logical_payloads={
+            "HABITAT_STRATEGY_JSON": agent00_output,
+            "VIDEO_STRATEGY_JSON": agent00b_output,
+            "SCORED_VIDEO_DATA_JSON": video_scored,
+            "SCRAPED_DATA_FILES_JSON": scraped_data_manifest,
+            "PRODUCT_BRIEF_JSON": stage1_data,
+            "AVATAR_BRIEF_JSON": avatar_brief_payload,
+            "COMPETITOR_ANALYSIS_JSON": competitor_analysis,
+            "HANDOFF_AUDIT_JSON": handoff_audit,
+            "SCORING_AUDIT_JSON": scoring_audit,
+            "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                "step_contents": {
+                    step_key: str(foundational_step_contents.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+                "step_summaries": {
+                    step_key: str(foundational_step_summaries.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+            },
+        },
+    )
+    try:
+        agent01_output, agent01_raw, agent01_provenance = _run_prompt_json_object(
+            asset=agent01_asset,
+            context="strategy_v2.agent1_output",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            runtime_instruction=(
+                "## Runtime Input Block\n"
+                f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent01_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+                f"SCRAPED_FILE_INVENTORY_JSON:\n{_dump_prompt_json_required(scraped_file_inventory, max_chars=16000, field_name='SCRAPED_FILE_INVENTORY_JSON')}\n\n"
+                "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before analyzing scraped evidence.\n"
+                "Treat SCRAPED_DATA_FILES_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as canonical.\n"
+                "SCRAPED_DATA_FILES is a logical label only; do not require runtime filesystem reads.\n"
+                "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
+                "Never invent, mutate, or alias filenames that are not explicitly listed at runtime.\n"
+                "Use SCORING_AUDIT_JSON as deterministic context for eligible-vs-excluded video rows; do not recompute excluded counts.\n"
+                "Use only provided scraped evidence; if a field is missing within present evidence, mark it as CANNOT_DETERMINE.\n"
+                "For hard-gate observables: set text_based_content=Y only when extractable textual evidence exists. "
+                "If text_based_content is not Y because text evidence is missing, set target_language=CANNOT_DETERMINE "
+                "and do not list target_language as an independent mining gate failure.\n"
+                "Because runtime enforces strict JSON response_format, return a single JSON object only.\n"
+                "Put the full human report into report_markdown string inside the JSON object.\n"
+                "Keep report_markdown concise and evidence-focused; target <=12000 characters.\n"
+                "Use evidence pointers in the format <virtual_path>::item[<index>] or <virtual_path>::<item_id>.\n"
+                "Every habitat_observations entry and mining_plan entry must include a non-empty evidence_refs array.\n"
+                "Every habitat_observations[*].mining_gate object must include status, failed_fields, and a non-empty reason.\n"
+                "Include excluded_source_files as filenames intentionally excluded from habitat_observations.\n"
+                "Ensure (habitat_observations.source_file U excluded_source_files) exactly matches SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
+                "Ensure every mining_plan.source_file appears in habitat_observations.source_file (mining_plan subset rule).\n"
+                "Construct mining_plan by selecting rows from habitat_observations only; never introduce a new source_file in mining_plan.\n"
+                "Never include any excluded_source_files entry inside mining_plan.\n"
+                "Never emit sentinel blocked tokens or blocked placeholders in output (e.g., BLOCKED_MISSING_REQUIRED_INPUTS, MISSING_REQUIRED_INPUTS, CANNOT_PROCEED, BLOCKED).\n"
+                "Output complete habitat_observations and mining_plan entries suitable for deterministic habitat scoring."
+            ),
+            schema_name="strategy_v2_voc_agent01",
+            schema=_VOC_AGENT01_OUTPUT_SCHEMA,
+            use_reasoning=True,
+            reasoning_effort="low",
+            use_web_search=False,
+            openai_tools=_openai_python_tool_resources(
+                settings.STRATEGY_V2_VOC_MODEL,
+                file_ids=list(agent01_file_id_map.values()),
+            ),
+            openai_tool_choice="auto",
+            openai_context_management=agent1_context_management,
+            max_tokens=_AGENT1_MAX_TOKENS,
+            heartbeat_context={
+                "activity": "strategy_v2.run_voc_agent1_habitat_qualifier",
+                "phase": "agent1_prompt",
+                "model": settings.STRATEGY_V2_VOC_MODEL,
+                "manifest_file_count": len(scraped_data_files),
+                "compaction_threshold": _AGENT1_COMPACTION_THRESHOLD,
+            },
+        )
+    finally:
+        _cleanup_openai_prompt_files(
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            file_ids=agent01_uploaded_file_ids,
+        )
+
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent1_habitat_qualifier",
+            "phase": "agent1_prompt",
+            "status": "completed",
+            "manifest_file_count": len(scraped_data_files),
+        }
+    )
+
+    _raise_if_blocked_prompt_output(
+        stage_label="v2-04 Agent 1 habitat qualifier",
+        parsed_output=agent01_output,
+        raw_output=agent01_raw,
+        remediation=(
+            "provide valid scraped-data manifest, habitat/video strategy handoff, "
+            "and complete product/avatar context before rerunning v2-04."
+        ),
+    )
+    raw_habitat_observations = agent01_output.get("habitat_observations")
+    if not isinstance(raw_habitat_observations, list):
+        raise StrategyV2SchemaValidationError("Agent 1 output must contain habitat_observations array.")
+    _validate_agent1_output_source_file_grounding(
+        agent01_output=agent01_output,
+        scraped_data_manifest=scraped_data_manifest,
+    )
+    habitat_observations = _normalize_habitat_observations(
+        [row for row in raw_habitat_observations if isinstance(row, dict)]
+    )
+    habitat_scored = score_habitats(habitat_observations)
+
+    with session_scope() as session:
+        qualifier_agent_run_id = _record_agent_run(
+            session=session,
+            org_id=org_id,
+            user_id=operator_user_id,
+            client_id=client_id,
+            objective_type="strategy_v2.agent1_habitat_scoring.prompt_chain",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            inputs_json={
+                "habitat_observation_count": len(habitat_observations),
+                "handoff_audit": handoff_audit if isinstance(handoff_audit, dict) else {},
+                "scoring_audit": scoring_audit,
+            },
+            outputs_json={
+                "habitat_scored": habitat_scored,
+                "scoring_audit": scoring_audit,
+            },
+        )
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_HABITAT_SCORING,
+            title="Strategy V2 Habitat Scoring",
+            summary="Agent 1 prompt-chain habitat observations qualified with deterministic scoring.",
+            payload={
+                "habitat_observation_count": len(habitat_observations),
+                "habitat_observations": habitat_observations,
+                "habitat_scored": habitat_scored,
+                "scoring_audit": scoring_audit,
+                "handoff_audit": handoff_audit if isinstance(handoff_audit, dict) else {},
+                "prompt_provenance": agent01_provenance,
+                "raw_output": agent01_raw[:20000],
+            },
+            model_name=settings.STRATEGY_V2_VOC_MODEL,
+            prompt_version="strategy_v2.agent1.prompt_chain.v2",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=qualifier_agent_run_id,
+        )
+
+    updated_step_payload_artifact_ids = _updated_step_payload_artifact_ids(
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        step_key=V2_STEP_HABITAT_SCORING,
+        artifact_id=step_payload_artifact_id,
+    )
+    return {
+        "agent01_output": agent01_output,
+        "habitat_observations": habitat_observations,
+        "habitat_scored": habitat_scored,
+        "scoring_audit": scoring_audit,
+        "step_payload_artifact_id": step_payload_artifact_id,
+        "step_payload_artifact_ids": updated_step_payload_artifact_ids,
+    }
+
+
+@activity.defn(name="strategy_v2.run_voc_agent2_extraction")
+def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    operator_user_id = str(params.get("operator_user_id") or "system")
+
+    _ = _require_stage1_artifact_id(params=params)
+    shared_context = _require_stage2b_shared_context(params=params)
+    existing_step_payload_artifact_ids = _parse_step_payload_artifact_ids(
+        payload=params.get("existing_step_payload_artifact_ids"),
+        field_name="existing_step_payload_artifact_ids",
+    )
+    foundational_step_contents = shared_context["foundational_step_contents"]
+    foundational_step_summaries = shared_context["foundational_step_summaries"]
+    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        workflow_run_id=workflow_run_id,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    )
+    _require_step_payload_artifact_prerequisites(
+        checkpoint_label="v2-05 Agent 2 VOC extraction",
+        step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        required_step_keys=[
+            *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+            V2_STEP_SCRAPE_VIRALITY,
+            V2_STEP_APIFY_INGESTION,
+            V2_STEP_HABITAT_SCORING,
+        ],
+        org_id=org_id,
+        validate_lineage=True,
+    )
+
+    stage1_data = shared_context["stage1_data"]
+    avatar_brief_payload = shared_context["avatar_brief_payload"]
+    competitor_analysis = _require_dict(
+        payload=params.get("competitor_analysis"),
+        field_name="competitor_analysis",
+    )
+    agent01_output = _require_dict(payload=params.get("agent01_output"), field_name="agent01_output")
+    habitat_scored = _require_dict(payload=params.get("habitat_scored"), field_name="habitat_scored")
+
+    existing_corpus_raw = params.get("existing_corpus")
+    if not isinstance(existing_corpus_raw, list):
+        raise StrategyV2SchemaValidationError("existing_corpus must be an array for v2-05.")
+    existing_corpus = [row for row in existing_corpus_raw if isinstance(row, dict)]
+    merged_voc_artifact_rows_raw = params.get("merged_voc_artifact_rows")
+    if not isinstance(merged_voc_artifact_rows_raw, list):
+        raise StrategyV2SchemaValidationError("merged_voc_artifact_rows must be an array for v2-05.")
+    merged_voc_artifact_rows = [row for row in merged_voc_artifact_rows_raw if isinstance(row, dict)]
+    scraped_data_manifest = _require_dict(
+        payload=params.get("scraped_data_manifest"),
+        field_name="scraped_data_manifest",
+    )
+    proof_asset_candidates_raw = params.get("proof_asset_candidates")
+    if not isinstance(proof_asset_candidates_raw, list):
+        raise StrategyV2SchemaValidationError("proof_asset_candidates must be an array for v2-05.")
+    proof_asset_candidates = [row for row in proof_asset_candidates_raw if isinstance(row, dict)]
+    corpus_selection_summary = _require_dict(
+        payload=params.get("corpus_selection_summary"),
+        field_name="corpus_selection_summary",
+    )
+    external_corpus_count = params.get("external_corpus_count")
+    if not isinstance(external_corpus_count, int) or external_corpus_count < 0:
+        raise StrategyV2SchemaValidationError("external_corpus_count must be a non-negative integer for v2-05.")
+
+    saturated_angles = extract_saturated_angles(competitor_analysis, limit=9)
+    evidence_rows, evidence_diagnostics = _build_agent2_evidence_rows(
+        existing_corpus=existing_corpus,
+        merged_voc_artifact_rows=merged_voc_artifact_rows,
+        scraped_data_manifest=scraped_data_manifest,
+    )
+    agent2_mode = "DUAL" if existing_corpus else "FRESH"
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent2_extraction",
+            "phase": "agent2_prompt",
+            "status": "started",
+        }
+    )
+    agent02_asset = resolve_prompt_asset(
+        pattern=_VOC_AGENT02_PROMPT_PATTERN,
+        context="VOC Agent 2 extractor",
+    )
+    extraction = _run_agent2_extractor(
+        agent02_asset=agent02_asset,
+        model=settings.STRATEGY_V2_VOC_MODEL,
+        workflow_run_id=workflow_run_id,
+        mode=agent2_mode,
+        evidence_rows=evidence_rows,
+        agent01_output=agent01_output,
+        habitat_scored=habitat_scored,
+        stage1_data=stage1_data,
+        avatar_brief_payload=avatar_brief_payload,
+        competitor_analysis=competitor_analysis,
+        saturated_angles=saturated_angles,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        activity_name="strategy_v2.run_voc_agent2_extraction",
+    )
+    agent02_output = {
+        "mode": extraction["mode"],
+        "voc_observations": extraction["voc_observations"],
+        "rejected_items": extraction["rejected_items"],
+        "extraction_summary": extraction["extraction_summary"],
+        "validation_errors": [],
+    }
+    raw_voc_observations = extraction["voc_observations"]
+    voc_observations = _normalize_voc_observations([row for row in raw_voc_observations if isinstance(row, dict)])
+    voc_scored = score_voc_items(voc_observations)
+    _require_voc_transition_quality(
+        voc_observations=voc_observations,
+        voc_scored=voc_scored,
+    )
+
+    with session_scope() as session:
+        voc_agent_run_id = _record_agent_run(
+            session=session,
+            org_id=org_id,
+            user_id=operator_user_id,
+            client_id=client_id,
+            objective_type="strategy_v2.agent2_voc_extraction.prompt_chain",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            inputs_json={"voc_observation_count": len(voc_observations)},
+            outputs_json=voc_scored,
+        )
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_VOC_EXTRACTION,
+            title="Strategy V2 VOC Extraction",
+            summary="Agent 2 prompt-chain VOC corpus extracted and scored.",
+            payload={
+                "voc_observation_count": len(voc_observations),
+                "prompt_corpus_count": len(existing_corpus),
+                "merged_corpus_count": len(merged_voc_artifact_rows),
+                "external_corpus_count": external_corpus_count,
+                "corpus_selection_summary": corpus_selection_summary,
+                "voc_observations": voc_observations,
+                "voc_scored": voc_scored,
+                "mode": str(extraction.get("mode") or agent2_mode),
+                "extraction_summary": extraction.get("extraction_summary", {}),
+                "rejected_items": extraction.get("rejected_items", []),
+                "rejected_item_count": len(
+                    [row for row in extraction.get("rejected_items", []) if isinstance(row, dict)]
+                ),
+                "evidence_row_count": len(evidence_rows),
+                "evidence_diagnostics": evidence_diagnostics,
+                "proof_asset_candidates": proof_asset_candidates,
+                "prompt_provenance": extraction.get("prompt_provenance", {}),
+                "raw_output": "\n\n".join(
+                    str(part)
+                    for part in extraction.get("raw_outputs_preview", [])[:8]
+                    if isinstance(part, str)
+                )[:20000],
+            },
+            model_name=settings.STRATEGY_V2_VOC_MODEL,
+            prompt_version="strategy_v2.agent2.prompt_chain.v2",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=voc_agent_run_id,
+        )
+
+    updated_step_payload_artifact_ids = _updated_step_payload_artifact_ids(
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        step_key=V2_STEP_VOC_EXTRACTION,
+        artifact_id=step_payload_artifact_id,
+    )
+    return {
+        "agent02_output": agent02_output,
+        "voc_observations": voc_observations,
+        "voc_scored": voc_scored,
+        "merged_voc_artifact_rows": merged_voc_artifact_rows,
+        "proof_asset_candidates": proof_asset_candidates,
+        "step_payload_artifact_id": step_payload_artifact_id,
+        "step_payload_artifact_ids": updated_step_payload_artifact_ids,
+    }
+
+
+@activity.defn(name="strategy_v2.run_voc_agent3_synthesis")
+def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    operator_user_id = str(params.get("operator_user_id") or "system")
+
+    stage1_artifact_id = _require_stage1_artifact_id(params=params)
+    shared_context = _require_stage2b_shared_context(params=params)
+    existing_step_payload_artifact_ids = _parse_step_payload_artifact_ids(
+        payload=params.get("existing_step_payload_artifact_ids"),
+        field_name="existing_step_payload_artifact_ids",
+    )
+    foundational_step_contents = shared_context["foundational_step_contents"]
+    foundational_step_summaries = shared_context["foundational_step_summaries"]
+    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        workflow_run_id=workflow_run_id,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    )
+    _require_step_payload_artifact_prerequisites(
+        checkpoint_label="v2-06 Agent 3 angle synthesis",
+        step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        required_step_keys=[
+            *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+            V2_STEP_VOC_EXTRACTION,
+        ],
+        org_id=org_id,
+        validate_lineage=True,
+    )
+
+    stage1_data = shared_context["stage1_data"]
+    competitor_analysis = _require_dict(
+        payload=params.get("competitor_analysis"),
+        field_name="competitor_analysis",
+    )
+    voc_observations_raw = params.get("voc_observations")
+    if not isinstance(voc_observations_raw, list) or not voc_observations_raw:
+        raise StrategyV2MissingContextError(
+            "voc_observations is required for Agent 3 angle synthesis. "
+            "Remediation: ensure v2-05 emits voc_observations before invoking v2-06."
+        )
+    voc_observations = [row for row in voc_observations_raw if isinstance(row, dict)]
+    if not voc_observations:
+        raise StrategyV2MissingContextError("voc_observations must include object rows for v2-06.")
+    voc_scored = _require_dict(payload=params.get("voc_scored"), field_name="voc_scored")
+
+    competitor_angle_map = build_competitor_angle_map(competitor_analysis)
+    saturated_angles = extract_saturated_angles(competitor_analysis, limit=9)
+    saturated_count = max(1, min(9, len(saturated_angles)))
+    activity.heartbeat(
+        {
+            "activity": "strategy_v2.run_voc_agent3_synthesis",
+            "phase": "agent3_prompt",
+            "status": "started",
+        }
+    )
+    agent03_asset = resolve_prompt_asset(
+        pattern=_VOC_AGENT03_PROMPT_PATTERN,
+        context="VOC Agent 3 shadow angle clusterer",
+    )
+    agent03_file_id_map, agent03_uploaded_file_ids = _upload_openai_prompt_json_files(
+        model=settings.STRATEGY_V2_VOC_MODEL,
+        workflow_run_id=workflow_run_id,
+        stage_label="agent3",
+        logical_payloads={
+            "AGENT2_HANDOFF_VOC_SCORED_JSON": voc_scored,
+            "AGENT2_VOC_OBSERVATIONS_JSON": voc_observations,
+            "COMPETITOR_ANGLE_MAP_JSON": competitor_angle_map,
+            "KNOWN_SATURATED_ANGLES_JSON": saturated_angles,
+            "PRODUCT_BRIEF_JSON": stage1_data,
+            "AVATAR_BRIEF_SUMMARY_JSON": {
+                "avatar_brief_summary": str(foundational_step_summaries.get("06") or "")[:4000]
+            },
+            "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                "step_contents": {
+                    step_key: str(foundational_step_contents.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+                "step_summaries": {
+                    step_key: str(foundational_step_summaries.get(step_key) or "")
+                    for step_key in _FOUNDATIONAL_STEP_KEYS
+                },
+            },
+        },
+    )
+    try:
+        agent03_output, agent03_raw, agent03_provenance = _run_prompt_json_object(
+            asset=agent03_asset,
+            context="strategy_v2.agent3_output",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            runtime_instruction=(
+                "## Runtime Input Block\n"
+                f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent03_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+                "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                "Use OPENAI_CODE_INTERPRETER_FILE_IDS_JSON to load each dataset.\n"
+                "Output both angle_observations and angle_candidates.\n"
+                f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} angle_candidates, "
+                f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate, "
+                f"and exactly {_AGENT3_HOOK_STARTERS_PER_CANDIDATE} hook_starters per candidate.\n"
+                f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
+            ),
+            schema_name="strategy_v2_voc_agent03",
+            schema={
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "angle_observations": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": _MAX_AGENT3_ANGLE_OBSERVATIONS,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "angle_id": {"type": "string", "maxLength": 32},
+                            "angle_name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                            "competitor_angle_overlap": {"type": "string", "enum": _VOC_YN_CD_ENUM},
+                        },
+                        "required": ["angle_id", "angle_name", "competitor_angle_overlap"],
+                    },
+                },
+                "angle_candidates": {
+                    "type": "array",
+                    "minItems": _MIN_AGENT3_ANGLE_CANDIDATES,
+                    "maxItems": _MIN_AGENT3_ANGLE_CANDIDATES,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "angle_id": {"type": "string", "maxLength": 32},
+                            "angle_name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                            "definition": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "who": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                    "pain_desire": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                    "mechanism_why": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                    "belief_shift": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "properties": {
+                                            "before": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                            "after": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                        },
+                                        "required": ["before", "after"],
+                                    },
+                                    "trigger": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                },
+                                "required": ["who", "pain_desire", "mechanism_why", "belief_shift", "trigger"],
+                            },
+                            "evidence": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "supporting_voc_count": {"type": "integer"},
+                                    "top_quotes": {
+                                        "type": "array",
+                                        "minItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
+                                        "maxItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
+                                        "items": {
+                                            "type": "object",
+                                            "additionalProperties": False,
+                                            "properties": {
+                                                "voc_id": {"type": "string", "maxLength": 64},
+                                                "quote": {"type": "string", "maxLength": _AGENT3_MAX_QUOTE_CHARS},
+                                                "adjusted_score": {"type": "number"},
+                                            },
+                                            "required": ["voc_id", "quote", "adjusted_score"],
+                                        },
+                                    },
+                                    "triangulation_status": {"type": "string", "enum": ["SINGLE", "DUAL", "MULTI"]},
+                                    "velocity_status": {
+                                        "type": "string",
+                                        "enum": ["ACCELERATING", "STEADY", "DECELERATING"],
+                                    },
+                                    "contradiction_count": {"type": "integer"},
+                                },
+                                "required": [
+                                    "supporting_voc_count",
+                                    "top_quotes",
+                                    "triangulation_status",
+                                    "velocity_status",
+                                    "contradiction_count",
+                                ],
+                            },
+                            "hook_starters": {
+                                "type": "array",
+                                "minItems": _AGENT3_HOOK_STARTERS_PER_CANDIDATE,
+                                "maxItems": _AGENT3_HOOK_STARTERS_PER_CANDIDATE,
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "visual": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                        "opening_line": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                        "lever": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                    },
+                                    "required": ["visual", "opening_line", "lever"],
+                                },
+                            },
+                        },
+                        "required": ["angle_id", "angle_name", "definition", "evidence", "hook_starters"],
+                    },
+                },
+            },
+            "required": ["angle_observations", "angle_candidates"],
+            },
+            use_reasoning=True,
+            use_web_search=True,
+            openai_tools=_openai_python_tool_resources(
+                settings.STRATEGY_V2_VOC_MODEL,
+                file_ids=list(agent03_file_id_map.values()),
+            ),
+            openai_tool_choice="auto",
+            max_tokens=_AGENT3_MAX_TOKENS,
+            heartbeat_context={
+                "activity": "strategy_v2.run_voc_agent3_synthesis",
+                "phase": "agent3_prompt",
+                "model": settings.STRATEGY_V2_VOC_MODEL,
+            },
+        )
+    finally:
+        _cleanup_openai_prompt_files(
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            file_ids=agent03_uploaded_file_ids,
+        )
+    _raise_if_blocked_prompt_output(
+        stage_label="v2-06 Agent 3 angle synthesis",
+        parsed_output=agent03_output,
+        raw_output=agent03_raw,
+        remediation=("ensure Agent 2 produced complete high-quality VOC observations before rerunning v2-06."),
+    )
+    raw_angle_observations = agent03_output.get("angle_observations")
+    if not isinstance(raw_angle_observations, list):
+        raise StrategyV2SchemaValidationError("Agent 3 output must contain angle_observations array.")
+    raw_angle_candidates = agent03_output.get("angle_candidates")
+    if not isinstance(raw_angle_candidates, list):
+        raise StrategyV2SchemaValidationError("Agent 3 output must contain angle_candidates array.")
+    angle_candidates = _normalize_angle_candidates([row for row in raw_angle_candidates if isinstance(row, dict)])
+    candidate_lookup = {
+        str(candidate.get("angle_id")): candidate
+        for candidate in angle_candidates
+        if isinstance(candidate, dict) and isinstance(candidate.get("angle_id"), str)
+    }
+    angle_observations = _normalize_angle_observations(
+        [row for row in raw_angle_observations if isinstance(row, dict)],
+        saturated_count=saturated_count,
+        candidate_lookup=candidate_lookup,
+    )
+    if len(angle_candidates) < _MIN_AGENT3_ANGLE_CANDIDATES:
+        raise StrategyV2DecisionError(
+            "Agent 3 did not return enough angle candidates for HITL selection quality. "
+            f"Received={len(angle_candidates)}, required>={_MIN_AGENT3_ANGLE_CANDIDATES}. "
+            "Remediation: rerun stage v2-06 with richer VOC inputs and stronger competitor-angle mapping."
+        )
+    scored_angles_payload = score_angles(angle_observations, saturated_count=saturated_count)
+    _require_angle_transition_quality(scored_angles_payload=scored_angles_payload)
+    scored_angle_rows = scored_angles_payload.get("angles")
+    scored_lookup: dict[str, dict[str, Any]] = {}
+    if isinstance(scored_angle_rows, list):
+        for row in scored_angle_rows:
+            if isinstance(row, dict) and isinstance(row.get("angle_id"), str):
+                scored_lookup[row["angle_id"]] = row
+    ranked_candidates: list[dict[str, Any]] = []
+    for candidate in angle_candidates:
+        candidate_id = candidate.get("angle_id")
+        score_row = scored_lookup.get(str(candidate_id))
+        ranked_candidates.append(
+            {
+                "angle": candidate,
+                "score": score_row.get("final_score") if isinstance(score_row, dict) else None,
+                "confidence_range": score_row.get("confidence_range") if isinstance(score_row, dict) else None,
+                "rank": score_row.get("rank") if isinstance(score_row, dict) else None,
+                "components": score_row.get("components") if isinstance(score_row, dict) else None,
+                "evidence_floor_gate": score_row.get("evidence_floor_gate") if isinstance(score_row, dict) else None,
+            }
+        )
+    ranked_candidates.sort(key=lambda row: float(row.get("score") or 0.0), reverse=True)
+
+    with session_scope() as session:
+        angle_agent_run_id = _record_agent_run(
+            session=session,
+            org_id=org_id,
+            user_id=operator_user_id,
+            client_id=client_id,
+            objective_type="strategy_v2.agent3_angle_synthesis.prompt_chain",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            inputs_json={"angle_observation_count": len(angle_observations)},
+            outputs_json={
+                "ranked_candidates": ranked_candidates,
+                "score_summary": scored_angles_payload.get("summary"),
+            },
+        )
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_ANGLE_SYNTHESIS,
+            title="Strategy V2 Angle Synthesis",
+            summary="Agent 3 prompt-chain angle candidates synthesized and ranked.",
+            payload={
+                "ranked_candidates": ranked_candidates,
+                "scorecard": scored_angles_payload,
+                "stage1_artifact_id": stage1_artifact_id,
+                "angle_observations": angle_observations,
+                "prompt_provenance": agent03_provenance,
+                "raw_output": agent03_raw[:30000],
+            },
+            model_name=settings.STRATEGY_V2_VOC_MODEL,
+            prompt_version="strategy_v2.agent3.prompt_chain.v2",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=angle_agent_run_id,
+        )
+
+    updated_step_payload_artifact_ids = _updated_step_payload_artifact_ids(
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        step_key=V2_STEP_ANGLE_SYNTHESIS,
+        artifact_id=step_payload_artifact_id,
+    )
+    return {
+        "ranked_angle_candidates": ranked_candidates,
+        "angle_observations": angle_observations,
+        "scorecard": scored_angles_payload,
+        "step_payload_artifact_id": step_payload_artifact_id,
+        "step_payload_artifact_ids": updated_step_payload_artifact_ids,
+    }
+
+
 @activity.defn(name="strategy_v2.run_voc_angle_pipeline")
 def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[str, Any]:
     org_id = str(params["org_id"])
@@ -4155,25 +10907,6 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 workflow_run_id=workflow_run_id,
                 confirmed_competitor_assets=confirmed_competitor_assets,
             )
-        if not apify_context and isinstance(precanon_research.get("asset_data_context"), dict):
-            apify_context = dict(precanon_research.get("asset_data_context") or {})
-        social_video_rows = apify_context.get("social_video_observations")
-        external_voc_rows = apify_context.get("external_voc_corpus")
-        needs_social_refresh = not isinstance(social_video_rows, list) or len(social_video_rows) == 0
-        needs_external_refresh = not isinstance(external_voc_rows, list) or len(external_voc_rows) == 0
-        if needs_social_refresh or needs_external_refresh:
-            source_refs = list(stage0.competitor_urls) + confirmed_competitor_assets
-            scrapeable_source_refs, excluded_source_refs = _partition_source_refs_for_ingestion(
-                [ref for ref in source_refs if isinstance(ref, str) and ref.strip()]
-            )
-            apify_context = _ingest_strategy_v2_asset_data(
-                source_refs=scrapeable_source_refs,
-                include_ads_context=False,
-                include_social_video=needs_social_refresh,
-                include_external_voc=needs_external_refresh,
-            )
-            apify_context["ingestion_source_refs"] = scrapeable_source_refs
-            apify_context["excluded_source_refs"] = excluded_source_refs
         activity.heartbeat(
             {
                 "activity": "strategy_v2.run_voc_angle_pipeline",
@@ -4332,61 +11065,75 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 pattern=_VOC_AGENT00_PROMPT_PATTERN,
                 context="VOC Agent 0 habitat strategist",
             )
-            agent00_output, agent00_raw, agent00_provenance = _run_prompt_json_object(
-                asset=agent00_asset,
-                context="strategy_v2.agent0_output",
+            agent00_file_id_map, agent00_uploaded_file_ids = _upload_openai_prompt_json_files(
                 model=settings.STRATEGY_V2_VOC_MODEL,
-                runtime_instruction=(
-                    "## Runtime Input Block\n"
-                    f"PRODUCT_BRIEF:\n{_dump_prompt_json(stage1_data, max_chars=12000)}\n\n"
-                    f"AVATAR_BRIEF:\n{_dump_prompt_json(avatar_brief_payload, max_chars=12000)}\n\n"
-                    f"AVATAR_BRIEF_SUMMARY:\n{str(foundational_step_summaries.get('06') or '')[:4000]}\n\n"
-                    f"COMPETITOR_RESEARCH_SUMMARY:\n{str(foundational_step_summaries.get('01') or '')[:6000]}\n\n"
-                    f"COMPETITOR_ANALYSIS:\n{_dump_prompt_json(competitor_analysis, max_chars=16000)}\n\n"
-                    "Output a strict JSON object with strategy_habitats and optional manual_queries."
-                ),
-                schema_name="strategy_v2_voc_agent00",
-                schema={
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "category_classification": {"type": "object", "additionalProperties": True},
-                        "strategy_habitats": {
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": True,
-                                "properties": {
-                                    "habitat_name": {"type": "string", "minLength": 1},
-                                    "habitat_type": {"type": "string", "minLength": 1},
-                                    "url_pattern": {"type": "string", "minLength": 1},
-                                },
-                                "required": ["habitat_name", "habitat_type", "url_pattern"],
-                            },
+                workflow_run_id=workflow_run_id,
+                stage_label="agent0-prompt-chain",
+                logical_payloads={
+                    "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                        "step_contents": {
+                            step_key: str(foundational_step_contents.get(step_key) or "")
+                            for step_key in _FOUNDATIONAL_STEP_KEYS
                         },
-                        "manual_queries": {"type": "array", "items": {"type": "string", "minLength": 1}},
-                        "handoff_block": {"type": "string"},
-                    },
-                    "required": ["strategy_habitats"],
-                },
-                use_reasoning=True,
-                use_web_search=False,
-                heartbeat_context={
-                    "activity": "strategy_v2.run_voc_angle_pipeline",
-                    "phase": "agent0_prompt",
-                    "model": settings.STRATEGY_V2_VOC_MODEL,
+                        "step_summaries": {
+                            step_key: str(foundational_step_summaries.get(step_key) or "")
+                            for step_key in _FOUNDATIONAL_STEP_KEYS
+                        },
+                    }
                 },
             )
+            try:
+                agent00_runtime_base = (
+                    "## Runtime Input Block\n"
+                    f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent00_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+                    "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                    "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before generating habitat strategy.\n\n"
+                    f"PRODUCT_BRIEF:\n{_dump_prompt_json(stage1_data, max_chars=12000)}\n\n"
+                    f"AVATAR_BRIEF:\n{_dump_prompt_json(avatar_brief_payload, max_chars=12000)}\n\n"
+                    f"COMPETITOR_RESEARCH:\n{str(foundational_step_contents.get('01') or '')[:20000]}\n\n"
+                    f"COMPETITOR_ANALYSIS_JSON:\n{_dump_prompt_json(competitor_analysis, max_chars=16000)}\n\n"
+                    f"KNOWN_HABITAT_URLS:\n{_dump_prompt_json([], max_chars=4000)}\n\n"
+                    f"PLATFORM_RESTRICTIONS:\n{_dump_prompt_json(None, max_chars=2000)}\n\n"
+                    f"GEOGRAPHIC_TARGET:\n{_dump_prompt_json(None, max_chars=2000)}\n"
+                )
+                agent00_handoff_output, agent00_raw, agent00_provenance = _run_prompt_json_object(
+                    asset=agent00_asset,
+                    context="strategy_v2.agent0_output",
+                    model=settings.STRATEGY_V2_VOC_MODEL,
+                    runtime_instruction=agent00_runtime_base,
+                    schema_name="strategy_v2_voc_agent00_handoff",
+                    schema=_VOC_AGENT00_HANDOFF_SCHEMA,
+                    use_reasoning=True,
+                    reasoning_effort="xhigh",
+                    use_web_search=True,
+                    openai_tools=_openai_python_tool_resources(
+                        settings.STRATEGY_V2_VOC_MODEL,
+                        file_ids=list(agent00_file_id_map.values()),
+                    ),
+                    openai_tool_choice="auto",
+                    heartbeat_context={
+                        "activity": "strategy_v2.run_voc_angle_pipeline",
+                        "phase": "agent0_prompt",
+                        "model": settings.STRATEGY_V2_VOC_MODEL,
+                    },
+                    append_schema_instruction=False,
+                )
+            finally:
+                _cleanup_openai_prompt_files(
+                    model=settings.STRATEGY_V2_VOC_MODEL,
+                    file_ids=agent00_uploaded_file_ids,
+                )
             _raise_if_blocked_prompt_output(
                 stage_label="v2-02 Agent 0 habitat strategist",
-                parsed_output=agent00_output,
+                parsed_output=agent00_handoff_output,
                 raw_output=agent00_raw,
                 remediation=(
                     "provide complete PRODUCT_BRIEF, AVATAR_BRIEF, and COMPETITOR_ANALYSIS "
                     "inputs before rerunning v2-02."
                 ),
             )
+            agent00_output = _normalize_agent00_handoff_output(agent00_handoff_output)
+            _require_agent00_executable_configs(agent00_output)
             habitat_strategy_payload = {
                 "category_niche": stage1.category_niche,
                 "competitor_urls": stage1.competitor_urls,
@@ -4397,6 +11144,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     if key in {"01", "03", "04", "06"} and isinstance(value, str)
                 },
                 "agent_output": agent00_output,
+                "agent_handoff_json": agent00_handoff_output,
                 "prompt_provenance": agent00_provenance,
                 "raw_output": agent00_raw[:20000],
             }
@@ -4431,55 +11179,90 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 pattern=_VOC_AGENT00B_PROMPT_PATTERN,
                 context="VOC Agent 0b social video strategist",
             )
-            agent00b_output, agent00b_raw, agent00b_provenance = _run_prompt_json_object(
-                asset=agent00b_asset,
-                context="strategy_v2.agent0b_output",
+            agent00b_file_id_map, agent00b_uploaded_file_ids = _upload_openai_prompt_json_files(
                 model=settings.STRATEGY_V2_VOC_MODEL,
-                runtime_instruction=(
-                    "## Runtime Input Block\n"
-                    f"PRODUCT_BRIEF:\n{_dump_prompt_json(stage1_data, max_chars=12000)}\n\n"
-                    f"AVATAR_BRIEF:\n{_dump_prompt_json(avatar_brief_payload, max_chars=12000)}\n\n"
-                    f"COMPETITOR_ANALYSIS:\n{_dump_prompt_json(competitor_analysis, max_chars=16000)}\n\n"
-                    f"PRODUCT_CATEGORY_KEYWORDS:\n{', '.join(product_category_keywords)}\n\n"
-                    f"KNOWN_COMPETITOR_SOCIAL_ACCOUNTS:\n{_dump_prompt_json(stage1.competitor_urls, max_chars=6000)}\n\n"
-                    "Output a strict JSON object with platform strategy and configuration summaries."
-                ),
-                schema_name="strategy_v2_voc_agent00b",
-                schema={
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "platform_priorities": {
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {"type": "string", "minLength": 1},
+                workflow_run_id=workflow_run_id,
+                stage_label="agent0b-prompt-chain",
+                logical_payloads={
+                    "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                        "step_contents": {
+                            step_key: str(foundational_step_contents.get(step_key) or "")
+                            for step_key in _FOUNDATIONAL_STEP_KEYS
                         },
-                        "configurations": {
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": True,
-                                "properties": {
-                                    "config_id": {"type": "string", "minLength": 1},
-                                    "platform": {"type": "string", "minLength": 1},
-                                    "mode": {"type": "string", "minLength": 1},
-                                },
-                                "required": ["config_id", "platform", "mode"],
-                            },
+                        "step_summaries": {
+                            step_key: str(foundational_step_summaries.get(step_key) or "")
+                            for step_key in _FOUNDATIONAL_STEP_KEYS
                         },
-                        "handoff_block": {"type": "string"},
-                    },
-                    "required": ["platform_priorities", "configurations"],
-                },
-                use_reasoning=True,
-                use_web_search=False,
-                heartbeat_context={
-                    "activity": "strategy_v2.run_voc_angle_pipeline",
-                    "phase": "agent0b_prompt",
-                    "model": settings.STRATEGY_V2_VOC_MODEL,
+                    }
                 },
             )
+            try:
+                agent00b_output, agent00b_raw, agent00b_provenance = _run_prompt_json_object(
+                    asset=agent00b_asset,
+                    context="strategy_v2.agent0b_output",
+                    model=settings.STRATEGY_V2_VOC_MODEL,
+                    runtime_instruction=(
+                        "## Runtime Input Block\n"
+                        f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent00b_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+                        "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                        "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before generating video strategy.\n\n"
+                        f"PRODUCT_BRIEF:\n{_dump_prompt_json(stage1_data, max_chars=12000)}\n\n"
+                        f"AVATAR_BRIEF:\n{_dump_prompt_json(avatar_brief_payload, max_chars=12000)}\n\n"
+                        f"COMPETITOR_ANALYSIS:\n{_dump_prompt_json(competitor_analysis, max_chars=16000)}\n\n"
+                        f"PRODUCT_CATEGORY_KEYWORDS:\n{', '.join(product_category_keywords)}\n\n"
+                        f"KNOWN_COMPETITOR_SOCIAL_ACCOUNTS:\n{_dump_prompt_json(stage1.competitor_urls, max_chars=6000)}\n"
+                    ),
+                    schema_name="strategy_v2_voc_agent00b",
+                    schema={
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "platform_priorities": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {"type": "string", "minLength": 1},
+                            },
+                            "configurations": {
+                                "type": "array",
+                                "minItems": 1,
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": True,
+                                    "properties": {
+                                        "config_id": {"type": "string", "minLength": 1},
+                                        "platform": {"type": "string", "minLength": 1},
+                                        "mode": {"type": "string", "minLength": 1},
+                                        "actor_id": {"type": "string", "minLength": 1},
+                                        "input": _APIFY_EXEC_INPUT_SCHEMA,
+                                        "metadata": {"type": "object", "additionalProperties": True},
+                                    },
+                                    "required": ["config_id", "platform", "mode", "actor_id", "input"],
+                                },
+                            },
+                            "handoff_block": {"type": "string"},
+                        },
+                        "required": ["platform_priorities", "configurations"],
+                    },
+                    use_reasoning=True,
+                    reasoning_effort="xhigh",
+                    use_web_search=True,
+                    openai_tools=_openai_python_tool_resources(
+                        settings.STRATEGY_V2_VOC_MODEL,
+                        file_ids=list(agent00b_file_id_map.values()),
+                    ),
+                    openai_tool_choice="auto",
+                    heartbeat_context={
+                        "activity": "strategy_v2.run_voc_angle_pipeline",
+                        "phase": "agent0b_prompt",
+                        "model": settings.STRATEGY_V2_VOC_MODEL,
+                    },
+                    append_schema_instruction=False,
+                )
+            finally:
+                _cleanup_openai_prompt_files(
+                    model=settings.STRATEGY_V2_VOC_MODEL,
+                    file_ids=agent00b_uploaded_file_ids,
+                )
             _raise_if_blocked_prompt_output(
                 stage_label="v2-03 Agent 0b social video strategist",
                 parsed_output=agent00b_output,
@@ -4488,6 +11271,96 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "supply PRODUCT_BRIEF, structured AVATAR_BRIEF, COMPETITOR_ANALYSIS, "
                     "and PRODUCT_CATEGORY_KEYWORDS before rerunning v2-03."
                 ),
+            )
+
+            strategy_apify_configs = _extract_apify_configs_from_agent_strategies(
+                habitat_strategy=agent00_output,
+                video_strategy=agent00b_output,
+            )
+            activity.heartbeat(
+                {
+                    "activity": "strategy_v2.run_voc_angle_pipeline",
+                    "phase": "apify_execution_layer",
+                    "status": "started",
+                    "config_count": len(strategy_apify_configs),
+                }
+            )
+
+            def _apify_progress_heartbeat(event: dict[str, Any]) -> None:
+                heartbeat_payload: dict[str, Any] = {
+                    "activity": "strategy_v2.run_voc_angle_pipeline",
+                    "phase": "apify_execution_layer",
+                    "status": "in_progress",
+                    "progress_event": str(event.get("event") or "unknown"),
+                    "config_count": len(strategy_apify_configs),
+                }
+                for field_name in (
+                    "actor_id",
+                    "config_id",
+                    "run_id",
+                    "run_index",
+                    "planned_run_count",
+                    "elapsed_seconds",
+                    "status",
+                ):
+                    field_value = event.get(field_name)
+                    if field_value is not None:
+                        if field_name == "status":
+                            heartbeat_payload["actor_run_status"] = field_value
+                        else:
+                            heartbeat_payload[field_name] = field_value
+                activity.heartbeat(heartbeat_payload)
+
+            apify_context = _ingest_strategy_v2_asset_data(
+                apify_configs=strategy_apify_configs,
+                include_ads_context=False,
+                include_social_video=True,
+                include_external_voc=True,
+                progress_callback=_apify_progress_heartbeat,
+            )
+            apify_context["ingestion_apify_configs"] = strategy_apify_configs
+            apify_context["ingestion_source_refs"] = []
+            apify_context["excluded_source_refs"] = []
+            raw_runs = apify_context.get("raw_runs")
+            raw_run_rows = [row for row in raw_runs if isinstance(row, dict)] if isinstance(raw_runs, list) else []
+            executed_actor_run_count = len(raw_run_rows)
+            failed_actor_run_count = len(
+                [row for row in raw_run_rows if str(row.get("status") or "").upper() != "SUCCEEDED"]
+            )
+            apify_summary = _require_dict(
+                payload=apify_context.get("summary"),
+                field_name="apify_context.summary",
+            )
+            strategy_config_run_count = apify_summary.get("strategy_config_run_count")
+            planned_actor_run_count = apify_summary.get("planned_actor_run_count")
+            if not isinstance(strategy_config_run_count, int) or strategy_config_run_count < 0:
+                raise StrategyV2SchemaValidationError(
+                    "apify_context.summary.strategy_config_run_count must be a non-negative integer."
+                )
+            if strategy_config_run_count != len(strategy_apify_configs):
+                raise StrategyV2SchemaValidationError(
+                    "apify_context.summary.strategy_config_run_count mismatch "
+                    f"(summary={strategy_config_run_count}, expected_strategy_configs={len(strategy_apify_configs)})."
+                )
+            if not isinstance(planned_actor_run_count, int) or planned_actor_run_count < 0:
+                raise StrategyV2SchemaValidationError(
+                    "apify_context.summary.planned_actor_run_count must be a non-negative integer."
+                )
+            if planned_actor_run_count < executed_actor_run_count:
+                raise StrategyV2SchemaValidationError(
+                    "apify_context.summary.planned_actor_run_count cannot be less than executed_actor_run_count "
+                    f"(planned={planned_actor_run_count}, executed={executed_actor_run_count})."
+                )
+            _validate_reddit_target_alignment(run_rows=raw_run_rows)
+            activity.heartbeat(
+                {
+                    "activity": "strategy_v2.run_voc_angle_pipeline",
+                    "phase": "apify_execution_layer",
+                    "status": "completed",
+                    "strategy_config_run_count": strategy_config_run_count,
+                    "planned_actor_run_count": planned_actor_run_count,
+                    "run_count": executed_actor_run_count,
+                }
             )
 
             video_observations = _extract_video_observations(competitor_analysis)
@@ -4509,24 +11382,28 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 seen_video_ids.add(video_id)
                 video_observations.append(row)
 
-            metric_video_rows = [
-                row
-                for row in video_observations
-                if isinstance(row, dict)
-                and isinstance(row.get("views"), int)
-                and isinstance(row.get("followers"), int)
-                and isinstance(row.get("comments"), int)
-                and isinstance(row.get("shares"), int)
-                and isinstance(row.get("likes"), int)
-                and isinstance(row.get("days_since_posted"), int)
-            ]
+            source_allowlist = _extract_video_source_allowlist(agent00b_output)
+            topic_keywords = _build_video_topic_keywords(stage1=stage1)
+            metric_video_rows, video_filter_diagnostics = _filter_metric_video_rows_for_scoring(
+                video_rows=video_observations,
+                source_allowlist=source_allowlist,
+                topic_keywords=topic_keywords,
+            )
+            video_scoring_status = "scored"
             if not metric_video_rows:
-                raise StrategyV2MissingContextError(
-                    "v2-03 requires at least one social video observation with numeric metrics "
-                    "(views, followers, comments, shares, likes, days_since_posted). "
-                    "Remediation: enrich competitor_analysis.asset_observation_sheets or external Apify video rows."
-                )
-            video_scored = score_videos(metric_video_rows)
+                if video_observations:
+                    raise StrategyV2DecisionError(
+                        "Video scoring aborted: no topic-aligned social video rows remained after source/topic validation. "
+                        f"Diagnostics={video_filter_diagnostics}"
+                    )
+                video_scoring_status = "skipped_no_metric_video_rows"
+            video_scored = _normalize_video_scored_rows(score_videos(metric_video_rows) if metric_video_rows else [])
+            scoring_audit = _build_video_scoring_audit(
+                video_observation_count=len(video_observations),
+                metric_video_observation_count=len(metric_video_rows),
+                video_scored=video_scored,
+                video_filter_diagnostics=video_filter_diagnostics,
+            )
             video_agent_run_id = _record_agent_run(
                 session=session,
                 org_id=org_id,
@@ -4535,13 +11412,17 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 objective_type="strategy_v2.agent0b_scrape_virality.prompt_chain",
                 model=settings.STRATEGY_V2_VOC_MODEL,
                 inputs_json={
+                    "video_scoring_status": video_scoring_status,
                     "video_observation_count": len(video_observations),
                     "metric_video_observation_count": len(metric_video_rows),
                     "apify_video_observation_count": len(apify_video_rows),
+                    "video_filter_diagnostics": video_filter_diagnostics,
                 },
                 outputs_json={
                     "video_strategy": agent00b_output,
+                    "video_filter_diagnostics": video_filter_diagnostics,
                     "video_scored": video_scored,
+                    "scoring_audit": scoring_audit,
                 },
             )
             v2_03_step_payload_artifact_id = _persist_step_payload(
@@ -4555,9 +11436,12 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 title="Strategy V2 Scrape + Virality",
                 summary="Agent 0b prompt-chain social video strategy and deterministic virality scoring.",
                 payload={
+                    "video_scoring_status": video_scoring_status,
                     "video_observation_count": len(video_observations),
                     "metric_video_observation_count": len(metric_video_rows),
                     "apify_video_observation_count": len(apify_video_rows),
+                    "video_filter_diagnostics": video_filter_diagnostics,
+                    "scoring_audit": scoring_audit,
                     "video_strategy": agent00b_output,
                     "video_scored": video_scored,
                     "prompt_provenance": agent00b_provenance,
@@ -4572,64 +11456,117 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 apify_context=apify_context,
                 competitor_analysis=competitor_analysis,
             )
+            _validate_agent1_scraped_manifest_integrity(
+                scraped_data_manifest=scraped_data_manifest,
+                planned_actor_run_count=planned_actor_run_count,
+                executed_actor_run_count=executed_actor_run_count,
+                failed_actor_run_count=failed_actor_run_count,
+            )
+            handoff_audit = {
+                "strategy_config_run_count": strategy_config_run_count,
+                "planned_actor_run_count": planned_actor_run_count,
+                "executed_actor_run_count": executed_actor_run_count,
+                "failed_actor_run_count": failed_actor_run_count,
+                "manifest_run_count": int(scraped_data_manifest.get("run_count") or 0),
+                "manifest_total_run_count": int(scraped_data_manifest.get("total_run_count") or 0),
+                "excluded_run_count": int(scraped_data_manifest.get("excluded_run_count") or 0),
+                "raw_files_len": len(scraped_data_manifest.get("raw_scraped_data_files") or []),
+                "excluded_runs_len": len(scraped_data_manifest.get("excluded_runs") or []),
+                "target_id_mapping_diagnostics": (
+                    dict(scraped_data_manifest.get("target_id_mapping_diagnostics"))
+                    if isinstance(scraped_data_manifest.get("target_id_mapping_diagnostics"), Mapping)
+                    else {}
+                ),
+                "scoring_audit": scoring_audit,
+            }
 
             agent01_asset = resolve_prompt_asset(
                 pattern=_VOC_AGENT01_PROMPT_PATTERN,
                 context="VOC Agent 1 habitat qualifier",
             )
-            agent01_output, agent01_raw, agent01_provenance = _run_prompt_json_object(
-                asset=agent01_asset,
-                context="strategy_v2.agent1_output",
+            scraped_file_inventory = _build_agent1_runtime_file_inventory(scraped_data_manifest)
+            agent01_file_id_map, agent01_uploaded_file_ids = _upload_openai_prompt_json_files(
                 model=settings.STRATEGY_V2_VOC_MODEL,
-                runtime_instruction=(
-                    "## Runtime Input Block\n"
-                    f"HABITAT_STRATEGY_JSON:\n{_dump_prompt_json(agent00_output, max_chars=9000)}\n\n"
-                    f"VIDEO_STRATEGY_JSON:\n{_dump_prompt_json(agent00b_output, max_chars=9000)}\n\n"
-                    f"SCORED_VIDEO_DATA_JSON:\n{_dump_prompt_json(video_scored, max_chars=9000)}\n\n"
-                    f"SCRAPED_DATA_FILES_JSON:\n{_dump_prompt_json(scraped_data_manifest, max_chars=10000)}\n\n"
-                    f"PRODUCT_BRIEF:\n{_dump_prompt_json(stage1_data, max_chars=9000)}\n\n"
-                    f"AVATAR_BRIEF:\n{_dump_prompt_json(avatar_brief_payload, max_chars=9000)}\n\n"
-                    f"COMPETITOR_ANALYSIS_JSON:\n{_dump_prompt_json(competitor_analysis, max_chars=10000)}\n\n"
-                    "If any detail is absent, continue with best-effort qualification using available evidence "
-                    "and mark unknowns as CANNOT_DETERMINE.\n"
-                    "Never emit sentinel blocked tokens in output.\n"
-                    "Output habitat_observations suitable for deterministic habitat scoring."
-                ),
-                schema_name="strategy_v2_voc_agent01",
-                schema={
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "habitat_observations": {
-                            "type": "array",
-                            "minItems": 1,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": True,
-                                "properties": {
-                                    "habitat_name": {"type": "string", "minLength": 1},
-                                    "habitat_type": {"type": "string", "minLength": 1},
-                                    "url_pattern": {"type": "string", "minLength": 1},
-                                },
-                                "required": ["habitat_name", "habitat_type", "url_pattern"],
-                            },
+                workflow_run_id=workflow_run_id,
+                stage_label="agent1-prompt-chain",
+                logical_payloads={
+                    "HABITAT_STRATEGY_JSON": agent00_output,
+                    "VIDEO_STRATEGY_JSON": agent00b_output,
+                    "SCORED_VIDEO_DATA_JSON": video_scored,
+                    "SCRAPED_DATA_FILES_JSON": scraped_data_manifest,
+                    "PRODUCT_BRIEF_JSON": stage1_data,
+                    "AVATAR_BRIEF_JSON": avatar_brief_payload,
+                    "COMPETITOR_ANALYSIS_JSON": competitor_analysis,
+                    "HANDOFF_AUDIT_JSON": handoff_audit,
+                    "SCORING_AUDIT_JSON": scoring_audit,
+                    "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                        "step_contents": {
+                            step_key: str(foundational_step_contents.get(step_key) or "")
+                            for step_key in _FOUNDATIONAL_STEP_KEYS
                         },
-                        "mining_plan": {
-                            "type": "array",
-                            "items": {"type": "object", "additionalProperties": True},
+                        "step_summaries": {
+                            step_key: str(foundational_step_summaries.get(step_key) or "")
+                            for step_key in _FOUNDATIONAL_STEP_KEYS
                         },
                     },
-                    "required": ["habitat_observations"],
-                },
-                use_reasoning=True,
-                use_web_search=False,
-                max_tokens=_AGENT1_MAX_TOKENS,
-                heartbeat_context={
-                    "activity": "strategy_v2.run_voc_angle_pipeline",
-                    "phase": "agent1_prompt",
-                    "model": settings.STRATEGY_V2_VOC_MODEL,
                 },
             )
+            try:
+                agent01_output, agent01_raw, agent01_provenance = _run_prompt_json_object(
+                    asset=agent01_asset,
+                    context="strategy_v2.agent1_output",
+                    model=settings.STRATEGY_V2_VOC_MODEL,
+                    runtime_instruction=(
+                        "## Runtime Input Block\n"
+                        f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent01_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+                        f"SCRAPED_FILE_INVENTORY_JSON:\n{_dump_prompt_json_required(scraped_file_inventory, max_chars=16000, field_name='SCRAPED_FILE_INVENTORY_JSON')}\n\n"
+                        "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                        "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before analyzing scraped evidence.\n"
+                        "Treat SCRAPED_DATA_FILES_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as canonical.\n"
+                        "SCRAPED_DATA_FILES is a logical label only; do not require runtime filesystem reads.\n"
+                        "Use only source_file names present in SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
+                        "Never invent, mutate, or alias filenames that are not explicitly listed at runtime.\n"
+                        "Use SCORING_AUDIT_JSON as deterministic context for eligible-vs-excluded video rows; do not recompute excluded counts.\n"
+                        "Use only provided scraped evidence; if a field is missing within present evidence, mark it as CANNOT_DETERMINE.\n"
+                        "For hard-gate observables: set text_based_content=Y only when extractable textual evidence exists. "
+                        "If text_based_content is not Y because text evidence is missing, set target_language=CANNOT_DETERMINE "
+                        "and do not list target_language as an independent mining gate failure.\n"
+                        "Because runtime enforces strict JSON response_format, return a single JSON object only.\n"
+                        "Put the full human report into report_markdown string inside the JSON object.\n"
+                        "Keep report_markdown concise and evidence-focused; target <=12000 characters.\n"
+                        "Use evidence pointers in the format <virtual_path>::item[<index>] or <virtual_path>::<item_id>.\n"
+                        "Every habitat_observations entry and mining_plan entry must include a non-empty evidence_refs array.\n"
+                        "Every habitat_observations[*].mining_gate object must include status, failed_fields, and a non-empty reason.\n"
+                        "Include excluded_source_files as filenames intentionally excluded from habitat_observations.\n"
+                        "Ensure (habitat_observations.source_file U excluded_source_files) exactly matches SCRAPED_FILE_INVENTORY_JSON.file_names.\n"
+                        "Ensure every mining_plan.source_file appears in habitat_observations.source_file (mining_plan subset rule).\n"
+                        "Construct mining_plan by selecting rows from habitat_observations only; never introduce a new source_file in mining_plan.\n"
+                        "Never include any excluded_source_files entry inside mining_plan.\n"
+                        "Never emit sentinel blocked tokens or blocked placeholders in output (e.g., BLOCKED_MISSING_REQUIRED_INPUTS, MISSING_REQUIRED_INPUTS, CANNOT_PROCEED, BLOCKED).\n"
+                        "Output complete habitat_observations and mining_plan entries suitable for deterministic habitat scoring."
+                    ),
+                    schema_name="strategy_v2_voc_agent01",
+                    schema=_VOC_AGENT01_OUTPUT_SCHEMA,
+                    use_reasoning=True,
+                    reasoning_effort="low",
+                    use_web_search=False,
+                    openai_tools=_openai_python_tool_resources(
+                        settings.STRATEGY_V2_VOC_MODEL,
+                        file_ids=list(agent01_file_id_map.values()),
+                    ),
+                    openai_tool_choice="auto",
+                    max_tokens=_AGENT1_MAX_TOKENS,
+                    heartbeat_context={
+                        "activity": "strategy_v2.run_voc_angle_pipeline",
+                        "phase": "agent1_prompt",
+                        "model": settings.STRATEGY_V2_VOC_MODEL,
+                    },
+                )
+            finally:
+                _cleanup_openai_prompt_files(
+                    model=settings.STRATEGY_V2_VOC_MODEL,
+                    file_ids=agent01_uploaded_file_ids,
+                )
             _raise_if_blocked_prompt_output(
                 stage_label="v2-04 Agent 1 habitat qualifier",
                 parsed_output=agent01_output,
@@ -4642,6 +11579,10 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
             raw_habitat_observations = agent01_output.get("habitat_observations")
             if not isinstance(raw_habitat_observations, list):
                 raise StrategyV2SchemaValidationError("Agent 1 output must contain habitat_observations array.")
+            _validate_agent1_output_source_file_grounding(
+                agent01_output=agent01_output,
+                scraped_data_manifest=scraped_data_manifest,
+            )
             habitat_observations = _normalize_habitat_observations(
                 [row for row in raw_habitat_observations if isinstance(row, dict)]
             )
@@ -4653,8 +11594,15 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 client_id=client_id,
                 objective_type="strategy_v2.agent1_habitat_scoring.prompt_chain",
                 model=settings.STRATEGY_V2_VOC_MODEL,
-                inputs_json={"habitat_observation_count": len(habitat_observations)},
-                outputs_json=habitat_scored,
+                inputs_json={
+                    "habitat_observation_count": len(habitat_observations),
+                    "handoff_audit": handoff_audit,
+                    "scoring_audit": scoring_audit,
+                },
+                outputs_json={
+                    "habitat_scored": habitat_scored,
+                    "scoring_audit": scoring_audit,
+                },
             )
             v2_04_step_payload_artifact_id = _persist_step_payload(
                 session=session,
@@ -4670,6 +11618,8 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "habitat_observation_count": len(habitat_observations),
                     "habitat_observations": habitat_observations,
                     "habitat_scored": habitat_scored,
+                    "scoring_audit": scoring_audit,
+                    "handoff_audit": handoff_audit,
                     "prompt_provenance": agent01_provenance,
                     "raw_output": agent01_raw[:20000],
                 },
@@ -4680,164 +11630,40 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
             )
 
             saturated_angles = extract_saturated_angles(competitor_analysis, limit=9)
+            evidence_rows, evidence_diagnostics = _build_agent2_evidence_rows(
+                existing_corpus=existing_corpus,
+                merged_voc_artifact_rows=merged_voc_artifact_rows,
+                scraped_data_manifest=scraped_data_manifest,
+            )
+            agent2_mode = "DUAL" if existing_corpus else "FRESH"
             agent02_asset = resolve_prompt_asset(
                 pattern=_VOC_AGENT02_PROMPT_PATTERN,
                 context="VOC Agent 2 extractor",
             )
-            agent02_output, agent02_raw, agent02_provenance = _run_prompt_json_object(
-                asset=agent02_asset,
-                context="strategy_v2.agent2_output",
+            extraction = _run_agent2_extractor(
+                agent02_asset=agent02_asset,
                 model=settings.STRATEGY_V2_VOC_MODEL,
-                runtime_instruction=(
-                    "## Runtime Input Block\n"
-                    "DUAL_MODE_REQUIRED: true\n"
-                    f"AGENT1_HANDOFF_JSON:\n{_dump_prompt_json(agent01_output, max_chars=12000)}\n\n"
-                    f"PRODUCT_BRIEF_JSON:\n{_dump_prompt_json(stage1_data, max_chars=9000)}\n\n"
-                    f"AVATAR_BRIEF:\n{_dump_prompt_json(avatar_brief_payload, max_chars=9000)}\n\n"
-                    f"AVATAR_SUMMARY:\n{str(foundational_step_summaries.get('06') or '')[:4000]}\n\n"
-                    f"EXISTING_VOC_CORPUS_JSON:\n{_dump_prompt_json(existing_corpus, max_chars=30000)}\n\n"
-                    f"VOC_CORPUS_SELECTION_SUMMARY_JSON:\n{_dump_prompt_json(merged_voc['summary'], max_chars=6000)}\n\n"
-                    f"KNOWN_SATURATED_ANGLES:\n{_dump_prompt_json(saturated_angles, max_chars=8000)}\n\n"
-                    "Output voc_observations suitable for deterministic VOC scoring."
-                ),
-                schema_name="strategy_v2_voc_agent02",
-                schema={
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "mode": {"type": "string", "minLength": 1},
-                        "voc_observations": {
-                            "type": "array",
-                            "minItems": 5,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "voc_id": {"type": "string", "minLength": 1},
-                                    "source": {"type": "string", "minLength": 1},
-                                    "quote": {"type": "string", "minLength": 1},
-                                    "specific_number": {"type": "string", "enum": ["Y", "N"]},
-                                    "specific_product_brand": {"type": "string", "enum": ["Y", "N"]},
-                                    "specific_event_moment": {"type": "string", "enum": ["Y", "N"]},
-                                    "specific_body_symptom": {"type": "string", "enum": ["Y", "N"]},
-                                    "before_after_comparison": {"type": "string", "enum": ["Y", "N"]},
-                                    "crisis_language": {"type": "string", "enum": ["Y", "N"]},
-                                    "profanity_extreme_punctuation": {"type": "string", "enum": ["Y", "N"]},
-                                    "physical_sensation": {"type": "string", "enum": ["Y", "N"]},
-                                    "identity_change_desire": {"type": "string", "enum": ["Y", "N"]},
-                                    "word_count": {"type": "integer", "minimum": 1},
-                                    "clear_trigger_event": {"type": "string", "enum": ["Y", "N"]},
-                                    "named_enemy": {"type": "string", "enum": ["Y", "N"]},
-                                    "shiftable_belief": {"type": "string", "enum": ["Y", "N"]},
-                                    "expectation_vs_reality": {"type": "string", "enum": ["Y", "N"]},
-                                    "headline_ready": {"type": "string", "enum": ["Y", "N"]},
-                                    "usable_content_pct": {
-                                        "type": "string",
-                                        "enum": ["OVER_75_PCT", "50_TO_75_PCT", "25_TO_50_PCT", "UNDER_25_PCT"],
-                                    },
-                                    "personal_context": {"type": "string", "enum": ["Y", "N"]},
-                                    "long_narrative": {"type": "string", "enum": ["Y", "N"]},
-                                    "engagement_received": {"type": "string", "enum": ["Y", "N"]},
-                                    "real_person_signals": {"type": "string", "enum": ["Y", "N"]},
-                                    "moderated_community": {"type": "string", "enum": ["Y", "N"]},
-                                    "trigger_event": {"type": "string", "minLength": 1},
-                                    "pain_problem": {"type": "string", "minLength": 1},
-                                    "desired_outcome": {"type": "string", "minLength": 1},
-                                    "failed_prior_solution": {"type": "string", "minLength": 1},
-                                    "enemy_blame": {"type": "string", "minLength": 1},
-                                    "identity_role": {"type": "string", "minLength": 1},
-                                    "fear_risk": {"type": "string", "minLength": 1},
-                                    "emotional_valence": {
-                                        "type": "string",
-                                        "enum": [
-                                            "RELIEF",
-                                            "RAGE",
-                                            "SHAME",
-                                            "PRIDE",
-                                            "ANXIETY",
-                                            "HOPE",
-                                            "FRUSTRATION",
-                                            "NEUTRAL",
-                                        ],
-                                    },
-                                    "durable_psychology": {"type": "string", "enum": ["Y", "N"]},
-                                    "market_specific": {"type": "string", "enum": ["Y", "N"]},
-                                    "date_bracket": {
-                                        "type": "string",
-                                        "enum": ["LAST_3MO", "LAST_6MO", "LAST_12MO", "LAST_24MO", "OLDER", "UNKNOWN"],
-                                    },
-                                    "buyer_stage": {"type": "string", "minLength": 1},
-                                    "solution_sophistication": {
-                                        "type": "string",
-                                        "enum": ["NOVICE", "EXPERIENCED", "EXHAUSTED", "UNKNOWN"],
-                                    },
-                                    "compliance_risk": {"type": "string", "enum": ["GREEN", "YELLOW", "RED"]},
-                                },
-                                "required": [
-                                    "voc_id",
-                                    "source",
-                                    "quote",
-                                    "specific_number",
-                                    "specific_product_brand",
-                                    "specific_event_moment",
-                                    "specific_body_symptom",
-                                    "before_after_comparison",
-                                    "crisis_language",
-                                    "profanity_extreme_punctuation",
-                                    "physical_sensation",
-                                    "identity_change_desire",
-                                    "word_count",
-                                    "clear_trigger_event",
-                                    "named_enemy",
-                                    "shiftable_belief",
-                                    "expectation_vs_reality",
-                                    "headline_ready",
-                                    "usable_content_pct",
-                                    "personal_context",
-                                    "long_narrative",
-                                    "engagement_received",
-                                    "real_person_signals",
-                                    "moderated_community",
-                                    "trigger_event",
-                                    "pain_problem",
-                                    "desired_outcome",
-                                    "failed_prior_solution",
-                                    "enemy_blame",
-                                    "identity_role",
-                                    "fear_risk",
-                                    "emotional_valence",
-                                    "durable_psychology",
-                                    "market_specific",
-                                    "date_bracket",
-                                    "buyer_stage",
-                                    "solution_sophistication",
-                                    "compliance_risk",
-                                ],
-                            },
-                        },
-                    },
-                    "required": ["mode", "voc_observations"],
-                },
-                use_reasoning=True,
-                use_web_search=False,
-                max_tokens=_AGENT2_MAX_TOKENS,
-                heartbeat_context={
-                    "activity": "strategy_v2.run_voc_angle_pipeline",
-                    "phase": "agent2_prompt",
-                    "model": settings.STRATEGY_V2_VOC_MODEL,
-                },
+                workflow_run_id=workflow_run_id,
+                mode=agent2_mode,
+                evidence_rows=evidence_rows,
+                agent01_output=agent01_output,
+                habitat_scored=habitat_scored,
+                stage1_data=stage1_data,
+                avatar_brief_payload=avatar_brief_payload,
+                competitor_analysis=competitor_analysis,
+                saturated_angles=saturated_angles,
+                foundational_step_contents=foundational_step_contents,
+                foundational_step_summaries=foundational_step_summaries,
+                activity_name="strategy_v2.run_voc_angle_pipeline",
             )
-            _raise_if_blocked_prompt_output(
-                stage_label="v2-05 Agent 2 VOC extractor",
-                parsed_output=agent02_output,
-                raw_output=agent02_raw,
-                remediation=(
-                    "provide valid Agent 1 handoff, product/avatar briefs, and corpus context before rerunning v2-05."
-                ),
-            )
-            raw_voc_observations = agent02_output.get("voc_observations")
-            if not isinstance(raw_voc_observations, list):
-                raise StrategyV2SchemaValidationError("Agent 2 output must contain voc_observations array.")
+            agent02_output = {
+                "mode": extraction["mode"],
+                "voc_observations": extraction["voc_observations"],
+                "rejected_items": extraction["rejected_items"],
+                "extraction_summary": extraction["extraction_summary"],
+                "validation_errors": [],
+            }
+            raw_voc_observations = extraction["voc_observations"]
             voc_observations = _normalize_voc_observations(
                 [row for row in raw_voc_observations if isinstance(row, dict)]
             )
@@ -4874,10 +11700,21 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "corpus_selection_summary": merged_voc["summary"],
                     "voc_observations": voc_observations,
                     "voc_scored": voc_scored,
-                    "mode": str(agent02_output.get("mode") or "DUAL"),
+                    "mode": str(extraction.get("mode") or agent2_mode),
+                    "extraction_summary": extraction.get("extraction_summary", {}),
+                    "rejected_items": extraction.get("rejected_items", []),
+                    "rejected_item_count": len(
+                        [row for row in extraction.get("rejected_items", []) if isinstance(row, dict)]
+                    ),
+                    "evidence_row_count": len(evidence_rows),
+                    "evidence_diagnostics": evidence_diagnostics,
                     "proof_asset_candidates": proof_asset_candidates,
-                    "prompt_provenance": agent02_provenance,
-                    "raw_output": agent02_raw[:20000],
+                    "prompt_provenance": extraction.get("prompt_provenance", {}),
+                    "raw_output": "\n\n".join(
+                        str(part)
+                        for part in extraction.get("raw_outputs_preview", [])[:8]
+                        if isinstance(part, str)
+                    )[:20000],
                 },
                 model_name=settings.STRATEGY_V2_VOC_MODEL,
                 prompt_version="strategy_v2.agent2.prompt_chain.v2",
@@ -4891,26 +11728,49 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 pattern=_VOC_AGENT03_PROMPT_PATTERN,
                 context="VOC Agent 3 shadow angle clusterer",
             )
-            agent03_output, agent03_raw, agent03_provenance = _run_prompt_json_object(
-                asset=agent03_asset,
-                context="strategy_v2.agent3_output",
+            agent03_file_id_map, agent03_uploaded_file_ids = _upload_openai_prompt_json_files(
                 model=settings.STRATEGY_V2_VOC_MODEL,
-                runtime_instruction=(
-                    "## Runtime Input Block\n"
-                    f"AGENT2_HANDOFF_VOC_SCORED_JSON:\n{_dump_prompt_json(voc_scored, max_chars=30000)}\n\n"
-                    f"AGENT2_VOC_OBSERVATIONS_JSON:\n{_dump_prompt_json(voc_observations, max_chars=24000)}\n\n"
-                    f"COMPETITOR_ANGLE_MAP_JSON:\n{_dump_prompt_json(competitor_angle_map, max_chars=16000)}\n\n"
-                    f"KNOWN_SATURATED_ANGLES_JSON:\n{_dump_prompt_json(saturated_angles, max_chars=10000)}\n\n"
-                    f"PRODUCT_BRIEF_JSON:\n{_dump_prompt_json(stage1_data, max_chars=9000)}\n\n"
-                    f"AVATAR_BRIEF_SUMMARY:\n{str(foundational_step_summaries.get('06') or '')[:4000]}\n\n"
-                    "Output both angle_observations and angle_candidates.\n"
-                    f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} angle_candidates, "
-                    f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate, "
-                    f"and exactly {_AGENT3_HOOK_STARTERS_PER_CANDIDATE} hook_starters per candidate.\n"
-                    f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
-                ),
-                schema_name="strategy_v2_voc_agent03",
-                schema={
+                workflow_run_id=workflow_run_id,
+                stage_label="agent3-prompt-chain",
+                logical_payloads={
+                    "AGENT2_HANDOFF_VOC_SCORED_JSON": voc_scored,
+                    "AGENT2_VOC_OBSERVATIONS_JSON": voc_observations,
+                    "COMPETITOR_ANGLE_MAP_JSON": competitor_angle_map,
+                    "KNOWN_SATURATED_ANGLES_JSON": saturated_angles,
+                    "PRODUCT_BRIEF_JSON": stage1_data,
+                    "AVATAR_BRIEF_SUMMARY_JSON": {
+                        "avatar_brief_summary": str(foundational_step_summaries.get("06") or "")[:4000]
+                    },
+                    "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+                        "step_contents": {
+                            step_key: str(foundational_step_contents.get(step_key) or "")
+                            for step_key in _FOUNDATIONAL_STEP_KEYS
+                        },
+                        "step_summaries": {
+                            step_key: str(foundational_step_summaries.get(step_key) or "")
+                            for step_key in _FOUNDATIONAL_STEP_KEYS
+                        },
+                    },
+                },
+            )
+            try:
+                agent03_output, agent03_raw, agent03_provenance = _run_prompt_json_object(
+                    asset=agent03_asset,
+                    context="strategy_v2.agent3_output",
+                    model=settings.STRATEGY_V2_VOC_MODEL,
+                    runtime_instruction=(
+                        "## Runtime Input Block\n"
+                        f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent03_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
+                        "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                        "Use OPENAI_CODE_INTERPRETER_FILE_IDS_JSON to load each dataset.\n"
+                        "Output both angle_observations and angle_candidates.\n"
+                        f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} angle_candidates, "
+                        f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate, "
+                        f"and exactly {_AGENT3_HOOK_STARTERS_PER_CANDIDATE} hook_starters per candidate.\n"
+                        f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
+                    ),
+                    schema_name="strategy_v2_voc_agent03",
+                    schema={
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
@@ -4920,7 +11780,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                             "maxItems": _MAX_AGENT3_ANGLE_OBSERVATIONS,
                             "items": {
                                 "type": "object",
-                                "additionalProperties": True,
+                                "additionalProperties": False,
                                 "properties": {
                                     "angle_id": {"type": "string", "maxLength": 32},
                                     "angle_name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
@@ -5017,16 +11877,26 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         },
                     },
                     "required": ["angle_observations", "angle_candidates"],
-                },
-                use_reasoning=True,
-                use_web_search=False,
-                max_tokens=_AGENT3_MAX_TOKENS,
-                heartbeat_context={
-                    "activity": "strategy_v2.run_voc_angle_pipeline",
-                    "phase": "agent3_prompt",
-                    "model": settings.STRATEGY_V2_VOC_MODEL,
-                },
-            )
+                    },
+                    use_reasoning=True,
+                    use_web_search=True,
+                    openai_tools=_openai_python_tool_resources(
+                        settings.STRATEGY_V2_VOC_MODEL,
+                        file_ids=list(agent03_file_id_map.values()),
+                    ),
+                    openai_tool_choice="auto",
+                    max_tokens=_AGENT3_MAX_TOKENS,
+                    heartbeat_context={
+                        "activity": "strategy_v2.run_voc_angle_pipeline",
+                        "phase": "agent3_prompt",
+                        "model": settings.STRATEGY_V2_VOC_MODEL,
+                    },
+                )
+            finally:
+                _cleanup_openai_prompt_files(
+                    model=settings.STRATEGY_V2_VOC_MODEL,
+                    file_ids=agent03_uploaded_file_ids,
+                )
             _raise_if_blocked_prompt_output(
                 stage_label="v2-06 Agent 3 angle synthesis",
                 parsed_output=agent03_output,
@@ -5131,6 +12001,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     **foundational_step_payload_artifact_ids,
                     V2_STEP_HABITAT_STRATEGY: v2_02_step_payload_artifact_id,
                     V2_STEP_SCRAPE_VIRALITY: v2_03_step_payload_artifact_id,
+                    V2_STEP_APIFY_INGESTION: v2_03_step_payload_artifact_id,
                     V2_STEP_HABITAT_SCORING: v2_04_step_payload_artifact_id,
                     V2_STEP_VOC_EXTRACTION: v2_05_step_payload_artifact_id,
                     V2_STEP_ANGLE_SYNTHESIS: v2_06_step_payload_artifact_id,
@@ -6998,37 +13869,13 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                     f"STEP_02_OUTPUT:\n{step_02_output[:10000]}\n\n"
                     f"STEP_04_OUTPUT_JSON:\n{_dump_prompt_json({'variants': generated_variant_inputs}, max_chars=30000)}\n\n"
                     "## Runtime Output Contract\n"
-                    "Return JSON with `evaluation` object (variants + dimensions) and `revision_notes` text."
+                    "Return JSON ONLY (no markdown, no prose outside JSON).\n"
+                    "For each variant, provide exactly the 8 required dimensions and required fields only.\n"
+                    "Do not emit large narratives, placeholder whitespace, or extra keys.\n"
+                    f"`revision_notes` MUST be non-empty plain text and <= {_STEP05_REVISION_NOTES_MAX_CHARS} chars."
                 ),
                 schema_name="strategy_v2_offer_step05",
-                schema={
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "evaluation": {
-                            "type": "object",
-                            "additionalProperties": False,
-                            "properties": {
-                                "variants": {
-                                    "type": "array",
-                                    "minItems": 1,
-                                    "items": {
-                                        "type": "object",
-                                        "additionalProperties": False,
-                                        "properties": {
-                                            "variant_id": {"type": "string"},
-                                            "dimensions": {"type": "object", "additionalProperties": True},
-                                        },
-                                        "required": ["variant_id", "dimensions"],
-                                    },
-                                }
-                            },
-                            "required": ["variants"],
-                        },
-                        "revision_notes": {"type": "string"},
-                    },
-                    "required": ["evaluation", "revision_notes"],
-                },
+                schema=_offer_step05_response_schema(),
                 use_reasoning=True,
                 use_web_search=False,
                 heartbeat_context={
@@ -7061,8 +13908,15 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
 
             revision_text = str(step05_parsed.get("revision_notes") or "").strip()
             if not revision_text:
+                response_id = (
+                    str(step05_provenance.get("openai_response_id") or "").strip()
+                    if isinstance(step05_provenance, dict)
+                    else ""
+                )
                 raise StrategyV2SchemaValidationError(
-                    "Offer Step 05 returned empty revision_notes while revision is required."
+                    "Offer Step 05 returned empty revision_notes while revision is required "
+                    f"(iteration={iteration}, response_id={response_id or 'UNKNOWN'}). "
+                    "Remediation: Step 05 must return a non-empty plain-text revision_notes string."
                 )
             revision_guidance = revision_text
             iteration += 1
@@ -7263,8 +14117,24 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
         voc_quotes=quotes,
     )
     copy_context_data = copy_context.model_dump(mode="python")
+    decision_payload = {
+        **decision.model_dump(mode="python"),
+        "reviewed_candidate_ids": cleaned_reviewed_candidate_ids,
+    }
 
     with session_scope() as session:
+        synced_product_offer = _sync_product_offer_from_strategy_output(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            onboarding_payload=onboarding_payload,
+            offer_pipeline_output=offer_pipeline_output,
+            stage3_data=stage3_data,
+            selected_variant=selected_variant,
+            selected_variant_score=selected_variant_score,
+            decision_payload=decision_payload,
+        )
         artifacts_repo = ArtifactsRepository(session)
         stage3_artifact = artifacts_repo.insert(
             org_id=org_id,
@@ -7292,10 +14162,9 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
                 "stage3": stage3_data,
                 "selected_variant": selected_variant,
                 "selected_variant_score": selected_variant_score,
-                "decision": {
-                    **decision.model_dump(mode="python"),
-                    "reviewed_candidate_ids": cleaned_reviewed_candidate_ids,
-                },
+                "decision": decision_payload,
+                "product_offer_id": synced_product_offer.get("id"),
+                "product_offer": synced_product_offer,
             },
         )
         copy_context_artifact = artifacts_repo.insert(
@@ -7314,9 +14183,10 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
             client_id=client_id,
             objective_type="strategy_v2.offer_winner_selection",
             model="human_decision",
-            inputs_json={"decision": decision.model_dump(mode="python")},
+            inputs_json={"decision": decision_payload},
             outputs_json={
                 "stage3": stage3_data,
+                "product_offer": synced_product_offer,
                 "copy_context_artifact_id": str(copy_context_artifact.id),
                 "awareness_matrix_artifact_id": str(awareness_matrix_artifact.id),
             },
@@ -7332,10 +14202,7 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
             title="Strategy V2 Offer Winner HITL",
             summary="Human-selected offer winner promoted to Stage 3 and copy context.",
             payload={
-                "decision": {
-                    **decision.model_dump(mode="python"),
-                    "reviewed_candidate_ids": cleaned_reviewed_candidate_ids,
-                },
+                "decision": decision_payload,
                 "stage3": stage3_data,
                 "stage3_artifact_id": str(stage3_artifact.id),
                 "awareness_matrix": awareness_matrix_data,
@@ -7343,6 +14210,8 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
                 "awareness_matrix_source_provenance": awareness_matrix_step2_provenance,
                 "awareness_matrix_artifact_id": str(awareness_matrix_artifact.id),
                 "offer_artifact_id": str(offer_artifact.id),
+                "product_offer_id": synced_product_offer.get("id"),
+                "product_offer": synced_product_offer,
                 "copy_context_artifact_id": str(copy_context_artifact.id),
             },
             model_name="human_decision",
@@ -7355,8 +14224,11 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
             "stage3_artifact_id": str(stage3_artifact.id),
             "awareness_matrix": awareness_matrix_data,
             "awareness_matrix_artifact_id": str(awareness_matrix_artifact.id),
+            "offer_artifact_id": str(offer_artifact.id),
             "copy_context": copy_context_data,
             "copy_context_artifact_id": str(copy_context_artifact.id),
+            "product_offer_id": str(synced_product_offer.get("id") or ""),
+            "product_offer": synced_product_offer,
             "step_payload_artifact_id": step_payload_artifact_id,
         }
 
@@ -8604,6 +15476,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             },
             use_reasoning=True,
             use_web_search=False,
+            max_tokens=_COPY_PIPELINE_MAX_TOKENS,
             heartbeat_context={
                 "activity": "strategy_v2.run_copy_pipeline",
                 "phase": "headline_prompt",
@@ -8684,6 +15557,29 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                 f"(expected_items={expected_presell_items}). "
                 "Remediation: generate non-numeric headlines or align promised list count with page sections."
             )
+        if _COPY_HEADLINE_EVALUATION_LIMIT < 1:
+            raise StrategyV2DecisionError(
+                "Headline evaluation limit must be >= 1. "
+                "Remediation: set STRATEGY_V2_COPY_HEADLINE_EVALUATION_LIMIT to a positive integer."
+            )
+        if _COPY_HEADLINE_EVALUATION_OFFSET < 0:
+            raise StrategyV2DecisionError(
+                "Headline evaluation offset must be >= 0. "
+                "Remediation: set STRATEGY_V2_COPY_HEADLINE_EVALUATION_OFFSET to a non-negative integer."
+            )
+        if _COPY_HEADLINE_EVALUATION_OFFSET >= len(ranked_headlines):
+            raise StrategyV2DecisionError(
+                "Headline evaluation offset exceeds available ranked headlines. "
+                "Remediation: lower STRATEGY_V2_COPY_HEADLINE_EVALUATION_OFFSET or increase candidate generation."
+            )
+        headlines_for_evaluation = ranked_headlines[
+            _COPY_HEADLINE_EVALUATION_OFFSET : _COPY_HEADLINE_EVALUATION_OFFSET + _COPY_HEADLINE_EVALUATION_LIMIT
+        ]
+        if not headlines_for_evaluation:
+            raise StrategyV2DecisionError(
+                "No headline candidates available for evaluation after applying headline evaluation limit. "
+                "Remediation: increase STRATEGY_V2_COPY_HEADLINE_EVALUATION_LIMIT."
+            )
 
         selected_bundle: dict[str, Any] | None = None
         qa_warning_count_total = 0
@@ -8695,7 +15591,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
         qa_model_effective = settings.STRATEGY_V2_COPY_QA_MODEL
         headline_qa_transient_fail_streak = 0
         headline_qa_transient_fail_fast_triggered = False
-        for headline_index, scored in enumerate(ranked_headlines, start=1):
+        for headline_index, scored in enumerate(headlines_for_evaluation, start=1):
             source_headline = str(scored.get("headline") or "").strip()
             if not source_headline:
                 continue
@@ -8706,7 +15602,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                     "phase": "headline_qa",
                     "status": "started",
                     "headline_index": headline_index,
-                    "headline_count": len(ranked_headlines),
+                    "headline_count": len(headlines_for_evaluation),
                 }
             )
             qa_result = run_headline_qa_loop(
@@ -8777,7 +15673,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                     "phase": "headline_qa",
                     "status": "completed",
                     "headline_index": headline_index,
-                    "headline_count": len(ranked_headlines),
+                    "headline_count": len(headlines_for_evaluation),
                     "qa_status": qa_status or "UNKNOWN",
                     "qa_iterations": attempt_row["qa_iterations"],
                     "qa_best_tier": attempt_row["qa_best_tier"],
@@ -8830,6 +15726,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                 },
                 use_reasoning=True,
                 use_web_search=False,
+                max_tokens=_COPY_PIPELINE_MAX_TOKENS,
                 heartbeat_context={
                     "activity": "strategy_v2.run_copy_pipeline",
                     "phase": "promise_contract_prompt",
@@ -8918,12 +15815,15 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         schema={
                             "type": "object",
                             "additionalProperties": False,
-                            "properties": {"markdown": {"type": "string"}},
-                            "required": ["markdown"],
+                            "properties": {
+                                "markdown": {"type": "string"},
+                                "template_payload": _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA,
+                            },
+                            "required": ["markdown", "template_payload"],
                         },
                         use_reasoning=True,
                         use_web_search=False,
-                        max_tokens=_FOUNDTN_STEP04_MAX_TOKENS,
+                        max_tokens=_COPY_PIPELINE_MAX_TOKENS,
                         heartbeat_context={
                             "activity": "strategy_v2.run_copy_pipeline",
                             "phase": "advertorial_prompt",
@@ -8944,6 +15844,10 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         llm_call_label="advertorial_prompt",
                     )
                     presell_markdown = str(advertorial_parsed.get("markdown") or "").strip()
+                    presell_template_payload = _require_dict(
+                        payload=advertorial_parsed.get("template_payload"),
+                        field_name="presell_template_payload",
+                    )
                     if _COPY_DEBUG_CAPTURE_FULL_MARKDOWN:
                         page_observability_row["presell_markdown_generated"] = presell_markdown
                     if _COPY_DEBUG_CAPTURE_THREADS and use_claude_chat_context:
@@ -8976,12 +15880,15 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         schema={
                             "type": "object",
                             "additionalProperties": False,
-                            "properties": {"markdown": {"type": "string"}},
-                            "required": ["markdown"],
+                            "properties": {
+                                "markdown": {"type": "string"},
+                                "template_payload": _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA,
+                            },
+                            "required": ["markdown", "template_payload"],
                         },
                         use_reasoning=True,
                         use_web_search=False,
-                        max_tokens=_FOUNDTN_STEP04_MAX_TOKENS,
+                        max_tokens=_COPY_PIPELINE_MAX_TOKENS,
                         heartbeat_context={
                             "activity": "strategy_v2.run_copy_pipeline",
                             "phase": "sales_page_prompt",
@@ -9002,6 +15909,27 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         llm_call_label="sales_page_prompt",
                     )
                     sales_page_markdown = str(sales_parsed.get("markdown") or "").strip()
+                    sales_template_payload = _require_dict(
+                        payload=sales_parsed.get("template_payload"),
+                        field_name="sales_template_payload",
+                    )
+                    presell_template_fields = validate_strategy_v2_template_payload_fields(
+                        template_id="pre-sales-listicle",
+                        payload_fields=presell_template_payload,
+                    )
+                    sales_template_fields = validate_strategy_v2_template_payload_fields(
+                        template_id="sales-pdp",
+                        payload_fields=sales_template_payload,
+                    )
+                    presell_template_patch = build_strategy_v2_template_patch_operations(
+                        template_id="pre-sales-listicle",
+                        payload_fields=presell_template_fields,
+                    )
+                    sales_template_patch = build_strategy_v2_template_patch_operations(
+                        template_id="sales-pdp",
+                        payload_fields=sales_template_fields,
+                    )
+                    page_observability_row["template_payload_validation"] = "pass"
                     if _COPY_DEBUG_CAPTURE_FULL_MARKDOWN:
                         page_observability_row["sales_markdown_generated"] = sales_page_markdown
                     if _COPY_DEBUG_CAPTURE_THREADS and use_claude_chat_context:
@@ -9105,6 +16033,12 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         "body_markdown": body_markdown,
                         "presell_markdown": presell_markdown,
                         "sales_page_markdown": sales_page_markdown,
+                        "presell_template_payload": presell_template_payload,
+                        "sales_template_payload": sales_template_payload,
+                        "presell_template_fields": presell_template_fields,
+                        "sales_template_fields": sales_template_fields,
+                        "presell_template_patch": presell_template_patch,
+                        "sales_template_patch": sales_template_patch,
                         "congruency": congruency,
                         "promise_contract": promise_contract,
                         "semantic_gates": {
@@ -9235,6 +16169,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             "finished_at": _now_iso(),
             "headline_candidate_count": len(headline_candidates),
             "headline_ranked_count": len(ranked_headlines),
+            "headline_evaluated_count": len(headlines_for_evaluation),
+            "headline_evaluation_offset": _COPY_HEADLINE_EVALUATION_OFFSET,
             "qa_attempt_count": len(qa_attempts),
             "qa_pass_count": sum(1 for row in qa_attempts if str(row.get("qa_status") or "").upper() == "PASS"),
             "qa_fail_count": sum(1 for row in qa_attempts if row.get("error")),
@@ -9319,7 +16255,65 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             payload=selected_bundle.get("quality_gate_report"),
             field_name="selected_quality_gate_report",
         )
+        presell_template_fields = _require_dict(
+            payload=selected_bundle.get("presell_template_fields"),
+            field_name="selected_presell_template_fields",
+        )
+        sales_template_fields = _require_dict(
+            payload=selected_bundle.get("sales_template_fields"),
+            field_name="selected_sales_template_fields",
+        )
+        presell_template_patch_raw = selected_bundle.get("presell_template_patch")
+        if not isinstance(presell_template_patch_raw, list) or not presell_template_patch_raw:
+            raise StrategyV2DecisionError(
+                "Selected bundle is missing presell template patch operations after validation."
+            )
+        sales_template_patch_raw = selected_bundle.get("sales_template_patch")
+        if not isinstance(sales_template_patch_raw, list) or not sales_template_patch_raw:
+            raise StrategyV2DecisionError(
+                "Selected bundle is missing sales template patch operations after validation."
+            )
+        if not all(isinstance(item, dict) for item in presell_template_patch_raw):
+            raise StrategyV2DecisionError(
+                "Selected bundle contains invalid presell template patch operations (expected objects)."
+            )
+        if not all(isinstance(item, dict) for item in sales_template_patch_raw):
+            raise StrategyV2DecisionError(
+                "Selected bundle contains invalid sales template patch operations (expected objects)."
+            )
+        presell_template_patch = [dict(item) for item in presell_template_patch_raw]
+        sales_template_patch = [dict(item) for item in sales_template_patch_raw]
         provenance_report = require_prompt_chain_provenance(prompt_chain=prompt_chain)
+        angle_id = stage3.selected_angle.angle_id
+        angle_run_id = f"{workflow_run_id}:{angle_id}"
+        template_payloads = {
+            "pre-sales-listicle": {
+                "payload_version": "v1",
+                "template_id": "pre-sales-listicle",
+                "angle_run_id": angle_run_id,
+                "fields": presell_template_fields,
+                "template_patch": presell_template_patch,
+                "validation_report": {
+                    "patch_operation_count": len(presell_template_patch),
+                    "patch_hash": hashlib.sha256(
+                        json.dumps(presell_template_patch, sort_keys=True, ensure_ascii=True).encode("utf-8")
+                    ).hexdigest(),
+                },
+            },
+            "sales-pdp": {
+                "payload_version": "v1",
+                "template_id": "sales-pdp",
+                "angle_run_id": angle_run_id,
+                "fields": sales_template_fields,
+                "template_patch": sales_template_patch,
+                "validation_report": {
+                    "patch_operation_count": len(sales_template_patch),
+                    "patch_hash": hashlib.sha256(
+                        json.dumps(sales_template_patch, sort_keys=True, ensure_ascii=True).encode("utf-8")
+                    ).hexdigest(),
+                },
+            },
+        }
 
         copy_payload = {
             "headline": winning_headline,
@@ -9342,6 +16336,8 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             "copy_prompt_chain": prompt_chain,
             "copy_prompt_chain_provenance": provenance_report.model_dump(mode="python"),
             "copy_loop_report": copy_loop_report,
+            "template_payloads": template_payloads,
+            "angle_run_id": angle_run_id,
         }
 
         with session_scope() as session:

@@ -41,6 +41,7 @@ def test_stream_text_responses_omits_temperature(monkeypatch) -> None:
         temperature=0.2,
         use_reasoning=True,
         use_web_search=False,
+        openai_context_management=[{"type": "compaction", "compact_threshold": 200000}],
     )
 
     # Exhaust the generator to force the OpenAI request to be built.
@@ -48,3 +49,6 @@ def test_stream_text_responses_omits_temperature(monkeypatch) -> None:
 
     assert llm._openai_client.responses.last_stream_kwargs is not None  # type: ignore[union-attr]
     assert "temperature" not in llm._openai_client.responses.last_stream_kwargs  # type: ignore[union-attr]
+    assert llm._openai_client.responses.last_stream_kwargs.get("extra_body") == {  # type: ignore[union-attr]
+        "context_management": [{"type": "compaction", "compact_threshold": 200000}]
+    }

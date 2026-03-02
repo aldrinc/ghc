@@ -20,7 +20,7 @@ from app.services.gemini_file_search import (
 
 
 CLAUDE_STRATEGY_MODEL = os.getenv("CLAUDE_STRATEGY_MODEL", CLAUDE_DEFAULT_MODEL)
-CLAUDE_STRUCTURED_MAX_TOKENS = int(os.getenv("CLAUDE_STRUCTURED_MAX_TOKENS", "4096"))
+CLAUDE_STRUCTURED_MAX_TOKENS = int(os.getenv("CLAUDE_STRUCTURED_MAX_TOKENS", "32000"))
 
 def _build_strategy_schema(channel_count: int) -> Dict[str, Any]:
     return {

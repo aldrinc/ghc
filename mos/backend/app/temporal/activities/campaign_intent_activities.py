@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.db.base import session_scope
 from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum, FunnelStatusEnum
-from app.db.models import Campaign, Funnel, FunnelPage, FunnelPageVersion
+from app.db.models import Campaign, Funnel, FunnelPage, FunnelPageVersion, Product, ProductOffer, ProductVariant
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
@@ -20,7 +20,9 @@ from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.design_systems import DesignSystemsRepository
 from app.services.design_systems import resolve_design_system_tokens
+from app.services.shopify_connection import get_client_shopify_connection_status
 from app.strategy_v2.downstream import load_strategy_v2_outputs
+from app.strategy_v2.template_bridge import apply_strategy_v2_template_patch
 
 
 _DEFAULT_AI_DRAFT_EMPTY_PAGE_MAX_ATTEMPTS = 3
@@ -86,6 +88,109 @@ def _run_generate_page_draft_with_retries(
                 on_retry(attempt, exc)
 
     raise RuntimeError("AI draft generation failed after retries without returning a result.")
+
+
+def _should_run_funnel_ai_processing(
+    *,
+    generate_ai_drafts: bool,
+    strategy_v2_payload_applied: bool,
+) -> bool:
+    return generate_ai_drafts or strategy_v2_payload_applied
+
+
+def _resolve_strategy_v2_selected_offer_id(
+    *,
+    strategy_v2_packet: dict[str, Any],
+) -> str | None:
+    offer_payload = strategy_v2_packet.get("offer")
+    if not isinstance(offer_payload, dict):
+        return None
+    raw_offer_id = offer_payload.get("product_offer_id")
+    if not isinstance(raw_offer_id, str) or not raw_offer_id.strip():
+        return None
+    return raw_offer_id.strip()
+
+
+def _validate_selected_offer_for_funnel(
+    *,
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    selected_offer_id: str,
+) -> None:
+    offer = session.scalars(
+        select(ProductOffer).where(
+            ProductOffer.id == selected_offer_id,
+            ProductOffer.org_id == org_id,
+        )
+    ).first()
+    if offer is None:
+        raise ValueError(
+            "Strategy V2 selected offer could not be found for funnel generation. "
+            f"selected_offer_id={selected_offer_id}"
+        )
+    if str(offer.client_id) != str(client_id) or str(offer.product_id or "") != str(product_id):
+        raise ValueError(
+            "Strategy V2 selected offer does not belong to the current client/product scope. "
+            f"selected_offer_id={selected_offer_id}"
+        )
+
+
+def _assert_shopify_launch_readiness(
+    *,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    selected_offer_id: str | None,
+) -> None:
+    status_payload = get_client_shopify_connection_status(client_id=client_id)
+    state = str(status_payload.get("state") or "").strip()
+    if state != "ready":
+        raise ValueError(
+            "Shopify connection is not ready for Strategy V2 launch funnel generation. "
+            f"state={state or '<empty>'} message={status_payload.get('message')!r}. "
+            "Remediation: connect Shopify for this workspace and ensure required scopes + storefront token are present."
+        )
+
+    with session_scope() as session:
+        product = session.scalars(
+            select(Product).where(Product.org_id == org_id, Product.id == product_id)
+        ).first()
+        if product is None:
+            raise ValueError("Product not found for Shopify readiness validation.")
+        if not isinstance(product.shopify_product_gid, str) or not product.shopify_product_gid.strip():
+            raise ValueError(
+                "Product is not connected to Shopify. Missing products.shopify_product_gid. "
+                "Remediation: connect Shopify product and sync it before launching."
+            )
+
+        variants_stmt = select(ProductVariant).where(ProductVariant.product_id == product_id)
+        if isinstance(selected_offer_id, str) and selected_offer_id.strip():
+            variants_stmt = variants_stmt.where(ProductVariant.offer_id == selected_offer_id.strip())
+        variants = list(session.scalars(variants_stmt).all())
+        if not variants:
+            raise ValueError(
+                "No product variants are available for Shopify launch readiness. "
+                "Remediation: sync Shopify variants for this product/offer before launching."
+            )
+
+        ready_variants = [
+            variant
+            for variant in variants
+            if isinstance(variant.provider, str)
+            and variant.provider.strip().lower() == "shopify"
+            and isinstance(variant.external_price_id, str)
+            and variant.external_price_id.strip().startswith("gid://shopify/ProductVariant/")
+            and isinstance(variant.option_values, dict)
+            and bool(variant.option_values)
+        ]
+        if not ready_variants:
+            raise ValueError(
+                "Shopify launch readiness failed: no variants are fully connected for checkout "
+                "(provider=shopify + external_price_id + option_values). "
+                "Remediation: sync Shopify variants and option mappings before launching."
+            )
 
 
 @activity.defn
@@ -158,6 +263,24 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     strategy_v2_copy_context = (
         strategy_v2_copy_context_raw if isinstance(strategy_v2_copy_context_raw, dict) else {}
     )
+    strategy_v2_copy_payload = (
+        strategy_v2_packet.get("copy")
+        if isinstance(strategy_v2_packet.get("copy"), dict)
+        else {}
+    )
+    strategy_v2_template_payloads = (
+        strategy_v2_copy_payload.get("template_payloads")
+        if isinstance(strategy_v2_copy_payload.get("template_payloads"), dict)
+        else strategy_v2_packet.get("template_payloads")
+        if isinstance(strategy_v2_packet.get("template_payloads"), dict)
+        else None
+    )
+    strategy_v2_context_present = bool(strategy_v2_packet)
+    strategy_v2_selected_offer_id = (
+        _resolve_strategy_v2_selected_offer_id(strategy_v2_packet=strategy_v2_packet)
+        if strategy_v2_context_present
+        else None
+    )
     idea_workspace_id = params.get("idea_workspace_id")
     actor_user_id = params.get("actor_user_id") or "workflow"
     generate_ai_drafts = bool(params.get("generate_ai_drafts", False))
@@ -192,7 +315,12 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         raise ValueError("campaign_id is required to create funnel drafts")
     if not pages:
         raise ValueError("pages are required to create funnel drafts")
-    if generate_ai_drafts and (not experiment or not variant):
+    if generate_ai_drafts and (
+        not isinstance(experiment, dict)
+        or not experiment
+        or not isinstance(variant, dict)
+        or not variant
+    ):
         raise ValueError("experiment and variant are required when generate_ai_drafts is enabled")
 
     if not product_id:
@@ -206,6 +334,14 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("Campaign not found for funnel draft creation")
         if campaign.product_id and str(campaign.product_id) != str(product_id):
             raise ValueError("product_id does not match campaign product_id")
+        if strategy_v2_selected_offer_id:
+            _validate_selected_offer_for_funnel(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=str(product_id),
+                selected_offer_id=str(strategy_v2_selected_offer_id),
+            )
 
         design_systems_repo = DesignSystemsRepository(session)
 
@@ -252,9 +388,16 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 campaign_id=campaign_id,
                 product_id=product_id,
                 experiment_spec_id=experiment_spec_id,
+                selected_offer_id=strategy_v2_selected_offer_id,
                 name=resolved_funnel_name,
                 status=FunnelStatusEnum.draft,
             )
+        elif strategy_v2_selected_offer_id and str(funnel.selected_offer_id or "") != str(strategy_v2_selected_offer_id):
+            funnel = funnels_repo.update(
+                org_id=org_id,
+                funnel_id=str(funnel.id),
+                selected_offer_id=strategy_v2_selected_offer_id,
+            ) or funnel
 
         existing_pages = pages_repo.list(funnel_id=str(funnel.id)) if funnel else []
         existing_pages_by_slug = {page.slug: page for page in existing_pages}
@@ -285,6 +428,38 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 template=template,
                 design_system_tokens=design_system_tokens,
             )
+            template_payload_json: str | None = None
+            strategy_v2_payload_applied = False
+            if template_id in {"sales-pdp", "pre-sales-listicle"} and strategy_v2_context_present:
+                if not isinstance(strategy_v2_template_payloads, dict):
+                    raise ValueError(
+                        "Strategy V2 template_payloads are required for template-based funnel generation "
+                        "when strategy_v2_packet is provided."
+                    )
+                payload_entry = strategy_v2_template_payloads.get(template_id)
+                if not isinstance(payload_entry, dict):
+                    raise ValueError(
+                        "Strategy V2 template payload is missing for page template "
+                        f"{template_id}."
+                    )
+                payload_template_id = str(payload_entry.get("template_id") or "").strip()
+                if payload_template_id != template_id:
+                    raise ValueError(
+                        "Strategy V2 template payload template_id mismatch for funnel page generation. "
+                        f"Expected={template_id}, received={payload_template_id or '<empty>'}."
+                    )
+                patch_operations = payload_entry.get("template_patch")
+                if not isinstance(patch_operations, list) or not patch_operations:
+                    raise ValueError(
+                        f"Strategy V2 template payload for {template_id} is missing template_patch operations."
+                    )
+                puck_data = apply_strategy_v2_template_patch(
+                    base_puck_data=puck_data,
+                    operations=patch_operations,
+                    template_id=template_id,
+                )
+                template_payload_json = json.dumps(payload_entry, ensure_ascii=True)
+                strategy_v2_payload_applied = True
 
             if page:
                 if page.template_id != template_id:
@@ -301,11 +476,30 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     design_system_id=page_spec.get("design_system_id") or page_spec.get("designSystemId"),
                 )
 
+            version_ai_metadata: dict[str, Any] | None = None
+            if strategy_v2_payload_applied:
+                strategy_v2_provenance = (
+                    strategy_v2_packet.get("provenance")
+                    if isinstance(strategy_v2_packet.get("provenance"), dict)
+                    else {}
+                )
+                strategy_v2_launch_metadata = (
+                    strategy_v2_packet.get("launch_metadata")
+                    if isinstance(strategy_v2_packet.get("launch_metadata"), dict)
+                    else None
+                )
+                version_ai_metadata = {
+                    "strategy_v2_provenance": strategy_v2_provenance,
+                    "strategy_v2_launch": strategy_v2_launch_metadata,
+                    "template_id": template_id,
+                }
+
             version = FunnelPageVersion(
                 page_id=page.id,
                 status=FunnelPageVersionStatusEnum.draft,
                 puck_data=puck_data,
                 source=FunnelPageVersionSourceEnum.human,
+                ai_metadata=version_ai_metadata,
                 created_at=datetime.now(timezone.utc),
             )
             session.add(version)
@@ -314,7 +508,21 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             created_pages.append({"page_id": str(page.id), "draft_version_id": str(version.id)})
             resolved_pages.append(page)
 
-            if generate_ai_drafts:
+            should_run_funnel_ai_processing = _should_run_funnel_ai_processing(
+                generate_ai_drafts=generate_ai_drafts,
+                strategy_v2_payload_applied=strategy_v2_payload_applied,
+            )
+            if should_run_funnel_ai_processing:
+                if (
+                    not isinstance(experiment, dict)
+                    or not experiment
+                    or not isinstance(variant, dict)
+                    or not variant
+                ):
+                    raise ValueError(
+                        "experiment and variant are required when funnel AI processing is enabled "
+                        "(generate_ai_drafts=true or strategy_v2 template payloads are applied)."
+                    )
                 prompt = _build_funnel_prompt(
                     strategy_sheet=strategy_sheet,
                     experiment=experiment,
@@ -355,6 +563,8 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                             idea_workspace_id=idea_workspace_id,
                             generate_images=not async_media_enrichment,
                             generate_testimonials=generate_testimonials and not async_media_enrichment,
+                            skip_draft_generation=strategy_v2_payload_applied,
+                            copy_pack=template_payload_json,
                         ),
                         max_attempts=ai_draft_max_attempts,
                         on_retry=lambda attempt, exc: log_activity(
@@ -760,6 +970,20 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
     async_media_enrichment = bool(params.get("async_media_enrichment", True))
     temporal_workflow_id = params.get("temporal_workflow_id")
     temporal_run_id = params.get("temporal_run_id")
+    require_pinned_strategy_v2_context = bool(params.get("require_pinned_strategy_v2_context", False))
+    require_shopify_connection = bool(params.get("require_shopify_connection", False))
+    provided_strategy_v2_packet_raw = params.get("strategy_v2_packet")
+    provided_strategy_v2_copy_context_raw = params.get("strategy_v2_copy_context")
+    provided_strategy_v2_packet = (
+        provided_strategy_v2_packet_raw
+        if isinstance(provided_strategy_v2_packet_raw, dict)
+        else None
+    )
+    provided_strategy_v2_copy_context = (
+        provided_strategy_v2_copy_context_raw
+        if isinstance(provided_strategy_v2_copy_context_raw, dict)
+        else None
+    )
 
     workflow_run_id: Optional[str] = None
     if temporal_workflow_id and temporal_run_id:
@@ -795,6 +1019,14 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
         raise ValueError("experiment_specs are required to create funnels from experiments")
     if not pages:
         raise ValueError("pages are required to create funnels from experiments")
+    if require_pinned_strategy_v2_context and provided_strategy_v2_packet is None:
+        raise ValueError(
+            "strategy_v2_packet is required when require_pinned_strategy_v2_context=true."
+        )
+    if require_pinned_strategy_v2_context and provided_strategy_v2_copy_context is None:
+        raise ValueError(
+            "strategy_v2_copy_context is required when require_pinned_strategy_v2_context=true."
+        )
 
     with session_scope() as session:
         artifacts_repo = ArtifactsRepository(session)
@@ -804,27 +1036,65 @@ def create_funnels_from_experiments_activity(params: Dict[str, Any]) -> Dict[str
         briefs_artifact = artifacts_repo.get_latest_by_type_for_campaign(
             org_id=org_id, campaign_id=campaign_id, artifact_type=ArtifactTypeEnum.asset_brief
         )
-        strategy_v2_outputs = load_strategy_v2_outputs(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-            product_id=product_id,
-        )
+        strategy_v2_outputs: dict[str, Any] = {}
+        if provided_strategy_v2_packet is None or provided_strategy_v2_copy_context is None:
+            strategy_v2_outputs = load_strategy_v2_outputs(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+            )
 
     if not strategy:
         raise ValueError("Strategy sheet not found for funnel generation")
 
     strategy_sheet = strategy.data if isinstance(strategy.data, dict) else {}
     strategy_v2_packet = (
-        strategy_v2_outputs.get("downstream_packet")
+        provided_strategy_v2_packet
+        if isinstance(provided_strategy_v2_packet, dict)
+        else strategy_v2_outputs.get("downstream_packet")
         if isinstance(strategy_v2_outputs.get("downstream_packet"), dict)
         else {}
     )
     strategy_v2_copy_context = (
-        strategy_v2_outputs.get("copy_context")
+        provided_strategy_v2_copy_context
+        if isinstance(provided_strategy_v2_copy_context, dict)
+        else strategy_v2_outputs.get("copy_context")
         if isinstance(strategy_v2_outputs.get("copy_context"), dict)
         else {}
     )
+    strategy_v2_selected_offer_id = _resolve_strategy_v2_selected_offer_id(
+        strategy_v2_packet=strategy_v2_packet,
+    )
+    if require_pinned_strategy_v2_context:
+        template_payloads = strategy_v2_packet.get("template_payloads")
+        if not isinstance(template_payloads, dict):
+            raise ValueError(
+                "strategy_v2_packet.template_payloads is required for pinned launch funnel generation."
+            )
+        for template_id in ("pre-sales-listicle", "sales-pdp"):
+            entry = template_payloads.get(template_id)
+            if not isinstance(entry, dict):
+                raise ValueError(
+                    f"Pinned strategy_v2_packet is missing template payload for {template_id}."
+                )
+            patch_ops = entry.get("template_patch")
+            if not isinstance(patch_ops, list) or not patch_ops:
+                raise ValueError(
+                    f"Pinned strategy_v2 template payload for {template_id} is missing template_patch operations."
+                )
+        if not strategy_v2_selected_offer_id:
+            raise ValueError(
+                "Pinned strategy_v2_packet is missing offer.product_offer_id. "
+                "Remediation: rerun Strategy V2 winner + copy pipeline so offer linkage is preserved."
+            )
+    if require_shopify_connection:
+        _assert_shopify_launch_readiness(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            selected_offer_id=strategy_v2_selected_offer_id,
+        )
     asset_briefs_all: list[dict[str, Any]] = []
     if briefs_artifact and isinstance(briefs_artifact.data, dict):
         raw_briefs = briefs_artifact.data.get("asset_briefs") or []

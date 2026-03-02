@@ -25,6 +25,10 @@ from app.temporal.workflows.precanon_market_research import PreCanonMarketResear
 from app.temporal.workflows.ads_ingestion import AdsIngestionWorkflow, AdsIngestionRetryWorkflow
 from app.temporal.workflows.ad_creative_analysis import AdsCreativeAnalysisWorkflow
 from app.temporal.workflows.strategy_v2 import StrategyV2Workflow
+from app.temporal.workflows.strategy_v2_launch import (
+    StrategyV2AngleCampaignLaunchWorkflow,
+    StrategyV2AngleIterationWorkflow,
+)
 from app.temporal.activities import placeholders as placeholder_activities
 from app.temporal.activities.client_onboarding_activities import (
     build_client_canon_activity,
@@ -100,7 +104,18 @@ from app.temporal.activities.strategy_v2_activities import (
     prepare_strategy_v2_competitor_asset_candidates_activity,
     run_strategy_v2_copy_pipeline_activity,
     run_strategy_v2_offer_pipeline_activity,
+    run_strategy_v2_voc_agent0_habitat_strategy_activity,
+    run_strategy_v2_voc_agent0b_apify_collection_activity,
+    run_strategy_v2_voc_agent0b_social_video_strategy_activity,
+    run_strategy_v2_voc_agent0b_apify_ingestion_activity,
+    run_strategy_v2_voc_agent1_habitat_qualifier_activity,
+    run_strategy_v2_voc_agent2_extraction_activity,
+    run_strategy_v2_voc_agent3_synthesis_activity,
     run_strategy_v2_voc_angle_pipeline_activity,
+)
+from app.temporal.activities.strategy_v2_launch_activities import (
+    create_strategy_v2_launch_artifacts_activity,
+    persist_strategy_v2_launch_record_activity,
 )
 
 
@@ -127,6 +142,8 @@ async def main() -> None:
             AdsCreativeAnalysisWorkflow,
             TestCampaignWorkflow,
             StrategyV2Workflow,
+            StrategyV2AngleCampaignLaunchWorkflow,
+            StrategyV2AngleIterationWorkflow,
         ]
         primary_activities = [
             placeholder_activities.noop_activity,
@@ -180,6 +197,13 @@ async def main() -> None:
             finalize_strategy_v2_research_proceed_activity,
             prepare_strategy_v2_competitor_asset_candidates_activity,
             finalize_strategy_v2_competitor_assets_confirmation_activity,
+            run_strategy_v2_voc_agent0_habitat_strategy_activity,
+            run_strategy_v2_voc_agent0b_apify_collection_activity,
+            run_strategy_v2_voc_agent0b_social_video_strategy_activity,
+            run_strategy_v2_voc_agent0b_apify_ingestion_activity,
+            run_strategy_v2_voc_agent1_habitat_qualifier_activity,
+            run_strategy_v2_voc_agent2_extraction_activity,
+            run_strategy_v2_voc_agent3_synthesis_activity,
             run_strategy_v2_voc_angle_pipeline_activity,
             apply_strategy_v2_angle_selection_activity,
             run_strategy_v2_offer_pipeline_activity,
@@ -188,6 +212,8 @@ async def main() -> None:
             run_strategy_v2_copy_pipeline_activity,
             finalize_strategy_v2_copy_approval_activity,
             mark_strategy_v2_failed_activity,
+            create_strategy_v2_launch_artifacts_activity,
+            persist_strategy_v2_launch_record_activity,
         ]
 
         with (
