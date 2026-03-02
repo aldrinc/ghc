@@ -1,3 +1,4 @@
+import base64
 import io
 import json
 import zipfile
@@ -908,6 +909,165 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     ]
     assert manifest["compliancePolicySync"]["rulesetVersion"] == "meta_tiktok_compliance_ruleset_v1"
     assert manifest["compliancePolicySync"]["shopDomain"] == "example.myshopify.com"
+
+
+def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
+    api_client, db_session, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="futrgroup2-0theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    version = ShopifyThemeTemplateDraftVersion(
+        draft_id=draft.id,
+        org_id=client.org_id,
+        client_id=client.id,
+        version_number=1,
+        source="build_job",
+        payload={
+            "shopDomain": "example.myshopify.com",
+            "workspaceName": "Acme Workspace",
+            "designSystemId": "design-system-1",
+            "designSystemName": "Acme DS",
+            "brandName": "Acme",
+            "logoAssetPublicId": str(uuid4()),
+            "logoUrl": "https://assets.example.com/public/assets/logo-1",
+            "themeId": "gid://shopify/OnlineStoreTheme/123",
+            "themeName": "futrgroup2-0theme",
+            "themeRole": "MAIN",
+            "cssVars": {"--color-brand": "#123456"},
+            "fontUrls": [],
+            "dataTheme": "light",
+            "productId": None,
+            "componentImageAssetMap": {},
+            "componentTextValues": {},
+            "imageSlots": [],
+            "textSlots": [],
+            "metadata": {},
+        },
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(version)
+    db_session.commit()
+
+    binary_asset = b"\x89PNG\r\n\x1a\n\x00\x00\x00IHDR\x00\x00"
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": selected_shop_domain or "example.myshopify.com",
+            "shopDomains": [],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_export_theme_brand(
+        *,
+        client_id: str,
+        workspace_name: str,
+        brand_name: str,
+        logo_url: str,
+        css_vars: dict[str, str],
+        font_urls: list[str] | None,
+        data_theme: str | None,
+        component_image_urls: dict[str, str] | None,
+        component_text_values: dict[str, str] | None,
+        auto_component_image_urls: list[str] | None,
+        theme_id: str | None,
+        theme_name: str | None,
+        shop_domain: str | None,
+    ):
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/123",
+            "themeName": "futrgroup2-0theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": None,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+            "files": [
+                {
+                    "filename": "layout/theme.liquid",
+                    "content": "{% comment %}Managed by mOS{% endcomment %}",
+                },
+                {
+                    "filename": "assets/hero.png",
+                    "contentBase64": base64.b64encode(binary_asset).decode("ascii"),
+                },
+            ],
+        }
+
+    def fake_sync_compliance_for_export(
+        *,
+        client_id: str,
+        shop_domain: str | None,
+        auth,
+        session,
+    ):
+        return {
+            "rulesetVersion": "meta_tiktok_compliance_ruleset_v1",
+            "shopDomain": "example.myshopify.com",
+            "pages": [],
+            "updatedProfileUrls": {},
+            "renderedPages": [],
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router, "export_client_shopify_theme_brand", fake_export_theme_brand
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "_sync_compliance_policy_pages_for_template_export",
+        fake_sync_compliance_for_export,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/template/export-zip",
+        json={"draftId": str(draft.id)},
+    )
+
+    assert response.status_code == 200
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    assert "assets/hero.png" in archive.namelist()
+    assert archive.read("assets/hero.png") == binary_asset
 
 
 def test_sync_shopify_theme_brand_returns_sync_payload(api_client, monkeypatch):

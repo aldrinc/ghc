@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass
 import re
 from typing import Any
@@ -1836,15 +1838,21 @@ def _parse_theme_brand_export_response_payload(*, payload: Any) -> dict[str, Any
             )
         filename = item.get("filename")
         content = item.get("content")
+        content_base64 = item.get("contentBase64")
         if not isinstance(filename, str) or not filename.strip():
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Shopify checkout app returned invalid filename for theme brand export.",
             )
-        if not isinstance(content, str):
+        has_text_content = isinstance(content, str)
+        has_base64_content = isinstance(content_base64, str)
+        if has_text_content == has_base64_content:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Shopify checkout app returned invalid file content for theme brand export.",
+                detail=(
+                    "Shopify checkout app returned invalid file content for theme brand export. "
+                    "Expected exactly one of content or contentBase64."
+                ),
             )
         cleaned_filename = filename.strip()
         if cleaned_filename in seen_filenames:
@@ -1853,7 +1861,31 @@ def _parse_theme_brand_export_response_payload(*, payload: Any) -> dict[str, Any
                 detail=f"Shopify checkout app returned duplicate export filename: {cleaned_filename}",
             )
         seen_filenames.add(cleaned_filename)
-        parsed_files.append({"filename": cleaned_filename, "content": content})
+        if has_text_content:
+            parsed_files.append({"filename": cleaned_filename, "content": content})
+            continue
+
+        cleaned_content_base64 = content_base64.strip()
+        if not cleaned_content_base64:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned empty contentBase64 for theme brand export.",
+            )
+        try:
+            base64.b64decode(cleaned_content_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Shopify checkout app returned malformed contentBase64 for theme brand export."
+                ),
+            ) from exc
+        parsed_files.append(
+            {
+                "filename": cleaned_filename,
+                "contentBase64": cleaned_content_base64,
+            }
+        )
 
     parsed_sync_payload["files"] = parsed_files
     return parsed_sync_payload

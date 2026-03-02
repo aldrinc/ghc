@@ -10,6 +10,7 @@ import {
 } from "@/api/designSystems";
 import {
   useClient,
+  useBuildClientShopifyThemeTemplateDraft,
   useDownloadClientShopifyThemeTemplateZip,
   useGenerateClientShopifyThemeTemplateImages,
   useListClientShopifyThemeTemplateDrafts,
@@ -28,7 +29,12 @@ import {
   type ClientShopifyThemeTemplatePublishResponse,
 } from "@/api/clients";
 import {
+  COMPLIANCE_RULESET_VERSION,
+  useClientComplianceProfile,
+  useUpsertClientComplianceProfile,
   useSyncComplianceShopifyPolicyPages,
+  type ClientComplianceProfile,
+  type ComplianceBusinessModel,
   type ComplianceShopifyPolicySyncResponse,
 } from "@/api/compliance";
 import { useAssets } from "@/api/assets";
@@ -697,6 +703,69 @@ function buildTextSlotReadableLabelMap(
   return labelsByPath;
 }
 
+type ComplianceProfileFormState = {
+  businessModelsCsv: string;
+  legalBusinessName: string;
+  operatingEntityName: string;
+  companyAddressText: string;
+  businessLicenseIdentifier: string;
+  supportEmail: string;
+  supportPhone: string;
+  supportHoursText: string;
+  responseTimeCommitment: string;
+};
+
+const ALLOWED_COMPLIANCE_BUSINESS_MODELS: ComplianceBusinessModel[] = [
+  "ecommerce",
+  "saas_subscription",
+  "digital_product",
+  "online_service",
+  "lead_generation",
+];
+
+function buildComplianceProfileFormState(
+  profile: ClientComplianceProfile | null | undefined,
+  workspaceName?: string
+): ComplianceProfileFormState {
+  const businessModels =
+    profile?.businessModels.length ? profile.businessModels : (["ecommerce"] as ComplianceBusinessModel[]);
+  return {
+    businessModelsCsv: businessModels.join(", "),
+    legalBusinessName: profile?.legalBusinessName?.trim() || workspaceName?.trim() || "",
+    operatingEntityName: profile?.operatingEntityName?.trim() || "",
+    companyAddressText: profile?.companyAddressText?.trim() || "",
+    businessLicenseIdentifier: profile?.businessLicenseIdentifier?.trim() || "",
+    supportEmail: profile?.supportEmail?.trim() || "",
+    supportPhone: profile?.supportPhone?.trim() || "",
+    supportHoursText: profile?.supportHoursText?.trim() || "",
+    responseTimeCommitment: profile?.responseTimeCommitment?.trim() || "",
+  };
+}
+
+function parseComplianceBusinessModels(input: string): ComplianceBusinessModel[] {
+  const requested = input
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (!requested.length) {
+    throw new Error("At least one business model is required.");
+  }
+
+  const deduped = Array.from(new Set(requested));
+  const invalid = deduped.filter((value) => !ALLOWED_COMPLIANCE_BUSINESS_MODELS.includes(value as ComplianceBusinessModel));
+  if (invalid.length) {
+    throw new Error(
+      `Unsupported business model(s): ${invalid.join(", ")}. Allowed: ${ALLOWED_COMPLIANCE_BUSINESS_MODELS.join(", ")}.`
+    );
+  }
+  return deduped as ComplianceBusinessModel[];
+}
+
+function normalizeComplianceOptionalText(value: string): string | undefined {
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
   const { data: client } = useClient(workspace?.id);
@@ -719,13 +788,18 @@ export function BrandDesignSystemPage() {
   const updateDesignSystem = useUpdateDesignSystem();
   const uploadDesignSystemLogo = useUploadDesignSystemLogo();
   const deleteDesignSystem = useDeleteDesignSystem();
+  const { data: complianceProfile, isLoading: isLoadingComplianceProfile } = useClientComplianceProfile(workspace?.id);
+  const upsertComplianceProfile = useUpsertClientComplianceProfile(workspace?.id);
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
+  const buildShopifyThemeTemplateDraft = useBuildClientShopifyThemeTemplateDraft(workspace?.id);
   const generateShopifyThemeTemplateImages = useGenerateClientShopifyThemeTemplateImages(workspace?.id);
   const publishShopifyThemeTemplateDraft = usePublishClientShopifyThemeTemplateDraft(workspace?.id);
   const downloadShopifyThemeTemplateZip = useDownloadClientShopifyThemeTemplateZip(workspace?.id);
   const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
   const {
     data: shopifyThemeTemplateDrafts = [],
+    isFetched: hasFetchedShopifyThemeTemplateDrafts,
+    isLoading: isLoadingShopifyThemeTemplateDrafts,
     refetch: refetchShopifyThemeTemplateDrafts,
   } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
   const { data: workspaceProducts = [] } = useProducts(workspace?.id);
@@ -774,8 +848,13 @@ export function BrandDesignSystemPage() {
   const [mappedImageSlotsDialogOpen, setMappedImageSlotsDialogOpen] = useState(false);
   const [templatePublishResult, setTemplatePublishResult] = useState<ClientShopifyThemeTemplatePublishResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
+  const [complianceProfileForm, setComplianceProfileForm] = useState<ComplianceProfileFormState>(() =>
+    buildComplianceProfileFormState(null, workspace?.name)
+  );
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const autoCreateBaseTemplateDraftAttemptKeyRef = useRef("");
+  const complianceProfileFormSeedRef = useRef("");
   const uploadTemplateProductAssets = useUploadProductAssets(templateAssetUploadProductId || "");
 
   const designSystemOptions = useMemo(
@@ -803,6 +882,7 @@ export function BrandDesignSystemPage() {
       .map((shopDomain) => ({ label: shopDomain, value: shopDomain }));
   }, [shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain, shopifyStatus?.shopDomains]);
   const hasShopifyConnectionTarget = shopDomainOptions.length > 0;
+  const hasSavedComplianceProfile = Boolean(complianceProfile?.id);
   const shopifyState = shopifyStatus?.state || "error";
   const shopifyStatusTone = useMemo(() => {
     if (shopifyState === "ready") return "success" as const;
@@ -826,6 +906,12 @@ export function BrandDesignSystemPage() {
     if (fallbackErrorMessage) return fallbackErrorMessage;
     return "Checking Shopify connection status.";
   }, [shopifyStatus?.message, shopifyStatusError]);
+  const complianceProfileUpdatedAtLabel = useMemo(() => {
+    if (!complianceProfile?.updatedAt) return "";
+    const parsed = new Date(complianceProfile.updatedAt);
+    if (Number.isNaN(parsed.getTime())) return complianceProfile.updatedAt;
+    return parsed.toLocaleString();
+  }, [complianceProfile?.updatedAt]);
   const isShopifyConnectionMutating =
     createShopifyInstallUrl.isPending ||
     autoProvisionShopifyStorefrontToken.isPending ||
@@ -863,7 +949,18 @@ export function BrandDesignSystemPage() {
     setMappedImageSlotsDialogOpen(false);
     setTemplatePublishResult(null);
     setPolicySyncResult(null);
-  }, [workspace?.id]);
+    complianceProfileFormSeedRef.current = "";
+    setComplianceProfileForm(buildComplianceProfileFormState(null, workspace?.name));
+  }, [workspace?.id, workspace?.name]);
+
+  useEffect(() => {
+    const workspaceId = workspace?.id || "";
+    const profileVersion = complianceProfile?.updatedAt || "missing";
+    const nextSeed = `${workspaceId}:${profileVersion}`;
+    if (!workspaceId || complianceProfileFormSeedRef.current === nextSeed) return;
+    complianceProfileFormSeedRef.current = nextSeed;
+    setComplianceProfileForm(buildComplianceProfileFormState(complianceProfile, workspace?.name));
+  }, [complianceProfile, workspace?.id, workspace?.name]);
 
   useEffect(() => {
     const connectedShopDomainCandidates = [
@@ -1402,6 +1499,80 @@ export function BrandDesignSystemPage() {
     }
   };
 
+  const handleCreateBaseTemplateDraft = async () => {
+    if (!workspace?.id) return;
+    const nextThemeName = themeSyncThemeName.trim();
+    if (!nextThemeName) {
+      toast.error("Theme name is required to build a template draft.");
+      return;
+    }
+
+    const payload: {
+      themeName: string;
+      shopDomain?: string;
+      designSystemId?: string;
+      productId?: string;
+    } = {
+      themeName: nextThemeName,
+    };
+
+    const normalizedShopDomain = shopifySyncShopDomain.trim().toLowerCase();
+    if (normalizedShopDomain) payload.shopDomain = normalizedShopDomain;
+    const normalizedDesignSystemId = themeSyncDesignSystemId.trim();
+    if (normalizedDesignSystemId) payload.designSystemId = normalizedDesignSystemId;
+    const normalizedProductId = themeSyncProductId.trim();
+    if (normalizedProductId) payload.productId = normalizedProductId;
+
+    try {
+      const response = await buildShopifyThemeTemplateDraft.mutateAsync(payload);
+      setSelectedTemplateDraftId(response.draft.id);
+      setTemplateDraftEditError(null);
+      await refetchShopifyThemeTemplateDrafts();
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
+  };
+
+  useEffect(() => {
+    if (shopifyThemeTemplateDrafts.length) {
+      autoCreateBaseTemplateDraftAttemptKeyRef.current = "";
+    }
+  }, [shopifyThemeTemplateDrafts.length]);
+
+  useEffect(() => {
+    if (!workspace?.id) return;
+    if (!hasFetchedShopifyThemeTemplateDrafts || isLoadingShopifyThemeTemplateDrafts) return;
+    if (shopifyThemeTemplateDrafts.length) return;
+    if (buildShopifyThemeTemplateDraft.isPending) return;
+    if (shopifyState !== "ready") return;
+    if (!hasShopifyConnectionTarget) return;
+    const nextThemeName = themeSyncThemeName.trim();
+    if (!nextThemeName) return;
+
+    const attemptKey = [
+      workspace.id,
+      shopifySyncShopDomain.trim().toLowerCase(),
+      themeSyncDesignSystemId.trim(),
+      themeSyncProductId.trim(),
+      nextThemeName,
+    ].join("|");
+    if (autoCreateBaseTemplateDraftAttemptKeyRef.current === attemptKey) return;
+    autoCreateBaseTemplateDraftAttemptKeyRef.current = attemptKey;
+    void handleCreateBaseTemplateDraft();
+  }, [
+    workspace?.id,
+    hasFetchedShopifyThemeTemplateDrafts,
+    isLoadingShopifyThemeTemplateDrafts,
+    shopifyThemeTemplateDrafts.length,
+    buildShopifyThemeTemplateDraft.isPending,
+    shopifyState,
+    hasShopifyConnectionTarget,
+    shopifySyncShopDomain,
+    themeSyncDesignSystemId,
+    themeSyncProductId,
+    themeSyncThemeName,
+  ]);
+
   const handleGenerateTemplateDraftImages = async () => {
     if (!workspace?.id) return;
     if (!selectedTemplateDraftId) {
@@ -1657,10 +1828,61 @@ export function BrandDesignSystemPage() {
     }
   };
 
+  const handleComplianceProfileFieldChange = (
+    field: keyof ComplianceProfileFormState,
+    value: string
+  ) => {
+    setComplianceProfileForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveComplianceProfile = async () => {
+    if (!workspace?.id) return;
+    const workspaceName = workspace?.name?.trim() || "";
+    if (!workspaceName) {
+      toast.error("Workspace name is required before saving a compliance profile.");
+      return;
+    }
+
+    let businessModels: ComplianceBusinessModel[];
+    try {
+      businessModels = parseComplianceBusinessModels(complianceProfileForm.businessModelsCsv);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid business models.";
+      toast.error(message);
+      return;
+    }
+
+    try {
+      const saved = await upsertComplianceProfile.mutateAsync({
+        rulesetVersion: COMPLIANCE_RULESET_VERSION,
+        businessModels,
+        legalBusinessName: normalizeComplianceOptionalText(complianceProfileForm.legalBusinessName),
+        operatingEntityName: normalizeComplianceOptionalText(complianceProfileForm.operatingEntityName),
+        companyAddressText: normalizeComplianceOptionalText(complianceProfileForm.companyAddressText),
+        businessLicenseIdentifier: normalizeComplianceOptionalText(complianceProfileForm.businessLicenseIdentifier),
+        supportEmail: normalizeComplianceOptionalText(complianceProfileForm.supportEmail),
+        supportPhone: normalizeComplianceOptionalText(complianceProfileForm.supportPhone),
+        supportHoursText: normalizeComplianceOptionalText(complianceProfileForm.supportHoursText),
+        responseTimeCommitment: normalizeComplianceOptionalText(complianceProfileForm.responseTimeCommitment),
+        metadata: {},
+      });
+      setComplianceProfileForm(buildComplianceProfileFormState(saved, workspace?.name));
+    } catch {
+      // Error toast is emitted by the mutation hook.
+    }
+  };
+
   const handleDownloadTemplateZip = async () => {
     if (!workspace?.id) return;
     if (!selectedTemplateDraftId.trim()) {
       toast.error("Select a template draft first.");
+      return;
+    }
+    if (!hasSavedComplianceProfile) {
+      toast.error("Save a compliance profile before exporting the template ZIP.");
       return;
     }
     try {
@@ -1674,6 +1896,10 @@ export function BrandDesignSystemPage() {
 
   const handleSyncCompliancePolicyPages = async () => {
     if (!workspace?.id) return;
+    if (!hasSavedComplianceProfile) {
+      toast.error("Save a compliance profile before generating policy pages.");
+      return;
+    }
     const payload = shopifySyncShopDomain ? { shopDomain: shopifySyncShopDomain } : {};
     try {
       const response = await syncCompliancePolicyPages.mutateAsync(payload);
@@ -2433,7 +2659,32 @@ export function BrandDesignSystemPage() {
                 {selectedTemplateDraft.latestVersion.data.textSlots.length} text · Draft edits auto-save
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="space-y-2 rounded-md border border-dashed border-border bg-surface-2 p-3">
+              <div className="text-xs text-content-muted">
+                No template drafts exist yet. A base draft is required before generating content, downloading ZIP
+                exports, or publishing to Shopify.
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    void handleCreateBaseTemplateDraft();
+                  }}
+                  disabled={
+                    buildShopifyThemeTemplateDraft.isPending ||
+                    shopifyState !== "ready" ||
+                    !hasShopifyConnectionTarget ||
+                    !themeSyncThemeName.trim()
+                  }
+                >
+                  {buildShopifyThemeTemplateDraft.isPending
+                    ? "Creating base draft…"
+                    : "Create base template draft"}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {templatePublishResult ? (
             <div className="space-y-2 rounded-md border border-divider p-3">
@@ -2489,18 +2740,131 @@ export function BrandDesignSystemPage() {
             <div>
               <div className="text-sm font-semibold text-content">Compliance policy pages</div>
               <div className="text-xs text-content-muted">
-                Generate and sync brand/workspace policy pages to Shopify using your configured compliance profile.
+                Save your compliance profile, then generate and sync policy pages to Shopify.
               </div>
             </div>
-            <Button
-              size="sm"
-              onClick={() => {
-                void handleSyncCompliancePolicyPages();
-              }}
-              disabled={syncCompliancePolicyPages.isPending || !hasShopifyConnectionTarget}
-            >
-              {syncCompliancePolicyPages.isPending ? "Generating…" : "Generate policy pages"}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  void handleSaveComplianceProfile();
+                }}
+                disabled={upsertComplianceProfile.isPending || isLoadingComplianceProfile || !workspace?.id}
+              >
+                {upsertComplianceProfile.isPending ? "Saving…" : "Save compliance profile"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  void handleSyncCompliancePolicyPages();
+                }}
+                disabled={
+                  syncCompliancePolicyPages.isPending ||
+                  !hasShopifyConnectionTarget ||
+                  !hasSavedComplianceProfile ||
+                  isLoadingComplianceProfile
+                }
+              >
+                {syncCompliancePolicyPages.isPending ? "Generating…" : "Generate policy pages"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-md border border-divider bg-surface-2 p-3">
+            <div className="text-xs text-content-muted">
+              Ruleset: <span className="font-semibold text-content">{COMPLIANCE_RULESET_VERSION}</span>
+            </div>
+            <div className="text-xs text-content-muted">
+              {isLoadingComplianceProfile
+                ? "Loading compliance profile…"
+                : hasSavedComplianceProfile
+                  ? `Profile saved${complianceProfileUpdatedAtLabel ? ` · Updated ${complianceProfileUpdatedAtLabel}` : ""}`
+                  : "No compliance profile saved yet. Save this section before ZIP export or policy generation."}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-semibold text-content">Business models</label>
+                <Input
+                  value={complianceProfileForm.businessModelsCsv}
+                  onChange={(event) => handleComplianceProfileFieldChange("businessModelsCsv", event.target.value)}
+                  placeholder="ecommerce"
+                />
+                <div className="text-[11px] text-content-muted">
+                  Comma-separated. Allowed: {ALLOWED_COMPLIANCE_BUSINESS_MODELS.join(", ")}.
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Legal business name</label>
+                <Input
+                  value={complianceProfileForm.legalBusinessName}
+                  onChange={(event) => handleComplianceProfileFieldChange("legalBusinessName", event.target.value)}
+                  placeholder="The Honest Herbalist LLC"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Operating entity name</label>
+                <Input
+                  value={complianceProfileForm.operatingEntityName}
+                  onChange={(event) => handleComplianceProfileFieldChange("operatingEntityName", event.target.value)}
+                  placeholder="Aldrin Clement"
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-semibold text-content">Company address text</label>
+                <textarea
+                  rows={2}
+                  value={complianceProfileForm.companyAddressText}
+                  onChange={(event) => handleComplianceProfileFieldChange("companyAddressText", event.target.value)}
+                  placeholder="123 Main St, Suite 10, Austin, TX 78701, United States"
+                  className={cn(
+                    "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-content shadow-sm transition",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                  )}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Business license ID</label>
+                <Input
+                  value={complianceProfileForm.businessLicenseIdentifier}
+                  onChange={(event) => handleComplianceProfileFieldChange("businessLicenseIdentifier", event.target.value)}
+                  placeholder="TX-1234567"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Support email</label>
+                <Input
+                  value={complianceProfileForm.supportEmail}
+                  onChange={(event) => handleComplianceProfileFieldChange("supportEmail", event.target.value)}
+                  placeholder="support@company.com"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Support phone</label>
+                <Input
+                  value={complianceProfileForm.supportPhone}
+                  onChange={(event) => handleComplianceProfileFieldChange("supportPhone", event.target.value)}
+                  placeholder="+1 555 010 1000"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Support hours</label>
+                <Input
+                  value={complianceProfileForm.supportHoursText}
+                  onChange={(event) => handleComplianceProfileFieldChange("supportHoursText", event.target.value)}
+                  placeholder="Mon-Fri 9:00 AM-5:00 PM CST"
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-semibold text-content">Response time commitment</label>
+                <Input
+                  value={complianceProfileForm.responseTimeCommitment}
+                  onChange={(event) => handleComplianceProfileFieldChange("responseTimeCommitment", event.target.value)}
+                  placeholder="Within 2 business days"
+                />
+              </div>
+            </div>
           </div>
 
           {policySyncResult ? (

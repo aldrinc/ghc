@@ -398,6 +398,9 @@ _THEME_SETTINGS_CSS_GRADIENT_FUNCTION_RE = re.compile(
 _THEME_SETTINGS_CSS_VAR_RE = re.compile(
     r"^var\(\s*--[A-Za-z0-9_-]+(?:\s*,\s*[^)]+)?\s*\)$"
 )
+_THEME_SETTINGS_CSS_VAR_CAPTURE_RE = re.compile(
+    r"^var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*(.+?)\s*)?\)$"
+)
 _THEME_SETTINGS_SIMPLE_NUMBER_RE = re.compile(
     r"^\s*([+-]?\d+(?:\.\d+)?)\s*(px|em|rem|%)?\s*$", re.IGNORECASE
 )
@@ -4144,6 +4147,137 @@ class ShopifyApiClient:
         return lowered_value in _THEME_SETTINGS_COLOR_VALUE_KEYWORDS
 
     @classmethod
+    def _resolve_theme_css_value_expression(
+        cls,
+        *,
+        effective_css_vars: dict[str, str],
+        raw_value: str,
+        source_var: str,
+        path: str,
+        context: str,
+        stack: list[str],
+    ) -> str:
+        cleaned_value = raw_value.strip()
+        if not cleaned_value:
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to be non-empty."
+                ),
+                status_code=422,
+            )
+
+        match = _THEME_SETTINGS_CSS_VAR_CAPTURE_RE.fullmatch(cleaned_value)
+        if match is None:
+            return cleaned_value
+
+        referenced_var = match.group(1)
+        fallback_value = match.group(2)
+        if referenced_var in stack:
+            chain = " -> ".join([*stack, referenced_var])
+            raise ShopifyApiError(
+                message=(
+                    f"{context} detected a circular css var reference while resolving {source_var} "
+                    f"for path {path}: {chain}."
+                ),
+                status_code=422,
+            )
+
+        referenced_raw_value = effective_css_vars.get(referenced_var)
+        if referenced_raw_value is None:
+            fallback_clean = (
+                fallback_value.strip()
+                if isinstance(fallback_value, str)
+                else ""
+            )
+            if fallback_clean:
+                return cls._resolve_theme_css_value_expression(
+                    effective_css_vars=effective_css_vars,
+                    raw_value=fallback_clean,
+                    source_var=source_var,
+                    path=path,
+                    context=context,
+                    stack=[*stack, referenced_var],
+                )
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path}, but {source_var} "
+                    f"references missing token {referenced_var} with no fallback."
+                ),
+                status_code=422,
+            )
+
+        if not isinstance(referenced_raw_value, str):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to resolve to a string value, "
+                    f"but referenced token {referenced_var} is {type(referenced_raw_value).__name__}."
+                ),
+                status_code=422,
+            )
+
+        return cls._resolve_theme_css_value_expression(
+            effective_css_vars=effective_css_vars,
+            raw_value=referenced_raw_value,
+            source_var=source_var,
+            path=path,
+            context=context,
+            stack=[*stack, referenced_var],
+        )
+
+    @classmethod
+    def _resolve_theme_settings_color_source_value(
+        cls,
+        *,
+        effective_css_vars: dict[str, str],
+        source_var: str,
+        path: str,
+        context: str,
+    ) -> str:
+        raw_value = effective_css_vars.get(source_var)
+        if raw_value is None:
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path}. "
+                    "Add the missing token to the design system."
+                ),
+                status_code=422,
+            )
+        if not isinstance(raw_value, str):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to be a string value, "
+                    f"received {type(raw_value).__name__}."
+                ),
+                status_code=422,
+            )
+
+        resolved_value = cls._resolve_theme_css_value_expression(
+            effective_css_vars=effective_css_vars,
+            raw_value=raw_value,
+            source_var=source_var,
+            path=path,
+            context=context,
+            stack=[source_var],
+        )
+        if _THEME_SETTINGS_CSS_VAR_RE.fullmatch(resolved_value):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to resolve to a concrete CSS color, "
+                    f"received {resolved_value!r}."
+                ),
+                status_code=422,
+            )
+        if not cls._is_theme_settings_color_like_value(value=resolved_value):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to resolve to a CSS color value, "
+                    f"received {resolved_value!r}."
+                ),
+                status_code=422,
+            )
+        return resolved_value
+
+    @classmethod
     def _resolve_theme_settings_semantic_key(
         cls,
         *,
@@ -4280,15 +4414,12 @@ class ShopifyApiClient:
                 unmapped_paths.append(path)
                 continue
             source_var = semantic_source_vars[semantic_key]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
-                raise ShopifyApiError(
-                    message=(
-                        f"Theme settings semantic mapping requires css var {source_var} for path {path}. "
-                        "Add the missing token to the design system."
-                    ),
-                    status_code=422,
-                )
+            expected_value = cls._resolve_theme_settings_color_source_value(
+                effective_css_vars=effective_css_vars,
+                source_var=source_var,
+                path=path,
+                context="Theme settings semantic mapping",
+            )
             existing_value = parent.get(key)
             if (
                 isinstance(existing_value, str)
@@ -4329,8 +4460,14 @@ class ShopifyApiClient:
                 unmapped_paths.append(path)
                 continue
             source_var = semantic_source_vars[semantic_key]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
+            try:
+                expected_value = cls._resolve_theme_settings_color_source_value(
+                    effective_css_vars=effective_css_vars,
+                    source_var=source_var,
+                    path=path,
+                    context="Theme settings semantic audit",
+                )
+            except ShopifyApiError:
                 mismatched_paths.append(path)
                 continue
             existing_value = parent.get(key)
@@ -4929,15 +5066,12 @@ class ShopifyApiClient:
                 unmapped_paths.append(path)
                 continue
             source_var = semantic_source_vars[semantic_key]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
-                raise ShopifyApiError(
-                    message=(
-                        f"Theme template settings mapping requires css var {source_var} for path {path}. "
-                        "Add the missing token to the design system."
-                    ),
-                    status_code=422,
-                )
+            expected_value = cls._resolve_theme_settings_color_source_value(
+                effective_css_vars=effective_css_vars,
+                source_var=source_var,
+                path=path,
+                context="Theme template settings mapping",
+            )
             existing_value = parent.get(key)
             if (
                 isinstance(existing_value, str)
@@ -4999,8 +5133,14 @@ class ShopifyApiClient:
                 unmapped_paths.append(path)
                 continue
             source_var = semantic_source_vars[semantic_key]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
+            try:
+                expected_value = cls._resolve_theme_settings_color_source_value(
+                    effective_css_vars=effective_css_vars,
+                    source_var=source_var,
+                    path=path,
+                    context="Theme template settings audit",
+                )
+            except ShopifyApiError:
                 mismatched_paths.append(path)
                 continue
             existing_value = parent.get(key)
@@ -6285,15 +6425,12 @@ class ShopifyApiClient:
         missing_paths: list[str] = []
         for path in expected_paths:
             source_var = profile.settings_value_paths[path]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
-                raise ShopifyApiError(
-                    message=(
-                        f"Theme settings mapping requires css var {source_var} for path {path}. "
-                        "Add the missing token to the design system."
-                    ),
-                    status_code=422,
-                )
+            expected_value = cls._resolve_theme_settings_color_source_value(
+                effective_css_vars=effective_css_vars,
+                source_var=source_var,
+                path=path,
+                context="Theme settings mapping",
+            )
             update_count = 0
             candidate_paths = cls._build_settings_path_candidates(path)
             for candidate_path in candidate_paths:
@@ -6465,8 +6602,14 @@ class ShopifyApiClient:
         missing_paths: list[str] = []
         for path in expected_paths:
             source_var = profile.settings_value_paths[path]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
+            try:
+                expected_value = cls._resolve_theme_settings_color_source_value(
+                    effective_css_vars=effective_css_vars,
+                    source_var=source_var,
+                    path=path,
+                    context="Theme settings audit",
+                )
+            except ShopifyApiError:
                 mismatched_paths.append(path)
                 continue
             candidate_values: list[list[Any]] = []
@@ -7017,7 +7160,37 @@ class ShopifyApiClient:
             status_code=409,
         )
 
-    async def _list_theme_text_files_with_content(
+    @staticmethod
+    def _decode_theme_file_bytes_as_utf8(*, raw_bytes: bytes) -> str | None:
+        try:
+            return raw_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return None
+
+    @staticmethod
+    def _filename_allows_html_body(*, filename: str) -> bool:
+        cleaned = filename.strip().lower()
+        return cleaned.endswith((".html", ".htm", ".liquid"))
+
+    @staticmethod
+    def _looks_like_html_error_document(*, raw_bytes: bytes) -> bool:
+        preview = raw_bytes[:8192].decode("utf-8", errors="ignore").lower()
+        if (
+            "<html" not in preview
+            and "<!doctype html" not in preview
+            and "<body" not in preview
+        ):
+            return False
+        error_markers = (
+            "404",
+            "not found",
+            "page not found",
+            "no such key",
+            "access denied",
+        )
+        return any(marker in preview for marker in error_markers)
+
+    async def _list_theme_files_with_content(
         self,
         *,
         shop_domain: str,
@@ -7055,7 +7228,7 @@ class ShopifyApiClient:
             }
         }
         """
-        files_by_filename: dict[str, str] = {}
+        files_by_filename: dict[str, dict[str, str]] = {}
         unsupported_body_types_by_name: dict[str, list[str]] = {}
         after: str | None = None
 
@@ -7127,6 +7300,10 @@ class ShopifyApiClient:
                             ),
                             status_code=409,
                         )
+                    files_by_filename[cleaned_filename] = {
+                        "filename": cleaned_filename,
+                        "content": content,
+                    }
                 elif typename == "OnlineStoreThemeFileBodyBase64":
                     content_base64 = (
                         body.get("contentBase64") if isinstance(body, dict) else None
@@ -7151,16 +7328,21 @@ class ShopifyApiClient:
                             ),
                             status_code=409,
                         ) from exc
-                    try:
-                        content = decoded_bytes.decode("utf-8-sig")
-                    except UnicodeDecodeError as exc:
-                        raise ShopifyApiError(
-                            message=(
-                                "Theme export only supports UTF-8 text files, but base64 content was "
-                                f"not UTF-8 decodable for filename={cleaned_filename}."
+                    decoded_text = self._decode_theme_file_bytes_as_utf8(
+                        raw_bytes=decoded_bytes
+                    )
+                    if decoded_text is not None:
+                        files_by_filename[cleaned_filename] = {
+                            "filename": cleaned_filename,
+                            "content": decoded_text,
+                        }
+                    else:
+                        files_by_filename[cleaned_filename] = {
+                            "filename": cleaned_filename,
+                            "contentBase64": base64.b64encode(decoded_bytes).decode(
+                                "ascii"
                             ),
-                            status_code=409,
-                        ) from exc
+                        }
                 elif typename == "OnlineStoreThemeFileBodyUrl":
                     body_url = body.get("url") if isinstance(body, dict) else None
                     if not isinstance(body_url, str) or not body_url.strip():
@@ -7175,16 +7357,21 @@ class ShopifyApiClient:
                         filename=cleaned_filename,
                         body_url=body_url.strip(),
                     )
-                    try:
-                        content = downloaded_bytes.decode("utf-8-sig")
-                    except UnicodeDecodeError as exc:
-                        raise ShopifyApiError(
-                            message=(
-                                "Theme export only supports UTF-8 text files, but downloaded URL content was "
-                                f"not UTF-8 decodable for filename={cleaned_filename}."
+                    decoded_text = self._decode_theme_file_bytes_as_utf8(
+                        raw_bytes=downloaded_bytes
+                    )
+                    if decoded_text is not None:
+                        files_by_filename[cleaned_filename] = {
+                            "filename": cleaned_filename,
+                            "content": decoded_text,
+                        }
+                    else:
+                        files_by_filename[cleaned_filename] = {
+                            "filename": cleaned_filename,
+                            "contentBase64": base64.b64encode(downloaded_bytes).decode(
+                                "ascii"
                             ),
-                            status_code=409,
-                        ) from exc
+                        }
                 else:
                     normalized_type = (
                         typename if isinstance(typename, str) and typename else "UNKNOWN"
@@ -7193,7 +7380,6 @@ class ShopifyApiClient:
                         cleaned_filename
                     )
                     continue
-                files_by_filename[cleaned_filename] = content
 
             page_info = files.get("pageInfo")
             if not isinstance(page_info, dict):
@@ -7227,15 +7413,11 @@ class ShopifyApiClient:
                 if not files_by_filename:
                     raise ShopifyApiError(
                         message=(
-                            "Theme export could not load any text-backed files. "
-                            "The theme cannot be exported as a text ZIP package."
+                            "Theme export could not load any files from the selected theme."
                         ),
                         status_code=409,
                     )
-                return [
-                    {"filename": filename, "content": files_by_filename[filename]}
-                    for filename in sorted(files_by_filename.keys())
-                ]
+                return [files_by_filename[filename] for filename in sorted(files_by_filename.keys())]
             end_cursor = page_info.get("endCursor")
             if not isinstance(end_cursor, str) or not end_cursor:
                 raise ShopifyApiError(
@@ -7302,6 +7484,21 @@ class ShopifyApiClient:
                 message=(
                     "Theme export downloaded an empty file body URL for "
                     f"filename={filename}."
+                ),
+                status_code=409,
+            )
+        content_type = response.headers.get("content-type", "").strip().lower()
+        if not self._filename_allows_html_body(
+            filename=filename
+        ) and (
+            "text/html" in content_type
+            or self._looks_like_html_error_document(raw_bytes=response.content)
+        ):
+            raise ShopifyApiError(
+                message=(
+                    "Theme export downloaded an HTML error document for "
+                    f"filename={filename}. The file body URL may have expired or "
+                    "is not accessible. Retry export."
                 ),
                 status_code=409,
             )
@@ -8667,18 +8864,21 @@ class ShopifyApiClient:
         if include_file_payloads:
             response_files = files_to_upsert
             if include_all_theme_text_files:
-                full_theme_text_files = await self._list_theme_text_files_with_content(
+                full_theme_text_files = await self._list_theme_files_with_content(
                     shop_domain=shop_domain,
                     access_token=access_token,
                     theme_id=theme["id"],
                 )
-                merged_by_filename = {
-                    item["filename"]: item["content"] for item in full_theme_text_files
+                merged_by_filename: dict[str, dict[str, str]] = {
+                    item["filename"]: dict(item) for item in full_theme_text_files
                 }
                 for item in files_to_upsert:
-                    merged_by_filename[item["filename"]] = item["content"]
+                    merged_by_filename[item["filename"]] = {
+                        "filename": item["filename"],
+                        "content": item["content"],
+                    }
                 response_files = [
-                    {"filename": filename, "content": merged_by_filename[filename]}
+                    merged_by_filename[filename]
                     for filename in sorted(merged_by_filename.keys())
                 ]
             response["files"] = response_files

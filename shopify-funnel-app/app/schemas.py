@@ -327,7 +327,18 @@ class SyncThemeBrandResponse(BaseModel):
 
 class ThemeBrandExportFile(BaseModel):
     filename: str
-    content: str
+    content: str | None = None
+    contentBase64: str | None = None
+
+    @model_validator(mode="after")
+    def validate_content_payload(self) -> "ThemeBrandExportFile":
+        has_text = isinstance(self.content, str)
+        has_base64 = isinstance(self.contentBase64, str)
+        if has_text == has_base64:
+            raise ValueError(
+                "Exactly one of content or contentBase64 is required for export files."
+            )
+        return self
 
 
 class ExportThemeBrandResponse(SyncThemeBrandResponse):

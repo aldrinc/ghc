@@ -1,3 +1,5 @@
+import base64
+import binascii
 import concurrent.futures
 from contextvars import ContextVar
 from datetime import datetime, timezone
@@ -3572,7 +3574,42 @@ def _build_shopify_theme_template_export_zip_response(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail="Shopify export returned a file with an empty filename.",
                 )
-            zip_file.writestr(filename, file_entry["content"])
+            content = file_entry.get("content")
+            content_base64 = file_entry.get("contentBase64")
+            has_text_content = isinstance(content, str)
+            has_base64_content = isinstance(content_base64, str)
+            if has_text_content == has_base64_content:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=(
+                        "Shopify export returned an invalid file payload. "
+                        "Expected exactly one of content or contentBase64."
+                    ),
+                )
+            if has_text_content:
+                zip_file.writestr(filename, content)
+                continue
+
+            cleaned_content_base64 = content_base64.strip()
+            if not cleaned_content_base64:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=(
+                        "Shopify export returned an empty contentBase64 payload "
+                        f"for filename={filename}."
+                    ),
+                )
+            try:
+                file_bytes = base64.b64decode(cleaned_content_base64, validate=True)
+            except (binascii.Error, ValueError) as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=(
+                        "Shopify export returned malformed contentBase64 payload "
+                        f"for filename={filename}."
+                    ),
+                ) from exc
+            zip_file.writestr(filename, file_bytes)
 
         for rendered_page in policy_sync_payload["renderedPages"]:
             file_path = f"mos-template-export/policies/{rendered_page['handle']}.md"

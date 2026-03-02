@@ -816,6 +816,16 @@ function parseFilenameFromContentDisposition(contentDisposition: string | null):
   }
 }
 
+function isZipContentType(contentType: string | null): boolean {
+  if (!contentType) return false;
+  const normalized = contentType.toLowerCase();
+  return (
+    normalized.includes("application/zip") ||
+    normalized.includes("application/x-zip-compressed") ||
+    normalized.includes("application/octet-stream")
+  );
+}
+
 async function parseDownloadError(resp: Response): Promise<Error> {
   try {
     const raw = await resp.clone().json();
@@ -851,6 +861,16 @@ export function useDownloadClientShopifyThemeTemplateZip(clientId?: string) {
       );
       if (!response.ok) {
         throw await parseDownloadError(response);
+      }
+      const responseContentType = response.headers.get("Content-Type");
+      if (!isZipContentType(responseContentType)) {
+        const preview = (await response.text()).trim().slice(0, 240);
+        const contentTypeLabel = responseContentType?.trim() || "unknown content type";
+        throw new Error(
+          preview
+            ? `Expected a ZIP download but received ${contentTypeLabel}. Response preview: ${preview}`
+            : `Expected a ZIP download but received ${contentTypeLabel}.`,
+        );
       }
       const blob = await response.blob();
       const fileNameFromHeader = parseFilenameFromContentDisposition(
