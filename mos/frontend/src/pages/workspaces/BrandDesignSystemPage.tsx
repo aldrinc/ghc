@@ -25,6 +25,7 @@ import {
   useUpdateClientShopifyInstallation,
   useUpdateClient,
   type ClientShopifyThemeTemplateDraftData,
+  type ClientShopifyThemeTemplateGenerateImagesResponse,
   type ClientShopifyThemeTemplateImageSlot,
   type ClientShopifyThemeTemplateTextSlot,
   type ClientShopifyThemeTemplatePublishResponse,
@@ -90,6 +91,8 @@ const DESIGN_SYSTEM_TEMPLATE = `{
     "--color-brand": "#061a70",
     "--color-bg": "#ffffff",
     "--color-text": "var(--color-brand)",
+    "--footer-text-color": "var(--color-text)",
+    "--announcement-text-color": "var(--footer-text-color)",
     "--color-muted": "rgba(6, 26, 112, 0.76)",
     "--color-border": "rgba(6, 26, 112, 0.18)",
     "--color-soft": "rgba(6, 26, 112, 0.06)",
@@ -602,6 +605,14 @@ function parseSlotPathList(raw: string): { value?: string[]; error?: string } {
     };
   }
   return { value: normalized };
+}
+
+function collectTemplateGenerationNonFatalErrors(
+  response: ClientShopifyThemeTemplateGenerateImagesResponse
+): string[] {
+  return [response.imageGenerationError?.trim(), response.copyGenerationError?.trim()].filter(
+    (message): message is string => Boolean(message)
+  );
 }
 
 function humanizeSlotToken(raw: string): string {
@@ -1121,6 +1132,14 @@ export function BrandDesignSystemPage() {
       return;
     }
     setTemplateAssetUploadProductId((current) => {
+      const draftProductId =
+        selectedTemplateDraft?.latestVersion?.data.productId?.trim() ||
+        selectedTemplateDraft?.productId?.trim() ||
+        themeSyncProductId.trim();
+      if (draftProductId && workspaceProducts.some((product) => product.id === draftProductId)) {
+        return draftProductId;
+      }
+      if (current && workspaceProducts.some((product) => product.id === current)) return current;
       const activeWorkspaceProductId = activeWorkspaceProduct?.id?.trim() || "";
       if (
         activeWorkspaceProductId &&
@@ -1128,14 +1147,6 @@ export function BrandDesignSystemPage() {
       ) {
         return activeWorkspaceProductId;
       }
-      const draftProductId =
-        selectedTemplateDraft?.productId ||
-        selectedTemplateDraft?.latestVersion?.data.productId ||
-        themeSyncProductId.trim();
-      if (draftProductId && workspaceProducts.some((product) => product.id === draftProductId)) {
-        return draftProductId;
-      }
-      if (current && workspaceProducts.some((product) => product.id === current)) return current;
       return workspaceProducts[0]?.id || "";
     });
   }, [
@@ -1511,32 +1522,46 @@ export function BrandDesignSystemPage() {
   const handleCreateBaseTemplateDraft = async () => {
     if (!workspace?.id) return;
     const nextThemeName = themeSyncThemeName.trim();
-    if (!nextThemeName) {
-      toast.error("Theme name is required to build a template draft.");
-      return;
-    }
 
     const payload: {
-      themeName: string;
+      themeName?: string;
       shopDomain?: string;
       designSystemId?: string;
       productId?: string;
-    } = {
-      themeName: nextThemeName,
-    };
+    } = {};
+    if (nextThemeName) payload.themeName = nextThemeName;
 
     const normalizedShopDomain = shopifySyncShopDomain.trim().toLowerCase();
     if (normalizedShopDomain) payload.shopDomain = normalizedShopDomain;
     const normalizedDesignSystemId = themeSyncDesignSystemId.trim();
     if (normalizedDesignSystemId) payload.designSystemId = normalizedDesignSystemId;
-    const normalizedProductId = themeSyncProductId.trim();
+    const normalizedProductId =
+      themeSyncProductId.trim() ||
+      activeWorkspaceProduct?.id?.trim() ||
+      templateAssetUploadProductId.trim();
     if (normalizedProductId) payload.productId = normalizedProductId;
 
     try {
       const response = await buildShopifyThemeTemplateDraft.mutateAsync(payload);
-      setSelectedTemplateDraftId(response.draft.id);
+      const draftId = response.draft.id;
+      const draftProductId = response.draft.productId?.trim() || normalizedProductId;
+      setSelectedTemplateDraftId(draftId);
       setTemplateDraftEditError(null);
       await refetchShopifyThemeTemplateDrafts();
+      if (!draftProductId) {
+        const errorMessage =
+          "Template draft created, but product-specific copy generation requires a productId.";
+        setTemplateDraftEditError(errorMessage);
+        toast.error(errorMessage);
+        return;
+      }
+      const generationResponse = await generateShopifyThemeTemplateImages.mutateAsync({
+        draftId,
+        productId: draftProductId,
+      });
+      const nonFatalErrors = collectTemplateGenerationNonFatalErrors(generationResponse);
+      await refetchShopifyThemeTemplateDrafts();
+      setTemplateDraftEditError(nonFatalErrors.length ? nonFatalErrors.join(" ") : null);
     } catch {
       // Error toast is emitted by the mutation hook.
     }
@@ -1556,7 +1581,6 @@ export function BrandDesignSystemPage() {
     if (shopifyState !== "ready") return;
     if (!hasShopifyConnectionTarget) return;
     const nextThemeName = themeSyncThemeName.trim();
-    if (!nextThemeName) return;
 
     const attemptKey = [
       workspace.id,
@@ -1601,7 +1625,8 @@ export function BrandDesignSystemPage() {
       draftId: selectedTemplateDraftId,
     };
     const explicitProductId =
-      activeWorkspaceProduct?.id?.trim() ||
+      selectedTemplateDraft?.latestVersion?.data.productId?.trim() ||
+      selectedTemplateDraft?.productId?.trim() ||
       templateAssetUploadProductId.trim() ||
       themeSyncProductId.trim();
     if (explicitProductId) payload.productId = explicitProductId;
@@ -1637,7 +1662,8 @@ export function BrandDesignSystemPage() {
     if (generatedProductId) {
       setTemplateAssetUploadProductId(generatedProductId);
     }
-    setTemplateDraftEditError(null);
+    const nonFatalErrors = collectTemplateGenerationNonFatalErrors(response);
+    setTemplateDraftEditError(nonFatalErrors.length ? nonFatalErrors.join(" ") : null);
     await refetchWorkspaceImageAssets();
   };
 
@@ -2241,10 +2267,10 @@ export function BrandDesignSystemPage() {
             <Input
               value={themeSyncThemeName}
               onChange={(event) => setThemeSyncThemeName(event.target.value)}
-              placeholder="futrgroup2-0theme"
+              placeholder="Optional theme name (defaults to main theme)"
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
-              Target Shopify theme name. This is used when building or auditing drafts.
+              Optional: target Shopify theme name. Leave blank to build from the store's main theme.
             </div>
           </div>
 
@@ -2686,8 +2712,7 @@ export function BrandDesignSystemPage() {
                   disabled={
                     buildShopifyThemeTemplateDraft.isPending ||
                     shopifyState !== "ready" ||
-                    !hasShopifyConnectionTarget ||
-                    !themeSyncThemeName.trim()
+                    !hasShopifyConnectionTarget
                   }
                 >
                   {buildShopifyThemeTemplateDraft.isPending

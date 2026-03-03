@@ -68,18 +68,38 @@ def _normalize_optional_string(
     return cleaned
 
 
-def _copy_output_schema() -> dict[str, Any]:
+def _collect_text_slot_paths(*, text_slots: list[dict[str, Any]]) -> list[str]:
+    slot_paths: list[str] = []
+    seen_slot_paths: set[str] = set()
+    for index, slot in enumerate(text_slots):
+        path_raw = slot.get("path")
+        if not isinstance(path_raw, str) or not path_raw.strip():
+            raise ValueError(f"text_slots[{index}] is missing a valid path.")
+        path = path_raw.strip()
+        if path in seen_slot_paths:
+            raise ValueError(f"text_slots contains duplicate path: {path}.")
+        seen_slot_paths.add(path)
+        slot_paths.append(path)
+    return slot_paths
+
+
+def _copy_output_schema(*, text_slot_paths: list[str]) -> dict[str, Any]:
+    path_schema: dict[str, Any] = {"type": "string", "minLength": 1}
+    if text_slot_paths:
+        path_schema["enum"] = text_slot_paths
     return {
         "type": "object",
         "additionalProperties": False,
         "properties": {
             "textAssignments": {
                 "type": "array",
+                "minItems": len(text_slot_paths),
+                "maxItems": len(text_slot_paths),
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "path": {"type": "string", "minLength": 1},
+                        "path": path_schema,
                         "value": {"type": "string", "minLength": 1},
                     },
                     "required": ["path", "value"],
@@ -147,6 +167,7 @@ def _build_copy_prompt(
     instructions = [
         "You are writing Shopify theme component copy for one product page.",
         "Write concise, conversion-focused copy for every text slot.",
+        "Set each assignment path to EXACTLY one of the provided text slot path strings.",
         "Respect each slot maxLength exactly.",
         "Never invent unsupported medical, legal, or compliance claims.",
         "Keep phrasing product-specific and consistent across the page.",
@@ -254,6 +275,7 @@ def generate_shopify_theme_component_copy(
         value=locale,
         max_length=16,
     )
+    text_slot_paths = _collect_text_slot_paths(text_slots=truncated_text_slots)
 
     prompt = _build_copy_prompt(
         product=product,
@@ -268,7 +290,7 @@ def generate_shopify_theme_component_copy(
 
     llm = LLMClient()
     model_id = llm.default_model
-    output_schema = _copy_output_schema()
+    output_schema = _copy_output_schema(text_slot_paths=text_slot_paths)
     try:
         if model_id.lower().startswith("claude"):
             response = call_claude_structured_message(

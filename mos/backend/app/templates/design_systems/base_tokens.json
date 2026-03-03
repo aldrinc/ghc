@@ -35,6 +35,8 @@
     "--color-brand": "#061a70",
     "--color-bg": "#ffffff",
     "--color-text": "var(--color-brand)",
+    "--footer-text-color": "var(--color-text)",
+    "--announcement-text-color": "var(--footer-text-color)",
     "--color-muted": "rgba(6, 26, 112, 0.76)",
     "--color-border": "rgba(6, 26, 112, 0.18)",
     "--color-soft": "rgba(6, 26, 112, 0.06)",

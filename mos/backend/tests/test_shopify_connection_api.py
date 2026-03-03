@@ -503,7 +503,6 @@ def test_enqueue_shopify_theme_template_build_job_returns_accepted(api_client, m
         json={
             "shopDomain": "example.myshopify.com",
             "designSystemId": "design-system-1",
-            "themeName": "futrgroup2-0theme",
         },
     )
 

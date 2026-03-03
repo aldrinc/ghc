@@ -169,16 +169,17 @@ _THEME_IMAGE_PROMPT_METADATA_BRAND_DESCRIPTION_KEY = "brandDescription"
 _THEME_COPY_GUIDELINE_MAX_LENGTH = 180
 _THEME_COPY_OPTION_MAX_LENGTH = 32
 _THEME_SYNC_AI_IMAGE_PROMPT_BASE = (
-    "Premium ecommerce product image for a beauty-tech LED face mask brand. "
-    "Modern skincare aesthetic, soft cinematic lighting, high detail, photoreal quality. "
+    "Premium ecommerce product image aligned to the provided product and brand context. "
+    "High-detail, photoreal quality, commercially usable composition. "
+    "Do not introduce unrelated product categories; depict only the product described in context. "
     "No text, no logos, no watermark, no UI."
 )
 _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME = {
-    "hero": "Hero composition with the LED mask as the focal subject in a wide cinematic frame.",
-    "gallery": "Product detail composition showing texture, contour, and premium materials.",
-    "supporting": "Clean supporting visual tied to LED mask benefits and daily routine context.",
-    "background": "Ambient background scene that complements the LED mask product.",
-    "generic": "Lifestyle composition aligned to a premium beauty-tech brand.",
+    "hero": "Hero composition with the product as the focal subject in a wide cinematic frame.",
+    "gallery": "Product detail composition showing materials, features, and craftsmanship.",
+    "supporting": "Clean supporting visual tied to documented product benefits and usage context.",
+    "background": "Ambient background scene that complements the product identity.",
+    "generic": "Lifestyle composition aligned to the product and brand positioning.",
 }
 _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
     "landscape": "16:9",
@@ -417,6 +418,27 @@ def _serialize_http_exception_detail(detail: Any) -> dict[str, Any]:
     if isinstance(detail, str):
         return {"message": detail}
     return {"message": str(detail)}
+
+
+def _format_non_fatal_generation_error(*, stage: str, exc: BaseException) -> str:
+    normalized_stage = stage.strip() or "Generation"
+    if isinstance(exc, HTTPException):
+        detail_payload = _serialize_http_exception_detail(exc.detail)
+        detail_message = detail_payload.get("message")
+        if isinstance(detail_message, str) and detail_message.strip():
+            return f"{normalized_stage} failed: {detail_message.strip()}"
+        detail_items = detail_payload.get("items")
+        if isinstance(detail_items, list) and detail_items:
+            joined_items = ", ".join(str(item) for item in detail_items)
+            return f"{normalized_stage} failed: {joined_items}"
+        raw_detail = str(exc.detail).strip()
+        if raw_detail:
+            return f"{normalized_stage} failed: {raw_detail}"
+        return f"{normalized_stage} failed with status {exc.status_code}."
+    raw_message = str(exc).strip()
+    if raw_message:
+        return f"{normalized_stage} failed: {raw_message}"
+    return f"{normalized_stage} failed."
 
 
 def _sanitize_theme_component_text_value(value: str) -> str:
@@ -2380,6 +2402,84 @@ def _resolve_component_image_urls_from_asset_map(
     return component_image_urls
 
 
+def _resolve_latest_template_publish_logo(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    design_system_id: str,
+) -> tuple[str, str]:
+    normalized_design_system_id = design_system_id.strip()
+    if not normalized_design_system_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify theme template draft is missing designSystemId. "
+                "Rebuild the draft before publishing."
+            ),
+        )
+
+    design_system = DesignSystemsRepository(session).get(
+        org_id=org_id,
+        design_system_id=normalized_design_system_id,
+    )
+    if not design_system:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Design system referenced by the Shopify template draft was not found. "
+                "Rebuild the draft before publishing."
+            ),
+        )
+
+    design_system_client_id = str(design_system.client_id).strip() if design_system.client_id else ""
+    if design_system_client_id and design_system_client_id != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Design system referenced by the template draft must belong to this workspace.",
+        )
+
+    try:
+        validated_tokens = validate_design_system_tokens(design_system.tokens)
+    except DesignSystemGenerationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+
+    brand_obj = validated_tokens.get("brand")
+    if not isinstance(brand_obj, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Design system tokens.brand must be a JSON object.",
+        )
+    logo_public_id_raw = brand_obj.get("logoAssetPublicId")
+    if not isinstance(logo_public_id_raw, str) or not logo_public_id_raw.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Design system tokens.brand.logoAssetPublicId must be a non-empty string.",
+        )
+    logo_public_id = logo_public_id_raw.strip()
+
+    logo_asset = AssetsRepository(session).get_by_public_id(
+        org_id=org_id,
+        public_id=logo_public_id,
+        client_id=client_id,
+    )
+    if not logo_asset:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Design system brand.logoAssetPublicId does not reference an existing logo asset "
+                "for this workspace."
+            ),
+        )
+
+    public_asset_base_url = _require_public_asset_base_url()
+    logo_url = f"{public_asset_base_url}/public/assets/{logo_public_id}"
+    return logo_public_id, logo_url
+
+
 def _run_client_shopify_theme_brand_sync_job(job_id: str) -> None:
     session = SessionLocal()
     progress_token = None
@@ -2769,6 +2869,8 @@ def _generate_shopify_theme_template_draft_images(
             remainingSlotPaths=[],
             quotaExhaustedSlotPaths=[],
             slotErrorsByPath={},
+            imageGenerationError=None,
+            copyGenerationError=None,
         )
 
     resolved_product_id = payload.productId.strip() if payload.productId else None
@@ -2810,80 +2912,118 @@ def _generate_shopify_theme_template_draft_images(
     quota_exhausted_slot_paths: list[str] = []
     slot_error_by_path: dict[str, str] = {}
     generated_asset_by_slot_path: dict[str, Any] = {}
+    image_generation_error: str | None = None
+    copy_generation_error: str | None = None
     if should_generate_images:
-        default_general_context = _build_theme_sync_default_general_prompt_context(
-            draft_data=latest_data,
-            product=resolved_product,
-            brand_description=workspace_brand_description,
-        )
-        default_slot_context_by_path = _build_theme_sync_default_slot_prompt_context_by_path(
-            image_slots=image_slots,
-            text_slots=text_slots,
-            component_text_values=latest_data.componentTextValues,
-        )
-        effective_general_context = default_general_context
-        effective_slot_context_by_path = dict(default_slot_context_by_path)
-        product_reference_image = _resolve_theme_sync_product_reference_image(
-            session=session,
-            org_id=auth.org_id,
-            client_id=client_id,
-            product=resolved_product,
-        )
+        try:
+            default_general_context = _build_theme_sync_default_general_prompt_context(
+                draft_data=latest_data,
+                product=resolved_product,
+                brand_description=workspace_brand_description,
+            )
+            default_slot_context_by_path = _build_theme_sync_default_slot_prompt_context_by_path(
+                image_slots=image_slots,
+                text_slots=text_slots,
+                component_text_values=latest_data.componentTextValues,
+            )
+            effective_general_context = default_general_context
+            effective_slot_context_by_path = dict(default_slot_context_by_path)
+            product_reference_image = _resolve_theme_sync_product_reference_image(
+                session=session,
+                org_id=auth.org_id,
+                client_id=client_id,
+                product=resolved_product,
+            )
 
-        _emit_theme_sync_progress(
-            {
-                "stage": "image_generation",
-                "message": (
-                    "Generating template images from deterministic slot requirements."
-                    if not requested_slot_paths
-                    else (
-                        "Generating template images from deterministic slot requirements "
-                        f"for {len(requested_slot_paths)} selected slot(s)."
-                    )
-                ),
-                "totalImageSlots": len(image_slots_pending_generation),
-                "completedImageSlots": 0,
-                "generatedImageCount": 0,
-                "fallbackImageCount": 0,
-                "skippedImageCount": 0,
-            }
-        )
-        (
-            _,
-            rate_limited_slot_paths,
-            generated_asset_by_slot_path,
-            quota_exhausted_slot_paths,
-            slot_error_by_path,
-        ) = _generate_theme_sync_ai_image_assets(
-            session=session,
-            org_id=auth.org_id,
-            client_id=client_id,
-            product_id=resolved_product_id,
-            image_slots=image_slots_pending_generation,
-            text_slots=text_slots,
-            general_prompt_context=effective_general_context,
-            slot_prompt_context_by_path=effective_slot_context_by_path,
-            max_concurrency=image_generation_max_concurrency,
-            stop_on_quota_exhausted=True,
-            reference_image_bytes=product_reference_image["imageBytes"],
-            reference_image_mime_type=product_reference_image["mimeType"],
-            reference_asset_public_id=product_reference_image["assetPublicId"],
-            reference_asset_id=product_reference_image["assetId"],
-        )
-        rate_limited_slot_paths = sorted(
-            {
-                slot_path.strip()
-                for slot_path in rate_limited_slot_paths
-                if isinstance(slot_path, str) and slot_path.strip()
-            }
-        )
-        quota_exhausted_slot_paths = sorted(
-            {
-                slot_path.strip()
-                for slot_path in quota_exhausted_slot_paths
-                if isinstance(slot_path, str) and slot_path.strip()
-            }
-        )
+            _emit_theme_sync_progress(
+                {
+                    "stage": "image_generation",
+                    "message": (
+                        "Generating template images from deterministic slot requirements."
+                        if not requested_slot_paths
+                        else (
+                            "Generating template images from deterministic slot requirements "
+                            f"for {len(requested_slot_paths)} selected slot(s)."
+                        )
+                    ),
+                    "totalImageSlots": len(image_slots_pending_generation),
+                    "completedImageSlots": 0,
+                    "generatedImageCount": 0,
+                    "fallbackImageCount": 0,
+                    "skippedImageCount": 0,
+                }
+            )
+            (
+                _,
+                rate_limited_slot_paths,
+                generated_asset_by_slot_path,
+                quota_exhausted_slot_paths,
+                slot_error_by_path,
+            ) = _generate_theme_sync_ai_image_assets(
+                session=session,
+                org_id=auth.org_id,
+                client_id=client_id,
+                product_id=resolved_product_id,
+                image_slots=image_slots_pending_generation,
+                text_slots=text_slots,
+                general_prompt_context=effective_general_context,
+                slot_prompt_context_by_path=effective_slot_context_by_path,
+                max_concurrency=image_generation_max_concurrency,
+                stop_on_quota_exhausted=True,
+                reference_image_bytes=product_reference_image["imageBytes"],
+                reference_image_mime_type=product_reference_image["mimeType"],
+                reference_asset_public_id=product_reference_image["assetPublicId"],
+                reference_asset_id=product_reference_image["assetId"],
+            )
+            rate_limited_slot_paths = sorted(
+                {
+                    slot_path.strip()
+                    for slot_path in rate_limited_slot_paths
+                    if isinstance(slot_path, str) and slot_path.strip()
+                }
+            )
+            quota_exhausted_slot_paths = sorted(
+                {
+                    slot_path.strip()
+                    for slot_path in quota_exhausted_slot_paths
+                    if isinstance(slot_path, str) and slot_path.strip()
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            image_generation_error = _format_non_fatal_generation_error(
+                stage="Image generation",
+                exc=exc,
+            )
+            logger.exception(
+                "Shopify template image generation failed; continuing with copy generation",
+                extra={"client_id": client_id, "draft_id": str(draft.id)},
+            )
+            _emit_theme_sync_progress(
+                {
+                    "stage": "image_generation",
+                    "message": image_generation_error,
+                    "totalImageSlots": len(image_slots_pending_generation),
+                    "completedImageSlots": 0,
+                    "generatedImageCount": 0,
+                    "skippedImageCount": len(image_slots_pending_generation),
+                }
+            )
+            if _is_gemini_quota_or_rate_limit_error(exc):
+                rate_limited_slot_paths = sorted(
+                    {
+                        str(slot.get("path")).strip()
+                        for slot in image_slots_pending_generation
+                        if isinstance(slot.get("path"), str)
+                        and str(slot.get("path")).strip()
+                    }
+                )
+                if _is_gemini_hard_quota_exhaustion_error(exc):
+                    quota_exhausted_slot_paths = list(rate_limited_slot_paths)
+            for slot in image_slots_pending_generation:
+                slot_path = str(slot.get("path")).strip()
+                if not slot_path:
+                    continue
+                slot_error_by_path.setdefault(slot_path, image_generation_error)
     rate_limited_slot_path_set = set(rate_limited_slot_paths)
 
     generated_slot_paths: list[str] = []
@@ -2896,24 +3036,24 @@ def _generate_shopify_theme_template_draft_images(
         if generated_asset is None:
             if slot_path in rate_limited_slot_path_set:
                 continue
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    "Image generation did not return an asset for a required template slot. "
-                    f"slotPath={slot_path}."
-                ),
+            slot_error_by_path[slot_path] = (
+                "Image generation did not return an asset for a required template slot. "
+                f"slotPath={slot_path}."
             )
+            if image_generation_error is None:
+                image_generation_error = slot_error_by_path[slot_path]
+            continue
         normalized_public_id = _normalize_asset_public_id(
             getattr(generated_asset, "public_id", None)
         )
         if not normalized_public_id:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    "Image generation returned an invalid asset without public_id. "
-                    f"slotPath={slot_path}."
-                ),
+            slot_error_by_path[slot_path] = (
+                "Image generation returned an invalid asset without public_id. "
+                f"slotPath={slot_path}."
             )
+            if image_generation_error is None:
+                image_generation_error = slot_error_by_path[slot_path]
+            continue
         next_component_image_asset_map[slot_path] = normalized_public_id
         generated_slot_paths.append(slot_path)
         raw_ai_metadata = getattr(generated_asset, "ai_metadata", None)
@@ -2937,104 +3077,123 @@ def _generate_shopify_theme_template_draft_images(
     generated_component_text_values: dict[str, str] = {}
     copy_agent_model: str | None = None
     if should_generate_text:
-        copy_settings = _resolve_theme_copy_settings_from_template_metadata(
-            metadata=latest_metadata
-        )
-        planner_copy_kwargs = _build_theme_copy_planner_kwargs(copy_settings=copy_settings)
-        offers = ProductOffersRepository(session).list_by_product(
-            product_id=str(resolved_product.id)
-        )
-        _emit_theme_sync_progress(
-            {
-                "stage": "planning_content",
-                "message": "Generating template copy for discovered text slots.",
-                "totalTextSlots": len(text_slots),
-            }
-        )
         try:
-            copy_agent_output = generate_shopify_theme_component_copy(
-                product=resolved_product,
-                offers=offers,
-                text_slots=text_slots,
-                **planner_copy_kwargs,
+            copy_settings = _resolve_theme_copy_settings_from_template_metadata(
+                metadata=latest_metadata
             )
-        except ValueError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Theme copy agent failed for Shopify template generation. "
-                    f"productId={resolved_product_id}. {exc}"
-                ),
-            ) from exc
+            planner_copy_kwargs = _build_theme_copy_planner_kwargs(
+                copy_settings=copy_settings
+            )
+            offers = ProductOffersRepository(session).list_by_product(
+                product_id=str(resolved_product.id)
+            )
+            _emit_theme_sync_progress(
+                {
+                    "stage": "planning_content",
+                    "message": "Generating template copy for discovered text slots.",
+                    "totalTextSlots": len(text_slots),
+                }
+            )
+            try:
+                copy_agent_output = generate_shopify_theme_component_copy(
+                    product=resolved_product,
+                    offers=offers,
+                    text_slots=text_slots,
+                    **planner_copy_kwargs,
+                )
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Theme copy agent failed for Shopify template generation. "
+                        f"productId={resolved_product_id}. {exc}"
+                    ),
+                ) from exc
 
-        copy_text_values = copy_agent_output.get("componentTextValues")
-        if not isinstance(copy_text_values, dict):
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Theme copy agent returned an invalid componentTextValues payload.",
+            copy_text_values = copy_agent_output.get("componentTextValues")
+            if not isinstance(copy_text_values, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Theme copy agent returned an invalid componentTextValues payload.",
+                )
+            expected_text_slot_paths = {
+                str(slot.get("path")).strip()
+                for slot in text_slots
+                if isinstance(slot.get("path"), str) and str(slot.get("path")).strip()
+            }
+            for setting_path, value in copy_text_values.items():
+                if not isinstance(setting_path, str) or not setting_path.strip():
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Theme copy agent returned an invalid text mapping path.",
+                    )
+                normalized_path = setting_path.strip()
+                if normalized_path not in expected_text_slot_paths:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=(
+                            "Theme copy agent returned an unknown text slot path: "
+                            f"{normalized_path}."
+                        ),
+                    )
+                if not isinstance(value, str) or not value.strip():
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=(
+                            "Theme copy agent returned an invalid text value for path "
+                            f"{normalized_path}."
+                        ),
+                    )
+                sanitized_value = _sanitize_theme_component_text_value(value)
+                if not sanitized_value:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=(
+                            "Theme copy agent returned text that became empty after sanitization "
+                            f"for path {normalized_path}."
+                        ),
+                    )
+                if normalized_path in generated_component_text_values:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail=(
+                            "Theme copy agent returned duplicate text mapping path "
+                            f"{normalized_path}."
+                        ),
+                    )
+                generated_component_text_values[normalized_path] = sanitized_value
+            if expected_text_slot_paths != set(generated_component_text_values.keys()):
+                missing_paths = sorted(
+                    expected_text_slot_paths - set(generated_component_text_values.keys())
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Theme copy agent did not assign all text slots: "
+                        + ", ".join(missing_paths)
+                        + "."
+                    ),
+                )
+            next_component_text_values.update(generated_component_text_values)
+            copy_model_raw = copy_agent_output.get("model")
+            if isinstance(copy_model_raw, str) and copy_model_raw.strip():
+                copy_agent_model = copy_model_raw.strip()
+        except Exception as exc:  # noqa: BLE001
+            copy_generation_error = _format_non_fatal_generation_error(
+                stage="Copy generation",
+                exc=exc,
             )
-        expected_text_slot_paths = {
-            str(slot.get("path")).strip()
-            for slot in text_slots
-            if isinstance(slot.get("path"), str) and str(slot.get("path")).strip()
-        }
-        for setting_path, value in copy_text_values.items():
-            if not isinstance(setting_path, str) or not setting_path.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail="Theme copy agent returned an invalid text mapping path.",
-                )
-            normalized_path = setting_path.strip()
-            if normalized_path not in expected_text_slot_paths:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=(
-                        "Theme copy agent returned an unknown text slot path: "
-                        f"{normalized_path}."
-                    ),
-                )
-            if not isinstance(value, str) or not value.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=(
-                        "Theme copy agent returned an invalid text value for path "
-                        f"{normalized_path}."
-                    ),
-                )
-            sanitized_value = _sanitize_theme_component_text_value(value)
-            if not sanitized_value:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=(
-                        "Theme copy agent returned text that became empty after sanitization "
-                        f"for path {normalized_path}."
-                    ),
-                )
-            if normalized_path in generated_component_text_values:
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=(
-                        "Theme copy agent returned duplicate text mapping path "
-                        f"{normalized_path}."
-                    ),
-                )
-            generated_component_text_values[normalized_path] = sanitized_value
-        if expected_text_slot_paths != set(generated_component_text_values.keys()):
-            missing_paths = sorted(
-                expected_text_slot_paths - set(generated_component_text_values.keys())
+            logger.exception(
+                "Shopify template copy generation failed; continuing with generated images",
+                extra={"client_id": client_id, "draft_id": str(draft.id)},
             )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=(
-                    "Theme copy agent did not assign all text slots: "
-                    + ", ".join(missing_paths)
-                    + "."
-                ),
+            _emit_theme_sync_progress(
+                {
+                    "stage": "planning_content",
+                    "message": copy_generation_error,
+                    "totalTextSlots": len(text_slots),
+                }
             )
-        next_component_text_values.update(generated_component_text_values)
-        copy_model_raw = copy_agent_output.get("model")
-        if isinstance(copy_model_raw, str) and copy_model_raw.strip():
-            copy_agent_model = copy_model_raw.strip()
 
     normalized_component_image_asset_map = (
         _normalize_theme_template_component_image_asset_map(next_component_image_asset_map)
@@ -3084,6 +3243,8 @@ def _generate_shopify_theme_template_draft_images(
             remainingSlotPaths=remaining_slot_paths,
             quotaExhaustedSlotPaths=quota_exhausted_slot_paths,
             slotErrorsByPath=slot_error_by_path,
+            imageGenerationError=image_generation_error,
+            copyGenerationError=copy_generation_error,
         )
 
     merged_metadata = dict(latest_metadata)
@@ -3112,6 +3273,10 @@ def _generate_shopify_theme_template_draft_images(
         merged_metadata["copyGenerationGeneratedAt"] = datetime.now(timezone.utc).isoformat()
     if isinstance(copy_agent_model, str) and copy_agent_model.strip():
         merged_metadata["copyAgentModel"] = copy_agent_model.strip()
+    if isinstance(image_generation_error, str) and image_generation_error.strip():
+        merged_metadata["imageGenerationError"] = image_generation_error.strip()
+    if isinstance(copy_generation_error, str) and copy_generation_error.strip():
+        merged_metadata["copyGenerationError"] = copy_generation_error.strip()
     if workspace_brand_description:
         merged_metadata[_THEME_IMAGE_PROMPT_METADATA_BRAND_DESCRIPTION_KEY] = (
             workspace_brand_description
@@ -3157,6 +3322,8 @@ def _generate_shopify_theme_template_draft_images(
         remainingSlotPaths=remaining_slot_paths,
         quotaExhaustedSlotPaths=quota_exhausted_slot_paths,
         slotErrorsByPath=slot_error_by_path,
+        imageGenerationError=image_generation_error,
+        copyGenerationError=copy_generation_error,
     )
 
 
@@ -3213,6 +3380,12 @@ def _publish_shopify_theme_template_draft(
         client_id=client_id,
         component_image_asset_map=component_image_asset_map,
     )
+    latest_logo_asset_public_id, latest_logo_url = _resolve_latest_template_publish_logo(
+        session=session,
+        org_id=auth.org_id,
+        client_id=client_id,
+        design_system_id=draft_data.designSystemId,
+    )
 
     _emit_theme_sync_progress(
         {
@@ -3226,7 +3399,7 @@ def _publish_shopify_theme_template_draft(
         client_id=client_id,
         workspace_name=draft_data.workspaceName,
         brand_name=draft_data.brandName,
-        logo_url=draft_data.logoUrl,
+        logo_url=latest_logo_url,
         css_vars=draft_data.cssVars,
         font_urls=draft_data.fontUrls,
         data_theme=draft_data.dataTheme,
@@ -3249,8 +3422,8 @@ def _publish_shopify_theme_template_draft(
         designSystemId=draft_data.designSystemId,
         designSystemName=draft_data.designSystemName,
         brandName=draft_data.brandName,
-        logoAssetPublicId=draft_data.logoAssetPublicId,
-        logoUrl=draft_data.logoUrl,
+        logoAssetPublicId=latest_logo_asset_public_id,
+        logoUrl=latest_logo_url,
         themeId=synced["themeId"],
         themeName=synced["themeName"],
         themeRole=synced["themeRole"],
@@ -3843,6 +4016,8 @@ def _generate_shopify_theme_template_draft_images_with_retry(
     aggregated_source_by_slot_path: dict[str, str] = {}
     aggregated_prompt_token_count_by_slot_path: dict[str, int] = {}
     aggregated_slot_errors_by_path: dict[str, str] = {}
+    aggregated_image_generation_error: str | None = None
+    aggregated_copy_generation_error: str | None = None
     last_remaining_slot_paths: list[str] = []
     final_response: ShopifyThemeTemplateGenerateImagesResponse | None = None
 
@@ -3906,6 +4081,18 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             and response.copyAgentModel.strip()
         ):
             aggregated_copy_agent_model = response.copyAgentModel.strip()
+        if (
+            aggregated_image_generation_error is None
+            and isinstance(response.imageGenerationError, str)
+            and response.imageGenerationError.strip()
+        ):
+            aggregated_image_generation_error = response.imageGenerationError.strip()
+        if (
+            aggregated_copy_generation_error is None
+            and isinstance(response.copyGenerationError, str)
+            and response.copyGenerationError.strip()
+        ):
+            aggregated_copy_generation_error = response.copyGenerationError.strip()
         aggregated_slot_paths.update(response.generatedSlotPaths)
         aggregated_model_by_slot_path.update(response.imageModelBySlotPath)
         aggregated_source_by_slot_path.update(response.imageSourceBySlotPath)
@@ -3953,15 +4140,21 @@ def _generate_shopify_theme_template_draft_images_with_retry(
                 if isinstance(first_quota_error, str) and first_quota_error.strip()
                 else ""
             )
+            quota_error_message = (
+                "Template image generation stopped early because Gemini quota is exhausted. "
+                f"Generated {generated_so_far} slot(s) before stopping.{model_note}"
+                f"{first_quota_error_note} "
+                "Retry once quota resets. Slots: "
+                + ", ".join(quota_exhausted_slot_paths)
+            )
+            if aggregated_slot_paths or aggregated_generated_text_count > 0:
+                if aggregated_image_generation_error is None:
+                    aggregated_image_generation_error = quota_error_message
+                last_remaining_slot_paths = list(quota_exhausted_slot_paths)
+                break
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=(
-                    "Template image generation stopped early because Gemini quota is exhausted. "
-                    f"Generated {generated_so_far} slot(s) before stopping.{model_note}"
-                    f"{first_quota_error_note} "
-                    "Retry once quota resets. Slots: "
-                    + ", ".join(quota_exhausted_slot_paths)
-                ),
+                detail=quota_error_message,
             )
 
         remaining_slot_paths = sorted(
@@ -4006,16 +4199,21 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             if isinstance(first_remaining_slot_error, str) and first_remaining_slot_error.strip()
             else ""
         )
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail=(
-                "Template image generation remained rate-limited after "
-                f"{max_attempts} attempts."
-                f"{first_remaining_slot_error_note}"
-                "Remaining slots: "
-                + ", ".join(last_remaining_slot_paths)
-            ),
+        remaining_error_message = (
+            "Template image generation remained rate-limited after "
+            f"{max_attempts} attempts."
+            f"{first_remaining_slot_error_note}"
+            "Remaining slots: "
+            + ", ".join(last_remaining_slot_paths)
         )
+        if aggregated_slot_paths or aggregated_generated_text_count > 0:
+            if aggregated_image_generation_error is None:
+                aggregated_image_generation_error = remaining_error_message
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=remaining_error_message,
+            )
 
     if (
         not aggregated_slot_paths
@@ -4026,6 +4224,8 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             update={
                 "generatedTextCount": aggregated_generated_text_count,
                 "copyAgentModel": aggregated_copy_agent_model,
+                "imageGenerationError": aggregated_image_generation_error,
+                "copyGenerationError": aggregated_copy_generation_error,
             }
         )
 
@@ -4043,6 +4243,27 @@ def _generate_shopify_theme_template_draft_images_with_retry(
         }
     )
     merged_prompt_token_count_total = sum(merged_prompt_token_count_by_slot_path.values())
+    merged_rate_limited_slot_paths = sorted(
+        {
+            slot_path.strip()
+            for slot_path in final_response.rateLimitedSlotPaths
+            if isinstance(slot_path, str) and slot_path.strip()
+        }
+    )
+    merged_remaining_slot_paths = sorted(
+        {
+            slot_path.strip()
+            for slot_path in (last_remaining_slot_paths or final_response.remainingSlotPaths)
+            if isinstance(slot_path, str) and slot_path.strip()
+        }
+    )
+    merged_quota_exhausted_slot_paths = sorted(
+        {
+            slot_path.strip()
+            for slot_path in final_response.quotaExhaustedSlotPaths
+            if isinstance(slot_path, str) and slot_path.strip()
+        }
+    )
 
     return final_response.model_copy(
         update={
@@ -4055,10 +4276,12 @@ def _generate_shopify_theme_template_draft_images_with_retry(
             "imageSourceBySlotPath": merged_source_by_slot_path,
             "promptTokenCountBySlotPath": merged_prompt_token_count_by_slot_path,
             "promptTokenCountTotal": merged_prompt_token_count_total,
-            "rateLimitedSlotPaths": [],
-            "remainingSlotPaths": [],
-            "quotaExhaustedSlotPaths": [],
+            "rateLimitedSlotPaths": merged_rate_limited_slot_paths,
+            "remainingSlotPaths": merged_remaining_slot_paths,
+            "quotaExhaustedSlotPaths": merged_quota_exhausted_slot_paths,
             "slotErrorsByPath": merged_slot_errors_by_path,
+            "imageGenerationError": aggregated_image_generation_error,
+            "copyGenerationError": aggregated_copy_generation_error,
         }
     )
 

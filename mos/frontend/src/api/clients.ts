@@ -236,6 +236,8 @@ export type ClientShopifyThemeTemplateGenerateImagesResponse = {
   remainingSlotPaths: string[];
   quotaExhaustedSlotPaths: string[];
   slotErrorsByPath: Record<string, string>;
+  imageGenerationError?: string | null;
+  copyGenerationError?: string | null;
 };
 
 export type ClientShopifyThemeTemplatePublishPayload = {
@@ -938,20 +940,31 @@ export function useGenerateClientShopifyThemeTemplateImages(clientId?: string) {
       }
     },
     onSuccess: (response) => {
+      const nonFatalErrors = [
+        response.imageGenerationError?.trim(),
+        response.copyGenerationError?.trim(),
+      ].filter((message): message is string => Boolean(message));
       const textSummary =
         response.generatedTextCount > 0
           ? ` Refreshed ${response.generatedTextCount} text slot(s).`
           : "";
-      if (response.remainingSlotPaths.length) {
-        toast.success(
-          `Generated ${response.generatedImageCount} template image(s). ` +
-            `${response.remainingSlotPaths.length} slot(s) still pending.` +
-            textSummary,
-        );
+      if (response.generatedImageCount > 0 || response.generatedTextCount > 0) {
+        if (response.remainingSlotPaths.length) {
+          toast.success(
+            `Generated ${response.generatedImageCount} template image(s). ` +
+              `${response.remainingSlotPaths.length} slot(s) still pending.` +
+              textSummary,
+          );
+        } else {
+          toast.success(
+            `Generated ${response.generatedImageCount} template image(s).` + textSummary,
+          );
+        }
       } else {
-        toast.success(
-          `Generated ${response.generatedImageCount} template image(s).` + textSummary,
-        );
+        toast.success("No new template assets were generated.");
+      }
+      if (nonFatalErrors.length) {
+        toast.error(nonFatalErrors.join(" "));
       }
       queryClient.invalidateQueries({
         queryKey: ["clients", "shopify-theme-template-drafts", clientId],

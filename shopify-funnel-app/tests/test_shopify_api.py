@@ -353,6 +353,104 @@ def test_list_theme_brand_template_slots_uses_deterministic_manifest(monkeypatch
     ]
 
 
+def test_list_theme_brand_template_slots_defaults_to_main_theme_when_selector_omitted(
+    monkeypatch,
+):
+    client = ShopifyApiClient()
+    manifest = {
+        "futrgroup2-0theme": {
+            "imageSlots": (
+                {
+                    "path": "templates/index.json.sections.hero.settings.image",
+                    "key": "image",
+                    "role": "hero",
+                    "recommendedAspect": "landscape",
+                },
+            ),
+            "textSlots": (),
+        }
+    }
+    monkeypatch.setattr(
+        shopify_api_module,
+        "_THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME",
+        manifest,
+    )
+    template_json = (
+        json.dumps(
+            {
+                "sections": {
+                    "hero": {
+                        "settings": {"image": "shopify://shop_images/hero-main.png"},
+                    }
+                }
+            }
+        )
+        + "\n"
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        },
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/2",
+                            "name": "preview-theme",
+                            "role": "UNPUBLISHED",
+                        },
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            variables = payload.get("variables", {})
+            assert variables.get("id") == "gid://shopify/OnlineStoreTheme/1"
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": template_json,
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.list_theme_brand_template_slots(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+        )
+    )
+
+    assert result["themeId"] == "gid://shopify/OnlineStoreTheme/1"
+    assert result["themeName"] == "futrgroup2-0theme"
+    assert result["themeRole"] == "MAIN"
+    assert result["imageSlots"] == [
+        {
+            "path": "templates/index.json.sections.hero.settings.image",
+            "key": "image",
+            "currentValue": "shopify://shop_images/hero-main.png",
+            "role": "hero",
+            "recommendedAspect": "landscape",
+        }
+    ]
+
+
 def test_list_theme_brand_template_slots_errors_when_manifest_path_missing(monkeypatch):
     client = ShopifyApiClient()
     manifest = {
@@ -1635,6 +1733,27 @@ def test_sync_theme_brand_updates_layout_and_css():
             assert (
                 'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"] {'
                 in css_content
+            )
+            assert (
+                'footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]),'
+                in css_content
+            )
+            assert (
+                'footer button, footer .button, footer .btn, footer input[type="button"], footer input[type="submit"], footer input[type="reset"], footer [role="button"],'
+                in css_content
+            )
+            assert (
+                "color: var(--footer-text-color) !important;" in css_content
+            )
+            assert (
+                "border-color: var(--footer-text-color) !important;" in css_content
+            )
+            assert (
+                ".announcement-bar, [id*=\"announcement\"], [class*=\"announcement\"] {"
+                in css_content
+            )
+            assert (
+                "color: var(--announcement-text-color) !important;" in css_content
             )
             settings_file = next(
                 item
@@ -4398,7 +4517,7 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
     )
     assert (
         footer_settings["input_placeholder_color"]
-        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-muted"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
     )
     assert (
         footer_settings["submit_color"]
@@ -4441,6 +4560,7 @@ def test_sync_theme_template_color_settings_data_uses_non_colliding_footer_text_
     css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
     css_vars["--footer-bg"] = "#222222"
     css_vars["--color-text"] = "#222222"
+    css_vars["--footer-text-color"] = "#f5f5f5"
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
         css_vars=css_vars,
@@ -4455,6 +4575,7 @@ def test_sync_theme_template_color_settings_data_uses_non_colliding_footer_text_
                         "newsletter_color": "#000000",
                         "copy_color": "#000000",
                         "input_color": "#000000",
+                        "input_placeholder_color": "#000000",
                     },
                 }
             }
@@ -4477,8 +4598,68 @@ def test_sync_theme_template_color_settings_data_uses_non_colliding_footer_text_
     assert footer_settings["newsletter_color"] == "#f5f5f5"
     assert footer_settings["copy_color"] == "#f5f5f5"
     assert footer_settings["input_color"] == "#f5f5f5"
+    assert footer_settings["input_placeholder_color"] == "#f5f5f5"
     assert (
         "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_color"
+        in report["updatedPaths"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_placeholder_color"
+        in report["updatedPaths"]
+    )
+    assert report["unmappedColorPaths"] == []
+
+
+def test_sync_theme_template_color_settings_data_maps_ss_footer_links_and_submit_border_to_footer_text():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
+    css_vars["--footer-text-color"] = "#a7d5ff"
+    css_vars["--color-brand"] = "#0f2618"
+    css_vars["--color-border"] = "rgba(15, 38, 24, 0.12)"
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=css_vars,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "ss_footer_4_9rJacA": {
+                    "type": "ss-footer-4",
+                    "settings": {
+                        "link_color": "#000000",
+                        "link_hover_color": "#000000",
+                        "submit_border_color": "#000000",
+                        "submit_border_hover_color": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/footer-group.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/footer-group.json",
+        template_content=next_template_content,
+    )
+    footer_settings = synced_template["sections"]["ss_footer_4_9rJacA"]["settings"]
+
+    assert footer_settings["link_color"] == "#a7d5ff"
+    assert footer_settings["link_hover_color"] == "#a7d5ff"
+    assert footer_settings["submit_border_color"] == "#a7d5ff"
+    assert footer_settings["submit_border_hover_color"] == "#a7d5ff"
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.link_color"
+        in report["updatedPaths"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_border_color"
         in report["updatedPaths"]
     )
     assert report["unmappedColorPaths"] == []
@@ -4540,6 +4721,46 @@ def test_sync_theme_template_color_settings_data_maps_announcement_background_to
         in report["updatedPaths"]
     )
     assert report["unmappedColorPaths"] == []
+
+
+def test_sync_theme_template_color_settings_data_uses_announcement_text_color_token():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
+    css_vars["--announcement-text-color"] = "#ffb86b"
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=css_vars,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "announcement_bar_main": {
+                    "type": "announcement-bar",
+                    "settings": {
+                        "text_color": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, _ = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/index.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/index.json",
+        template_content=next_template_content,
+    )
+
+    assert (
+        synced_template["sections"]["announcement_bar_main"]["settings"]["text_color"]
+        == "#ffb86b"
+    )
 
 
 def test_parse_theme_template_json_supports_leading_comment_block():

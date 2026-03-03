@@ -219,7 +219,7 @@ _THEME_SETTINGS_VALUE_PATHS_BY_NAME: dict[str, dict[str, str]] = {
         "current.color_link": "--color-brand",
         "current.color_accent": "--color-brand",
         "current.footer_background": "--footer-bg",
-        "current.footer_text": "--color-text",
+        "current.footer_text": "--footer-text-color",
         "current.color_schemes[*].settings.background": "--color-page-bg",
         "current.color_schemes[*].settings.text": "--color-text",
         "current.color_schemes[*].settings.button": "--color-cta",
@@ -289,9 +289,21 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"]',
             (
                 ("background-color", "var(--footer-bg)"),
-                ("color", "var(--color-text)"),
+                ("color", "var(--footer-text-color)"),
                 ("border-color", "var(--color-border)"),
             ),
+        ),
+        (
+            'footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), #shopify-section-footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [role="contentinfo"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), .footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [id*="footer"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [class*="footer"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"])',
+            (("color", "var(--footer-text-color)"),),
+        ),
+        (
+            'footer button, footer .button, footer .btn, footer input[type="button"], footer input[type="submit"], footer input[type="reset"], footer [role="button"], #shopify-section-footer button, #shopify-section-footer .button, #shopify-section-footer .btn, #shopify-section-footer input[type="button"], #shopify-section-footer input[type="submit"], #shopify-section-footer input[type="reset"], #shopify-section-footer [role="button"], [role="contentinfo"] button, [role="contentinfo"] .button, [role="contentinfo"] .btn, [role="contentinfo"] input[type="button"], [role="contentinfo"] input[type="submit"], [role="contentinfo"] input[type="reset"], [role="contentinfo"] [role="button"], .footer button, .footer .button, .footer .btn, .footer input[type="button"], .footer input[type="submit"], .footer input[type="reset"], .footer [role="button"], [id*="footer"] button, [id*="footer"] .button, [id*="footer"] .btn, [id*="footer"] input[type="button"], [id*="footer"] input[type="submit"], [id*="footer"] input[type="reset"], [id*="footer"] [role="button"], [class*="footer"] button, [class*="footer"] .button, [class*="footer"] .btn, [class*="footer"] input[type="button"], [class*="footer"] input[type="submit"], [class*="footer"] input[type="reset"], [class*="footer"] [role="button"]',
+            (("border-color", "var(--footer-text-color)"),),
+        ),
+        (
+            '.announcement-bar, [id*="announcement"], [class*="announcement"]',
+            (("color", "var(--announcement-text-color)"),),
         ),
     ),
 }
@@ -301,6 +313,7 @@ _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
         "background": "--color-page-bg",
         "foreground": "--color-text",
         "text": "--color-text",
+        "announcement_text": "--announcement-text-color",
         "button": "--color-cta",
         "button_text": "--color-cta-text",
         "button_label": "--color-cta-text",
@@ -3790,27 +3803,16 @@ class ShopifyApiClient:
             if "--hero-bg" not in expanded and "--color-page-bg" in expanded:
                 expanded["--hero-bg"] = expanded["--color-page-bg"]
 
-            footer_text = expanded.get("--color-text")
-            footer_bg = expanded.get("--footer-bg")
-            if isinstance(footer_text, str) and footer_text.strip():
-                resolved_footer_text = footer_text
-                if (
-                    isinstance(footer_bg, str)
-                    and footer_bg.strip()
-                    and cls._normalize_css_value_for_comparison(footer_bg)
-                    == cls._normalize_css_value_for_comparison(footer_text)
-                ):
-                    for candidate_key in ("--color-page-bg", "--color-bg", "--color-brand"):
-                        candidate_value = expanded.get(candidate_key)
-                        if (
-                            isinstance(candidate_value, str)
-                            and candidate_value.strip()
-                            and cls._normalize_css_value_for_comparison(candidate_value)
-                            != cls._normalize_css_value_for_comparison(footer_bg)
-                        ):
-                            resolved_footer_text = candidate_value
-                            break
-                expanded["--footer-text-color"] = resolved_footer_text
+            footer_text = expanded.get("--footer-text-color")
+            if not isinstance(footer_text, str) or not footer_text.strip():
+                color_text = expanded.get("--color-text")
+                if isinstance(color_text, str) and color_text.strip():
+                    expanded["--footer-text-color"] = color_text
+            announcement_text = expanded.get("--announcement-text-color")
+            if not isinstance(announcement_text, str) or not announcement_text.strip():
+                footer_text_value = expanded.get("--footer-text-color")
+                if isinstance(footer_text_value, str) and footer_text_value.strip():
+                    expanded["--announcement-text-color"] = footer_text_value
         return expanded
 
     @classmethod
@@ -4360,7 +4362,22 @@ class ShopifyApiClient:
             and ({"copy", "input", "text"} & key_tokens)
             and ({"color", "text", "foreground"} & key_tokens)
             and not ({"background", "bg", "border"} & key_tokens)
-            and "placeholder" not in key_tokens
+        ):
+            return "footer_text"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
+            and "link" in key_tokens
+            and ({"color", "text", "foreground"} & key_tokens)
+            and not ({"background", "bg", "border"} & key_tokens)
+        ):
+            return "footer_text"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
+            and ({"submit", "button"} & key_tokens)
+            and "border" in key_tokens
+            and ({"color", "text", "foreground"} & key_tokens)
         ):
             return "footer_text"
         if (
@@ -4379,12 +4396,14 @@ class ShopifyApiClient:
         ):
             return "button"
         if (
-            "text" in semantic_source_vars
+            ("announcement_text" in semantic_source_vars or "text" in semantic_source_vars)
             and "announcement" in path_tokens
             and ({"text", "foreground"} & key_tokens)
             and "color" in key_tokens
             and not ({"background", "bg", "border"} & key_tokens)
         ):
+            if "announcement_text" in semantic_source_vars:
+                return "announcement_text"
             return "text"
 
         # `button_color` should map to button text before generic variant matching
@@ -6923,7 +6942,7 @@ class ShopifyApiClient:
     ) -> dict[str, str]:
         if theme_id and theme_name:
             raise ShopifyApiError(
-                message="Provide exactly one of themeId or themeName.",
+                message="Provide at most one of themeId or themeName.",
                 status_code=400,
             )
         if theme_id:
@@ -6949,38 +6968,41 @@ class ShopifyApiClient:
                 )
             return self._coerce_theme_data(node=theme, query_name="theme")
 
-        if theme_name:
-            cleaned_theme_name = theme_name.strip()
-            if not cleaned_theme_name:
-                raise ShopifyApiError(
-                    message="themeName cannot be empty when provided.",
-                    status_code=400,
-                )
-            query = """
-            query themesForBrandSync($first: Int!) {
-                themes(first: $first) {
-                    nodes {
-                        id
-                        name
-                        role
-                    }
+        cleaned_theme_name = theme_name.strip() if theme_name is not None else None
+        if cleaned_theme_name is not None and not cleaned_theme_name:
+            raise ShopifyApiError(
+                message="themeName cannot be empty when provided.",
+                status_code=400,
+            )
+        query = """
+        query themesForBrandSync($first: Int!) {
+            themes(first: $first) {
+                nodes {
+                    id
+                    name
+                    role
                 }
             }
-            """
-            response = await self._admin_graphql(
-                shop_domain=shop_domain,
-                access_token=access_token,
-                payload={"query": query, "variables": {"first": 100}},
-            )
-            raw_nodes = (response.get("themes") or {}).get("nodes")
-            if not isinstance(raw_nodes, list):
-                raise ShopifyApiError(message="themes query response is invalid.")
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={"query": query, "variables": {"first": 100}},
+        )
+        raw_nodes = (response.get("themes") or {}).get("nodes")
+        if not isinstance(raw_nodes, list):
+            raise ShopifyApiError(message="themes query response is invalid.")
+        parsed_nodes = [
+            self._coerce_theme_data(node=node, query_name="themes") for node in raw_nodes
+        ]
+        if cleaned_theme_name:
             requested_name = cleaned_theme_name.lower()
-            matches: list[dict[str, str]] = []
-            for node in raw_nodes:
-                parsed = self._coerce_theme_data(node=node, query_name="themes")
-                if parsed["name"].strip().lower() == requested_name:
-                    matches.append(parsed)
+            matches = [
+                parsed
+                for parsed in parsed_nodes
+                if parsed["name"].strip().lower() == requested_name
+            ]
             if not matches:
                 raise ShopifyApiError(
                     message=f"Theme not found for themeName={cleaned_theme_name}.",
@@ -6997,9 +7019,28 @@ class ShopifyApiClient:
                 )
             return matches[0]
 
+        main_themes = [
+            parsed
+            for parsed in parsed_nodes
+            if parsed["role"].strip().upper() == "MAIN"
+        ]
+        if len(main_themes) == 1:
+            return main_themes[0]
+        if not main_themes:
+            raise ShopifyApiError(
+                message=(
+                    "No MAIN theme was found for this store. "
+                    "Provide themeName or themeId explicitly."
+                ),
+                status_code=409,
+            )
+        theme_ids = ", ".join(theme["id"] for theme in main_themes)
         raise ShopifyApiError(
-            message="Exactly one of themeId or themeName is required.",
-            status_code=400,
+            message=(
+                "Multiple MAIN themes were found for this store. "
+                f"Provide themeName or themeId explicitly. matchedThemeIds={theme_ids}"
+            ),
+            status_code=409,
         )
 
     async def _load_theme_file_text(
@@ -7703,6 +7744,7 @@ class ShopifyApiClient:
         *,
         theme_id: str | None,
         theme_name: str | None,
+        allow_empty: bool = False,
     ) -> tuple[str | None, str | None]:
         normalized_theme_id = (
             theme_id.strip() if isinstance(theme_id, str) and theme_id.strip() else None
@@ -7712,7 +7754,12 @@ class ShopifyApiClient:
             if isinstance(theme_name, str) and theme_name.strip()
             else None
         )
-        if bool(normalized_theme_id) == bool(normalized_theme_name):
+        if normalized_theme_id and normalized_theme_name:
+            raise ShopifyApiError(
+                message="Provide at most one of themeId or themeName.",
+                status_code=400,
+            )
+        if not allow_empty and not normalized_theme_id and not normalized_theme_name:
             raise ShopifyApiError(
                 message="Exactly one of themeId or themeName is required.",
                 status_code=400,
@@ -8338,6 +8385,7 @@ class ShopifyApiClient:
         normalized_theme_id, normalized_theme_name = self._normalize_theme_selector(
             theme_id=theme_id,
             theme_name=theme_name,
+            allow_empty=True,
         )
         theme = await self._resolve_theme_for_brand_sync(
             shop_domain=shop_domain,

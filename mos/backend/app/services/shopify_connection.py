@@ -1919,10 +1919,10 @@ def list_client_shopify_theme_template_slots(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="themeName cannot be empty when provided.",
             )
-    if bool(cleaned_theme_id) == bool(cleaned_theme_name):
+    if cleaned_theme_id is not None and cleaned_theme_name is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Exactly one of themeId or themeName is required.",
+            detail="Provide at most one of themeId or themeName.",
         )
 
     request_payload: dict[str, Any] = {}

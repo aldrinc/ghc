@@ -359,8 +359,8 @@ class ListThemeBrandTemplateSlotsRequest(BaseModel):
             raise ValueError("Exactly one of clientId or shopDomain is required")
         has_theme_id = bool(self.themeId and self.themeId.strip())
         has_theme_name = bool(self.themeName and self.themeName.strip())
-        if has_theme_id == has_theme_name:
-            raise ValueError("Exactly one of themeId or themeName is required")
+        if has_theme_id and has_theme_name:
+            raise ValueError("Provide at most one of themeId or themeName")
         return self
 
 

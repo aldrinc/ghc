@@ -16,5 +16,5 @@ if [ ! -x "node_modules/.bin/vite" ]; then
   exit 1
 fi
 
-echo "[frontend] Starting Vite dev server on http://localhost:5275"
-exec npm run dev -- --host --port 5275
+echo "[frontend] Starting Vite dev server on http://localhost:5275 (forced dep re-optimize)"
+exec npm run dev -- --host --port 5275 --force

@@ -11,9 +11,16 @@ import { Button, buttonClasses } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import { FieldControl, FieldDescription, FieldError, FieldLabel, FieldRoot, FormRoot } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import { useApiClient, type ApiError } from "@/api/client";
 import { useCreateClient, useStartOnboarding } from "@/api/clients";
+import {
+  COMPLIANCE_RULESET_VERSION,
+  type ClientComplianceProfile,
+  type ComplianceBusinessModel,
+} from "@/api/compliance";
 import { useSetProductPrimaryAssetById, useUploadProductAssetsById } from "@/api/products";
 import { toast } from "@/components/ui/toast";
 import type { Client } from "@/types/common";
@@ -34,6 +41,14 @@ const steps: WizardStep[] = [
   },
   { key: "funnel", label: "Strategy V2", description: "Required Strategy V2 operator inputs" },
   { key: "review", label: "Review", description: "Confirm and submit" },
+];
+
+const complianceBusinessModelOptions: Array<{ label: string; value: ComplianceBusinessModel }> = [
+  { label: "E-commerce", value: "ecommerce" },
+  { label: "SaaS subscription", value: "saas_subscription" },
+  { label: "Digital product", value: "digital_product" },
+  { label: "Online service", value: "online_service" },
+  { label: "Lead generation", value: "lead_generation" },
 ];
 
 type ProductDraft = {
@@ -69,7 +84,7 @@ type WizardState = {
   brand_story: string;
   funnel_notes: string;
   product_customizable: boolean;
-  business_model: string;
+  business_model: ComplianceBusinessModel | "";
   funnel_position: string;
   target_platforms: string;
   target_regions: string;
@@ -139,6 +154,8 @@ export function OnboardingWizard({
   const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
   const [editingProductIndex, setEditingProductIndex] = useState<number | null>(null);
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
+  const [isSavingComplianceProfile, setIsSavingComplianceProfile] = useState(false);
+  const { request } = useApiClient();
   const onboarding = useStartOnboarding();
   const createClient = useCreateClient();
   const uploadProductAssetsById = useUploadProductAssetsById();
@@ -159,6 +176,7 @@ export function OnboardingWizard({
   const progress = Math.round(((stepIndex + 1) / steps.length) * 100);
   const requiresClientName = !activeClientId;
   const isSubmitting =
+    isSavingComplianceProfile ||
     onboarding.isPending ||
     createClient.isPending ||
     uploadProductAssetsById.isPending ||
@@ -325,6 +343,31 @@ export function OnboardingWizard({
     }
     try {
       const ensuredClientId = await ensureClient();
+      setIsSavingComplianceProfile(true);
+      try {
+        const legalBusinessName = state.client_name.trim() || clientName?.trim() || undefined;
+        await request<ClientComplianceProfile>(`/clients/${ensuredClientId}/compliance/profile`, {
+          method: "PUT",
+          body: JSON.stringify({
+            rulesetVersion: COMPLIANCE_RULESET_VERSION,
+            businessModels: [state.business_model],
+            legalBusinessName,
+            metadata: {
+              source: "onboarding_wizard",
+              complianceNotes: state.compliance_notes.trim() || undefined,
+            },
+          }),
+        });
+      } catch (error) {
+        const apiError = error as ApiError;
+        const message = apiError?.message?.trim()
+          ? apiError.message
+          : "Failed to create required compliance profile before onboarding.";
+        toast.error(message);
+        return;
+      } finally {
+        setIsSavingComplianceProfile(false);
+      }
       const response = await onboarding.mutateAsync({ clientId: ensuredClientId, payload });
       const productId = (response as any)?.product_id;
       if (!productId) {
@@ -730,11 +773,16 @@ export function OnboardingWizard({
           <div className="grid gap-4 md:grid-cols-2">
             <FieldRoot name="business_model">
               <FieldLabel>Business model</FieldLabel>
-              <FieldDescription>Required. Example: DTC, SaaS, info product.</FieldDescription>
-              <Input
+              <FieldDescription>Required for compliance profile setup.</FieldDescription>
+              <Select
                 value={state.business_model}
-                onChange={(e) => setState((s) => ({ ...s, business_model: e.target.value }))}
-                placeholder="DTC"
+                onValueChange={(value) =>
+                  setState((s) => ({ ...s, business_model: value as ComplianceBusinessModel | "" }))
+                }
+                options={[
+                  { label: "Select business model", value: "" },
+                  ...complianceBusinessModelOptions,
+                ]}
                 required
               />
               <FieldError />
