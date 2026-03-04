@@ -254,7 +254,7 @@ def test_bridge_request_returns_504_on_timeout(monkeypatch):
 
 
 def test_list_client_shopify_products_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/catalog/products/list"
         assert json_body["clientId"] == "client_1"
@@ -291,7 +291,7 @@ def test_list_client_shopify_products_rejects_out_of_range_limit():
 
 
 def test_get_client_shopify_product_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/catalog/products/get"
         assert json_body["clientId"] == "client_1"
@@ -349,7 +349,7 @@ def test_get_client_shopify_product_rejects_invalid_product_gid():
 
 
 def test_create_client_shopify_product_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/catalog/products/create"
         assert json_body["clientId"] == "client_1"
@@ -384,7 +384,7 @@ def test_create_client_shopify_product_parses_response(monkeypatch):
 
 
 def test_update_client_shopify_variant_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "PATCH"
         assert path == "/v1/catalog/variants"
         assert json_body["clientId"] == "client_1"
@@ -410,7 +410,7 @@ def test_update_client_shopify_variant_parses_response(monkeypatch):
 
 
 def test_update_client_shopify_variant_sends_inventory_related_fields(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "PATCH"
         assert path == "/v1/catalog/variants"
         assert json_body["clientId"] == "client_1"
@@ -490,7 +490,7 @@ def test_auto_provision_client_shopify_storefront_token_posts_to_bridge(monkeypa
 
     observed: dict[str, object] = {}
 
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         observed["method"] = method
         observed["path"] = path
         observed["json_body"] = json_body
@@ -578,7 +578,7 @@ def test_disconnect_client_shopify_store_unlinks_workspace(monkeypatch):
 
     observed: dict[str, object] = {}
 
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         observed["method"] = method
         observed["path"] = path
         observed["json_body"] = json_body
@@ -631,7 +631,7 @@ def test_disconnect_client_shopify_store_requires_matching_workspace(monkeypatch
 
 
 def test_upsert_client_shopify_policy_pages_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/policies/pages/upsert"
         assert json_body["clientId"] == "client_1"
@@ -680,7 +680,7 @@ def test_upsert_client_shopify_policy_pages_rejects_empty_pages():
 
 
 def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/themes/brand/sync"
         assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
@@ -780,6 +780,80 @@ def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
     }
 
 
+def test_export_client_shopify_theme_brand_uses_export_timeout(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection.settings,
+        "SHOPIFY_THEME_EXPORT_TIMEOUT_SECONDS",
+        600.0,
+    )
+
+    def fake_bridge_request(
+        *,
+        method: str,
+        path: str,
+        json_body=None,
+        timeout_seconds=None,
+        bridge_mode="public",
+    ):
+        assert method == "POST"
+        assert path == "/v1/themes/brand/export"
+        assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_EXPORT_TIMEOUT_SECONDS
+        assert json_body["clientId"] == "client_1"
+        assert json_body["themeName"] == "futrgroup2-0theme"
+        return {
+            "shopDomain": "example.myshopify.com",
+            "themeId": "gid://shopify/OnlineStoreTheme/1",
+            "themeName": "Main Theme",
+            "themeRole": "MAIN",
+            "layoutFilename": "layout/theme.liquid",
+            "cssFilename": "assets/acme-workspace-workspace-brand.css",
+            "settingsFilename": "config/settings_data.json",
+            "jobId": None,
+            "coverage": {
+                "requiredSourceVars": [],
+                "requiredThemeVars": [],
+                "missingSourceVars": [],
+                "missingThemeVars": [],
+            },
+            "settingsSync": {
+                "settingsFilename": "config/settings_data.json",
+                "expectedPaths": [],
+                "updatedPaths": [],
+                "missingPaths": [],
+                "requiredMissingPaths": [],
+                "semanticUpdatedPaths": [],
+                "unmappedColorPaths": [],
+                "semanticTypographyUpdatedPaths": [],
+                "unmappedTypographyPaths": [],
+            },
+            "files": [
+                {
+                    "filename": "layout/theme.liquid",
+                    "content": "{% comment %}Managed by mOS{% endcomment %}",
+                }
+            ],
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.export_client_shopify_theme_brand(
+        client_id="client_1",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        css_vars={"--color-brand": "#123456"},
+        theme_name="futrgroup2-0theme",
+    )
+
+    assert response["themeName"] == "Main Theme"
+    assert response["files"] == [
+        {
+            "filename": "layout/theme.liquid",
+            "content": "{% comment %}Managed by mOS{% endcomment %}",
+        }
+    ]
+
+
 def test_sync_client_shopify_theme_brand_batches_component_images(monkeypatch):
     observed_requests: list[dict[str, Any]] = []
     image_paths = [
@@ -791,7 +865,7 @@ def test_sync_client_shopify_theme_brand_batches_component_images(monkeypatch):
         for idx, path in enumerate(image_paths, start=1)
     }
 
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/themes/brand/sync"
         assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
@@ -947,7 +1021,7 @@ def test_sync_client_shopify_theme_brand_rejects_invalid_auto_component_image_ur
 
 
 def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/themes/brand/sync"
         assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
@@ -994,7 +1068,7 @@ def test_sync_client_shopify_theme_brand_allows_missing_job_id(monkeypatch):
 
 
 def test_audit_client_shopify_theme_brand_parses_response(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/themes/brand/audit"
         assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
@@ -1084,7 +1158,7 @@ def test_audit_client_shopify_theme_brand_parses_response(monkeypatch):
 
 
 def test_audit_client_shopify_theme_brand_rejects_invalid_marker_flag(monkeypatch):
-    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"
         assert path == "/v1/themes/brand/audit"
         assert timeout_seconds == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS

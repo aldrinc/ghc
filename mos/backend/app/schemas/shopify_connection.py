@@ -59,6 +59,13 @@ class ShopifyConnectionStatusResponse(BaseModel):
     selectedShopDomain: str | None = None
     hasStorefrontAccessToken: bool = False
     missingScopes: list[str] = Field(default_factory=list)
+    installationState: Literal[
+        "not_installed",
+        "conflict",
+        "installed_missing_storefront_token",
+        "installed",
+        "error",
+    ] = "not_installed"
 
 
 class ShopifyCatalogProductSummary(BaseModel):

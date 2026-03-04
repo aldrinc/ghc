@@ -448,6 +448,22 @@ class InstallationResponse(BaseModel):
     uninstalledAt: datetime | None
 
 
+class EmbeddedSessionResponse(BaseModel):
+    shopDomain: str
+    isInstalled: bool
+    linkedWorkspaceId: str | None = None
+    hasStorefrontAccessToken: bool = False
+    installationState: Literal[
+        "not_installed",
+        "installed_missing_storefront_token",
+        "installed",
+    ]
+
+
+class LinkWorkspaceRequest(BaseModel):
+    clientId: str = Field(min_length=1)
+
+
 class ForwardOrderPayload(BaseModel):
     shopDomain: str
     orderId: str

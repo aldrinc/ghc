@@ -15,12 +15,16 @@ This service is a Shopify app bridge for Marketi funnels. It does three things:
 
 - `GET /auth/install?shop={shop}.myshopify.com&client_id={mos_client_uuid}`
 - `GET /auth/callback`
+- `GET /app` (embedded admin shell)
+- `GET /app/api/session` (Shopify session-token auth)
+- `POST /app/api/link-workspace` (Shopify session-token auth)
 - `GET /admin/installations` (Bearer internal token)
 - `PATCH /admin/installations/{shop}.myshopify.com` (Bearer internal token)
 - `POST /admin/installations/{shop}.myshopify.com/storefront-token/auto` (Bearer internal token)
 - `POST /v1/checkouts` (Bearer internal token)
 - `POST /webhooks/orders/create`
 - `POST /webhooks/app/uninstalled`
+- `POST /webhooks/compliance`
 
 ## Local run
 
@@ -43,7 +47,13 @@ uvicorn app.main:app --reload --port 8011
 ```
 
 2. Approve requested scopes in Shopify.
-3. After callback, the installation is stored and webhooks are registered.
+3. Callback redirects to `/app` in embedded context unless `SHOPIFY_INSTALL_SUCCESS_REDIRECT_URL` is configured.
+4. Installation is stored and webhooks are registered.
+
+## Theme operation policy
+
+- Direct theme write operations (`/v1/themes/brand/sync`) are intentionally disabled.
+- Theme audits, slot discovery, and ZIP export remain available for template-based rollout.
 
 ## Storefront token setup
 
@@ -108,6 +118,28 @@ When `SHOPIFY_ENABLE_ORDER_FORWARDING=true`, `orders/create` is forwarded to:
 - Header: `x-marketi-webhook-secret: {MOS_WEBHOOK_SHARED_SECRET}`
 
 Only orders with `note_attributes.funnel_id` are forwarded.
+
+## Shopify compliance webhooks
+
+Public app distribution requires Shopify privacy compliance webhooks:
+
+- `customers/data_request`
+- `customers/redact`
+- `shop/redact`
+
+This app receives those topics at:
+
+- `POST /webhooks/compliance`
+
+When `SHOPIFY_ENABLE_COMPLIANCE_FORWARDING=true`, each compliance event is also forwarded to:
+
+- `POST {MOS_BACKEND_BASE_URL}/shopify/compliance/webhook`
+- Header: `x-marketi-webhook-secret: {MOS_WEBHOOK_SHARED_SECRET}`
+
+Forwarding errors return `502` so Shopify retries, preventing silent compliance-data loss.
+
+`shop/redact` triggers deletion of shop-scoped records from this bridge database
+(`shop_installations`, `oauth_states`, and `processed_webhook_events` for that shop).
 
 ## Protected customer data note (important)
 

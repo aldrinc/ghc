@@ -7,8 +7,8 @@ from uuid import uuid4
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request, status
-from fastapi.responses import ORJSONResponse, RedirectResponse
-from sqlalchemy import select
+from fastapi.responses import HTMLResponse, ORJSONResponse, RedirectResponse
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -29,7 +29,9 @@ from app.schemas import (
     ForwardOrderPayload,
     GetProductRequest,
     GetProductResponse,
+    EmbeddedSessionResponse,
     InstallationResponse,
+    LinkWorkspaceRequest,
     ListThemeBrandTemplateSlotsRequest,
     ListThemeBrandTemplateSlotsResponse,
     ThemeTemplateImageSlot,
@@ -50,6 +52,7 @@ from app.schemas import (
 from app.security import (
     normalize_shop_domain,
     require_internal_api_token,
+    require_shopify_session_shop_domain,
     verify_oauth_hmac,
     verify_webhook_hmac,
 )
@@ -57,6 +60,10 @@ from app.shopify_api import ShopifyApiClient, ShopifyApiError
 
 app = FastAPI(title="Marketi Shopify Funnel App", default_response_class=ORJSONResponse)
 shopify_api = ShopifyApiClient()
+
+_SHOPIFY_COMPLIANCE_TOPICS = frozenset(
+    {"customers/data_request", "customers/redact", "shop/redact"}
+)
 
 
 @app.on_event("startup")
@@ -67,6 +74,89 @@ def startup() -> None:
 @app.get("/health")
 def health() -> dict[str, bool]:
     return {"ok": True}
+
+
+def _reject_direct_theme_write_operations() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "Direct theme write operations are disabled. "
+            "Use template ZIP export and extension-based rollout for storefront updates."
+        ),
+    )
+
+
+def _serialize_embedded_session(
+    *,
+    shop_domain: str,
+    installation: ShopInstallation | None,
+) -> EmbeddedSessionResponse:
+    if not installation or installation.uninstalled_at is not None:
+        return EmbeddedSessionResponse(
+            shopDomain=shop_domain,
+            isInstalled=False,
+            linkedWorkspaceId=None,
+            hasStorefrontAccessToken=False,
+            installationState="not_installed",
+        )
+
+    has_storefront_access_token = bool(installation.storefront_access_token)
+    installation_state = (
+        "installed" if has_storefront_access_token else "installed_missing_storefront_token"
+    )
+    return EmbeddedSessionResponse(
+        shopDomain=shop_domain,
+        isInstalled=True,
+        linkedWorkspaceId=installation.client_id,
+        hasStorefrontAccessToken=has_storefront_access_token,
+        installationState=installation_state,
+    )
+
+
+async def _forward_compliance_to_mos(
+    *,
+    topic: str,
+    shop_domain: str,
+    event_id: str,
+    payload: dict[str, Any],
+) -> None:
+    if not settings.SHOPIFY_ENABLE_COMPLIANCE_FORWARDING:
+        return
+
+    headers = {
+        "Content-Type": "application/json",
+        "x-marketi-webhook-secret": settings.MOS_WEBHOOK_SHARED_SECRET or "",
+    }
+    forward_payload = {
+        "topic": topic,
+        "shopDomain": shop_domain,
+        "eventId": event_id,
+        "payload": payload,
+    }
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=settings.SHOPIFY_REQUEST_TIMEOUT_SECONDS
+        ) as client:
+            response = await client.post(
+                settings.mos_compliance_webhook_url,
+                json=forward_payload,
+                headers=headers,
+            )
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Failed to forward compliance webhook to mOS backend: {exc}",
+        ) from exc
+
+    if response.status_code >= 400:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "mOS compliance ingestion failed "
+                f"({response.status_code}): {response.text}"
+            ),
+        )
 
 
 def _serialize_installation(installation: ShopInstallation) -> InstallationResponse:
@@ -226,6 +316,10 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
             shop_domain=shop_domain,
             admin_access_token=admin_access_token,
         )
+        await shopify_api.ensure_catalog_collection_route_is_available(
+            shop_domain=shop_domain,
+            access_token=admin_access_token,
+        )
         session.delete(oauth_state)
         session.commit()
         session.refresh(installation)
@@ -255,30 +349,135 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
         )
         return RedirectResponse(url=success_url, status_code=302)
 
-    if auto_provision_error:
-        next_step = (
-            "Storefront token auto-provisioning failed. "
-            f"Retry via POST /admin/installations/{shop_domain}/storefront-token/auto "
-            "or set manually via PATCH /admin/installations/{shop_domain}."
+    redirect_query = {"shop": shop_domain}
+    host = request.query_params.get("host")
+    if isinstance(host, str) and host.strip():
+        redirect_query["host"] = host.strip()
+    return RedirectResponse(
+        url=f"{settings.app_base_url}/app?{urlencode(redirect_query)}",
+        status_code=302,
+    )
+
+
+@app.get("/app", response_class=HTMLResponse)
+def embedded_app_shell() -> HTMLResponse:
+    html = f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mOS Shopify App</title>
+    <style>
+      body {{
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #f6f6f7;
+        color: #111827;
+      }}
+      .card {{
+        max-width: 720px;
+        margin: 24px auto;
+        padding: 24px;
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+      }}
+      .status {{
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        white-space: pre-wrap;
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 8px;
+        padding: 12px;
+      }}
+    </style>
+    <script src="https://unpkg.com/@shopify/app-bridge@3"></script>
+    <script src="https://unpkg.com/@shopify/app-bridge-utils@3"></script>
+  </head>
+  <body>
+    <div class="card">
+      <h1>mOS Shopify App</h1>
+      <p>Embedded admin session is active. Link this installation to your mOS workspace from mOS.</p>
+      <div id="status" class="status">Loading embedded session…</div>
+    </div>
+    <script>
+      (async function bootstrap() {{
+        const statusEl = document.getElementById("status");
+        try {{
+          const params = new URLSearchParams(window.location.search);
+          const host = params.get("host");
+          if (!host) {{
+            throw new Error("Missing host query parameter for embedded app context.");
+          }}
+          const app = window["app-bridge"].default({{
+            apiKey: {settings.SHOPIFY_APP_API_KEY!r},
+            host: host,
+            forceRedirect: true
+          }});
+          const token = await window["app-bridge-utils"].getSessionToken(app);
+          const response = await fetch("/app/api/session", {{
+            headers: {{ Authorization: `Bearer ${{token}}` }}
+          }});
+          const body = await response.json();
+          if (!response.ok) {{
+            throw new Error(body?.detail || "Failed to load embedded session.");
+          }}
+          statusEl.textContent = JSON.stringify(body, null, 2);
+        }} catch (err) {{
+          const message = err instanceof Error ? err.message : String(err);
+          statusEl.textContent = `Embedded app error: ${{message}}`;
+        }}
+      }})();
+    </script>
+  </body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
+@app.get("/app/api/session", response_model=EmbeddedSessionResponse)
+def app_api_session(
+    shop_domain: str = Depends(require_shopify_session_shop_domain),
+    session: Session = Depends(get_session),
+):
+    installation = session.scalars(
+        select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
+    ).first()
+    return _serialize_embedded_session(shop_domain=shop_domain, installation=installation)
+
+
+@app.post("/app/api/link-workspace", response_model=EmbeddedSessionResponse)
+def app_api_link_workspace(
+    payload: LinkWorkspaceRequest,
+    shop_domain: str = Depends(require_shopify_session_shop_domain),
+    session: Session = Depends(get_session),
+):
+    client_id = payload.clientId.strip()
+    installation = session.scalars(
+        select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
+    ).first()
+    if not installation or installation.uninstalled_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shop installation not found. Install the app first.",
         )
-    elif installation.storefront_access_token:
-        next_step = "Shopify installation is ready for checkout."
-    else:
-        next_step = (
-            "Set storefrontAccessToken via PATCH /admin/installations/{shop_domain} "
-            "before creating checkouts."
+    if installation.client_id and installation.client_id != client_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "This Shopify store is already linked to a different mOS workspace. "
+                f"linkedWorkspaceId={installation.client_id}"
+            ),
         )
 
-    return {
-        "ok": True,
-        "shopDomain": shop_domain,
-        "clientId": installation.client_id,
-        "scopes": [scope.strip() for scope in scopes_csv.split(",") if scope.strip()],
-        "hasStorefrontAccessToken": bool(installation.storefront_access_token),
-        "storefrontTokenAutoProvisioned": auto_provisioned,
-        "storefrontTokenAutoProvisioningError": auto_provision_error,
-        "next": next_step,
-    }
+    if installation.client_id != client_id:
+        installation.client_id = client_id
+        installation.updated_at = datetime.now(timezone.utc)
+        session.add(installation)
+        session.commit()
+        session.refresh(installation)
+
+    return _serialize_embedded_session(shop_domain=shop_domain, installation=installation)
 
 
 @app.get("/admin/installations", dependencies=[Depends(require_internal_api_token)])
@@ -371,6 +570,10 @@ async def auto_provision_installation_storefront_token(
         await _provision_storefront_token_if_missing(
             installation=installation,
             session=session,
+        )
+        await shopify_api.ensure_catalog_collection_route_is_available(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
         )
     except ShopifyApiError as exc:
         session.rollback()
@@ -711,6 +914,7 @@ async def sync_theme_brand(
     payload: SyncThemeBrandRequest,
     session: Session = Depends(get_session),
 ):
+    _reject_direct_theme_write_operations()
     installation = _resolve_active_installation(
         client_id=payload.clientId,
         shop_domain=payload.shopDomain,
@@ -769,6 +973,10 @@ async def export_theme_brand(
         session=session,
     )
     try:
+        await shopify_api.ensure_catalog_collection_route_is_available(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+        )
         exported = await shopify_api.sync_theme_brand(
             shop_domain=installation.shop_domain,
             access_token=installation.admin_access_token,
@@ -786,7 +994,7 @@ async def export_theme_brand(
             upsert_theme_files=False,
             include_file_payloads=True,
             include_all_theme_text_files=True,
-            resolve_external_images_to_shopify_files=False,
+            resolve_external_images_to_shopify_files=True,
         )
     except ShopifyApiError as exc:
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
@@ -1190,3 +1398,115 @@ async def app_uninstalled_webhook(
         session.commit()
 
     return {"received": True}
+
+
+@app.post("/webhooks/compliance")
+async def compliance_webhook(request: Request, session: Session = Depends(get_session)):
+    body = await request.body()
+    if not verify_webhook_hmac(
+        body=body, supplied_hmac=request.headers.get("x-shopify-hmac-sha256")
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid webhook HMAC"
+        )
+
+    topic_header = request.headers.get("x-shopify-topic")
+    if not topic_header:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing x-shopify-topic header",
+        )
+    topic = topic_header.strip().lower()
+    if topic not in _SHOPIFY_COMPLIANCE_TOPICS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Unsupported compliance webhook topic. "
+                "Expected one of: customers/data_request, customers/redact, shop/redact."
+            ),
+        )
+
+    shop_header = request.headers.get("x-shopify-shop-domain")
+    event_id = request.headers.get("x-shopify-event-id")
+    if not shop_header:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing x-shopify-shop-domain header",
+        )
+    if not event_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing x-shopify-event-id header",
+        )
+    shop_domain = normalize_shop_domain(shop_header)
+
+    try:
+        payload = await request.json()
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON payload"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Webhook payload must be a JSON object",
+        )
+
+    payload_shop_domain = payload.get("shop_domain")
+    if not isinstance(payload_shop_domain, str) or not payload_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Compliance payload must include shop_domain",
+        )
+    if normalize_shop_domain(payload_shop_domain) != shop_domain:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Compliance payload shop_domain does not match x-shopify-shop-domain",
+        )
+
+    if topic != "shop/redact":
+        existing = session.scalars(
+            select(ProcessedWebhookEvent).where(
+                ProcessedWebhookEvent.shop_domain == shop_domain,
+                ProcessedWebhookEvent.topic == topic,
+                ProcessedWebhookEvent.event_id == event_id,
+            )
+        ).first()
+        if existing:
+            return {"received": True, "duplicate": True, "topic": topic}
+
+    await _forward_compliance_to_mos(
+        topic=topic,
+        shop_domain=shop_domain,
+        event_id=event_id,
+        payload=payload,
+    )
+
+    if topic == "shop/redact":
+        session.execute(
+            delete(ProcessedWebhookEvent).where(
+                ProcessedWebhookEvent.shop_domain == shop_domain
+            )
+        )
+        session.execute(delete(OAuthState).where(OAuthState.shop_domain == shop_domain))
+        session.execute(
+            delete(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
+        )
+        session.commit()
+        return {"received": True, "topic": topic, "shopDomain": shop_domain}
+
+    status_value = (
+        "no_local_customer_data_for_requested_customer"
+        if topic == "customers/data_request"
+        else "customer_redact_acknowledged_no_local_customer_data"
+    )
+    session.add(
+        ProcessedWebhookEvent(
+            shop_domain=shop_domain,
+            topic=topic,
+            event_id=event_id,
+            status=status_value,
+        )
+    )
+    session.commit()
+    return {"received": True, "topic": topic, "shopDomain": shop_domain}

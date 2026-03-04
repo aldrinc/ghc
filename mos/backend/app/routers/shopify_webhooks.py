@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hmac
 import json
+import logging
+import re
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from uuid import UUID
@@ -13,10 +15,20 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.db.deps import get_session
 from app.db.enums import FunnelEventTypeEnum
-from app.db.models import Funnel, FunnelEvent, FunnelOrder
-from app.schemas.shopify import ShopifyOrderWebhookPayload
+from app.db.models import (
+    Funnel,
+    FunnelEvent,
+    FunnelOrder,
+    ShopifyThemeTemplateDraft,
+)
+from app.schemas.shopify import (
+    ShopifyComplianceWebhookPayload,
+    ShopifyOrderWebhookPayload,
+)
 
 router = APIRouter(prefix="/shopify", tags=["shopify"])
+logger = logging.getLogger(__name__)
+_SHOP_DOMAIN_RE = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
 
 
 def _parse_metadata_json(value: str | None, label: str) -> dict:
@@ -97,6 +109,16 @@ def _price_to_cents(total_price: str | None) -> int | None:
         ) from exc
     cents = (amount * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     return int(cents)
+
+
+def _normalize_shop_domain(value: str) -> str:
+    cleaned = value.strip().lower()
+    if not cleaned or not _SHOP_DOMAIN_RE.fullmatch(cleaned):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="shopDomain must be a valid *.myshopify.com domain.",
+        )
+    return cleaned
 
 
 @router.post("/orders/webhook")
@@ -199,3 +221,83 @@ def ingest_shopify_order_webhook(
 
     session.commit()
     return {"received": True}
+
+
+@router.post("/compliance/webhook")
+def ingest_shopify_compliance_webhook(
+    payload: ShopifyComplianceWebhookPayload,
+    request: Request,
+    session: Session = Depends(get_session),
+):
+    expected_secret = settings.SHOPIFY_COMPLIANCE_WEBHOOK_SECRET
+    if not expected_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Shopify compliance webhook secret is not configured. "
+                "Set SHOPIFY_COMPLIANCE_WEBHOOK_SECRET."
+            ),
+        )
+
+    provided_secret = request.headers.get("x-marketi-webhook-secret", "")
+    if not hmac.compare_digest(provided_secret, expected_secret):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Shopify compliance webhook secret.",
+        )
+
+    shop_domain = _normalize_shop_domain(payload.shopDomain)
+    payload_shop_domain = payload.payload.get("shop_domain")
+    if isinstance(payload_shop_domain, str) and payload_shop_domain.strip():
+        normalized_payload_shop_domain = _normalize_shop_domain(payload_shop_domain)
+        if normalized_payload_shop_domain != shop_domain:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Compliance payload shop_domain does not match shopDomain "
+                    "from bridge forwarding payload."
+                ),
+            )
+
+    if payload.topic in {"customers/data_request", "customers/redact"}:
+        logger.info(
+            "Received Shopify compliance webhook with no local customer dataset",
+            extra={
+                "topic": payload.topic,
+                "shop_domain": shop_domain,
+                "event_id": payload.eventId,
+            },
+        )
+        return {
+            "received": True,
+            "topic": payload.topic,
+            "shopDomain": shop_domain,
+            "status": "acknowledged_no_local_customer_dataset",
+        }
+
+    deleted_orders = session.query(FunnelOrder).filter(
+        FunnelOrder.stripe_session_id.like(f"shopify:{shop_domain}:%")
+    ).delete(synchronize_session=False)
+    deleted_drafts = session.query(ShopifyThemeTemplateDraft).filter(
+        ShopifyThemeTemplateDraft.shop_domain == shop_domain
+    ).delete(synchronize_session=False)
+    session.commit()
+
+    logger.info(
+        "Processed Shopify shop/redact compliance webhook",
+        extra={
+            "topic": payload.topic,
+            "shop_domain": shop_domain,
+            "event_id": payload.eventId,
+            "deleted_orders": deleted_orders,
+            "deleted_template_drafts": deleted_drafts,
+        },
+    )
+
+    return {
+        "received": True,
+        "topic": payload.topic,
+        "shopDomain": shop_domain,
+        "deletedOrders": deleted_orders,
+        "deletedThemeTemplateDrafts": deleted_drafts,
+    }

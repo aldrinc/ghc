@@ -14,6 +14,13 @@ export type ShopifyConnectionState =
   | "ready"
   | "error";
 
+export type ShopifyInstallationState =
+  | "not_installed"
+  | "conflict"
+  | "installed_missing_storefront_token"
+  | "installed"
+  | "error";
+
 export type ClientShopifyStatus = {
   state: ShopifyConnectionState;
   message: string;
@@ -22,6 +29,11 @@ export type ClientShopifyStatus = {
   selectedShopDomain?: string | null;
   hasStorefrontAccessToken: boolean;
   missingScopes: string[];
+  installationState: ShopifyInstallationState;
+};
+
+export type ClientShopifyInstallUrlResponse = {
+  installUrl: string;
 };
 
 export type ClientShopifyCatalogProduct = {
@@ -385,7 +397,7 @@ export function useCreateClientShopifyInstallUrl(clientId: string) {
   return useMutation({
     mutationFn: (payload: { shopDomain: string }) => {
       if (!clientId) throw new Error("Client ID is required.");
-      return post<{ installUrl: string }>(`/clients/${clientId}/shopify/install-url`, payload);
+      return post<ClientShopifyInstallUrlResponse>(`/clients/${clientId}/shopify/install-url`, payload);
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to create Shopify install URL";

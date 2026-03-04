@@ -108,11 +108,14 @@ class Settings(BaseSettings):
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
+    # Single public Shopify app bridge configuration.
     SHOPIFY_APP_BASE_URL: str | None = None
     SHOPIFY_INTERNAL_API_TOKEN: str | None = None
     SHOPIFY_ORDER_WEBHOOK_SECRET: str | None = None
+    SHOPIFY_COMPLIANCE_WEBHOOK_SECRET: str | None = None
     SHOPIFY_CHECKOUT_REQUEST_TIMEOUT_SECONDS: float = 20.0
     SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS: float = 180.0
+    SHOPIFY_THEME_EXPORT_TIMEOUT_SECONDS: float = 600.0
     SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE: int = 4
 
     META_GRAPH_API_VERSION: str | None = None
