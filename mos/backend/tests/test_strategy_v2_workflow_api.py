@@ -24,6 +24,20 @@ def _stub_activity_heartbeat(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _stub_prompt_file_uploads(monkeypatch):
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_upload_openai_prompt_json_files",
+        lambda **_kwargs: ({}, []),
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_cleanup_openai_prompt_files",
+        lambda **_kwargs: None,
+    )
+
+
+@pytest.fixture(autouse=True)
 def _stub_prompt_chain_runtime(monkeypatch):
     def _resolve_prompt_asset_stub(*, pattern: str, context: str):
         if "pipeline-orchestrator.md" in pattern:

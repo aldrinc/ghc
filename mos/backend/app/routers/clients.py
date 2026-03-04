@@ -2799,6 +2799,8 @@ def _resolve_component_image_urls_from_asset_map(
     client_id: str,
     component_image_asset_map: dict[str, str],
 ) -> dict[str, str]:
+    if not component_image_asset_map:
+        return {}
     public_asset_base_url = _require_public_asset_base_url()
     assets_repo = AssetsRepository(session)
     component_image_urls: dict[str, str] = {}
