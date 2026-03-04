@@ -4,11 +4,52 @@ from contextlib import contextmanager
 from types import SimpleNamespace
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.db.enums import GeminiContextFileStatusEnum
 from app.db.models import GeminiContextFile
 from app.temporal.activities import swipe_image_ad_activities as swipe_activity
+
+
+@pytest.fixture(autouse=True)
+def _stub_genai_types_when_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    if swipe_activity.genai_types is not None:
+        return
+
+    class _FakePart:
+        def __init__(self, *, data: bytes, mime_type: str) -> None:
+            self.data = data
+            self.mime_type = mime_type
+
+        @classmethod
+        def from_bytes(cls, *, data: bytes, mime_type: str):
+            return cls(data=data, mime_type=mime_type)
+
+    class _FakeFileSearch:
+        def __init__(self, *, file_search_store_names):
+            self.file_search_store_names = file_search_store_names
+
+    class _FakeTool:
+        def __init__(self, *, file_search):
+            self.file_search = file_search
+
+    class _FakeGenerateContentConfig:
+        def __init__(self, *, temperature: float, max_output_tokens: int, tools):
+            self.temperature = temperature
+            self.max_output_tokens = max_output_tokens
+            self.tools = tools
+
+    monkeypatch.setattr(
+        swipe_activity,
+        "genai_types",
+        SimpleNamespace(
+            Part=_FakePart,
+            FileSearch=_FakeFileSearch,
+            Tool=_FakeTool,
+            GenerateContentConfig=_FakeGenerateContentConfig,
+        ),
+    )
 
 
 def _create_campaign_with_product(api_client: TestClient, *, suffix: str) -> tuple[str, str, str]:
