@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } fro
 import { Textarea } from "@/components/ui/textarea";
 import { useArtifacts, useLatestArtifact } from "@/api/artifacts";
 import { useApiClient, type ApiError } from "@/api/client";
-import { useCampaign, useUpdateExperimentSpecs } from "@/api/campaigns";
+import { useCampaign, useCampaignStrategyV2Launches, useUpdateExperimentSpecs } from "@/api/campaigns";
 import { useDeleteFunnel, useFunnels } from "@/api/funnels";
 import { useProduct } from "@/api/products";
 import { useWorkflowLogs, useWorkflows, useWorkflowSignal } from "@/api/workflows";
@@ -22,6 +22,7 @@ import { useProductContext } from "@/contexts/ProductContext";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { cn } from "@/lib/utils";
 import type { Artifact, AssetBrief, ExperimentSpec, StrategySheet } from "@/types/artifacts";
+import type { StrategyV2LaunchRecord } from "@/types/common";
 import type { ProductAsset } from "@/types/products";
 
 function formatDate(value?: string | null) {
@@ -251,6 +252,7 @@ export function CampaignDetailPage() {
   const [creativeProductionPending, setCreativeProductionPending] = useState(false);
   const [creativeProductionError, setCreativeProductionError] = useState<string | null>(null);
   const [selectedPreviewAssetByBrief, setSelectedPreviewAssetByBrief] = useState<Record<string, string>>({});
+  const [selectedUmsIterationFilter, setSelectedUmsIterationFilter] = useState<string>("all");
   const [publishedDeleteTarget, setPublishedDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [deletePendingFunnelId, setDeletePendingFunnelId] = useState<string | null>(null);
 
@@ -262,6 +264,8 @@ export function CampaignDetailPage() {
   const { data: experimentArtifacts = EMPTY_ARTIFACTS, isLoading: experimentsLoading } = useArtifacts(experimentFilters);
   const { data: assetBriefArtifacts = EMPTY_ARTIFACTS, isLoading: briefsLoading } = useArtifacts(assetBriefFilters);
   const { data: funnels = [], isLoading: funnelsLoading } = useFunnels(campaignId ? { campaignId } : undefined);
+  const { data: campaignStrategyV2Launches = [], isLoading: campaignStrategyV2LaunchesLoading } =
+    useCampaignStrategyV2Launches(campaignId);
 
   const campaignWorkflows = useMemo(() => {
     if (!campaignId) return [];
@@ -349,6 +353,53 @@ export function CampaignDetailPage() {
     });
     return map;
   }, [funnels]);
+  const campaignLaunches = useMemo(() => {
+    return [...(campaignStrategyV2Launches as StrategyV2LaunchRecord[])].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+  }, [campaignStrategyV2Launches]);
+  const launchByFunnelId = useMemo(() => {
+    const map = new Map<string, StrategyV2LaunchRecord>();
+    campaignLaunches.forEach((row) => {
+      if (!row.funnel_id || map.has(row.funnel_id)) return;
+      map.set(row.funnel_id, row);
+    });
+    return map;
+  }, [campaignLaunches]);
+  const umsIterationOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const rows: Array<{ id: string; label: string }> = [];
+    campaignLaunches.forEach((row) => {
+      const id = row.selected_ums_id || "primary";
+      if (seen.has(id)) return;
+      seen.add(id);
+      rows.push({
+        id,
+        label: id === "primary" ? "Primary launch" : id,
+      });
+    });
+    return rows;
+  }, [campaignLaunches]);
+  const filteredFunnels = useMemo(() => {
+    if (selectedUmsIterationFilter === "all") return funnels;
+    return funnels.filter((funnel) => {
+      const launchRow = launchByFunnelId.get(funnel.id);
+      const umsId = launchRow?.selected_ums_id || "primary";
+      return umsId === selectedUmsIterationFilter;
+    });
+  }, [launchByFunnelId, funnels, selectedUmsIterationFilter]);
+  const campaignAngleIdentity = useMemo(() => {
+    const row = campaignLaunches.find(
+      (launch) => launch.launch_type === "initial_angle" || launch.launch_type === "additional_angle",
+    );
+    if (!row) return null;
+    return {
+      angle_id: row.angle_id,
+      angle_run_id: row.angle_run_id,
+      launch_type: row.launch_type,
+      selected_ums_id: row.selected_ums_id || "primary",
+    };
+  }, [campaignLaunches]);
   const existingFunnelExperimentIds = useMemo(() => {
     const ids = new Set<string>();
     funnels.forEach((funnel) => {
@@ -460,6 +511,12 @@ export function CampaignDetailPage() {
   useEffect(() => {
     setSelectedAssetBriefIds((prev) => prev.filter((id) => assetBriefs.some((brief) => brief.id === id)));
   }, [assetBriefs]);
+
+  useEffect(() => {
+    if (selectedUmsIterationFilter === "all") return;
+    if (umsIterationOptions.some((option) => option.id === selectedUmsIterationFilter)) return;
+    setSelectedUmsIterationFilter("all");
+  }, [selectedUmsIterationFilter, umsIterationOptions]);
 
   useEffect(() => {
     if (funnels.length && funnelCreationRequested) {
@@ -1037,6 +1094,42 @@ export function CampaignDetailPage() {
                 ))}
               </div>
             </div>
+          </div>
+
+          <div className="mt-4 border border-border bg-transparent p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-base font-semibold text-content">Strategy V2 angle identity</div>
+                <div className="text-sm text-content-muted">
+                  Campaign lineage from Strategy V2 launch records.
+                </div>
+              </div>
+              {campaignStrategyV2LaunchesLoading ? <Badge tone="accent">Loading</Badge> : null}
+            </div>
+            {campaignAngleIdentity ? (
+              <div className="mt-3 grid gap-2 text-sm text-content md:grid-cols-2">
+                <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                  <div className="text-xs text-content-muted">Angle ID</div>
+                  <div className="font-mono">{campaignAngleIdentity.angle_id}</div>
+                </div>
+                <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                  <div className="text-xs text-content-muted">Angle run ID</div>
+                  <div className="font-mono">{campaignAngleIdentity.angle_run_id}</div>
+                </div>
+                <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                  <div className="text-xs text-content-muted">Launch type</div>
+                  <div>{campaignAngleIdentity.launch_type}</div>
+                </div>
+                <div className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                  <div className="text-xs text-content-muted">Latest UMS group</div>
+                  <div>{campaignAngleIdentity.selected_ums_id}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-3 text-sm text-content-muted">
+                No Strategy V2 launch lineage found for this campaign yet.
+              </div>
+            )}
           </div>
 
           <div className="border border-border bg-transparent">
@@ -1642,36 +1735,60 @@ export function CampaignDetailPage() {
         </TabsContent>
 
         <TabsContent value="funnels" flush>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-base font-semibold text-content">Funnels</div>
               <div className="text-sm text-content-muted">
                 Funnels are managed in the funnels workspace and can be edited anytime.
               </div>
             </div>
-            <Button variant="secondary" size="sm" onClick={() => navigate("/research/funnels")}>
-              View all funnels
-            </Button>
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-content-muted">
+                UMS filter
+                <select
+                  className="ml-2 rounded-md border border-border bg-surface px-2 py-1 text-xs text-content"
+                  value={selectedUmsIterationFilter}
+                  onChange={(event) => setSelectedUmsIterationFilter(event.target.value)}
+                >
+                  <option value="all">All groups</option>
+                  {umsIterationOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button variant="secondary" size="sm" onClick={() => navigate("/research/funnels")}>
+                View all funnels
+              </Button>
+            </div>
+          </div>
+          <div className="mt-2 text-xs text-content-muted">
+            Showing {filteredFunnels.length} of {funnels.length} funnels
+            {selectedUmsIterationFilter !== "all" ? ` for UMS group '${selectedUmsIterationFilter}'.` : "."}
           </div>
           <div className="mt-4">
             {funnelsLoading ? (
               <div className="border border-border bg-transparent px-4 py-3 text-base text-content-muted">
                 Loading funnels…
               </div>
-            ) : funnels.length ? (
+            ) : filteredFunnels.length ? (
               <div className="border border-border bg-transparent">
                 <div className="overflow-x-auto">
                   <Table variant="ghost">
                     <TableHeader>
                       <TableRow>
                         <TableHeadCell>Name</TableHeadCell>
+                        <TableHeadCell>Angle / UMS</TableHeadCell>
                         <TableHeadCell>Status</TableHeadCell>
                         <TableHeadCell>Updated</TableHeadCell>
                         <TableHeadCell />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {funnels.map((funnel) => (
+                      {filteredFunnels.map((funnel) => {
+                        const launchRow = launchByFunnelId.get(funnel.id);
+                        return (
                         <TableRow key={funnel.id}>
                           <TableCell>
                             <Link
@@ -1683,6 +1800,17 @@ export function CampaignDetailPage() {
                             {funnel.description ? (
                               <div className="mt-1 text-sm text-content-muted">{funnel.description}</div>
                             ) : null}
+                          </TableCell>
+                          <TableCell>
+                            {launchRow ? (
+                              <div className="text-xs text-content-muted">
+                                <div>angle: {launchRow.angle_id}</div>
+                                <div>ums: {launchRow.selected_ums_id || "primary"}</div>
+                                <div>type: {launchRow.launch_type}</div>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-content-muted">No Strategy V2 launch row</span>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge tone={funnelToneMap[funnel.status] || "neutral"}>{funnel.status}</Badge>
@@ -1704,10 +1832,14 @@ export function CampaignDetailPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      )})}
                     </TableBody>
                   </Table>
                 </div>
+              </div>
+            ) : selectedUmsIterationFilter !== "all" ? (
+              <div className="border border-border bg-transparent px-4 py-3 text-base">
+                No funnels matched UMS group <span className="font-mono">{selectedUmsIterationFilter}</span>.
               </div>
             ) : isFunnelGenerationActive ? (
               <div className="border border-border bg-transparent px-4 py-3 text-base text-content-muted">

@@ -17,6 +17,8 @@ from app.db.repositories.org_deploy_domains import OrgDeployDomainsRepository
 from app.db.repositories.shopify_theme_template_drafts import (
     ShopifyThemeTemplateDraftsRepository,
 )
+from app.db.repositories.gemini_context_files import GeminiContextFilesRepository
+from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 
 __all__ = [
     "ClientsRepository",
@@ -36,4 +38,6 @@ __all__ = [
     "ResearchArtifactsRepository",
     "OrgDeployDomainsRepository",
     "ShopifyThemeTemplateDraftsRepository",
+    "GeminiContextFilesRepository",
+    "StrategyV2LaunchesRepository",
 ]

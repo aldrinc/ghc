@@ -9,6 +9,7 @@ class ClientUpdateRequest(BaseModel):
     name: Optional[str] = None
     industry: Optional[str] = None
     designSystemId: Optional[str] = None
+    strategyV2Enabled: Optional[bool] = None
 
 
 class ClientDeleteRequest(BaseModel):

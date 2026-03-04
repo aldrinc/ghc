@@ -327,7 +327,18 @@ class SyncThemeBrandResponse(BaseModel):
 
 class ThemeBrandExportFile(BaseModel):
     filename: str
-    content: str
+    content: str | None = None
+    contentBase64: str | None = None
+
+    @model_validator(mode="after")
+    def validate_content_payload(self) -> "ThemeBrandExportFile":
+        has_text = isinstance(self.content, str)
+        has_base64 = isinstance(self.contentBase64, str)
+        if has_text == has_base64:
+            raise ValueError(
+                "Exactly one of content or contentBase64 is required for export files."
+            )
+        return self
 
 
 class ExportThemeBrandResponse(SyncThemeBrandResponse):
@@ -348,8 +359,8 @@ class ListThemeBrandTemplateSlotsRequest(BaseModel):
             raise ValueError("Exactly one of clientId or shopDomain is required")
         has_theme_id = bool(self.themeId and self.themeId.strip())
         has_theme_name = bool(self.themeName and self.themeName.strip())
-        if has_theme_id == has_theme_name:
-            raise ValueError("Exactly one of themeId or themeName is required")
+        if has_theme_id and has_theme_name:
+            raise ValueError("Provide at most one of themeId or themeName")
         return self
 
 
@@ -435,6 +446,22 @@ class InstallationResponse(BaseModel):
     installedAt: datetime
     updatedAt: datetime
     uninstalledAt: datetime | None
+
+
+class EmbeddedSessionResponse(BaseModel):
+    shopDomain: str
+    isInstalled: bool
+    linkedWorkspaceId: str | None = None
+    hasStorefrontAccessToken: bool = False
+    installationState: Literal[
+        "not_installed",
+        "installed_missing_storefront_token",
+        "installed",
+    ]
+
+
+class LinkWorkspaceRequest(BaseModel):
+    clientId: str = Field(min_length=1)
 
 
 class ForwardOrderPayload(BaseModel):

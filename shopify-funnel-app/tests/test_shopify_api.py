@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import json
+from typing import Any
 
 import pytest
 
@@ -145,6 +147,237 @@ def test_create_storefront_access_token_requires_access_token_field():
         )
 
 
+def test_ensure_catalog_collection_route_is_available_returns_existing_published_collection():
+    client = ShopifyApiClient()
+    call_log: list[str] = []
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "admin_token"
+        query = payload.get("query", "")
+        if "query collectionByHandle" in query:
+            call_log.append("collectionByHandle")
+            return {
+                "collections": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/Collection/1",
+                            "handle": "all",
+                            "title": "Catalog",
+                        }
+                    ]
+                }
+            }
+        if "query publicationsForCatalogRoute" in query:
+            call_log.append("publications")
+            return {
+                "publications": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/Publication/1",
+                            "name": "Online Store",
+                        }
+                    ]
+                }
+            }
+        if "query collectionPublicationState" in query:
+            call_log.append("collectionPublicationState")
+            return {"collection": {"id": "gid://shopify/Collection/1", "publishedOnPublication": True}}
+        if "query shopProductsForCatalogRoute" in query:
+            call_log.append("shopProductsForCatalogRoute")
+            return {
+                "products": {
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    "nodes": [],
+                }
+            }
+        raise AssertionError(f"Unexpected query: {query}")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.ensure_catalog_collection_route_is_available(
+            shop_domain="example.myshopify.com",
+            access_token="admin_token",
+        )
+    )
+
+    assert call_log == [
+        "collectionByHandle",
+        "publications",
+        "collectionPublicationState",
+        "shopProductsForCatalogRoute",
+    ]
+    assert result == {
+        "collectionId": "gid://shopify/Collection/1",
+        "collectionHandle": "all",
+        "collectionTitle": "Catalog",
+        "addedProductCount": 0,
+    }
+
+
+def test_ensure_catalog_collection_route_is_available_creates_and_publishes_collection_when_missing():
+    client = ShopifyApiClient()
+    call_log: list[str] = []
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "admin_token"
+        query = payload.get("query", "")
+        if "query collectionByHandle" in query:
+            call_log.append("collectionByHandle")
+            return {"collections": {"nodes": []}}
+        if "mutation collectionCreateForCatalog" in query:
+            call_log.append("collectionCreate")
+            variables = payload.get("variables")
+            assert variables == {
+                "input": {
+                    "title": "Catalog",
+                    "handle": "all",
+                }
+            }
+            return {
+                "collectionCreate": {
+                    "collection": {
+                        "id": "gid://shopify/Collection/2",
+                        "handle": "all",
+                        "title": "Catalog",
+                    },
+                    "userErrors": [],
+                }
+            }
+        if "query publicationsForCatalogRoute" in query:
+            call_log.append("publications")
+            return {
+                "publications": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/Publication/1",
+                            "name": "Online Store",
+                        }
+                    ]
+                }
+            }
+        if "query collectionPublicationState" in query:
+            call_log.append("collectionPublicationState")
+            return {"collection": {"id": "gid://shopify/Collection/2", "publishedOnPublication": False}}
+        if "mutation publishCatalogCollection" in query:
+            call_log.append("publishCatalogCollection")
+            variables = payload.get("variables")
+            assert variables == {
+                "id": "gid://shopify/Collection/2",
+                "input": [{"publicationId": "gid://shopify/Publication/1"}],
+            }
+            return {"publishablePublish": {"userErrors": []}}
+        if "query shopProductsForCatalogRoute" in query:
+            call_log.append("shopProductsForCatalogRoute")
+            return {
+                "products": {
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    "nodes": [{"id": "gid://shopify/Product/10"}],
+                }
+            }
+        if "query collectionProductsForCatalogRoute" in query:
+            call_log.append("collectionProductsForCatalogRoute")
+            return {
+                "collection": {
+                    "id": "gid://shopify/Collection/2",
+                    "products": {
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": [],
+                    },
+                }
+            }
+        if "mutation collectionAddProductsForCatalog" in query:
+            call_log.append("collectionAddProductsForCatalog")
+            variables = payload.get("variables")
+            assert variables == {
+                "id": "gid://shopify/Collection/2",
+                "productIds": ["gid://shopify/Product/10"],
+            }
+            return {"collectionAddProducts": {"userErrors": []}}
+        raise AssertionError(f"Unexpected query: {query}")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.ensure_catalog_collection_route_is_available(
+            shop_domain="example.myshopify.com",
+            access_token="admin_token",
+        )
+    )
+
+    assert call_log == [
+        "collectionByHandle",
+        "collectionCreate",
+        "publications",
+        "collectionPublicationState",
+        "publishCatalogCollection",
+        "shopProductsForCatalogRoute",
+        "collectionProductsForCatalogRoute",
+        "collectionAddProductsForCatalog",
+    ]
+    assert result == {
+        "collectionId": "gid://shopify/Collection/2",
+        "collectionHandle": "all",
+        "collectionTitle": "Catalog",
+        "addedProductCount": 1,
+    }
+
+
+def test_ensure_product_in_catalog_collection_adds_product_without_full_resync():
+    client = ShopifyApiClient()
+    observed: dict[str, Any] = {}
+
+    async def fake_ensure_catalog_collection_route_is_available(
+        *,
+        shop_domain: str,
+        access_token: str,
+        sync_all_products: bool = True,
+    ):
+        observed["shop_domain"] = shop_domain
+        observed["access_token"] = access_token
+        observed["sync_all_products"] = sync_all_products
+        return {
+            "collectionId": "gid://shopify/Collection/7",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+            "addedProductCount": 0,
+        }
+
+    async def fake_add_products_to_collection(
+        *,
+        shop_domain: str,
+        access_token: str,
+        collection_id: str,
+        product_ids: list[str],
+    ) -> None:
+        observed["collection_id"] = collection_id
+        observed["product_ids"] = product_ids
+
+    client.ensure_catalog_collection_route_is_available = (  # type: ignore[method-assign]
+        fake_ensure_catalog_collection_route_is_available
+    )
+    client._add_products_to_collection = fake_add_products_to_collection  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.ensure_product_in_catalog_collection(
+            shop_domain="example.myshopify.com",
+            access_token="admin_token",
+            product_gid="gid://shopify/Product/10",
+        )
+    )
+
+    assert observed == {
+        "shop_domain": "example.myshopify.com",
+        "access_token": "admin_token",
+        "sync_all_products": False,
+        "collection_id": "gid://shopify/Collection/7",
+        "product_ids": ["gid://shopify/Product/10"],
+    }
+    assert result["collectionId"] == "gid://shopify/Collection/7"
+
+
 def test_sync_theme_template_component_text_settings_wraps_richtext_values():
     template_filename = "sections/footer-group.json"
     setting_path = f"{template_filename}.sections.footer.settings.text"
@@ -180,6 +413,42 @@ def test_sync_theme_template_component_text_settings_wraps_richtext_values():
     assert report["missingPaths"] == []
 
 
+def test_sync_theme_template_component_text_settings_wraps_explicit_richtext_paths():
+    template_filename = "templates/collection.json"
+    setting_path = f"{template_filename}.sections.recently-viewed.settings.description"
+    template_content = (
+        json.dumps(
+            {
+                "sections": {
+                    "recently-viewed": {
+                        "settings": {
+                            "description": "Old plain copy",
+                        }
+                    }
+                }
+            }
+        )
+        + "\n"
+    )
+
+    updated_content, report = (
+        ShopifyApiClient._sync_theme_template_component_text_settings_data(
+            template_filename=template_filename,
+            template_content=template_content,
+            component_text_values_by_path={setting_path: "Fresh copy & details"},
+            richtext_setting_paths={setting_path},
+        )
+    )
+
+    updated_json = json.loads(updated_content)
+    assert (
+        updated_json["sections"]["recently-viewed"]["settings"]["description"]
+        == "<p>Fresh copy &amp; details</p>"
+    )
+    assert report["updatedPaths"] == [setting_path]
+    assert report["missingPaths"] == []
+
+
 def test_sync_theme_template_component_text_settings_keeps_plain_text_values():
     template_filename = "sections/footer-group.json"
     setting_path = f"{template_filename}.sections.footer.settings.heading"
@@ -208,6 +477,189 @@ def test_sync_theme_template_component_text_settings_keeps_plain_text_values():
 
     updated_json = json.loads(updated_content)
     assert updated_json["sections"]["footer"]["settings"]["heading"] == "New heading"
+    assert report["updatedPaths"] == [setting_path]
+    assert report["missingPaths"] == []
+
+
+def test_stabilize_collection_images_with_text_overlay_settings_prevents_button_clipping():
+    template_filename = "templates/collection.json"
+    template_content = (
+        json.dumps(
+            {
+                "sections": {
+                    "images-with-text-overlay": {
+                        "type": "images-with-text-overlay",
+                        "settings": {
+                            "image_height": "400px",
+                            "image_height_mobile": "400px",
+                            "content_position": "md:items-center md:justify-start",
+                        },
+                        "blocks": {
+                            "spacing": {
+                                "type": "spacing",
+                                "settings": {
+                                    "height": 80,
+                                    "height_mobile": 20,
+                                },
+                            },
+                            "button_one": {
+                                "type": "button",
+                                "settings": {"button_label": "Learn more"},
+                            },
+                        },
+                    }
+                }
+            }
+        )
+        + "\n"
+    )
+
+    updated_content = ShopifyApiClient._stabilize_collection_images_with_text_overlay_settings(
+        template_filename=template_filename,
+        template_content=template_content,
+    )
+    updated_json = json.loads(updated_content)
+    section_settings = updated_json["sections"]["images-with-text-overlay"]["settings"]
+    spacing_settings = updated_json["sections"]["images-with-text-overlay"]["blocks"][
+        "spacing"
+    ]["settings"]
+
+    assert section_settings["image_height"] == "550px"
+    assert section_settings["image_height_mobile"] == "500px"
+    assert section_settings["content_position"] == "md:items-start md:justify-start"
+    assert spacing_settings["height"] == 32
+    assert spacing_settings["height_mobile"] == 8
+
+
+def test_normalize_theme_text_to_english_rewrites_known_french_labels():
+    content = (
+        "Suivre ma commande | Voir le panier | Ajouter au panier | "
+        "Panier | Passer a la caisse | Livraison"
+    )
+
+    normalized = ShopifyApiClient._normalize_theme_text_to_english(content=content)
+
+    assert "Track my order" in normalized
+    assert "View cart" in normalized
+    assert "Add to cart" in normalized
+    assert "Cart" in normalized
+    assert "Checkout" in normalized
+    assert "Shipping" in normalized
+    assert "Suivre ma commande" not in normalized
+
+
+def test_stabilize_main_collection_sidebar_menu_layout_left_aligns_menu():
+    content = (
+        '<div class="hidden md:flex collection__content h-fit removable-facet flex flex-col rounded-lg col-span-1">\n'
+        '<h3 class="h3 mb-4 text-center">Menu</h3>\n'
+        '{%- render \'collection-nav\', section: section, main_menu: main_menu, class: " mb-4 flex-col items-start", limit: link_count -%}\n'
+        "</div>\n"
+    )
+
+    updated = ShopifyApiClient._stabilize_main_collection_sidebar_menu_layout(
+        filename="sections/main-collection.liquid",
+        content=content,
+    )
+
+    assert '<h3 class="h3 mb-4 w-full text-left">Menu</h3>' in updated
+    assert (
+        'class: "mb-4 flex-col items-start w-full", limit: link_count' in updated
+    )
+
+
+def test_stabilize_header_icons_cart_controls_removes_track_order_and_drawer_attrs():
+    content = (
+        '<div class="header__icons">\n'
+        '<a href="{{ routes.cart_url }}" class="cart-drawer-button w-fit" is="magnet-link" aria-controls="CartDrawer" aria-expanded="false" data-no-instant>\n'
+        "{%- render 'icon', icon: 'direction', size: 'lg' -%}\n"
+        '<span class="hidden md:block">Track my order</span>\n'
+        "</a>\n"
+        '<div class="h-full divider"><span></span></div>\n'
+        '<a href="{{ routes.cart_url }}" class="cart-drawer-button w-fit gap-2 flex items-center justify-center relative" is="magnet-link" aria-controls="CartDrawer" aria-expanded="false" data-no-instant>\n'
+        "{%- render 'icon', icon: 'cart', size: 'lg' -%}\n"
+        '<cart-count class="count absolute top-0 right-0 text-xs">1</cart-count>\n'
+        "<span class=\"hidden md:block\">{{ 'general.cart.title' | t }}</span>\n"
+        "</a>\n"
+        "</div>\n"
+    )
+
+    updated = ShopifyApiClient._stabilize_header_icons_cart_controls(
+        filename="snippets/header-icons.liquid",
+        content=content,
+    )
+
+    assert "Track my order" not in updated
+    assert "cart-drawer-button" not in updated
+    assert 'aria-controls="CartDrawer"' not in updated
+    assert 'aria-expanded="false"' not in updated
+    assert "{{ 'general.cart.title' | t }}" not in updated
+    assert "cart-link-button" in updated
+
+
+def test_stabilize_product_card_inventory_language_english_labels():
+    content = (
+        '{%- liquid\n'
+        'assign stock_class = "inventory--high"\n'
+        'assign stock_text = "En stock"\n'
+        "if product.selected_or_first_available_variant.inventory_quantity < 5\n"
+        '  assign stock_text = "Presque épuisé"\n'
+        "endif\n"
+        "-%}\n"
+    )
+
+    updated = ShopifyApiClient._stabilize_product_card_inventory_language(
+        filename="snippets/product-card.liquid",
+        content=content,
+    )
+
+    assert 'assign stock_text = "In stock"' in updated
+    assert 'assign stock_text = "Almost sold out"' in updated
+    assert "En stock" not in updated
+    assert "Presque épuisé" not in updated
+
+
+def test_sync_theme_template_component_image_settings_creates_optional_leaf_paths():
+    template_filename = "templates/collection.json"
+    setting_path = (
+        f"{template_filename}.sections.main-collection.blocks.promotion.settings.image"
+    )
+    template_content = (
+        json.dumps(
+            {
+                "sections": {
+                    "main-collection": {
+                        "blocks": {
+                            "promotion": {
+                                "settings": {
+                                    "heading": "Promo heading",
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        )
+        + "\n"
+    )
+
+    updated_content, report = (
+        ShopifyApiClient._sync_theme_template_component_image_settings_data(
+            template_filename=template_filename,
+            template_content=template_content,
+            component_image_urls_by_path={
+                setting_path: "shopify://shop_images/catalog-promo.png"
+            },
+            allow_missing_leaf_paths={setting_path},
+        )
+    )
+
+    updated_json = json.loads(updated_content)
+    assert (
+        updated_json["sections"]["main-collection"]["blocks"]["promotion"]["settings"][
+            "image"
+        ]
+        == "shopify://shop_images/catalog-promo.png"
+    )
     assert report["updatedPaths"] == [setting_path]
     assert report["missingPaths"] == []
 
@@ -254,6 +706,13 @@ def test_list_theme_brand_template_slots_uses_deterministic_manifest(monkeypatch
                     "key": "image",
                     "role": "hero",
                     "recommendedAspect": "landscape",
+                },
+                {
+                    "path": "templates/index.json.sections.hero.settings.mobile_image",
+                    "key": "mobile_image",
+                    "role": "hero",
+                    "recommendedAspect": "landscape",
+                    "allowMissing": True,
                 },
             ),
             "textSlots": (
@@ -339,6 +798,13 @@ def test_list_theme_brand_template_slots_uses_deterministic_manifest(monkeypatch
             "currentValue": "shopify://shop_images/hero.png",
             "role": "hero",
             "recommendedAspect": "landscape",
+        },
+        {
+            "path": "templates/index.json.sections.hero.settings.mobile_image",
+            "key": "mobile_image",
+            "currentValue": None,
+            "role": "hero",
+            "recommendedAspect": "landscape",
         }
     ]
     assert result["textSlots"] == [
@@ -348,6 +814,104 @@ def test_list_theme_brand_template_slots_uses_deterministic_manifest(monkeypatch
             "currentValue": "Hero headline",
             "role": "headline",
             "maxLength": 120,
+        }
+    ]
+
+
+def test_list_theme_brand_template_slots_defaults_to_main_theme_when_selector_omitted(
+    monkeypatch,
+):
+    client = ShopifyApiClient()
+    manifest = {
+        "futrgroup2-0theme": {
+            "imageSlots": (
+                {
+                    "path": "templates/index.json.sections.hero.settings.image",
+                    "key": "image",
+                    "role": "hero",
+                    "recommendedAspect": "landscape",
+                },
+            ),
+            "textSlots": (),
+        }
+    }
+    monkeypatch.setattr(
+        shopify_api_module,
+        "_THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME",
+        manifest,
+    )
+    template_json = (
+        json.dumps(
+            {
+                "sections": {
+                    "hero": {
+                        "settings": {"image": "shopify://shop_images/hero-main.png"},
+                    }
+                }
+            }
+        )
+        + "\n"
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        },
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/2",
+                            "name": "preview-theme",
+                            "role": "UNPUBLISHED",
+                        },
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            variables = payload.get("variables", {})
+            assert variables.get("id") == "gid://shopify/OnlineStoreTheme/1"
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": template_json,
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.list_theme_brand_template_slots(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+        )
+    )
+
+    assert result["themeId"] == "gid://shopify/OnlineStoreTheme/1"
+    assert result["themeName"] == "futrgroup2-0theme"
+    assert result["themeRole"] == "MAIN"
+    assert result["imageSlots"] == [
+        {
+            "path": "templates/index.json.sections.hero.settings.image",
+            "key": "image",
+            "currentValue": "shopify://shop_images/hero-main.png",
+            "role": "hero",
+            "recommendedAspect": "landscape",
         }
     ]
 
@@ -539,6 +1103,79 @@ def test_list_theme_brand_template_slots_orders_image_slots_by_render_order(monk
         "templates/index.json.sections.zz_section.blocks.block_1.settings.image",
         "templates/index.json.sections.aa_section.settings.image",
     ]
+
+
+def test_theme_template_slot_manifest_includes_catalog_copy_and_images():
+    manifest = shopify_api_module._THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME[
+        "futrgroup2-0theme"
+    ]
+    image_slots = manifest["imageSlots"]
+    text_slots = manifest["textSlots"]
+    image_slots_by_path = {str(item["path"]): item for item in image_slots}
+    text_slot_paths = {str(item["path"]) for item in text_slots}
+
+    assert (
+        "templates/collection.json.sections.main-collection.blocks.promotion.settings.image"
+        in image_slots_by_path
+    )
+    assert (
+        image_slots_by_path[
+            "templates/collection.json.sections.main-collection.blocks.promotion.settings.image"
+        ].get("allowMissing")
+        is True
+    )
+    assert (
+        "templates/collection.json.sections.images-with-text-overlay.settings.image_1"
+        in image_slots_by_path
+    )
+    assert (
+        "templates/collection.json.sections.images-with-text-overlay.settings.image_2"
+        in image_slots_by_path
+    )
+    assert (
+        "templates/collection.json.sections.images-with-text-overlay.settings.image_3"
+        in image_slots_by_path
+    )
+    assert (
+        "templates/collection.json.sections.images-with-text-overlay.settings.image_4"
+        in image_slots_by_path
+    )
+    assert (
+        "templates/collection.json.sections.images-with-text-overlay.settings.image_5"
+        in image_slots_by_path
+    )
+    assert (
+        "templates/collection.json.sections.main-collection.blocks.promotion.settings.heading"
+        in text_slot_paths
+    )
+    assert (
+        "templates/collection.json.sections.images-with-text-overlay.blocks.text.settings.text"
+        in text_slot_paths
+    )
+    assert (
+        "templates/collection.json.sections.recently-viewed.settings.description"
+        in text_slot_paths
+    )
+
+
+def test_manifest_richtext_paths_include_collection_body_copy():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(theme_name="futrgroup2-0theme")
+    richtext_paths = ShopifyApiClient._get_richtext_theme_template_slot_paths_from_manifest(
+        profile=profile
+    )
+
+    assert (
+        "templates/collection.json.sections.main-collection.blocks.promotion.settings.content"
+        in richtext_paths
+    )
+    assert (
+        "templates/collection.json.sections.images-with-text-overlay.blocks.text.settings.text"
+        in richtext_paths
+    )
+    assert (
+        "templates/collection.json.sections.recently-viewed.settings.description"
+        in richtext_paths
+    )
 
 
 def test_admin_graphql_reports_missing_navigation_scopes_for_menus_access_denied():
@@ -840,6 +1477,7 @@ def test_get_product_returns_variants_with_inventory_fields():
 def test_create_product_returns_created_product_and_variants():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []
+    observed_catalog_sync: dict[str, str] = {}
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         observed_payloads.append(payload)
@@ -897,6 +1535,25 @@ def test_create_product_returns_created_product_and_variants():
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
 
+    async def fake_ensure_product_in_catalog_collection(
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gid: str,
+    ) -> dict[str, str]:
+        observed_catalog_sync["shop_domain"] = shop_domain
+        observed_catalog_sync["access_token"] = access_token
+        observed_catalog_sync["product_gid"] = product_gid
+        return {
+            "collectionId": "gid://shopify/Collection/1",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+        }
+
+    client.ensure_product_in_catalog_collection = (  # type: ignore[method-assign]
+        fake_ensure_product_in_catalog_collection
+    )
+
     result = asyncio.run(
         client.create_product(
             shop_domain="example.myshopify.com",
@@ -916,6 +1573,11 @@ def test_create_product_returns_created_product_and_variants():
     assert result["variants"][0]["priceCents"] == 4999
     assert result["variants"][1]["variantGid"] == "gid://shopify/ProductVariant/200"
     assert len(observed_payloads) == 3
+    assert observed_catalog_sync == {
+        "shop_domain": "example.myshopify.com",
+        "access_token": "token",
+        "product_gid": "gid://shopify/Product/999",
+    }
 
 
 def test_create_product_requires_variants():
@@ -1416,6 +2078,69 @@ def test_upsert_policy_pages_updates_existing_page():
     assert result[0]["pageId"] == "gid://shopify/Page/101"
 
 
+def test_apply_policy_pages_to_menu_items_dedupes_footer_links():
+    menu_items = [
+        {
+            "id": "gid://shopify/MenuItem/10",
+            "title": "Contact",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/11",
+            "title": "Contact Us",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/12",
+            "title": "Privacy Policy",
+            "type": "HTTP",
+            "url": "/policies/privacy-policy",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/13",
+            "title": "Privacy Policy",
+            "type": "HTTP",
+            "url": "/pages/privacy-policy",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+    ]
+    policy_pages = [
+        {
+            "pageId": "gid://shopify/Page/101",
+            "title": "Privacy Policy",
+            "handle": "privacy-policy",
+        }
+    ]
+
+    next_items, changed = ShopifyApiClient._apply_policy_pages_to_menu_items(
+        menu_items=menu_items,
+        policy_pages=policy_pages,
+    )
+
+    assert changed is True
+    assert len(next_items) == 2
+    assert next_items[0]["url"] == "/pages/contact"
+
+    privacy_item = next_items[1]
+    assert privacy_item["title"] == "Privacy Policy"
+    assert privacy_item["type"] == "PAGE"
+    assert privacy_item["resourceId"] == "gid://shopify/Page/101"
+    assert privacy_item["url"] == "/policies/privacy-policy"
+
+
 def test_sync_theme_brand_updates_layout_and_css():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []
@@ -1628,12 +2353,67 @@ def test_sync_theme_brand_updates_layout_and_css():
                 in css_content
             )
             assert (
-                'button, .button, .btn, input[type="button"], input[type="submit"], input[type="reset"], [role="button"] {'
+                "header nav li, header .header__inline-menu li, header .list-menu--inline > li, #shopify-section-header nav li, #shopify-section-header .header__inline-menu li, #shopify-section-header .list-menu--inline > li {"
+                in css_content
+            )
+            assert "display: flex !important;" in css_content
+            assert "align-items: center !important;" in css_content
+            assert (
+                "header nav li > a, header nav li > details > summary, header .header__menu-item, header .header__inline-menu a, header .header__inline-menu summary, #shopify-section-header nav li > a, #shopify-section-header nav li > details > summary, #shopify-section-header .header__menu-item, #shopify-section-header .header__inline-menu a, #shopify-section-header .header__inline-menu summary {"
+                in css_content
+            )
+            assert "display: inline-flex !important;" in css_content
+            assert "line-height: 1 !important;" in css_content
+            assert (
+                '.button, .btn, input[type="button"], input[type="submit"], input[type="reset"] {'
                 in css_content
             )
             assert (
+                ".button .icon-arrow-right, .button .icon-arrow-left, .button [class*=\"arrow\"] svg,"
+                in css_content
+            )
+            assert "fill: currentColor !important;" in css_content
+            assert "stroke: currentColor !important;" in css_content
+            assert (
+                '.cart-drawer, cart-drawer, #CartDrawer, [id="CartDrawer"], [data-cart-drawer], .drawer--cart,'
+                in css_content
+            )
+            assert "background-color: #ffffff !important;" in css_content
+            assert '[class*="cart-drawer"]' not in css_content
+            assert (
+                "header .header__buttons .cart-drawer-button, #shopify-section-header .header__buttons .cart-drawer-button,"
+                in css_content
+            )
+            assert "box-shadow: none !important;" in css_content
+            assert (
+                ".swiper-button-prev, .swiper-button-next, .slick-prev, .slick-next, .flickity-prev-next-button,"
+                in css_content
+            )
+            assert "background-color: transparent !important;" in css_content
+            assert (
                 'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"] {'
                 in css_content
+            )
+            assert (
+                'footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]),'
+                in css_content
+            )
+            assert (
+                'footer button, footer .button, footer .btn, footer input[type="button"], footer input[type="submit"], footer input[type="reset"], footer [role="button"],'
+                in css_content
+            )
+            assert (
+                "color: var(--footer-text-color) !important;" in css_content
+            )
+            assert (
+                "border-color: var(--footer-text-color) !important;" in css_content
+            )
+            assert (
+                ".announcement-bar, [id*=\"announcement\"], [class*=\"announcement\"] {"
+                in css_content
+            )
+            assert (
+                "color: var(--announcement-text-color) !important;" in css_content
             )
             settings_file = next(
                 item
@@ -1776,7 +2556,7 @@ def test_sync_theme_brand_updates_layout_and_css():
             "content": b"logo-bytes",
         }
     ]
-    assert len(observed_payloads) == 8
+    assert len(observed_payloads) == 9
 
 
 def test_sync_theme_brand_allows_upsert_without_job():
@@ -1958,7 +2738,7 @@ def test_sync_theme_brand_allows_upsert_without_job():
             "unmappedTypographyPaths": [],
         },
     }
-    assert len(observed_payloads) == 5
+    assert len(observed_payloads) == 6
 
 
 def test_sync_theme_brand_upserts_template_component_settings():
@@ -2660,6 +3440,165 @@ def test_sync_theme_brand_errors_for_missing_component_image_path():
                 theme_name="futrgroup2-0theme",
             )
         )
+
+
+def test_sync_theme_brand_allows_manifest_optional_component_image_path():
+    client = ShopifyApiClient()
+    settings_json = _build_minimal_theme_settings_json()
+    collection_template_json = (
+        json.dumps(
+            {
+                "sections": {
+                    "main-collection": {
+                        "blocks": {
+                            "promotion": {
+                                "settings": {
+                                    "heading": "Example heading",
+                                    "content": "<p>Promo copy</p>",
+                                    "button_label": "Shop now",
+                                }
+                            }
+                        }
+                    }
+                },
+                "order": ["main-collection"],
+            }
+        )
+        + "\n"
+    )
+    observed_upload_urls: list[str] = []
+    optional_image_path = (
+        "templates/collection.json.sections.main-collection.blocks.promotion.settings.image"
+    )
+
+    async def fake_create_shopify_logo_file_reference_from_url(
+        *, shop_domain: str, access_token: str, logo_url: str
+    ):
+        observed_upload_urls.append(logo_url)
+        return "shopify://shop_images/catalog-promo-uploaded.png"
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get(
+                "filenames"
+            ) or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "templates/collection.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "templates/collection.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": collection_template_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        "<html><head>\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                        "old content\n"
+                                        "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                        "</head><body></body></html>"
+                                    ),
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._create_shopify_logo_file_reference_from_url = fake_create_shopify_logo_file_reference_from_url  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            font_urls=[],
+            component_image_urls={
+                optional_image_path: "https://assets.example.com/public/assets/catalog-1"
+            },
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+            upsert_theme_files=False,
+            include_file_payloads=True,
+        )
+    )
+
+    assert observed_upload_urls == ["https://assets.example.com/public/assets/catalog-1"]
+    collection_file = next(
+        file_entry
+        for file_entry in result["files"]
+        if file_entry["filename"] == "templates/collection.json"
+    )
+    synced_collection = json.loads(collection_file["content"])
+    assert (
+        synced_collection["sections"]["main-collection"]["blocks"]["promotion"][
+            "settings"
+        ]["image"]
+        == "shopify://shop_images/catalog-promo-uploaded.png"
+    )
 
 
 def test_sync_theme_brand_auto_component_images_map_to_template_settings():
@@ -3622,6 +4561,78 @@ def test_sync_theme_settings_data_updates_semantic_color_paths():
     assert report["unmappedColorPaths"] == []
 
 
+def test_sync_theme_settings_data_resolves_var_color_tokens_for_mapped_and_semantic_paths():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars={
+            **_THEME_SYNC_REQUIRED_CSS_VARS,
+            "--color-text": "var(--color-brand)",
+            "--color-soft": "var(--color-border)",
+        },
+    )
+    settings_content = _build_minimal_theme_settings_json(
+        extra_current={
+            "sections": {
+                "announcement": {
+                    "text_color": "#ffffff",
+                    "color_drawer_overlay": "#ffffff",
+                }
+            }
+        }
+    )
+
+    next_settings_content, _ = ShopifyApiClient._sync_theme_settings_data(
+        profile=profile,
+        settings_content=settings_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_settings = ShopifyApiClient._parse_theme_settings_json(
+        settings_content=next_settings_content
+    )
+
+    assert synced_settings["current"]["color_foreground"] == "#123456"
+    assert synced_settings["current"]["footer_text"] == "#123456"
+    assert (
+        synced_settings["current"]["color_schemes"][0]["settings"]["text"] == "#123456"
+    )
+    assert (
+        synced_settings["current"]["sections"]["announcement"]["text_color"]
+        == "#123456"
+    )
+    assert (
+        synced_settings["current"]["sections"]["announcement"]["color_drawer_overlay"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+    )
+    assert "var(" not in next_settings_content
+
+
+def test_sync_theme_settings_data_errors_for_unresolved_var_color_tokens():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars={
+            **_THEME_SYNC_REQUIRED_CSS_VARS,
+            "--color-text": "var(--missing-color-token)",
+        },
+    )
+    settings_content = _build_minimal_theme_settings_json()
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="references missing token --missing-color-token with no fallback",
+    ):
+        ShopifyApiClient._sync_theme_settings_data(
+            profile=profile,
+            settings_content=settings_content,
+            effective_css_vars=effective_css_vars,
+        )
+
+
 def test_sync_theme_settings_data_maps_footer_section_background_to_footer_bg():
     profile = ShopifyApiClient._resolve_theme_brand_profile(
         theme_name="futrgroup2-0theme"
@@ -3635,14 +4646,14 @@ def test_sync_theme_settings_data_maps_footer_section_background_to_footer_bg():
             "sections": {
                 "ss_footer_4_abc123": {
                     "type": "ss-footer-4",
-                    "settings": {
-                        "background_color": "#111111",
-                        "border_color": "#222222",
-                        "newsletter_color": "#333333",
-                    },
+                        "settings": {
+                            "background_color": "#111111",
+                            "border_color": "#000000",
+                            "newsletter_color": "#333333",
+                        },
+                    }
                 }
             }
-        }
     )
 
     next_settings_content, report = ShopifyApiClient._sync_theme_settings_data(
@@ -3663,7 +4674,7 @@ def test_sync_theme_settings_data_maps_footer_section_background_to_footer_bg():
     )
     assert (
         footer_settings["border_color"]
-        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+        == effective_css_vars["--footer-text-color"]
     )
     assert (
         footer_settings["newsletter_color"]
@@ -4130,9 +5141,11 @@ def test_sync_theme_template_color_settings_data_updates_component_paths():
     profile = ShopifyApiClient._resolve_theme_brand_profile(
         theme_name="futrgroup2-0theme"
     )
+    css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
+    css_vars["--hero-bg"] = "#e9fbff"
     effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
         profile=profile,
-        css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+        css_vars=css_vars,
     )
     template_content = json.dumps(
         {
@@ -4194,7 +5207,7 @@ def test_sync_theme_template_color_settings_data_updates_component_paths():
     )
     assert (
         hero_settings["item_bg_color"]
-        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-page-bg"]
+        == css_vars["--hero-bg"]
     )
     assert (
         hero_settings["arrow_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-brand"]
@@ -4215,6 +5228,50 @@ def test_sync_theme_template_color_settings_data_updates_component_paths():
         "templates/index.json.sections.hero.settings.heading_color"
         in report["updatedPaths"]
     )
+
+
+def test_sync_theme_template_color_settings_data_resolves_var_color_tokens():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars={
+            **_THEME_SYNC_REQUIRED_CSS_VARS,
+            "--color-text": "var(--color-brand)",
+            "--color-cta-text": "var(--color-bg)",
+        },
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "hero": {
+                    "type": "image-with-text-overlay",
+                    "settings": {
+                        "heading_color": "#111111",
+                        "button_color": "#111111",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, _ = (
+        ShopifyApiClient._sync_theme_template_color_settings_data(
+            profile=profile,
+            template_filename="templates/index.json",
+            template_content=template_content,
+            effective_css_vars=effective_css_vars,
+        )
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/index.json",
+        template_content=next_template_content,
+    )
+    hero_settings = synced_template["sections"]["hero"]["settings"]
+
+    assert hero_settings["heading_color"] == "#123456"
+    assert hero_settings["button_color"] == _THEME_SYNC_REQUIRED_CSS_VARS["--color-bg"]
 
 
 def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_footer_bg():
@@ -4265,7 +5322,7 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
     )
     assert (
         footer_settings["border_color"]
-        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-border"]
+        == effective_css_vars["--footer-text-color"]
     )
     assert (
         footer_settings["newsletter_color"]
@@ -4279,7 +5336,7 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
     )
     assert (
         footer_settings["input_placeholder_color"]
-        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-muted"]
+        == _THEME_SYNC_REQUIRED_CSS_VARS["--color-text"]
     )
     assert (
         footer_settings["submit_color"]
@@ -4313,8 +5370,165 @@ def test_sync_theme_template_color_settings_data_maps_ss_footer_background_to_fo
         "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_color"
         in report["updatedPaths"]
     )
+
+
+def test_sync_theme_template_color_settings_data_uses_non_colliding_footer_text_color():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
+    css_vars["--footer-bg"] = "#222222"
+    css_vars["--color-text"] = "#222222"
+    css_vars["--footer-text-color"] = "#f5f5f5"
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=css_vars,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "ss_footer_4_9rJacA": {
+                    "type": "ss-footer-4",
+                    "settings": {
+                        "background_color": "#000000",
+                        "newsletter_color": "#000000",
+                        "copy_color": "#000000",
+                        "input_color": "#000000",
+                        "input_placeholder_color": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/footer-group.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/footer-group.json",
+        template_content=next_template_content,
+    )
+    footer_settings = synced_template["sections"]["ss_footer_4_9rJacA"]["settings"]
+
+    assert footer_settings["background_color"] == "#222222"
+    assert footer_settings["newsletter_color"] == "#f5f5f5"
+    assert footer_settings["copy_color"] == "#f5f5f5"
+    assert footer_settings["input_color"] == "#f5f5f5"
+    assert footer_settings["input_placeholder_color"] == "#f5f5f5"
     assert (
-        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_hover_color"
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_color"
+        in report["updatedPaths"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_placeholder_color"
+        in report["updatedPaths"]
+    )
+    assert report["unmappedColorPaths"] == []
+
+
+def test_sync_theme_template_color_settings_data_maps_ss_footer_links_and_submit_border_to_footer_text():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
+    css_vars["--footer-text-color"] = "#a7d5ff"
+    css_vars["--color-brand"] = "#0f2618"
+    css_vars["--color-border"] = "rgba(15, 38, 24, 0.12)"
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=css_vars,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "ss_footer_4_9rJacA": {
+                    "type": "ss-footer-4",
+                    "settings": {
+                        "link_color": "#000000",
+                        "link_hover_color": "#000000",
+                        "submit_border_color": "#000000",
+                        "submit_border_hover_color": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/footer-group.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/footer-group.json",
+        template_content=next_template_content,
+    )
+    footer_settings = synced_template["sections"]["ss_footer_4_9rJacA"]["settings"]
+
+    assert footer_settings["link_color"] == "#a7d5ff"
+    assert footer_settings["link_hover_color"] == "#a7d5ff"
+    assert footer_settings["submit_border_color"] == "#a7d5ff"
+    assert footer_settings["submit_border_hover_color"] == "#a7d5ff"
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.link_color"
+        in report["updatedPaths"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.submit_border_color"
+        in report["updatedPaths"]
+    )
+    assert report["unmappedColorPaths"] == []
+
+
+def test_sync_theme_template_color_settings_data_maps_ss_footer_input_and_tabs_border_to_footer_text():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
+    css_vars["--footer-text-color"] = "#a7d5ff"
+    css_vars["--color-border"] = "rgba(15, 38, 24, 0.12)"
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=css_vars,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "ss_footer_4_9rJacA": {
+                    "type": "ss-footer-4",
+                    "settings": {
+                        "input_border_color": "#000000",
+                        "tabs_border_color": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, report = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/footer-group.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/footer-group.json",
+        template_content=next_template_content,
+    )
+    footer_settings = synced_template["sections"]["ss_footer_4_9rJacA"]["settings"]
+
+    assert footer_settings["input_border_color"] == "#a7d5ff"
+    assert footer_settings["tabs_border_color"] == "#a7d5ff"
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.input_border_color"
+        in report["updatedPaths"]
+    )
+    assert (
+        "templates/footer-group.json.sections.ss_footer_4_9rJacA.settings.tabs_border_color"
         in report["updatedPaths"]
     )
     assert report["unmappedColorPaths"] == []
@@ -4376,6 +5590,46 @@ def test_sync_theme_template_color_settings_data_maps_announcement_background_to
         in report["updatedPaths"]
     )
     assert report["unmappedColorPaths"] == []
+
+
+def test_sync_theme_template_color_settings_data_uses_announcement_text_color_token():
+    profile = ShopifyApiClient._resolve_theme_brand_profile(
+        theme_name="futrgroup2-0theme"
+    )
+    css_vars = dict(_THEME_SYNC_REQUIRED_CSS_VARS)
+    css_vars["--announcement-text-color"] = "#ffb86b"
+    effective_css_vars = ShopifyApiClient._build_theme_compat_css_vars(
+        profile=profile,
+        css_vars=css_vars,
+    )
+    template_content = json.dumps(
+        {
+            "sections": {
+                "announcement_bar_main": {
+                    "type": "announcement-bar",
+                    "settings": {
+                        "text_color": "#000000",
+                    },
+                }
+            }
+        }
+    )
+
+    next_template_content, _ = ShopifyApiClient._sync_theme_template_color_settings_data(
+        profile=profile,
+        template_filename="templates/index.json",
+        template_content=template_content,
+        effective_css_vars=effective_css_vars,
+    )
+    synced_template = ShopifyApiClient._parse_theme_template_json(
+        filename="templates/index.json",
+        template_content=next_template_content,
+    )
+
+    assert (
+        synced_template["sections"]["announcement_bar_main"]["settings"]["text_color"]
+        == "#ffb86b"
+    )
 
 
 def test_parse_theme_template_json_supports_leading_comment_block():
@@ -4600,6 +5854,8 @@ def test_audit_theme_brand_reports_ready_when_layout_css_and_settings_are_synced
                         }
                     }
                 }
+            if requested_filename == "snippets/header-drawer.liquid":
+                return {"theme": {"files": {"nodes": [], "userErrors": []}}}
         raise AssertionError("Unexpected query payload")
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
@@ -4765,6 +6021,8 @@ def test_audit_theme_brand_reports_template_component_mismatch():
                         }
                     }
                 }
+            if requested_filename == "snippets/header-drawer.liquid":
+                return {"theme": {"files": {"nodes": [], "userErrors": []}}}
         raise AssertionError("Unexpected query payload")
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
@@ -4856,6 +6114,8 @@ def test_audit_theme_brand_reports_gaps_for_missing_marker_and_css_asset():
                         }
                     }
                 }
+            if requested_filename == "snippets/header-drawer.liquid":
+                return {"theme": {"files": {"nodes": [], "userErrors": []}}}
         raise AssertionError("Unexpected query payload")
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
@@ -4950,6 +6210,8 @@ def test_sync_theme_brand_errors_when_settings_data_is_empty():
                         }
                     }
                 }
+            if requested_filename == "snippets/header-drawer.liquid":
+                return {"theme": {"files": {"nodes": [], "userErrors": []}}}
         raise AssertionError("Unexpected query payload")
 
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
@@ -5057,6 +6319,8 @@ def test_sync_theme_brand_export_includes_url_backed_theme_file():
                         }
                     }
                 }
+            if requested_filename == "snippets/header-drawer.liquid":
+                return {"theme": {"files": {"nodes": [], "userErrors": []}}}
         if "query themeTextFilesForExport" in query:
             return {
                 "theme": {
@@ -5094,8 +6358,56 @@ def test_sync_theme_brand_export_includes_url_backed_theme_file():
                                         '<summary aria-expanded="false">Catalog</summary>'
                                         '<div><button type="button">Catalog</button></div>'
                                         "</details></li>"
+                                        '<li><a href="/pages/track-order">Suivre ma commande</a></li>'
                                         '<li><a href="/pages/contact">Contact</a></li>'
                                         "</ul>"
+                                    ),
+                                },
+                            },
+                            {
+                                "filename": "sections/main-collection.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        '<div class="hidden md:flex collection__content h-fit removable-facet flex flex-col rounded-lg col-span-1">\n'
+                                        '<h3 class="h3 mb-4 text-center">Menu</h3>\n'
+                                        '{%- render \'collection-nav\', section: section, main_menu: main_menu, class: " mb-4 flex-col items-start", limit: link_count -%}\n'
+                                        "</div>\n"
+                                    ),
+                                },
+                            },
+                            {
+                                "filename": "snippets/header-icons.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        '<div class="header__icons">\n'
+                                        '<a href="{{ routes.cart_url }}" class="cart-drawer-button w-fit" is="magnet-link" aria-controls="CartDrawer" aria-expanded="false" data-no-instant>\n'
+                                        "{%- render 'icon', icon: 'direction', size: 'lg' -%}\n"
+                                        '<span class="hidden md:block">Track my order</span>\n'
+                                        "</a>\n"
+                                        '<div class="h-full divider"><span></span></div>\n'
+                                        '<a href="{{ routes.cart_url }}" class="cart-drawer-button w-fit gap-2 flex items-center justify-center relative" is="magnet-link" aria-controls="CartDrawer" aria-expanded="false" data-no-instant>\n'
+                                        "{%- render 'icon', icon: 'cart', size: 'lg' -%}\n"
+                                        '<cart-count class="count absolute top-0 right-0 text-xs">1</cart-count>\n'
+                                        "<span class=\"hidden md:block\">{{ 'general.cart.title' | t }}</span>\n"
+                                        "</a>\n"
+                                        "</div>\n"
+                                    ),
+                                },
+                            },
+                            {
+                                "filename": "snippets/product-card.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": (
+                                        '{%- liquid\n'
+                                        'assign stock_class = "inventory--high"\n'
+                                        'assign stock_text = "En stock"\n'
+                                        "if product.selected_or_first_available_variant.inventory_quantity < 5\n"
+                                        '  assign stock_text = "Presque épuisé"\n'
+                                        "endif\n"
+                                        "-%}\n"
                                     ),
                                 },
                             },
@@ -5142,3 +6454,423 @@ def test_sync_theme_brand_export_includes_url_backed_theme_file():
     assert "assets/acme-workspace-workspace-brand.css" in exported_files
     assert "snippets/header-drawer.liquid" in exported_files
     assert "Catalog" not in exported_files["snippets/header-drawer.liquid"]
+    assert (
+        "Track my order" in exported_files["snippets/header-drawer.liquid"]
+    )
+    assert (
+        "Suivre ma commande" not in exported_files["snippets/header-drawer.liquid"]
+    )
+    assert "sections/main-collection.liquid" in exported_files
+    assert (
+        '<h3 class="h3 mb-4 w-full text-left">Menu</h3>'
+        in exported_files["sections/main-collection.liquid"]
+    )
+    assert (
+        'class: "mb-4 flex-col items-start w-full", limit: link_count'
+        in exported_files["sections/main-collection.liquid"]
+    )
+    assert "snippets/header-icons.liquid" in exported_files
+    assert "Track my order" not in exported_files["snippets/header-icons.liquid"]
+    assert "cart-drawer-button" not in exported_files["snippets/header-icons.liquid"]
+    assert (
+        'aria-controls="CartDrawer"'
+        not in exported_files["snippets/header-icons.liquid"]
+    )
+    assert "snippets/product-card.liquid" in exported_files
+    assert "En stock" not in exported_files["snippets/product-card.liquid"]
+    assert "Presque épuisé" not in exported_files["snippets/product-card.liquid"]
+    assert 'assign stock_text = "In stock"' in exported_files["snippets/product-card.liquid"]
+
+
+def test_sync_theme_brand_export_includes_binary_url_backed_theme_file_as_base64():
+    client = ShopifyApiClient()
+    settings_json = _build_minimal_theme_settings_json()
+    binary_image_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00IHDR\x00\x00"
+    downloaded_theme_file_urls: list[tuple[str, str]] = []
+
+    async def fake_download_theme_file_text_body_from_url(
+        *,
+        filename: str,
+        body_url: str,
+    ) -> bytes:
+        downloaded_theme_file_urls.append((filename, body_url))
+        assert filename == "assets/hero.png"
+        assert body_url == "https://cdn.example.com/assets/hero.png"
+        return binary_image_bytes
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get("filenames") or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "layout/theme.liquid":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "layout/theme.liquid",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": (
+                                            "<html><head>\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                            "old content\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                            "</head><body></body></html>"
+                                        ),
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "snippets/header-drawer.liquid":
+                return {"theme": {"files": {"nodes": [], "userErrors": []}}}
+        if "query themeTextFilesForExport" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "layout/theme.liquid",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": "<html><head></head><body>legacy layout</body></html>",
+                                },
+                            },
+                            {
+                                "filename": "config/settings_data.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": settings_json,
+                                },
+                            },
+                            {
+                                "filename": "assets/hero.png",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyUrl",
+                                    "url": "https://cdn.example.com/assets/hero.png",
+                                },
+                            },
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._download_theme_file_text_body_from_url = (  # type: ignore[method-assign]
+        fake_download_theme_file_text_body_from_url
+    )
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            font_urls=[],
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+            upsert_theme_files=False,
+            include_file_payloads=True,
+            include_all_theme_text_files=True,
+            resolve_external_images_to_shopify_files=False,
+        )
+    )
+
+    assert downloaded_theme_file_urls == [
+        ("assets/hero.png", "https://cdn.example.com/assets/hero.png")
+    ]
+    exported_files = {file_entry["filename"]: file_entry for file_entry in result["files"]}
+    assert "assets/hero.png" in exported_files
+    assert "contentBase64" in exported_files["assets/hero.png"]
+    assert "content" not in exported_files["assets/hero.png"]
+    assert (
+        base64.b64decode(exported_files["assets/hero.png"]["contentBase64"])
+        == binary_image_bytes
+    )
+
+
+def test_sync_theme_brand_export_uses_shopify_logo_reference_in_rendered_files():
+    client = ShopifyApiClient()
+    settings_json = (
+        '{"current":{"logo":"shopify://shop_images/current-logo.png","logo_mobile":"shopify://shop_images/current-logo.png",'
+        '"color_background":"#ffffff","color_foreground":"#111111","color_button":"#000000",'
+        '"color_button_text":"#ffffff","color_link":"#000000","color_accent":"#000000",'
+        '"footer_background":"#ffffff","footer_text":"#111111"}}\n'
+    )
+
+    async def fake_download_logo_source_file(*, logo_url: str):
+        assert logo_url == "https://assets.example.com/public/assets/logo-1"
+        return (b"logo-bytes", "image/png")
+
+    async def fake_upload_logo_file_to_staged_target(
+        *,
+        upload_url: str,
+        parameters: list[tuple[str, str]],
+        filename: str,
+        mime_type: str,
+        content: bytes,
+    ):
+        assert upload_url == "https://shopify-upload.example.com"
+        assert filename == "logo-1.png"
+        assert mime_type == "image/png"
+        assert content == b"logo-bytes"
+        assert parameters == [("key", "logo-key"), ("acl", "private")]
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeTemplateFilesForBrandSync" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "userErrors": [],
+                    }
+                }
+            }
+        if "query themeFileByName" in query:
+            requested_filenames = (payload.get("variables") or {}).get("filenames") or []
+            requested_filename = requested_filenames[0] if requested_filenames else None
+            if requested_filename == "config/settings_data.json":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "config/settings_data.json",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": settings_json,
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "layout/theme.liquid":
+                return {
+                    "theme": {
+                        "files": {
+                            "nodes": [
+                                {
+                                    "filename": "layout/theme.liquid",
+                                    "body": {
+                                        "__typename": "OnlineStoreThemeFileBodyText",
+                                        "content": (
+                                            "<html><head>\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_START -->\n"
+                                            "old content\n"
+                                            "<!-- MOS_WORKSPACE_BRAND_END -->\n"
+                                            "</head><body></body></html>"
+                                        ),
+                                    },
+                                }
+                            ],
+                            "userErrors": [],
+                        }
+                    }
+                }
+            if requested_filename == "snippets/header-drawer.liquid":
+                return {"theme": {"files": {"nodes": [], "userErrors": []}}}
+        if "mutation createThemeLogoStagedUpload" in query:
+            return {
+                "stagedUploadsCreate": {
+                    "stagedTargets": [
+                        {
+                            "url": "https://shopify-upload.example.com",
+                            "resourceUrl": "https://shopify-staged.example.com/logo-1.png",
+                            "parameters": [
+                                {"name": "key", "value": "logo-key"},
+                                {"name": "acl", "value": "private"},
+                            ],
+                        }
+                    ],
+                    "userErrors": [],
+                }
+            }
+        if "mutation createThemeLogoFileFromStagedUpload" in query:
+            return {
+                "fileCreate": {
+                    "files": [
+                        {
+                            "__typename": "MediaImage",
+                            "id": "gid://shopify/MediaImage/123",
+                            "fileStatus": "READY",
+                            "image": {
+                                "url": "https://cdn.shopify.com/s/files/1/0000/0001/files/logo-1.png?v=12345"
+                            },
+                        }
+                    ],
+                    "userErrors": [],
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+    client._download_logo_source_file = fake_download_logo_source_file  # type: ignore[method-assign]
+    client._upload_logo_file_to_staged_target = fake_upload_logo_file_to_staged_target  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.sync_theme_brand(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            workspace_name="Acme Workspace",
+            brand_name="Acme",
+            logo_url="https://assets.example.com/public/assets/logo-1",
+            css_vars=_THEME_SYNC_REQUIRED_CSS_VARS,
+            font_urls=[],
+            data_theme="light",
+            theme_name="futrgroup2-0theme",
+            upsert_theme_files=False,
+            include_file_payloads=True,
+            include_all_theme_text_files=False,
+            resolve_external_images_to_shopify_files=True,
+        )
+    )
+
+    exported_files = {item["filename"]: item["content"] for item in result["files"]}
+    css_content = exported_files["assets/acme-workspace-workspace-brand.css"]
+    layout_content = exported_files["layout/theme.liquid"]
+    settings_content = exported_files["config/settings_data.json"]
+
+    assert "shopify://shop_images/logo-1.png" in css_content
+    assert "shopify://shop_images/logo-1.png" in layout_content
+    assert "shopify://shop_images/logo-1.png" in settings_content
+    assert "https://assets.example.com/public/assets/logo-1" not in css_content
+    assert "https://assets.example.com/public/assets/logo-1" not in layout_content
+
+
+def test_download_theme_file_text_body_from_url_rejects_html_error_document(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client = ShopifyApiClient()
+    html_404_bytes = (
+        b"<!doctype html><html><head><title>404 Not Found</title></head>"
+        b"<body>Page not found</body></html>"
+    )
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-type": "text/html; charset=utf-8"}
+        content = html_404_bytes
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str):
+            return FakeResponse()
+
+    monkeypatch.setattr(shopify_api_module.httpx, "AsyncClient", FakeAsyncClient)
+
+    with pytest.raises(ShopifyApiError, match="HTML error document"):
+        asyncio.run(
+            client._download_theme_file_text_body_from_url(
+                filename="assets/theme.css",
+                body_url="https://cdn.example.com/assets/theme.css",
+            )
+        )
+
+
+def test_download_theme_file_text_body_from_url_allows_liquid_html_payload(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    client = ShopifyApiClient()
+    liquid_like_html_bytes = (
+        b"<!doctype html><html><body>{% if customer %}Hello{% endif %}</body></html>"
+    )
+
+    class FakeResponse:
+        status_code = 200
+        headers = {"content-type": "text/html; charset=utf-8"}
+        content = liquid_like_html_bytes
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+        async def get(self, url: str):
+            return FakeResponse()
+
+    monkeypatch.setattr(shopify_api_module.httpx, "AsyncClient", FakeAsyncClient)
+
+    downloaded = asyncio.run(
+        client._download_theme_file_text_body_from_url(
+            filename="layout/theme.liquid",
+            body_url="https://cdn.example.com/layout/theme.liquid",
+        )
+    )
+    assert downloaded == liquid_like_html_bytes

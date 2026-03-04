@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Product Brief — Stage 0 (Seed Input)",
+  "description": "Initial product brief filled by the operator before any pipeline execution.",
+  "type": "object",
+  "required": ["stage", "product_name", "description", "product_customizable"],
+  "properties": {
+    "stage": {
+      "type": "integer",
+      "const": 0,
+      "description": "Pipeline stage marker"
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Product name"
+    },
+    "description": {
+      "type": "string",
+      "description": "1-3 sentence product description — what it is and does. Not marketing copy."
+    },
+    "price": {
+      "type": "string",
+      "description": "Price if known (e.g., '$49 one-time', '$29/mo'). Mark 'TBD' if unknown."
+    },
+    "competitor_urls": {
+      "type": "array",
+      "items": { "type": "string", "format": "uri" },
+      "description": "Known competitor website URLs"
+    },
+    "product_customizable": {
+      "type": "boolean",
+      "description": "Can downstream pipelines recommend format/bundle/pricing changes? true for books/supplements/formulations, false for fixed physical products."
+    }
+  }
+}

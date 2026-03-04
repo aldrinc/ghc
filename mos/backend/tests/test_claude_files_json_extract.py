@@ -3,6 +3,7 @@ import pytest
 from app.services.claude_files import (
     _extract_first_json_object,
     _extract_puck_content_count,
+    _is_retryable_structured_transport_error,
     _structured_output_summary,
 )
 
@@ -38,3 +39,13 @@ def test_structured_output_summary_includes_puck_content_count_when_available():
     assert summary["stopReason"] == "end_turn"
     assert summary["hasParsed"] is True
     assert summary["puckContentCount"] == 0
+
+
+def test_retryable_structured_transport_error_matches_bad_record_mac_message():
+    err = RuntimeError("[SSL: SSLV3_ALERT_BAD_RECORD_MAC] ssl/tls alert bad record mac (_ssl.c:2580)")
+    assert _is_retryable_structured_transport_error(err) is True
+
+
+def test_retryable_structured_transport_error_rejects_non_network_errors():
+    err = RuntimeError("json schema validation failed")
+    assert _is_retryable_structured_transport_error(err) is False

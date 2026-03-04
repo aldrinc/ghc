@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Literal
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -23,3 +24,10 @@ class ShopifyOrderWebhookPayload(BaseModel):
     noteAttributes: dict[str, str] = Field(default_factory=dict)
     lineItems: list[ShopifyWebhookLineItem] = Field(default_factory=list)
     raw: dict[str, Any] = Field(default_factory=dict)
+
+
+class ShopifyComplianceWebhookPayload(BaseModel):
+    topic: Literal["customers/data_request", "customers/redact", "shop/redact"]
+    shopDomain: str = Field(min_length=1)
+    eventId: str = Field(min_length=1)
+    payload: dict[str, Any] = Field(default_factory=dict)

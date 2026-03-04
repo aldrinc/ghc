@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Angle Observation Sheet",
+  "description": "40+ fields filled by Agent 3 for each candidate angle. Includes v2 competitor overlap field.",
+  "type": "object",
+  "required": ["angle_id", "angle_name"],
+  "properties": {
+    "angle_id": { "type": "string", "pattern": "^A\\d{2,}$" },
+    "angle_name": { "type": "string" },
+
+    "distinct_voc_items": { "type": "integer" },
+    "distinct_authors": { "type": "integer" },
+    "intensity_spike_count": { "type": "integer" },
+    "sleeping_giant_count": { "type": "integer" },
+    "aspiration_gap_4plus": { "type": "string", "enum": ["Y", "N"] },
+    "avg_adjusted_score": { "type": "number" },
+
+    "crisis_language_count": { "type": "integer" },
+    "dollar_time_loss_count": { "type": "integer" },
+    "physical_symptom_count": { "type": "integer" },
+    "rage_shame_anxiety_count": { "type": "integer" },
+    "exhausted_sophistication_count": { "type": "integer" },
+
+    "product_addresses_pain": { "type": "string", "enum": ["Y", "N"] },
+    "product_feature_maps_to_mechanism": { "type": "string", "enum": ["Y", "N"] },
+    "outcome_achievable": { "type": "string", "enum": ["Y", "N"] },
+    "mechanism_factually_supportable": { "type": "string", "enum": ["Y", "N"] },
+
+    "supporting_voc_count": { "type": "integer" },
+    "items_above_60": { "type": "integer" },
+    "triangulation_status": { "type": "string", "enum": ["SINGLE", "DUAL", "MULTI"] },
+    "contradiction_count": { "type": "integer" },
+
+    "source_habitat_types": { "type": "integer" },
+    "dominant_source_pct": { "type": "number" },
+
+    "green_count": { "type": "integer" },
+    "yellow_count": { "type": "integer" },
+    "red_count": { "type": "integer" },
+    "expressible_without_red": { "type": "string", "enum": ["Y", "N"] },
+    "requires_disease_naming": { "type": "string", "enum": ["Y", "N"] },
+
+    "velocity_status": { "type": "string", "enum": ["ACCELERATING", "STEADY", "DECELERATING"] },
+    "stage_UNAWARE_count": { "type": "integer" },
+    "stage_PROBLEM_AWARE_count": { "type": "integer" },
+    "stage_SOLUTION_AWARE_count": { "type": "integer" },
+    "stage_PRODUCT_AWARE_count": { "type": "integer" },
+    "stage_MOST_AWARE_count": { "type": "integer" },
+    "pain_chronicity": { "type": "string", "enum": ["ACUTE", "CHRONIC", "BOTH"] },
+    "trigger_seasonality": { "type": "string", "enum": ["ONGOING", "EVENT_DRIVEN", "SEASONAL"] },
+
+    "segment_breadth": { "type": "string", "enum": ["NARROW", "MODERATE", "BROAD"] },
+    "pain_universality": { "type": "string", "enum": ["SUBGROUP", "MODERATE", "UNIVERSAL"] },
+
+    "single_visual_expressible": { "type": "string", "enum": ["Y", "N"] },
+    "hook_under_12_words": { "type": "string", "enum": ["Y", "N"] },
+    "natural_villain_present": { "type": "string", "enum": ["Y", "N"] },
+    "language_registry_headline_exists": { "type": "string", "enum": ["Y", "N"] },
+
+    "competitor_count_using_angle": { "type": "string", "enum": ["0", "1-2", "3-5", "6+"] },
+    "recent_competitor_entry": { "type": "string", "enum": ["Y", "N"] },
+
+    "news_cycle_dependent": { "type": "string", "enum": ["Y", "N"] },
+    "competitor_behavior_dependent": { "type": "string", "enum": ["Y", "N"] },
+    "pain_structural": { "type": "string", "enum": ["Y", "N"] },
+
+    "competitor_angle_overlap": {
+      "type": "string",
+      "enum": ["Y", "N"],
+      "description": "v2: Does this angle directly overlap with a known competitor angle from competitor_analysis.json"
+    }
+  }
+}

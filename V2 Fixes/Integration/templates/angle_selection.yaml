@@ -1,0 +1,93 @@
+# angle_selection.yaml
+# =====================================================================
+# PURPOSE: Bridge between Agent 3 (Shadow Angle Clusterer) output
+#          and Offer Agent pipeline input.
+#
+# WHEN TO FILL: After reviewing Agent 3's ranked Purple Ocean angle
+#               candidates and selecting one for offer construction.
+#
+# HOW TO FILL: Copy values directly from Agent 3's output. Do not
+#              rephrase or summarize — use the exact text from the
+#              angle primitive and evidence assembly.
+#
+# DOWNSTREAM: This file is consumed by the Offer Agent's
+#             pipeline-orchestrator as the `selected_angle` input.
+# =====================================================================
+
+selected_angle:
+  # === FROM AGENT 3 ANGLE PRIMITIVE (Section 3: Candidate Angle Profiles) ===
+  angle_id: ""              # e.g., "A04" — from ANGLE_ID
+  angle_name: ""            # e.g., "The Dosage Gap" — from ANGLE_NAME
+
+  definition:
+    who: ""                 # Copy from WHO field in angle primitive
+    pain_desire: ""         # Combine PAIN + DESIRED OUTCOME fields
+    mechanism_why: ""       # Copy from MECHANISM field
+    belief_shift:
+      before: ""            # Copy from BELIEF SHIFT → BEFORE
+      after: ""             # Copy from BELIEF SHIFT → AFTER
+    trigger: ""             # Copy from TRIGGER field
+
+  # === FROM AGENT 3 EVIDENCE ASSEMBLY (Section 3: Supporting Evidence Block) ===
+  evidence:
+    supporting_voc_count: 0 # From observation sheet: supporting_voc_count
+    top_quotes:             # Top 5 from Evidence Assembly, ranked by Adjusted Score
+      - voc_id: ""
+        quote: ""
+        adjusted_score: 0
+      - voc_id: ""
+        quote: ""
+        adjusted_score: 0
+      - voc_id: ""
+        quote: ""
+        adjusted_score: 0
+      - voc_id: ""
+        quote: ""
+        adjusted_score: 0
+      - voc_id: ""
+        quote: ""
+        adjusted_score: 0
+    triangulation_status: ""    # SINGLE / DUAL / MULTI — from observation sheet
+    velocity_status: ""         # ACCELERATING / STEADY / DECELERATING — from observation sheet
+    contradiction_count: 0      # Number of contradiction/limiting items
+
+  # === FROM AGENT 3 HOOK STARTERS (Section 3: Hook Starter Generation) ===
+  hook_starters:
+    - visual: ""            # What the viewer sees in the first frame
+      opening_line: ""      # 1-2 line opening copy
+      lever: ""             # Psychological lever it pulls
+    - visual: ""
+      opening_line: ""
+      lever: ""
+    - visual: ""
+      opening_line: ""
+      lever: ""
+
+  # === FROM AGENT 3 COMPLIANCE BLOCK (Section 3: Compliance Block) ===
+  compliance:
+    green_count: 0
+    yellow_count: 0
+    red_count: 0
+    overall_risk: ""            # GREEN / YELLOW / RED (derived from counts)
+    expressible_without_red: true  # Can angle work without RED claims?
+    requires_disease_naming: false # Does angle require naming conditions?
+    platform_notes: ""          # Meta / TikTok / YouTube specific notes
+
+  # === FROM AGENT 3 DIFFERENTIATION MAP (Section 3: Saturation Differentiation) ===
+  purple_ocean_context:
+    saturated_angles:           # From Section 2: Saturated Angle Summary
+      - name: ""
+        competitors_using: []
+        hook_pattern: ""
+      - name: ""
+        competitors_using: []
+        hook_pattern: ""
+      - name: ""
+        competitors_using: []
+        hook_pattern: ""
+    differentiation_summary: "" # How this angle differs from ALL saturated angles
+    minimum_distinctiveness: 0  # Min dimensions different from closest saturated angle
+
+# === OPERATOR FILLS THESE ===
+selection_rationale: ""         # Why you chose this angle over the alternatives
+selection_date: ""              # YYYY-MM-DD

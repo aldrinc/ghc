@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Product Brief — Stage 1 (Post-Research)",
+  "description": "Product brief enriched with findings from the Foundational Docs Pipeline (Stage 1).",
+  "type": "object",
+  "required": ["stage", "product_name", "description", "product_customizable", "category_niche"],
+  "properties": {
+    "stage": {
+      "type": "integer",
+      "const": 1
+    },
+    "product_name": { "type": "string" },
+    "description": { "type": "string" },
+    "price": { "type": "string" },
+    "competitor_urls": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "product_customizable": { "type": "boolean" },
+    "category_niche": {
+      "type": "string",
+      "description": "Category / niche label from Step 01 output. Source: STEP1_CONTENT header."
+    },
+    "market_maturity_stage": {
+      "type": "string",
+      "enum": ["Introduction", "Growth", "Maturity", "Decline"],
+      "description": "Product lifecycle stage from Step 01 assessment. Source: STEP1_CONTENT market maturity section."
+    },
+    "primary_segment": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Top-ranked buyer segment name" },
+        "size_estimate": { "type": "string", "description": "Qualitative size estimate" },
+        "key_differentiator": { "type": "string", "description": "What makes this segment distinct" }
+      },
+      "description": "Source: STEP6_CONTENT ranked segments (top 1)"
+    },
+    "bottleneck": {
+      "type": "string",
+      "description": "Primary conversion bottleneck identified in research. Source: STEP6_CONTENT bottleneck analysis."
+    },
+    "positioning_gaps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Identified positioning whitespace from competitor research. Source: STEP1_CONTENT positioning gaps section."
+    },
+    "competitor_count_validated": {
+      "type": "integer",
+      "description": "Number of validated competitors found. Source: count from STEP1_CONTENT."
+    },
+    "primary_icps": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Top 3 ideal customer profile descriptions. Source: STEP6_CONTENT ranked segments."
+    }
+  }
+}

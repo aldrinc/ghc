@@ -7,10 +7,24 @@ import { Callout } from "@/components/ui/callout";
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@/components/ui/menu";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { StatusBadge } from "@/components/StatusBadge";
+import { StrategyV2ReviewWorkspace } from "@/components/workflows/StrategyV2ReviewWorkspace";
 import { useAssets } from "@/api/assets";
-import { useStopWorkflow, useWorkflowDetail, useWorkflowSignal } from "@/api/workflows";
+import { useClientShopifyStatus } from "@/api/clients";
+import {
+  useStopWorkflow,
+  useStrategyV2LaunchAdditionalAngle,
+  useStrategyV2LaunchAdditionalUms,
+  useStrategyV2LaunchAngleCampaign,
+  useWorkflowDetail,
+  useWorkflowSignal,
+  type StrategyV2LaunchActionResponse,
+} from "@/api/workflows";
 import { useProductContext } from "@/contexts/ProductContext";
-import type { Asset, ResearchArtifactRef } from "@/types/common";
+import type { Asset, ResearchArtifactRef, StrategyV2LaunchRecord, StrategyV2State } from "@/types/common";
+
+const EMPTY_RESEARCH_ARTIFACTS: ResearchArtifactRef[] = [];
+const EMPTY_ARTIFACT_LIST: any[] = [];
+const EMPTY_LAUNCH_RECORDS: StrategyV2LaunchRecord[] = [];
 
 function formatDate(value?: string | null) {
   if (!value) return "—";
@@ -30,12 +44,79 @@ function truncate(text?: string, max = 120) {
   return text.length > max ? `${text.slice(0, max)}…` : text;
 }
 
+function isExternalDocUrl(value?: string | null): boolean {
+  if (!value) return false;
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+function parseDelimitedValues(value: string): string[] {
+  const values = value
+    .split(/[\n,]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const seen = new Set<string>();
+  return values.filter((item) => {
+    if (seen.has(item)) return false;
+    seen.add(item);
+    return true;
+  });
+}
+
+function toErrorMessage(error: unknown): string {
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object" && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return "Request failed.";
+}
+
+function formatLaunchType(value: string): string {
+  if (value === "initial_angle") return "Initial angle";
+  if (value === "additional_ums") return "Additional UMS";
+  if (value === "additional_angle") return "Additional angle";
+  return value;
+}
+
+type StrategyV2PendingSignal =
+  | "strategy_v2_proceed_research"
+  | "strategy_v2_confirm_competitor_assets"
+  | "strategy_v2_select_angle"
+  | "strategy_v2_select_ump_ums"
+  | "strategy_v2_select_offer_winner"
+  | "strategy_v2_approve_final_copy";
+
+type StrategyV2Candidate = {
+  id: string;
+  label: string;
+  assetRef?: string;
+  raw?: Record<string, unknown>;
+};
+
+function resolveStrategyV2PendingSignal(state?: StrategyV2State | null): StrategyV2PendingSignal | null {
+  const raw = state?.pending_signal_type || state?.required_signal_type;
+  if (
+    raw === "strategy_v2_proceed_research" ||
+    raw === "strategy_v2_confirm_competitor_assets" ||
+    raw === "strategy_v2_select_angle" ||
+    raw === "strategy_v2_select_ump_ums" ||
+    raw === "strategy_v2_select_offer_winner" ||
+    raw === "strategy_v2_approve_final_copy"
+  ) {
+    return raw;
+  }
+  return null;
+}
+
 export function WorkflowDetailPage() {
   const { workflowId } = useParams();
   const navigate = useNavigate();
   const { data, isLoading, isError, refetch } = useWorkflowDetail(workflowId);
   const workflowSignal = useWorkflowSignal(workflowId);
   const stopWorkflow = useStopWorkflow();
+  const launchAngleCampaign = useStrategyV2LaunchAngleCampaign(workflowId);
+  const launchAdditionalUms = useStrategyV2LaunchAdditionalUms(workflowId);
+  const launchAdditionalAngle = useStrategyV2LaunchAdditionalAngle(workflowId);
   const { product, products, selectProduct } = useProductContext();
 
   const run = data?.run;
@@ -44,23 +125,119 @@ export function WorkflowDetailPage() {
     [products, run?.product_id]
   );
   const researchArtifacts: ResearchArtifactRef[] = useMemo(
-    () => (data?.research_artifacts || []) as ResearchArtifactRef[],
-    [data?.research_artifacts]
+    () => (Array.isArray(data?.research_artifacts) ? (data?.research_artifacts as ResearchArtifactRef[]) : EMPTY_RESEARCH_ARTIFACTS),
+    [data?.research_artifacts],
   );
   const stepSummaries = (data?.precanon_research?.step_summaries as Record<string, string> | undefined) || {};
   const canonStory = (data?.client_canon?.data?.brand as any)?.story as string | undefined;
   const isOnboarding = run?.kind === "client_onboarding";
   const isCampaignPlanning = run?.kind === "campaign_planning" || run?.kind === "campaign_intent";
   const isCreativeProduction = run?.kind === "creative_production";
+  const isStrategyV2 = run?.kind === "strategy_v2";
   const approvalsDisabled = !run || run.status !== "running";
+  const strategyV2State = data?.strategy_v2_state || null;
+  const strategyV2PendingSignal = resolveStrategyV2PendingSignal(strategyV2State);
+  const strategyV2PendingPayload = (strategyV2State?.pending_decision_payload || {}) as Record<string, unknown>;
   const strategyData = (data?.strategy_sheet?.data || {}) as any;
   const channelPlan = (strategyData.channelPlan as any[]) || [];
   const messaging = (strategyData.messaging as any[]) || [];
   const risks = (strategyData.risks as string[]) || [];
   const mitigations = (strategyData.mitigations as string[]) || [];
-  const experimentArtifacts = data?.experiment_specs || [];
-  const assetBriefArtifacts = data?.asset_briefs || [];
+  const experimentArtifacts = useMemo(
+    () => (Array.isArray(data?.experiment_specs) ? (data?.experiment_specs as any[]) : EMPTY_ARTIFACT_LIST),
+    [data?.experiment_specs],
+  );
+  const assetBriefArtifacts = useMemo(
+    () => (Array.isArray(data?.asset_briefs) ? (data?.asset_briefs as any[]) : EMPTY_ARTIFACT_LIST),
+    [data?.asset_briefs],
+  );
+  const strategyV2Stage3Data = (data?.strategy_v2_stage3?.data || {}) as Record<string, unknown>;
+  const strategyV2OfferData = (data?.strategy_v2_offer?.data || {}) as Record<string, unknown>;
+  const strategyV2CopyCanonical = (data?.strategy_v2_copy_canonical || {}) as Record<string, unknown>;
+  const strategyV2CopyContextData = (data?.strategy_v2_copy_context?.data || {}) as Record<string, unknown>;
+  const strategyV2AwarenessData = (data?.strategy_v2_awareness_angle_matrix?.data || {}) as Record<string, unknown>;
+  const strategyV2Launches = useMemo(
+    () => (Array.isArray(data?.strategy_v2_launches) ? (data.strategy_v2_launches as StrategyV2LaunchRecord[]) : EMPTY_LAUNCH_RECORDS),
+    [data?.strategy_v2_launches],
+  );
   const latestLog = data?.logs?.[0];
+  const {
+    data: shopifyStatus,
+    isLoading: isLoadingShopifyStatus,
+    refetch: refetchShopifyStatus,
+  } = useClientShopifyStatus(run?.client_id || undefined);
+  const isShopifyLaunchReady = shopifyStatus?.state === "ready";
+  const shopifyLaunchBlockedReason = !run?.client_id
+    ? "This workflow run is missing client scope for Shopify validation."
+    : isLoadingShopifyStatus
+      ? "Checking Shopify connection status for this client."
+      : !shopifyStatus
+        ? "Shopify status is unavailable for this client."
+        : isShopifyLaunchReady
+          ? null
+          : shopifyStatus.message || `Shopify connection state must be 'ready' (current: ${shopifyStatus.state}).`;
+
+  const hasStrategyV2Copy = useMemo(
+    () => Object.keys(strategyV2CopyCanonical).length > 0,
+    [strategyV2CopyCanonical],
+  );
+  const strategyV2LaunchReady =
+    isStrategyV2 &&
+    run?.status === "completed" &&
+    !strategyV2PendingSignal &&
+    hasStrategyV2Copy;
+  const strategyV2LaunchBlockedReason = !isStrategyV2
+    ? "Launch actions are available for Strategy V2 workflows only."
+    : !hasStrategyV2Copy
+      ? "Launch requires canonical copy output."
+      : strategyV2PendingSignal
+        ? "Resolve the pending Strategy V2 gate before launching."
+        : run?.status !== "completed"
+          ? "Launch is available once the Strategy V2 run completes."
+          : null;
+
+  const strategyV2StateSummaries =
+    (strategyV2State?.scored_candidate_summaries || {}) as Record<string, unknown>;
+  const additionalAngleOptions = useMemo(() => {
+    const raw = strategyV2StateSummaries.angles;
+    if (!Array.isArray(raw)) return [] as Array<{ id: string; label: string }>;
+    const seen = new Set<string>();
+    const rows: Array<{ id: string; label: string }> = [];
+    raw.forEach((item, index) => {
+      if (!item || typeof item !== "object") return;
+      const row = item as Record<string, unknown>;
+      const nested = row.angle;
+      const angle =
+        nested && typeof nested === "object" ? (nested as Record<string, unknown>) : row;
+      const id = String(angle.angle_id || row.angle_id || "").trim();
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      const label = String(angle.angle_name || angle.angle_id || `Angle ${index + 1}`).trim();
+      rows.push({ id, label });
+    });
+    return rows;
+  }, [strategyV2StateSummaries.angles]);
+  const additionalUmsOptions = useMemo(() => {
+    const raw = strategyV2StateSummaries.ump_ums_pairs;
+    if (!Array.isArray(raw)) return [] as Array<{ id: string; label: string }>;
+    const seen = new Set<string>();
+    const rows: Array<{ id: string; label: string }> = [];
+    raw.forEach((item, index) => {
+      if (!item || typeof item !== "object") return;
+      const row = item as Record<string, unknown>;
+      const id = String(row.ums_id || "").trim();
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      const ump = String(row.ump_name || "").trim();
+      const ums = String(row.ums_name || "").trim();
+      const label = `${ump || "UMP"} / ${ums || id}`.trim() || `UMS ${index + 1}`;
+      rows.push({ id, label });
+    });
+    return rows;
+  }, [strategyV2StateSummaries.ump_ums_pairs]);
+  const selectedAngleName = String(
+    ((strategyV2Stage3Data.selected_angle as Record<string, unknown> | undefined)?.angle_name as string) || "",
+  ).trim();
 
   const experimentSpecs = useMemo(() => {
     const latest = experimentArtifacts?.[0] as any;
@@ -86,9 +263,142 @@ export function WorkflowDetailPage() {
     return Array.from(map.values());
   }, [assetBriefArtifacts]);
 
+  const strategyV2Candidates = useMemo<StrategyV2Candidate[]>(() => {
+    if (!strategyV2PendingSignal) return [];
+    const candidates: StrategyV2Candidate[] = [];
+    if (
+      strategyV2PendingSignal === "strategy_v2_select_angle" ||
+      strategyV2PendingSignal === "strategy_v2_select_ump_ums" ||
+      strategyV2PendingSignal === "strategy_v2_select_offer_winner"
+    ) {
+      const rawCandidates = strategyV2PendingPayload.candidates;
+      if (!Array.isArray(rawCandidates)) return [];
+      rawCandidates.forEach((row, index) => {
+        if (!row || typeof row !== "object") return;
+        const candidate = row as Record<string, unknown>;
+        let id = "";
+        let label = "";
+        let rawPayload: Record<string, unknown> = candidate;
+        if (strategyV2PendingSignal === "strategy_v2_select_angle") {
+          const nestedAngle = candidate.angle;
+          const anglePayload =
+            nestedAngle && typeof nestedAngle === "object"
+              ? (nestedAngle as Record<string, unknown>)
+              : candidate;
+          id = String(anglePayload.angle_id || candidate.angle_id || "").trim();
+          label = String(anglePayload.angle_name || anglePayload.angle_id || `Angle ${index + 1}`).trim();
+          rawPayload = anglePayload;
+        } else if (strategyV2PendingSignal === "strategy_v2_select_ump_ums") {
+          id = String(candidate.pair_id || "").trim();
+          const ump = String(candidate.ump_name || "").trim();
+          const ums = String(candidate.ums_name || "").trim();
+          label = `${ump || "UMP"} / ${ums || "UMS"}`.trim();
+        } else {
+          id = String(candidate.variant_id || "").trim();
+          label = String(candidate.ump || candidate.variant_id || `Variant ${index + 1}`).trim();
+        }
+        if (!id) return;
+        candidates.push({ id, label, raw: rawPayload });
+      });
+      return candidates;
+    }
+
+    if (strategyV2PendingSignal === "strategy_v2_confirm_competitor_assets") {
+      const rawCandidates = strategyV2PendingPayload.candidates;
+      if (!Array.isArray(rawCandidates)) return [];
+      rawCandidates.forEach((row, index) => {
+        if (!row || typeof row !== "object") return;
+        const candidate = row as Record<string, unknown>;
+        const candidateId = String(candidate.candidate_id || "").trim();
+        const assetRef = String(candidate.source_ref || "").trim();
+        if (!candidateId || !assetRef) return;
+        const label = String(
+          candidate.competitor_name || candidate.title || candidate.name || assetRef || `Competitor Candidate ${index + 1}`
+        ).trim();
+        candidates.push({
+          id: candidateId,
+          label,
+          assetRef,
+          raw: candidate,
+        });
+      });
+      return candidates;
+    }
+
+    if (strategyV2PendingSignal === "strategy_v2_approve_final_copy") {
+      const copyArtifactId = String(strategyV2PendingPayload.copy_artifact_id || "").trim();
+      if (copyArtifactId) {
+        const headline = String(strategyV2PendingPayload.headline || "").trim();
+        candidates.push({
+          id: copyArtifactId,
+          label: headline ? `Copy artifact: ${truncate(headline, 80)}` : `Copy artifact: ${copyArtifactId}`,
+          raw: { copy_artifact_id: copyArtifactId },
+        });
+      }
+    }
+    return candidates;
+  }, [strategyV2PendingPayload, strategyV2PendingSignal]);
+
+  const strategyCandidateIds = useMemo(
+    () => strategyV2Candidates.map((candidate) => candidate.id),
+    [strategyV2Candidates]
+  );
+
+  const [launchStepUnlocked, setLaunchStepUnlocked] = useState(false);
+  const [launchActionError, setLaunchActionError] = useState<string | null>(null);
+  const [latestLaunchResponse, setLatestLaunchResponse] = useState<StrategyV2LaunchActionResponse | null>(null);
+  const [launchChannelsInput, setLaunchChannelsInput] = useState("");
+  const [launchAssetBriefTypesInput, setLaunchAssetBriefTypesInput] = useState("");
+  const [launchExperimentPolicy, setLaunchExperimentPolicy] = useState("");
+  const [additionalUmsCampaignId, setAdditionalUmsCampaignId] = useState("");
+  const [additionalUmsLaunchPrefix, setAdditionalUmsLaunchPrefix] = useState("");
+  const [additionalUmsChannelsOverrideInput, setAdditionalUmsChannelsOverrideInput] = useState("");
+  const [additionalUmsAssetBriefTypesOverrideInput, setAdditionalUmsAssetBriefTypesOverrideInput] = useState("");
+  const [selectedAdditionalUmsIds, setSelectedAdditionalUmsIds] = useState<string[]>([]);
+  const [selectedAdditionalAngleIds, setSelectedAdditionalAngleIds] = useState<string[]>([]);
+
+  const anyLaunchPending =
+    launchAngleCampaign.isPending ||
+    launchAdditionalUms.isPending ||
+    launchAdditionalAngle.isPending;
+
+  useEffect(() => {
+    setSelectedAdditionalUmsIds((prev) =>
+      prev.filter((id) => additionalUmsOptions.some((option) => option.id === id)),
+    );
+  }, [additionalUmsOptions]);
+
+  useEffect(() => {
+    setSelectedAdditionalAngleIds((prev) =>
+      prev.filter((id) => additionalAngleOptions.some((option) => option.id === id)),
+    );
+  }, [additionalAngleOptions]);
+
+  useEffect(() => {
+    if (additionalUmsCampaignId.trim()) return;
+    const latestCampaignLaunch = strategyV2Launches.find(
+      (row) => row.campaign_id && (row.launch_type === "initial_angle" || row.launch_type === "additional_angle"),
+    );
+    if (!latestCampaignLaunch?.campaign_id) return;
+    setAdditionalUmsCampaignId(latestCampaignLaunch.campaign_id);
+  }, [additionalUmsCampaignId, strategyV2Launches]);
+
   const [selectedExperimentIds, setSelectedExperimentIds] = useState<string[]>([]);
   useEffect(() => {
-    setSelectedExperimentIds((prev) => prev.filter((id) => experimentSpecs.some((spec: any) => spec.id === id)));
+    setSelectedExperimentIds((prev) => {
+      if (!prev.length) return prev;
+      const allowed = new Set(
+        experimentSpecs
+          .map((spec: any) => String(spec?.id || "").trim())
+          .filter(Boolean),
+      );
+      if (!allowed.size) return prev.length ? [] : prev;
+      const next = prev.filter((id) => allowed.has(id));
+      if (next.length === prev.length && next.every((id, index) => id === prev[index])) {
+        return prev;
+      }
+      return next;
+    });
   }, [experimentSpecs]);
 
   const allExperimentIds = useMemo(
@@ -184,9 +494,121 @@ export function WorkflowDetailPage() {
       },
     });
   };
+  const handleStrategyV2SubmitSignal = (signal: string, body: Record<string, unknown>) => {
+    workflowSignal.mutate({ signal, body });
+  };
   const handleStopWorkflow = () => {
     if (!run?.id || stopWorkflow.isPending) return;
     stopWorkflow.mutate(run.id);
+  };
+
+  const toggleAdditionalUmsSelection = (id: string) => {
+    setSelectedAdditionalUmsIds((prev) => (prev.includes(id) ? prev.filter((row) => row !== id) : [...prev, id]));
+  };
+
+  const toggleAdditionalAngleSelection = (id: string) => {
+    setSelectedAdditionalAngleIds((prev) => (prev.includes(id) ? prev.filter((row) => row !== id) : [...prev, id]));
+  };
+
+  const handleLaunchAngleCampaign = async () => {
+    setLaunchActionError(null);
+    if (!isShopifyLaunchReady) {
+      setLaunchActionError(shopifyLaunchBlockedReason || "Shopify connection must be ready before launch.");
+      return;
+    }
+    const channels = parseDelimitedValues(launchChannelsInput);
+    const assetBriefTypes = parseDelimitedValues(launchAssetBriefTypesInput);
+    const experimentVariantPolicy = launchExperimentPolicy.trim();
+    if (!channels.length) {
+      setLaunchActionError("channels must include at least one non-empty value.");
+      return;
+    }
+    if (!assetBriefTypes.length) {
+      setLaunchActionError("assetBriefTypes must include at least one non-empty value.");
+      return;
+    }
+    if (!experimentVariantPolicy) {
+      setLaunchActionError("experimentVariantPolicy is required.");
+      return;
+    }
+    try {
+      const response = await launchAngleCampaign.mutateAsync({
+        channels,
+        assetBriefTypes,
+        experimentVariantPolicy,
+      });
+      setLatestLaunchResponse(response);
+    } catch (error) {
+      setLaunchActionError(toErrorMessage(error));
+    }
+  };
+
+  const handleLaunchAdditionalUms = async () => {
+    setLaunchActionError(null);
+    if (!isShopifyLaunchReady) {
+      setLaunchActionError(shopifyLaunchBlockedReason || "Shopify connection must be ready before launch.");
+      return;
+    }
+    const campaignId = additionalUmsCampaignId.trim();
+    const launchNamePrefix = additionalUmsLaunchPrefix.trim();
+    if (!campaignId) {
+      setLaunchActionError("campaignId is required for additional UMS launch.");
+      return;
+    }
+    if (!selectedAdditionalUmsIds.length) {
+      setLaunchActionError("Select at least one UMS id for additional UMS launch.");
+      return;
+    }
+    if (!launchNamePrefix) {
+      setLaunchActionError("launchNamePrefix is required for additional UMS launch.");
+      return;
+    }
+    const channelsOverride = parseDelimitedValues(additionalUmsChannelsOverrideInput);
+    const assetBriefTypesOverride = parseDelimitedValues(additionalUmsAssetBriefTypesOverrideInput);
+    try {
+      const response = await launchAdditionalUms.mutateAsync({
+        campaignId,
+        umsSelectionIds: selectedAdditionalUmsIds,
+        launchNamePrefix,
+        ...(channelsOverride.length ? { channels: channelsOverride } : {}),
+        ...(assetBriefTypesOverride.length ? { assetBriefTypes: assetBriefTypesOverride } : {}),
+      });
+      setLatestLaunchResponse(response);
+    } catch (error) {
+      setLaunchActionError(toErrorMessage(error));
+    }
+  };
+
+  const handleLaunchAdditionalAngle = async () => {
+    setLaunchActionError(null);
+    if (!isShopifyLaunchReady) {
+      setLaunchActionError(shopifyLaunchBlockedReason || "Shopify connection must be ready before launch.");
+      return;
+    }
+    const channels = parseDelimitedValues(launchChannelsInput);
+    const assetBriefTypes = parseDelimitedValues(launchAssetBriefTypesInput);
+    if (!channels.length) {
+      setLaunchActionError("channels must include at least one non-empty value.");
+      return;
+    }
+    if (!assetBriefTypes.length) {
+      setLaunchActionError("assetBriefTypes must include at least one non-empty value.");
+      return;
+    }
+    if (!selectedAdditionalAngleIds.length) {
+      setLaunchActionError("Select at least one angle id for additional angle launch.");
+      return;
+    }
+    try {
+      const response = await launchAdditionalAngle.mutateAsync({
+        selectedAngleIds: selectedAdditionalAngleIds,
+        channels,
+        assetBriefTypes,
+      });
+      setLatestLaunchResponse(response);
+    } catch (error) {
+      setLaunchActionError(toErrorMessage(error));
+    }
   };
 
   return (
@@ -194,8 +616,8 @@ export function WorkflowDetailPage() {
       <PageHeader
         title="Workflow detail"
         description={
-          runProduct?.name
-            ? `Inspect research artifacts for ${runProduct.name}.`
+          runProduct?.title
+            ? `Inspect research artifacts for ${runProduct.title}.`
             : "Inspect research artifacts and unblock any required gates."
         }
         actions={
@@ -250,7 +672,7 @@ export function WorkflowDetailPage() {
                   size="sm"
                   onClick={() =>
                     selectProduct(run.product_id || "", {
-                      name: runProduct?.name,
+                      title: runProduct?.title,
                       client_id: run.client_id || undefined,
                     })
                   }
@@ -261,7 +683,7 @@ export function WorkflowDetailPage() {
             >
               <>
                 This workflow is scoped to{" "}
-                <span className="font-semibold text-content">{runProduct?.name || run.product_id}</span>. Switch product
+                <span className="font-semibold text-content">{runProduct?.title || run.product_id}</span>. Switch product
                 to review artifacts in context.
               </>
             </Callout>
@@ -287,7 +709,7 @@ export function WorkflowDetailPage() {
                 <div>
                   <div className="text-content-muted">Product</div>
                   <div className="font-mono text-[11px] text-content-muted">
-                    {runProduct?.name || run.product_id || "—"}
+                    {runProduct?.title || run.product_id || "—"}
                   </div>
                 </div>
                 <div>
@@ -314,6 +736,8 @@ export function WorkflowDetailPage() {
                   <div className="text-xs text-content-muted">
                     {isOnboarding
                       ? "Onboarding is automatic and does not require approvals."
+                      : isStrategyV2
+                        ? "Strategy V2 requires explicit HITL decisions at each manual checkpoint."
                       : isCreativeProduction
                         ? "Creative production waits for asset approvals."
                         : isCampaignPlanning
@@ -326,6 +750,22 @@ export function WorkflowDetailPage() {
                 <div className="mt-3 ds-card ds-card--sm bg-surface-2 text-xs text-content-muted">
                   No action required. This run will proceed automatically as activities complete.
                 </div>
+              ) : isStrategyV2 ? (
+                <StrategyV2ReviewWorkspace
+                  workflowId={workflowId}
+                  runStatus={run.status}
+                  pendingSignal={strategyV2PendingSignal}
+                  pendingPayload={strategyV2PendingPayload}
+                  strategyState={strategyV2State}
+                  candidates={strategyV2Candidates}
+                  candidateIds={strategyCandidateIds}
+                  researchArtifacts={researchArtifacts}
+                  stepSummaries={stepSummaries}
+                  logs={data?.logs || []}
+                  disabled={approvalsDisabled}
+                  isSubmitting={workflowSignal.isPending}
+                  onSubmitSignal={handleStrategyV2SubmitSignal}
+                />
               ) : isCampaignPlanning ? (
                 <div className="mt-3 space-y-3 text-sm">
                   {experimentSpecs.length ? (
@@ -386,12 +826,39 @@ export function WorkflowDetailPage() {
             </div>
           </div>
 
+          {data?.pending_activity_progress?.length ? (
+            <div className="ds-card ds-card--md p-0 shadow-none">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-content">Pending activity progress</div>
+                  <div className="text-xs text-content-muted">Temporal heartbeat snapshots for active activities.</div>
+                </div>
+              </div>
+              <div className="space-y-2 p-4 text-xs text-content">
+                {data.pending_activity_progress.map((row) => (
+                  <div key={`${row.activity_id}-${row.attempt || 0}`} className="ds-card ds-card--sm bg-surface-2">
+                    <div className="font-semibold text-content">{row.activity_type || row.activity_id}</div>
+                    <div className="mt-1 text-content-muted">
+                      State: {row.state || "—"} · Attempt: {row.attempt || 0} · Last heartbeat:{" "}
+                      {formatDate(row.last_heartbeat_time || null)}
+                    </div>
+                    {row.heartbeat_progress ? (
+                      <div className="mt-1 text-content-muted">
+                        Heartbeat: {truncate(JSON.stringify(row.heartbeat_progress), 200)}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
           {researchArtifacts?.length ? (
             <div className="ds-card ds-card--md p-0 shadow-none">
               <div className="flex items-center justify-between border-b border-border px-4 py-3">
                 <div>
-                  <div className="text-sm font-semibold text-content">Pre-canon research artifacts</div>
-                  <div className="text-xs text-content-muted">Read summaries inline; open docs for full files.</div>
+                  <div className="text-sm font-semibold text-content">Workflow research artifacts</div>
+                  <div className="text-xs text-content-muted">Read summaries inline and open the persisted workflow file.</div>
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -414,15 +881,414 @@ export function WorkflowDetailPage() {
                             <Link to={`/workflows/${workflowId}/research/${art.step_key}`} className="text-sm">
                               <Button variant="secondary" size="xs">View</Button>
                             </Link>
-                            <a href={art.doc_url} target="_blank" rel="noreferrer" className="text-primary underline text-xs">
-                              Open doc
-                            </a>
+                            {isExternalDocUrl(art.doc_url) ? (
+                              <a href={art.doc_url} target="_blank" rel="noreferrer" className="text-primary underline text-xs">
+                                Open doc
+                              </a>
+                            ) : null}
                           </TableCell>
                         </TableRow>
                       );
                     })}
                   </TableBody>
                 </Table>
+              </div>
+            </div>
+          ) : null}
+
+          {isStrategyV2 ? (
+            <div className="ds-card ds-card--md p-0 shadow-none">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-content">Strategy V2 outputs</div>
+                  <div className="text-xs text-content-muted">Canonical stage, offer, copy, and context artifacts.</div>
+                </div>
+              </div>
+              <div className="grid gap-3 p-4 md:grid-cols-2 text-xs text-content">
+                <div className="ds-card ds-card--sm bg-surface-2">
+                  <div className="font-semibold text-content">Stage 3</div>
+                  <div className="mt-1 text-content-muted">
+                    Angle: {String((strategyV2Stage3Data.selected_angle as any)?.angle_name || "—")}
+                  </div>
+                  <div className="text-content-muted">UMP: {String(strategyV2Stage3Data.ump || "—")}</div>
+                  <div className="text-content-muted">UMS: {String(strategyV2Stage3Data.ums || "—")}</div>
+                </div>
+                <div className="ds-card ds-card--sm bg-surface-2">
+                  <div className="font-semibold text-content">Offer</div>
+                  <div className="mt-1 text-content-muted">
+                    Winner: {String((strategyV2OfferData.variant_selected as string) || "—")}
+                  </div>
+                  <div className="text-content-muted">
+                    Composite score: {String(strategyV2OfferData.composite_score || "—")}
+                  </div>
+                  <div className="text-content-muted">
+                    Guarantee: {String(strategyV2OfferData.guarantee_type || "—")}
+                  </div>
+                </div>
+                <div className="ds-card ds-card--sm bg-surface-2 md:col-span-2">
+                  <div className="font-semibold text-content">Copy (canonical)</div>
+                  <div className="mt-1 text-content-muted">
+                    Headline: {String(strategyV2CopyCanonical.headline || "—")}
+                  </div>
+                  <div className="text-content-muted">
+                    Presell length: {String(String(strategyV2CopyCanonical.presell_markdown || "").length || 0)} chars
+                  </div>
+                  <div className="text-content-muted">
+                    Sales length: {String(String(strategyV2CopyCanonical.sales_page_markdown || "").length || 0)} chars
+                  </div>
+                </div>
+                <div className="ds-card ds-card--sm bg-surface-2">
+                  <div className="font-semibold text-content">Awareness matrix</div>
+                  <div className="mt-1 text-content-muted">
+                    Angle name: {String(strategyV2AwarenessData.angle_name || "—")}
+                  </div>
+                </div>
+                <div className="ds-card ds-card--sm bg-surface-2">
+                  <div className="font-semibold text-content">Copy context</div>
+                  <div className="mt-1 text-content-muted">
+                    Context keys: {Object.keys(strategyV2CopyContextData || {}).length}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {isStrategyV2 ? (
+            <div className="ds-card ds-card--md p-0 shadow-none">
+              <div className="flex items-center justify-between border-b border-border px-4 py-3">
+                <div>
+                  <div className="text-sm font-semibold text-content">Strategy V2 launch actions</div>
+                  <div className="text-xs text-content-muted">
+                    Launch campaigns and funnel iterations from the approved Strategy V2 copy branch.
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-4 p-4 text-xs text-content">
+                {strategyV2LaunchReady ? (
+                  launchStepUnlocked ? (
+                    <>
+                      <Callout
+                        variant={isShopifyLaunchReady ? "success" : "warning"}
+                        title="Step 2: Verify Shopify connection"
+                        actions={
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="secondary"
+                              size="xs"
+                              onClick={() => void refetchShopifyStatus()}
+                              disabled={isLoadingShopifyStatus || anyLaunchPending}
+                            >
+                              {isLoadingShopifyStatus ? "Checking…" : "Refresh status"}
+                            </Button>
+                            {run?.product_id ? (
+                              <Link
+                                to={`/workspaces/products/${run.product_id}`}
+                                className={buttonClasses({ variant: "secondary", size: "xs" })}
+                              >
+                                Open product setup
+                              </Link>
+                            ) : null}
+                          </div>
+                        }
+                      >
+                        {isShopifyLaunchReady
+                          ? `Shopify ready${shopifyStatus?.shopDomain ? ` (${shopifyStatus.shopDomain})` : ""}. Launch actions can run.`
+                          : shopifyLaunchBlockedReason || "Shopify must be connected and ready before launching."}
+                      </Callout>
+
+                      <Callout
+                        variant="success"
+                        title="Launch setup unlocked"
+                        actions={
+                          <Button
+                            variant="secondary"
+                            size="xs"
+                            onClick={() => setLaunchStepUnlocked(false)}
+                            disabled={anyLaunchPending}
+                          >
+                            Lock
+                          </Button>
+                        }
+                      >
+                        Copy is approved and this run is complete. Configure launch actions below.
+                      </Callout>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="ds-card ds-card--sm bg-surface-2">
+                          <div className="text-xs font-semibold text-content">Launch inputs</div>
+                          <div className="mt-2 space-y-2">
+                            <label className="block">
+                              <div className="mb-1 text-[11px] text-content-muted">channels (newline or comma separated)</div>
+                              <textarea
+                                rows={3}
+                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
+                                value={launchChannelsInput}
+                                onChange={(event) => setLaunchChannelsInput(event.target.value)}
+                                placeholder={"facebook\ninstagram"}
+                              />
+                            </label>
+                            <label className="block">
+                              <div className="mb-1 text-[11px] text-content-muted">
+                                assetBriefTypes (newline or comma separated)
+                              </div>
+                              <textarea
+                                rows={3}
+                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
+                                value={launchAssetBriefTypesInput}
+                                onChange={(event) => setLaunchAssetBriefTypesInput(event.target.value)}
+                                placeholder={"static-image\nvideo-script"}
+                              />
+                            </label>
+                            <label className="block">
+                              <div className="mb-1 text-[11px] text-content-muted">experimentVariantPolicy</div>
+                              <input
+                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
+                                value={launchExperimentPolicy}
+                                onChange={(event) => setLaunchExperimentPolicy(event.target.value)}
+                                placeholder="angle_launch_standard_v1"
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="ds-card ds-card--sm bg-surface-2">
+                          <div className="text-xs font-semibold text-content">Initial angle launch</div>
+                          <div className="mt-1 text-[11px] text-content-muted">
+                            Creates campaign + strategy/brief artifacts + pre-sales/sales funnel for selected angle.
+                          </div>
+                          <div className="mt-2 text-[11px] text-content-muted">
+                            Selected angle: {selectedAngleName || "—"}
+                          </div>
+                          <div className="mt-2">
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={() => void handleLaunchAngleCampaign()}
+                              disabled={anyLaunchPending || !isShopifyLaunchReady}
+                            >
+                              {launchAngleCampaign.isPending ? "Launching…" : "Launch angle campaign"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="ds-card ds-card--sm bg-surface-2">
+                          <div className="text-xs font-semibold text-content">Additional UMS launch (same campaign)</div>
+                          <div className="mt-1 text-[11px] text-content-muted">
+                            Creates one funnel per selected UMS under an existing angle campaign.
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            <label className="block">
+                              <div className="mb-1 text-[11px] text-content-muted">campaignId</div>
+                              <input
+                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
+                                value={additionalUmsCampaignId}
+                                onChange={(event) => setAdditionalUmsCampaignId(event.target.value)}
+                                placeholder="Campaign UUID"
+                              />
+                            </label>
+                            <label className="block">
+                              <div className="mb-1 text-[11px] text-content-muted">launchNamePrefix</div>
+                              <input
+                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
+                                value={additionalUmsLaunchPrefix}
+                                onChange={(event) => setAdditionalUmsLaunchPrefix(event.target.value)}
+                                placeholder="Angle iteration"
+                              />
+                            </label>
+                            <label className="block">
+                              <div className="mb-1 text-[11px] text-content-muted">channels override (optional)</div>
+                              <textarea
+                                rows={2}
+                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
+                                value={additionalUmsChannelsOverrideInput}
+                                onChange={(event) => setAdditionalUmsChannelsOverrideInput(event.target.value)}
+                                placeholder="leave empty to inherit campaign"
+                              />
+                            </label>
+                            <label className="block">
+                              <div className="mb-1 text-[11px] text-content-muted">assetBriefTypes override (optional)</div>
+                              <textarea
+                                rows={2}
+                                className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-xs"
+                                value={additionalUmsAssetBriefTypesOverrideInput}
+                                onChange={(event) => setAdditionalUmsAssetBriefTypesOverrideInput(event.target.value)}
+                                placeholder="leave empty to inherit campaign"
+                              />
+                            </label>
+                            {additionalUmsOptions.length ? (
+                              <div className="space-y-1 rounded-md border border-border bg-surface p-2">
+                                <div className="text-[11px] font-semibold text-content">UMS selections</div>
+                                {additionalUmsOptions.map((option) => (
+                                  <label key={option.id} className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border border-border bg-surface text-accent"
+                                      checked={selectedAdditionalUmsIds.includes(option.id)}
+                                      onChange={() => toggleAdditionalUmsSelection(option.id)}
+                                    />
+                                    <span>{option.label}</span>
+                                    <span className="font-mono text-[11px] text-content-muted">{option.id}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-content-muted">No UMS candidates available in state.</div>
+                            )}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => void handleLaunchAdditionalUms()}
+                              disabled={anyLaunchPending || !isShopifyLaunchReady}
+                            >
+                              {launchAdditionalUms.isPending ? "Launching…" : "Launch additional UMS funnels"}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="ds-card ds-card--sm bg-surface-2">
+                          <div className="text-xs font-semibold text-content">Additional angle launch (new campaigns)</div>
+                          <div className="mt-1 text-[11px] text-content-muted">
+                            Replays angle branch and launches selected angles into separate campaigns.
+                          </div>
+                          <div className="mt-2 space-y-2">
+                            {additionalAngleOptions.length ? (
+                              <div className="space-y-1 rounded-md border border-border bg-surface p-2">
+                                <div className="text-[11px] font-semibold text-content">Angle selections</div>
+                                {additionalAngleOptions.map((option) => (
+                                  <label key={option.id} className="flex items-center gap-2">
+                                    <input
+                                      type="checkbox"
+                                      className="h-4 w-4 rounded border border-border bg-surface text-accent"
+                                      checked={selectedAdditionalAngleIds.includes(option.id)}
+                                      onChange={() => toggleAdditionalAngleSelection(option.id)}
+                                    />
+                                    <span>{option.label}</span>
+                                    <span className="font-mono text-[11px] text-content-muted">{option.id}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-content-muted">No additional angle candidates available in state.</div>
+                            )}
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => void handleLaunchAdditionalAngle()}
+                              disabled={anyLaunchPending || !isShopifyLaunchReady}
+                            >
+                              {launchAdditionalAngle.isPending ? "Launching…" : "Launch additional angles"}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <Callout
+                      variant="warning"
+                      title="Step 1: Proceed to launch setup"
+                      actions={
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => setLaunchStepUnlocked(true)}
+                        >
+                          Proceed to launch setup
+                        </Button>
+                      }
+                    >
+                      Copy is generated and approved. Click to proceed before running launch actions.
+                    </Callout>
+                  )
+                ) : (
+                  <Callout variant="neutral" title="Launch actions are blocked">
+                    {strategyV2LaunchBlockedReason || "This workflow is not ready for launch actions yet."}
+                  </Callout>
+                )}
+
+                {launchActionError ? (
+                  <Callout variant="danger" title="Launch request failed">
+                    {launchActionError}
+                  </Callout>
+                ) : null}
+
+                {latestLaunchResponse ? (
+                  <Callout variant="success" title="Launch workflow started">
+                    Launch workflow run:{" "}
+                    <Link
+                      to={`/workflows/${latestLaunchResponse.launch_workflow_run_id}`}
+                      className="font-mono underline"
+                    >
+                      {latestLaunchResponse.launch_workflow_run_id}
+                    </Link>
+                  </Callout>
+                ) : null}
+
+                <div className="border-t border-border pt-3">
+                  <div className="text-xs font-semibold text-content">Launch history</div>
+                  {strategyV2Launches.length ? (
+                    <div className="mt-2 overflow-x-auto">
+                      <Table variant="ghost">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHeadCell>Type</TableHeadCell>
+                            <TableHeadCell>Campaign</TableHeadCell>
+                            <TableHeadCell>Funnel</TableHeadCell>
+                            <TableHeadCell>Angle / UMS</TableHeadCell>
+                            <TableHeadCell>Status</TableHeadCell>
+                            <TableHeadCell>Created</TableHeadCell>
+                            <TableHeadCell>Workflow</TableHeadCell>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {strategyV2Launches.map((row) => (
+                            <TableRow key={row.id}>
+                              <TableCell>{formatLaunchType(row.launch_type)}</TableCell>
+                              <TableCell>
+                                {row.campaign_id ? (
+                                  <Link to={`/campaigns/${row.campaign_id}`} className="font-mono underline">
+                                    {row.campaign_id}
+                                  </Link>
+                                ) : (
+                                  "—"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {row.funnel_id ? (
+                                  <Link to={`/research/funnels/${row.funnel_id}`} className="font-mono underline">
+                                    {row.funnel_id}
+                                  </Link>
+                                ) : (
+                                  "—"
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-[11px] text-content-muted">angle={row.angle_id}</div>
+                                <div className="text-[11px] text-content-muted">
+                                  ums={row.selected_ums_id || "primary"}
+                                </div>
+                              </TableCell>
+                              <TableCell>{row.launch_status || "—"}</TableCell>
+                              <TableCell>{formatDate(row.created_at)}</TableCell>
+                              <TableCell>
+                                {row.launch_workflow_run_id ? (
+                                  <Link to={`/workflows/${row.launch_workflow_run_id}`} className="font-mono underline">
+                                    {row.launch_workflow_run_id}
+                                  </Link>
+                                ) : (
+                                  "—"
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-[11px] text-content-muted">No launch history yet.</div>
+                  )}
+                </div>
               </div>
             </div>
           ) : null}

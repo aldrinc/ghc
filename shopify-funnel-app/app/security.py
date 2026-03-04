@@ -5,8 +5,11 @@ import hashlib
 import hmac
 import re
 from collections.abc import Sequence
+from urllib.parse import urlparse
 
+import jwt
 from fastapi import Header, HTTPException, status
+from jwt import InvalidTokenError
 
 from app.config import settings
 
@@ -73,3 +76,49 @@ def require_internal_api_token(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid internal API token",
         )
+
+
+def require_shopify_session_shop_domain(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> str:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Bearer session token",
+        )
+    token = authorization[7:].strip()
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Shopify session token",
+        )
+
+    try:
+        claims = jwt.decode(
+            token,
+            settings.SHOPIFY_APP_API_SECRET,
+            algorithms=["HS256"],
+            audience=settings.SHOPIFY_APP_API_KEY,
+            options={
+                "require": ["aud", "exp", "nbf", "iss", "dest"],
+            },
+        )
+    except InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid Shopify session token: {exc}",
+        ) from exc
+
+    destination = claims.get("dest")
+    if not isinstance(destination, str) or not destination.strip():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Shopify session token is missing dest claim",
+        )
+    parsed_destination = urlparse(destination)
+    if parsed_destination.scheme != "https" or not parsed_destination.netloc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Shopify session token has invalid dest claim",
+        )
+    return normalize_shop_domain(parsed_destination.netloc)

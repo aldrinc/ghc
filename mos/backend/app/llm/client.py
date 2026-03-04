@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+import io
 import logging
 import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
+from urllib.parse import urlparse
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
@@ -47,13 +49,42 @@ class OpenAIResponsePendingError(RuntimeError):
         self.waited_seconds = waited_seconds
 
 
+class OpenAIResponseFailedError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        response_id: str,
+        status: str,
+        error_code: str | None = None,
+        error_message: str | None = None,
+        raw_error: Any = None,
+        incomplete_details: Any = None,
+    ) -> None:
+        details = error_message or raw_error
+        message = (
+            "OpenAI responses API returned no content "
+            f"(status={status}, response_id={response_id}, error_code={error_code}, "
+            f"error={details}, incomplete_details={incomplete_details})"
+        )
+        super().__init__(message)
+        self.response_id = response_id
+        self.status = status
+        self.error_code = error_code
+        self.error_message = error_message
+        self.raw_error = raw_error
+        self.incomplete_details = incomplete_details
+
+
 logger = logging.getLogger(__name__)
 _DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL") or "gpt-5.2-2025-12-11"
 _DEFAULT_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", "120"))
 _MAX_RETRIES = int(os.getenv("LLM_REQUEST_RETRIES", "2"))
 _O3_MAX_OUTPUT_TOKENS = int(os.getenv("O3_DEEP_RESEARCH_MAX_OUTPUT_TOKENS", "64000"))
+_ANTHROPIC_DEFAULT_MAX_TOKENS = int(os.getenv("ANTHROPIC_DEFAULT_MAX_TOKENS", "32000"))
 _POLL_INTERVAL_SECONDS = int(os.getenv("LLM_POLL_INTERVAL_SECONDS", "15"))
 _POLL_TIMEOUT_SECONDS = int(os.getenv("LLM_POLL_TIMEOUT_SECONDS", "3600"))
+_ANTHROPIC_DEFAULT_BASE_URL = "https://api.anthropic.com"
+_OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
 
 
 @dataclass
@@ -62,8 +93,13 @@ class LLMGenerationParams:
     max_tokens: Optional[int] = None
     temperature: float = 0.2
     use_reasoning: bool = False
+    reasoning_effort: Optional[str] = None
     use_web_search: bool = False
     response_format: Optional[dict[str, Any]] = None
+    openai_tools: Optional[list[dict[str, Any]]] = None
+    openai_tool_choice: Optional[Any] = None
+    openai_context_management: Optional[list[dict[str, Any]]] = None
+    progress_callback: Optional[Callable[[dict[str, Any]], None]] = None
 
 
 class LLMClient:
@@ -91,11 +127,92 @@ class LLMClient:
             "api_key": api_key,
             "timeout": float(_DEFAULT_TIMEOUT),
             "max_retries": _MAX_RETRIES,
+            # Explicitly set base_url so wrappers cannot inherit malformed env defaults.
+            "base_url": self._openai_base_url(),
         }
-        base_url = os.getenv("OPENAI_BASE_URL")
-        if base_url:
-            client_kwargs["base_url"] = base_url
         self._openai_client = self._openai_client_class(**client_kwargs)
+
+    def upload_openai_file_bytes(
+        self,
+        *,
+        filename: str,
+        content_bytes: bytes,
+        purpose: str = "assistants",
+    ) -> str:
+        self._ensure_openai_client()
+
+        normalized_filename = filename.strip()
+        if not normalized_filename:
+            raise ValueError("OpenAI file upload requires a non-empty filename.")
+        if not content_bytes:
+            raise ValueError("OpenAI file upload requires non-empty content_bytes.")
+        normalized_purpose = purpose.strip()
+        if not normalized_purpose:
+            raise ValueError("OpenAI file upload requires a non-empty purpose.")
+
+        file_buffer = io.BytesIO(content_bytes)
+        file_buffer.name = normalized_filename
+        response = self._openai_client.files.create(file=file_buffer, purpose=normalized_purpose)
+
+        file_id = getattr(response, "id", None)
+        if file_id is None and isinstance(response, dict):
+            file_id = response.get("id")
+        if not isinstance(file_id, str) or not file_id.strip():
+            raise RuntimeError(
+                "OpenAI file upload returned no file id "
+                f"(filename={normalized_filename}, purpose={normalized_purpose})."
+            )
+        return file_id.strip()
+
+    def delete_openai_file(self, *, file_id: str) -> None:
+        self._ensure_openai_client()
+
+        normalized_file_id = file_id.strip()
+        if not normalized_file_id:
+            raise ValueError("OpenAI file delete requires a non-empty file_id.")
+
+        response = self._openai_client.files.delete(normalized_file_id)
+        deleted = getattr(response, "deleted", None)
+        if deleted is None and isinstance(response, dict):
+            deleted = response.get("deleted")
+        if deleted is False:
+            raise RuntimeError(f"OpenAI file delete returned deleted=false for file_id={normalized_file_id}.")
+
+    @staticmethod
+    def _openai_base_url() -> str:
+        configured_base_url = os.getenv("OPENAI_BASE_URL")
+        normalized_base_url = configured_base_url.strip() if isinstance(configured_base_url, str) else ""
+        if not normalized_base_url:
+            return _OPENAI_DEFAULT_BASE_URL
+
+        parsed = urlparse(normalized_base_url)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise LLMClientConfigError(
+                "OPENAI_BASE_URL must be a fully qualified http(s) URL, e.g. "
+                "'https://api.openai.com/v1'."
+            )
+        return normalized_base_url
+
+    @staticmethod
+    def _anthropic_base_url() -> str:
+        configured_base_url = os.getenv("ANTHROPIC_API_BASE_URL")
+        if configured_base_url is None:
+            configured_base_url = os.getenv("ANTHROPIC_BASE_URL")
+        normalized_base_url = configured_base_url.strip() if isinstance(configured_base_url, str) else ""
+        return normalized_base_url or _ANTHROPIC_DEFAULT_BASE_URL
+
+    def _ensure_anthropic_client(self) -> None:
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            raise LLMClientConfigError("ANTHROPIC_API_KEY not configured")
+
+        if self._anthropic_client:
+            return
+
+        self._anthropic_client = Anthropic(
+            api_key=api_key,
+            base_url=self._anthropic_base_url(),
+        )
 
     def _langfuse_metadata(
         self,
@@ -114,7 +231,13 @@ class LLMClient:
             metadata["temperature"] = params.temperature
             metadata["maxTokens"] = params.max_tokens
             metadata["useReasoning"] = bool(params.use_reasoning)
+            if params.reasoning_effort:
+                metadata["reasoningEffort"] = params.reasoning_effort
             metadata["useWebSearch"] = bool(params.use_web_search)
+            if params.openai_tools:
+                metadata["openaiToolCount"] = len(params.openai_tools)
+            if params.openai_context_management:
+                metadata["openaiContextManagementCount"] = len(params.openai_context_management)
             if params.response_format is not None:
                 metadata["hasResponseFormat"] = True
         return metadata
@@ -137,6 +260,28 @@ class LLMClient:
         if isinstance(output_tokens, int):
             usage_details["output"] = output_tokens
         return usage_details or None
+
+    @staticmethod
+    def _extract_anthropic_text(response: Any) -> str | None:
+        content_blocks = getattr(response, "content", None)
+        if isinstance(content_blocks, list):
+            text_parts: list[str] = []
+            for block in content_blocks:
+                block_text = getattr(block, "text", None)
+                if isinstance(block_text, str) and block_text:
+                    text_parts.append(block_text)
+                    continue
+                if isinstance(block, dict):
+                    mapped_text = block.get("text")
+                    if isinstance(mapped_text, str) and mapped_text:
+                        text_parts.append(mapped_text)
+            if text_parts:
+                return "".join(text_parts)
+
+        output_text = getattr(response, "output_text", None)
+        if isinstance(output_text, str) and output_text:
+            return output_text
+        return None
 
     @staticmethod
     def _extract_gemini_usage(result: Any) -> dict[str, int] | None:
@@ -214,21 +359,56 @@ class LLMClient:
 
     def _extract_response_text(self, response: Any) -> Optional[str]:
         text = getattr(response, "output_text", None)
-        if text:
+        if isinstance(text, str) and text:
             return text
+
         maybe_output = getattr(response, "output", None)
+        if maybe_output is None and isinstance(response, dict):
+            maybe_output = response.get("output")
         if not maybe_output:
             return None
+
+        def _chunk_text(chunk: Any) -> Optional[str]:
+            if isinstance(chunk, str):
+                return chunk
+            if isinstance(chunk, dict):
+                raw = chunk.get("text")
+                if isinstance(raw, str) and raw:
+                    return raw
+                raw_output = chunk.get("output_text")
+                if isinstance(raw_output, str) and raw_output:
+                    return raw_output
+                if isinstance(raw_output, dict):
+                    nested_text = raw_output.get("text")
+                    if isinstance(nested_text, str) and nested_text:
+                        return nested_text
+                refusal = chunk.get("refusal")
+                if isinstance(refusal, str) and refusal:
+                    return refusal
+                return None
+            raw_attr = getattr(chunk, "text", None)
+            if isinstance(raw_attr, str) and raw_attr:
+                return raw_attr
+            refusal_attr = getattr(chunk, "refusal", None)
+            if isinstance(refusal_attr, str) and refusal_attr:
+                return refusal_attr
+            return None
+
         try:
             parts: list[str] = []
             for item in maybe_output:
                 content = getattr(item, "content", None)
-                if not content:
+                if content is None and isinstance(item, dict):
+                    content = item.get("content")
+                if isinstance(content, str) and content:
+                    parts.append(content)
+                    continue
+                if not isinstance(content, list):
                     continue
                 for chunk in content:
-                    chunk_text = getattr(chunk, "text", None)
-                    if chunk_text:
-                        parts.append(chunk_text)
+                    extracted = _chunk_text(chunk)
+                    if extracted:
+                        parts.append(extracted)
             return "".join(parts) if parts else None
         except Exception:
             return None
@@ -294,6 +474,68 @@ class LLMClient:
             return value
         return str(status)
 
+    def _extract_openai_usage(self, response: Any) -> dict[str, int] | None:
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return None
+
+        input_tokens = getattr(usage, "input_tokens", None)
+        output_tokens = getattr(usage, "output_tokens", None)
+        total_tokens = getattr(usage, "total_tokens", None)
+        reasoning_tokens = getattr(usage, "reasoning_tokens", None)
+        cached_input_tokens = getattr(usage, "cached_input_tokens", None)
+
+        if isinstance(usage, dict):
+            input_tokens = usage.get("input_tokens", input_tokens)
+            output_tokens = usage.get("output_tokens", output_tokens)
+            total_tokens = usage.get("total_tokens", total_tokens)
+            reasoning_tokens = usage.get("reasoning_tokens", reasoning_tokens)
+            cached_input_tokens = usage.get("cached_input_tokens", cached_input_tokens)
+
+        payload: dict[str, int] = {}
+        if isinstance(input_tokens, int):
+            payload["input_tokens"] = input_tokens
+        if isinstance(output_tokens, int):
+            payload["output_tokens"] = output_tokens
+        if isinstance(total_tokens, int):
+            payload["total_tokens"] = total_tokens
+        if isinstance(reasoning_tokens, int):
+            payload["reasoning_tokens"] = reasoning_tokens
+        if isinstance(cached_input_tokens, int):
+            payload["cached_input_tokens"] = cached_input_tokens
+        return payload or None
+
+    @staticmethod
+    def _extract_openai_error_code(error: Any) -> str | None:
+        if error is None:
+            return None
+        code = getattr(error, "code", None)
+        if isinstance(code, str) and code.strip():
+            return code.strip()
+        if isinstance(error, dict):
+            mapped = error.get("code")
+            if isinstance(mapped, str) and mapped.strip():
+                return mapped.strip()
+        return None
+
+    @staticmethod
+    def _extract_openai_error_message(error: Any) -> str | None:
+        if error is None:
+            return None
+        message = getattr(error, "message", None)
+        if isinstance(message, str) and message.strip():
+            return message.strip()
+        if isinstance(error, dict):
+            mapped = error.get("message")
+            if isinstance(mapped, str) and mapped.strip():
+                return mapped.strip()
+        return None
+
+    @staticmethod
+    def _is_retryable_openai_failure(error: OpenAIResponseFailedError) -> bool:
+        code = (error.error_code or "").strip().lower()
+        return code == "server_error"
+
     def _poll_openai_response(
         self,
         response_id: str,
@@ -301,11 +543,13 @@ class LLMClient:
         include: Optional[list[str]] = None,
         poll_timeout_seconds: Optional[int] = None,
         initial_response: Any = None,
+        progress_callback: Optional[Callable[[dict[str, Any]], None]] = None,
     ) -> str:
         if not response_id:
             raise RuntimeError("OpenAI responses API returned an empty response_id; cannot poll for output.")
         timeout_seconds = poll_timeout_seconds or _POLL_TIMEOUT_SECONDS
         response = initial_response
+        last_pending_log_minute = -1
         if response is None:
             if include:
                 response = self._openai_client.responses.retrieve(response_id, include=include)
@@ -314,12 +558,75 @@ class LLMClient:
         status = self._normalize_openai_status(getattr(response, "status", None))
         text = self._extract_response_text(response)
         start = time.monotonic()
+        pending_statuses = {"queued", "in_progress", None}
+
+        def _emit_progress(
+            *,
+            current_status: str | None,
+            elapsed_seconds: float,
+            usage: dict[str, int] | None = None,
+        ) -> None:
+            if progress_callback is None:
+                return
+            payload: dict[str, Any] = {
+                "response_id": response_id,
+                "status": str(current_status or "unknown"),
+                "elapsed_seconds": round(elapsed_seconds, 2),
+            }
+            if usage:
+                payload.update(usage)
+            progress_callback(payload)
+
+        _emit_progress(current_status=status, elapsed_seconds=0.0)
         while True:
-            if text:
+            if status in ("completed", None) and text:
+                elapsed = time.monotonic() - start
+                _emit_progress(
+                    current_status=status,
+                    elapsed_seconds=elapsed,
+                    usage=self._extract_openai_usage(response),
+                )
+                logger.warning(
+                    "OpenAI response completed "
+                    f"(response_id={response_id}, status={status}, elapsed_seconds={round(elapsed, 2)}, "
+                    f"text_chars={len(text)})",
+                    extra={
+                        "response_id": response_id,
+                        "status": status,
+                        "elapsed_seconds": round(elapsed, 2),
+                        "text_chars": len(text),
+                    },
+                )
                 return text
-            if status not in ("queued", "in_progress"):
+            if status == "incomplete":
+                incomplete = getattr(response, "incomplete_details", None)
+                reason = getattr(incomplete, "reason", None)
+                if reason is None and isinstance(incomplete, dict):
+                    reason = incomplete.get("reason")
+                reason_str = str(reason or incomplete or "unknown")
+                text_chars = len(text) if isinstance(text, str) else 0
+                raise RuntimeError(
+                    "OpenAI responses API returned incomplete output "
+                    f"(status={status}, reason={reason_str}, response_id={response_id}, text_chars={text_chars})"
+                )
+            if status not in pending_statuses:
                 break
             elapsed = time.monotonic() - start
+            _emit_progress(current_status=status, elapsed_seconds=elapsed)
+            elapsed_minute = int(elapsed // 60)
+            if elapsed_minute >= 1 and elapsed_minute != last_pending_log_minute:
+                last_pending_log_minute = elapsed_minute
+                logger.warning(
+                    "OpenAI response still pending "
+                    f"(response_id={response_id}, status={status}, elapsed_seconds={round(elapsed, 2)}, "
+                    f"timeout_seconds={timeout_seconds})",
+                    extra={
+                        "response_id": response_id,
+                        "status": status,
+                        "elapsed_seconds": round(elapsed, 2),
+                        "timeout_seconds": timeout_seconds,
+                    },
+                )
             if elapsed >= timeout_seconds:
                 raise OpenAIResponsePendingError(
                     response_id=response_id,
@@ -336,9 +643,13 @@ class LLMClient:
 
         error = getattr(response, "error", None)
         incomplete = getattr(response, "incomplete_details", None)
-        raise RuntimeError(
-            "OpenAI responses API returned no content "
-            f"(status={status}, response_id={response_id}, error={error}, incomplete_details={incomplete})"
+        raise OpenAIResponseFailedError(
+            response_id=response_id,
+            status=str(status or "unknown"),
+            error_code=self._extract_openai_error_code(error),
+            error_message=self._extract_openai_error_message(error),
+            raw_error=error,
+            incomplete_details=incomplete,
         )
 
     def retrieve_openai_response_text(
@@ -366,6 +677,7 @@ class LLMClient:
         max_tokens = params.max_tokens if params and params.max_tokens else None
         temperature = params.temperature if params else 0.2
         use_reasoning = bool(params.use_reasoning) if params else False
+        reasoning_effort = params.reasoning_effort if params and params.reasoning_effort else "medium"
         use_web_search = bool(params.use_web_search) if params else False
         response_format = params.response_format if params else None
         model_lower = model.lower()
@@ -392,31 +704,81 @@ class LLMClient:
             }
             if max_tokens:
                 request_kwargs["max_output_tokens"] = max_tokens
+            tools: list[dict[str, Any]] = []
             if use_web_search:
-                request_kwargs["tools"] = [{"type": "web_search"}]
+                tools.append({"type": "web_search"})
                 request_kwargs["include"] = include  # include sources per docs
+            if params and params.openai_tools:
+                tools.extend(params.openai_tools)
+            if tools:
+                request_kwargs["tools"] = tools
+            if params and params.openai_tool_choice is not None:
+                request_kwargs["tool_choice"] = params.openai_tool_choice
+            if params and params.openai_context_management is not None:
+                context_management = params.openai_context_management
+                if not isinstance(context_management, list) or not context_management:
+                    raise RuntimeError("openai_context_management must be a non-empty list when provided.")
+                existing_extra_body = request_kwargs.get("extra_body")
+                if existing_extra_body is not None and not isinstance(existing_extra_body, dict):
+                    raise RuntimeError("OpenAI Responses extra_body must be an object when context_management is set.")
+                merged_extra_body: dict[str, Any] = dict(existing_extra_body) if isinstance(existing_extra_body, dict) else {}
+                merged_extra_body["context_management"] = context_management
+                request_kwargs["extra_body"] = merged_extra_body
             if use_reasoning:
-                request_kwargs["reasoning"] = {"effort": "medium"}
+                request_kwargs["reasoning"] = {"effort": reasoning_effort}
             if response_format:
                 request_kwargs["text"] = {
                     "format": self._openai_text_format_from_response_format(response_format)
                 }
 
-            response = self._openai_client.responses.create(**request_kwargs)
-            response_id = getattr(response, "id", None)
-            try:
-                return self._poll_openai_response(
-                    response_id,
-                    include=include,
-                    poll_timeout_seconds=_POLL_TIMEOUT_SECONDS,
-                    initial_response=response,
-                )
-            except OpenAIResponsePendingError:
+            max_attempts = max(1, _MAX_RETRIES)
+            for attempt in range(1, max_attempts + 1):
+                response = self._openai_client.responses.create(**request_kwargs)
+                response_id = getattr(response, "id", None)
                 logger.warning(
-                    "OpenAI response still pending after poll timeout",
-                    extra={"model": model, "response_id": response_id},
+                    "OpenAI responses request created "
+                    f"(model={model}, response_id={response_id}, use_web_search={use_web_search}, "
+                    f"use_reasoning={use_reasoning}, attempt={attempt}, max_attempts={max_attempts})",
+                    extra={
+                        "model": model,
+                        "response_id": response_id,
+                        "use_web_search": use_web_search,
+                        "use_reasoning": use_reasoning,
+                        "attempt": attempt,
+                        "max_attempts": max_attempts,
+                    },
                 )
-                raise
+                try:
+                    return self._poll_openai_response(
+                        response_id,
+                        include=include,
+                        poll_timeout_seconds=_POLL_TIMEOUT_SECONDS,
+                        initial_response=response,
+                        progress_callback=params.progress_callback if params else None,
+                    )
+                except OpenAIResponsePendingError:
+                    logger.warning(
+                        "OpenAI response still pending after poll timeout",
+                        extra={"model": model, "response_id": response_id, "attempt": attempt},
+                    )
+                    raise
+                except OpenAIResponseFailedError as exc:
+                    if attempt >= max_attempts or not self._is_retryable_openai_failure(exc):
+                        raise
+                    sleep_seconds = min(2 ** (attempt - 1), 8)
+                    logger.warning(
+                        "OpenAI responses request failed with transient server_error; retrying",
+                        extra={
+                            "model": model,
+                            "response_id": exc.response_id,
+                            "status": exc.status,
+                            "error_code": exc.error_code,
+                            "attempt": attempt,
+                            "max_attempts": max_attempts,
+                            "retry_sleep_seconds": sleep_seconds,
+                        },
+                    )
+                    time.sleep(sleep_seconds)
 
         logger.warning(
             "OpenAI chat completion request",
@@ -465,6 +827,7 @@ class LLMClient:
         max_tokens = params.max_tokens if params and params.max_tokens else None
         temperature = params.temperature if params else 0.2
         use_reasoning = bool(params.use_reasoning) if params else False
+        reasoning_effort = params.reasoning_effort if params and params.reasoning_effort else "medium"
         use_web_search = bool(params.use_web_search) if params else False
         response_format = params.response_format if params else None
         model_lower = model.lower()
@@ -487,7 +850,17 @@ class LLMClient:
                 request_kwargs["tools"] = [{"type": "web_search"}]
                 request_kwargs["include"] = include
             if use_reasoning:
-                request_kwargs["reasoning"] = {"effort": "medium"}
+                request_kwargs["reasoning"] = {"effort": reasoning_effort}
+            if params and params.openai_context_management is not None:
+                context_management = params.openai_context_management
+                if not isinstance(context_management, list) or not context_management:
+                    raise RuntimeError("openai_context_management must be a non-empty list when provided.")
+                existing_extra_body = request_kwargs.get("extra_body")
+                if existing_extra_body is not None and not isinstance(existing_extra_body, dict):
+                    raise RuntimeError("OpenAI Responses extra_body must be an object when context_management is set.")
+                merged_extra_body: dict[str, Any] = dict(existing_extra_body) if isinstance(existing_extra_body, dict) else {}
+                merged_extra_body["context_management"] = context_management
+                request_kwargs["extra_body"] = merged_extra_body
             if response_format:
                 request_kwargs["text"] = {
                     "format": self._openai_text_format_from_response_format(response_format)
@@ -546,7 +919,7 @@ class LLMClient:
         """
         max_output_tokens = params.max_tokens if params and params.max_tokens else _O3_MAX_OUTPUT_TOKENS
         use_web_search = bool(params.use_web_search) if params else True
-        reasoning_effort = "medium"
+        reasoning_effort = params.reasoning_effort if params and params.reasoning_effort else "medium"
 
         tools = [{"type": "web_search"}] if use_web_search else []
         include = ["web_search_call.action.sources"] if use_web_search else None
@@ -575,6 +948,7 @@ class LLMClient:
                 include=include,
                 poll_timeout_seconds=_POLL_TIMEOUT_SECONDS,
                 initial_response=response,
+                progress_callback=params.progress_callback if params else None,
             )
         except OpenAIResponsePendingError:
             logger.warning(
@@ -660,18 +1034,14 @@ class LLMClient:
         raise RuntimeError(f"Gemini returned no content for model {model}")
 
     def _generate_with_anthropic(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> str:
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise LLMClientConfigError("ANTHROPIC_API_KEY not configured")
+        self._ensure_anthropic_client()
 
-        if not self._anthropic_client:
-            self._anthropic_client = Anthropic(api_key=api_key)
-
-        max_tokens = params.max_tokens if params and params.max_tokens else 4096
+        max_tokens = params.max_tokens if params and params.max_tokens else _ANTHROPIC_DEFAULT_MAX_TOKENS
         temperature = params.temperature if params else 0.2
         timeout = _DEFAULT_TIMEOUT
 
         text = None
+        last_error: Exception | None = None
         with start_langfuse_generation(
             name="llm.anthropic.generate",
             model=model,
@@ -695,8 +1065,7 @@ class LLMClient:
                         messages=[{"role": "user", "content": prompt}],
                         timeout=timeout,
                     )
-                    text_parts = [content.text for content in response.content if getattr(content, "text", None)]
-                    text = "".join(text_parts) if text_parts else None
+                    text = self._extract_anthropic_text(response)
                     if text:
                         if generation is not None:
                             generation.update(
@@ -704,24 +1073,30 @@ class LLMClient:
                                 usage_details=self._extract_anthropic_usage(response),
                             )
                         break
-                except Exception:
+                    stop_reason = getattr(response, "stop_reason", None)
+                    content_types = [
+                        getattr(content, "type", type(content).__name__) for content in getattr(response, "content", [])
+                    ]
+                    last_error = RuntimeError(
+                        "Anthropic response had no text content "
+                        f"(stop_reason={stop_reason}, content_types={content_types})"
+                    )
+                except Exception as exc:
                     logger.exception("Anthropic generation attempt failed", extra={"model": model})
                     text = None
+                    last_error = exc
 
         if text:
             return text
 
+        if last_error is not None:
+            raise RuntimeError(f"Anthropic generation failed for model {model}: {last_error}") from last_error
         raise RuntimeError(f"Anthropic returned no content for model {model}")
 
     def _stream_with_anthropic(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> Iterator[str]:
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise LLMClientConfigError("ANTHROPIC_API_KEY not configured")
+        self._ensure_anthropic_client()
 
-        if not self._anthropic_client:
-            self._anthropic_client = Anthropic(api_key=api_key)
-
-        max_tokens = params.max_tokens if params and params.max_tokens else 4096
+        max_tokens = params.max_tokens if params and params.max_tokens else _ANTHROPIC_DEFAULT_MAX_TOKENS
         temperature = params.temperature if params else 0.2
         timeout = _DEFAULT_TIMEOUT
 

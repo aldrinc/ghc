@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Competitor Asset Observation Sheet",
+  "description": "15+ fields filled by the pre-pipeline Competitor Asset Analyzer for each competitor marketing asset.",
+  "type": "object",
+  "required": ["asset_id", "asset_type", "competitor_name"],
+  "properties": {
+    "asset_id": { "type": "string", "pattern": "^CA\\d{2,}$" },
+    "asset_type": {
+      "type": "string",
+      "enum": ["AD_COPY", "LANDING_PAGE", "AD_IMAGE", "VIDEO_AD"]
+    },
+    "competitor_name": { "type": "string" },
+    "source_url": { "type": "string" },
+
+    "primary_angle": {
+      "type": "string",
+      "enum": ["FEAR_BASED", "ASPIRATION", "AUTHORITY", "SOCIAL_PROOF", "CURIOSITY", "URGENCY", "IDENTITY", "MECHANISM", "COMPARISON", "EDUCATION"]
+    },
+    "secondary_angle": {
+      "type": ["string", "null"],
+      "enum": ["FEAR_BASED", "ASPIRATION", "AUTHORITY", "SOCIAL_PROOF", "CURIOSITY", "URGENCY", "IDENTITY", "MECHANISM", "COMPARISON", "EDUCATION", null]
+    },
+    "buyer_stage_targeted": {
+      "type": "string",
+      "enum": ["UNAWARE", "PROBLEM_AWARE", "SOLUTION_AWARE", "PRODUCT_AWARE", "MOST_AWARE"]
+    },
+
+    "emotional_driver": {
+      "type": "string",
+      "enum": ["FEAR", "HOPE", "IDENTITY", "AUTONOMY", "TRUST", "URGENCY", "CURIOSITY", "FRUSTRATION"]
+    },
+    "emotional_intensity": {
+      "type": "string",
+      "enum": ["LOW", "MEDIUM", "HIGH"]
+    },
+
+    "hook_type": {
+      "type": "string",
+      "enum": ["QUESTION", "BOLD_CLAIM", "STORY", "STAT", "PATTERN_INTERRUPT", "TESTIMONIAL", "CONTROVERSY", "BEFORE_AFTER", "LISTICLE"]
+    },
+    "cta_type": {
+      "type": "string",
+      "enum": ["DIRECT_BUY", "LEARN_MORE", "FREE_TRIAL", "LEAD_MAGNET", "QUIZ", "WEBINAR", "EMAIL_OPT_IN"]
+    },
+    "narrative_structure": {
+      "type": "string",
+      "enum": ["PROBLEM_AGITATE_SOLVE", "STORY_BRIDGE_SOLUTION", "EDUCATION_TO_OFFER", "TESTIMONIAL_TO_PROOF", "LISTICLE_TO_CTA"]
+    },
+
+    "uses_social_proof": { "type": "string", "enum": ["Y", "N"] },
+    "uses_scarcity": { "type": "string", "enum": ["Y", "N"] },
+    "uses_authority": { "type": "string", "enum": ["Y", "N"] },
+    "uses_risk_reversal": { "type": "string", "enum": ["Y", "N"] },
+    "uses_specificity": { "type": "string", "enum": ["Y", "N"] },
+    "uses_enemy_framing": { "type": "string", "enum": ["Y", "N"] },
+    "uses_identity_language": { "type": "string", "enum": ["Y", "N"] },
+    "uses_before_after": { "type": "string", "enum": ["Y", "N"] },
+
+    "compliance_flag": {
+      "type": "string",
+      "enum": ["GREEN", "YELLOW", "RED"]
+    },
+    "compliance_notes": { "type": "string" },
+
+    "core_claim": { "type": "string" },
+    "implied_mechanism": { "type": "string" },
+    "target_segment_description": { "type": "string" },
+
+    "visual_style": {
+      "type": "string",
+      "enum": ["UGC", "POLISHED", "TEXT_HEAVY", "LIFESTYLE", "EDUCATIONAL", "TALKING_HEAD", "B_ROLL", "ANIMATION"]
+    },
+    "visual_tone": {
+      "type": "string",
+      "enum": ["PROFESSIONAL", "CASUAL", "URGENT", "CALM", "EDGY"]
+    }
+  }
+}

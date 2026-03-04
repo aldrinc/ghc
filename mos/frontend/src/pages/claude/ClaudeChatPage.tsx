@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ClaudeStreamHandle } from "@/api/claude";
 import { useClaudeContext, useClaudeStream } from "@/api/claude";
+import type { GeminiStreamHandle } from "@/api/gemini";
+import { useGeminiContext, useGeminiStream } from "@/api/gemini";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +13,28 @@ import { toast } from "@/components/ui/toast";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useProductContext } from "@/contexts/ProductContext";
 import type { ClaudeContextFile, ClaudeStreamEvent } from "@/types/claude";
+import type { GeminiCitation, GeminiContextFile, GeminiStreamEvent } from "@/types/gemini";
 import type { ApiError } from "@/api/client";
 import { ArrowUp, Square } from "lucide-react";
+
+type ChatProvider = "claude" | "gemini";
+type StreamHandle = ClaudeStreamHandle | GeminiStreamHandle;
+type StreamEvent = ClaudeStreamEvent | GeminiStreamEvent;
+
+type ContextDoc = {
+  id: string;
+  provider: ChatProvider;
+  providerFileId: string;
+  doc_key?: string | null;
+  doc_title?: string | null;
+  source_kind?: string | null;
+  step_key?: string | null;
+  filename?: string | null;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  drive_url?: string | null;
+  created_at?: string | null;
+};
 
 type ChatMessage = {
   id: string;
@@ -20,7 +42,19 @@ type ChatMessage = {
   content: string;
   status?: "streaming" | "error" | "done" | "stopped";
   attachedFileIds?: string[];
+  citations?: GeminiCitation[];
 };
+
+function getApiErrorMessage(err: unknown): string | null {
+  if (!err) return null;
+  if (typeof (err as ApiError)?.message === "string") {
+    return (err as ApiError).message;
+  }
+  if (err instanceof Error && err.message) {
+    return err.message;
+  }
+  return null;
+}
 
 function useUuid() {
   return () => {
@@ -36,16 +70,17 @@ function ContextDocItem({
   selected,
   onToggle,
 }: {
-  doc: ClaudeContextFile;
+  doc: ContextDoc;
   selected: boolean;
   onToggle: (fileId: string) => void;
 }) {
+  const idLabel = doc.provider === "gemini" ? "document_name" : "file_id";
   return (
     <label className="group flex cursor-pointer items-start gap-3 rounded-xl border border-border/60 bg-surface px-3 py-3 shadow-sm transition hover:border-border hover:bg-surface-2">
       <input
         type="checkbox"
         checked={selected}
-        onChange={() => onToggle(doc.claude_file_id)}
+        onChange={() => onToggle(doc.providerFileId)}
         className="mt-1 size-4 rounded-md border-border/60 text-primary focus:ring-2 focus:ring-primary"
       />
       <div className="flex flex-col gap-1">
@@ -62,7 +97,7 @@ function ContextDocItem({
           {doc.size_bytes ? ` • ${(doc.size_bytes / 1024).toFixed(0)} KB` : ""}
         </div>
         <div className="text-[11px] text-content-muted/80 break-all">
-          file_id: {doc.claude_file_id}
+          {idLabel}: {doc.providerFileId}
         </div>
       </div>
     </label>
@@ -72,6 +107,7 @@ function ContextDocItem({
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";
   const attachedCount = message.attachedFileIds?.length ?? 0;
+  const citationCount = message.citations?.length ?? 0;
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
@@ -87,6 +123,19 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             className={`mt-2 text-[11px] ${isUser ? "text-content-muted" : "text-content-muted"}`}
           >
             {attachedCount} source{attachedCount > 1 ? "s" : ""} attached
+          </div>
+        ) : null}
+        {!isUser && citationCount ? (
+          <div className="mt-2 space-y-1 text-[11px] text-content-muted">
+            <div>{citationCount} citation{citationCount > 1 ? "s" : ""}</div>
+            {message.citations?.slice(0, 5).map((citation, idx) => {
+              const label = citation.title || citation.document_name || citation.uri || "Source";
+              return (
+                <div key={`${label}-${idx}`} className="truncate">
+                  {label}
+                </div>
+              );
+            })}
           </div>
         ) : null}
         {message.status === "error" ? (
@@ -107,19 +156,31 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 export function ClaudeChatPage() {
   const { workspace } = useWorkspace();
   const { product } = useProductContext();
-  const { data: contextData, isLoading: isLoadingContext } = useClaudeContext({
-    ideaWorkspaceId: product?.id ? workspace?.id : undefined,
-    clientId: product?.id ? workspace?.id : undefined,
-    productId: product?.id,
-  });
+  const [provider, setProvider] = useState<ChatProvider>("claude");
+  const providerLabel = provider === "claude" ? "Claude" : "Gemini File Search";
+  const isClaudeProvider = provider === "claude";
+  const isGeminiProvider = provider === "gemini";
+  const { data: claudeContextData, isLoading: isLoadingClaudeContext, error: claudeContextError } =
+    useClaudeContext({
+      ideaWorkspaceId: isClaudeProvider && product?.id ? workspace?.id : undefined,
+      clientId: isClaudeProvider && product?.id ? workspace?.id : undefined,
+      productId: isClaudeProvider ? product?.id : undefined,
+    });
+  const { data: geminiContextData, isLoading: isLoadingGeminiContext, error: geminiContextError } =
+    useGeminiContext({
+      ideaWorkspaceId: isGeminiProvider && product?.id ? workspace?.id : undefined,
+      clientId: isGeminiProvider && product?.id ? workspace?.id : undefined,
+      productId: isGeminiProvider ? product?.id : undefined,
+    });
   const sendClaude = useClaudeStream();
+  const sendGemini = useGeminiStream();
   const [selectedFiles, setSelectedFiles] = useState<string[]>([]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [contextQuery, setContextQuery] = useState("");
   const [isAtBottom, setIsAtBottom] = useState(true);
-  const streamRef = useRef<ClaudeStreamHandle | null>(null);
+  const streamRef = useRef<StreamHandle | null>(null);
   const streamBufferRef = useRef<Record<string, string>>({});
   const flushHandleRef = useRef<number | null>(null);
   const hasManualSelectionRef = useRef(false);
@@ -129,9 +190,44 @@ export function ClaudeChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const makeId = useUuid();
 
-  const contextFiles = useMemo(() => contextData?.files || [], [contextData?.files]);
+  const contextFiles = useMemo<ContextDoc[]>(() => {
+    if (provider === "claude") {
+      return (claudeContextData?.files || []).map((doc: ClaudeContextFile) => ({
+        id: doc.id,
+        provider: "claude",
+        providerFileId: doc.claude_file_id,
+        doc_key: doc.doc_key,
+        doc_title: doc.doc_title,
+        source_kind: doc.source_kind,
+        step_key: doc.step_key,
+        filename: doc.filename,
+        mime_type: doc.mime_type,
+        size_bytes: doc.size_bytes,
+        drive_url: doc.drive_url,
+        created_at: doc.created_at,
+      }));
+    }
+    return (geminiContextData?.files || []).map((doc: GeminiContextFile) => ({
+      id: doc.id,
+      provider: "gemini",
+      providerFileId: doc.gemini_document_name,
+      doc_key: doc.doc_key,
+      doc_title: doc.doc_title,
+      source_kind: doc.source_kind,
+      step_key: doc.step_key,
+      filename: doc.filename,
+      mime_type: doc.mime_type,
+      size_bytes: doc.size_bytes,
+      drive_url: doc.drive_url,
+      created_at: doc.created_at,
+    }));
+  }, [provider, claudeContextData?.files, geminiContextData?.files]);
+  const isLoadingContext = isClaudeProvider ? isLoadingClaudeContext : isLoadingGeminiContext;
+  const contextErrorMessage = isClaudeProvider
+    ? getApiErrorMessage(claudeContextError)
+    : getApiErrorMessage(geminiContextError);
   const attachedDocs = useMemo(
-    () => contextFiles.filter((doc) => selectedFiles.includes(doc.claude_file_id)),
+    () => contextFiles.filter((doc) => selectedFiles.includes(doc.providerFileId)),
     [contextFiles, selectedFiles]
   );
   const filteredDocs = useMemo(() => {
@@ -152,25 +248,25 @@ export function ClaudeChatPage() {
     });
   }, [contextFiles, contextQuery]);
   const filteredDocIds = useMemo(
-    () => new Set(filteredDocs.map((doc) => doc.claude_file_id)),
+    () => new Set(filteredDocs.map((doc) => doc.providerFileId)),
     [filteredDocs]
   );
   const filteredAttachedDocs = useMemo(
-    () => attachedDocs.filter((doc) => filteredDocIds.has(doc.claude_file_id)),
+    () => attachedDocs.filter((doc) => filteredDocIds.has(doc.providerFileId)),
     [attachedDocs, filteredDocIds]
   );
   const unattachedDocs = useMemo(
-    () => filteredDocs.filter((doc) => !selectedFiles.includes(doc.claude_file_id)),
+    () => filteredDocs.filter((doc) => !selectedFiles.includes(doc.providerFileId)),
     [filteredDocs, selectedFiles]
   );
 
   useEffect(() => {
     setSelectedFiles((prev) => {
       const validSelections = prev.filter((id) =>
-        contextFiles.some((file) => file.claude_file_id === id)
+        contextFiles.some((file) => file.providerFileId === id)
       );
       if (!hasManualSelectionRef.current && contextFiles.length) {
-        return contextFiles.map((file) => file.claude_file_id);
+        return contextFiles.map((file) => file.providerFileId);
       }
       return validSelections;
     });
@@ -185,6 +281,19 @@ export function ClaudeChatPage() {
     streamRef.current?.abort();
     streamRef.current = null;
     hasManualSelectionRef.current = false;
+    streamBufferRef.current = {};
+  }, [provider]);
+
+  useEffect(() => {
+    setSelectedFiles([]);
+    setMessages([]);
+    setDraft("");
+    setContextQuery("");
+    setIsStreaming(false);
+    streamRef.current?.abort();
+    streamRef.current = null;
+    hasManualSelectionRef.current = false;
+    streamBufferRef.current = {};
   }, [workspace?.id]);
 
   useEffect(() => {
@@ -283,7 +392,7 @@ export function ClaudeChatPage() {
     streamBufferRef.current = {};
   }, []);
 
-  const handleEvent = (assistantId: string) => (event: ClaudeStreamEvent) => {
+  const handleEvent = (assistantId: string, activeProvider: ChatProvider) => (event: StreamEvent) => {
     if (event.type === "text") {
       streamBufferRef.current[assistantId] =
         (streamBufferRef.current[assistantId] ?? "") + event.text;
@@ -298,9 +407,13 @@ export function ClaudeChatPage() {
       toast.error(event.message);
     } else if (event.type === "done") {
       flushStreamBufferNow();
+      const citations =
+        activeProvider === "gemini" && "citations" in event && Array.isArray(event.citations)
+          ? event.citations
+          : undefined;
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === assistantId ? { ...msg, status: "done" } : msg
+          msg.id === assistantId ? { ...msg, status: "done", citations } : msg
         )
       );
       setIsStreaming(false);
@@ -310,11 +423,11 @@ export function ClaudeChatPage() {
 
   const sendMessage = async () => {
     if (!workspace) {
-      toast.error("Select a workspace to chat with Claude.");
+      toast.error(`Select a workspace to chat with ${providerLabel}.`);
       return;
     }
     if (!product?.id) {
-      toast.error("Select a product to chat with Claude.");
+      toast.error(`Select a product to chat with ${providerLabel}.`);
       return;
     }
     const prompt = draft.trim();
@@ -336,21 +449,22 @@ export function ClaudeChatPage() {
     setIsStreaming(true);
 
     try {
-      const handle = await sendClaude(
-        {
-          prompt,
-          ideaWorkspaceId: workspace.id,
-          clientId: workspace.id,
-          productId: product.id,
-          fileIds: attachedFileIds,
-        },
-        handleEvent(assistantId)
-      );
+      const payload = {
+        prompt,
+        ideaWorkspaceId: workspace.id,
+        clientId: workspace.id,
+        productId: product.id,
+        fileIds: attachedFileIds,
+      };
+      const handle =
+        provider === "claude"
+          ? await sendClaude(payload, handleEvent(assistantId, provider))
+          : await sendGemini(payload, handleEvent(assistantId, provider));
       streamRef.current = handle;
     } catch (err) {
       setIsStreaming(false);
       const message =
-        (err as ApiError)?.message || (err as Error)?.message || "Failed to reach Claude";
+        (err as ApiError)?.message || (err as Error)?.message || `Failed to reach ${providerLabel}`;
       toast.error(message);
       streamRef.current = null;
       setMessages((prev) =>
@@ -372,9 +486,9 @@ export function ClaudeChatPage() {
   if (!workspace) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Claude Chat" description="Select a workspace to load context files." />
+        <PageHeader title="Assistant Chat" description="Select a workspace to load context files." />
         <div className="ds-card ds-card--md ds-card--empty max-w-3xl text-center text-sm">
-          Choose a workspace from the sidebar to start chatting with Claude.
+          Choose a workspace from the sidebar to start chatting.
         </div>
       </div>
     );
@@ -382,9 +496,9 @@ export function ClaudeChatPage() {
   if (!product) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Claude Chat" description="Select a product to load context files." />
+        <PageHeader title="Assistant Chat" description="Select a product to load context files." />
         <div className="ds-card ds-card--md ds-card--empty max-w-3xl text-center text-sm">
-          Choose a product from the header to start chatting with Claude.
+          Choose a product from the header to start chatting.
         </div>
       </div>
     );
@@ -392,7 +506,25 @@ export function ClaudeChatPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Claude Chat" />
+      <PageHeader title="Assistant Chat" />
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant={isClaudeProvider ? "default" : "secondary"}
+          onClick={() => setProvider("claude")}
+          disabled={isStreaming}
+        >
+          Claude
+        </Button>
+        <Button
+          size="sm"
+          variant={isGeminiProvider ? "default" : "secondary"}
+          onClick={() => setProvider("gemini")}
+          disabled={isStreaming}
+        >
+          Gemini File Search
+        </Button>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="flex min-h-[calc(100vh-220px)] flex-col">
@@ -405,7 +537,7 @@ export function ClaudeChatPage() {
               <div className="mx-auto w-full max-w-3xl space-y-6 px-1 py-6 pb-28">
                   {messages.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-border/70 bg-surface-2 px-6 py-10 text-center text-sm text-content-muted">
-                      Start the conversation and Claude will ground answers in your documents.
+                      Start the conversation and {providerLabel} will ground answers in your documents.
                     </div>
                   ) : (
                     messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
@@ -431,7 +563,7 @@ export function ClaudeChatPage() {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onInput={resizeTextarea}
-                  placeholder="Message Claude"
+                  placeholder={`Message ${providerLabel}`}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
                       e.preventDefault();
@@ -439,7 +571,7 @@ export function ClaudeChatPage() {
                     }
                   }}
                   rows={1}
-                  aria-label="Message Claude"
+                  aria-label={`Message ${providerLabel}`}
                   className="min-h-[44px] flex-1 resize-none bg-transparent text-[15px] text-content placeholder:text-content-muted focus-visible:outline-none"
                 />
                 <div className="flex items-center gap-2 pb-1">
@@ -492,7 +624,9 @@ export function ClaudeChatPage() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-semibold text-content">Documents</div>
-              <div className="text-xs text-content-muted">Attach sources to ground Claude responses.</div>
+              <div className="text-xs text-content-muted">
+                Attach sources to ground {providerLabel} responses.
+              </div>
             </div>
             <Button
               size="sm"
@@ -502,7 +636,7 @@ export function ClaudeChatPage() {
                 setSelectedFiles((prev) =>
                   prev.length === contextFiles.length
                     ? []
-                    : contextFiles.map((f) => f.claude_file_id)
+                    : contextFiles.map((f) => f.providerFileId)
                 );
               }}
               disabled={!contextFiles.length}
@@ -530,9 +664,13 @@ export function ClaudeChatPage() {
           <Separator className="my-4" />
           {isLoadingContext ? (
             <div className="text-sm text-content-muted">Loading documents…</div>
+          ) : contextErrorMessage ? (
+            <div className="rounded-2xl border border-dashed border-border/70 bg-surface px-4 py-6 text-center text-xs text-warning">
+              {contextErrorMessage}
+            </div>
           ) : !contextFiles.length ? (
             <div className="rounded-2xl border border-dashed border-border/70 bg-surface px-4 py-6 text-center text-xs text-content-muted">
-              No Claude documents found for this workspace yet.
+              No {providerLabel} documents found for this workspace yet.
             </div>
           ) : (
             <ScrollArea className="min-h-0 flex-1 border-0 bg-transparent" viewportClassName="h-full">
@@ -544,9 +682,9 @@ export function ClaudeChatPage() {
                     </div>
                     {filteredAttachedDocs.map((doc) => (
                       <ContextDocItem
-                        key={doc.claude_file_id}
+                        key={doc.providerFileId}
                         doc={doc}
-                        selected={selectedFiles.includes(doc.claude_file_id)}
+                        selected={selectedFiles.includes(doc.providerFileId)}
                         onToggle={toggleFile}
                       />
                     ))}
@@ -560,9 +698,9 @@ export function ClaudeChatPage() {
                     <div className="space-y-3">
                       {unattachedDocs.map((doc) => (
                         <ContextDocItem
-                          key={doc.claude_file_id}
+                          key={doc.providerFileId}
                           doc={doc}
-                          selected={selectedFiles.includes(doc.claude_file_id)}
+                          selected={selectedFiles.includes(doc.providerFileId)}
                           onToggle={toggleFile}
                         />
                       ))}

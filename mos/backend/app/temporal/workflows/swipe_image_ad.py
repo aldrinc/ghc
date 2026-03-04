@@ -21,6 +21,7 @@ class SwipeImageAdInput:
     company_swipe_id: Optional[str] = None
     swipe_image_url: Optional[str] = None
     model: Optional[str] = None
+    render_model_id: Optional[str] = None
     max_output_tokens: Optional[int] = None
     aspect_ratio: str = "1:1"
     count: int = 1
@@ -46,6 +47,7 @@ class SwipeImageAdWorkflow:
             "company_swipe_id": input.company_swipe_id,
             "swipe_image_url": input.swipe_image_url,
             "model": input.model,
+            "render_model_id": input.render_model_id,
             "max_output_tokens": input.max_output_tokens,
             "aspect_ratio": input.aspect_ratio,
             "count": input.count,
@@ -57,4 +59,3 @@ class SwipeImageAdWorkflow:
             params,
             schedule_to_close_timeout=timedelta(minutes=20),
         )
-

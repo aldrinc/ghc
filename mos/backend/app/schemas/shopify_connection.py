@@ -59,6 +59,13 @@ class ShopifyConnectionStatusResponse(BaseModel):
     selectedShopDomain: str | None = None
     hasStorefrontAccessToken: bool = False
     missingScopes: list[str] = Field(default_factory=list)
+    installationState: Literal[
+        "not_installed",
+        "conflict",
+        "installed_missing_storefront_token",
+        "installed",
+        "error",
+    ] = "not_installed"
 
 
 class ShopifyCatalogProductSummary(BaseModel):
@@ -271,8 +278,8 @@ class ShopifyThemeTemplateBuildRequest(BaseModel):
     def validate_theme_selector(self) -> "ShopifyThemeTemplateBuildRequest":
         has_theme_id = bool(self.themeId and self.themeId.strip())
         has_theme_name = bool(self.themeName and self.themeName.strip())
-        if has_theme_id == has_theme_name:
-            raise ValueError("Exactly one of themeId or themeName is required")
+        if has_theme_id and has_theme_name:
+            raise ValueError("Provide at most one of themeId or themeName")
         return self
 
 
@@ -392,6 +399,8 @@ class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):
     remainingSlotPaths: list[str] = Field(default_factory=list)
     quotaExhaustedSlotPaths: list[str] = Field(default_factory=list)
     slotErrorsByPath: dict[str, str] = Field(default_factory=dict)
+    imageGenerationError: str | None = None
+    copyGenerationError: str | None = None
 
 
 class ShopifyThemeTemplateGenerateImagesJobStartResponse(BaseModel):

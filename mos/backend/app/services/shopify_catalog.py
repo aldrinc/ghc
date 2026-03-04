@@ -9,24 +9,25 @@ _PRODUCT_GID_PREFIX = "gid://shopify/Product/"
 
 
 def _require_checkout_service_config() -> tuple[str, str]:
-    if not settings.SHOPIFY_APP_BASE_URL:
+    base_url = settings.SHOPIFY_APP_BASE_URL
+    internal_token = settings.SHOPIFY_INTERNAL_API_TOKEN
+    if not base_url:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                "Shopify checkout bridge is not configured in mos/backend. "
+                "Shopify catalog bridge is not configured in mos/backend. "
                 "Set SHOPIFY_APP_BASE_URL and restart backend."
             ),
         )
-    if not settings.SHOPIFY_INTERNAL_API_TOKEN:
+    if not internal_token:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                "Shopify checkout bridge auth is not configured in mos/backend. "
-                "Set SHOPIFY_INTERNAL_API_TOKEN (must match the bridge token configured "
-                "in shopify-funnel-app) and restart backend."
+                "Shopify catalog bridge auth is not configured in mos/backend. "
+                "Set SHOPIFY_INTERNAL_API_TOKEN and restart backend."
             ),
         )
-    return settings.SHOPIFY_APP_BASE_URL.rstrip("/"), settings.SHOPIFY_INTERNAL_API_TOKEN
+    return base_url.rstrip("/"), internal_token
 
 
 def verify_shopify_product_exists(*, client_id: str, product_gid: str) -> None:

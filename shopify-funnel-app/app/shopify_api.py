@@ -20,7 +20,14 @@ from app.config import settings
 _THEME_BRAND_LAYOUT_FILENAME = "layout/theme.liquid"
 _THEME_BRAND_SETTINGS_FILENAME = "config/settings_data.json"
 _THEME_FOOTER_GROUP_FILENAME = "sections/footer-group.json"
+_THEME_MAIN_COLLECTION_SECTION_FILENAME = "sections/main-collection.liquid"
+_THEME_HEADER_ICONS_FILENAME = "snippets/header-icons.liquid"
 _THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
+_THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
+_CATALOG_COLLECTION_HANDLE = "all"
+_CATALOG_COLLECTION_TITLE = "Catalog"
+_GRAPHQL_MAX_PAGE_SIZE = 250
+_COLLECTION_ADD_PRODUCTS_BATCH_SIZE = 50
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
 _THEME_BRAND_MARKER_END = "<!-- MOS_WORKSPACE_BRAND_END -->"
 _THEME_TEMPLATE_JSON_FILENAME_RE = re.compile(r"^(?:templates|sections)/.+\.json$")
@@ -32,6 +39,39 @@ _THEME_CATALOG_DETAILS_MENU_ITEM_RE = re.compile(
 _THEME_CATALOG_LINK_MENU_ITEM_RE = re.compile(
     r"<li>\s*<a\b[^>]*>\s*Catalog\s*</a>\s*</li>",
     re.IGNORECASE | re.DOTALL,
+)
+_THEME_FRENCH_UI_TEXT_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        re.compile(r"\bSuivre\s+ma\s+commande\b", re.IGNORECASE),
+        "Track my order",
+    ),
+    (
+        re.compile(r"\bVoir\s+le\s+panier\b", re.IGNORECASE),
+        "View cart",
+    ),
+    (
+        re.compile(r"\bAjouter\s+au\s+panier\b", re.IGNORECASE),
+        "Add to cart",
+    ),
+    (
+        re.compile(r"\bPanier\b", re.IGNORECASE),
+        "Cart",
+    ),
+    (
+        re.compile(r"\bPasser\s+(?:a|\u00e0)\s+la\s+caisse\b", re.IGNORECASE),
+        "Checkout",
+    ),
+    (
+        re.compile(
+            r"\bTaxes\s+incluses\s+et\s+frais\s+d['\u2019]exp(?:e|\u00e9)dition\s+calcul(?:e|\u00e9)es?\s+(?:a|\u00e0)\s+la\s+caisse\.?",
+            re.IGNORECASE,
+        ),
+        "Taxes included and shipping calculated at checkout.",
+    ),
+    (
+        re.compile(r"\bLivraison\b", re.IGNORECASE),
+        "Shipping",
+    ),
 )
 _THEME_LOGO_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
 _DEFAULT_THEME_VAR_SCOPE_SELECTORS: tuple[str, ...] = (":root",)
@@ -219,7 +259,7 @@ _THEME_SETTINGS_VALUE_PATHS_BY_NAME: dict[str, dict[str, str]] = {
         "current.color_link": "--color-brand",
         "current.color_accent": "--color-brand",
         "current.footer_background": "--footer-bg",
-        "current.footer_text": "--color-text",
+        "current.footer_text": "--footer-text-color",
         "current.color_schemes[*].settings.background": "--color-page-bg",
         "current.color_schemes[*].settings.text": "--color-text",
         "current.color_schemes[*].settings.button": "--color-cta",
@@ -270,11 +310,49 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             (("color", "var(--color-brand)"),),
         ),
         (
-            'button, .button, .btn, input[type="button"], input[type="submit"], input[type="reset"], [role="button"]',
+            'header nav li, header .header__inline-menu li, header .list-menu--inline > li, #shopify-section-header nav li, #shopify-section-header .header__inline-menu li, #shopify-section-header .list-menu--inline > li',
+            (
+                ("display", "flex"),
+                ("align-items", "center"),
+                ("justify-content", "flex-start"),
+            ),
+        ),
+        (
+            'header nav li > a, header nav li > details > summary, header .header__menu-item, header .header__inline-menu a, header .header__inline-menu summary, #shopify-section-header nav li > a, #shopify-section-header nav li > details > summary, #shopify-section-header .header__menu-item, #shopify-section-header .header__inline-menu a, #shopify-section-header .header__inline-menu summary',
+            (
+                ("display", "inline-flex"),
+                ("align-items", "center"),
+                ("justify-content", "flex-start"),
+                ("text-align", "left"),
+                ("width", "100%"),
+                ("line-height", "1"),
+            ),
+        ),
+        (
+            'header .drawer__menu-item, #shopify-section-header .drawer__menu-item, header .drawer__submenu > button, #shopify-section-header .drawer__submenu > button, header .drawer__submenu a, #shopify-section-header .drawer__submenu a',
+            (
+                ("display", "inline-flex"),
+                ("align-items", "center"),
+                ("justify-content", "flex-start"),
+                ("text-align", "left"),
+                ("width", "100%"),
+                ("line-height", "1"),
+            ),
+        ),
+        (
+            '.button, .btn, input[type="button"], input[type="submit"], input[type="reset"]',
             (
                 ("background-color", "var(--color-cta)"),
                 ("color", "var(--color-cta-text)"),
                 ("border-color", "var(--color-border)"),
+            ),
+        ),
+        (
+            ".button .icon-arrow-right, .button .icon-arrow-left, .button [class*=\"arrow\"] svg, .button [class*=\"arrow\"] svg *, .btn .icon-arrow-right, .btn .icon-arrow-left, .btn [class*=\"arrow\"] svg, .btn [class*=\"arrow\"] svg *, button .icon-arrow-right, button .icon-arrow-left, button [class*=\"arrow\"] svg, button [class*=\"arrow\"] svg *",
+            (
+                ("color", "var(--color-cta-text)"),
+                ("fill", "currentColor"),
+                ("stroke", "currentColor"),
             ),
         ),
         (
@@ -286,20 +364,59 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             ),
         ),
         (
-            'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"]',
+            ".cart-drawer, cart-drawer, #CartDrawer, [id=\"CartDrawer\"], [data-cart-drawer], .drawer--cart, .cart-drawer .drawer__inner, .cart-drawer__inner, .cart-drawer .drawer__header, .cart-drawer .drawer__footer, .cart-drawer .cart-items, .cart-drawer .cart-item, cart-drawer .drawer__inner, cart-drawer .drawer__header, cart-drawer .drawer__footer, cart-drawer .cart-items, cart-drawer .cart-item, #CartDrawer .drawer__inner, #CartDrawer .drawer__header, #CartDrawer .drawer__footer, #CartDrawer .cart-items, #CartDrawer .cart-item",
             (
-                ("background-color", "var(--footer-bg)"),
+                ("background-color", "#ffffff"),
                 ("color", "var(--color-text)"),
                 ("border-color", "var(--color-border)"),
             ),
+        ),
+        (
+            "header .header__buttons .cart-drawer-button, #shopify-section-header .header__buttons .cart-drawer-button, header .header__buttons .cart-drawer-button:hover, #shopify-section-header .header__buttons .cart-drawer-button:hover, header .header__buttons .cart-drawer-button:focus-visible, #shopify-section-header .header__buttons .cart-drawer-button:focus-visible",
+            (
+                ("background-color", "transparent"),
+                ("border-color", "transparent"),
+                ("box-shadow", "none"),
+            ),
+        ),
+        (
+            '.swiper-button-prev, .swiper-button-next, .slick-prev, .slick-next, .flickity-prev-next-button, [class*="slider"] [class*="prev"], [class*="slider"] [class*="next"], [class*="carousel"] [class*="prev"], [class*="carousel"] [class*="next"], [class*="arrow-prev"], [class*="arrow-next"], [class*="arrow-left"], [class*="arrow-right"]',
+            (
+                ("background-color", "transparent"),
+                ("border-color", "transparent"),
+                ("color", "var(--color-brand)"),
+                ("box-shadow", "none"),
+            ),
+        ),
+        (
+            'footer, #shopify-section-footer, [role="contentinfo"], .footer, [id*="footer"], [class*="footer"]',
+            (
+                ("background-color", "var(--footer-bg)"),
+                ("color", "var(--footer-text-color)"),
+                ("border-color", "var(--footer-text-color)"),
+            ),
+        ),
+        (
+            'footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), #shopify-section-footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [role="contentinfo"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), .footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [id*="footer"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [class*="footer"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"])',
+            (("color", "var(--footer-text-color)"),),
+        ),
+        (
+            'footer button, footer .button, footer .btn, footer input[type="button"], footer input[type="submit"], footer input[type="reset"], footer [role="button"], #shopify-section-footer button, #shopify-section-footer .button, #shopify-section-footer .btn, #shopify-section-footer input[type="button"], #shopify-section-footer input[type="submit"], #shopify-section-footer input[type="reset"], #shopify-section-footer [role="button"], [role="contentinfo"] button, [role="contentinfo"] .button, [role="contentinfo"] .btn, [role="contentinfo"] input[type="button"], [role="contentinfo"] input[type="submit"], [role="contentinfo"] input[type="reset"], [role="contentinfo"] [role="button"], .footer button, .footer .button, .footer .btn, .footer input[type="button"], .footer input[type="submit"], .footer input[type="reset"], .footer [role="button"], [id*="footer"] button, [id*="footer"] .button, [id*="footer"] .btn, [id*="footer"] input[type="button"], [id*="footer"] input[type="submit"], [id*="footer"] input[type="reset"], [id*="footer"] [role="button"], [class*="footer"] button, [class*="footer"] .button, [class*="footer"] .btn, [class*="footer"] input[type="button"], [class*="footer"] input[type="submit"], [class*="footer"] input[type="reset"], [class*="footer"] [role="button"]',
+            (("border-color", "var(--footer-text-color)"),),
+        ),
+        (
+            '.announcement-bar, [id*="announcement"], [class*="announcement"]',
+            (("color", "var(--announcement-text-color)"),),
         ),
     ),
 }
 _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
     "futrgroup2-0theme": {
+        "hero_background": "--hero-bg",
         "background": "--color-page-bg",
         "foreground": "--color-text",
         "text": "--color-text",
+        "announcement_text": "--announcement-text-color",
         "button": "--color-cta",
         "button_text": "--color-cta-text",
         "button_label": "--color-cta-text",
@@ -312,7 +429,7 @@ _THEME_SETTINGS_SEMANTIC_SOURCE_VARS_BY_NAME: dict[str, dict[str, str]] = {
         "shadow": "--color-muted",
         "image_background": "--color-bg",
         "footer_background": "--footer-bg",
-        "footer_text": "--color-text",
+        "footer_text": "--footer-text-color",
         "copy": "--color-text",
         "input": "--color-text",
         "input_placeholder": "--color-muted",
@@ -406,6 +523,9 @@ _THEME_SETTINGS_CSS_GRADIENT_FUNCTION_RE = re.compile(
 )
 _THEME_SETTINGS_CSS_VAR_RE = re.compile(
     r"^var\(\s*--[A-Za-z0-9_-]+(?:\s*,\s*[^)]+)?\s*\)$"
+)
+_THEME_SETTINGS_CSS_VAR_CAPTURE_RE = re.compile(
+    r"^var\(\s*(--[A-Za-z0-9_-]+)\s*(?:,\s*(.+?)\s*)?\)$"
 )
 _THEME_SETTINGS_SIMPLE_NUMBER_RE = re.compile(
     r"^\s*([+-]?\d+(?:\.\d+)?)\s*(px|em|rem|%)?\s*$", re.IGNORECASE
@@ -727,6 +847,69 @@ _THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME: dict[
                 "key": "image",
                 "role": "supporting",
                 "recommendedAspect": "square",
+            },
+            {
+                "path": "templates/collection.json.sections.main-collection-banner.settings.image",
+                "key": "image",
+                "role": "hero",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
+            },
+            {
+                "path": "templates/collection.json.sections.main-collection-banner.settings.image_mobile",
+                "key": "image_mobile",
+                "role": "hero",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
+            },
+            {
+                "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.image",
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
+            },
+            {
+                "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.image_mobile",
+                "key": "image_mobile",
+                "role": "supporting",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_1",
+                "key": "image_1",
+                "role": "supporting",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_2",
+                "key": "image_2",
+                "role": "supporting",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_3",
+                "key": "image_3",
+                "role": "supporting",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_4",
+                "key": "image_4",
+                "role": "supporting",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_5",
+                "key": "image_5",
+                "role": "supporting",
+                "recommendedAspect": "landscape",
+                "allowMissing": True,
             },
         ),
         "textSlots": (
@@ -1059,6 +1242,69 @@ _THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME: dict[
                 "key": "text",
                 "role": "body",
                 "maxLength": 320,
+            },
+            {
+                "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.content",
+                "key": "content",
+                "role": "body",
+                "maxLength": 320,
+                "richText": True,
+            },
+            {
+                "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.button_label",
+                "key": "button_label",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.blocks.subheading.settings.subheading",
+                "key": "subheading",
+                "role": "supporting",
+                "maxLength": 90,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.blocks.heading.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.blocks.text.settings.text",
+                "key": "text",
+                "role": "body",
+                "maxLength": 320,
+                "richText": True,
+            },
+            {
+                "path": "templates/collection.json.sections.images-with-text-overlay.blocks.button_YJdTtb.settings.button_label",
+                "key": "button_label",
+                "role": "cta",
+                "maxLength": 40,
+            },
+            {
+                "path": "templates/collection.json.sections.recently-viewed.settings.heading",
+                "key": "heading",
+                "role": "headline",
+                "maxLength": 120,
+            },
+            {
+                "path": "templates/collection.json.sections.recently-viewed.settings.subheading",
+                "key": "subheading",
+                "role": "supporting",
+                "maxLength": 90,
+            },
+            {
+                "path": "templates/collection.json.sections.recently-viewed.settings.description",
+                "key": "description",
+                "role": "body",
+                "maxLength": 320,
+                "richText": True,
             },
         ),
     }
@@ -1529,6 +1775,601 @@ class ShopifyApiClient:
             )
 
         return products
+
+    async def ensure_catalog_collection_route_is_available(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        sync_all_products: bool = True,
+    ) -> dict[str, Any]:
+        collection = await self._get_collection_by_handle(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            handle=_CATALOG_COLLECTION_HANDLE,
+        )
+        if collection is None:
+            collection = await self._create_collection(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                title=_CATALOG_COLLECTION_TITLE,
+                handle=_CATALOG_COLLECTION_HANDLE,
+            )
+
+        online_store_publication_id = await self._get_online_store_publication_id(
+            shop_domain=shop_domain,
+            access_token=access_token,
+        )
+        is_published = await self._is_collection_published_on_publication(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            collection_id=collection["id"],
+            publication_id=online_store_publication_id,
+        )
+        if not is_published:
+            await self._publish_collection_to_publication(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                collection_id=collection["id"],
+                publication_id=online_store_publication_id,
+            )
+
+        added_product_count = 0
+        if sync_all_products:
+            shop_product_ids = await self._list_shop_product_ids(
+                shop_domain=shop_domain,
+                access_token=access_token,
+            )
+            if shop_product_ids:
+                collection_product_ids = await self._list_collection_product_ids(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    collection_id=collection["id"],
+                )
+                existing_product_ids = set(collection_product_ids)
+                missing_product_ids = [
+                    product_id
+                    for product_id in shop_product_ids
+                    if product_id not in existing_product_ids
+                ]
+                for start in range(
+                    0, len(missing_product_ids), _COLLECTION_ADD_PRODUCTS_BATCH_SIZE
+                ):
+                    await self._add_products_to_collection(
+                        shop_domain=shop_domain,
+                        access_token=access_token,
+                        collection_id=collection["id"],
+                        product_ids=missing_product_ids[
+                            start : start + _COLLECTION_ADD_PRODUCTS_BATCH_SIZE
+                        ],
+                    )
+                added_product_count = len(missing_product_ids)
+
+        return {
+            "collectionId": collection["id"],
+            "collectionHandle": collection["handle"],
+            "collectionTitle": collection["title"],
+            "addedProductCount": added_product_count,
+        }
+
+    async def _get_collection_by_handle(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        handle: str,
+    ) -> dict[str, str] | None:
+        cleaned_handle = handle.strip().lower()
+        if not cleaned_handle:
+            raise ShopifyApiError(message="Collection handle cannot be empty.", status_code=400)
+        query = """
+        query collectionByHandle($first: Int!, $query: String!) {
+            collections(first: $first, query: $query) {
+                nodes {
+                    id
+                    handle
+                    title
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": query,
+                "variables": {
+                    "first": 1,
+                    "query": f"handle:{cleaned_handle}",
+                },
+            },
+        )
+        collections = response.get("collections")
+        if not isinstance(collections, dict):
+            raise ShopifyApiError(message="collections query response is invalid.")
+        nodes = collections.get("nodes")
+        if not isinstance(nodes, list):
+            raise ShopifyApiError(message="collections query response is missing nodes.")
+        if not nodes:
+            return None
+        first_node = nodes[0]
+        if not isinstance(first_node, dict):
+            raise ShopifyApiError(message="collections query returned an invalid collection node.")
+        collection_id = first_node.get("id")
+        collection_handle = first_node.get("handle")
+        collection_title = first_node.get("title")
+        if not isinstance(collection_id, str) or not collection_id.strip():
+            raise ShopifyApiError(message="collections query response is missing collection.id.")
+        if (
+            not isinstance(collection_handle, str)
+            or not collection_handle.strip()
+            or collection_handle.strip().lower() != cleaned_handle
+        ):
+            raise ShopifyApiError(
+                message=(
+                    "collections query returned an unexpected collection handle "
+                    f"while resolving handle={cleaned_handle}."
+                )
+            )
+        if not isinstance(collection_title, str) or not collection_title.strip():
+            raise ShopifyApiError(message="collections query response is missing collection.title.")
+        return {
+            "id": collection_id.strip(),
+            "handle": collection_handle.strip(),
+            "title": collection_title.strip(),
+        }
+
+    async def _get_online_store_publication_id(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+    ) -> str:
+        query = """
+        query publicationsForCatalogRoute($first: Int!) {
+            publications(first: $first) {
+                nodes {
+                    id
+                    name
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={"query": query, "variables": {"first": 50}},
+        )
+        publications = response.get("publications")
+        if not isinstance(publications, dict):
+            raise ShopifyApiError(message="publications query response is invalid.")
+        nodes = publications.get("nodes")
+        if not isinstance(nodes, list):
+            raise ShopifyApiError(message="publications query response is missing nodes.")
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            publication_id = node.get("id")
+            publication_name = node.get("name")
+            if (
+                isinstance(publication_id, str)
+                and publication_id.strip()
+                and isinstance(publication_name, str)
+                and publication_name.strip().lower() == "online store"
+            ):
+                return publication_id.strip()
+        raise ShopifyApiError(
+            message="Online Store publication was not found while preparing catalog route.",
+            status_code=409,
+        )
+
+    async def _is_collection_published_on_publication(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        collection_id: str,
+        publication_id: str,
+    ) -> bool:
+        cleaned_collection_id = collection_id.strip()
+        cleaned_publication_id = publication_id.strip()
+        if not cleaned_collection_id:
+            raise ShopifyApiError(message="collection_id cannot be empty.", status_code=400)
+        if not cleaned_publication_id:
+            raise ShopifyApiError(message="publication_id cannot be empty.", status_code=400)
+        query = """
+        query collectionPublicationState($id: ID!, $publicationId: ID!) {
+            collection(id: $id) {
+                id
+                publishedOnPublication(publicationId: $publicationId)
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": query,
+                "variables": {
+                    "id": cleaned_collection_id,
+                    "publicationId": cleaned_publication_id,
+                },
+            },
+        )
+        collection = response.get("collection")
+        if collection is None:
+            raise ShopifyApiError(
+                message=(
+                    "Collection not found while checking publication state. "
+                    f"id={cleaned_collection_id}."
+                ),
+                status_code=404,
+            )
+        if not isinstance(collection, dict):
+            raise ShopifyApiError(message="collection publication query response is invalid.")
+        published_on_publication = collection.get("publishedOnPublication")
+        if not isinstance(published_on_publication, bool):
+            raise ShopifyApiError(
+                message="collection publication query response is missing publishedOnPublication."
+            )
+        return published_on_publication
+
+    async def _publish_collection_to_publication(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        collection_id: str,
+        publication_id: str,
+    ) -> None:
+        cleaned_collection_id = collection_id.strip()
+        cleaned_publication_id = publication_id.strip()
+        if not cleaned_collection_id:
+            raise ShopifyApiError(message="collection_id cannot be empty.", status_code=400)
+        if not cleaned_publication_id:
+            raise ShopifyApiError(message="publication_id cannot be empty.", status_code=400)
+        mutation = """
+        mutation publishCatalogCollection($id: ID!, $input: [PublicationInput!]!) {
+            publishablePublish(id: $id, input: $input) {
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "id": cleaned_collection_id,
+                    "input": [{"publicationId": cleaned_publication_id}],
+                },
+            },
+        )
+        payload = response.get("publishablePublish")
+        if not isinstance(payload, dict):
+            raise ShopifyApiError(message="publishablePublish response is missing payload.")
+        user_errors = payload.get("userErrors") or []
+        if not isinstance(user_errors, list):
+            raise ShopifyApiError(message="publishablePublish response has invalid userErrors.")
+        self._assert_no_user_errors(
+            user_errors=user_errors,
+            mutation_name="publishablePublish",
+        )
+
+    async def _create_collection(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        title: str,
+        handle: str,
+    ) -> dict[str, str]:
+        cleaned_title = title.strip()
+        cleaned_handle = handle.strip().lower()
+        if not cleaned_title:
+            raise ShopifyApiError(message="Collection title cannot be empty.", status_code=400)
+        if not cleaned_handle:
+            raise ShopifyApiError(message="Collection handle cannot be empty.", status_code=400)
+        mutation = """
+        mutation collectionCreateForCatalog($input: CollectionInput!) {
+            collectionCreate(input: $input) {
+                collection {
+                    id
+                    handle
+                    title
+                }
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "input": {
+                        "title": cleaned_title,
+                        "handle": cleaned_handle,
+                    }
+                },
+            },
+        )
+        payload = response.get("collectionCreate")
+        if not isinstance(payload, dict):
+            raise ShopifyApiError(message="collectionCreate response is missing payload.")
+        user_errors = payload.get("userErrors") or []
+        if not isinstance(user_errors, list):
+            raise ShopifyApiError(message="collectionCreate response has invalid userErrors.")
+        self._assert_no_user_errors(
+            user_errors=user_errors,
+            mutation_name="collectionCreate",
+        )
+        collection = payload.get("collection")
+        if not isinstance(collection, dict):
+            raise ShopifyApiError(message="collectionCreate response is missing collection.")
+        collection_id = collection.get("id")
+        collection_handle = collection.get("handle")
+        collection_title = collection.get("title")
+        if not isinstance(collection_id, str) or not collection_id.strip():
+            raise ShopifyApiError(message="collectionCreate response is missing collection.id.")
+        if not isinstance(collection_handle, str) or not collection_handle.strip():
+            raise ShopifyApiError(message="collectionCreate response is missing collection.handle.")
+        if not isinstance(collection_title, str) or not collection_title.strip():
+            raise ShopifyApiError(message="collectionCreate response is missing collection.title.")
+        return {
+            "id": collection_id.strip(),
+            "handle": collection_handle.strip(),
+            "title": collection_title.strip(),
+        }
+
+    async def _list_shop_product_ids(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+    ) -> list[str]:
+        query = """
+        query shopProductsForCatalogRoute($first: Int!, $after: String) {
+            products(first: $first, after: $after) {
+                pageInfo {
+                    hasNextPage
+                    endCursor
+                }
+                nodes {
+                    id
+                }
+            }
+        }
+        """
+        product_ids: list[str] = []
+        cursor: str | None = None
+        for _ in range(100):
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={
+                    "query": query,
+                    "variables": {
+                        "first": _GRAPHQL_MAX_PAGE_SIZE,
+                        "after": cursor,
+                    },
+                },
+            )
+            products = response.get("products")
+            if not isinstance(products, dict):
+                raise ShopifyApiError(message="products query response is invalid.")
+            nodes = products.get("nodes")
+            if not isinstance(nodes, list):
+                raise ShopifyApiError(message="products query response is missing nodes.")
+            for node in nodes:
+                if not isinstance(node, dict):
+                    raise ShopifyApiError(
+                        message="products query returned an invalid product node."
+                    )
+                product_id = node.get("id")
+                if not isinstance(product_id, str) or not product_id.strip():
+                    raise ShopifyApiError(
+                        message="products query response is missing product.id."
+                    )
+                product_ids.append(product_id.strip())
+
+            page_info = products.get("pageInfo")
+            if not isinstance(page_info, dict):
+                raise ShopifyApiError(message="products query response is missing pageInfo.")
+            has_next_page = page_info.get("hasNextPage")
+            if not isinstance(has_next_page, bool):
+                raise ShopifyApiError(
+                    message="products query response is missing pageInfo.hasNextPage."
+                )
+            if not has_next_page:
+                return product_ids
+            end_cursor = page_info.get("endCursor")
+            if not isinstance(end_cursor, str) or not end_cursor.strip():
+                raise ShopifyApiError(
+                    message="products query response is missing pageInfo.endCursor."
+                )
+            cursor = end_cursor
+        raise ShopifyApiError(
+            message="products query exceeded pagination limit while loading shop products."
+        )
+
+    async def _list_collection_product_ids(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        collection_id: str,
+    ) -> list[str]:
+        cleaned_collection_id = collection_id.strip()
+        if not cleaned_collection_id:
+            raise ShopifyApiError(message="collection_id cannot be empty.", status_code=400)
+        query = """
+        query collectionProductsForCatalogRoute($id: ID!, $first: Int!, $after: String) {
+            collection(id: $id) {
+                id
+                products(first: $first, after: $after) {
+                    pageInfo {
+                        hasNextPage
+                        endCursor
+                    }
+                    nodes {
+                        id
+                    }
+                }
+            }
+        }
+        """
+        collection_product_ids: list[str] = []
+        cursor: str | None = None
+        for _ in range(100):
+            response = await self._admin_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                payload={
+                    "query": query,
+                    "variables": {
+                        "id": cleaned_collection_id,
+                        "first": _GRAPHQL_MAX_PAGE_SIZE,
+                        "after": cursor,
+                    },
+                },
+            )
+            collection = response.get("collection")
+            if collection is None:
+                raise ShopifyApiError(
+                    message=f"Collection not found while loading collection products. id={cleaned_collection_id}.",
+                    status_code=404,
+                )
+            if not isinstance(collection, dict):
+                raise ShopifyApiError(message="collection query response is invalid.")
+            products = collection.get("products")
+            if not isinstance(products, dict):
+                raise ShopifyApiError(
+                    message="collection query response is missing collection.products."
+                )
+            nodes = products.get("nodes")
+            if not isinstance(nodes, list):
+                raise ShopifyApiError(
+                    message="collection query response is missing collection.products.nodes."
+                )
+            for node in nodes:
+                if not isinstance(node, dict):
+                    raise ShopifyApiError(
+                        message="collection query returned an invalid collection product node."
+                    )
+                product_id = node.get("id")
+                if not isinstance(product_id, str) or not product_id.strip():
+                    raise ShopifyApiError(
+                        message="collection query response is missing collection product id."
+                    )
+                collection_product_ids.append(product_id.strip())
+
+            page_info = products.get("pageInfo")
+            if not isinstance(page_info, dict):
+                raise ShopifyApiError(
+                    message="collection query response is missing collection.products.pageInfo."
+                )
+            has_next_page = page_info.get("hasNextPage")
+            if not isinstance(has_next_page, bool):
+                raise ShopifyApiError(
+                    message=(
+                        "collection query response is missing collection.products.pageInfo.hasNextPage."
+                    )
+                )
+            if not has_next_page:
+                return collection_product_ids
+            end_cursor = page_info.get("endCursor")
+            if not isinstance(end_cursor, str) or not end_cursor.strip():
+                raise ShopifyApiError(
+                    message=(
+                        "collection query response is missing collection.products.pageInfo.endCursor."
+                    )
+                )
+            cursor = end_cursor
+        raise ShopifyApiError(
+            message="collection query exceeded pagination limit while loading collection products."
+        )
+
+    async def _add_products_to_collection(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        collection_id: str,
+        product_ids: list[str],
+    ) -> None:
+        cleaned_collection_id = collection_id.strip()
+        if not cleaned_collection_id:
+            raise ShopifyApiError(message="collection_id cannot be empty.", status_code=400)
+        if not product_ids:
+            return
+        mutation = """
+        mutation collectionAddProductsForCatalog($id: ID!, $productIds: [ID!]!) {
+            collectionAddProducts(id: $id, productIds: $productIds) {
+                userErrors {
+                    field
+                    message
+                }
+            }
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={
+                "query": mutation,
+                "variables": {
+                    "id": cleaned_collection_id,
+                    "productIds": product_ids,
+                },
+            },
+        )
+        payload = response.get("collectionAddProducts")
+        if not isinstance(payload, dict):
+            raise ShopifyApiError(message="collectionAddProducts response is missing payload.")
+        user_errors = payload.get("userErrors") or []
+        if not isinstance(user_errors, list):
+            raise ShopifyApiError(
+                message="collectionAddProducts response has invalid userErrors."
+            )
+        self._assert_no_user_errors(
+            user_errors=user_errors,
+            mutation_name="collectionAddProducts",
+        )
+
+    async def ensure_product_in_catalog_collection(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gid: str,
+    ) -> dict[str, Any]:
+        cleaned_product_gid = product_gid.strip()
+        if not cleaned_product_gid.startswith("gid://shopify/Product/"):
+            raise ShopifyApiError(
+                message="product_gid must be a valid Shopify Product GID.",
+                status_code=400,
+            )
+        collection = await self.ensure_catalog_collection_route_is_available(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            sync_all_products=False,
+        )
+        await self._add_products_to_collection(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            collection_id=collection["collectionId"],
+            product_ids=[cleaned_product_gid],
+        )
+        return collection
 
     @staticmethod
     def _price_cents_to_decimal_string(price_cents: int) -> str:
@@ -2189,6 +3030,12 @@ class ShopifyApiClient:
                 ),
             )
 
+        await self.ensure_product_in_catalog_collection(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            product_gid=product_gid,
+        )
+
         return {
             "productGid": product_gid,
             "title": product_title,
@@ -2554,6 +3401,76 @@ class ShopifyApiClient:
             path_without_query = f"/{path_without_query}"
         return f"/{path_without_query.strip('/').lower()}"
 
+    @staticmethod
+    def _canonicalize_menu_item_path_for_dedupe(*, path: str) -> str:
+        normalized = path.strip().lower()
+        policy_match = re.fullmatch(
+            r"/policies/([a-z0-9]+(?:-[a-z0-9]+)*)", normalized
+        )
+        if policy_match is not None:
+            return f"/pages/{policy_match.group(1)}"
+        return normalized
+
+    @classmethod
+    def _build_menu_item_dedupe_keys(
+        cls,
+        *,
+        item: dict[str, Any],
+    ) -> tuple[str, ...]:
+        keys: list[str] = []
+        resource_id = item.get("resourceId")
+        if isinstance(resource_id, str) and resource_id:
+            item_type = item.get("type")
+            normalized_type = (
+                item_type.strip().upper()
+                if isinstance(item_type, str) and item_type.strip()
+                else "UNKNOWN"
+            )
+            keys.append(f"resource:{normalized_type}:{resource_id}")
+
+        normalized_path = cls._normalize_menu_item_path(item.get("url"))
+        if normalized_path is not None:
+            canonical_path = cls._canonicalize_menu_item_path_for_dedupe(
+                path=normalized_path
+            )
+            keys.append(f"url:{canonical_path}")
+
+        return tuple(keys)
+
+    @classmethod
+    def _dedupe_menu_items(
+        cls,
+        *,
+        menu_items: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], bool]:
+        deduped_items: list[dict[str, Any]] = []
+        seen_keys: set[str] = set()
+        changed = False
+
+        for item in menu_items:
+            if not isinstance(item, dict):
+                deduped_items.append(item)
+                continue
+
+            raw_children = item.get("items")
+            if isinstance(raw_children, list):
+                deduped_children, child_changed = cls._dedupe_menu_items(
+                    menu_items=raw_children
+                )
+                if child_changed:
+                    item["items"] = deduped_children
+                    changed = True
+
+            dedupe_keys = cls._build_menu_item_dedupe_keys(item=item)
+            if dedupe_keys and any(key in seen_keys for key in dedupe_keys):
+                changed = True
+                continue
+            for key in dedupe_keys:
+                seen_keys.add(key)
+            deduped_items.append(item)
+
+        return deduped_items, changed
+
     @classmethod
     def _coerce_menu_summary_node(
         cls,
@@ -2869,10 +3786,13 @@ class ShopifyApiClient:
         for item in next_items:
             resource_id = item.get("resourceId")
             if isinstance(resource_id, str) and resource_id:
-                existing_by_resource_id[resource_id] = item
+                existing_by_resource_id.setdefault(resource_id, item)
             normalized_path = cls._normalize_menu_item_path(item.get("url"))
             if normalized_path is not None:
-                existing_by_path[normalized_path] = item
+                canonical_path = cls._canonicalize_menu_item_path_for_dedupe(
+                    path=normalized_path
+                )
+                existing_by_path.setdefault(canonical_path, item)
 
         changed = False
         for policy_page in policy_pages:
@@ -2895,7 +3815,9 @@ class ShopifyApiClient:
                     status_code=409,
                 )
 
-            normalized_path = cls._build_policy_page_path(handle=raw_handle)
+            normalized_path = cls._canonicalize_menu_item_path_for_dedupe(
+                path=cls._build_policy_page_path(handle=raw_handle)
+            )
             existing_item = existing_by_resource_id.get(raw_page_id)
             if existing_item is None:
                 existing_item = existing_by_path.get(normalized_path)
@@ -2921,6 +3843,11 @@ class ShopifyApiClient:
             if existing_item.get("resourceId") != raw_page_id:
                 existing_item["resourceId"] = raw_page_id
                 changed = True
+
+        deduped_items, dedupe_changed = cls._dedupe_menu_items(menu_items=next_items)
+        if dedupe_changed:
+            changed = True
+            next_items = deduped_items
 
         return next_items, changed
 
@@ -3716,6 +4643,10 @@ class ShopifyApiClient:
     def _escape_css_string(raw_value: str) -> str:
         return raw_value.replace("\\", "\\\\").replace('"', '\\"')
 
+    @staticmethod
+    def _normalize_css_value_for_comparison(raw_value: str) -> str:
+        return re.sub(r"\s+", "", raw_value.strip().lower())
+
     @classmethod
     def _resolve_theme_brand_profile(cls, *, theme_name: str) -> ThemeBrandProfile:
         normalized_theme_name = theme_name.strip().lower()
@@ -3775,6 +4706,23 @@ class ShopifyApiClient:
                 if alias_key in expanded:
                     continue
                 expanded[alias_key] = f"var({source_key})"
+
+        if profile.theme_name == "futrgroup2-0theme":
+            # Hero-adjacent component backgrounds should track hero bg even when
+            # the source token omitted it.
+            if "--hero-bg" not in expanded and "--color-page-bg" in expanded:
+                expanded["--hero-bg"] = expanded["--color-page-bg"]
+
+            footer_text = expanded.get("--footer-text-color")
+            if not isinstance(footer_text, str) or not footer_text.strip():
+                color_text = expanded.get("--color-text")
+                if isinstance(color_text, str) and color_text.strip():
+                    expanded["--footer-text-color"] = color_text
+            announcement_text = expanded.get("--announcement-text-color")
+            if not isinstance(announcement_text, str) or not announcement_text.strip():
+                footer_text_value = expanded.get("--footer-text-color")
+                if isinstance(footer_text_value, str) and footer_text_value.strip():
+                    expanded["--announcement-text-color"] = footer_text_value
         return expanded
 
     @classmethod
@@ -4153,6 +5101,137 @@ class ShopifyApiClient:
         return lowered_value in _THEME_SETTINGS_COLOR_VALUE_KEYWORDS
 
     @classmethod
+    def _resolve_theme_css_value_expression(
+        cls,
+        *,
+        effective_css_vars: dict[str, str],
+        raw_value: str,
+        source_var: str,
+        path: str,
+        context: str,
+        stack: list[str],
+    ) -> str:
+        cleaned_value = raw_value.strip()
+        if not cleaned_value:
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to be non-empty."
+                ),
+                status_code=422,
+            )
+
+        match = _THEME_SETTINGS_CSS_VAR_CAPTURE_RE.fullmatch(cleaned_value)
+        if match is None:
+            return cleaned_value
+
+        referenced_var = match.group(1)
+        fallback_value = match.group(2)
+        if referenced_var in stack:
+            chain = " -> ".join([*stack, referenced_var])
+            raise ShopifyApiError(
+                message=(
+                    f"{context} detected a circular css var reference while resolving {source_var} "
+                    f"for path {path}: {chain}."
+                ),
+                status_code=422,
+            )
+
+        referenced_raw_value = effective_css_vars.get(referenced_var)
+        if referenced_raw_value is None:
+            fallback_clean = (
+                fallback_value.strip()
+                if isinstance(fallback_value, str)
+                else ""
+            )
+            if fallback_clean:
+                return cls._resolve_theme_css_value_expression(
+                    effective_css_vars=effective_css_vars,
+                    raw_value=fallback_clean,
+                    source_var=source_var,
+                    path=path,
+                    context=context,
+                    stack=[*stack, referenced_var],
+                )
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path}, but {source_var} "
+                    f"references missing token {referenced_var} with no fallback."
+                ),
+                status_code=422,
+            )
+
+        if not isinstance(referenced_raw_value, str):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to resolve to a string value, "
+                    f"but referenced token {referenced_var} is {type(referenced_raw_value).__name__}."
+                ),
+                status_code=422,
+            )
+
+        return cls._resolve_theme_css_value_expression(
+            effective_css_vars=effective_css_vars,
+            raw_value=referenced_raw_value,
+            source_var=source_var,
+            path=path,
+            context=context,
+            stack=[*stack, referenced_var],
+        )
+
+    @classmethod
+    def _resolve_theme_settings_color_source_value(
+        cls,
+        *,
+        effective_css_vars: dict[str, str],
+        source_var: str,
+        path: str,
+        context: str,
+    ) -> str:
+        raw_value = effective_css_vars.get(source_var)
+        if raw_value is None:
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path}. "
+                    "Add the missing token to the design system."
+                ),
+                status_code=422,
+            )
+        if not isinstance(raw_value, str):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to be a string value, "
+                    f"received {type(raw_value).__name__}."
+                ),
+                status_code=422,
+            )
+
+        resolved_value = cls._resolve_theme_css_value_expression(
+            effective_css_vars=effective_css_vars,
+            raw_value=raw_value,
+            source_var=source_var,
+            path=path,
+            context=context,
+            stack=[source_var],
+        )
+        if _THEME_SETTINGS_CSS_VAR_RE.fullmatch(resolved_value):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to resolve to a concrete CSS color, "
+                    f"received {resolved_value!r}."
+                ),
+                status_code=422,
+            )
+        if not cls._is_theme_settings_color_like_value(value=resolved_value):
+            raise ShopifyApiError(
+                message=(
+                    f"{context} requires css var {source_var} for path {path} to resolve to a CSS color value, "
+                    f"received {resolved_value!r}."
+                ),
+                status_code=422,
+            )
+        return resolved_value
+
+    @classmethod
     def _resolve_theme_settings_semantic_key(
         cls,
         *,
@@ -4183,10 +5262,57 @@ class ShopifyApiClient:
         if (
             "footer_text" in semantic_source_vars
             and "footer" in path_tokens
+            and "border" in key_tokens
+            and ({"color", "text", "foreground"} & key_tokens)
+        ):
+            return "footer_text"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
             and "newsletter" in key_tokens
             and ({"color", "text", "foreground"} & key_tokens)
         ):
             return "footer_text"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
+            and ({"copy", "input", "text"} & key_tokens)
+            and ({"color", "text", "foreground"} & key_tokens)
+            and not ({"background", "bg", "border"} & key_tokens)
+        ):
+            return "footer_text"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
+            and "link" in key_tokens
+            and ({"color", "text", "foreground"} & key_tokens)
+            and not ({"background", "bg", "border"} & key_tokens)
+        ):
+            return "footer_text"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
+            and ({"submit", "button"} & key_tokens)
+            and "border" in key_tokens
+            and ({"color", "text", "foreground"} & key_tokens)
+        ):
+            return "footer_text"
+        if (
+            "footer_text" in semantic_source_vars
+            and "footer" in path_tokens
+            and ({"input", "tabs", "tab"} & key_tokens)
+            and "border" in key_tokens
+            and ({"color", "text", "foreground"} & key_tokens)
+        ):
+            return "footer_text"
+        if (
+            "hero_background" in semantic_source_vars
+            and ({"hero", "banner"} & path_tokens)
+            and ({"background", "bg"} & key_tokens)
+            and "border" not in key_tokens
+            and not ({"button", "submit", "cta"} & key_tokens)
+        ):
+            return "hero_background"
         if (
             "button" in semantic_source_vars
             and "announcement" in path_tokens
@@ -4195,12 +5321,14 @@ class ShopifyApiClient:
         ):
             return "button"
         if (
-            "text" in semantic_source_vars
+            ("announcement_text" in semantic_source_vars or "text" in semantic_source_vars)
             and "announcement" in path_tokens
             and ({"text", "foreground"} & key_tokens)
             and "color" in key_tokens
             and not ({"background", "bg", "border"} & key_tokens)
         ):
+            if "announcement_text" in semantic_source_vars:
+                return "announcement_text"
             return "text"
 
         # `button_color` should map to button text before generic variant matching
@@ -4289,15 +5417,12 @@ class ShopifyApiClient:
                 unmapped_paths.append(path)
                 continue
             source_var = semantic_source_vars[semantic_key]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
-                raise ShopifyApiError(
-                    message=(
-                        f"Theme settings semantic mapping requires css var {source_var} for path {path}. "
-                        "Add the missing token to the design system."
-                    ),
-                    status_code=422,
-                )
+            expected_value = cls._resolve_theme_settings_color_source_value(
+                effective_css_vars=effective_css_vars,
+                source_var=source_var,
+                path=path,
+                context="Theme settings semantic mapping",
+            )
             existing_value = parent.get(key)
             if (
                 isinstance(existing_value, str)
@@ -4338,8 +5463,14 @@ class ShopifyApiClient:
                 unmapped_paths.append(path)
                 continue
             source_var = semantic_source_vars[semantic_key]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
+            try:
+                expected_value = cls._resolve_theme_settings_color_source_value(
+                    effective_css_vars=effective_css_vars,
+                    source_var=source_var,
+                    path=path,
+                    context="Theme settings semantic audit",
+                )
+            except ShopifyApiError:
                 mismatched_paths.append(path)
                 continue
             existing_value = parent.get(key)
@@ -4938,15 +6069,12 @@ class ShopifyApiClient:
                 unmapped_paths.append(path)
                 continue
             source_var = semantic_source_vars[semantic_key]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
-                raise ShopifyApiError(
-                    message=(
-                        f"Theme template settings mapping requires css var {source_var} for path {path}. "
-                        "Add the missing token to the design system."
-                    ),
-                    status_code=422,
-                )
+            expected_value = cls._resolve_theme_settings_color_source_value(
+                effective_css_vars=effective_css_vars,
+                source_var=source_var,
+                path=path,
+                context="Theme template settings mapping",
+            )
             existing_value = parent.get(key)
             if (
                 isinstance(existing_value, str)
@@ -5008,8 +6136,14 @@ class ShopifyApiClient:
                 unmapped_paths.append(path)
                 continue
             source_var = semantic_source_vars[semantic_key]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
+            try:
+                expected_value = cls._resolve_theme_settings_color_source_value(
+                    effective_css_vars=effective_css_vars,
+                    source_var=source_var,
+                    path=path,
+                    context="Theme template settings audit",
+                )
+            except ShopifyApiError:
                 mismatched_paths.append(path)
                 continue
             existing_value = parent.get(key)
@@ -5783,6 +6917,114 @@ class ShopifyApiClient:
         return manifest
 
     @classmethod
+    def _get_optional_theme_template_slot_paths_from_manifest(
+        cls, *, profile: ThemeBrandProfile
+    ) -> tuple[set[str], set[str]]:
+        manifest = cls._get_theme_template_slot_manifest(profile=profile)
+        raw_image_slots = manifest.get("imageSlots")
+        raw_text_slots = manifest.get("textSlots")
+        if not isinstance(raw_image_slots, tuple) or not isinstance(
+            raw_text_slots, tuple
+        ):
+            raise ShopifyApiError(
+                message=(
+                    "Theme template slot manifest is invalid. "
+                    f"themeName={profile.theme_name}."
+                ),
+                status_code=500,
+            )
+
+        optional_image_paths: set[str] = set()
+        optional_text_paths: set[str] = set()
+
+        for slot_type, raw_slots in (
+            ("imageSlots", raw_image_slots),
+            ("textSlots", raw_text_slots),
+        ):
+            for item in raw_slots:
+                if not isinstance(item, dict):
+                    raise ShopifyApiError(
+                        message=(
+                            "Theme template slot manifest contains an invalid slot entry. "
+                            f"themeName={profile.theme_name}, slotType={slot_type}."
+                        ),
+                        status_code=500,
+                    )
+                path = item.get("path")
+                allow_missing = item.get("allowMissing", False)
+                if not isinstance(path, str) or not path.strip():
+                    raise ShopifyApiError(
+                        message=(
+                            "Theme template slot manifest contains an invalid path entry. "
+                            f"themeName={profile.theme_name}, slotType={slot_type}, slot={item}."
+                        ),
+                        status_code=500,
+                    )
+                if not isinstance(allow_missing, bool):
+                    raise ShopifyApiError(
+                        message=(
+                            "Theme template slot manifest contains an invalid allowMissing value. "
+                            f"themeName={profile.theme_name}, slotType={slot_type}, slot={item}."
+                        ),
+                        status_code=500,
+                    )
+                if not allow_missing:
+                    continue
+                if slot_type == "imageSlots":
+                    optional_image_paths.add(path.strip())
+                else:
+                    optional_text_paths.add(path.strip())
+
+        return optional_image_paths, optional_text_paths
+
+    @classmethod
+    def _get_richtext_theme_template_slot_paths_from_manifest(
+        cls, *, profile: ThemeBrandProfile
+    ) -> set[str]:
+        manifest = cls._get_theme_template_slot_manifest(profile=profile)
+        raw_text_slots = manifest.get("textSlots")
+        if not isinstance(raw_text_slots, tuple):
+            raise ShopifyApiError(
+                message=(
+                    "Theme template slot manifest is invalid. "
+                    f"themeName={profile.theme_name}."
+                ),
+                status_code=500,
+            )
+
+        richtext_paths: set[str] = set()
+        for item in raw_text_slots:
+            if not isinstance(item, dict):
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains an invalid text slot entry. "
+                        f"themeName={profile.theme_name}."
+                    ),
+                    status_code=500,
+                )
+            path = item.get("path")
+            rich_text = item.get("richText", False)
+            if not isinstance(path, str) or not path.strip():
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains an invalid text slot path. "
+                        f"themeName={profile.theme_name}, slot={item}."
+                    ),
+                    status_code=500,
+                )
+            if not isinstance(rich_text, bool):
+                raise ShopifyApiError(
+                    message=(
+                        "Theme template slot manifest contains an invalid richText value. "
+                        f"themeName={profile.theme_name}, slot={item}."
+                    ),
+                    status_code=500,
+                )
+            if rich_text:
+                richtext_paths.add(path.strip())
+        return richtext_paths
+
+    @classmethod
     def _resolve_theme_template_slots_from_manifest(
         cls,
         *,
@@ -5806,7 +7048,9 @@ class ShopifyApiClient:
         parsed_templates_by_filename: dict[str, dict[str, Any]] = {}
         missing_paths: list[str] = []
 
-        def resolve_current_value(*, setting_path: str) -> str | None:
+        def resolve_current_value(
+            *, setting_path: str, allow_missing: bool = False
+        ) -> str | None:
             template_filename, json_path = cls._split_theme_template_setting_path(
                 setting_path=setting_path
             )
@@ -5823,7 +7067,8 @@ class ShopifyApiClient:
                 parsed_templates_by_filename[template_filename] = template_data
             values = cls._read_json_path_values(node=template_data, path=json_path)
             if not values:
-                missing_paths.append(setting_path)
+                if not allow_missing:
+                    missing_paths.append(setting_path)
                 return None
             current_value = values[0]
             if not isinstance(current_value, str):
@@ -5846,6 +7091,7 @@ class ShopifyApiClient:
             key = item.get("key")
             role = item.get("role")
             recommended_aspect = item.get("recommendedAspect")
+            allow_missing = item.get("allowMissing", False)
             if (
                 not isinstance(path, str)
                 or not path.strip()
@@ -5855,6 +7101,7 @@ class ShopifyApiClient:
                 or not role.strip()
                 or not isinstance(recommended_aspect, str)
                 or recommended_aspect not in {"landscape", "portrait", "square", "any"}
+                or not isinstance(allow_missing, bool)
             ):
                 raise ShopifyApiError(
                     message=(
@@ -5877,7 +7124,10 @@ class ShopifyApiClient:
                 {
                     "path": normalized_path,
                     "key": key.strip(),
-                    "currentValue": resolve_current_value(setting_path=normalized_path),
+                    "currentValue": resolve_current_value(
+                        setting_path=normalized_path,
+                        allow_missing=allow_missing,
+                    ),
                     "role": role.strip(),
                     "recommendedAspect": recommended_aspect,
                 }
@@ -5898,6 +7148,7 @@ class ShopifyApiClient:
             key = item.get("key")
             role = item.get("role")
             max_length = item.get("maxLength")
+            allow_missing = item.get("allowMissing", False)
             if (
                 not isinstance(path, str)
                 or not path.strip()
@@ -5907,6 +7158,7 @@ class ShopifyApiClient:
                 or not role.strip()
                 or not isinstance(max_length, int)
                 or max_length <= 0
+                or not isinstance(allow_missing, bool)
             ):
                 raise ShopifyApiError(
                     message=(
@@ -5929,7 +7181,10 @@ class ShopifyApiClient:
                 {
                     "path": normalized_path,
                     "key": key.strip(),
-                    "currentValue": resolve_current_value(setting_path=normalized_path),
+                    "currentValue": resolve_current_value(
+                        setting_path=normalized_path,
+                        allow_missing=allow_missing,
+                    ),
                     "role": role.strip(),
                     "maxLength": max_length,
                 }
@@ -6021,12 +7276,28 @@ class ShopifyApiClient:
         return grouped
 
     @classmethod
+    def _group_theme_component_setting_paths_by_template(
+        cls,
+        *,
+        setting_paths: set[str],
+    ) -> dict[str, set[str]]:
+        grouped: dict[str, set[str]] = {}
+        for setting_path in setting_paths:
+            template_filename, _ = cls._split_theme_template_setting_path(
+                setting_path=setting_path
+            )
+            grouped.setdefault(template_filename, set()).add(setting_path)
+        return grouped
+
+    @classmethod
     def _sync_theme_template_component_text_settings_data(
         cls,
         *,
         template_filename: str,
         template_content: str,
         component_text_values_by_path: dict[str, str],
+        allow_missing_leaf_paths: set[str] | None = None,
+        richtext_setting_paths: set[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         report = {
             "templateFilename": template_filename,
@@ -6040,6 +7311,8 @@ class ShopifyApiClient:
             filename=template_filename,
             template_content=template_content,
         )
+        allowed_missing_leaf_paths = set(allow_missing_leaf_paths or ())
+        normalized_richtext_paths = set(richtext_setting_paths or ())
 
         updated_paths: list[str] = []
         missing_paths: list[str] = []
@@ -6062,12 +7335,13 @@ class ShopifyApiClient:
             resolved_text_value = cls._coerce_theme_component_text_value_for_setting(
                 text_value=text_value,
                 existing_values=existing_values,
+                expect_richtext=setting_path in normalized_richtext_paths,
             )
             update_count = cls._set_json_path_value(
                 node=template_data,
                 path=json_path,
                 value=resolved_text_value,
-                create_missing_leaf=False,
+                create_missing_leaf=setting_path in allowed_missing_leaf_paths,
             )
             if update_count > 0:
                 updated_paths.append(setting_path)
@@ -6098,14 +7372,212 @@ class ShopifyApiClient:
         *,
         text_value: str,
         existing_values: list[Any],
+        expect_richtext: bool = False,
     ) -> str:
-        if any(
+        if expect_richtext or any(
             cls._is_theme_component_richtext_value(value=value)
             for value in existing_values
         ):
             collapsed = " ".join(text_value.split()).strip()
             return f"<p>{escape(collapsed)}</p>"
         return text_value
+
+    @classmethod
+    def _stabilize_collection_images_with_text_overlay_settings(
+        cls,
+        *,
+        template_filename: str,
+        template_content: str,
+    ) -> str:
+        if template_filename != "templates/collection.json":
+            return template_content
+
+        template_data = cls._parse_theme_template_json(
+            filename=template_filename,
+            template_content=template_content,
+        )
+        sections = template_data.get("sections")
+        if not isinstance(sections, dict):
+            return template_content
+        section = sections.get("images-with-text-overlay")
+        if not isinstance(section, dict) or section.get("type") != "images-with-text-overlay":
+            return template_content
+        section_settings = section.get("settings")
+        blocks = section.get("blocks")
+        if not isinstance(section_settings, dict) or not isinstance(blocks, dict):
+            return template_content
+
+        has_button_with_label = False
+        for block in blocks.values():
+            if not isinstance(block, dict) or block.get("type") != "button":
+                continue
+            block_settings = block.get("settings")
+            if not isinstance(block_settings, dict):
+                continue
+            button_label = block_settings.get("button_label")
+            if isinstance(button_label, str) and button_label.strip():
+                has_button_with_label = True
+                break
+        if not has_button_with_label:
+            return template_content
+
+        changed = False
+        if section_settings.get("image_height") in {"400px", "450px"}:
+            section_settings["image_height"] = "550px"
+            changed = True
+        if section_settings.get("image_height_mobile") in {
+            "auto",
+            "200px",
+            "250px",
+            "300px",
+            "400px",
+        }:
+            section_settings["image_height_mobile"] = "500px"
+            changed = True
+        if section_settings.get("content_position") == "md:items-center md:justify-start":
+            section_settings["content_position"] = "md:items-start md:justify-start"
+            changed = True
+
+        for block in blocks.values():
+            if not isinstance(block, dict) or block.get("type") != "spacing":
+                continue
+            block_settings = block.get("settings")
+            if not isinstance(block_settings, dict):
+                continue
+            spacing_height = block_settings.get("height")
+            if isinstance(spacing_height, (int, float)) and spacing_height > 32:
+                block_settings["height"] = 32
+                changed = True
+            spacing_height_mobile = block_settings.get("height_mobile")
+            if isinstance(spacing_height_mobile, (int, float)) and spacing_height_mobile > 8:
+                block_settings["height_mobile"] = 8
+                changed = True
+
+        if not changed:
+            return template_content
+        return json.dumps(template_data, ensure_ascii=False, separators=(",", ":")) + "\n"
+
+    @classmethod
+    def _stabilize_main_collection_sidebar_menu_layout(
+        cls,
+        *,
+        filename: str,
+        content: str,
+    ) -> str:
+        if filename != _THEME_MAIN_COLLECTION_SECTION_FILENAME:
+            return content
+
+        updated_content = content
+
+        def _rewrite_menu_heading(match: re.Match[str]) -> str:
+            class_tokens = [token for token in match.group("class").split() if token]
+            class_tokens = [
+                token for token in class_tokens if token not in {"text-center", "text-left"}
+            ]
+            class_tokens.extend(["w-full", "text-left"])
+            return f'<h3 class="{" ".join(class_tokens)}">Menu</h3>'
+
+        updated_content = re.sub(
+            r'<h3\s+class="(?P<class>[^"]*)">\s*Menu\s*</h3>',
+            _rewrite_menu_heading,
+            updated_content,
+            count=1,
+        )
+
+        def _rewrite_collection_nav_class(match: re.Match[str]) -> str:
+            class_tokens = [token for token in match.group("class").split() if token]
+            class_tokens = [
+                token
+                for token in class_tokens
+                if token not in {"mb-4", "flex-col", "items-start", "w-full"}
+            ]
+            class_tokens.extend(["mb-4", "flex-col", "items-start", "w-full"])
+            return (
+                f'{match.group("prefix")}{" ".join(class_tokens)}'
+                f'{match.group("suffix")}'
+            )
+
+        updated_content = re.sub(
+            r'(?P<prefix>class:\s*")(?P<class>[^"]*)(?P<suffix>"\s*,\s*limit:\s*link_count)',
+            _rewrite_collection_nav_class,
+            updated_content,
+            count=1,
+        )
+
+        return updated_content
+
+    @classmethod
+    def _stabilize_header_icons_cart_controls(
+        cls,
+        *,
+        filename: str,
+        content: str,
+    ) -> str:
+        if filename != _THEME_HEADER_ICONS_FILENAME:
+            return content
+
+        updated_content = content
+
+        # Remove the custom "Track my order" button and the separator that follows it.
+        updated_content = re.sub(
+            r'<a\s+href="\{\{\s*routes\.cart_url\s*\}\}"[^>]*>'
+            r'.*?(?:Suivre\s+ma\s+commande|Track\s+my\s+order).*?</a>\s*'
+            r'(?:<div\s+class="h-full\s+divider"><span></span></div>\s*)?',
+            "",
+            updated_content,
+            flags=re.IGNORECASE | re.DOTALL,
+            count=1,
+        )
+
+        # Keep the remaining cart control as a plain link (disable cart drawer trigger attrs/classes).
+        updated_content = re.sub(
+            r"\bcart-drawer-button\b",
+            "cart-link-button",
+            updated_content,
+        )
+        updated_content = re.sub(
+            r'\saria-controls="CartDrawer"',
+            "",
+            updated_content,
+        )
+        updated_content = re.sub(
+            r'\saria-expanded="false"',
+            "",
+            updated_content,
+        )
+
+        # Render icon/count only in the top-right cart control.
+        updated_content = re.sub(
+            r'\s*<span\s+class="hidden\s+md:block">\s*'
+            r'\{\{\s*[\'"]general\.cart\.title[\'"]\s*\|\s*t\s*\}\}'
+            r'\s*</span>\s*',
+            "\n",
+            updated_content,
+            flags=re.DOTALL,
+        )
+        return updated_content
+
+    @classmethod
+    def _stabilize_product_card_inventory_language(
+        cls,
+        *,
+        filename: str,
+        content: str,
+    ) -> str:
+        if filename != _THEME_PRODUCT_CARD_SNIPPET_FILENAME:
+            return content
+
+        updated_content = re.sub(
+            r'assign\s+stock_text\s*=\s*["\']En stock["\']',
+            'assign stock_text = "In stock"',
+            content,
+        )
+        updated_content = re.sub(
+            r'assign\s+stock_text\s*=\s*["\']Presque épuisé["\']',
+            'assign stock_text = "Almost sold out"',
+            updated_content,
+        )
+        return updated_content
 
     @classmethod
     def _strip_catalog_navigation_from_header_drawer(
@@ -6117,12 +7589,24 @@ class ShopifyApiClient:
         return _THEME_CATALOG_LINK_MENU_ITEM_RE.sub("", without_catalog_details)
 
     @classmethod
+    def _normalize_theme_text_to_english(
+        cls,
+        *,
+        content: str,
+    ) -> str:
+        normalized = content
+        for pattern, replacement in _THEME_FRENCH_UI_TEXT_REPLACEMENTS:
+            normalized = pattern.sub(replacement, normalized)
+        return normalized
+
+    @classmethod
     def _sync_theme_template_component_image_settings_data(
         cls,
         *,
         template_filename: str,
         template_content: str,
         component_image_urls_by_path: dict[str, str],
+        allow_missing_leaf_paths: set[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         report = {
             "templateFilename": template_filename,
@@ -6136,6 +7620,7 @@ class ShopifyApiClient:
             filename=template_filename,
             template_content=template_content,
         )
+        allowed_missing_leaf_paths = set(allow_missing_leaf_paths or ())
 
         updated_paths: list[str] = []
         missing_paths: list[str] = []
@@ -6155,7 +7640,7 @@ class ShopifyApiClient:
                 node=template_data,
                 path=json_path,
                 value=image_url,
-                create_missing_leaf=False,
+                create_missing_leaf=setting_path in allowed_missing_leaf_paths,
             )
             if update_count > 0:
                 updated_paths.append(setting_path)
@@ -6303,15 +7788,12 @@ class ShopifyApiClient:
         missing_paths: list[str] = []
         for path in expected_paths:
             source_var = profile.settings_value_paths[path]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
-                raise ShopifyApiError(
-                    message=(
-                        f"Theme settings mapping requires css var {source_var} for path {path}. "
-                        "Add the missing token to the design system."
-                    ),
-                    status_code=422,
-                )
+            expected_value = cls._resolve_theme_settings_color_source_value(
+                effective_css_vars=effective_css_vars,
+                source_var=source_var,
+                path=path,
+                context="Theme settings mapping",
+            )
             update_count = 0
             candidate_paths = cls._build_settings_path_candidates(path)
             for candidate_path in candidate_paths:
@@ -6483,8 +7965,14 @@ class ShopifyApiClient:
         missing_paths: list[str] = []
         for path in expected_paths:
             source_var = profile.settings_value_paths[path]
-            expected_value = effective_css_vars.get(source_var)
-            if expected_value is None:
+            try:
+                expected_value = cls._resolve_theme_settings_color_source_value(
+                    effective_css_vars=effective_css_vars,
+                    source_var=source_var,
+                    path=path,
+                    context="Theme settings audit",
+                )
+            except ShopifyApiError:
                 mismatched_paths.append(path)
                 continue
             candidate_values: list[list[Any]] = []
@@ -6730,7 +8218,7 @@ class ShopifyApiClient:
     ) -> dict[str, str]:
         if theme_id and theme_name:
             raise ShopifyApiError(
-                message="Provide exactly one of themeId or themeName.",
+                message="Provide at most one of themeId or themeName.",
                 status_code=400,
             )
         if theme_id:
@@ -6756,38 +8244,41 @@ class ShopifyApiClient:
                 )
             return self._coerce_theme_data(node=theme, query_name="theme")
 
-        if theme_name:
-            cleaned_theme_name = theme_name.strip()
-            if not cleaned_theme_name:
-                raise ShopifyApiError(
-                    message="themeName cannot be empty when provided.",
-                    status_code=400,
-                )
-            query = """
-            query themesForBrandSync($first: Int!) {
-                themes(first: $first) {
-                    nodes {
-                        id
-                        name
-                        role
-                    }
+        cleaned_theme_name = theme_name.strip() if theme_name is not None else None
+        if cleaned_theme_name is not None and not cleaned_theme_name:
+            raise ShopifyApiError(
+                message="themeName cannot be empty when provided.",
+                status_code=400,
+            )
+        query = """
+        query themesForBrandSync($first: Int!) {
+            themes(first: $first) {
+                nodes {
+                    id
+                    name
+                    role
                 }
             }
-            """
-            response = await self._admin_graphql(
-                shop_domain=shop_domain,
-                access_token=access_token,
-                payload={"query": query, "variables": {"first": 100}},
-            )
-            raw_nodes = (response.get("themes") or {}).get("nodes")
-            if not isinstance(raw_nodes, list):
-                raise ShopifyApiError(message="themes query response is invalid.")
+        }
+        """
+        response = await self._admin_graphql(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            payload={"query": query, "variables": {"first": 100}},
+        )
+        raw_nodes = (response.get("themes") or {}).get("nodes")
+        if not isinstance(raw_nodes, list):
+            raise ShopifyApiError(message="themes query response is invalid.")
+        parsed_nodes = [
+            self._coerce_theme_data(node=node, query_name="themes") for node in raw_nodes
+        ]
+        if cleaned_theme_name:
             requested_name = cleaned_theme_name.lower()
-            matches: list[dict[str, str]] = []
-            for node in raw_nodes:
-                parsed = self._coerce_theme_data(node=node, query_name="themes")
-                if parsed["name"].strip().lower() == requested_name:
-                    matches.append(parsed)
+            matches = [
+                parsed
+                for parsed in parsed_nodes
+                if parsed["name"].strip().lower() == requested_name
+            ]
             if not matches:
                 raise ShopifyApiError(
                     message=f"Theme not found for themeName={cleaned_theme_name}.",
@@ -6804,9 +8295,28 @@ class ShopifyApiClient:
                 )
             return matches[0]
 
+        main_themes = [
+            parsed
+            for parsed in parsed_nodes
+            if parsed["role"].strip().upper() == "MAIN"
+        ]
+        if len(main_themes) == 1:
+            return main_themes[0]
+        if not main_themes:
+            raise ShopifyApiError(
+                message=(
+                    "No MAIN theme was found for this store. "
+                    "Provide themeName or themeId explicitly."
+                ),
+                status_code=409,
+            )
+        theme_ids = ", ".join(theme["id"] for theme in main_themes)
         raise ShopifyApiError(
-            message="Exactly one of themeId or themeName is required.",
-            status_code=400,
+            message=(
+                "Multiple MAIN themes were found for this store. "
+                f"Provide themeName or themeId explicitly. matchedThemeIds={theme_ids}"
+            ),
+            status_code=409,
         )
 
     async def _load_theme_file_text(
@@ -7035,7 +8545,37 @@ class ShopifyApiClient:
             status_code=409,
         )
 
-    async def _list_theme_text_files_with_content(
+    @staticmethod
+    def _decode_theme_file_bytes_as_utf8(*, raw_bytes: bytes) -> str | None:
+        try:
+            return raw_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return None
+
+    @staticmethod
+    def _filename_allows_html_body(*, filename: str) -> bool:
+        cleaned = filename.strip().lower()
+        return cleaned.endswith((".html", ".htm", ".liquid"))
+
+    @staticmethod
+    def _looks_like_html_error_document(*, raw_bytes: bytes) -> bool:
+        preview = raw_bytes[:8192].decode("utf-8", errors="ignore").lower()
+        if (
+            "<html" not in preview
+            and "<!doctype html" not in preview
+            and "<body" not in preview
+        ):
+            return False
+        error_markers = (
+            "404",
+            "not found",
+            "page not found",
+            "no such key",
+            "access denied",
+        )
+        return any(marker in preview for marker in error_markers)
+
+    async def _list_theme_files_with_content(
         self,
         *,
         shop_domain: str,
@@ -7073,7 +8613,7 @@ class ShopifyApiClient:
             }
         }
         """
-        files_by_filename: dict[str, str] = {}
+        files_by_filename: dict[str, dict[str, str]] = {}
         unsupported_body_types_by_name: dict[str, list[str]] = {}
         after: str | None = None
 
@@ -7145,6 +8685,10 @@ class ShopifyApiClient:
                             ),
                             status_code=409,
                         )
+                    files_by_filename[cleaned_filename] = {
+                        "filename": cleaned_filename,
+                        "content": content,
+                    }
                 elif typename == "OnlineStoreThemeFileBodyBase64":
                     content_base64 = (
                         body.get("contentBase64") if isinstance(body, dict) else None
@@ -7169,16 +8713,21 @@ class ShopifyApiClient:
                             ),
                             status_code=409,
                         ) from exc
-                    try:
-                        content = decoded_bytes.decode("utf-8-sig")
-                    except UnicodeDecodeError as exc:
-                        raise ShopifyApiError(
-                            message=(
-                                "Theme export only supports UTF-8 text files, but base64 content was "
-                                f"not UTF-8 decodable for filename={cleaned_filename}."
+                    decoded_text = self._decode_theme_file_bytes_as_utf8(
+                        raw_bytes=decoded_bytes
+                    )
+                    if decoded_text is not None:
+                        files_by_filename[cleaned_filename] = {
+                            "filename": cleaned_filename,
+                            "content": decoded_text,
+                        }
+                    else:
+                        files_by_filename[cleaned_filename] = {
+                            "filename": cleaned_filename,
+                            "contentBase64": base64.b64encode(decoded_bytes).decode(
+                                "ascii"
                             ),
-                            status_code=409,
-                        ) from exc
+                        }
                 elif typename == "OnlineStoreThemeFileBodyUrl":
                     body_url = body.get("url") if isinstance(body, dict) else None
                     if not isinstance(body_url, str) or not body_url.strip():
@@ -7193,16 +8742,21 @@ class ShopifyApiClient:
                         filename=cleaned_filename,
                         body_url=body_url.strip(),
                     )
-                    try:
-                        content = downloaded_bytes.decode("utf-8-sig")
-                    except UnicodeDecodeError as exc:
-                        raise ShopifyApiError(
-                            message=(
-                                "Theme export only supports UTF-8 text files, but downloaded URL content was "
-                                f"not UTF-8 decodable for filename={cleaned_filename}."
+                    decoded_text = self._decode_theme_file_bytes_as_utf8(
+                        raw_bytes=downloaded_bytes
+                    )
+                    if decoded_text is not None:
+                        files_by_filename[cleaned_filename] = {
+                            "filename": cleaned_filename,
+                            "content": decoded_text,
+                        }
+                    else:
+                        files_by_filename[cleaned_filename] = {
+                            "filename": cleaned_filename,
+                            "contentBase64": base64.b64encode(downloaded_bytes).decode(
+                                "ascii"
                             ),
-                            status_code=409,
-                        ) from exc
+                        }
                 else:
                     normalized_type = (
                         typename if isinstance(typename, str) and typename else "UNKNOWN"
@@ -7211,7 +8765,6 @@ class ShopifyApiClient:
                         cleaned_filename
                     )
                     continue
-                files_by_filename[cleaned_filename] = content
 
             page_info = files.get("pageInfo")
             if not isinstance(page_info, dict):
@@ -7245,15 +8798,11 @@ class ShopifyApiClient:
                 if not files_by_filename:
                     raise ShopifyApiError(
                         message=(
-                            "Theme export could not load any text-backed files. "
-                            "The theme cannot be exported as a text ZIP package."
+                            "Theme export could not load any files from the selected theme."
                         ),
                         status_code=409,
                     )
-                return [
-                    {"filename": filename, "content": files_by_filename[filename]}
-                    for filename in sorted(files_by_filename.keys())
-                ]
+                return [files_by_filename[filename] for filename in sorted(files_by_filename.keys())]
             end_cursor = page_info.get("endCursor")
             if not isinstance(end_cursor, str) or not end_cursor:
                 raise ShopifyApiError(
@@ -7320,6 +8869,21 @@ class ShopifyApiClient:
                 message=(
                     "Theme export downloaded an empty file body URL for "
                     f"filename={filename}."
+                ),
+                status_code=409,
+            )
+        content_type = response.headers.get("content-type", "").strip().lower()
+        if not self._filename_allows_html_body(
+            filename=filename
+        ) and (
+            "text/html" in content_type
+            or self._looks_like_html_error_document(raw_bytes=response.content)
+        ):
+            raise ShopifyApiError(
+                message=(
+                    "Theme export downloaded an HTML error document for "
+                    f"filename={filename}. The file body URL may have expired or "
+                    "is not accessible. Retry export."
                 ),
                 status_code=409,
             )
@@ -7456,6 +9020,7 @@ class ShopifyApiClient:
         *,
         theme_id: str | None,
         theme_name: str | None,
+        allow_empty: bool = False,
     ) -> tuple[str | None, str | None]:
         normalized_theme_id = (
             theme_id.strip() if isinstance(theme_id, str) and theme_id.strip() else None
@@ -7465,7 +9030,12 @@ class ShopifyApiClient:
             if isinstance(theme_name, str) and theme_name.strip()
             else None
         )
-        if bool(normalized_theme_id) == bool(normalized_theme_name):
+        if normalized_theme_id and normalized_theme_name:
+            raise ShopifyApiError(
+                message="Provide at most one of themeId or themeName.",
+                status_code=400,
+            )
+        if not allow_empty and not normalized_theme_id and not normalized_theme_name:
             raise ShopifyApiError(
                 message="Exactly one of themeId or themeName is required.",
                 status_code=400,
@@ -8091,6 +9661,7 @@ class ShopifyApiClient:
         normalized_theme_id, normalized_theme_name = self._normalize_theme_selector(
             theme_id=theme_id,
             theme_name=theme_name,
+            allow_empty=True,
         )
         theme = await self._resolve_theme_for_brand_sync(
             shop_domain=shop_domain,
@@ -8299,6 +9870,12 @@ class ShopifyApiClient:
             theme_id=theme["id"],
             filename=_THEME_BRAND_SETTINGS_FILENAME,
         )
+        header_drawer_content = await self._try_load_theme_file_text(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            theme_id=theme["id"],
+            filename=_THEME_HEADER_DRAWER_FILENAME,
+        )
         if profile.settings_value_paths and settings_content is None:
             raise ShopifyApiError(
                 message=f"Theme file not found: {_THEME_BRAND_SETTINGS_FILENAME}",
@@ -8327,6 +9904,16 @@ class ShopifyApiClient:
                             logo_url=cleaned_logo_url,
                         )
                     )
+        # Export mode should prefer Shopify-hosted logo references in generated files
+        # when we resolved one from an external source URL.
+        rendered_logo_url = cleaned_logo_url
+        if (
+            not upsert_theme_files
+            and resolve_external_images_to_shopify_files
+            and isinstance(settings_logo_url, str)
+            and settings_logo_url.strip()
+        ):
+            rendered_logo_url = settings_logo_url.strip()
 
         should_list_theme_templates = bool(normalized_auto_component_image_urls) or (
             self._is_theme_component_settings_sync_enabled_for_profile(profile=profile)
@@ -8361,6 +9948,37 @@ class ShopifyApiClient:
                 component_text_values=normalized_component_text_values
             )
         )
+        optional_manifest_image_paths: set[str] = set()
+        optional_manifest_text_paths: set[str] = set()
+        richtext_manifest_text_paths: set[str] = set()
+        if component_image_urls_by_template or component_text_values_by_template:
+            (
+                optional_manifest_image_paths,
+                optional_manifest_text_paths,
+            ) = self._get_optional_theme_template_slot_paths_from_manifest(
+                profile=profile
+            )
+        if component_text_values_by_template:
+            richtext_manifest_text_paths = (
+                self._get_richtext_theme_template_slot_paths_from_manifest(
+                    profile=profile
+                )
+            )
+        optional_component_image_paths_by_template = (
+            self._group_theme_component_setting_paths_by_template(
+                setting_paths=optional_manifest_image_paths
+            )
+        )
+        optional_component_text_paths_by_template = (
+            self._group_theme_component_setting_paths_by_template(
+                setting_paths=optional_manifest_text_paths
+            )
+        )
+        richtext_component_text_paths_by_template = (
+            self._group_theme_component_setting_paths_by_template(
+                setting_paths=richtext_manifest_text_paths
+            )
+        )
         template_filenames_to_load.update(component_image_urls_by_template.keys())
         template_filenames_to_load.update(component_text_values_by_template.keys())
 
@@ -8391,18 +10009,19 @@ class ShopifyApiClient:
             css_filename=css_filename,
             workspace_name=cleaned_workspace_name,
             brand_name=cleaned_brand_name,
-            logo_url=cleaned_logo_url,
+            logo_url=rendered_logo_url,
             data_theme=cleaned_data_theme,
         )
         next_layout = self._replace_theme_brand_liquid_block(
             layout_content=layout_content,
             replacement_block=replacement_block,
         )
+        next_layout = self._normalize_theme_text_to_english(content=next_layout)
         css_content = self._render_theme_brand_css(
             theme_name=theme["name"],
             workspace_name=cleaned_workspace_name,
             brand_name=cleaned_brand_name,
-            logo_url=cleaned_logo_url,
+            logo_url=rendered_logo_url,
             data_theme=cleaned_data_theme,
             css_vars=normalized_css_vars,
             font_urls=normalized_font_urls,
@@ -8428,6 +10047,9 @@ class ShopifyApiClient:
                 settings_content=settings_content,
                 effective_css_vars=effective_css_vars,
                 logo_url=settings_logo_url,
+            )
+            next_settings_content = self._normalize_theme_text_to_english(
+                content=next_settings_content
             )
 
         next_template_contents: dict[str, str] = dict(template_settings_contents)
@@ -8516,6 +10138,12 @@ class ShopifyApiClient:
                 template_filename=template_filename,
                 template_content=template_content,
                 component_text_values_by_path=component_text_map,
+                allow_missing_leaf_paths=optional_component_text_paths_by_template.get(
+                    template_filename, set()
+                ),
+                richtext_setting_paths=richtext_component_text_paths_by_template.get(
+                    template_filename, set()
+                ),
             )
             template_component_text_missing_paths.extend(
                 validation_sync["missingPaths"]
@@ -8544,6 +10172,12 @@ class ShopifyApiClient:
                         template_filename=template_filename,
                         template_content=template_content,
                         component_text_values_by_path=component_text_map,
+                        allow_missing_leaf_paths=optional_component_text_paths_by_template.get(
+                            template_filename, set()
+                        ),
+                        richtext_setting_paths=richtext_component_text_paths_by_template.get(
+                            template_filename, set()
+                        ),
                     )
                 )
                 next_template_contents[template_filename] = next_template_content
@@ -8564,6 +10198,9 @@ class ShopifyApiClient:
                     template_filename=template_filename,
                     template_content=template_content,
                     component_image_urls_by_path=component_image_map,
+                    allow_missing_leaf_paths=optional_component_image_paths_by_template.get(
+                        template_filename, set()
+                    ),
                 )
             )
             template_component_image_missing_paths.extend(
@@ -8619,9 +10256,29 @@ class ShopifyApiClient:
                         template_filename=template_filename,
                         template_content=template_content,
                         component_image_urls_by_path=resolved_component_image_map,
+                        allow_missing_leaf_paths=optional_component_image_paths_by_template.get(
+                            template_filename, set()
+                        ),
                     )
                 )
                 next_template_contents[template_filename] = next_template_content
+
+        for template_filename, template_content in list(next_template_contents.items()):
+            stabilized_template_content = (
+                self._stabilize_collection_images_with_text_overlay_settings(
+                    template_filename=template_filename,
+                    template_content=template_content,
+                )
+            )
+            next_template_contents[template_filename] = self._normalize_theme_text_to_english(
+                content=stabilized_template_content
+            )
+
+        next_header_drawer_content: str | None = None
+        if isinstance(header_drawer_content, str):
+            next_header_drawer_content = self._normalize_theme_text_to_english(
+                content=header_drawer_content
+            )
 
         template_files_to_upsert: list[dict[str, str]] = []
         for (
@@ -8651,6 +10308,17 @@ class ShopifyApiClient:
                 {
                     "filename": _THEME_BRAND_SETTINGS_FILENAME,
                     "content": next_settings_content,
+                }
+            )
+        if (
+            isinstance(header_drawer_content, str)
+            and isinstance(next_header_drawer_content, str)
+            and next_header_drawer_content != header_drawer_content
+        ):
+            files_to_upsert.append(
+                {
+                    "filename": _THEME_HEADER_DRAWER_FILENAME,
+                    "content": next_header_drawer_content,
                 }
             )
         files_to_upsert.extend(template_files_to_upsert)
@@ -8685,32 +10353,55 @@ class ShopifyApiClient:
         if include_file_payloads:
             response_files = files_to_upsert
             if include_all_theme_text_files:
-                full_theme_text_files = await self._list_theme_text_files_with_content(
+                full_theme_text_files = await self._list_theme_files_with_content(
                     shop_domain=shop_domain,
                     access_token=access_token,
                     theme_id=theme["id"],
                 )
-                merged_by_filename = {
-                    item["filename"]: item["content"] for item in full_theme_text_files
+                merged_by_filename: dict[str, dict[str, str]] = {
+                    item["filename"]: dict(item) for item in full_theme_text_files
                 }
                 for item in files_to_upsert:
-                    merged_by_filename[item["filename"]] = item["content"]
+                    merged_by_filename[item["filename"]] = {
+                        "filename": item["filename"],
+                        "content": item["content"],
+                    }
                 response_files = [
-                    {"filename": filename, "content": merged_by_filename[filename]}
+                    merged_by_filename[filename]
                     for filename in sorted(merged_by_filename.keys())
                 ]
             for file_entry in response_files:
                 filename = file_entry.get("filename")
                 content = file_entry.get("content")
-                if (
-                    filename == _THEME_HEADER_DRAWER_FILENAME
-                    and isinstance(content, str)
-                ):
-                    file_entry["content"] = (
-                        self._strip_catalog_navigation_from_header_drawer(
-                            content=content
+                if not isinstance(content, str):
+                    continue
+                normalized_content = self._normalize_theme_text_to_english(
+                    content=content
+                )
+                if isinstance(filename, str):
+                    normalized_content = (
+                        self._stabilize_main_collection_sidebar_menu_layout(
+                            filename=filename,
+                            content=normalized_content,
                         )
                     )
+                    normalized_content = self._stabilize_header_icons_cart_controls(
+                        filename=filename,
+                        content=normalized_content,
+                    )
+                    normalized_content = (
+                        self._stabilize_product_card_inventory_language(
+                            filename=filename,
+                            content=normalized_content,
+                        )
+                    )
+                if filename == _THEME_HEADER_DRAWER_FILENAME:
+                    normalized_content = (
+                        self._strip_catalog_navigation_from_header_drawer(
+                            content=normalized_content
+                        )
+                    )
+                file_entry["content"] = normalized_content
             response["files"] = response_files
         return response
 

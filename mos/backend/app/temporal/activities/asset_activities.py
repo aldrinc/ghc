@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import concurrent.futures
 import hashlib
 import io
 import mimetypes
@@ -61,6 +60,38 @@ class _ProductReferenceAsset:
 @dataclass(frozen=True)
 class _SwipeCandidate:
     company_swipe_id: str
+
+
+def _extract_requirement_swipe_source(requirement: dict[str, Any]) -> tuple[str | None, str | None]:
+    """
+    Resolve an optional explicit swipe source from a requirement payload.
+
+    Supported keys:
+    - companySwipeId / company_swipe_id
+    - swipeImageUrl / swipe_image_url
+    """
+    company_swipe_id = requirement.get("companySwipeId")
+    if not isinstance(company_swipe_id, str) or not company_swipe_id.strip():
+        company_swipe_id = requirement.get("company_swipe_id")
+    if isinstance(company_swipe_id, str):
+        company_swipe_id = company_swipe_id.strip() or None
+    else:
+        company_swipe_id = None
+
+    swipe_image_url = requirement.get("swipeImageUrl")
+    if not isinstance(swipe_image_url, str) or not swipe_image_url.strip():
+        swipe_image_url = requirement.get("swipe_image_url")
+    if isinstance(swipe_image_url, str):
+        swipe_image_url = swipe_image_url.strip() or None
+    else:
+        swipe_image_url = None
+
+    if company_swipe_id and swipe_image_url:
+        raise ValueError(
+            "Asset brief requirement must provide exactly one swipe source when explicit swipe keys are set "
+            "(companySwipeId/company_swipe_id OR swipeImageUrl/swipe_image_url)."
+        )
+    return company_swipe_id, swipe_image_url
 
 
 def _repo(session) -> AssetsRepository:
@@ -802,10 +833,7 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
         payload_in={"asset_brief_id": asset_brief_id, "campaign_id": campaign_id, "product_id": product_id},
     )
 
-    try:
-        creative_client = CreativeServiceClient()
-    except CreativeServiceConfigError as exc:
-        raise RuntimeError(str(exc)) from exc
+    creative_client: CreativeServiceClient | None = None
 
     with session_scope() as session:
         artifacts_repo = ArtifactsRepository(session)
@@ -840,21 +868,14 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 raise ValueError("Asset brief requirements must be objects.")
             requirements.append(req)
 
-        total_assets_per_brief = int(settings.CREATIVE_SERVICE_ASSETS_PER_BRIEF or 6)
-        requirement_allocations = _split_requirement_asset_counts(requirements, total_assets_per_brief)
-
-        swipe_candidates = _load_swipe_candidates(
-            session=session,
-            org_id=org_id,
-            client_id=client_id,
-        )
-        swipe_parallelism = int(os.getenv("SWIPE_BRIEF_MAX_CONCURRENCY", "4"))
-        if swipe_parallelism <= 0:
-            raise ValueError("SWIPE_BRIEF_MAX_CONCURRENCY must be greater than zero.")
         from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
 
         created_asset_ids: list[str] = []
-        for requirement_index, req, _allocation_count in requirement_allocations:
+        selected_swipe_sources: list[dict[str, Any]] = []
+        swipe_candidates: list[_SwipeCandidate] | None = None
+        ordered_swipe_ids: list[str] | None = None
+
+        for requirement_index, req in enumerate(requirements):
             fmt = req.get("format") or "image"
             if not isinstance(fmt, str) or not fmt.strip():
                 raise ValueError("Asset requirement format must be a non-empty string.")
@@ -865,48 +886,67 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                     f"Unsupported format={fmt!r} for requirementIndex={requirement_index}."
                 )
 
-            future_to_swipe_id: dict[concurrent.futures.Future, str] = {}
-            max_workers = min(swipe_parallelism, len(swipe_candidates))
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-                for swipe_candidate in swipe_candidates:
-                    future = executor.submit(
-                        generate_swipe_image_ad_activity,
-                        {
-                            "org_id": org_id,
-                            "client_id": client_id,
-                            "product_id": product_id,
-                            "campaign_id": campaign_id,
-                            "asset_brief_id": asset_brief_id,
-                            "requirement_index": requirement_index,
-                            "company_swipe_id": swipe_candidate.company_swipe_id,
-                            "count": 1,
-                            "workflow_run_id": workflow_run_id,
-                        },
-                    )
-                    future_to_swipe_id[future] = swipe_candidate.company_swipe_id
+            explicit_company_swipe_id, explicit_swipe_image_url = _extract_requirement_swipe_source(req)
+            selected_company_swipe_id = explicit_company_swipe_id
+            selected_swipe_image_url = explicit_swipe_image_url
 
-                for future in concurrent.futures.as_completed(future_to_swipe_id):
-                    company_swipe_id = future_to_swipe_id[future]
-                    try:
-                        swipe_result = future.result()
-                    except Exception as exc:  # noqa: BLE001
-                        for pending in future_to_swipe_id:
-                            if not pending.done():
-                                pending.cancel()
-                        raise RuntimeError(
-                            "Swipe image ad generation failed "
-                            f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
-                            f"company_swipe_id={company_swipe_id})."
-                        ) from exc
-
-                generated_ids = swipe_result.get("asset_ids") if isinstance(swipe_result, dict) else None
-                if not isinstance(generated_ids, list) or not generated_ids:
-                    raise RuntimeError(
-                        "Swipe image ad generation returned no asset_ids "
-                        f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
-                        f"company_swipe_id={company_swipe_id})."
+            # If requirement payload did not specify a swipe source, choose one deterministic client swipe.
+            if not selected_company_swipe_id and not selected_swipe_image_url:
+                if swipe_candidates is None:
+                    swipe_candidates = _load_swipe_candidates(
+                        session=session,
+                        org_id=org_id,
+                        client_id=client_id,
                     )
-                created_asset_ids.extend([str(asset_id) for asset_id in generated_ids if asset_id])
+                    ordered_swipe_ids = sorted({candidate.company_swipe_id for candidate in swipe_candidates})
+                    if not ordered_swipe_ids:
+                        raise ValueError(
+                            "Swipe-only creative generation requires at least one client swipe mapped to company media."
+                        )
+
+                selection_seed = f"{asset_brief_id}:{requirement_index}"
+                digest = hashlib.sha256(selection_seed.encode("utf-8")).hexdigest()
+                pick_index = int(digest[:8], 16) % len(ordered_swipe_ids)
+                selected_company_swipe_id = ordered_swipe_ids[pick_index]
+
+            try:
+                swipe_result = generate_swipe_image_ad_activity(
+                    {
+                        "org_id": org_id,
+                        "client_id": client_id,
+                        "product_id": product_id,
+                        "campaign_id": campaign_id,
+                        "asset_brief_id": asset_brief_id,
+                        "requirement_index": requirement_index,
+                        "company_swipe_id": selected_company_swipe_id,
+                        "swipe_image_url": selected_swipe_image_url,
+                        "count": 1,
+                        "workflow_run_id": workflow_run_id,
+                    },
+                )
+            except Exception as exc:  # noqa: BLE001
+                raise RuntimeError(
+                    "Swipe image ad generation failed "
+                    f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
+                    f"company_swipe_id={selected_company_swipe_id}, swipe_image_url={selected_swipe_image_url}, "
+                    f"error={exc})."
+                ) from exc
+
+            generated_ids = swipe_result.get("asset_ids") if isinstance(swipe_result, dict) else None
+            if not isinstance(generated_ids, list) or not generated_ids:
+                raise RuntimeError(
+                    "Swipe image ad generation returned no asset_ids "
+                    f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
+                    f"company_swipe_id={selected_company_swipe_id}, swipe_image_url={selected_swipe_image_url})."
+                )
+            created_asset_ids.extend([str(asset_id) for asset_id in generated_ids if asset_id])
+            selected_swipe_sources.append(
+                {
+                    "requirement_index": requirement_index,
+                    "company_swipe_id": selected_company_swipe_id,
+                    "swipe_image_url": selected_swipe_image_url,
+                }
+            )
 
         if not created_asset_ids:
             raise RuntimeError(f"No swipe-based assets were generated for brief {asset_brief_id}.")
@@ -918,6 +958,7 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 "asset_brief_id": asset_brief_id,
                 "asset_ids": created_asset_ids,
                 "mode": "swipe_only",
+                "selected_swipe_sources": selected_swipe_sources,
             },
         )
         return {"asset_ids": created_asset_ids}
@@ -1089,6 +1130,12 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                     status="queued",
                     payload=image_payload.model_dump(mode="json"),
                 )
+
+                if creative_client is None:
+                    try:
+                        creative_client = CreativeServiceClient()
+                    except CreativeServiceConfigError as exc:
+                        raise RuntimeError(str(exc)) from exc
 
                 try:
                     created_job = creative_client.create_image_ads(

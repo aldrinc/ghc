@@ -41,11 +41,37 @@ class Settings(BaseSettings):
     TEMPORAL_MEDIA_ENRICHMENT_ACTIVITY_WORKERS: int = 8
     TEMPORAL_ADDRESS: str = "localhost:7234"
     CAMPAIGN_FUNNEL_VARIANT_ACTIVITY_CONCURRENCY: int = 3
+    STRATEGY_V2_DEFAULT_ENABLED: bool = False
+    STRATEGY_V2_VOC_MODEL: str = "gpt-5.2-2025-12-11"
+    STRATEGY_V2_OFFER_MODEL: str = "gpt-5.2-2025-12-11"
+    STRATEGY_V2_COPY_MODEL: str = "gpt-5.2-2025-12-11"
+    STRATEGY_V2_COPY_QA_MODEL: str = "claude-sonnet-4-20250514"
+    STRATEGY_V2_APIFY_ENABLED: bool = False
+    STRATEGY_V2_APIFY_MAX_WAIT_SECONDS: int = 900
+    STRATEGY_V2_APIFY_MAX_ITEMS_PER_DATASET: int = 500
+    STRATEGY_V2_APIFY_MAX_ACTOR_RUNS: int = 100
+    STRATEGY_V2_APIFY_ALLOWED_ACTOR_IDS: str = ""
+    STRATEGY_V2_APIFY_META_ACTOR_ID: str = "curious_coder~facebook-ads-library-scraper"
+    STRATEGY_V2_APIFY_TIKTOK_ACTOR_ID: str = "clockworks/tiktok-scraper"
+    STRATEGY_V2_APIFY_INSTAGRAM_ACTOR_ID: str = "apify/instagram-scraper"
+    STRATEGY_V2_APIFY_YOUTUBE_ACTOR_ID: str = "streamers/youtube-scraper"
+    STRATEGY_V2_APIFY_REDDIT_ACTOR_ID: str = "practicaltools/apify-reddit-api"
+    STRATEGY_V2_APIFY_WEB_ACTOR_ID: str = "apify/web-scraper"
+    STRATEGY_V2_VOC_MERGED_CORPUS_MAX_ROWS: int = 400
+    STRATEGY_V2_VOC_PROMPT_CORPUS_ROWS: int = 80
+    STRATEGY_V2_VOC_PROMPT_STEP4_ROWS: int = 40
+    STRATEGY_V2_VOC_PROMPT_EXTERNAL_ROWS: int = 40
+    STRATEGY_V2_VOC_SOURCE_DIVERSITY_MAX_RATIO: float = 0.25
 
     BACKEND_CORS_ORIGINS: list[str]
 
     OPENAI_API_KEY: str | None = None
     OPENAI_WEBHOOK_SECRET: str | None = None
+    GEMINI_FILE_SEARCH_ENABLED: bool = False
+    GEMINI_FILE_SEARCH_MODEL: str = "gemini-2.5-flash"
+    GEMINI_FILE_SEARCH_STORE_PREFIX: str = "mos"
+    GEMINI_FILE_SEARCH_POLL_INTERVAL_SECONDS: float = 2.0
+    GEMINI_FILE_SEARCH_POLL_TIMEOUT_SECONDS: float = 300.0
     AGENTA_ENABLED: bool = False
     AGENTA_API_KEY: str | None = None
     AGENTA_HOST: str = "https://cloud.agenta.ai"
@@ -82,11 +108,14 @@ class Settings(BaseSettings):
 
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None
+    # Single public Shopify app bridge configuration.
     SHOPIFY_APP_BASE_URL: str | None = None
     SHOPIFY_INTERNAL_API_TOKEN: str | None = None
     SHOPIFY_ORDER_WEBHOOK_SECRET: str | None = None
+    SHOPIFY_COMPLIANCE_WEBHOOK_SECRET: str | None = None
     SHOPIFY_CHECKOUT_REQUEST_TIMEOUT_SECONDS: float = 20.0
     SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS: float = 180.0
+    SHOPIFY_THEME_EXPORT_TIMEOUT_SECONDS: float = 600.0
     SHOPIFY_THEME_COMPONENT_IMAGE_BATCH_SIZE: int = 4
 
     META_GRAPH_API_VERSION: str | None = None
@@ -106,6 +135,13 @@ class Settings(BaseSettings):
     CREATIVE_SERVICE_ASSETS_PER_BRIEF: int = 6
     CREATIVE_SERVICE_RETENTION_DAYS: int = 60
     CREATIVE_SERVICE_PRODUCT_ASSET_CONTEXT_LIMIT: int = 6
+    IMAGE_RENDER_PROVIDER: str = "higgsfield"
+    HIGGSFIELD_BASE_URL: str = "https://platform.higgsfield.ai"
+    HF_KEY: str | None = None
+    HF_API_KEY: str | None = None
+    HF_API_SECRET: str | None = None
+    HIGGSFIELD_DEFAULT_MODEL: str = "nano-banana-pro"
+    HIGGSFIELD_DEFAULT_RESOLUTION: str = "1k"
 
     MEDIA_STORAGE_BUCKET: str | None = None
     MEDIA_STORAGE_PREVIEW_BUCKET: str | None = None

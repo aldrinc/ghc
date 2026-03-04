@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+import { useProductContext } from "@/contexts/ProductContext";
 import {
   useDesignSystems,
   useCreateDesignSystem,
@@ -10,10 +11,10 @@ import {
 } from "@/api/designSystems";
 import {
   useClient,
+  useBuildClientShopifyThemeTemplateDraft,
   useDownloadClientShopifyThemeTemplateZip,
   useGenerateClientShopifyThemeTemplateImages,
   useListClientShopifyThemeTemplateDrafts,
-  usePublishClientShopifyThemeTemplateDraft,
   useCreateClientShopifyInstallUrl,
   useClientShopifyStatus,
   useDisconnectClientShopifyInstallation,
@@ -23,16 +24,21 @@ import {
   useUpdateClientShopifyInstallation,
   useUpdateClient,
   type ClientShopifyThemeTemplateDraftData,
+  type ClientShopifyThemeTemplateGenerateImagesResponse,
   type ClientShopifyThemeTemplateImageSlot,
   type ClientShopifyThemeTemplateTextSlot,
-  type ClientShopifyThemeTemplatePublishResponse,
 } from "@/api/clients";
 import {
+  COMPLIANCE_RULESET_VERSION,
+  useClientComplianceProfile,
+  useUpsertClientComplianceProfile,
   useSyncComplianceShopifyPolicyPages,
+  type ClientComplianceProfile,
+  type ComplianceBusinessModel,
   type ComplianceShopifyPolicySyncResponse,
 } from "@/api/compliance";
 import { useAssets } from "@/api/assets";
-import { useProducts, useUploadProductAssets } from "@/api/products";
+import { useUploadProductAssets } from "@/api/products";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +89,8 @@ const DESIGN_SYSTEM_TEMPLATE = `{
     "--color-brand": "#061a70",
     "--color-bg": "#ffffff",
     "--color-text": "var(--color-brand)",
+    "--footer-text-color": "var(--color-text)",
+    "--announcement-text-color": "var(--footer-text-color)",
     "--color-muted": "rgba(6, 26, 112, 0.76)",
     "--color-border": "rgba(6, 26, 112, 0.18)",
     "--color-soft": "rgba(6, 26, 112, 0.06)",
@@ -391,6 +399,8 @@ const DESIGN_SYSTEM_PROMPT = `Update our DESIGN SYSTEM TEMPLATE for a specific b
 Brand details: [describe your brand, industry, vibe, and any required colors/fonts].
 Return the full updated tokens JSON (same shape/keys as the template).`;
 
+const DEFAULT_SHOPIFY_THEME_NAME = "futrgroup2-0theme";
+
 function formatTokens(tokens: unknown) {
   const value = tokens && typeof tokens === "object" ? tokens : DEFAULT_TOKENS;
   try {
@@ -572,6 +582,20 @@ function orderStringMapByPreferredPaths(
   return ordered;
 }
 
+function areStringMapsEqual(
+  left: Record<string, string>,
+  right: Record<string, string>
+): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  for (const key of leftKeys) {
+    if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+    if (left[key] !== right[key]) return false;
+  }
+  return true;
+}
+
 function parseSlotPathList(raw: string): { value?: string[]; error?: string } {
   if (!raw.trim()) return { value: [] };
   const normalized: string[] = [];
@@ -595,6 +619,14 @@ function parseSlotPathList(raw: string): { value?: string[]; error?: string } {
     };
   }
   return { value: normalized };
+}
+
+function collectTemplateGenerationNonFatalErrors(
+  response: ClientShopifyThemeTemplateGenerateImagesResponse
+): string[] {
+  return [response.imageGenerationError?.trim(), response.copyGenerationError?.trim()].filter(
+    (message): message is string => Boolean(message)
+  );
 }
 
 function humanizeSlotToken(raw: string): string {
@@ -697,8 +729,72 @@ function buildTextSlotReadableLabelMap(
   return labelsByPath;
 }
 
+type ComplianceProfileFormState = {
+  businessModelsCsv: string;
+  legalBusinessName: string;
+  operatingEntityName: string;
+  companyAddressText: string;
+  businessLicenseIdentifier: string;
+  supportEmail: string;
+  supportPhone: string;
+  supportHoursText: string;
+  responseTimeCommitment: string;
+};
+
+const ALLOWED_COMPLIANCE_BUSINESS_MODELS: ComplianceBusinessModel[] = [
+  "ecommerce",
+  "saas_subscription",
+  "digital_product",
+  "online_service",
+  "lead_generation",
+];
+
+function buildComplianceProfileFormState(
+  profile: ClientComplianceProfile | null | undefined,
+  workspaceName?: string
+): ComplianceProfileFormState {
+  const businessModels =
+    profile?.businessModels.length ? profile.businessModels : (["ecommerce"] as ComplianceBusinessModel[]);
+  return {
+    businessModelsCsv: businessModels.join(", "),
+    legalBusinessName: profile?.legalBusinessName?.trim() || workspaceName?.trim() || "",
+    operatingEntityName: profile?.operatingEntityName?.trim() || "",
+    companyAddressText: profile?.companyAddressText?.trim() || "",
+    businessLicenseIdentifier: profile?.businessLicenseIdentifier?.trim() || "",
+    supportEmail: profile?.supportEmail?.trim() || "",
+    supportPhone: profile?.supportPhone?.trim() || "",
+    supportHoursText: profile?.supportHoursText?.trim() || "",
+    responseTimeCommitment: profile?.responseTimeCommitment?.trim() || "",
+  };
+}
+
+function parseComplianceBusinessModels(input: string): ComplianceBusinessModel[] {
+  const requested = input
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (!requested.length) {
+    throw new Error("At least one business model is required.");
+  }
+
+  const deduped = Array.from(new Set(requested));
+  const invalid = deduped.filter((value) => !ALLOWED_COMPLIANCE_BUSINESS_MODELS.includes(value as ComplianceBusinessModel));
+  if (invalid.length) {
+    throw new Error(
+      `Unsupported business model(s): ${invalid.join(", ")}. Allowed: ${ALLOWED_COMPLIANCE_BUSINESS_MODELS.join(", ")}.`
+    );
+  }
+  return deduped as ComplianceBusinessModel[];
+}
+
+function normalizeComplianceOptionalText(value: string): string | undefined {
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
 export function BrandDesignSystemPage() {
   const { workspace } = useWorkspace();
+  const { product: activeWorkspaceProduct, products: workspaceProducts } = useProductContext();
   const { data: client } = useClient(workspace?.id);
   const {
     data: shopifyStatus,
@@ -719,16 +815,19 @@ export function BrandDesignSystemPage() {
   const updateDesignSystem = useUpdateDesignSystem();
   const uploadDesignSystemLogo = useUploadDesignSystemLogo();
   const deleteDesignSystem = useDeleteDesignSystem();
+  const { data: complianceProfile, isLoading: isLoadingComplianceProfile } = useClientComplianceProfile(workspace?.id);
+  const upsertComplianceProfile = useUpsertClientComplianceProfile(workspace?.id);
   const syncCompliancePolicyPages = useSyncComplianceShopifyPolicyPages(workspace?.id);
+  const buildShopifyThemeTemplateDraft = useBuildClientShopifyThemeTemplateDraft(workspace?.id);
   const generateShopifyThemeTemplateImages = useGenerateClientShopifyThemeTemplateImages(workspace?.id);
-  const publishShopifyThemeTemplateDraft = usePublishClientShopifyThemeTemplateDraft(workspace?.id);
   const downloadShopifyThemeTemplateZip = useDownloadClientShopifyThemeTemplateZip(workspace?.id);
   const updateShopifyThemeTemplateDraft = useUpdateClientShopifyThemeTemplateDraft(workspace?.id);
   const {
     data: shopifyThemeTemplateDrafts = [],
+    isFetched: hasFetchedShopifyThemeTemplateDrafts,
+    isLoading: isLoadingShopifyThemeTemplateDrafts,
     refetch: refetchShopifyThemeTemplateDrafts,
   } = useListClientShopifyThemeTemplateDrafts(workspace?.id);
-  const { data: workspaceProducts = [] } = useProducts(workspace?.id);
   const { data: logoAssets = [], isLoading: isLoadingLogoAssets } = useAssets(
     { clientId: workspace?.id, assetKind: "image", statuses: ["approved", "qa_passed"] },
     { enabled: Boolean(workspace?.id) }
@@ -755,7 +854,7 @@ export function BrandDesignSystemPage() {
   const [showManualStorefrontTokenInput, setShowManualStorefrontTokenInput] = useState(false);
   const [shopifySyncShopDomain, setShopifySyncShopDomain] = useState("");
   const [themeSyncDesignSystemId, setThemeSyncDesignSystemId] = useState("");
-  const [themeSyncThemeName, setThemeSyncThemeName] = useState("futrgroup2-0theme");
+  const [themeSyncThemeName, setThemeSyncThemeName] = useState(DEFAULT_SHOPIFY_THEME_NAME);
   const [themeSyncProductId, setThemeSyncProductId] = useState("");
   const [selectedTemplateDraftId, setSelectedTemplateDraftId] = useState("");
   const [templateImageGenerationSlotPathsInput, setTemplateImageGenerationSlotPathsInput] = useState("");
@@ -772,10 +871,15 @@ export function BrandDesignSystemPage() {
   const [templatePreviewTextValues, setTemplatePreviewTextValues] = useState<Record<string, string>>({});
   const [templatePreviewImageErrorsByPath, setTemplatePreviewImageErrorsByPath] = useState<Record<string, boolean>>({});
   const [mappedImageSlotsDialogOpen, setMappedImageSlotsDialogOpen] = useState(false);
-  const [templatePublishResult, setTemplatePublishResult] = useState<ClientShopifyThemeTemplatePublishResponse | null>(null);
   const [policySyncResult, setPolicySyncResult] = useState<ComplianceShopifyPolicySyncResponse | null>(null);
+  const [complianceProfileForm, setComplianceProfileForm] = useState<ComplianceProfileFormState>(() =>
+    buildComplianceProfileFormState(null, workspace?.name)
+  );
   const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
+  const autoCreateBaseTemplateDraftAttemptKeyRef = useRef("");
+  const complianceProfileFormSeedRef = useRef("");
+  const templateDraftPersistQueueRef = useRef<Promise<void>>(Promise.resolve());
   const uploadTemplateProductAssets = useUploadProductAssets(templateAssetUploadProductId || "");
 
   const designSystemOptions = useMemo(
@@ -803,7 +907,10 @@ export function BrandDesignSystemPage() {
       .map((shopDomain) => ({ label: shopDomain, value: shopDomain }));
   }, [shopifyStatus?.selectedShopDomain, shopifyStatus?.shopDomain, shopifyStatus?.shopDomains]);
   const hasShopifyConnectionTarget = shopDomainOptions.length > 0;
+  const hasSavedComplianceProfile = Boolean(complianceProfile?.id);
   const shopifyState = shopifyStatus?.state || "error";
+  const installationState = shopifyStatus?.installationState || "not_installed";
+  const canUseAdvancedShopifyFeatures = shopifyState === "ready";
   const shopifyStatusTone = useMemo(() => {
     if (shopifyState === "ready") return "success" as const;
     if (shopifyState === "not_connected" || shopifyState === "installed_missing_storefront_token") return "neutral" as const;
@@ -826,6 +933,19 @@ export function BrandDesignSystemPage() {
     if (fallbackErrorMessage) return fallbackErrorMessage;
     return "Checking Shopify connection status.";
   }, [shopifyStatus?.message, shopifyStatusError]);
+  const installationStatusLabel = useMemo(() => {
+    if (installationState === "installed") return "Installed";
+    if (installationState === "installed_missing_storefront_token") return "Installed (missing token)";
+    if (installationState === "conflict") return "Conflict";
+    if (installationState === "error") return "Error";
+    return "Not installed";
+  }, [installationState]);
+  const complianceProfileUpdatedAtLabel = useMemo(() => {
+    if (!complianceProfile?.updatedAt) return "";
+    const parsed = new Date(complianceProfile.updatedAt);
+    if (Number.isNaN(parsed.getTime())) return complianceProfile.updatedAt;
+    return parsed.toLocaleString();
+  }, [complianceProfile?.updatedAt]);
   const isShopifyConnectionMutating =
     createShopifyInstallUrl.isPending ||
     autoProvisionShopifyStorefrontToken.isPending ||
@@ -844,7 +964,7 @@ export function BrandDesignSystemPage() {
     setShowManualStorefrontTokenInput(false);
     setShopifySyncShopDomain("");
     setThemeSyncDesignSystemId("");
-    setThemeSyncThemeName("futrgroup2-0theme");
+    setThemeSyncThemeName(DEFAULT_SHOPIFY_THEME_NAME);
     setThemeSyncProductId("");
     setSelectedTemplateDraftId("");
     setTemplateImageGenerationSlotPathsInput("");
@@ -861,9 +981,19 @@ export function BrandDesignSystemPage() {
     setTemplatePreviewTextValues({});
     setTemplatePreviewImageErrorsByPath({});
     setMappedImageSlotsDialogOpen(false);
-    setTemplatePublishResult(null);
     setPolicySyncResult(null);
-  }, [workspace?.id]);
+    complianceProfileFormSeedRef.current = "";
+    setComplianceProfileForm(buildComplianceProfileFormState(null, workspace?.name));
+  }, [workspace?.id, workspace?.name]);
+
+  useEffect(() => {
+    const workspaceId = workspace?.id || "";
+    const profileVersion = complianceProfile?.updatedAt || "missing";
+    const nextSeed = `${workspaceId}:${profileVersion}`;
+    if (!workspaceId || complianceProfileFormSeedRef.current === nextSeed) return;
+    complianceProfileFormSeedRef.current = nextSeed;
+    setComplianceProfileForm(buildComplianceProfileFormState(complianceProfile, workspace?.name));
+  }, [complianceProfile, workspace?.id, workspace?.name]);
 
   useEffect(() => {
     const connectedShopDomainCandidates = [
@@ -1023,17 +1153,25 @@ export function BrandDesignSystemPage() {
       return;
     }
     setTemplateAssetUploadProductId((current) => {
-      if (current && workspaceProducts.some((product) => product.id === current)) return current;
       const draftProductId =
-        selectedTemplateDraft?.productId ||
-        selectedTemplateDraft?.latestVersion?.data.productId ||
+        selectedTemplateDraft?.latestVersion?.data.productId?.trim() ||
+        selectedTemplateDraft?.productId?.trim() ||
         themeSyncProductId.trim();
       if (draftProductId && workspaceProducts.some((product) => product.id === draftProductId)) {
         return draftProductId;
       }
+      if (current && workspaceProducts.some((product) => product.id === current)) return current;
+      const activeWorkspaceProductId = activeWorkspaceProduct?.id?.trim() || "";
+      if (
+        activeWorkspaceProductId &&
+        workspaceProducts.some((product) => product.id === activeWorkspaceProductId)
+      ) {
+        return activeWorkspaceProductId;
+      }
       return workspaceProducts[0]?.id || "";
     });
   }, [
+    activeWorkspaceProduct?.id,
     workspaceProducts,
     selectedTemplateDraft?.id,
     selectedTemplateDraft?.productId,
@@ -1300,10 +1438,11 @@ export function BrandDesignSystemPage() {
       return;
     }
     const response = await createShopifyInstallUrl.mutateAsync({ shopDomain: nextDomain });
-    if (!response.installUrl) {
+    const installUrl = response.installUrl?.trim() || "";
+    if (!installUrl) {
       throw new Error("Install URL is missing from response.");
     }
-    window.location.assign(response.installUrl);
+    window.location.assign(installUrl);
   };
 
   const handleSetStorefrontToken = async () => {
@@ -1387,23 +1526,122 @@ export function BrandDesignSystemPage() {
       componentImageAssetMap,
       templateImageSlotPathOrder
     );
-    try {
-      await updateShopifyThemeTemplateDraft.mutateAsync({
-        draftId: selectedTemplateDraftId,
-        payload: {
-          componentImageAssetMap: orderedImageMap,
-          componentTextValues,
-        },
-        suppressSuccessToast: true,
+    const persistPromise = templateDraftPersistQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        await updateShopifyThemeTemplateDraft.mutateAsync({
+          draftId: selectedTemplateDraftId,
+          payload: {
+            componentImageAssetMap: orderedImageMap,
+            componentTextValues,
+          },
+          suppressSuccessToast: true,
+        });
+        setTemplateDraftEditError(null);
       });
+    templateDraftPersistQueueRef.current = persistPromise;
+    await persistPromise;
+  };
+
+  const handleCreateBaseTemplateDraft = async () => {
+    if (!workspace?.id) return;
+    if (!canUseAdvancedShopifyFeatures) {
+      toast.error("Connect Shopify and resolve setup errors before using template build/export features.");
+      return;
+    }
+    const nextThemeName = themeSyncThemeName.trim();
+
+    const payload: {
+      themeName?: string;
+      shopDomain?: string;
+      designSystemId?: string;
+      productId?: string;
+    } = {};
+    if (nextThemeName) payload.themeName = nextThemeName;
+
+    const normalizedShopDomain = shopifySyncShopDomain.trim().toLowerCase();
+    if (normalizedShopDomain) payload.shopDomain = normalizedShopDomain;
+    const normalizedDesignSystemId = themeSyncDesignSystemId.trim();
+    if (normalizedDesignSystemId) payload.designSystemId = normalizedDesignSystemId;
+    const normalizedProductId =
+      themeSyncProductId.trim() ||
+      activeWorkspaceProduct?.id?.trim() ||
+      templateAssetUploadProductId.trim();
+    if (normalizedProductId) payload.productId = normalizedProductId;
+
+    try {
+      const response = await buildShopifyThemeTemplateDraft.mutateAsync(payload);
+      const draftId = response.draft.id;
+      const draftProductId = response.draft.productId?.trim() || normalizedProductId;
+      setSelectedTemplateDraftId(draftId);
       setTemplateDraftEditError(null);
+      await refetchShopifyThemeTemplateDrafts();
+      if (!draftProductId) {
+        const errorMessage =
+          "Template draft created, but product-specific copy generation requires a productId.";
+        setTemplateDraftEditError(errorMessage);
+        toast.error(errorMessage);
+        return;
+      }
+      const generationResponse = await generateShopifyThemeTemplateImages.mutateAsync({
+        draftId,
+        productId: draftProductId,
+      });
+      const nonFatalErrors = collectTemplateGenerationNonFatalErrors(generationResponse);
+      await refetchShopifyThemeTemplateDrafts();
+      setTemplateDraftEditError(nonFatalErrors.length ? nonFatalErrors.join(" ") : null);
     } catch {
       // Error toast is emitted by the mutation hook.
     }
   };
 
+  useEffect(() => {
+    if (shopifyThemeTemplateDrafts.length) {
+      autoCreateBaseTemplateDraftAttemptKeyRef.current = "";
+    }
+  }, [shopifyThemeTemplateDrafts.length]);
+
+  useEffect(() => {
+    if (!workspace?.id) return;
+    if (!hasFetchedShopifyThemeTemplateDrafts || isLoadingShopifyThemeTemplateDrafts) return;
+    if (shopifyThemeTemplateDrafts.length) return;
+    if (buildShopifyThemeTemplateDraft.isPending) return;
+    if (shopifyState !== "ready") return;
+    if (!canUseAdvancedShopifyFeatures) return;
+    if (!hasShopifyConnectionTarget) return;
+    const nextThemeName = themeSyncThemeName.trim();
+
+    const attemptKey = [
+      workspace.id,
+      shopifySyncShopDomain.trim().toLowerCase(),
+      themeSyncDesignSystemId.trim(),
+      themeSyncProductId.trim(),
+      nextThemeName,
+    ].join("|");
+    if (autoCreateBaseTemplateDraftAttemptKeyRef.current === attemptKey) return;
+    autoCreateBaseTemplateDraftAttemptKeyRef.current = attemptKey;
+    void handleCreateBaseTemplateDraft();
+  }, [
+    workspace?.id,
+    hasFetchedShopifyThemeTemplateDrafts,
+    isLoadingShopifyThemeTemplateDrafts,
+    shopifyThemeTemplateDrafts.length,
+    buildShopifyThemeTemplateDraft.isPending,
+    shopifyState,
+    canUseAdvancedShopifyFeatures,
+    hasShopifyConnectionTarget,
+    shopifySyncShopDomain,
+    themeSyncDesignSystemId,
+    themeSyncProductId,
+    themeSyncThemeName,
+  ]);
+
   const handleGenerateTemplateDraftImages = async () => {
     if (!workspace?.id) return;
+    if (!canUseAdvancedShopifyFeatures) {
+      toast.error("Connect Shopify and resolve setup errors before generating template images or text.");
+      return;
+    }
     if (!selectedTemplateDraftId) {
       toast.error("Select a template draft first.");
       return;
@@ -1420,7 +1658,11 @@ export function BrandDesignSystemPage() {
     } = {
       draftId: selectedTemplateDraftId,
     };
-    const explicitProductId = templateAssetUploadProductId.trim() || themeSyncProductId.trim();
+    const explicitProductId =
+      selectedTemplateDraft?.latestVersion?.data.productId?.trim() ||
+      selectedTemplateDraft?.productId?.trim() ||
+      templateAssetUploadProductId.trim() ||
+      themeSyncProductId.trim();
     if (explicitProductId) payload.productId = explicitProductId;
     if (parsedSlotPathList.value.length) payload.slotPaths = parsedSlotPathList.value;
     setTemplateDraftEditError(null);
@@ -1454,12 +1696,17 @@ export function BrandDesignSystemPage() {
     if (generatedProductId) {
       setTemplateAssetUploadProductId(generatedProductId);
     }
-    setTemplateDraftEditError(null);
+    const nonFatalErrors = collectTemplateGenerationNonFatalErrors(response);
+    setTemplateDraftEditError(nonFatalErrors.length ? nonFatalErrors.join(" ") : null);
     await refetchWorkspaceImageAssets();
   };
 
   const handleClearTemplateDraftImageMappings = async () => {
     if (!workspace?.id) return;
+    if (!canUseAdvancedShopifyFeatures) {
+      toast.error("Connect Shopify and resolve setup errors before editing template mappings.");
+      return;
+    }
     if (!selectedTemplateDraftId) {
       toast.error("Select a template draft first.");
       return;
@@ -1484,6 +1731,10 @@ export function BrandDesignSystemPage() {
 
   const handleClearTemplateDraftImageMapping = async (slotPath: string) => {
     if (!workspace?.id) return;
+    if (!canUseAdvancedShopifyFeatures) {
+      toast.error("Connect Shopify and resolve setup errors before editing template mappings.");
+      return;
+    }
     if (!selectedTemplateDraftId) {
       toast.error("Select a template draft first.");
       return;
@@ -1555,6 +1806,8 @@ export function BrandDesignSystemPage() {
     void persistTemplateDraftEdits({
       componentImageAssetMap: orderedNextImageMap,
       componentTextValues: parsedTextValues.value,
+    }).catch(() => {
+      // Error toast is emitted by the mutation hook.
     });
   };
 
@@ -1580,6 +1833,8 @@ export function BrandDesignSystemPage() {
     void persistTemplateDraftEdits({
       componentImageAssetMap: parsedImageMap.value,
       componentTextValues: nextTextValues,
+    }).catch(() => {
+      // Error toast is emitted by the mutation hook.
     });
   };
 
@@ -1641,17 +1896,48 @@ export function BrandDesignSystemPage() {
     setMappedImageSlotsDialogOpen(true);
   };
 
-  const handlePublishTemplateDraft = async () => {
+  const handleComplianceProfileFieldChange = (
+    field: keyof ComplianceProfileFormState,
+    value: string
+  ) => {
+    setComplianceProfileForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  };
+
+  const handleSaveComplianceProfile = async () => {
     if (!workspace?.id) return;
-    if (!selectedTemplateDraftId) {
-      toast.error("Select a template draft first.");
+    const workspaceName = workspace?.name?.trim() || "";
+    if (!workspaceName) {
+      toast.error("Workspace name is required before saving a compliance profile.");
       return;
     }
+
+    let businessModels: ComplianceBusinessModel[];
     try {
-      const response = await publishShopifyThemeTemplateDraft.mutateAsync({
-        draftId: selectedTemplateDraftId,
+      businessModels = parseComplianceBusinessModels(complianceProfileForm.businessModelsCsv);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Invalid business models.";
+      toast.error(message);
+      return;
+    }
+
+    try {
+      const saved = await upsertComplianceProfile.mutateAsync({
+        rulesetVersion: COMPLIANCE_RULESET_VERSION,
+        businessModels,
+        legalBusinessName: normalizeComplianceOptionalText(complianceProfileForm.legalBusinessName),
+        operatingEntityName: normalizeComplianceOptionalText(complianceProfileForm.operatingEntityName),
+        companyAddressText: normalizeComplianceOptionalText(complianceProfileForm.companyAddressText),
+        businessLicenseIdentifier: normalizeComplianceOptionalText(complianceProfileForm.businessLicenseIdentifier),
+        supportEmail: normalizeComplianceOptionalText(complianceProfileForm.supportEmail),
+        supportPhone: normalizeComplianceOptionalText(complianceProfileForm.supportPhone),
+        supportHoursText: normalizeComplianceOptionalText(complianceProfileForm.supportHoursText),
+        responseTimeCommitment: normalizeComplianceOptionalText(complianceProfileForm.responseTimeCommitment),
+        metadata: {},
       });
-      setTemplatePublishResult(response);
+      setComplianceProfileForm(buildComplianceProfileFormState(saved, workspace?.name));
     } catch {
       // Error toast is emitted by the mutation hook.
     }
@@ -1659,8 +1945,57 @@ export function BrandDesignSystemPage() {
 
   const handleDownloadTemplateZip = async () => {
     if (!workspace?.id) return;
+    if (!canUseAdvancedShopifyFeatures) {
+      toast.error("Connect Shopify and resolve setup errors before exporting template ZIP files.");
+      return;
+    }
     if (!selectedTemplateDraftId.trim()) {
       toast.error("Select a template draft first.");
+      return;
+    }
+    if (!hasSavedComplianceProfile) {
+      toast.error("Save a compliance profile before exporting the template ZIP.");
+      return;
+    }
+    const parsedImageMap = parseStringMap(templateDraftImageMapInput, "Image map");
+    if (!parsedImageMap.value) {
+      const message = parsedImageMap.error || "Invalid image map.";
+      setTemplateDraftEditError(message);
+      toast.error(message);
+      return;
+    }
+    const parsedTextValues = parseStringMap(templateDraftTextValuesInput, "Text values");
+    if (!parsedTextValues.value) {
+      const message = parsedTextValues.error || "Invalid text values.";
+      setTemplateDraftEditError(message);
+      toast.error(message);
+      return;
+    }
+    const currentOrderedImageMap = orderStringMapByPreferredPaths(
+      parsedImageMap.value,
+      templateImageSlotPathOrder
+    );
+    const latestVersionData = selectedTemplateDraft?.latestVersion?.data;
+    const latestOrderedImageMap = orderStringMapByPreferredPaths(
+      latestVersionData?.componentImageAssetMap || {},
+      templateImageSlotPathOrder
+    );
+    const latestTextValues = latestVersionData?.componentTextValues || {};
+    const hasUnsavedDraftEdits =
+      !areStringMapsEqual(currentOrderedImageMap, latestOrderedImageMap) ||
+      !areStringMapsEqual(parsedTextValues.value, latestTextValues);
+    try {
+      if (hasUnsavedDraftEdits) {
+        await persistTemplateDraftEdits({
+          componentImageAssetMap: currentOrderedImageMap,
+          componentTextValues: parsedTextValues.value,
+        });
+      } else {
+        await templateDraftPersistQueueRef.current;
+      }
+      setTemplateDraftEditError(null);
+    } catch {
+      // Error toast is emitted by the mutation hook.
       return;
     }
     try {
@@ -1674,6 +2009,10 @@ export function BrandDesignSystemPage() {
 
   const handleSyncCompliancePolicyPages = async () => {
     if (!workspace?.id) return;
+    if (!hasSavedComplianceProfile) {
+      toast.error("Save a compliance profile before generating policy pages.");
+      return;
+    }
     const payload = shopifySyncShopDomain ? { shopDomain: shopifySyncShopDomain } : {};
     try {
       const response = await syncCompliancePolicyPages.mutateAsync(payload);
@@ -1865,6 +2204,7 @@ export function BrandDesignSystemPage() {
             <Badge tone={shopifyStatusTone}>{isLoadingShopifyStatus ? "Checking…" : shopifyStatusLabel}</Badge>
           </div>
           <div className="text-xs text-content-muted">{shopifyStatusMessage}</div>
+          <div className="text-xs text-content-muted">Installation: {installationStatusLabel}</div>
           {shopifyStatus?.missingScopes?.length ? (
             <div className="text-xs text-danger">Missing scopes: {shopifyStatus.missingScopes.join(", ")}</div>
           ) : null}
@@ -1930,14 +2270,14 @@ export function BrandDesignSystemPage() {
               >
                 Refresh
               </Button>
-              <Button
-                size="sm"
-                onClick={() => void handleConnectShopify()}
-                disabled={!workspace?.id || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
-              >
-                {createShopifyInstallUrl.isPending ? "Redirecting…" : "Connect Shopify"}
-              </Button>
-            </div>
+                <Button
+                  size="sm"
+                  onClick={() => void handleConnectShopify()}
+                  disabled={!workspace?.id || !shopifyShopDomainDraft.trim() || isShopifyConnectionMutating}
+                >
+                  {createShopifyInstallUrl.isPending ? "Redirecting…" : "Connect Shopify app"}
+                </Button>
+              </div>
           )}
           {shopifyState === "installed_missing_storefront_token" ? (
             <div className="space-y-2">
@@ -1994,7 +2334,7 @@ export function BrandDesignSystemPage() {
             <div>
               <div className="text-sm font-semibold text-content">Theme template workflow</div>
               <div className="text-xs text-content-muted">
-                Review and edit the template draft in mOS, then publish the approved draft to Shopify.
+                Review and edit the template draft in mOS, then export the approved ZIP package.
               </div>
             </div>
           </div>
@@ -2003,10 +2343,11 @@ export function BrandDesignSystemPage() {
             <Input
               value={themeSyncThemeName}
               onChange={(event) => setThemeSyncThemeName(event.target.value)}
-              placeholder="futrgroup2-0theme"
+              placeholder={`Theme name (default: ${DEFAULT_SHOPIFY_THEME_NAME})`}
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
-              Target Shopify theme name. This is used when building or auditing drafts.
+              Optional: target Shopify theme name. Default is {DEFAULT_SHOPIFY_THEME_NAME}; clear it to build
+              from the store&apos;s main theme.
             </div>
           </div>
 
@@ -2052,7 +2393,7 @@ export function BrandDesignSystemPage() {
               disabled={!templateDraftOptions.length}
             />
             <div className="text-xs text-content-muted md:flex md:items-center">
-              Select a draft to review/edit in mOS before publishing.
+              Select a draft to review/edit in mOS before exporting.
             </div>
           </div>
 
@@ -2381,7 +2722,7 @@ export function BrandDesignSystemPage() {
                   onClick={() => {
                     void handleClearTemplateDraftImageMappings();
                   }}
-                  disabled={updateShopifyThemeTemplateDraft.isPending}
+                  disabled={updateShopifyThemeTemplateDraft.isPending || !canUseAdvancedShopifyFeatures}
                 >
                   {updateShopifyThemeTemplateDraft.isPending ? "Clearing…" : "Clear all mapped image slots"}
                 </Button>
@@ -2391,7 +2732,7 @@ export function BrandDesignSystemPage() {
                   onClick={() => {
                     void handleGenerateTemplateDraftImages();
                   }}
-                  disabled={generateShopifyThemeTemplateImages.isPending}
+                  disabled={generateShopifyThemeTemplateImages.isPending || !canUseAdvancedShopifyFeatures}
                 >
                   {generateShopifyThemeTemplateImages.isPending
                     ? "Generating…"
@@ -2412,20 +2753,17 @@ export function BrandDesignSystemPage() {
                   }}
                   disabled={
                     downloadShopifyThemeTemplateZip.isPending ||
+                    updateShopifyThemeTemplateDraft.isPending ||
+                    !canUseAdvancedShopifyFeatures ||
                     !hasShopifyConnectionTarget ||
                     !selectedTemplateDraftId.trim()
                   }
                 >
-                  {downloadShopifyThemeTemplateZip.isPending ? "Preparing ZIP…" : "Download template ZIP"}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    void handlePublishTemplateDraft();
-                  }}
-                  disabled={publishShopifyThemeTemplateDraft.isPending}
-                >
-                  {publishShopifyThemeTemplateDraft.isPending ? "Publishing…" : "Publish template"}
+                  {downloadShopifyThemeTemplateZip.isPending
+                    ? "Preparing ZIP…"
+                    : updateShopifyThemeTemplateDraft.isPending
+                      ? "Saving draft…"
+                      : "Download template ZIP"}
                 </Button>
               </div>
               <div className="text-xs text-content-muted">
@@ -2433,54 +2771,32 @@ export function BrandDesignSystemPage() {
                 {selectedTemplateDraft.latestVersion.data.textSlots.length} text · Draft edits auto-save
               </div>
             </div>
-          ) : null}
-
-          {templatePublishResult ? (
-            <div className="space-y-2 rounded-md border border-divider p-3">
+          ) : (
+            <div className="space-y-2 rounded-md border border-dashed border-border bg-surface-2 p-3">
               <div className="text-xs text-content-muted">
-                Last publish: <span className="font-semibold text-content">{templatePublishResult.sync.shopDomain}</span> ·{" "}
-                <span className="font-semibold text-content">{templatePublishResult.sync.themeName}</span>
+                No template drafts exist yet. A base draft is required before generating content or downloading ZIP
+                exports.
               </div>
-              <Table variant="ghost" size={1} layout="fixed" containerClassName="rounded-md border border-divider">
-                <TableBody>
-                  <TableRow>
-                    <TableCell className="w-[240px] text-xs text-content-muted">Draft</TableCell>
-                    <TableCell className="text-xs text-content break-all">
-                      {templatePublishResult.draft.id} · v{templatePublishResult.version.versionNumber}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">CSS asset</TableCell>
-                    <TableCell className="text-xs text-content break-all">{templatePublishResult.sync.cssFilename}</TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Settings file</TableCell>
-                    <TableCell className="text-xs text-content break-all">
-                      {templatePublishResult.sync.settingsFilename || "n/a"}
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Coverage</TableCell>
-                    <TableCell className="text-xs text-content">
-                      {templatePublishResult.sync.coverage.requiredThemeVars.length} required theme vars ·{" "}
-                      {templatePublishResult.sync.coverage.missingThemeVars.length} missing
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Settings paths</TableCell>
-                    <TableCell className="text-xs text-content">
-                      {templatePublishResult.sync.settingsSync.updatedPaths.length} updated ·{" "}
-                      {templatePublishResult.sync.settingsSync.missingPaths.length} missing
-                    </TableCell>
-                  </TableRow>
-                  <TableRow>
-                    <TableCell className="text-xs text-content-muted">Job ID</TableCell>
-                    <TableCell className="text-xs text-content break-all">{templatePublishResult.sync.jobId || "n/a"}</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    void handleCreateBaseTemplateDraft();
+                  }}
+                  disabled={
+                    buildShopifyThemeTemplateDraft.isPending ||
+                    shopifyState !== "ready" ||
+                    !canUseAdvancedShopifyFeatures ||
+                    !hasShopifyConnectionTarget
+                  }
+                >
+                  {buildShopifyThemeTemplateDraft.isPending
+                    ? "Creating base draft…"
+                    : "Create base template draft"}
+                </Button>
+              </div>
             </div>
-          ) : null}
+          )}
 
         </div>
 
@@ -2489,18 +2805,131 @@ export function BrandDesignSystemPage() {
             <div>
               <div className="text-sm font-semibold text-content">Compliance policy pages</div>
               <div className="text-xs text-content-muted">
-                Generate and sync brand/workspace policy pages to Shopify using your configured compliance profile.
+                Save your compliance profile, then generate and sync policy pages to Shopify.
               </div>
             </div>
-            <Button
-              size="sm"
-              onClick={() => {
-                void handleSyncCompliancePolicyPages();
-              }}
-              disabled={syncCompliancePolicyPages.isPending || !hasShopifyConnectionTarget}
-            >
-              {syncCompliancePolicyPages.isPending ? "Generating…" : "Generate policy pages"}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  void handleSaveComplianceProfile();
+                }}
+                disabled={upsertComplianceProfile.isPending || isLoadingComplianceProfile || !workspace?.id}
+              >
+                {upsertComplianceProfile.isPending ? "Saving…" : "Save compliance profile"}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  void handleSyncCompliancePolicyPages();
+                }}
+                disabled={
+                  syncCompliancePolicyPages.isPending ||
+                  !hasShopifyConnectionTarget ||
+                  !hasSavedComplianceProfile ||
+                  isLoadingComplianceProfile
+                }
+              >
+                {syncCompliancePolicyPages.isPending ? "Generating…" : "Generate policy pages"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-md border border-divider bg-surface-2 p-3">
+            <div className="text-xs text-content-muted">
+              Ruleset: <span className="font-semibold text-content">{COMPLIANCE_RULESET_VERSION}</span>
+            </div>
+            <div className="text-xs text-content-muted">
+              {isLoadingComplianceProfile
+                ? "Loading compliance profile…"
+                : hasSavedComplianceProfile
+                  ? `Profile saved${complianceProfileUpdatedAtLabel ? ` · Updated ${complianceProfileUpdatedAtLabel}` : ""}`
+                  : "No compliance profile saved yet. Save this section before ZIP export or policy generation."}
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-semibold text-content">Business models</label>
+                <Input
+                  value={complianceProfileForm.businessModelsCsv}
+                  onChange={(event) => handleComplianceProfileFieldChange("businessModelsCsv", event.target.value)}
+                  placeholder="ecommerce"
+                />
+                <div className="text-[11px] text-content-muted">
+                  Comma-separated. Allowed: {ALLOWED_COMPLIANCE_BUSINESS_MODELS.join(", ")}.
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Legal business name</label>
+                <Input
+                  value={complianceProfileForm.legalBusinessName}
+                  onChange={(event) => handleComplianceProfileFieldChange("legalBusinessName", event.target.value)}
+                  placeholder="The Honest Herbalist LLC"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Operating entity name</label>
+                <Input
+                  value={complianceProfileForm.operatingEntityName}
+                  onChange={(event) => handleComplianceProfileFieldChange("operatingEntityName", event.target.value)}
+                  placeholder="Aldrin Clement"
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-semibold text-content">Company address text</label>
+                <textarea
+                  rows={2}
+                  value={complianceProfileForm.companyAddressText}
+                  onChange={(event) => handleComplianceProfileFieldChange("companyAddressText", event.target.value)}
+                  placeholder="123 Main St, Suite 10, Austin, TX 78701, United States"
+                  className={cn(
+                    "w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-content shadow-sm transition",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                  )}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Business license ID</label>
+                <Input
+                  value={complianceProfileForm.businessLicenseIdentifier}
+                  onChange={(event) => handleComplianceProfileFieldChange("businessLicenseIdentifier", event.target.value)}
+                  placeholder="TX-1234567"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Support email</label>
+                <Input
+                  value={complianceProfileForm.supportEmail}
+                  onChange={(event) => handleComplianceProfileFieldChange("supportEmail", event.target.value)}
+                  placeholder="support@company.com"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Support phone</label>
+                <Input
+                  value={complianceProfileForm.supportPhone}
+                  onChange={(event) => handleComplianceProfileFieldChange("supportPhone", event.target.value)}
+                  placeholder="+1 555 010 1000"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-content">Support hours</label>
+                <Input
+                  value={complianceProfileForm.supportHoursText}
+                  onChange={(event) => handleComplianceProfileFieldChange("supportHoursText", event.target.value)}
+                  placeholder="Mon-Fri 9:00 AM-5:00 PM CST"
+                />
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-semibold text-content">Response time commitment</label>
+                <Input
+                  value={complianceProfileForm.responseTimeCommitment}
+                  onChange={(event) => handleComplianceProfileFieldChange("responseTimeCommitment", event.target.value)}
+                  placeholder="Within 2 business days"
+                />
+              </div>
+            </div>
           </div>
 
           {policySyncResult ? (
@@ -3172,7 +3601,7 @@ export function BrandDesignSystemPage() {
           <div className="space-y-2">
             <DialogTitle>Template Draft Preview</DialogTitle>
             <DialogDescription>
-              Review mapped images and text before publishing this template to Shopify.
+              Review mapped images and text before exporting this template ZIP.
             </DialogDescription>
           </div>
 

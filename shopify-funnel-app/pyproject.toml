@@ -17,6 +17,7 @@ dependencies = [
   "pydantic-settings",
   "python-dotenv",
   "orjson",
+  "PyJWT",
 ]
 
 [project.optional-dependencies]

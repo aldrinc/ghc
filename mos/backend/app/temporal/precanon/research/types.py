@@ -99,6 +99,7 @@ class PersistArtifactResult:
     idea_folder_id: Optional[str]
     idea_folder_url: Optional[str]
     claude_file_id: Optional[str]
+    gemini_document_name: Optional[str]
     created_at_iso: str
 
 

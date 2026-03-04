@@ -13,5 +13,5 @@ export const appRoutes: AppRoute[] = [
   { path: "/research", label: "Research" },
   { path: "/research/funnels", label: "Funnels" },
   { path: "/creative-library", label: "Creative Library" },
-  { path: "/claude-chat", label: "Claude Chat" },
+  { path: "/claude-chat", label: "Assistant Chat" },
 ];

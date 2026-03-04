@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HeadlineInput",
+  "description": "Input schema for the Headline Engineering workflow. Provides all context needed to generate, score, and evaluate headlines.",
+  "type": "object",
+  "required": ["page_type", "awareness_level", "key_benefit"],
+  "properties": {
+    "page_type": {
+      "type": "string",
+      "enum": ["listicle", "advertorial", "sales_page", "meta_ad", "tiktok", "youtube_preroll", "youtube_organic", "email_subject"],
+      "description": "The page type or platform this headline will appear on. Determines word count targets, tone calibration, and compliance constraints."
+    },
+    "awareness_level": {
+      "type": "string",
+      "enum": ["unaware", "problem_aware", "solution_aware", "product_aware", "most_aware"],
+      "description": "Eugene Schwartz awareness level of the target reader. Determines archetype selection, mechanism depth, and directness of promise."
+    },
+    "key_benefit": {
+      "type": "string",
+      "description": "The single most important benefit or transformation the headline should promise. Must be specific and concrete, not vague.",
+      "minLength": 10,
+      "maxLength": 200
+    },
+    "target_audience_segment": {
+      "type": "string",
+      "description": "Specific audience segment from the audience-product.md reference (e.g., 'protective parent', 'chronic-issue researcher', 'homesteader/prepper'). Influences identity markers and emotional register.",
+      "maxLength": 100
+    },
+    "mechanism_hint": {
+      "type": "string",
+      "description": "Brief description of the mechanism or unique approach the headline can reference or tease. Do not include the full mechanism — just enough for a hint.",
+      "maxLength": 200
+    },
+    "beliefs_to_target": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8"]
+      },
+      "description": "Which beliefs from the B1-B8 chain (Subsection A) the headline should target or advance. Used for HookBank diversity checking.",
+      "minItems": 1,
+      "maxItems": 3
+    },
+    "archetype_preference": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "problem_callout",
+          "identity_callout",
+          "contrarian_claim",
+          "curiosity_gap",
+          "safety_warning",
+          "social_proof_lead",
+          "story_anecdote",
+          "direct_benefit",
+          "expert_insight"
+        ]
+      },
+      "description": "Preferred archetypes for headline generation. Optional — if omitted, the agent selects based on awareness level and page type.",
+      "maxItems": 3
+    },
+    "emotional_register": {
+      "type": "string",
+      "enum": ["clinical", "empathetic", "provocative"],
+      "description": "Desired emotional register per Section 3 Subsection D. Clinical = authority/data-driven. Empathetic = warmth/understanding. Provocative = protective urgency."
+    },
+    "quantity": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 10,
+      "description": "Number of headlines to generate. Default is 10 (a standard HookBank). For a single headline, set to 1."
+    },
+    "upstream_ad_hook": {
+      "type": "string",
+      "description": "The ad headline or hook that drives traffic to this page. Required for presell and sales page headlines to enforce message match. Not needed for ad-level headlines.",
+      "maxLength": 300
+    },
+    "upstream_presell_headline": {
+      "type": "string",
+      "description": "The presell headline that drives traffic to the sales page. Required for sales page headlines to enforce message match continuity.",
+      "maxLength": 300
+    },
+    "constraints": {
+      "type": "object",
+      "description": "Additional constraints beyond the defaults.",
+      "properties": {
+        "max_word_count": {
+          "type": "integer",
+          "description": "Override the default word count ceiling for this page type."
+        },
+        "banned_words_additional": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Additional words to ban beyond the Section 3 default list."
+        },
+        "required_words": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Words that must appear in the headline (e.g., product name for most-aware traffic)."
+        }
+      }
+    }
+  }
+}

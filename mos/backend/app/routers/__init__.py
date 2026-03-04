@@ -14,6 +14,7 @@ from app.routers import (
 )
 from app.routers import (
     claude,
+    gemini,
     compliance,
     deep_research,
     explore,
@@ -43,6 +44,7 @@ __all__ = [
     "workflows",
     "deploy",
     "claude",
+    "gemini",
     "compliance",
     "deep_research",
     "explore",

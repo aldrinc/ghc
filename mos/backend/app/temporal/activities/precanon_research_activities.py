@@ -15,6 +15,10 @@ from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
 from app.google_clients import upload_text_file, create_folder
 from app.services.claude_files import ensure_uploaded_to_claude
+from app.services.gemini_file_search import (
+    ensure_uploaded_to_gemini_file_search,
+    is_gemini_file_search_enabled,
+)
 from app.llm.client import OpenAIResponsePendingError
 from app.temporal.precanon.research import (
     IdeaFolderRequest,
@@ -218,6 +222,25 @@ def persist_artifact_activity(request: PersistArtifactRequest) -> PersistArtifac
         if not request.allow_claude_stub:
             raise
 
+    gemini_document_name = None
+    if is_gemini_file_search_enabled():
+        gemini_document_name = ensure_uploaded_to_gemini_file_search(
+            org_id=request.org_id,
+            idea_workspace_id=idea_workspace_id or request.workflow_id or "",
+            client_id=request.client_id,
+            product_id=request.product_id,
+            campaign_id=request.campaign_id,
+            doc_key=f"precanon:{request.step_key}",
+            doc_title=request.title,
+            source_kind="precanon_step",
+            step_key=request.step_key,
+            filename=file_name,
+            mime_type="text/plain",
+            content_bytes=request.content.encode("utf-8"),
+            drive_doc_id=doc_id,
+            drive_url=doc_url,
+        )
+
     with session_scope() as session:
         root_workflow_run_id = _resolve_root_workflow_run_id(
             session=session,
@@ -245,5 +268,6 @@ def persist_artifact_activity(request: PersistArtifactRequest) -> PersistArtifac
         idea_folder_id=request.idea_folder_id,
         idea_folder_url=request.idea_folder_url,
         claude_file_id=claude_file_id,
+        gemini_document_name=gemini_document_name,
         created_at_iso=_now_iso(),
     )

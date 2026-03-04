@@ -23,8 +23,8 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from app.db.base import session_scope
-from app.db.enums import ArtifactTypeEnum
-from app.db.models import ClientSwipeAsset, CompanySwipeAsset, CompanySwipeMedia
+from app.db.enums import ArtifactTypeEnum, GeminiContextFileStatusEnum
+from app.db.models import ClientSwipeAsset, CompanySwipeAsset, CompanySwipeMedia, GeminiContextFile
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.services.media_storage import MediaStorage
 from app.services.swipe_prompt import build_swipe_context_block, load_swipe_to_image_ad_prompt
@@ -304,6 +304,8 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
     storage = MediaStorage()
     manifest_path = output_dir / "manifest.tsv"
     prompts_path = output_dir / "prompt_details.jsonl"
+    gemini_files_manifest_path = output_dir / "gemini_store_files.tsv"
+    gemini_files_details_path = output_dir / "gemini_store_files.jsonl"
     index_path = output_dir / "index.html"
 
     manifest_columns = [
@@ -318,7 +320,18 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
         "swipe_company_id",
         "swipe_template_name",
         "swipe_source_url",
+        "renderer_reference_assets_count",
+        "renderer_reference_asset_ids",
+        "renderer_reference_local_asset_ids",
+        "gemini_store_count",
+        "gemini_store_names",
+        "gemini_prompt_image_attached",
+        "gemini_prompt_image_mime_type",
+        "gemini_prompt_image_size_bytes",
+        "gemini_prompt_image_sha256",
         "swipe_prompt_model",
+        "swipe_render_model_id_requested",
+        "swipe_render_model_id_used",
         "prompt_template_sha256",
         "prompt_template_sha_match",
         "prompt_template_source",
@@ -336,6 +349,7 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
     prompt_details_lines: list[str] = []
     manifest_rows: list[dict[str, Any]] = []
     card_html: list[str] = []
+    used_gemini_store_names: set[str] = set()
 
     for idx, row in enumerate(rows, start=1):
         content = row.get("content") if isinstance(row.get("content"), dict) else {}
@@ -361,11 +375,43 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
             visual_guidelines=visual_guidelines,
         )
         reconstructed_context_block = "\n\n".join([reconstructed_context_block, offer_context_block]).strip()
+        stored_prompt_input_text = _safe_str(metadata.get("swipePromptInputText")).strip()
         stored_context_block = _safe_str(metadata.get("swipePromptContextBlock")).strip()
         effective_context_block = stored_context_block or reconstructed_context_block
 
         swipe_company_id = _safe_str(metadata.get("swipeCompanyId")).strip()
         swipe_source_url = _safe_str(metadata.get("swipeSourceUrl")).strip()
+        renderer_reference_asset_ids = (
+            metadata.get("swipeProductReferenceRemoteAssetIds")
+            if isinstance(metadata.get("swipeProductReferenceRemoteAssetIds"), list)
+            else []
+        )
+        renderer_reference_local_asset_ids = (
+            metadata.get("swipeProductReferenceLocalAssetIds")
+            if isinstance(metadata.get("swipeProductReferenceLocalAssetIds"), list)
+            else []
+        )
+        renderer_reference_titles = (
+            metadata.get("swipeProductReferenceTitles")
+            if isinstance(metadata.get("swipeProductReferenceTitles"), list)
+            else []
+        )
+        renderer_reference_text = _safe_str(metadata.get("swipeProductReferenceText")).strip()
+        gemini_store_names = metadata.get("swipeGeminiStoreNames") if isinstance(metadata.get("swipeGeminiStoreNames"), list) else []
+        prompt_image_attached_raw = metadata.get("swipePromptImageAttached")
+        if isinstance(prompt_image_attached_raw, bool):
+            prompt_image_attached = prompt_image_attached_raw
+        else:
+            prompt_image_attached = None
+        prompt_image_source_url = _safe_str(metadata.get("swipePromptImageSourceUrl")).strip()
+        prompt_image_mime_type = _safe_str(metadata.get("swipePromptImageMimeType")).strip()
+        prompt_image_size_bytes = metadata.get("swipePromptImageSizeBytes")
+        prompt_image_sha256 = _safe_str(metadata.get("swipePromptImageSha256")).strip()
+        swipe_render_model_id_requested = _safe_str(metadata.get("swipeRenderModelIdRequested")).strip()
+        swipe_render_model_id_used = _safe_str(metadata.get("swipeRenderModelIdUsed")).strip()
+        used_gemini_store_names.update(
+            _safe_str(item).strip() for item in gemini_store_names if _safe_str(item).strip()
+        )
         swipe_catalog_entry = swipe_catalog.get(swipe_company_id)
         source_name = _basename_from_urlish(swipe_source_url)
         swipe_template_name = (
@@ -392,11 +438,14 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
         prompt_template_source = template_version.source
         prompt_template_sha_match = bool(prompt_template_sha_asset and prompt_template_sha_asset == prompt_template_sha)
 
-        original_prompt_text = (
-            f"{effective_context_block}\n\n"
-            f"{prompt_template_text}\n\n"
-            f"[COMPETITOR_SWIPE_IMAGE_URL]\n{swipe_source_url or '[UNKNOWN]'}\n"
-        )
+        if stored_prompt_input_text:
+            original_prompt_text = stored_prompt_input_text
+        else:
+            original_prompt_text = (
+                f"{effective_context_block}\n\n"
+                f"{prompt_template_text}\n\n"
+                f"[COMPETITOR_SWIPE_IMAGE_URL]\n{swipe_source_url or '[UNKNOWN]'}\n"
+            )
 
         storage_key = _safe_str(row.get("storage_key"))
         content_type = _safe_str(row.get("content_type")).strip() or "application/octet-stream"
@@ -431,7 +480,34 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
                 "swipe_company_id": swipe_company_id,
                 "swipe_template_name": swipe_template_name,
                 "swipe_source_url": swipe_source_url,
+                "renderer_reference_assets_count": len(renderer_reference_asset_ids),
+                "renderer_reference_asset_ids": "|".join(
+                    _safe_str(item).strip()
+                    for item in renderer_reference_asset_ids
+                    if _safe_str(item).strip()
+                ),
+                "renderer_reference_local_asset_ids": "|".join(
+                    _safe_str(item).strip()
+                    for item in renderer_reference_local_asset_ids
+                    if _safe_str(item).strip()
+                ),
+                "gemini_store_count": len([item for item in gemini_store_names if _safe_str(item).strip()]),
+                "gemini_store_names": "|".join(
+                    _safe_str(item).strip() for item in gemini_store_names if _safe_str(item).strip()
+                ),
+                "gemini_prompt_image_attached": (
+                    "yes"
+                    if prompt_image_attached is True
+                    else "no"
+                    if prompt_image_attached is False
+                    else "unknown"
+                ),
+                "gemini_prompt_image_mime_type": prompt_image_mime_type,
+                "gemini_prompt_image_size_bytes": prompt_image_size_bytes or "",
+                "gemini_prompt_image_sha256": prompt_image_sha256,
                 "swipe_prompt_model": swipe_prompt_model,
+                "swipe_render_model_id_requested": swipe_render_model_id_requested,
+                "swipe_render_model_id_used": swipe_render_model_id_used,
                 "prompt_template_sha256": prompt_template_sha_asset,
                 "prompt_template_sha_match": "yes" if prompt_template_sha_match else "no",
                 "prompt_template_source": prompt_template_source,
@@ -454,12 +530,24 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
             "swipe_company_id": swipe_company_id,
             "swipe_template_name": swipe_template_name,
             "swipe_source_url": swipe_source_url,
+            "renderer_reference_asset_ids": renderer_reference_asset_ids,
+            "renderer_reference_local_asset_ids": renderer_reference_local_asset_ids,
+            "renderer_reference_titles": renderer_reference_titles,
+            "renderer_reference_text": renderer_reference_text,
+            "gemini_store_names": gemini_store_names,
+            "prompt_image_attached": prompt_image_attached,
+            "prompt_image_source_url": prompt_image_source_url or swipe_source_url,
+            "prompt_image_mime_type": prompt_image_mime_type,
+            "prompt_image_size_bytes": prompt_image_size_bytes,
+            "prompt_image_sha256": prompt_image_sha256,
             "prompt_template_key": _safe_str(metadata.get("swipePromptTemplateKey")) or "prompts/swipe/swipe_to_image_ad.md",
             "prompt_template_sha256_asset": prompt_template_sha_asset,
             "prompt_template_sha256_local": prompt_template_sha,
             "prompt_template_sha_match": prompt_template_sha_match,
             "prompt_template_source": prompt_template_source,
             "swipe_prompt_model": swipe_prompt_model,
+            "swipe_render_model_id_requested": swipe_render_model_id_requested,
+            "swipe_render_model_id_used": swipe_render_model_id_used,
             "context_block": effective_context_block,
             "original_prompt_input_text": original_prompt_text,
             "generated_prompt_extracted": generated_prompt,
@@ -473,6 +561,40 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
         prompt_details_lines.append(json.dumps(prompt_details, ensure_ascii=False))
 
         media_names = ", ".join(swipe_catalog_entry.media_names) if swipe_catalog_entry else ""
+        renderer_reference_asset_ids_text = ", ".join(
+            _safe_str(item).strip()
+            for item in renderer_reference_asset_ids
+            if _safe_str(item).strip()
+        ) or "[UNKNOWN]"
+        renderer_reference_local_asset_ids_text = ", ".join(
+            _safe_str(item).strip()
+            for item in renderer_reference_local_asset_ids
+            if _safe_str(item).strip()
+        ) or "[UNKNOWN]"
+        renderer_reference_titles_text = ", ".join(
+            _safe_str(item).strip()
+            for item in renderer_reference_titles
+            if _safe_str(item).strip()
+        ) or "[UNKNOWN]"
+        gemini_store_names_text = ", ".join(
+            _safe_str(item).strip() for item in gemini_store_names if _safe_str(item).strip()
+        ) or "[UNKNOWN]"
+        gemini_store_count = len([item for item in gemini_store_names if _safe_str(item).strip()])
+        prompt_image_attachment_text = (
+            "yes"
+            if prompt_image_attached is True
+            else "no"
+            if prompt_image_attached is False
+            else "[UNKNOWN]"
+        )
+        prompt_image_source_text = prompt_image_source_url or swipe_source_url or "[UNKNOWN]"
+        prompt_image_mime_text = prompt_image_mime_type or "[UNKNOWN]"
+        prompt_image_size_text = (
+            str(prompt_image_size_bytes)
+            if isinstance(prompt_image_size_bytes, int) and prompt_image_size_bytes >= 0
+            else "[UNKNOWN]"
+        )
+        prompt_image_sha_text = prompt_image_sha256 or "[UNKNOWN]"
         markdown_state = "full" if gemini_markdown_is_full else "preview-only"
 
         card_html.append(
@@ -490,6 +612,10 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
                     '    <details>',
                     "      <summary>Prompt Details</summary>",
                     f'      <div class="section"><b>Swipe Template</b><br/>companySwipeId: {html.escape(swipe_company_id or "[UNKNOWN]")}<br/>label: {html.escape(swipe_template_name)}<br/>sourceUrl: {html.escape(swipe_source_url or "[UNKNOWN]")}<br/>mediaFiles: {html.escape(media_names or "[UNKNOWN]")}</div>',
+                    f'      <div class="section"><b>Gemini Prompt Image Attachment</b><br/>attached: {html.escape(prompt_image_attachment_text)}<br/>sourceUrl: {html.escape(prompt_image_source_text)}<br/>mimeType: {html.escape(prompt_image_mime_text)}<br/>sizeBytes: {html.escape(prompt_image_size_text)}<br/>sha256: {html.escape(prompt_image_sha_text)}</div>',
+                    f'      <div class="section"><b>Gemini File Search</b><br/>storesCount: {gemini_store_count}<br/>stores: {html.escape(gemini_store_names_text)}</div>',
+                    f'      <div class="section"><b>Model Routing</b><br/>promptModel: {html.escape(swipe_prompt_model or "[UNKNOWN]")}<br/>renderModelRequested: {html.escape(swipe_render_model_id_requested or "[UNKNOWN]")}<br/>renderModelUsed: {html.escape(swipe_render_model_id_used or "[UNKNOWN]")}</div>',
+                    f'      <div class="section"><b>Final Renderer Context (Product References)</b><br/>remoteAssetIds: {html.escape(renderer_reference_asset_ids_text)}<br/>localAssetIds: {html.escape(renderer_reference_local_asset_ids_text)}<br/>titles: {html.escape(renderer_reference_titles_text)}<br/>referenceText: {html.escape(renderer_reference_text or "[UNKNOWN]")}</div>',
                     f'      <div class="section"><b>Prompt Template</b><br/>key: {html.escape(_safe_str(metadata.get("swipePromptTemplateKey")) or "prompts/swipe/swipe_to_image_ad.md")}<br/>asset sha: {html.escape(prompt_template_sha_asset or "[UNKNOWN]")}<br/>resolved sha: {html.escape(prompt_template_sha)}<br/>template source: {html.escape(prompt_template_source)}<br/>sha match: {"yes" if prompt_template_sha_match else "no"}</div>',
                     '      <details class="nested">',
                     "        <summary>Original Prompt Input (full)</summary>",
@@ -544,6 +670,97 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
             f"<tr><td>{html.escape(company_swipe_id)}</td><td>{html.escape(entry.display_name)}</td><td>{html.escape(entry.custom_title or '')}</td><td>{html.escape(entry.company_title or '')}</td><td>{html.escape(', '.join(entry.media_names))}</td><td>{is_used}</td><td>{count}</td></tr>"
         )
 
+    gemini_file_columns = [
+        "id",
+        "gemini_store_name",
+        "gemini_document_name",
+        "gemini_file_name",
+        "doc_key",
+        "doc_title",
+        "source_kind",
+        "step_key",
+        "filename",
+        "mime_type",
+        "size_bytes",
+        "sha256",
+        "drive_url",
+        "created_at",
+        "updated_at",
+    ]
+    gemini_file_rows: list[dict[str, Any]] = []
+    if used_gemini_store_names:
+        with session_scope() as session:
+            records = list(
+                session.scalars(
+                    select(GeminiContextFile)
+                    .where(
+                        GeminiContextFile.org_id == org_id,
+                        GeminiContextFile.status == GeminiContextFileStatusEnum.ready,
+                        GeminiContextFile.gemini_store_name.in_(sorted(used_gemini_store_names)),
+                    )
+                    .order_by(
+                        GeminiContextFile.gemini_store_name.asc(),
+                        GeminiContextFile.source_kind.asc(),
+                        GeminiContextFile.doc_key.asc(),
+                        GeminiContextFile.created_at.asc(),
+                    )
+                ).all()
+            )
+        for record in records:
+            created_at = getattr(record, "created_at", None)
+            updated_at = getattr(record, "updated_at", None)
+            gemini_file_rows.append(
+                {
+                    "id": _safe_str(getattr(record, "id", None)),
+                    "gemini_store_name": _safe_str(getattr(record, "gemini_store_name", None)),
+                    "gemini_document_name": _safe_str(getattr(record, "gemini_document_name", None)),
+                    "gemini_file_name": _safe_str(getattr(record, "gemini_file_name", None)),
+                    "doc_key": _safe_str(getattr(record, "doc_key", None)),
+                    "doc_title": _safe_str(getattr(record, "doc_title", None)),
+                    "source_kind": _safe_str(getattr(record, "source_kind", None)),
+                    "step_key": _safe_str(getattr(record, "step_key", None)),
+                    "filename": _safe_str(getattr(record, "filename", None)),
+                    "mime_type": _safe_str(getattr(record, "mime_type", None)),
+                    "size_bytes": getattr(record, "size_bytes", None),
+                    "sha256": _safe_str(getattr(record, "sha256", None)),
+                    "drive_url": _safe_str(getattr(record, "drive_url", None)),
+                    "created_at": created_at.isoformat() if created_at else "",
+                    "updated_at": updated_at.isoformat() if updated_at else "",
+                }
+            )
+
+    with gemini_files_manifest_path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=gemini_file_columns, delimiter="\t")
+        writer.writeheader()
+        writer.writerows(gemini_file_rows)
+
+    gemini_files_details_path.write_text(
+        "\n".join(json.dumps(row, ensure_ascii=False) for row in gemini_file_rows) + ("\n" if gemini_file_rows else ""),
+        encoding="utf-8",
+    )
+
+    gemini_file_table_rows = []
+    for row in gemini_file_rows:
+        drive_url = _safe_str(row.get("drive_url")).strip()
+        if drive_url:
+            drive_cell = f'<a href="{html.escape(drive_url)}" target="_blank" rel="noopener noreferrer">{html.escape(drive_url)}</a>'
+        else:
+            drive_cell = "[NONE]"
+        gemini_file_table_rows.append(
+            "<tr>"
+            f"<td>{html.escape(_safe_str(row.get('gemini_store_name')))}</td>"
+            f"<td>{html.escape(_safe_str(row.get('doc_key')))}</td>"
+            f"<td>{html.escape(_safe_str(row.get('doc_title')))}</td>"
+            f"<td>{html.escape(_safe_str(row.get('source_kind')))}</td>"
+            f"<td>{html.escape(_safe_str(row.get('step_key')))}</td>"
+            f"<td>{html.escape(_safe_str(row.get('filename')))}</td>"
+            f"<td>{html.escape(_safe_str(row.get('mime_type')))}</td>"
+            f"<td>{html.escape(_safe_str(row.get('size_bytes')))}</td>"
+            f"<td>{html.escape(_safe_str(row.get('gemini_document_name')))}</td>"
+            f"<td>{drive_cell}</td>"
+            "</tr>"
+        )
+
     html_doc = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -575,7 +792,7 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
 <body>
   <h1>Swipe Brief Export: {html.escape(brief_id)}</h1>
   <p><span class="pill">assets: {len(manifest_rows)}</span><span class="pill">used swipe templates: {len(used_company_ids)}</span><span class="pill">client swipes available: {len(swipe_catalog)}</span></p>
-  <p class="hint">Files: manifest.tsv (summary), prompt_details.jsonl (full prompt payload per asset). Prompts are collapsed by default below each card.</p>
+  <p class="hint">Files: manifest.tsv (summary), prompt_details.jsonl (full prompt payload per asset), gemini_store_files.tsv + gemini_store_files.jsonl (Gemini File Search files for stores used in this brief). Prompts are collapsed by default below each card.</p>
 
   <h2>Used Swipe Templates</h2>
   <table>
@@ -590,6 +807,14 @@ def export_brief_outputs(*, brief_id: str, output_root: Path) -> Path:
     <thead><tr><th>companySwipeId</th><th>display</th><th>custom title</th><th>company title</th><th>media files</th><th>status</th><th>used count</th></tr></thead>
     <tbody>
       {''.join(catalog_rows) if catalog_rows else '<tr><td colspan="7">No client swipe entries found.</td></tr>'}
+    </tbody>
+  </table>
+
+  <h2>Gemini Store Files (Used Stores)</h2>
+  <table>
+    <thead><tr><th>store</th><th>doc_key</th><th>doc_title</th><th>source_kind</th><th>step_key</th><th>filename</th><th>mime_type</th><th>size_bytes</th><th>document_name</th><th>drive_url</th></tr></thead>
+    <tbody>
+      {''.join(gemini_file_table_rows) if gemini_file_table_rows else '<tr><td colspan="10">No Gemini context files found for the stores attached to generated assets in this brief.</td></tr>'}
     </tbody>
   </table>
 
@@ -625,6 +850,8 @@ def main() -> None:
     print(f"index={output_dir / 'index.html'}")
     print(f"manifest={output_dir / 'manifest.tsv'}")
     print(f"prompt_details={output_dir / 'prompt_details.jsonl'}")
+    print(f"gemini_store_files_manifest={output_dir / 'gemini_store_files.tsv'}")
+    print(f"gemini_store_files_details={output_dir / 'gemini_store_files.jsonl'}")
 
 
 if __name__ == "__main__":

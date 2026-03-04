@@ -11,9 +11,17 @@ import { Button, buttonClasses } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
 import { FieldControl, FieldDescription, FieldError, FieldLabel, FieldRoot, FormRoot } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
+import { useApiClient, type ApiError } from "@/api/client";
 import { useCreateClient, useStartOnboarding } from "@/api/clients";
+import {
+  COMPLIANCE_RULESET_VERSION,
+  type ClientComplianceProfile,
+  type ComplianceBusinessModel,
+} from "@/api/compliance";
+import { useSetProductPrimaryAssetById, useUploadProductAssetsById } from "@/api/products";
 import { toast } from "@/components/ui/toast";
 import type { Client } from "@/types/common";
 
@@ -31,8 +39,16 @@ const steps: WizardStep[] = [
     label: "Product",
     description: "Add what we should scope research and strategy to.",
   },
-  { key: "funnel", label: "Funnel", description: "Funnel notes" },
+  { key: "funnel", label: "Strategy V2", description: "Required Strategy V2 operator inputs" },
   { key: "review", label: "Review", description: "Confirm and submit" },
+];
+
+const complianceBusinessModelOptions: Array<{ label: string; value: ComplianceBusinessModel }> = [
+  { label: "E-commerce", value: "ecommerce" },
+  { label: "SaaS subscription", value: "saas_subscription" },
+  { label: "Digital product", value: "digital_product" },
+  { label: "Online service", value: "online_service" },
+  { label: "Lead generation", value: "lead_generation" },
 ];
 
 type ProductDraft = {
@@ -45,6 +61,7 @@ type ProductDraft = {
   disclaimers: string;
   goals: string;
   competitor_urls: string;
+  primary_image_file: File | null;
 };
 
 const emptyProductDraft: ProductDraft = {
@@ -57,6 +74,7 @@ const emptyProductDraft: ProductDraft = {
   disclaimers: "",
   goals: "",
   competitor_urls: "",
+  primary_image_file: null,
 };
 
 type WizardState = {
@@ -65,6 +83,14 @@ type WizardState = {
   business_type: "new" | "existing";
   brand_story: string;
   funnel_notes: string;
+  product_customizable: boolean;
+  business_model: ComplianceBusinessModel | "";
+  funnel_position: string;
+  target_platforms: string;
+  target_regions: string;
+  existing_proof_assets: string;
+  brand_voice_notes: string;
+  compliance_notes: string;
   products: ProductDraft[];
 };
 
@@ -74,6 +100,14 @@ const baseState: WizardState = {
   business_type: "new",
   brand_story: "",
   funnel_notes: "",
+  product_customizable: false,
+  business_model: "",
+  funnel_position: "",
+  target_platforms: "",
+  target_regions: "",
+  existing_proof_assets: "",
+  brand_voice_notes: "",
+  compliance_notes: "",
   products: [],
 };
 
@@ -82,6 +116,13 @@ const initialState = (clientName?: string, clientIndustry?: string): WizardState
   client_name: clientName || "",
   client_industry: clientIndustry || "",
 });
+
+function parseListInput(value: string): string[] {
+  return value
+    .split(/[\n,]/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
 
 type OnboardingWizardProps = {
   clientId?: string;
@@ -113,8 +154,12 @@ export function OnboardingWizard({
   const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
   const [editingProductIndex, setEditingProductIndex] = useState<number | null>(null);
   const [productDraft, setProductDraft] = useState<ProductDraft>(emptyProductDraft);
+  const [isSavingComplianceProfile, setIsSavingComplianceProfile] = useState(false);
+  const { request } = useApiClient();
   const onboarding = useStartOnboarding();
   const createClient = useCreateClient();
+  const uploadProductAssetsById = useUploadProductAssetsById();
+  const setProductPrimaryAssetById = useSetProductPrimaryAssetById();
 
   useEffect(() => {
     if (!open && !isPage) {
@@ -130,7 +175,12 @@ export function OnboardingWizard({
   const currentStep = steps[stepIndex];
   const progress = Math.round(((stepIndex + 1) / steps.length) * 100);
   const requiresClientName = !activeClientId;
-  const isSubmitting = onboarding.isPending || createClient.isPending;
+  const isSubmitting =
+    isSavingComplianceProfile ||
+    onboarding.isPending ||
+    createClient.isPending ||
+    uploadProductAssetsById.isPending ||
+    setProductPrimaryAssetById.isPending;
 
   const canNext = useMemo(() => {
     if (currentStep.key === "basics") {
@@ -141,7 +191,20 @@ export function OnboardingWizard({
     }
     if (currentStep.key === "product") {
       if (state.products.length !== 1) return false;
-      return Boolean(state.products[0]?.product_name?.trim());
+      return (
+        Boolean(state.products[0]?.product_name?.trim()) &&
+        Boolean(state.products[0]?.product_description?.trim()) &&
+        Boolean(state.products[0]?.primary_image_file)
+      );
+    }
+    if (currentStep.key === "funnel") {
+      if (!state.business_model.trim()) return false;
+      if (!state.funnel_position.trim()) return false;
+      if (!parseListInput(state.target_platforms).length) return false;
+      if (!parseListInput(state.target_regions).length) return false;
+      if (!parseListInput(state.existing_proof_assets).length) return false;
+      if (!state.brand_voice_notes.trim()) return false;
+      return true;
     }
     return true;
   }, [currentStep, requiresClientName, state]);
@@ -173,6 +236,7 @@ export function OnboardingWizard({
     const created = (await createClient.mutateAsync({
       name: state.client_name.trim(),
       industry: state.client_industry.trim() || undefined,
+      strategyV2Enabled: true,
     })) as Client;
     if (!created?.id) {
       throw new Error("Client creation failed");
@@ -191,15 +255,58 @@ export function OnboardingWizard({
       toast.error("Add exactly one product (product name is required).");
       return;
     }
+    if (!firstProduct?.product_description?.trim()) {
+      toast.error("Product description is required.");
+      return;
+    }
+    if (!firstProduct?.primary_image_file) {
+      toast.error("A primary product image is required.");
+      return;
+    }
     if (requiresClientName && !state.client_name.trim()) {
       toast.error("Client name is required.");
+      return;
+    }
+    const targetPlatforms = parseListInput(state.target_platforms);
+    const targetRegions = parseListInput(state.target_regions);
+    const existingProofAssets = parseListInput(state.existing_proof_assets);
+    if (!state.business_model.trim()) {
+      toast.error("Business model is required.");
+      return;
+    }
+    if (!state.funnel_position.trim()) {
+      toast.error("Funnel position is required.");
+      return;
+    }
+    if (!targetPlatforms.length) {
+      toast.error("At least one target platform is required.");
+      return;
+    }
+    if (!targetRegions.length) {
+      toast.error("At least one target region is required.");
+      return;
+    }
+    if (!existingProofAssets.length) {
+      toast.error("At least one existing proof asset is required.");
+      return;
+    }
+    if (!state.brand_voice_notes.trim()) {
+      toast.error("Brand voice notes are required.");
       return;
     }
     const payload = {
       business_type: state.business_type,
       brand_story: state.brand_story.trim(),
       product_name: firstProduct.product_name.trim(),
-      product_description: firstProduct.product_description.trim() || undefined,
+      product_customizable: state.product_customizable,
+      business_model: state.business_model.trim(),
+      funnel_position: state.funnel_position.trim(),
+      target_platforms: targetPlatforms,
+      target_regions: targetRegions,
+      existing_proof_assets: existingProofAssets,
+      brand_voice_notes: state.brand_voice_notes.trim(),
+      compliance_notes: state.compliance_notes.trim() || undefined,
+      product_description: firstProduct.product_description.trim(),
       product_category: firstProduct.product_category.trim() || undefined,
       primary_benefits: firstProduct.primary_benefits.trim()
         ? firstProduct.primary_benefits.split(",").map((item) => item.trim()).filter(Boolean)
@@ -236,12 +343,51 @@ export function OnboardingWizard({
     }
     try {
       const ensuredClientId = await ensureClient();
+      setIsSavingComplianceProfile(true);
+      try {
+        const legalBusinessName = state.client_name.trim() || clientName?.trim() || undefined;
+        await request<ClientComplianceProfile>(`/clients/${ensuredClientId}/compliance/profile`, {
+          method: "PUT",
+          body: JSON.stringify({
+            rulesetVersion: COMPLIANCE_RULESET_VERSION,
+            businessModels: [state.business_model],
+            legalBusinessName,
+            metadata: {
+              source: "onboarding_wizard",
+              complianceNotes: state.compliance_notes.trim() || undefined,
+            },
+          }),
+        });
+      } catch (error) {
+        const apiError = error as ApiError;
+        const message = apiError?.message?.trim()
+          ? apiError.message
+          : "Failed to create required compliance profile before onboarding.";
+        toast.error(message);
+        return;
+      } finally {
+        setIsSavingComplianceProfile(false);
+      }
       const response = await onboarding.mutateAsync({ clientId: ensuredClientId, payload });
       const productId = (response as any)?.product_id;
       if (!productId) {
         toast.error("Onboarding started but no product ID was returned.");
         return;
       }
+
+      const uploadedAssets = await uploadProductAssetsById.mutateAsync({
+        productId,
+        files: [firstProduct.primary_image_file],
+      });
+      const primaryImageAsset = uploadedAssets.find((asset) => asset.asset_kind === "image");
+      if (!primaryImageAsset?.id) {
+        throw new Error("Product image upload did not return an image asset.");
+      }
+      await setProductPrimaryAssetById.mutateAsync({
+        productId,
+        primaryAssetId: primaryImageAsset.id,
+      });
+
       resetWizard();
       setOpen(false);
       onCompleted?.({
@@ -287,6 +433,14 @@ export function OnboardingWizard({
       toast.error("Product name is required.");
       return;
     }
+    if (!productDraft.product_description.trim()) {
+      toast.error("Product description is required.");
+      return;
+    }
+    if (!productDraft.primary_image_file) {
+      toast.error("Primary product image is required.");
+      return;
+    }
     if (editingProductIndex === null && state.products.length >= 1) {
       toast.error("Only one product is supported right now.");
       return;
@@ -294,6 +448,7 @@ export function OnboardingWizard({
     const nextDraft: ProductDraft = {
       ...productDraft,
       product_name: productDraft.product_name.trim(),
+      product_description: productDraft.product_description.trim(),
     };
     setState((s) => {
       const nextProducts = [...s.products];
@@ -384,7 +539,7 @@ export function OnboardingWizard({
           </FieldRoot>
           <FieldRoot name="brand_story">
             <FieldLabel>Brand story / context</FieldLabel>
-            <FieldDescription>Required. What should we know before generating canon/metrics?</FieldDescription>
+            <FieldDescription>Required. What should we know before generating Strategy V2 outputs?</FieldDescription>
             <FieldControl
               value={state.brand_story}
               onChange={(e) => setState((s) => ({ ...s, brand_story: e.target.value }))}
@@ -415,6 +570,9 @@ export function OnboardingWizard({
                       <div className="mt-1 text-xs text-content-muted">
                         {product.product_category ? product.product_category : "Category not set"}
                       </div>
+                      <div className="mt-1 text-xs text-content-muted">
+                        Primary image: {product.primary_image_file?.name || "Missing"}
+                      </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Button variant="secondary" size="xs" onClick={() => openEditProduct(idx)} disabled={isSubmitting}>
@@ -438,7 +596,7 @@ export function OnboardingWizard({
                     {editingProductIndex === null ? "Add product" : "Edit product"}
                   </div>
                   <div className="mt-1 text-xs text-content-muted">
-                    Product details help generate canon, strategy, and angles.
+                    Product details help generate strategy, offer, and copy outputs.
                   </div>
                 </div>
                 <Badge tone="neutral" className="shrink-0">
@@ -486,7 +644,7 @@ export function OnboardingWizard({
 
                 <FieldRoot name="product_description" className="md:col-span-2">
                   <FieldLabel>Description</FieldLabel>
-                  <FieldDescription>Optional short description of the product.</FieldDescription>
+                  <FieldDescription>Required short description of the product.</FieldDescription>
                   <FieldControl
                     value={productDraft.product_description}
                     onChange={(e) => setProductDraft((draft) => ({ ...draft, product_description: e.target.value }))}
@@ -557,6 +715,35 @@ export function OnboardingWizard({
                   />
                   <FieldError />
                 </FieldRoot>
+
+                <FieldRoot name="primary_image_file" className="md:col-span-2">
+                  <FieldLabel>Primary product image</FieldLabel>
+                  <FieldDescription>Required. Upload the product image used for downstream generation.</FieldDescription>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      if (!file) {
+                        setProductDraft((draft) => ({ ...draft, primary_image_file: null }));
+                        return;
+                      }
+                      if (!file.type.startsWith("image/")) {
+                        toast.error("Primary product image must be an image file.");
+                        e.currentTarget.value = "";
+                        return;
+                      }
+                      setProductDraft((draft) => ({ ...draft, primary_image_file: file }));
+                    }}
+                    disabled={isSubmitting}
+                  />
+                  <div className="mt-1 text-xs text-content-muted">
+                    {productDraft.primary_image_file
+                      ? `Selected: ${productDraft.primary_image_file.name}`
+                      : "No primary image selected."}
+                  </div>
+                  <FieldError />
+                </FieldRoot>
               </div>
 
               <div className="mt-4 flex items-center justify-end gap-2 border-t border-divider pt-4">
@@ -573,15 +760,119 @@ export function OnboardingWizard({
       )}
 
       {currentStep.key === "funnel" && (
-        <FieldRoot name="funnel_notes">
-          <FieldLabel>Funnel notes</FieldLabel>
-          <FieldDescription>Optional funnel notes or channel preferences.</FieldDescription>
-          <FieldControl
-            value={state.funnel_notes}
-            onChange={(e) => setState((s) => ({ ...s, funnel_notes: e.target.value }))}
-            render={(props) => <Textarea {...props} rows={2} />}
-          />
-        </FieldRoot>
+        <div className="space-y-4">
+          <label className="flex items-center gap-2 text-sm text-content">
+            <input
+              type="checkbox"
+              checked={state.product_customizable}
+              onChange={() => setState((s) => ({ ...s, product_customizable: !s.product_customizable }))}
+            />
+            Product customizable
+          </label>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <FieldRoot name="business_model">
+              <FieldLabel>Business model</FieldLabel>
+              <FieldDescription>Required for compliance profile setup.</FieldDescription>
+              <Select
+                value={state.business_model}
+                onValueChange={(value) =>
+                  setState((s) => ({ ...s, business_model: value as ComplianceBusinessModel | "" }))
+                }
+                options={[
+                  { label: "Select business model", value: "" },
+                  ...complianceBusinessModelOptions,
+                ]}
+                required
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="funnel_position">
+              <FieldLabel>Funnel position</FieldLabel>
+              <FieldDescription>Required. Example: cold traffic, warm retargeting.</FieldDescription>
+              <Input
+                value={state.funnel_position}
+                onChange={(e) => setState((s) => ({ ...s, funnel_position: e.target.value }))}
+                placeholder="Cold traffic acquisition"
+                required
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="target_platforms">
+              <FieldLabel>Target platforms</FieldLabel>
+              <FieldDescription>Required. Comma or newline separated.</FieldDescription>
+              <FieldControl
+                value={state.target_platforms}
+                onChange={(e) => setState((s) => ({ ...s, target_platforms: e.target.value }))}
+                render={(props) => <Textarea {...props} rows={3} placeholder="Meta Ads, TikTok Ads" required />}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="target_regions">
+              <FieldLabel>Target regions</FieldLabel>
+              <FieldDescription>Required. Comma or newline separated.</FieldDescription>
+              <FieldControl
+                value={state.target_regions}
+                onChange={(e) => setState((s) => ({ ...s, target_regions: e.target.value }))}
+                render={(props) => <Textarea {...props} rows={3} placeholder="United States, Canada" required />}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="existing_proof_assets" className="md:col-span-2">
+              <FieldLabel>Existing proof assets</FieldLabel>
+              <FieldDescription>Required. Comma or newline separated proof references.</FieldDescription>
+              <FieldControl
+                value={state.existing_proof_assets}
+                onChange={(e) => setState((s) => ({ ...s, existing_proof_assets: e.target.value }))}
+                render={(props) => (
+                  <Textarea
+                    {...props}
+                    rows={3}
+                    placeholder="Customer testimonials, before/after screenshots, case study docs"
+                    required
+                  />
+                )}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="brand_voice_notes" className="md:col-span-2">
+              <FieldLabel>Brand voice notes</FieldLabel>
+              <FieldDescription>Required guidance for headline/copy generation.</FieldDescription>
+              <FieldControl
+                value={state.brand_voice_notes}
+                onChange={(e) => setState((s) => ({ ...s, brand_voice_notes: e.target.value }))}
+                render={(props) => (
+                  <Textarea
+                    {...props}
+                    rows={3}
+                    placeholder="Conversational, direct response, confident but compliant."
+                    required
+                  />
+                )}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="compliance_notes" className="md:col-span-2">
+              <FieldLabel>Compliance notes</FieldLabel>
+              <FieldDescription>Optional legal/compliance constraints.</FieldDescription>
+              <FieldControl
+                value={state.compliance_notes}
+                onChange={(e) => setState((s) => ({ ...s, compliance_notes: e.target.value }))}
+                render={(props) => <Textarea {...props} rows={2} placeholder="Avoid medical diagnosis language." />}
+              />
+              <FieldError />
+            </FieldRoot>
+            <FieldRoot name="funnel_notes" className="md:col-span-2">
+              <FieldLabel>Additional funnel notes</FieldLabel>
+              <FieldDescription>Optional extra context.</FieldDescription>
+              <FieldControl
+                value={state.funnel_notes}
+                onChange={(e) => setState((s) => ({ ...s, funnel_notes: e.target.value }))}
+                render={(props) => <Textarea {...props} rows={2} />}
+              />
+            </FieldRoot>
+          </div>
+        </div>
       )}
 
       {currentStep.key === "review" && (
@@ -601,6 +892,32 @@ export function OnboardingWizard({
               <strong>Brand story:</strong> {state.brand_story || "Missing"}
             </p>
             <p>
+              <strong>Product customizable:</strong> {state.product_customizable ? "Yes" : "No"}
+            </p>
+            <p>
+              <strong>Business model:</strong> {state.business_model || "Missing"}
+            </p>
+            <p>
+              <strong>Funnel position:</strong> {state.funnel_position || "Missing"}
+            </p>
+            <p>
+              <strong>Target platforms:</strong> {parseListInput(state.target_platforms).join(", ") || "Missing"}
+            </p>
+            <p>
+              <strong>Target regions:</strong> {parseListInput(state.target_regions).join(", ") || "Missing"}
+            </p>
+            <p>
+              <strong>Existing proof assets:</strong> {parseListInput(state.existing_proof_assets).join(", ") || "Missing"}
+            </p>
+            <p>
+              <strong>Brand voice notes:</strong> {state.brand_voice_notes || "Missing"}
+            </p>
+            {state.compliance_notes ? (
+              <p>
+                <strong>Compliance notes:</strong> {state.compliance_notes}
+              </p>
+            ) : null}
+            <p>
               <strong>Products:</strong> {state.products.length ? state.products.length : "Missing"}
             </p>
             {state.products[0]?.product_name ? (
@@ -608,11 +925,9 @@ export function OnboardingWizard({
                 <p>
                   <strong>Product name:</strong> {state.products[0].product_name}
                 </p>
-                {state.products[0].product_description ? (
-                  <p>
-                    <strong>Description:</strong> {state.products[0].product_description}
-                  </p>
-                ) : null}
+                <p>
+                  <strong>Description:</strong> {state.products[0].product_description || "Missing"}
+                </p>
                 {state.products[0].product_category ? (
                   <p>
                     <strong>Category:</strong> {state.products[0].product_category}
@@ -648,6 +963,9 @@ export function OnboardingWizard({
                     <strong>Competitor URLs:</strong> {state.products[0].competitor_urls}
                   </p>
                 ) : null}
+                <p>
+                  <strong>Primary image:</strong> {state.products[0].primary_image_file?.name || "Missing"}
+                </p>
               </>
             ) : null}
             {state.funnel_notes ? (

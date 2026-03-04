@@ -16,8 +16,10 @@ class Settings(BaseSettings):
     SHOPIFY_REQUEST_TIMEOUT_SECONDS: float = 20.0
 
     SHOPIFY_ENABLE_ORDER_FORWARDING: bool = True
+    SHOPIFY_ENABLE_COMPLIANCE_FORWARDING: bool = True
     MOS_BACKEND_BASE_URL: AnyHttpUrl | None = None
     MOS_WEBHOOK_SHARED_SECRET: str | None = None
+    SHOPIFY_WORKSPACE_LINK_SIGNING_SECRET: str | None = None
     SHOPIFY_INSTALL_SUCCESS_REDIRECT_URL: AnyHttpUrl | None = None
 
     @field_validator("SHOPIFY_APP_SCOPES")
@@ -30,20 +32,29 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_forwarding_config(self) -> "Settings":
-        if self.SHOPIFY_ENABLE_ORDER_FORWARDING:
+        requires_mos_forwarding = (
+            self.SHOPIFY_ENABLE_ORDER_FORWARDING
+            or self.SHOPIFY_ENABLE_COMPLIANCE_FORWARDING
+        )
+        if requires_mos_forwarding:
             if not self.MOS_BACKEND_BASE_URL:
                 raise ValueError(
-                    "MOS_BACKEND_BASE_URL is required when SHOPIFY_ENABLE_ORDER_FORWARDING=true"
+                    "MOS_BACKEND_BASE_URL is required when Shopify->mOS forwarding is enabled"
                 )
             if not self.MOS_WEBHOOK_SHARED_SECRET:
                 raise ValueError(
-                    "MOS_WEBHOOK_SHARED_SECRET is required when SHOPIFY_ENABLE_ORDER_FORWARDING=true"
+                    "MOS_WEBHOOK_SHARED_SECRET is required when Shopify->mOS forwarding is enabled"
                 )
         return self
 
     @property
     def app_base_url(self) -> str:
         return str(self.SHOPIFY_APP_BASE_URL).rstrip("/")
+
+    @property
+    def mos_compliance_webhook_url(self) -> str:
+        base = str(self.MOS_BACKEND_BASE_URL).rstrip("/")
+        return f"{base}/shopify/compliance/webhook"
 
     @property
     def admin_scopes_csv(self) -> str:

@@ -1,0 +1,323 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VOC Item Observation Sheet",
+  "description": "Agent 2 VOC observation contract with source lineage, hook metadata, and whitespace tagging.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "voc_id",
+    "source",
+    "source_type",
+    "source_url",
+    "source_author",
+    "source_date",
+    "is_hook",
+    "hook_format",
+    "hook_word_count",
+    "video_virality_tier",
+    "video_view_count",
+    "competitor_saturation",
+    "in_whitespace",
+    "evidence_ref",
+    "quote"
+  ],
+  "properties": {
+    "voc_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "REDDIT",
+        "FORUM",
+        "BLOG_COMMENT",
+        "REVIEW_SITE",
+        "QA",
+        "TIKTOK_COMMENT",
+        "IG_COMMENT",
+        "YT_COMMENT",
+        "VIDEO_HOOK"
+      ]
+    },
+    "source_url": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_author": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_date": {
+      "type": "string",
+      "minLength": 1
+    },
+    "is_hook": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "hook_format": {
+      "type": "string",
+      "enum": [
+        "QUESTION",
+        "STATEMENT",
+        "STORY",
+        "STATISTIC",
+        "CONTRARIAN",
+        "DEMONSTRATION",
+        "NONE"
+      ]
+    },
+    "hook_word_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "video_virality_tier": {
+      "type": "string",
+      "enum": [
+        "VIRAL",
+        "HIGH_PERFORMING",
+        "ABOVE_AVERAGE",
+        "BASELINE"
+      ]
+    },
+    "video_view_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "competitor_saturation": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "in_whitespace": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "evidence_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "quote": {
+      "type": "string",
+      "minLength": 1
+    },
+    "specific_number": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "specific_product_brand": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "specific_event_moment": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "specific_body_symptom": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "before_after_comparison": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "crisis_language": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "profanity_extreme_punctuation": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "physical_sensation": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "identity_change_desire": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "word_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "clear_trigger_event": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "named_enemy": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "shiftable_belief": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "expectation_vs_reality": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "headline_ready": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "usable_content_pct": {
+      "type": "string",
+      "enum": [
+        "OVER_75_PCT",
+        "50_TO_75_PCT",
+        "25_TO_50_PCT",
+        "UNDER_25_PCT"
+      ]
+    },
+    "date_bracket": {
+      "type": "string",
+      "enum": [
+        "LAST_3MO",
+        "LAST_6MO",
+        "LAST_12MO",
+        "LAST_24MO",
+        "OLDER",
+        "UNKNOWN"
+      ]
+    },
+    "durable_psychology": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "market_specific": {
+      "type": "string",
+      "enum": [
+        "Y",
+        "N"
+      ]
+    },
+    "trigger_event": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pain_problem": {
+      "type": "string",
+      "minLength": 1
+    },
+    "desired_outcome": {
+      "type": "string",
+      "minLength": 1
+    },
+    "failed_prior_solution": {
+      "type": "string",
+      "minLength": 1
+    },
+    "enemy_blame": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identity_role": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fear_risk": {
+      "type": "string",
+      "minLength": 1
+    },
+    "emotional_valence": {
+      "type": "string",
+      "enum": [
+        "RELIEF",
+        "RAGE",
+        "SHAME",
+        "PRIDE",
+        "ANXIETY",
+        "HOPE",
+        "FRUSTRATION",
+        "NEUTRAL"
+      ]
+    },
+    "buyer_stage": {
+      "type": "string",
+      "enum": [
+        "UNAWARE",
+        "PROBLEM_AWARE",
+        "SOLUTION_AWARE",
+        "PRODUCT_AWARE",
+        "MOST_AWARE",
+        "UNKNOWN"
+      ]
+    },
+    "solution_sophistication": {
+      "type": "string",
+      "enum": [
+        "NOVICE",
+        "EXPERIENCED",
+        "EXHAUSTED",
+        "UNKNOWN"
+      ]
+    },
+    "compliance_risk": {
+      "type": "string",
+      "enum": [
+        "GREEN",
+        "YELLOW",
+        "RED"
+      ]
+    }
+  }
+}

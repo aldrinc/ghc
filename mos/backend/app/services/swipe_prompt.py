@@ -8,28 +8,18 @@ from typing import Any, Dict, List, Tuple
 from app.config import settings
 from app.llm_ops import fetch_prompt_text
 
-_PROMPT_CACHE: Dict[str, Tuple[str, str]] = {}
-
-
 def load_swipe_to_image_ad_prompt() -> Tuple[str, str]:
     """
     Load the swipe -> image-ad prompt template and compute its SHA256.
     """
-    cache_key = "swipe_to_image_ad"
-    if cache_key in _PROMPT_CACHE:
-        return _PROMPT_CACHE[cache_key]
-
     prompt_key = "prompts/swipe/swipe_to_image_ad.md"
     if settings.AGENTA_ENABLED:
-        text, sha = fetch_prompt_text(prompt_key)
-        _PROMPT_CACHE[cache_key] = (text, sha)
-        return text, sha
+        return fetch_prompt_text(prompt_key)
 
     backend_app_root = Path(__file__).resolve().parents[1]
     prompt_path = backend_app_root / "prompts" / "swipe" / "swipe_to_image_ad.md"
     text = prompt_path.read_text(encoding="utf-8")
     sha = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    _PROMPT_CACHE[cache_key] = (text, sha)
     return text, sha
 
 

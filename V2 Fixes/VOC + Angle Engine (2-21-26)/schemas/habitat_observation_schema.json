@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Habitat Observation Sheet",
+  "description": "52-field observation sheet filled by Agent 1 for text-based habitats",
+  "type": "object",
+  "required": ["habitat_name", "habitat_type", "url_pattern"],
+  "properties": {
+    "habitat_name": { "type": "string" },
+    "habitat_type": {
+      "type": "string",
+      "enum": ["Reddit", "Forum", "Review_Site", "QA", "Blog_Comments", "FB_Group", "YouTube", "Competitor_Adjacent"]
+    },
+    "url_pattern": { "type": "string" },
+
+    "threads_50_plus": { "type": "string", "enum": ["Y", "N"] },
+    "threads_200_plus": { "type": "string", "enum": ["Y", "N"] },
+    "threads_1000_plus": { "type": "string", "enum": ["Y", "N"] },
+
+    "posts_last_3mo": { "type": "string", "enum": ["Y", "N"] },
+    "posts_last_6mo": { "type": "string", "enum": ["Y", "N"] },
+    "posts_last_12mo": { "type": "string", "enum": ["Y", "N"] },
+    "recency_ratio": { "type": "string", "enum": ["MAJORITY_RECENT", "BALANCED", "MAJORITY_OLD"] },
+
+    "exact_category": { "type": "string", "enum": ["Y", "N"] },
+    "purchasing_comparing": { "type": "string", "enum": ["Y", "N"] },
+    "personal_usage": { "type": "string", "enum": ["Y", "N"] },
+    "adjacent_only": { "type": "string", "enum": ["Y", "N"] },
+
+    "first_person_narratives": { "type": "string", "enum": ["Y", "N"] },
+    "trigger_events": { "type": "string", "enum": ["Y", "N"] },
+    "fear_frustration_shame": { "type": "string", "enum": ["Y", "N"] },
+    "specific_dollar_or_time": { "type": "string", "enum": ["Y", "N"] },
+    "long_detailed_posts": { "type": "string", "enum": ["Y", "N"] },
+
+    "comparison_discussions": { "type": "string", "enum": ["Y", "N"] },
+    "price_value_mentions": { "type": "string", "enum": ["Y", "N"] },
+    "post_purchase_experience": { "type": "string", "enum": ["Y", "N"] },
+
+    "relevance_pct": { "type": "string", "enum": ["OVER_50_PCT", "25_TO_50_PCT", "10_TO_25_PCT", "UNDER_10_PCT"] },
+    "dominated_by_offtopic": { "type": "string", "enum": ["Y", "N"] },
+
+    "competitor_brands_mentioned": { "type": "string", "enum": ["Y", "N"] },
+    "competitor_brand_count": { "type": "string", "enum": ["0", "1-3", "4-7", "8+"] },
+    "competitor_ads_present": { "type": "string", "enum": ["Y", "N"] },
+
+    "trend_direction": { "type": "string", "enum": ["HIGHER", "SAME", "LOWER", "CANNOT_DETERMINE"] },
+    "seasonal_patterns": { "type": "string", "enum": ["Y", "N"] },
+    "seasonal_description": { "type": "string" },
+
+    "habitat_age": { "type": "string", "enum": ["UNDER_1YR", "1_TO_3YR", "3_TO_7YR", "OVER_7YR"] },
+    "membership_trend": { "type": "string", "enum": ["GROWING", "STABLE", "DECLINING", "CANNOT_DETERMINE"] },
+    "post_frequency_trend": { "type": "string", "enum": ["INCREASING", "SAME", "DECREASING", "CANNOT_DETERMINE"] },
+
+    "publicly_accessible": { "type": "string", "enum": ["Y", "N"] },
+    "text_based_content": { "type": "string", "enum": ["Y", "N"] },
+    "target_language": { "type": "string", "enum": ["Y", "N"] },
+    "no_rate_limiting": { "type": "string", "enum": ["Y", "N"] },
+
+    "purchase_intent_density": { "type": "string", "enum": ["MOST", "SOME", "FEW", "NONE"] },
+    "discusses_spending": { "type": "string", "enum": ["Y", "N"] },
+    "recommendation_threads": { "type": "string", "enum": ["Y", "N"] },
+
+    "reusability": { "type": "string", "enum": ["PRODUCT_SPECIFIC", "PATTERN_REUSABLE"] },
+
+    "language_samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "post_url": { "type": "string" },
+          "has_trigger_event": { "type": "string", "enum": ["Y", "N"] },
+          "has_failed_solution": { "type": "string", "enum": ["Y", "N"] },
+          "has_identity_language": { "type": "string", "enum": ["Y", "N"] },
+          "has_specific_outcome": { "type": "string", "enum": ["Y", "N"] },
+          "word_count": { "type": "integer" }
+        }
+      },
+      "minItems": 3,
+      "maxItems": 5
+    }
+  }
+}

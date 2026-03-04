@@ -14,6 +14,13 @@ export type ShopifyConnectionState =
   | "ready"
   | "error";
 
+export type ShopifyInstallationState =
+  | "not_installed"
+  | "conflict"
+  | "installed_missing_storefront_token"
+  | "installed"
+  | "error";
+
 export type ClientShopifyStatus = {
   state: ShopifyConnectionState;
   message: string;
@@ -22,6 +29,11 @@ export type ClientShopifyStatus = {
   selectedShopDomain?: string | null;
   hasStorefrontAccessToken: boolean;
   missingScopes: string[];
+  installationState: ShopifyInstallationState;
+};
+
+export type ClientShopifyInstallUrlResponse = {
+  installUrl: string;
 };
 
 export type ClientShopifyCatalogProduct = {
@@ -236,6 +248,8 @@ export type ClientShopifyThemeTemplateGenerateImagesResponse = {
   remainingSlotPaths: string[];
   quotaExhaustedSlotPaths: string[];
   slotErrorsByPath: Record<string, string>;
+  imageGenerationError?: string | null;
+  copyGenerationError?: string | null;
 };
 
 export type ClientShopifyThemeTemplatePublishPayload = {
@@ -383,7 +397,7 @@ export function useCreateClientShopifyInstallUrl(clientId: string) {
   return useMutation({
     mutationFn: (payload: { shopDomain: string }) => {
       if (!clientId) throw new Error("Client ID is required.");
-      return post<{ installUrl: string }>(`/clients/${clientId}/shopify/install-url`, payload);
+      return post<ClientShopifyInstallUrlResponse>(`/clients/${clientId}/shopify/install-url`, payload);
     },
     onError: (err: ApiError | Error) => {
       const message = "message" in err ? err.message : err?.message || "Failed to create Shopify install URL";
@@ -816,6 +830,16 @@ function parseFilenameFromContentDisposition(contentDisposition: string | null):
   }
 }
 
+function isZipContentType(contentType: string | null): boolean {
+  if (!contentType) return false;
+  const normalized = contentType.toLowerCase();
+  return (
+    normalized.includes("application/zip") ||
+    normalized.includes("application/x-zip-compressed") ||
+    normalized.includes("application/octet-stream")
+  );
+}
+
 async function parseDownloadError(resp: Response): Promise<Error> {
   try {
     const raw = await resp.clone().json();
@@ -851,6 +875,16 @@ export function useDownloadClientShopifyThemeTemplateZip(clientId?: string) {
       );
       if (!response.ok) {
         throw await parseDownloadError(response);
+      }
+      const responseContentType = response.headers.get("Content-Type");
+      if (!isZipContentType(responseContentType)) {
+        const preview = (await response.text()).trim().slice(0, 240);
+        const contentTypeLabel = responseContentType?.trim() || "unknown content type";
+        throw new Error(
+          preview
+            ? `Expected a ZIP download but received ${contentTypeLabel}. Response preview: ${preview}`
+            : `Expected a ZIP download but received ${contentTypeLabel}.`,
+        );
       }
       const blob = await response.blob();
       const fileNameFromHeader = parseFilenameFromContentDisposition(
@@ -918,20 +952,31 @@ export function useGenerateClientShopifyThemeTemplateImages(clientId?: string) {
       }
     },
     onSuccess: (response) => {
+      const nonFatalErrors = [
+        response.imageGenerationError?.trim(),
+        response.copyGenerationError?.trim(),
+      ].filter((message): message is string => Boolean(message));
       const textSummary =
         response.generatedTextCount > 0
           ? ` Refreshed ${response.generatedTextCount} text slot(s).`
           : "";
-      if (response.remainingSlotPaths.length) {
-        toast.success(
-          `Generated ${response.generatedImageCount} template image(s). ` +
-            `${response.remainingSlotPaths.length} slot(s) still pending.` +
-            textSummary,
-        );
+      if (response.generatedImageCount > 0 || response.generatedTextCount > 0) {
+        if (response.remainingSlotPaths.length) {
+          toast.success(
+            `Generated ${response.generatedImageCount} template image(s). ` +
+              `${response.remainingSlotPaths.length} slot(s) still pending.` +
+              textSummary,
+          );
+        } else {
+          toast.success(
+            `Generated ${response.generatedImageCount} template image(s).` + textSummary,
+          );
+        }
       } else {
-        toast.success(
-          `Generated ${response.generatedImageCount} template image(s).` + textSummary,
-        );
+        toast.success("No new template assets were generated.");
+      }
+      if (nonFatalErrors.length) {
+        toast.error(nonFatalErrors.join(" "));
       }
       queryClient.invalidateQueries({
         queryKey: ["clients", "shopify-theme-template-drafts", clientId],
@@ -972,7 +1017,8 @@ export function useCreateClient() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: { name: string; industry?: string }) => post<Client>("/clients", payload),
+    mutationFn: (payload: { name: string; industry?: string; strategyV2Enabled?: boolean }) =>
+      post<Client>("/clients", payload),
     onSuccess: () => {
       toast.success("Client created");
       queryClient.invalidateQueries({ queryKey: ["clients"] });

@@ -13,6 +13,7 @@ from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.funnels import FunnelsRepository
 from app.db.repositories.products import ProductsRepository
+from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
@@ -25,6 +26,8 @@ from app.temporal.workflows.campaign_funnel_generation import (
     CampaignFunnelGenerationWorkflow,
 )
 from app.temporal.workflows.creative_production import CreativeProductionInput, CreativeProductionWorkflow
+from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
+from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from temporalio.api.enums.v1 import WorkflowExecutionStatus
 
 
@@ -62,23 +65,73 @@ def _validate_planning_prereqs(
     session: Session,
 ) -> None:
     artifacts_repo = ArtifactsRepository(session)
-    canon = artifacts_repo.get_latest_by_type(
+    strategy_v2_required = is_strategy_v2_enabled(
+        session=session,
         org_id=org_id,
         client_id=client_id,
-        product_id=product_id,
-        artifact_type=ArtifactTypeEnum.client_canon,
     )
-    metric = artifacts_repo.get_latest_by_type(
-        org_id=org_id,
-        client_id=client_id,
-        product_id=product_id,
-        artifact_type=ArtifactTypeEnum.metric_schema,
-    )
-    if not canon or not metric:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Complete client onboarding (canon + metric schema) before starting campaign planning.",
+    if not strategy_v2_required:
+        canon = artifacts_repo.get_latest_by_type(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            artifact_type=ArtifactTypeEnum.client_canon,
         )
+        metric = artifacts_repo.get_latest_by_type(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            artifact_type=ArtifactTypeEnum.metric_schema,
+        )
+        if not canon or not metric:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Complete client onboarding (canon + metric schema) before starting campaign planning.",
+            )
+    try:
+        require_strategy_v2_outputs_if_enabled(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+def _strategy_v2_launch_row_payload(row, *, launch_status: str | None = None) -> dict:
+    launch_type_raw = str(getattr(row, "launch_type", "") or "").strip()
+    if launch_type_raw not in {"initial_angle", "additional_ums", "additional_angle"}:
+        launch_type = "initial_angle"
+    else:
+        launch_type = launch_type_raw
+    created_at = getattr(row, "created_at", None)
+    created_at_iso = created_at.isoformat() if created_at else ""
+    return {
+        "id": str(getattr(row, "id")),
+        "launch_type": launch_type,
+        "launch_key": str(getattr(row, "launch_key", "") or ""),
+        "campaign_id": str(getattr(row, "campaign_id")) if getattr(row, "campaign_id", None) else None,
+        "funnel_id": str(getattr(row, "funnel_id")) if getattr(row, "funnel_id", None) else None,
+        "angle_id": str(getattr(row, "angle_id", "") or ""),
+        "angle_run_id": str(getattr(row, "angle_run_id", "") or ""),
+        "selected_ums_id": str(getattr(row, "selected_ums_id")) if getattr(row, "selected_ums_id", None) else None,
+        "selected_variant_id": (
+            str(getattr(row, "selected_variant_id")) if getattr(row, "selected_variant_id", None) else None
+        ),
+        "launch_index": int(getattr(row, "launch_index")) if getattr(row, "launch_index", None) is not None else None,
+        "launch_workflow_run_id": (
+            str(getattr(row, "launch_workflow_run_id")) if getattr(row, "launch_workflow_run_id", None) else None
+        ),
+        "launch_temporal_workflow_id": (
+            str(getattr(row, "launch_temporal_workflow_id"))
+            if getattr(row, "launch_temporal_workflow_id", None)
+            else None
+        ),
+        "launch_status": launch_status,
+        "created_by_user": str(getattr(row, "created_by_user")) if getattr(row, "created_by_user", None) else None,
+        "created_at": created_at_iso,
+    }
 
 
 async def _start_campaign_planning(
@@ -232,6 +285,43 @@ def get_campaign(
     return jsonable_encoder(campaign)
 
 
+@router.get("/{campaign_id}/strategy-v2-launches")
+def list_campaign_strategy_v2_launches(
+    campaign_id: str,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    campaign = CampaignsRepository(session).get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+
+    launches_repo = StrategyV2LaunchesRepository(session)
+    workflow_repo = WorkflowsRepository(session)
+    rows = launches_repo.list_for_campaign(org_id=auth.org_id, campaign_id=campaign_id)
+    status_by_workflow_run_id: dict[str, str | None] = {}
+    for row in rows:
+        launch_workflow_run_id_raw = getattr(row, "launch_workflow_run_id", None)
+        if launch_workflow_run_id_raw is None:
+            continue
+        launch_workflow_run_id = str(launch_workflow_run_id_raw)
+        if launch_workflow_run_id in status_by_workflow_run_id:
+            continue
+        linked_run = workflow_repo.get(org_id=auth.org_id, workflow_run_id=launch_workflow_run_id)
+        status_by_workflow_run_id[launch_workflow_run_id] = linked_run.status.value if linked_run else None
+
+    payload_rows = []
+    for row in rows:
+        launch_workflow_run_id_raw = getattr(row, "launch_workflow_run_id", None)
+        launch_status = (
+            status_by_workflow_run_id.get(str(launch_workflow_run_id_raw))
+            if launch_workflow_run_id_raw is not None
+            else None
+        )
+        payload_rows.append(_strategy_v2_launch_row_payload(row, launch_status=launch_status))
+
+    return jsonable_encoder(payload_rows)
+
+
 @router.post("/{campaign_id}/plan")
 async def start_campaign_planning(
     campaign_id: str,
@@ -291,6 +381,15 @@ async def generate_campaign_funnels(
             status_code=status.HTTP_409_CONFLICT,
             detail="Campaign is missing creative brief types. Set creative brief types before creating funnels.",
         )
+    try:
+        require_strategy_v2_outputs_if_enabled(
+            session=session,
+            org_id=auth.org_id,
+            client_id=str(campaign.client_id),
+            product_id=str(campaign.product_id),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     if not payload.experiment_ids:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

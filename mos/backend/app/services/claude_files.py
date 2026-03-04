@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -20,6 +21,9 @@ logger = logging.getLogger(__name__)
 CLAUDE_API_BASE_URL = os.getenv("ANTHROPIC_API_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL") or "https://api.anthropic.com"
 CLAUDE_HTTP_TIMEOUT = int(os.getenv("ANTHROPIC_HTTP_TIMEOUT", "300"))
 CLAUDE_DEFAULT_MODEL = os.getenv("CLAUDE_DEFAULT_MODEL", "claude-3-5-sonnet-20241022")
+CLAUDE_STRUCTURED_HTTP_TIMEOUT = int(os.getenv("ANTHROPIC_STRUCTURED_HTTP_TIMEOUT", "900"))
+CLAUDE_STRUCTURED_MAX_ATTEMPTS = max(1, int(os.getenv("ANTHROPIC_STRUCTURED_MAX_ATTEMPTS", "3")))
+CLAUDE_STRUCTURED_RETRYABLE_STATUS_CODES = {408, 429, 500, 502, 503, 504, 529}
 
 
 @dataclass
@@ -279,6 +283,14 @@ def _is_output_format_unsupported(exc: httpx.HTTPStatusError) -> bool:
         return False
 
 
+def _is_retryable_structured_transport_error(exc: Exception) -> bool:
+    if isinstance(exc, (httpx.ReadError, httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError)):
+        return True
+
+    lowered = str(exc).lower()
+    return "sslv3_alert_bad_record_mac" in lowered or "bad record mac" in lowered
+
+
 def _extract_first_json_object(text: str) -> Dict[str, Any]:
     """
     Extract and parse the first top-level JSON object from an arbitrary text blob.
@@ -376,6 +388,19 @@ def _extract_anthropic_usage_from_payload(payload: Any) -> Dict[str, int] | None
     return usage_details or None
 
 
+def _extract_request_id_from_headers(headers: Any) -> str | None:
+    if headers is None:
+        return None
+    for key in ("request-id", "x-request-id", "anthropic-request-id"):
+        value = headers.get(key) if hasattr(headers, "get") else None
+        if not value:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None
+
+
 def _extract_puck_content_count(parsed: Any) -> int | None:
     if not isinstance(parsed, dict):
         return None
@@ -420,6 +445,37 @@ def _user_content_summary(user_content: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
 
 
+def _messages_summary(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+    role_counts: Dict[str, int] = {}
+    block_count = 0
+    text_chars = 0
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role") or "unknown")
+        role_counts[role] = role_counts.get(role, 0) + 1
+        content = message.get("content")
+        if isinstance(content, str):
+            text_chars += len(content)
+            continue
+        if isinstance(content, list):
+            block_count += len(content)
+            for block in content:
+                if not isinstance(block, dict):
+                    continue
+                if block.get("type") == "text":
+                    text_value = block.get("text")
+                    if isinstance(text_value, str):
+                        text_chars += len(text_value)
+
+    return {
+        "messageCount": len(messages),
+        "roleCounts": role_counts,
+        "blockCount": block_count,
+        "textChars": text_chars,
+    }
+
+
 def _structured_output_summary(*, payload: Dict[str, Any], parsed: Any, text_content: str) -> Dict[str, Any]:
     summary: Dict[str, Any] = {
         "stopReason": payload.get("stop_reason"),
@@ -438,9 +494,10 @@ def call_claude_structured_message(
     *,
     model: str,
     system: Optional[str],
-    user_content: List[Dict[str, Any]],
+    user_content: Optional[List[Dict[str, Any]]] = None,
+    messages: Optional[List[Dict[str, Any]]] = None,
     output_schema: Dict[str, Any],
-    max_tokens: int = 4096,
+    max_tokens: int = 32000,
     temperature: float = 0.0,
 ) -> Dict[str, Any]:
     """
@@ -460,11 +517,23 @@ def call_claude_structured_message(
     if not candidate_model:
         raise RuntimeError("Claude model is required for structured message call")
 
+    if (user_content is None) == (messages is None):
+        raise RuntimeError(
+            "Claude structured message call requires exactly one of user_content or messages."
+        )
+
+    if messages is not None:
+        if not isinstance(messages, list) or not messages:
+            raise RuntimeError("Claude structured message call requires a non-empty messages list.")
+        request_messages = messages
+    else:
+        request_messages = [{"role": "user", "content": user_content or []}]
+
     body = {
         "model": candidate_model,
         "max_tokens": max_tokens,
         "temperature": temperature,
-        "messages": [{"role": "user", "content": user_content}],
+        "messages": request_messages,
         "output_format": {"type": "json_schema", "schema": safe_schema},
     }
     if system:
@@ -472,13 +541,17 @@ def call_claude_structured_message(
 
     schema_json = json.dumps(safe_schema, ensure_ascii=False, sort_keys=True)
     schema_sha256 = hashlib.sha256(schema_json.encode("utf-8")).hexdigest()
-    user_content_summary = _user_content_summary(user_content)
+    input_summary: Dict[str, Any]
+    if messages is not None:
+        input_summary = {"messages": _messages_summary(messages)}
+    else:
+        input_summary = {"userContent": _user_content_summary(user_content or [])}
 
     url = f"{CLAUDE_API_BASE_URL.rstrip('/')}/v1/messages"
     with start_langfuse_generation(
         name="llm.anthropic.structured",
         model=candidate_model,
-        input={"systemChars": len(system or ""), "userContent": user_content_summary},
+        input={"systemChars": len(system or ""), **input_summary},
         metadata={
             "operation": "claude_structured_message",
             "provider": "anthropic",
@@ -490,23 +563,72 @@ def call_claude_structured_message(
         tags=["llm", "anthropic", "structured"],
         trace_name="llm.workflow",
     ) as generation:
-        try:
-            with httpx.Client(timeout=CLAUDE_HTTP_TIMEOUT) as client:
-                response = client.post(url, headers=headers, json=body)
-                response.raise_for_status()
-                payload = response.json()
-        except httpx.HTTPStatusError as exc:
-            if _is_model_not_found(exc):
-                raise RuntimeError(f"Claude model not found: {candidate_model}") from exc
-            if _is_output_format_unsupported(exc):
+        request_id: str | None = None
+        payload: Dict[str, Any] | None = None
+        last_retryable_error: Exception | None = None
+
+        for attempt in range(1, CLAUDE_STRUCTURED_MAX_ATTEMPTS + 1):
+            try:
+                with httpx.Client(timeout=CLAUDE_STRUCTURED_HTTP_TIMEOUT) as client:
+                    response = client.post(url, headers=headers, json=body)
+                    response.raise_for_status()
+                    payload = response.json()
+                    request_id = _extract_request_id_from_headers(response.headers)
+                    break
+            except httpx.HTTPStatusError as exc:
+                request_id = _extract_request_id_from_headers(exc.response.headers if exc.response is not None else None)
+                request_id_suffix = f", request_id={request_id}" if request_id else ""
+                if _is_model_not_found(exc):
+                    raise RuntimeError(f"Claude model not found: {candidate_model}{request_id_suffix}") from exc
+                if _is_output_format_unsupported(exc):
+                    raise RuntimeError(
+                        "Claude model does not support structured outputs (output_format=json_schema): "
+                        f"{candidate_model}{request_id_suffix}"
+                    ) from exc
+
+                status_code = exc.response.status_code if exc.response else None
+                if status_code in CLAUDE_STRUCTURED_RETRYABLE_STATUS_CODES and attempt < CLAUDE_STRUCTURED_MAX_ATTEMPTS:
+                    last_retryable_error = exc
+                    logger.warning(
+                        "claude_structured_message_retry_status",
+                        extra={
+                            "status_code": status_code,
+                            "attempt": attempt,
+                            "max_attempts": CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+                            "request_id": request_id,
+                            "model": candidate_model,
+                        },
+                    )
+                    time.sleep(min(2 ** (attempt - 1), 8))
+                    continue
+
+                body_text = exc.response.text if exc.response else ""
+                status = exc.response.status_code if exc.response else "unknown"
                 raise RuntimeError(
-                    f"Claude model does not support structured outputs (output_format=json_schema): {candidate_model}"
+                    f"Claude structured message failed (status={status}{request_id_suffix}): {body_text}"
                 ) from exc
-            body_text = exc.response.text if exc.response else ""
-            status = exc.response.status_code if exc.response else "unknown"
-            raise RuntimeError(f"Claude structured message failed (status={status}): {body_text}") from exc
-        except Exception as exc:  # noqa: BLE001
-            raise RuntimeError(f"Claude structured message failed: {exc}") from exc
+            except Exception as exc:  # noqa: BLE001
+                if _is_retryable_structured_transport_error(exc) and attempt < CLAUDE_STRUCTURED_MAX_ATTEMPTS:
+                    last_retryable_error = exc
+                    logger.warning(
+                        "claude_structured_message_retry_transport",
+                        extra={
+                            "attempt": attempt,
+                            "max_attempts": CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+                            "model": candidate_model,
+                            "error": str(exc),
+                        },
+                    )
+                    time.sleep(min(2 ** (attempt - 1), 8))
+                    continue
+                raise RuntimeError(f"Claude structured message failed: {exc}") from exc
+
+        if payload is None:
+            terminal_error = last_retryable_error or RuntimeError("unknown Claude structured message error")
+            raise RuntimeError(
+                "Claude structured message failed after retry budget exhausted. "
+                f"attempts={CLAUDE_STRUCTURED_MAX_ATTEMPTS} error={terminal_error}"
+            ) from terminal_error
 
         parsed = None
         output_block = payload.get("output")
@@ -533,23 +655,32 @@ def call_claude_structured_message(
 
         if parsed is None:
             summary = _summarize_claude_structured_payload(payload)
+            request_id_suffix = f" request_id={request_id}" if request_id else ""
             if stop_reason == "max_tokens":
                 # This is very often truncated JSON. Surface a clear error so callers can increase max_tokens.
                 raise RuntimeError(
                     "Claude structured message returned non-JSON output (stop_reason=max_tokens). "
-                    f"Increase max_tokens. {summary}"
+                    f"Increase max_tokens. {summary}{request_id_suffix}"
                 )
 
             head = text_content[:400].replace("\n", "\\n") if text_content else ""
             raise RuntimeError(
                 "Claude structured message returned no parsable output. "
-                f"{summary} text_head={head!r}"
+                f"{summary}{request_id_suffix} text_head={head!r}"
             )
 
+        usage_details = _extract_anthropic_usage_from_payload(payload)
         if generation is not None:
             generation.update(
                 output=_structured_output_summary(payload=payload, parsed=parsed, text_content=text_content),
-                usage_details=_extract_anthropic_usage_from_payload(payload),
+                usage_details=usage_details,
             )
 
-        return {"parsed": parsed, "raw": payload, "text": text_content}
+        return {
+            "parsed": parsed,
+            "raw": payload,
+            "text": text_content,
+            "request_id": request_id,
+            "stop_reason": stop_reason,
+            "usage": usage_details,
+        }

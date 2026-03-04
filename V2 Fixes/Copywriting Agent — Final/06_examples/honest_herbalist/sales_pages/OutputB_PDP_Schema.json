@@ -1,0 +1,511 @@
+{
+  "meta": {
+    "title": "The Honest Herbalist Handbook — The Only Herbal Reference That Starts Where Every Other Guide Stops",
+    "description": "Dosing ranges by form and age. Interaction flags for common medications. Safety notes that go beyond 'consult your herbalist.' One spiral-bound, laminated kitchen manual. $49.",
+    "lang": "en"
+  },
+  "theme": {
+    "dataTheme": "honest-herbalist",
+    "tokens": {
+      "colorPrimary": "#4A6741",
+      "colorAccent": "#C8A96E",
+      "colorBackground": "#FAF8F5",
+      "colorText": "#2C2C2C",
+      "fontHeading": "Georgia, serif",
+      "fontBody": "system-ui, sans-serif",
+      "borderRadius": 4
+    }
+  },
+  "copy": {
+    "common": {
+      "starsAriaLabelTemplate": "{rating} out of 5 stars"
+    },
+    "modal": {
+      "closeAriaLabel": "Close dialog",
+      "dialogAriaLabel": "Information dialog"
+    },
+    "reviews": {
+      "sectionAriaLabel": "Customer reviews",
+      "prevButtonAriaLabel": "Previous review",
+      "nextButtonAriaLabel": "Next review",
+      "dotsAriaLabel": "Review navigation",
+      "goToReviewAriaLabelTemplate": "Go to review {index}"
+    },
+    "reviewWall": {
+      "verifiedLabel": "Verified Buyer"
+    }
+  },
+  "page": {
+    "hero": {
+      "header": {
+        "logo": {
+          "src": "",
+          "alt": "The Honest Herbalist logo — a simple botanical leaf mark with brand name in serif type",
+          "href": "/"
+        },
+        "nav": [
+          {
+            "label": "What's Inside",
+            "href": "#whats-inside"
+          },
+          {
+            "label": "How It's Different",
+            "href": "#comparison"
+          },
+          {
+            "label": "Reviews",
+            "href": "#reviews"
+          },
+          {
+            "label": "FAQ",
+            "href": "#faq"
+          }
+        ],
+        "cta": {
+          "label": "Get the Handbook",
+          "href": "#purchase"
+        }
+      },
+      "gallery": {
+        "watchInAction": {
+          "label": "See the handbook in action"
+        },
+        "slides": [
+          {
+            "src": "",
+            "alt": "The Honest Herbalist Handbook open on a kitchen counter, showing a full herb profile with dosing ranges, interaction flags, and confidence ratings clearly visible on laminated pages",
+            "thumbSrc": ""
+          },
+          {
+            "src": "",
+            "alt": "The Honest Herbalist Handbook spiral-bound and lying flat next to a mortar and pestle, dried herbs, and a cup of tea on a warm wood countertop",
+            "thumbSrc": ""
+          },
+          {
+            "src": "",
+            "alt": "Close-up of a single herb profile page showing the three-tier confidence rating system, milligram dosing columns for adults and children, and a highlighted drug interaction flag",
+            "thumbSrc": ""
+          },
+          {
+            "src": "",
+            "alt": "The two digital bonus guides displayed on a tablet screen — Herbal Safety Quick-Check Guide and Home Apothecary Starter Guide — alongside the physical handbook",
+            "thumbSrc": ""
+          }
+        ],
+        "freeGifts": {
+          "icon": {
+            "src": "",
+            "alt": "Gift icon representing two free digital bonus guides included with your order"
+          },
+          "title": "2 Free Digital Bonus Guides",
+          "body": "Yours instantly while the handbook ships. Herbal Safety Quick-Check Guide plus Home Apothecary Starter Guide.",
+          "ctaLabel": "See what's included"
+        }
+      },
+      "purchase": {
+        "faqPills": [
+          {
+            "label": "How is this different from other herb books?",
+            "answer": "Most herb books organize around what an herb does. This one organizes around what you need to know before you use it — dose, interactions, safety flags, confidence level. If your current books include milligram dosing ranges by form and age group, you may not need this. If they don't, this is the one that fills that gap."
+          },
+          {
+            "label": "Is this evidence-based?",
+            "answer": "Every herb profile includes a three-tier confidence rating: Traditional Use, Some Evidence, or Stronger Evidence. Where clinical studies exist, the handbook references them. Where only traditional use exists, it says so plainly. No overpromising."
+          },
+          {
+            "label": "Does it cover drug interactions?",
+            "answer": "Yes. The handbook flags documented interactions with common medication categories — SSRIs, blood thinners, birth control, blood pressure medications, and more — directly on each herb profile."
+          }
+        ],
+        "title": "The Honest Herbalist Handbook",
+        "benefits": [
+          {
+            "text": "300+ herb profiles organized safety-first"
+          },
+          {
+            "text": "Dosing ranges by form and age group"
+          },
+          {
+            "text": "Drug interaction flags on every profile"
+          },
+          {
+            "text": "Three-tier confidence ratings"
+          },
+          {
+            "text": "Laminated, spiral-bound — built for the kitchen counter"
+          },
+          {
+            "text": "2 digital bonus guides included instantly"
+          }
+        ],
+        "size": {
+          "title": "Format",
+          "helpLinkLabel": "Product details",
+          "options": [
+            {
+              "id": "standard",
+              "label": "Standard Edition",
+              "sizeIn": "8.5 x 11 in",
+              "sizeCm": "21.6 x 27.9 cm"
+            }
+          ],
+          "shippingDelayLabel": ""
+        },
+        "color": {
+          "title": "Edition",
+          "options": [
+            {
+              "id": "natural",
+              "label": "Natural"
+            }
+          ],
+          "outOfStockTitle": "",
+          "outOfStockBody": ""
+        },
+        "offer": {
+          "title": "Choose Your Option",
+          "helperText": "Includes 2 digital bonus guides — instant access while your handbook ships.",
+          "seeWhyLabel": "See what's included",
+          "options": [
+            {
+              "id": "handbook-single",
+              "title": "The Honest Herbalist Handbook",
+              "image": {
+                "src": "",
+                "alt": "The Honest Herbalist Handbook — laminated spiral-bound kitchen manual with two digital bonus guides"
+              },
+              "price": 49
+            }
+          ]
+        },
+        "cta": {
+          "labelTemplate": "Get the Handbook — ${price}",
+          "subBullets": [
+            "Ships to your door",
+            "2 digital bonus guides — yours instantly",
+            "30-day money-back guarantee"
+          ],
+          "urgency": {
+            "message": "12,000+ readers trust this on their kitchen counter",
+            "rows": [
+              {
+                "label": "Format",
+                "value": "Laminated, spiral-bound kitchen manual",
+                "tone": "muted"
+              },
+              {
+                "label": "Bonus",
+                "value": "2 digital guides — instant access",
+                "tone": "highlight"
+              },
+              {
+                "label": "Guarantee",
+                "value": "30-day \"Look It Up\" guarantee",
+                "tone": "muted"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "videos": {
+      "badge": "See It In Action",
+      "title": "How the Handbook Works in Your Kitchen",
+      "videos": [
+        {
+          "id": "handbook-walkthrough",
+          "thumbnail": {
+            "src": "",
+            "alt": "Video thumbnail showing a pair of hands flipping through laminated pages of The Honest Herbalist Handbook on a kitchen counter"
+          }
+        },
+        {
+          "id": "herb-profile-demo",
+          "thumbnail": {
+            "src": "",
+            "alt": "Video thumbnail showing a close-up of a single herb profile page with dosing ranges and interaction flags highlighted"
+          }
+        }
+      ]
+    },
+    "marquee": {
+      "items": [
+        "300+ Herb Profiles",
+        "Dosing by Form & Age",
+        "Drug Interaction Flags",
+        "Three-Tier Confidence Ratings",
+        "Symptom-First Index",
+        "Pediatric Ranges",
+        "Laminated & Spiral-Bound",
+        "Built for the Kitchen Counter",
+        "12,000+ Readers"
+      ],
+      "repeat": 2
+    },
+    "story": {
+      "problem": {
+        "id": "the-gap",
+        "bg": "peach",
+        "badge": "The Problem",
+        "title": "Most Herb Guides Tell You Everything Except the One Thing You Need",
+        "paragraphs": [
+          "You've looked up an herb and found three different answers on three different sites. You've held a bottle of elderberry and realized you had no idea whether the dose was right for your nine-year-old. You've read an herb book cover to cover and walked away knowing what chamomile is used for — but not how much to actually take.",
+          "Most herbal guides tell you everything except the one thing you need at the moment you're standing in your kitchen making a decision: the dose. The interaction. The safety note that should have been on the first page.",
+          "That's the gap. And it's the reason this handbook exists."
+        ],
+        "emphasisLine": "You already know the problem. This is the reference that finally solves it.",
+        "image": {
+          "src": "",
+          "alt": "A kitchen counter with three different herb books open to the same herb, each showing different and incomplete dosing information — illustrating the inconsistency problem"
+        },
+        "layout": "textLeft"
+      },
+      "solution": {
+        "id": "whats-inside",
+        "bg": "blue",
+        "badge": "The Solution",
+        "title": "What Makes This Handbook Structurally Different",
+        "paragraphs": [
+          "Most herb guides are organized around what an herb does. This one is organized around what you need to know before you use it.",
+          "Every herb profile in The Honest Herbalist Handbook starts with three things most references skip: dosing ranges by form and by age group, interaction flags for common medications, and a confidence rating for every listed use."
+        ],
+        "emphasisLine": "This isn't a book you read once and shelve. It's a reference you open when you're holding a bottle and need an answer.",
+        "bullets": [
+          {
+            "title": "Dosing ranges — by form and by age group",
+            "body": "Actual milligram ranges for tinctures, capsules, teas, and glycerites. Adult ranges and pediatric ranges, clearly separated. When a dose is based on published clinical data, it says so. When it's based on traditional use, it says that too."
+          },
+          {
+            "title": "Interaction flags for common medications",
+            "body": "SSRIs. Blood thinners. Birth control. Blood pressure meds. If an herb has a documented interaction with a medication that millions of people take daily, that flag is on the profile — not buried in an appendix."
+          },
+          {
+            "title": "A confidence rating for every listed use",
+            "body": "A three-tier system — Traditional Use, Some Evidence, Stronger Evidence — so you know the difference between centuries of folk use and a controlled clinical study."
+          }
+        ],
+        "image": {
+          "src": "",
+          "alt": "A clear, well-organized herb profile page from The Honest Herbalist Handbook showing the three structural pillars: dosing columns, interaction flags highlighted in amber, and the confidence rating badge"
+        },
+        "layout": "textRight",
+        "callout": {
+          "leftTitle": "Built for the Way You Actually Use Herbs",
+          "leftBody": "You're not trying to become a clinical herbalist. You're the person who reaches for chamomile before melatonin, who gives your kid honey and thyme before calling the pediatrician — but who also wants to know you're not accidentally making things worse. Natural-first, but not reckless.",
+          "rightTitle": "You Don't Need a Course",
+          "rightBody": "You don't need a certification. You need a reference that respects the way you already think about your family's health. This handbook was built for that exact mindset — curious, but careful."
+        }
+      }
+    },
+    "comparison": {
+      "id": "comparison",
+      "badge": "Side by Side",
+      "title": "How This Compares",
+      "swipeHint": "Swipe to compare",
+      "columns": {
+        "pup": "The Honest Herbalist Handbook",
+        "disposable": "Typical Herb Guide"
+      },
+      "rows": [
+        {
+          "label": "Dosing",
+          "pup": "Milligram ranges by form + age group",
+          "disposable": "\"Brew a tea\" or no dose listed"
+        },
+        {
+          "label": "Drug Interactions",
+          "pup": "Flagged on every herb profile",
+          "disposable": "Appendix or missing entirely"
+        },
+        {
+          "label": "Evidence Quality",
+          "pup": "Three-tier confidence rating",
+          "disposable": "All uses listed equally"
+        },
+        {
+          "label": "Safety for Children",
+          "pup": "Pediatric ranges with age cutoffs",
+          "disposable": "\"Consult your pediatrician\""
+        },
+        {
+          "label": "When to Stop",
+          "pup": "\"When not to DIY\" section per herb",
+          "disposable": "Rarely addressed"
+        },
+        {
+          "label": "Format",
+          "pup": "Laminated, spiral-bound — built for the kitchen counter",
+          "disposable": "Paperback, shelf reference"
+        }
+      ]
+    },
+    "reviewSlider": {
+      "title": "What Readers Are Saying",
+      "body": "Over 12,000 readers keep this on their kitchen counter.",
+      "hint": "Swipe to read more",
+      "toggle": {
+        "auto": "Auto-play reviews",
+        "manual": "Manual review navigation"
+      },
+      "slides": [
+        {
+          "src": "",
+          "alt": "5-star review from Sarah M.: Found three interactions in her daily routine she never knew existed — St. John's Wort with birth control flagged after three years of use"
+        },
+        {
+          "src": "",
+          "alt": "5-star review from Rachel K.: Pediatric dosing ranges eliminated guesswork for her six-year-old — keeps the handbook on the counter next to the spice rack"
+        },
+        {
+          "src": "",
+          "alt": "5-star review from Jenny D.: After buying three other herb books, this was the first to treat safety like it belongs on the front page"
+        },
+        {
+          "src": "",
+          "alt": "5-star review from Amanda P.: Stopped spending 45 minutes cross-referencing websites — now opens the handbook, checks the profile and flags, and is done"
+        }
+      ]
+    },
+    "guarantee": {
+      "id": "guarantee",
+      "badge": "Our Promise",
+      "title": "The \"Look It Up\" Guarantee",
+      "paragraphs": [
+        "Try it for 30 days.",
+        "When your handbook arrives, open it to any herb you already use. Check the dosing range. Check the interaction flags. Check the confidence rating.",
+        "If the information isn't more specific, more organized, and more useful than what you've been relying on — return it. Full refund. No questionnaire. No hoops."
+      ],
+      "whyTitle": "Why We Offer This",
+      "whyBody": "We're confident because the book is built to pass that test on the first page you open. Every herb profile leads with the information other guides leave out. One look and you'll feel the difference.",
+      "closingLine": "30 days. Any herb. If it doesn't change how you make decisions, send it back.",
+      "right": {
+        "image": {
+          "src": "",
+          "alt": "The Honest Herbalist Handbook lying open on a kitchen counter with a cup of herbal tea beside it — showing a real-use scenario that reflects the guarantee's 'look it up' test"
+        },
+        "reviewCard": {
+          "name": "Sarah M.",
+          "verifiedLabel": "Verified Buyer",
+          "rating": 5,
+          "text": "I found three interactions in my daily routine I never knew existed. The interaction chart alone was worth the price."
+        },
+        "commentThread": {
+          "label": "Conversation",
+          "comments": [
+            {
+              "name": "Rachel K.",
+              "text": "The pediatric dosing ranges took the guesswork away completely. I keep it on the counter next to the spice rack."
+            },
+            {
+              "name": "Jenny D.",
+              "text": "This is the first herb guide that treats safety like it belongs on the front page, not the back."
+            }
+          ]
+        }
+      }
+    },
+    "faq": {
+      "id": "faq",
+      "title": "Common Questions",
+      "items": [
+        {
+          "question": "I already have several herb books. How is this different?",
+          "answer": "Most herb books organize around what an herb does. This one organizes around what you need to know before you use it — dose, interactions, safety flags, confidence level. If your current books include milligram dosing ranges by form and age group, you may not need this. If they don't, this is the one that fills that gap."
+        },
+        {
+          "question": "Is this evidence-based?",
+          "answer": "Every herb profile includes a three-tier confidence rating: Traditional Use, Some Evidence, or Stronger Evidence. Where clinical studies exist, the handbook references them. Where only traditional use exists, it says so plainly. No overpromising."
+        },
+        {
+          "question": "I'm on medications. Does this cover drug interactions?",
+          "answer": "Yes. The handbook flags documented interactions with common medication categories — SSRIs, blood thinners, birth control, blood pressure medications, and more — directly on each herb profile."
+        },
+        {
+          "question": "Is this safe to use for children's dosing?",
+          "answer": "The handbook includes pediatric dosing ranges with age-based cutoffs. It also flags herbs that are not appropriate for children and notes when professional guidance is recommended."
+        },
+        {
+          "question": "What if I'm not satisfied?",
+          "answer": "Return it within 30 days for a full refund. No questionnaire. Open the handbook to any herb you already use — if the information isn't more specific and more useful than what you've been relying on, send it back."
+        }
+      ]
+    },
+    "reviewWall": {
+      "id": "reviews",
+      "badge": "Real Readers",
+      "title": "What Readers Are Saying",
+      "ratingLabel": "4.9 out of 5 based on 12,000+ readers",
+      "tiles": [
+        {
+          "id": "review-sarah-m",
+          "image": {
+            "src": "",
+            "alt": "Sarah M. review card — 5 stars — found three drug interactions in her daily routine she never knew about, including St. John's Wort with birth control"
+          }
+        },
+        {
+          "id": "review-rachel-k",
+          "image": {
+            "src": "",
+            "alt": "Rachel K. review card — 5 stars — pediatric dosing ranges eliminated guesswork for her six-year-old daughter"
+          }
+        },
+        {
+          "id": "review-jenny-d",
+          "image": {
+            "src": "",
+            "alt": "Jenny D. review card — 5 stars — after three other herb books, this was the first to put safety information on the front page"
+          }
+        },
+        {
+          "id": "review-amanda-p",
+          "image": {
+            "src": "",
+            "alt": "Amanda P. review card — 5 stars — stopped spending 45 minutes cross-referencing herb websites at midnight"
+          }
+        }
+      ],
+      "showMoreLabel": "Show more reviews"
+    },
+    "footer": {
+      "logo": {
+        "src": "",
+        "alt": "The Honest Herbalist logo — a simple botanical leaf mark with brand name"
+      },
+      "copyright": "2026 The Honest Herbalist. All rights reserved.",
+      "company": "The Honest Herbalist LLC"
+    },
+    "modals": {
+      "sizeChart": {
+        "title": "Product Details",
+        "sizes": [
+          {
+            "label": "Standard Edition",
+            "size": "8.5 x 11 in (21.6 x 27.9 cm)",
+            "idealFor": "Kitchen counter use — lies flat, handles spills, built for daily reference",
+            "weight": "1.8 lbs (0.82 kg)"
+          }
+        ],
+        "note": "Laminated pages with spiral binding. Designed to lie flat on the counter and withstand kitchen hands, spills, and daily use. This is a working reference, not a shelf book."
+      },
+      "whyBundle": {
+        "title": "Why the Handbook Includes Digital Bonus Guides",
+        "body": "Your physical handbook ships to your door, but you shouldn't have to wait to start making safer decisions. The two digital bonus guides give you instant access to the most critical safety information and a practical starter path — so you can begin using what you learn today, not next week.",
+        "quotes": [
+          {
+            "text": "I printed the Quick-Check Guide and stuck it on the fridge the same day I ordered. By the time the handbook arrived, I'd already caught an interaction I didn't know about.",
+            "author": "Sarah M."
+          },
+          {
+            "text": "The Starter Guide helped me build a basic apothecary while I waited for the handbook to ship. I felt like I was already getting value before the box arrived.",
+            "author": "Amanda P."
+          }
+        ]
+      },
+      "freeGifts": {
+        "title": "Your 2 Free Digital Bonus Guides",
+        "body": "Bonus 1: Herbal Safety Quick-Check Guide — A printable one-page reference covering the most common herb-drug interactions, pregnancy and nursing flags, and pediatric cautions. Stick it on the fridge. Use it today.\n\nBonus 2: Home Apothecary Starter Guide — A practical walkthrough of the 12 herbs worth having in your cabinet, how to source them, what to make first, and a budget-conscious shopping list. Start building your apothecary while the handbook ships.\n\nBoth guides are delivered digitally — instant access the moment you order."
+      }
+    }
+  }
+}

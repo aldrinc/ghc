@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import binascii
 from dataclasses import dataclass
 import re
 from typing import Any
@@ -28,8 +30,6 @@ _IMPLIED_SHOPIFY_SCOPES: dict[str, set[str]] = {
     "write_products": {"read_products"},
     "write_discounts": {"read_discounts"},
 }
-
-
 @dataclass(frozen=True)
 class ShopifyInstallation:
     shop_domain: str
@@ -48,27 +48,25 @@ def _effective_shopify_scopes(scopes: list[str]) -> set[str]:
 
 
 def _require_checkout_service_config() -> tuple[str, str]:
-    if not settings.SHOPIFY_APP_BASE_URL:
+    base_url = settings.SHOPIFY_APP_BASE_URL
+    internal_token = settings.SHOPIFY_INTERNAL_API_TOKEN
+    if not base_url:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                "Shopify checkout bridge is not configured in mos/backend. "
+                "Shopify app bridge is not configured in mos/backend. "
                 "Set SHOPIFY_APP_BASE_URL and restart backend."
             ),
         )
-    if not settings.SHOPIFY_INTERNAL_API_TOKEN:
+    if not internal_token:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=(
-                "Shopify checkout bridge auth is not configured in mos/backend. "
-                "Set SHOPIFY_INTERNAL_API_TOKEN (must match the bridge token configured "
-                "in shopify-funnel-app) and restart backend."
+                "Shopify app bridge token is not configured in mos/backend. "
+                "Set SHOPIFY_INTERNAL_API_TOKEN and restart backend."
             ),
         )
-    return (
-        settings.SHOPIFY_APP_BASE_URL.rstrip("/"),
-        settings.SHOPIFY_INTERNAL_API_TOKEN,
-    )
+    return base_url.rstrip("/"), internal_token
 
 
 def _error_detail_from_response(response: httpx.Response) -> str:
@@ -343,7 +341,10 @@ def update_client_shopify_variant(
 
 
 def list_shopify_installations() -> list[ShopifyInstallation]:
-    payload = _bridge_request(method="GET", path="/admin/installations")
+    payload = _bridge_request(
+        method="GET",
+        path="/admin/installations",
+    )
     if not isinstance(payload, list):
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -405,94 +406,135 @@ def list_shopify_installations() -> list[ShopifyInstallation]:
 def get_client_shopify_connection_status(
     *, client_id: str, selected_shop_domain: str | None = None
 ) -> dict[str, Any]:
-    installations = list_shopify_installations()
-    active_for_client = [
-        installation
-        for installation in installations
-        if installation.client_id == client_id and installation.uninstalled_at is None
-    ]
-    active_shop_domains = sorted(
-        {installation.shop_domain for installation in active_for_client}
-    )
     normalized_selected_shop: str | None = None
     if selected_shop_domain is not None:
         normalized_selected_shop = normalize_shop_domain(selected_shop_domain)
 
-    if not active_for_client:
-        return {
-            "state": "not_connected",
-            "message": "Shopify is not connected for this workspace.",
-            "shopDomain": None,
-            "shopDomains": [],
-            "selectedShopDomain": normalized_selected_shop,
-            "hasStorefrontAccessToken": False,
-            "missingScopes": [],
-        }
-
-    selected_installation = None
-    if normalized_selected_shop is not None:
-        selected_installation = next(
-            (
-                installation
-                for installation in active_for_client
-                if installation.shop_domain == normalized_selected_shop
-            ),
-            None,
+    def _resolve_status(
+        *,
+        installations: list[ShopifyInstallation],
+        require_storefront_token: bool,
+        enforce_required_scopes: bool,
+    ) -> dict[str, Any]:
+        active_for_client = [
+            installation
+            for installation in installations
+            if installation.client_id == client_id and installation.uninstalled_at is None
+        ]
+        active_shop_domains = sorted(
+            {installation.shop_domain for installation in active_for_client}
         )
+        if not active_for_client:
+            return {
+                "state": "not_installed",
+                "message": "Shopify is not installed for this workspace.",
+                "installation": None,
+                "shopDomains": active_shop_domains,
+                "missingScopes": [],
+            }
 
-    if len(active_for_client) > 1 and selected_installation is None:
-        detail = "Multiple active Shopify stores are linked to this workspace. Choose one store explicitly."
+        selected_installation = None
         if normalized_selected_shop is not None:
+            selected_installation = next(
+                (
+                    installation
+                    for installation in active_for_client
+                    if installation.shop_domain == normalized_selected_shop
+                ),
+                None,
+            )
+
+        if len(active_for_client) > 1 and selected_installation is None:
             detail = (
-                f"Selected default Shopify store ({normalized_selected_shop}) is not active for this workspace. "
+                "Multiple active Shopify stores are linked to this workspace. "
                 "Choose one store explicitly."
             )
-        return {
-            "state": "multiple_installations_conflict",
-            "message": detail,
-            "shopDomain": None,
-            "shopDomains": active_shop_domains,
-            "selectedShopDomain": normalized_selected_shop,
-            "hasStorefrontAccessToken": False,
-            "missingScopes": [],
-        }
+            if normalized_selected_shop is not None:
+                detail = (
+                    f"Selected default Shopify store ({normalized_selected_shop}) is not active "
+                    "for this workspace. Choose one store explicitly."
+                )
+            return {
+                "state": "conflict",
+                "message": detail,
+                "installation": None,
+                "shopDomains": active_shop_domains,
+                "missingScopes": [],
+            }
 
-    installation = selected_installation or active_for_client[0]
-    effective_scopes = _effective_shopify_scopes(installation.scopes)
-    missing_scopes = sorted(_REQUIRED_SHOPIFY_SCOPES.difference(effective_scopes))
-    if missing_scopes:
+        installation = selected_installation or active_for_client[0]
+        missing_scopes: list[str] = []
+        if enforce_required_scopes:
+            effective_scopes = _effective_shopify_scopes(installation.scopes)
+            missing_scopes = sorted(_REQUIRED_SHOPIFY_SCOPES.difference(effective_scopes))
+            if missing_scopes:
+                return {
+                    "state": "error",
+                    "message": (
+                        "Shopify app install is missing required Admin API scopes. "
+                        "If scopes were recently changed, reconnect/reinstall the app for this store."
+                    ),
+                    "installation": installation,
+                    "shopDomains": active_shop_domains,
+                    "missingScopes": missing_scopes,
+                }
+
+        if require_storefront_token and not installation.has_storefront_access_token:
+            return {
+                "state": "installed_missing_storefront_token",
+                "message": "Shopify is installed but missing storefront access token.",
+                "installation": installation,
+                "shopDomains": active_shop_domains,
+                "missingScopes": missing_scopes,
+            }
+
         return {
-            "state": "error",
-            "message": (
-                "Shopify app install is missing required Admin API scopes. "
-                "If scopes were recently changed, reconnect/reinstall the app for this store."
-            ),
-            "shopDomain": installation.shop_domain,
+            "state": "installed",
+            "message": "Shopify installation is active.",
+            "installation": installation,
             "shopDomains": active_shop_domains,
-            "selectedShopDomain": normalized_selected_shop,
-            "hasStorefrontAccessToken": installation.has_storefront_access_token,
             "missingScopes": missing_scopes,
         }
 
-    if not installation.has_storefront_access_token:
-        return {
-            "state": "installed_missing_storefront_token",
-            "message": "Shopify is installed but missing storefront access token.",
-            "shopDomain": installation.shop_domain,
-            "shopDomains": active_shop_domains,
-            "selectedShopDomain": normalized_selected_shop,
-            "hasStorefrontAccessToken": False,
-            "missingScopes": [],
-        }
+    installations = list_shopify_installations()
+    resolved_status = _resolve_status(
+        installations=installations,
+        require_storefront_token=True,
+        enforce_required_scopes=True,
+    )
+
+    resolved_state = resolved_status["state"]
+    if resolved_state == "not_installed":
+        state = "not_connected"
+        message = "Shopify app is not connected for this workspace."
+    elif resolved_state == "conflict":
+        state = "multiple_installations_conflict"
+        message = str(resolved_status["message"])
+    elif resolved_state == "installed_missing_storefront_token":
+        state = "installed_missing_storefront_token"
+        message = str(resolved_status["message"])
+    elif resolved_state == "error":
+        state = "error"
+        message = str(resolved_status["message"])
+    else:
+        state = "ready"
+        message = "Shopify connection is ready."
+
+    installation: ShopifyInstallation | None = resolved_status["installation"]
 
     return {
-        "state": "ready",
-        "message": "Shopify connection is ready.",
-        "shopDomain": installation.shop_domain,
-        "shopDomains": active_shop_domains,
+        "state": state,
+        "message": message,
+        "shopDomain": installation.shop_domain if installation else None,
+        "shopDomains": resolved_status["shopDomains"],
         "selectedShopDomain": normalized_selected_shop,
-        "hasStorefrontAccessToken": True,
-        "missingScopes": [],
+        "hasStorefrontAccessToken": (
+            installation.has_storefront_access_token
+            if installation is not None
+            else False
+        ),
+        "missingScopes": resolved_status["missingScopes"],
+        "installationState": resolved_state,
     }
 
 
@@ -1560,13 +1602,29 @@ def sync_client_shopify_theme_brand(
     image_batch_size = configured_image_batch_size
     if export_files and component_image_items:
         image_batch_size = max(image_batch_size, len(component_image_items))
+    resolved_theme_operation_timeout = (
+        settings.SHOPIFY_THEME_EXPORT_TIMEOUT_SECONDS
+        if export_files
+        else settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
+    )
+    if not isinstance(resolved_theme_operation_timeout, (int, float)) or (
+        resolved_theme_operation_timeout <= 0
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "SHOPIFY_THEME_EXPORT_TIMEOUT_SECONDS must be a positive number."
+                if export_files
+                else "SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS must be a positive number."
+            ),
+        )
 
     def _sync_theme_brand_request(*, request_payload: dict[str, Any]) -> dict[str, Any]:
         payload = _bridge_request(
             method="POST",
             path="/v1/themes/brand/export" if export_files else "/v1/themes/brand/sync",
             json_body=request_payload,
-            timeout_seconds=settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS,
+            timeout_seconds=float(resolved_theme_operation_timeout),
         )
         if export_files:
             return _parse_theme_brand_export_response_payload(payload=payload)
@@ -1836,15 +1894,21 @@ def _parse_theme_brand_export_response_payload(*, payload: Any) -> dict[str, Any
             )
         filename = item.get("filename")
         content = item.get("content")
+        content_base64 = item.get("contentBase64")
         if not isinstance(filename, str) or not filename.strip():
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
                 detail="Shopify checkout app returned invalid filename for theme brand export.",
             )
-        if not isinstance(content, str):
+        has_text_content = isinstance(content, str)
+        has_base64_content = isinstance(content_base64, str)
+        if has_text_content == has_base64_content:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Shopify checkout app returned invalid file content for theme brand export.",
+                detail=(
+                    "Shopify checkout app returned invalid file content for theme brand export. "
+                    "Expected exactly one of content or contentBase64."
+                ),
             )
         cleaned_filename = filename.strip()
         if cleaned_filename in seen_filenames:
@@ -1853,7 +1917,31 @@ def _parse_theme_brand_export_response_payload(*, payload: Any) -> dict[str, Any
                 detail=f"Shopify checkout app returned duplicate export filename: {cleaned_filename}",
             )
         seen_filenames.add(cleaned_filename)
-        parsed_files.append({"filename": cleaned_filename, "content": content})
+        if has_text_content:
+            parsed_files.append({"filename": cleaned_filename, "content": content})
+            continue
+
+        cleaned_content_base64 = content_base64.strip()
+        if not cleaned_content_base64:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned empty contentBase64 for theme brand export.",
+            )
+        try:
+            base64.b64decode(cleaned_content_base64, validate=True)
+        except (binascii.Error, ValueError) as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Shopify checkout app returned malformed contentBase64 for theme brand export."
+                ),
+            ) from exc
+        parsed_files.append(
+            {
+                "filename": cleaned_filename,
+                "contentBase64": cleaned_content_base64,
+            }
+        )
 
     parsed_sync_payload["files"] = parsed_files
     return parsed_sync_payload
@@ -1887,10 +1975,10 @@ def list_client_shopify_theme_template_slots(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="themeName cannot be empty when provided.",
             )
-    if bool(cleaned_theme_id) == bool(cleaned_theme_name):
+    if cleaned_theme_id is not None and cleaned_theme_name is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Exactly one of themeId or themeName is required.",
+            detail="Provide at most one of themeId or themeName.",
         )
 
     request_payload: dict[str, Any] = {}
@@ -2395,6 +2483,16 @@ def build_client_shopify_install_url(*, client_id: str, shop_domain: str) -> str
     base_url, _ = _require_checkout_service_config()
     query = urlencode({"shop": normalized_shop, "client_id": client_id})
     return f"{base_url}/auth/install?{query}"
+
+
+def build_client_shopify_install_urls(*, client_id: str, shop_domain: str) -> dict[str, str]:
+    install_url = build_client_shopify_install_url(
+        client_id=client_id,
+        shop_domain=shop_domain,
+    )
+    return {
+        "installUrl": install_url,
+    }
 
 
 def set_client_shopify_storefront_token(
