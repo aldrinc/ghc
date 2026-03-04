@@ -1,11 +1,12 @@
 import json
 import os
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from sqlalchemy import select
 
-from app.db.models import Org, OrgDeployDomain
+from app.db.models import OrgDeployDomain
 from app.services import deploy as deploy_service
 
 
@@ -150,9 +151,13 @@ def test_patch_workload_endpoint_clears_plan_domains_when_configuring_bunny(api_
     assert captured["cdn_server_names"] == ["shop.example.com"]
 
 
-def test_get_workload_domains_includes_org_server_names(api_client, db_session, monkeypatch):
-    org_id = db_session.scalars(select(Org.id)).first()
-    assert org_id is not None
+def test_get_workload_domains_includes_org_server_names(
+    api_client,
+    db_session,
+    auth_context,
+    monkeypatch,
+):
+    org_id = UUID(auth_context.org_id)
     db_session.add_all(
         [
             OrgDeployDomain(org_id=org_id, hostname="offers.example.com"),

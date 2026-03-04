@@ -681,6 +681,66 @@ def _stub_prompt_chain_runtime(monkeypatch):
     monkeypatch.setattr(strategy_v2_activities, "_run_prompt_json_object", _fake_run_prompt_json_object)
 
 
+def _stub_ingest_strategy_v2_asset_data(**kwargs: Any) -> dict[str, Any]:
+    apify_configs_raw = kwargs.get("apify_configs")
+    apify_configs = (
+        [row for row in apify_configs_raw if isinstance(row, dict)]
+        if isinstance(apify_configs_raw, list)
+        else []
+    )
+    config_count = len(apify_configs)
+    first_config = apify_configs[0] if apify_configs else {}
+    metadata = first_config.get("metadata") if isinstance(first_config.get("metadata"), dict) else {}
+    config_id = str(first_config.get("config_id") or "cfg-1")
+    target_id = str(metadata.get("target_id") or "HT-001")
+    return {
+        "candidate_assets": [],
+        "social_video_observations": [],
+        "external_voc_corpus": [
+            {
+                "voc_id": "APIFY_V0001",
+                "source_url": "https://www.reddit.com/r/sleep/comments/abc123/example",
+                "source_type": "REDDIT",
+                "source_author": "user-1",
+                "source_date": "2026-02-01",
+                "quote": "Night routines keep failing after two days.",
+                "compliance_risk": "YELLOW",
+            }
+        ],
+        "proof_asset_candidates": [],
+        "raw_runs": [
+            {
+                "actor_id": "practicaltools/apify-reddit-api",
+                "run_id": "run-1",
+                "dataset_id": "dataset-1",
+                "config_id": config_id,
+                "status": "SUCCEEDED",
+                "config_metadata": {
+                    "target_id": target_id,
+                    "platform": "reddit",
+                    "habitat_name": "reddit.com/r/sleep",
+                    "habitat_type": "TEXT_COMMUNITY",
+                },
+                "input_payload": {
+                    "startUrls": [{"url": "https://www.reddit.com/r/sleep"}],
+                },
+                "items": [
+                    {
+                        "source_url": "https://www.reddit.com/r/sleep/comments/abc123/example",
+                        "title": "Example post",
+                        "body": "Night routines keep failing after two days.",
+                        "subreddit": "sleep",
+                    }
+                ],
+            }
+        ],
+        "summary": {
+            "strategy_config_run_count": config_count,
+            "planned_actor_run_count": max(config_count, 1),
+        },
+    }
+
+
 def _create_client_and_product(
     *,
     api_client,
@@ -2635,6 +2695,11 @@ def test_strategy_v2_voc_pipeline_accepts_precanon_research_without_client_canon
     )
     monkeypatch.setattr(strategy_v2_activities, "_require_voc_transition_quality", lambda **_kwargs: None)
     monkeypatch.setattr(strategy_v2_activities, "_validate_agent1_output_source_file_grounding", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ingest_strategy_v2_asset_data",
+        _stub_ingest_strategy_v2_asset_data,
+    )
 
     client_id, product_id = _create_client_and_product(
         api_client=api_client,
@@ -2820,6 +2885,11 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
     )
     monkeypatch.setattr(strategy_v2_activities, "_require_voc_transition_quality", lambda **_kwargs: None)
     monkeypatch.setattr(strategy_v2_activities, "_validate_agent1_output_source_file_grounding", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ingest_strategy_v2_asset_data",
+        _stub_ingest_strategy_v2_asset_data,
+    )
     monkeypatch.setattr(
         strategy_v2_activities,
         "_run_foundational_research_from_onboarding",
@@ -3260,6 +3330,11 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
     )
     monkeypatch.setattr(strategy_v2_activities, "_require_voc_transition_quality", lambda **_kwargs: None)
     monkeypatch.setattr(strategy_v2_activities, "_validate_agent1_output_source_file_grounding", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ingest_strategy_v2_asset_data",
+        _stub_ingest_strategy_v2_asset_data,
+    )
 
     client_id, product_id = _create_client_and_product(
         api_client=api_client,

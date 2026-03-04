@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from app.strategy_v2.contracts import CompetitorAssetConfirmationDecision
 from app.strategy_v2 import build_url_candidates, score_candidate_assets, select_top_candidates
 from app.strategy_v2.errors import StrategyV2MissingContextError
+from app.temporal.activities import strategy_v2_activities
 from app.temporal.activities.strategy_v2_activities import (
     prepare_strategy_v2_competitor_asset_candidates_activity,
 )
@@ -35,6 +36,20 @@ def _stage1_payload(*, competitor_urls: list[str]) -> dict[str, object]:
             "Parents",
             "Budget-conscious buyers",
         ],
+    }
+
+
+def _stub_ingest_strategy_v2_asset_data(**_kwargs) -> dict[str, object]:
+    return {
+        "candidate_assets": [],
+        "social_video_observations": [],
+        "external_voc_corpus": [],
+        "proof_asset_candidates": [],
+        "raw_runs": [],
+        "summary": {
+            "strategy_config_run_count": 0,
+            "planned_actor_run_count": 0,
+        },
     }
 
 
@@ -146,7 +161,14 @@ def test_select_top_candidates_tie_breaks_by_candidate_id_asc() -> None:
     assert [row["candidate_id"] for row in selected] == ["a", "b"]
 
 
-def test_prepare_competitor_asset_candidates_requires_three_eligible_assets() -> None:
+def test_prepare_competitor_asset_candidates_requires_three_eligible_assets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ingest_strategy_v2_asset_data",
+        _stub_ingest_strategy_v2_asset_data,
+    )
     params = {
         "stage1": _stage1_payload(
             competitor_urls=[
@@ -160,7 +182,12 @@ def test_prepare_competitor_asset_candidates_requires_three_eligible_assets() ->
         prepare_strategy_v2_competitor_asset_candidates_activity(params)
 
 
-def test_prepare_competitor_asset_candidates_success() -> None:
+def test_prepare_competitor_asset_candidates_success(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_ingest_strategy_v2_asset_data",
+        _stub_ingest_strategy_v2_asset_data,
+    )
     params = {
         "stage1": _stage1_payload(
             competitor_urls=[

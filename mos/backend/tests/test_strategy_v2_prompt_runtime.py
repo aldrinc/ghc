@@ -283,6 +283,8 @@ def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.Mon
         avatar_brief_payload={},
         competitor_analysis={},
         saturated_angles=[],
+        foundational_step_contents={},
+        foundational_step_summaries={},
         activity_name="strategy_v2.run_voc_agent2_extraction",
     )
 
