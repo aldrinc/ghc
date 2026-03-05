@@ -1702,6 +1702,146 @@ def export_client_shopify_theme_brand(
     )
 
 
+def resolve_client_shopify_image_urls_to_files(
+    *,
+    client_id: str,
+    image_urls_by_key: dict[str, str],
+    shop_domain: str | None = None,
+) -> dict[str, Any]:
+    if not isinstance(image_urls_by_key, dict) or not image_urls_by_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="imageUrls must be a non-empty object.",
+        )
+
+    normalized_image_urls: dict[str, str] = {}
+    for raw_key, raw_value in image_urls_by_key.items():
+        if not isinstance(raw_key, str) or not raw_key.strip():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="imageUrls keys must be non-empty strings.",
+            )
+        key = raw_key.strip()
+        if key in normalized_image_urls:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate imageUrls key after normalization: {key}",
+            )
+        if any(char in key for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"imageUrls key contains unsupported characters: {key}",
+            )
+
+        if not isinstance(raw_value, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"imageUrls[{key}] must be a string URL.",
+            )
+        value = raw_value.strip()
+        if not value:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"imageUrls[{key}] cannot be empty.",
+            )
+        if any(char.isspace() for char in value):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"imageUrls[{key}] must not include whitespace characters.",
+            )
+        if any(char in value for char in ('"', "'", "<", ">", "\n", "\r")):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"imageUrls[{key}] contains unsupported characters.",
+            )
+        if not (
+            value.startswith("https://")
+            or value.startswith("http://")
+            or value.startswith("shopify://")
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"imageUrls[{key}] must be an absolute http(s) URL "
+                    "or a shopify:// URL."
+                ),
+            )
+        normalized_image_urls[key] = value
+
+    request_payload: dict[str, Any] = {"imageUrls": normalized_image_urls}
+    if shop_domain is not None:
+        request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
+    else:
+        request_payload["clientId"] = client_id
+
+    payload = _bridge_request(
+        method="POST",
+        path="/v1/files/images/resolve",
+        json_body=request_payload,
+        timeout_seconds=settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS,
+    )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid image URL resolve payload.",
+        )
+
+    response_shop_domain = payload.get("shopDomain")
+    if not isinstance(response_shop_domain, str) or not response_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid shopDomain for image URL resolve.",
+        )
+    raw_resolved_urls = payload.get("resolvedImageUrls")
+    if not isinstance(raw_resolved_urls, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid resolvedImageUrls payload.",
+        )
+
+    resolved_image_urls: dict[str, str] = {}
+    for key, value in raw_resolved_urls.items():
+        if not isinstance(key, str) or key not in normalized_image_urls:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned unexpected resolvedImageUrls keys.",
+            )
+        if not isinstance(value, str) or not value.strip():
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Shopify checkout app returned invalid resolved image URL "
+                    f"for key={key}."
+                ),
+            )
+        resolved_value = value.strip()
+        if not resolved_value.startswith("shopify://"):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Shopify checkout app did not return a Shopify file reference "
+                    f"for key={key}."
+                ),
+            )
+        resolved_image_urls[key] = resolved_value
+
+    expected_keys = set(normalized_image_urls.keys())
+    actual_keys = set(resolved_image_urls.keys())
+    if expected_keys != actual_keys:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Shopify checkout app returned an incomplete resolvedImageUrls payload. "
+                f"expected={sorted(expected_keys)} got={sorted(actual_keys)}"
+            ),
+        )
+
+    return {
+        "shopDomain": response_shop_domain.strip().lower(),
+        "resolvedImageUrls": resolved_image_urls,
+    }
+
+
 def _parse_theme_brand_sync_response_payload(*, payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise HTTPException(

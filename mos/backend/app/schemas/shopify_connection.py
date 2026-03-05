@@ -252,6 +252,22 @@ class ShopifyThemeBrandSyncJobStatusResponse(BaseModel):
     finishedAt: datetime | None = None
 
 
+class ShopifyThemeTemplateFeatureHighlightCard(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    header: str | None = Field(default=None, min_length=1)
+    subtext: str | None = Field(default=None, min_length=1)
+
+
+class ShopifyThemeTemplateFeatureHighlights(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    card1: ShopifyThemeTemplateFeatureHighlightCard | None = None
+    card2: ShopifyThemeTemplateFeatureHighlightCard | None = None
+    card3: ShopifyThemeTemplateFeatureHighlightCard | None = None
+    card4: ShopifyThemeTemplateFeatureHighlightCard | None = None
+
+
 class ShopifyThemeTemplateBuildRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -261,6 +277,7 @@ class ShopifyThemeTemplateBuildRequest(BaseModel):
     productId: str | None = Field(default=None, min_length=1)
     componentImageAssetMap: dict[str, str] = Field(default_factory=dict)
     componentTextValues: dict[str, str] = Field(default_factory=dict)
+    featureHighlights: ShopifyThemeTemplateFeatureHighlights | None = None
     toneGuidelines: list[str] = Field(default_factory=list, max_length=20)
     mustAvoidClaims: list[str] = Field(default_factory=list, max_length=20)
     ctaStyle: Literal["direct", "benefit", "urgent", "soft"] | None = None
@@ -319,7 +336,9 @@ class ShopifyThemeTemplateDraftData(BaseModel):
     dataTheme: str
     productId: str | None = None
     componentImageAssetMap: dict[str, str] = Field(default_factory=dict)
+    componentImageUrls: dict[str, str] = Field(default_factory=dict)
     componentTextValues: dict[str, str] = Field(default_factory=dict)
+    featureHighlights: ShopifyThemeTemplateFeatureHighlights | None = None
     imageSlots: list[ShopifyThemeTemplateImageSlot] = Field(default_factory=list)
     textSlots: list[ShopifyThemeTemplateTextSlot] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -368,6 +387,7 @@ class ShopifyThemeTemplateDraftUpdateRequest(BaseModel):
 
     componentImageAssetMap: dict[str, str] | None = None
     componentTextValues: dict[str, str] | None = None
+    featureHighlights: ShopifyThemeTemplateFeatureHighlights | None = None
     notes: str | None = None
 
 
@@ -377,6 +397,7 @@ class ShopifyThemeTemplateGenerateImagesRequest(BaseModel):
     draftId: str = Field(..., min_length=1)
     productId: str | None = Field(default=None, min_length=1)
     slotPaths: list[str] = Field(default_factory=list)
+    featureHighlights: ShopifyThemeTemplateFeatureHighlights | None = None
 
 
 class ShopifyThemeTemplateGenerateImagesResponse(BaseModel):

@@ -13,11 +13,13 @@ This service is a Shopify app bridge for Marketi funnels. It does three things:
 
 ## Endpoints
 
+- `GET /` (Shopify App URL entrypoint)
 - `GET /auth/install?shop={shop}.myshopify.com&client_id={mos_client_uuid}`
 - `GET /auth/callback`
 - `GET /app` (embedded admin shell)
 - `GET /app/api/session` (Shopify session-token auth)
 - `POST /app/api/link-workspace` (Shopify session-token auth)
+- `POST /app/api/storefront-token/auto` (Shopify session-token auth)
 - `GET /admin/installations` (Bearer internal token)
 - `PATCH /admin/installations/{shop}.myshopify.com` (Bearer internal token)
 - `POST /admin/installations/{shop}.myshopify.com/storefront-token/auto` (Bearer internal token)
@@ -53,7 +55,8 @@ uvicorn app.main:app --reload --port 8011
 ## Theme operation policy
 
 - Direct theme write operations (`/v1/themes/brand/sync`) are intentionally disabled.
-- Theme audits, slot discovery, and ZIP export remain available for template-based rollout.
+- Theme file export (`/v1/themes/brand/export`) is intentionally disabled for public-app compliance.
+- Storefront changes must use theme app extensions (no manual theme file edits/download workflows).
 
 ## Storefront token setup
 

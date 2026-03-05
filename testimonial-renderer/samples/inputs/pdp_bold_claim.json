@@ -5,7 +5,7 @@
   },
   "brand": {
     "logoText": "SampleLogo",
-    "stripBgColor": "#14532d",
+    "stripBgColor": "#0f4d36",
     "stripTextColor": "#ffffff"
   },
   "rating": {
@@ -24,4 +24,3 @@
     "text": "YOUR BOLD CLAIM TEXT HERE"
   }
 }
-

@@ -70,7 +70,7 @@ npx playwright install chromium
 {
   "template": "pdp_ugc_standard",
   "output": {
-    "preset": "tiktok"
+    "preset": "feed"
   },
   "brand": {
     "name": "Sample Brand",
@@ -114,15 +114,15 @@ npx playwright install chromium
   - `meta` requires: `time`; optional: `followLabel`, `authorLabel`
   - Optional per comment: `reactionCount`, `attachmentUrl`, `viewRepliesText`, `replies[]`
 - PDP templates
-  - `pdp_ugc_standard`, `pdp_bold_claim`, `pdp_personal_highlight`
+- `pdp_ugc_standard`, `pdp_bold_claim`, `pdp_personal_highlight`
     - Required: `brand`, `rating`, `cta`, `background`, `comment`
-    - Optional: `output` (defaults to TikTok preset)
+    - `pdp_ugc_standard` also accepts `comments` with 1-2 entries instead of `comment`
+    - Optional: `output` (defaults to feed preset)
   - Optional brand generation fields (all templates): `brand.name`, `brand.assets.logoUrl`, `brand.assets.referenceImages[]`, `brand.assets.palette`, `brand.assets.notes`
 
-### PDP output presets
+### PDP output preset
 
-- `output.preset: "tiktok"` (default): 1080x1920 (9:16)
-- `output.preset: "feed"`: 1080x1350 (4:5)
+- `output.preset: "feed"` (default and only supported value): 1080x1350 (4:5)
 
 ### PDP background generation (Nano Banana)
 

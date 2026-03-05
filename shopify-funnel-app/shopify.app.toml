@@ -17,7 +17,7 @@ uri = "/webhooks/compliance"
 
 [access_scopes]
 # Keep this aligned with SHOPIFY_APP_SCOPES in shopify-funnel-app/.env
-scopes = "read_products,write_products,read_orders,write_orders,read_discounts,write_discounts,read_content,write_content,read_inventory,write_inventory,read_themes,unauthenticated_read_product_listings"
+scopes = "read_products,write_products,read_orders,read_content,write_content,read_inventory,write_inventory,read_themes,unauthenticated_read_product_listings"
 
 [auth]
 redirect_urls = [ "https://shopify.moshq.app/auth/callback" ]

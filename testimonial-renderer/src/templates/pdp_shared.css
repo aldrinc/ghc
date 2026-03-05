@@ -15,13 +15,15 @@ body {
 #card {
   --card-w: 540px;
   --card-h: 960px;
-  --strip-h: 112px;
+  --strip-h: 94px;
   --pdp-comment-box-width: calc(var(--card-w) * 205 / 500);
+  --pdp-strip-copy-left-pad: 0px;
   --strip-bg: #111827;
   --strip-text: #ffffff;
-  --star: #f5b43a;
+  --star: #ffc53d;
   --bubble-bg: #ffffff;
-  /* Lighter, TikTok-style comment bubble */
+  --pdp-comment-tail-scale: 1;
+  /* Lighter reference-style comment bubble */
   --bubble-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
   --bubble-radius: 6.4px;
 
@@ -35,7 +37,9 @@ body {
 
 #card.is-feed {
   --card-h: 675px;
-  --strip-h: 98px;
+  --strip-h: 66px;
+  --pdp-comment-box-width: calc(var(--card-w) * 172 / 500);
+  --pdp-strip-copy-left-pad: 14px;
 }
 
 .pdp-bg {
@@ -155,17 +159,16 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 12px;
-  height: 12px;
-  border-radius: 999px;
-  background: #59cdd5;
+  width: 9.25px;
+  height: 9.25px;
   flex-shrink: 0;
 }
 
-.pdp-verified svg {
-  width: 8px;
-  height: 8px;
-  fill: #ffffff;
+.pdp-verified img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .pdp-bubble-text {
@@ -195,16 +198,16 @@ body {
 
 .pdp-bubble.pdp-comment-box::before {
   background: #ffffff;
-  border-radius: 3px;
+  border-radius: 8px;
   border-bottom-left-radius: 0;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
 }
 
 .pdp-bubble.pdp-comment-box::after {
   left: 0;
-  bottom: -10px;
-  width: 32px;
-  height: 30px;
+  bottom: calc(-10px * var(--pdp-comment-tail-scale));
+  width: calc(32px * var(--pdp-comment-tail-scale));
+  height: calc(30px * var(--pdp-comment-tail-scale));
   background: url('./assets/pdp-comment-tail.svg') no-repeat center / 100% 100%;
   clip-path: none;
   border-radius: 0;
@@ -214,9 +217,9 @@ body {
 
 #card.is-feed .pdp-bubble.pdp-comment-box::after {
   left: 0;
-  bottom: -8px;
-  width: 32px;
-  height: 30px;
+  bottom: calc(-8px * var(--pdp-comment-tail-scale));
+  width: calc(32px * var(--pdp-comment-tail-scale));
+  height: calc(30px * var(--pdp-comment-tail-scale));
 }
 
 .pdp-comment-box .pdp-bubble-row {
@@ -232,7 +235,7 @@ body {
   height: 23px;
   min-width: 23px;
   min-height: 23px;
-  margin-top: 13px;
+  margin-top: 0;
 }
 
 #card.is-feed .pdp-comment-box .pdp-avatar {
@@ -240,7 +243,7 @@ body {
   height: 19px;
   min-width: 19px;
   min-height: 19px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 .pdp-comment-box .pdp-bubble-header {
@@ -250,6 +253,20 @@ body {
   color: #5f6368;
   padding-top: 1px;
   padding-right: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: clip;
+}
+
+.pdp-comment-box .pdp-context-scaled {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.pdp-comment-box .pdp-context-prefix,
+.pdp-comment-box .pdp-context-suffix {
+  font-weight: 420;
 }
 
 #card.is-feed .pdp-comment-box .pdp-bubble-header {
@@ -259,15 +276,20 @@ body {
 
 .pdp-comment-box .pdp-handle {
   color: #5f6368;
-  font-weight: 600;
+  font-weight: 420;
 }
 
 .pdp-comment-box .pdp-verified {
-  margin-left: 3.5px;
-  margin-right: 0;
-  width: 10px;
-  height: 10px;
-  transform: translate(0, -2px);
+  margin-left: 2px;
+  margin-right: 2px;
+  width: 8.75px;
+  height: 8.75px;
+  transform: translate(0, -0.5px);
+}
+
+#card.is-feed .pdp-comment-box .pdp-verified {
+  width: 7.75px;
+  height: 7.75px;
 }
 
 .pdp-comment-box .pdp-bubble-text {
@@ -323,66 +345,129 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
-  padding: 16px 22px;
+  gap: 16px;
+  padding: 12px 22px 11px;
   z-index: 4;
+}
+
+#card.is-feed .pdp-strip {
+  gap: 16px;
+  padding: 11px 20px 10px 10px;
 }
 
 .pdp-strip-left {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
+  padding-left: var(--pdp-strip-copy-left-pad);
+}
+
+#card.is-feed .pdp-strip-left {
+  gap: 3px;
 }
 
 .pdp-rating-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   min-width: 0;
+}
+
+#card.is-feed .pdp-rating-row {
+  gap: 6px;
+  align-self: center;
 }
 
 .pdp-stars {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 1px;
   flex-shrink: 0;
 }
 
+#card.is-feed .pdp-stars {
+  gap: 1px;
+  transform: translateY(-0.5px);
+}
+
 .pdp-star {
-  width: 18px;
-  height: 18px;
+  width: 13px;
+  height: 13px;
+  display: block;
+  margin-right: -1px;
   fill: var(--star);
 }
 
+.pdp-star path {
+  stroke: var(--star);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
 #card.is-feed .pdp-star {
-  width: 16px;
-  height: 16px;
+  width: 11px;
+  height: 11px;
+  margin-right: 0;
+}
+
+.pdp-stars .pdp-star:last-child {
+  margin-right: 0;
 }
 
 .pdp-rating-text {
-  font-size: 13px;
-  line-height: 1.1;
-  font-weight: 700;
-  opacity: 0.92;
+  font-size: 12px;
+  line-height: 1.02;
+  font-family: Arial, sans-serif;
+  font-weight: 320;
+  letter-spacing: 0;
+  opacity: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+#card.is-feed .pdp-rating-text {
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  transform: translateY(-0.5px);
+}
+
+.pdp-rating-text #rating-value,
+.pdp-rating-text #rating-detail {
+  font-weight: 320;
+}
+
+.pdp-rating-text #rating-detail {
+  margin-left: 3px;
+}
+
 .pdp-cta {
-  font-size: 22px;
-  line-height: 1.02;
-  font-weight: 800;
-  letter-spacing: -0.03em;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 320;
+  letter-spacing: 0.01em;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.pdp-cta-strong {
+  font-weight: 640;
+}
+
+.pdp-cta-soft {
+  margin-left: 3px;
+  font-weight: 240;
+}
+
 #card.is-feed .pdp-cta {
-  font-size: 19px;
+  font-size: 18px;
+  line-height: 0.98;
 }
 
 .pdp-logo {
@@ -394,25 +479,22 @@ body {
 }
 
 .pdp-logo img {
-  max-height: 46px;
-  max-width: 220px;
+  max-height: 52px;
+  max-width: 250px;
   object-fit: contain;
 }
 
 #card.is-feed .pdp-logo img {
-  max-height: 40px;
+  max-height: 48px;
+  max-width: 230px;
 }
 
 .pdp-logo-text {
-  font-size: 34px;
+  font-size: 38px;
   line-height: 1;
-  font-weight: 800;
+  font-weight: 640;
   letter-spacing: -0.04em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-#card.is-feed .pdp-logo-text {
-  font-size: 30px;
 }

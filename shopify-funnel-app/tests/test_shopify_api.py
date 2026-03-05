@@ -2368,8 +2368,23 @@ def test_sync_theme_brand_updates_layout_and_css():
                 '.button, .btn, input[type="button"], input[type="submit"], input[type="reset"] {'
                 in css_content
             )
+            assert "border-radius: 999px !important;" in css_content
+            assert "box-shadow: 8px 8px 0 var(--color-muted) !important;" in css_content
+            assert (
+                "transition: background-color 220ms ease, color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease !important;"
+                in css_content
+            )
+            assert (
+                ".button:hover, .button:focus-visible, .btn:hover, .btn:focus-visible,"
+                in css_content
+            )
+            assert "transform: translateY(-2px) !important;" in css_content
             assert (
                 ".button .icon-arrow-right, .button .icon-arrow-left, .button [class*=\"arrow\"] svg,"
+                in css_content
+            )
+            assert (
+                ".button:hover .icon-arrow-right, .button:hover .icon-arrow-left, .button:hover [class*=\"arrow\"] svg,"
                 in css_content
             )
             assert "fill: currentColor !important;" in css_content

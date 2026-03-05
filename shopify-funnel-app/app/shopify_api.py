@@ -9,6 +9,7 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
 from html import escape
 import mimetypes
+from pathlib import Path
 import re
 from typing import Any, Literal
 from urllib.parse import urlparse
@@ -74,6 +75,7 @@ _THEME_FRENCH_UI_TEXT_REPLACEMENTS: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
 )
 _THEME_LOGO_UPLOAD_MAX_BYTES = 20 * 1024 * 1024
+_THEME_FILE_IMAGE_RESOLVE_MAX_CONCURRENCY = 4
 _DEFAULT_THEME_VAR_SCOPE_SELECTORS: tuple[str, ...] = (":root",)
 _THEME_VAR_SCOPE_SELECTORS_BY_NAME: dict[str, tuple[str, ...]] = {
     "futrgroup2-0theme": (
@@ -344,13 +346,36 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             (
                 ("background-color", "var(--color-cta)"),
                 ("color", "var(--color-cta-text)"),
-                ("border-color", "var(--color-border)"),
+                ("border-color", "var(--color-cta)"),
+                ("border-radius", "999px"),
+                ("box-shadow", "8px 8px 0 var(--color-muted)"),
+                (
+                    "transition",
+                    "background-color 220ms ease, color 220ms ease, border-color 220ms ease, box-shadow 220ms ease, transform 220ms ease",
+                ),
+            ),
+        ),
+        (
+            '.button:hover, .button:focus-visible, .btn:hover, .btn:focus-visible, input[type="button"]:hover, input[type="button"]:focus-visible, input[type="submit"]:hover, input[type="submit"]:focus-visible, input[type="reset"]:hover, input[type="reset"]:focus-visible',
+            (
+                ("background-color", "var(--color-cta-text)"),
+                ("color", "var(--color-cta)"),
+                ("border-color", "var(--color-cta)"),
+                ("transform", "translateY(-2px)"),
             ),
         ),
         (
             ".button .icon-arrow-right, .button .icon-arrow-left, .button [class*=\"arrow\"] svg, .button [class*=\"arrow\"] svg *, .btn .icon-arrow-right, .btn .icon-arrow-left, .btn [class*=\"arrow\"] svg, .btn [class*=\"arrow\"] svg *, button .icon-arrow-right, button .icon-arrow-left, button [class*=\"arrow\"] svg, button [class*=\"arrow\"] svg *",
             (
                 ("color", "var(--color-cta-text)"),
+                ("fill", "currentColor"),
+                ("stroke", "currentColor"),
+            ),
+        ),
+        (
+            ".button:hover .icon-arrow-right, .button:hover .icon-arrow-left, .button:hover [class*=\"arrow\"] svg, .button:hover [class*=\"arrow\"] svg *, .button:focus-visible .icon-arrow-right, .button:focus-visible .icon-arrow-left, .button:focus-visible [class*=\"arrow\"] svg, .button:focus-visible [class*=\"arrow\"] svg *, .btn:hover .icon-arrow-right, .btn:hover .icon-arrow-left, .btn:hover [class*=\"arrow\"] svg, .btn:hover [class*=\"arrow\"] svg *, .btn:focus-visible .icon-arrow-right, .btn:focus-visible .icon-arrow-left, .btn:focus-visible [class*=\"arrow\"] svg, .btn:focus-visible [class*=\"arrow\"] svg *, button:hover .icon-arrow-right, button:hover .icon-arrow-left, button:hover [class*=\"arrow\"] svg, button:hover [class*=\"arrow\"] svg *, button:focus-visible .icon-arrow-right, button:focus-visible .icon-arrow-left, button:focus-visible [class*=\"arrow\"] svg, button:focus-visible [class*=\"arrow\"] svg *",
+            (
+                ("color", "var(--color-cta)"),
                 ("fill", "currentColor"),
                 ("stroke", "currentColor"),
             ),
@@ -675,243 +700,148 @@ _THEME_COMPONENT_RICHTEXT_TOP_LEVEL_TAG_RE = re.compile(
     r"^\s*<(?:p|ul|ol|h[1-6])(?:\s[^>]*)?>",
     re.IGNORECASE,
 )
+_THEME_IMAGE_SLOT_CONFIG_PATH = (
+    Path(__file__).resolve().parents[2] / "theme_image_slot_config.json"
+)
+_THEME_IMAGE_SLOT_ALLOWED_RECOMMENDED_ASPECTS = frozenset(
+    {"landscape", "portrait", "square", "any"}
+)
+
+
+def _load_theme_image_slots_by_name_from_config() -> dict[str, tuple[dict[str, Any], ...]]:
+    try:
+        parsed = json.loads(_THEME_IMAGE_SLOT_CONFIG_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "Shared theme image slot config file is missing. "
+            f"path={_THEME_IMAGE_SLOT_CONFIG_PATH}."
+        ) from exc
+    except OSError as exc:
+        raise RuntimeError(
+            "Shared theme image slot config file could not be read. "
+            f"path={_THEME_IMAGE_SLOT_CONFIG_PATH}, error={exc}."
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "Shared theme image slot config file is invalid JSON. "
+            f"path={_THEME_IMAGE_SLOT_CONFIG_PATH}, error={exc}."
+        ) from exc
+
+    raw_theme_map = (
+        parsed.get("themeImageSlotsByName") if isinstance(parsed, dict) else None
+    )
+    if not isinstance(raw_theme_map, dict):
+        raise RuntimeError(
+            "Shared theme image slot config is invalid. "
+            "Expected object key `themeImageSlotsByName`."
+        )
+
+    normalized_by_name: dict[str, tuple[dict[str, Any], ...]] = {}
+    for raw_theme_name, raw_slots in raw_theme_map.items():
+        if not isinstance(raw_theme_name, str) or not raw_theme_name.strip():
+            raise RuntimeError(
+                "Shared theme image slot config contains an invalid theme key. "
+                f"theme={raw_theme_name!r}."
+            )
+        if not isinstance(raw_slots, list):
+            raise RuntimeError(
+                "Shared theme image slot config contains an invalid slot list. "
+                f"theme={raw_theme_name}."
+            )
+
+        normalized_slots: list[dict[str, Any]] = []
+        seen_paths: set[str] = set()
+        for index, raw_slot in enumerate(raw_slots):
+            if not isinstance(raw_slot, dict):
+                raise RuntimeError(
+                    "Shared theme image slot config contains a non-object slot entry. "
+                    f"theme={raw_theme_name}, index={index}."
+                )
+            path = raw_slot.get("path")
+            key = raw_slot.get("key")
+            role = raw_slot.get("role")
+            recommended_aspect = raw_slot.get("recommendedAspect")
+            allow_missing = raw_slot.get("allowMissing", False)
+            prompt_aspect_ratio = raw_slot.get("promptAspectRatio")
+            prompt_render_hint = raw_slot.get("promptRenderHint")
+            if (
+                not isinstance(path, str)
+                or not path.strip()
+                or not isinstance(key, str)
+                or not key.strip()
+                or not isinstance(role, str)
+                or not role.strip()
+                or not isinstance(recommended_aspect, str)
+                or recommended_aspect
+                not in _THEME_IMAGE_SLOT_ALLOWED_RECOMMENDED_ASPECTS
+                or not isinstance(allow_missing, bool)
+            ):
+                raise RuntimeError(
+                    "Shared theme image slot config contains an invalid slot definition. "
+                    f"theme={raw_theme_name}, index={index}, slot={raw_slot}."
+                )
+            if prompt_aspect_ratio is not None and (
+                not isinstance(prompt_aspect_ratio, str)
+                or not prompt_aspect_ratio.strip()
+            ):
+                raise RuntimeError(
+                    "Shared theme image slot config contains an invalid promptAspectRatio. "
+                    f"theme={raw_theme_name}, index={index}."
+                )
+            if prompt_render_hint is not None and (
+                not isinstance(prompt_render_hint, str)
+                or not prompt_render_hint.strip()
+            ):
+                raise RuntimeError(
+                    "Shared theme image slot config contains an invalid promptRenderHint. "
+                    f"theme={raw_theme_name}, index={index}."
+                )
+
+            normalized_path = path.strip()
+            if normalized_path in seen_paths:
+                raise RuntimeError(
+                    "Shared theme image slot config contains duplicate slot paths. "
+                    f"theme={raw_theme_name}, path={normalized_path}."
+                )
+            seen_paths.add(normalized_path)
+
+            normalized_slot: dict[str, Any] = {
+                "path": normalized_path,
+                "key": key.strip(),
+                "role": role.strip(),
+                "recommendedAspect": recommended_aspect,
+            }
+            if allow_missing:
+                normalized_slot["allowMissing"] = True
+            if isinstance(prompt_aspect_ratio, str) and prompt_aspect_ratio.strip():
+                normalized_slot["promptAspectRatio"] = prompt_aspect_ratio.strip()
+            if isinstance(prompt_render_hint, str) and prompt_render_hint.strip():
+                normalized_slot["promptRenderHint"] = prompt_render_hint.strip()
+            normalized_slots.append(normalized_slot)
+
+        normalized_by_name[raw_theme_name.strip()] = tuple(normalized_slots)
+
+    return normalized_by_name
+
+
+_THEME_IMAGE_SLOTS_BY_THEME_NAME = _load_theme_image_slots_by_name_from_config()
+
+
+def _require_theme_image_slots_for_theme(theme_name: str) -> tuple[dict[str, Any], ...]:
+    slots = _THEME_IMAGE_SLOTS_BY_THEME_NAME.get(theme_name)
+    if slots is None:
+        raise RuntimeError(
+            "Shared theme image slot config is missing required theme entries. "
+            f"theme={theme_name}."
+        )
+    return slots
+
+
 _THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME: dict[
     str, dict[str, tuple[dict[str, Any], ...]]
 ] = {
     "futrgroup2-0theme": {
-        "imageSlots": (
-            {
-                "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_CDPHGa.settings.image",
-                "key": "image",
-                "role": "gallery",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_PijDXy.settings.image",
-                "key": "image",
-                "role": "gallery",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_VfHpJg.settings.image",
-                "key": "image",
-                "role": "gallery",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_g4F98H.settings.image",
-                "key": "image",
-                "role": "gallery",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.image_with_text_M6Cfj7.settings.image",
-                "key": "image",
-                "role": "gallery",
-                "recommendedAspect": "portrait",
-            },
-            {
-                "path": "templates/index.json.sections.image_with_text_aQPm77.settings.image",
-                "key": "image",
-                "role": "gallery",
-                "recommendedAspect": "portrait",
-            },
-            {
-                "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.settings.image",
-                "key": "image",
-                "role": "hero",
-                "recommendedAspect": "landscape",
-            },
-            {
-                "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.settings.image_mobile",
-                "key": "image_mobile",
-                "role": "hero",
-                "recommendedAspect": "landscape",
-            },
-            {
-                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.after_image",
-                "key": "after_image",
-                "role": "gallery",
-                "recommendedAspect": "portrait",
-            },
-            {
-                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.before_image",
-                "key": "before_image",
-                "role": "gallery",
-                "recommendedAspect": "portrait",
-            },
-            {
-                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.after_image",
-                "key": "after_image",
-                "role": "gallery",
-                "recommendedAspect": "portrait",
-            },
-            {
-                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.before_image",
-                "key": "before_image",
-                "role": "gallery",
-                "recommendedAspect": "portrait",
-            },
-            {
-                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.after_image",
-                "key": "after_image",
-                "role": "gallery",
-                "recommendedAspect": "portrait",
-            },
-            {
-                "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.before_image",
-                "key": "before_image",
-                "role": "gallery",
-                "recommendedAspect": "portrait",
-            },
-            {
-                "path": "templates/index.json.sections.ss_countdown_timer_4_TxGT4a.settings.image",
-                "key": "image",
-                "role": "hero",
-                "recommendedAspect": "landscape",
-            },
-            {
-                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_CieJRi.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_DTL7F7.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_EA4mWi.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_LUTUBp.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_MkDhxG.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_bCk3JY.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_dnta3i.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_mq6JiQ.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            },
-            {
-                "path": "templates/collection.json.sections.main-collection-banner.settings.image",
-                "key": "image",
-                "role": "hero",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-            {
-                "path": "templates/collection.json.sections.main-collection-banner.settings.image_mobile",
-                "key": "image_mobile",
-                "role": "hero",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-            {
-                "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.image",
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-            {
-                "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.image_mobile",
-                "key": "image_mobile",
-                "role": "supporting",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-            {
-                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_1",
-                "key": "image_1",
-                "role": "supporting",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-            {
-                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_2",
-                "key": "image_2",
-                "role": "supporting",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-            {
-                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_3",
-                "key": "image_3",
-                "role": "supporting",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-            {
-                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_4",
-                "key": "image_4",
-                "role": "supporting",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-            {
-                "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_5",
-                "key": "image_5",
-                "role": "supporting",
-                "recommendedAspect": "landscape",
-                "allowMissing": True,
-            },
-        ),
+        "imageSlots": _require_theme_image_slots_for_theme("futrgroup2-0theme"),
         "textSlots": (
             {
                 "path": "sections/footer-group.json.sections.ss_footer_4_9rJacA.blocks.tab_AaWBPg.settings.text",
@@ -1151,13 +1081,13 @@ _THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME: dict[
                 "path": "templates/index.json.sections.ss_countdown_timer_4_TxGT4a.blocks.heading_Ry3fND.settings.heading",
                 "key": "heading",
                 "role": "headline",
-                "maxLength": 120,
+                "maxLength": 72,
             },
             {
                 "path": "templates/index.json.sections.ss_countdown_timer_4_TxGT4a.blocks.text_KQyqqd.settings.text",
                 "key": "text",
                 "role": "body",
-                "maxLength": 320,
+                "maxLength": 140,
             },
             {
                 "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.text",
@@ -9649,6 +9579,115 @@ class ShopifyApiClient:
             file_id=file_id,
         )
         return self._build_shopify_logo_reference_from_file_url(file_url=ready_file_url)
+
+    async def resolve_image_urls_to_shopify_files(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        image_urls: dict[str, str],
+    ) -> dict[str, str]:
+        if not isinstance(image_urls, dict) or not image_urls:
+            raise ShopifyApiError(
+                message="imageUrls must be a non-empty object.",
+                status_code=400,
+            )
+
+        normalized_image_urls: dict[str, str] = {}
+        for raw_key, raw_url in image_urls.items():
+            if not isinstance(raw_key, str) or not raw_key.strip():
+                raise ShopifyApiError(
+                    message="imageUrls keys must be non-empty strings.",
+                    status_code=400,
+                )
+            key = raw_key.strip()
+            if key in normalized_image_urls:
+                raise ShopifyApiError(
+                    message=f"Duplicate imageUrls key after normalization: {key}.",
+                    status_code=400,
+                )
+            if any(char in key for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message=f"imageUrls key contains unsupported characters: {key}.",
+                    status_code=400,
+                )
+
+            if not isinstance(raw_url, str) or not raw_url.strip():
+                raise ShopifyApiError(
+                    message=f"imageUrls[{key}] must be a non-empty string.",
+                    status_code=400,
+                )
+            image_url = raw_url.strip()
+            if any(char.isspace() for char in image_url):
+                raise ShopifyApiError(
+                    message=f"imageUrls[{key}] must not include whitespace characters.",
+                    status_code=400,
+                )
+            if any(char in image_url for char in ('"', "'", "<", ">", "\n", "\r")):
+                raise ShopifyApiError(
+                    message=f"imageUrls[{key}] contains unsupported characters.",
+                    status_code=400,
+                )
+            if not (
+                image_url.startswith("https://")
+                or image_url.startswith("http://")
+                or self._is_shopify_file_url(value=image_url)
+            ):
+                raise ShopifyApiError(
+                    message=(
+                        f"imageUrls[{key}] must be an absolute http(s) URL "
+                        "or a shopify:// URL."
+                    ),
+                    status_code=400,
+                )
+            normalized_image_urls[key] = image_url
+
+        upload_cache: dict[str, str] = {}
+        external_image_urls = [
+            image_url
+            for image_url in normalized_image_urls.values()
+            if not self._is_shopify_file_url(value=image_url)
+        ]
+        unique_external_image_urls = list(dict.fromkeys(external_image_urls))
+
+        if unique_external_image_urls:
+            semaphore = asyncio.Semaphore(_THEME_FILE_IMAGE_RESOLVE_MAX_CONCURRENCY)
+
+            async def _resolve_external_image_url(image_url: str) -> tuple[str, str]:
+                async with semaphore:
+                    resolved_url = await self._create_shopify_logo_file_reference_from_url(
+                        shop_domain=shop_domain,
+                        access_token=access_token,
+                        logo_url=image_url,
+                    )
+                    return image_url, resolved_url
+
+            resolved_pairs = await asyncio.gather(
+                *[
+                    _resolve_external_image_url(image_url)
+                    for image_url in unique_external_image_urls
+                ]
+            )
+            for image_url, resolved_url in resolved_pairs:
+                upload_cache[image_url] = resolved_url
+
+        resolved_image_urls: dict[str, str] = {}
+        for key, image_url in normalized_image_urls.items():
+            if self._is_shopify_file_url(value=image_url):
+                resolved_image_urls[key] = image_url
+                continue
+            resolved_url = upload_cache.get(image_url)
+            if not isinstance(resolved_url, str) or not resolved_url.strip():
+                raise ShopifyApiError(
+                    message=(
+                        "Image URL resolution did not return a Shopify file URL "
+                        f"for key={key}."
+                    ),
+                    status_code=409,
+                )
+            resolved_image_urls[key] = resolved_url
+
+        return resolved_image_urls
 
     async def list_theme_brand_template_slots(
         self,

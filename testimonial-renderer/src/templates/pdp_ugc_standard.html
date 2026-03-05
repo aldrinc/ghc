@@ -9,13 +9,47 @@
     <style>
       #bubble-primary {
         left: 22px;
-        bottom: calc(var(--strip-h) + 22px);
+        bottom: calc(var(--strip-h) + 90px);
+      }
+
+      #bubble-secondary {
+        display: none;
+        left: 22px;
+      }
+
+      #card.has-dual-comments #bubble-primary {
+        left: 30px;
+        top: 40px;
+        bottom: auto;
+      }
+
+      #card.has-dual-comments #bubble-secondary {
+        left: auto;
+        right: 22px;
+        bottom: calc(var(--strip-h) + 200px);
       }
 
       #card.is-feed #bubble-primary {
         left: 16px;
         right: auto;
-        bottom: calc(var(--strip-h) + 14px);
+        bottom: calc(var(--strip-h) + 63px);
+      }
+
+      #card.is-feed #bubble-secondary {
+        left: 16px;
+        right: auto;
+      }
+
+      #card.is-feed.has-dual-comments #bubble-primary {
+        left: 24px;
+        top: 30px;
+        bottom: auto;
+      }
+
+      #card.is-feed.has-dual-comments #bubble-secondary {
+        left: auto;
+        right: 16px;
+        bottom: calc(var(--strip-h) + 175px);
       }
     </style>
   </head>
@@ -34,15 +68,25 @@
         </div>
       </div>
 
+      <div id="bubble-secondary" class="pdp-bubble pdp-comment-box">
+        <div class="pdp-bubble-row">
+          <div id="secondary-avatar" class="pdp-avatar" aria-label="Comment avatar"></div>
+          <div class="pdp-bubble-copy">
+            <div id="secondary-context" class="pdp-bubble-header"></div>
+            <div id="secondary-text" class="pdp-bubble-text"></div>
+          </div>
+        </div>
+      </div>
+
       <div class="pdp-strip">
         <div class="pdp-strip-left">
           <div class="pdp-rating-row">
             <div class="pdp-stars" aria-hidden="true">
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
             </div>
             <div class="pdp-rating-text">
               <span id="rating-value"></span>
@@ -94,37 +138,213 @@
 
       const setOutputPreset = (output) => {
         const preset = output && output.preset;
-        if (preset === 'feed') {
+        if (!preset || preset === 'feed') {
           document.getElementById('card').classList.add('is-feed');
           return;
         }
-        if (preset === 'tiktok') {
+        throw new Error(`Unsupported output.preset: ${preset}. Only "feed" is supported.`);
+      };
+
+      const fitContextLine = (el) => {
+        if (!el) {
           return;
         }
-        throw new Error(`Unsupported output.preset: ${preset}`);
+
+        const scaledNodes = Array.from(el.querySelectorAll('.pdp-context-scaled'));
+        if (scaledNodes.length === 0) {
+          return;
+        }
+
+        scaledNodes.forEach((node) => {
+          node.style.fontSize = '';
+        });
+
+        const computedFontSize = Number.parseFloat(window.getComputedStyle(scaledNodes[0]).fontSize);
+        if (!Number.isFinite(computedFontSize) || computedFontSize <= 0) {
+          return;
+        }
+
+        if (el.clientWidth <= 0) {
+          return;
+        }
+
+        const fixedWidth = Array.from(el.children)
+          .filter((node) => !node.classList.contains('pdp-context-scaled'))
+          .reduce((total, node) => {
+            const style = window.getComputedStyle(node);
+            const marginLeft = Number.parseFloat(style.marginLeft) || 0;
+            const marginRight = Number.parseFloat(style.marginRight) || 0;
+            return total + node.getBoundingClientRect().width + marginLeft + marginRight;
+          }, 0);
+
+        const availableWidth = el.clientWidth - fixedWidth;
+        if (availableWidth <= 0) {
+          return;
+        }
+
+        const isFeed = document.getElementById('card').classList.contains('is-feed');
+        const minFontSize = isFeed ? 4.75 : 5;
+        let nextFontSize = computedFontSize;
+
+        const measureScaledWidth = () =>
+          scaledNodes.reduce((total, node) => total + node.getBoundingClientRect().width, 0);
+
+        const applyFontSize = (fontSize) => {
+          scaledNodes.forEach((node) => {
+            node.style.fontSize = `${fontSize}px`;
+          });
+        };
+
+        const initialScaledWidth = measureScaledWidth();
+        if (initialScaledWidth > availableWidth) {
+          nextFontSize = Math.max(minFontSize, (computedFontSize * availableWidth) / initialScaledWidth);
+          applyFontSize(nextFontSize);
+        }
+
+        while (measureScaledWidth() > availableWidth && nextFontSize > minFontSize) {
+          nextFontSize = Math.max(minFontSize, nextFontSize - 0.25);
+          applyFontSize(nextFontSize);
+        }
+      };
+
+      const alignAvatarToFirstTextLine = (avatarEl, textEl) => {
+        if (!avatarEl || !textEl || avatarEl.style.display === 'none') {
+          return;
+        }
+
+        const row = avatarEl.parentElement;
+        if (!row) {
+          return;
+        }
+
+        avatarEl.style.marginTop = '0px';
+
+        const rowBox = row.getBoundingClientRect();
+        const avatarBox = avatarEl.getBoundingClientRect();
+        const textBox = textEl.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(textEl);
+        let lineHeight = Number.parseFloat(computedStyle.lineHeight);
+        if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+          const fontSize = Number.parseFloat(computedStyle.fontSize);
+          if (!Number.isFinite(fontSize) || fontSize <= 0) {
+            return;
+          }
+          lineHeight = fontSize * 1.2;
+        }
+
+        const desiredTop = textBox.top - rowBox.top + lineHeight / 2 - avatarBox.height / 2;
+        avatarEl.style.marginTop = `${Math.max(0, desiredTop)}px`;
+      };
+
+      const resolveComments = (data) => {
+        if (Array.isArray(data.comments) && data.comments.length > 0) {
+          return data.comments;
+        }
+        if (data.comment && typeof data.comment === 'object') {
+          return [data.comment];
+        }
+        throw new Error('pdp_ugc_standard requires comment or comments.');
+      };
+
+      const setCommentLayout = (comments) => {
+        const card = document.getElementById('card');
+        if (!card) {
+          throw new Error('Card element not found.');
+        }
+        card.classList.toggle('has-dual-comments', Array.isArray(comments) && comments.length > 1);
       };
 
       const setContextLine = (el, handle, verified = true) => {
         el.innerHTML = '';
+
+        const preBadgeText = document.createElement('span');
+        preBadgeText.className = 'pdp-context-scaled';
+
         const prefix = document.createElement('span');
+        prefix.className = 'pdp-context-prefix';
         prefix.textContent = 'Reply to ';
+
         const handleSpan = document.createElement('span');
         handleSpan.className = 'pdp-handle';
-        handleSpan.textContent = `${handle}'s`;
+        handleSpan.textContent = handle;
+
+        const possessive = document.createElement('span');
+        possessive.className = 'pdp-context-suffix';
+        possessive.textContent = "'s";
+
+        preBadgeText.appendChild(prefix);
+        preBadgeText.appendChild(handleSpan);
+        preBadgeText.appendChild(possessive);
+
         const verifiedBadge = document.createElement('span');
         verifiedBadge.className = 'pdp-verified';
         verifiedBadge.title = 'Verified';
         verifiedBadge.setAttribute('aria-label', 'Verified');
-        verifiedBadge.innerHTML =
-          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.3 12.8 7.1 10.6 6 11.7l3.3 3.3L18 6.3l-1.1-1.1z"></path></svg>';
+        const verifiedBadgeImage = document.createElement('img');
+        verifiedBadgeImage.src = '../assets/verified_badge_tight.png';
+        verifiedBadgeImage.alt = '';
+        verifiedBadgeImage.setAttribute('aria-hidden', 'true');
+        verifiedBadge.appendChild(verifiedBadgeImage);
+
         const suffix = document.createElement('span');
+        suffix.className = 'pdp-context-scaled pdp-context-suffix';
         suffix.textContent = ' comment';
-        el.appendChild(prefix);
-        el.appendChild(handleSpan);
+
+        el.appendChild(preBadgeText);
         if (verified) {
           el.appendChild(verifiedBadge);
         }
         el.appendChild(suffix);
+        fitContextLine(el);
+        return verified ? verifiedBadgeImage : null;
+      };
+
+      const populateCommentBubble = ({ bubbleId, avatarId, contextId, textId, comment, waits }) => {
+        const bubble = document.getElementById(bubbleId);
+        const avatar = document.getElementById(avatarId);
+        const context = document.getElementById(contextId);
+        const text = document.getElementById(textId);
+
+        if (!bubble || !avatar || !context || !text) {
+          throw new Error(`Missing comment bubble elements for ${bubbleId}.`);
+        }
+
+        bubble.style.display = 'block';
+
+        const avatarWait = setAvatar(avatar, comment);
+        if (avatarWait) {
+          waits.push(avatarWait);
+        }
+
+        const verifiedBadgeImage = setContextLine(context, comment.handle, comment.verified !== false);
+        if (verifiedBadgeImage) {
+          waits.push(waitForImage(verifiedBadgeImage));
+        }
+        text.textContent = comment.text;
+
+        return { bubble, avatar, context, text };
+      };
+
+      const hideCommentBubble = ({ bubbleId, contextId, textId, avatarId }) => {
+        const bubble = document.getElementById(bubbleId);
+        const context = document.getElementById(contextId);
+        const text = document.getElementById(textId);
+        const avatar = document.getElementById(avatarId);
+
+        if (!bubble || !context || !text || !avatar) {
+          return;
+        }
+
+        bubble.style.display = 'none';
+        bubble.style.top = '';
+        bubble.style.right = '';
+        bubble.style.left = '';
+        bubble.style.bottom = '';
+        context.textContent = '';
+        text.textContent = '';
+        avatar.textContent = '';
+        avatar.style.backgroundImage = 'none';
+        avatar.classList.remove('has-image');
       };
 
       const initialsFromHandle = (handle) => {
@@ -164,6 +384,32 @@
         return null;
       };
 
+      const setCtaText = (el, text) => {
+        const raw = typeof text === 'string' ? text.trim() : '';
+        el.replaceChildren();
+
+        if (!raw) {
+          return;
+        }
+
+        const match = raw.match(/^(.*?)(\s*FREE TODAY!?)$/i);
+        if (!match || !match[1].trim()) {
+          el.textContent = raw;
+          return;
+        }
+
+        const strong = document.createElement('span');
+        strong.className = 'pdp-cta-strong';
+        strong.textContent = match[1].trimEnd();
+        el.appendChild(strong);
+        el.appendChild(document.createTextNode(' '));
+
+        const soft = document.createElement('span');
+        soft.className = 'pdp-cta-soft';
+        soft.textContent = match[2].trimStart();
+        el.appendChild(soft);
+      };
+
       window.setCardData = async (data) => {
         if (!data || typeof data !== 'object') {
           throw new Error('Payload must be an object.');
@@ -174,6 +420,7 @@
         const card = document.getElementById('card');
         card.style.setProperty('--strip-bg', data.brand.stripBgColor);
         card.style.setProperty('--strip-text', data.brand.stripTextColor);
+        card.style.setProperty('--pdp-comment-tail-scale', String(data.output.commentTailScale));
 
         const waits = [];
 
@@ -182,24 +429,53 @@
         bg.alt = data.background.alt || '';
         waits.push(waitForImage(bg));
 
-        const avatar = document.getElementById('primary-avatar');
-        const avatarWait = setAvatar(avatar, data.comment);
-        if (avatarWait) {
-          waits.push(avatarWait);
-        }
+        const comments = resolveComments(data);
+        setCommentLayout(comments);
+        const primaryBubble = populateCommentBubble({
+          bubbleId: 'bubble-primary',
+          avatarId: 'primary-avatar',
+          contextId: 'primary-context',
+          textId: 'primary-text',
+          comment: comments[0],
+          waits,
+        });
 
-        const handle = data.comment.handle;
-        const showVerified = data.comment.verified !== false;
-        setContextLine(document.getElementById('primary-context'), handle, showVerified);
-        document.getElementById('primary-text').textContent = data.comment.text;
+        let secondaryBubble = null;
+        if (comments[1]) {
+          secondaryBubble = populateCommentBubble({
+            bubbleId: 'bubble-secondary',
+            avatarId: 'secondary-avatar',
+            contextId: 'secondary-context',
+            textId: 'secondary-text',
+            comment: comments[1],
+            waits,
+          });
+        } else {
+          hideCommentBubble({
+            bubbleId: 'bubble-secondary',
+            avatarId: 'secondary-avatar',
+            contextId: 'secondary-context',
+            textId: 'secondary-text',
+          });
+        }
 
         document.getElementById('rating-value').textContent = data.rating.valueText;
         document.getElementById('rating-detail').textContent = ` ${data.rating.detailText}`;
-        document.getElementById('cta').textContent = data.cta.text;
+        setCtaText(document.getElementById('cta'), data.cta.text);
 
         setLogo(data.brand, waits);
 
         await Promise.all(waits);
+        await document.fonts.ready;
+        await new Promise((resolve) => window.requestAnimationFrame(resolve));
+
+        fitContextLine(primaryBubble.context);
+        alignAvatarToFirstTextLine(primaryBubble.avatar, primaryBubble.text);
+
+        if (secondaryBubble) {
+          fitContextLine(secondaryBubble.context);
+          alignAvatarToFirstTextLine(secondaryBubble.avatar, secondaryBubble.text);
+        }
       };
     </script>
   </body>

@@ -1,0 +1,243 @@
+{
+  "themeImageSlotsByName": {
+    "futrgroup2-0theme": [
+      {
+        "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_CDPHGa.settings.image",
+        "key": "image",
+        "role": "gallery",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_PijDXy.settings.image",
+        "key": "image",
+        "role": "gallery",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_VfHpJg.settings.image",
+        "key": "image",
+        "role": "gallery",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.collage_EiUYGW.blocks.image_g4F98H.settings.image",
+        "key": "image",
+        "role": "gallery",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.image_with_text_M6Cfj7.settings.image",
+        "key": "image",
+        "role": "gallery",
+        "recommendedAspect": "square",
+        "promptAspectRatio": "1:1",
+        "promptRenderHint": "Render target: 500x500 desktop-equivalent frame and 300x300 mobile-equivalent frame. Fill the full frame edge-to-edge with no borders, empty margins, or embedded frames. After placement, the left outer corners stay rounded and the right side remains sharp where the image meets the text column."
+      },
+      {
+        "path": "templates/index.json.sections.image_with_text_aQPm77.settings.image",
+        "key": "image",
+        "role": "gallery",
+        "recommendedAspect": "square",
+        "promptAspectRatio": "1:1",
+        "promptRenderHint": "Render target: 450x450 desktop-equivalent frame. Fill the full frame edge-to-edge with no borders, empty margins, or embedded frames. After placement, the right outer corners stay rounded and the left side remains sharp where the image meets the text column."
+      },
+      {
+        "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.settings.image",
+        "key": "image",
+        "role": "hero",
+        "recommendedAspect": "landscape"
+      },
+      {
+        "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.settings.image_mobile",
+        "key": "image_mobile",
+        "role": "hero",
+        "recommendedAspect": "landscape"
+      },
+      {
+        "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.after_image",
+        "key": "after_image",
+        "role": "gallery",
+        "recommendedAspect": "portrait"
+      },
+      {
+        "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_HwqgmG.settings.before_image",
+        "key": "before_image",
+        "role": "gallery",
+        "recommendedAspect": "portrait"
+      },
+      {
+        "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.after_image",
+        "key": "after_image",
+        "role": "gallery",
+        "recommendedAspect": "portrait"
+      },
+      {
+        "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_U4jGRN.settings.before_image",
+        "key": "before_image",
+        "role": "gallery",
+        "recommendedAspect": "portrait"
+      },
+      {
+        "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.after_image",
+        "key": "after_image",
+        "role": "gallery",
+        "recommendedAspect": "portrait"
+      },
+      {
+        "path": "templates/index.json.sections.ss_before_after_image_4_bAFP6h.blocks.slide_dEC66U.settings.before_image",
+        "key": "before_image",
+        "role": "gallery",
+        "recommendedAspect": "portrait"
+      },
+      {
+        "path": "templates/index.json.sections.ss_countdown_timer_4_TxGT4a.settings.image",
+        "key": "image",
+        "role": "hero",
+        "recommendedAspect": "square",
+        "promptAspectRatio": "1:1",
+        "promptRenderHint": "Render target: square 1:1 frame for a split countdown section. Required output size: at least 1600x1600. Fill the frame edge-to-edge with no top/bottom empty bands, letterboxing, or embedded borders. Keep the primary subject centered with safe crop margins so rounded-corner clipping preserves key details."
+      },
+      {
+        "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_CieJRi.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_DTL7F7.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_EA4mWi.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_LUTUBp.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_MkDhxG.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_bCk3JY.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_dnta3i.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_mq6JiQ.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "square"
+      },
+      {
+        "path": "templates/collection.json.sections.main-collection-banner.settings.image",
+        "key": "image",
+        "role": "hero",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      },
+      {
+        "path": "templates/collection.json.sections.main-collection-banner.settings.image_mobile",
+        "key": "image_mobile",
+        "role": "hero",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      },
+      {
+        "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.image",
+        "key": "image",
+        "role": "supporting",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      },
+      {
+        "path": "templates/collection.json.sections.main-collection.blocks.promotion.settings.image_mobile",
+        "key": "image_mobile",
+        "role": "supporting",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      },
+      {
+        "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_1",
+        "key": "image_1",
+        "role": "supporting",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      },
+      {
+        "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_2",
+        "key": "image_2",
+        "role": "supporting",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      },
+      {
+        "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_3",
+        "key": "image_3",
+        "role": "supporting",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      },
+      {
+        "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_4",
+        "key": "image_4",
+        "role": "supporting",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      },
+      {
+        "path": "templates/collection.json.sections.images-with-text-overlay.settings.image_5",
+        "key": "image_5",
+        "role": "supporting",
+        "recommendedAspect": "landscape",
+        "allowMissing": true
+      }
+    ]
+  }
+}

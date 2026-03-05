@@ -1,11 +1,11 @@
 {
   "template": "pdp_personal_highlight",
   "output": {
-    "preset": "tiktok"
+    "preset": "feed"
   },
   "brand": {
     "logoText": "SampleLogo",
-    "stripBgColor": "#111827",
+    "stripBgColor": "#0f4d36",
     "stripTextColor": "#ffffff"
   },
   "rating": {
@@ -24,4 +24,3 @@
     "text": "YOUR PERSONAL HIGHLIGHT TEXT HERE"
   }
 }
-
