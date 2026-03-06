@@ -2,7 +2,7 @@
 
 client_id = "38e928aaa25e54c8ee25c2db99547094"
 name = "mOS-prod"
-application_url = "https://shopify.moshq.app/"
+application_url = "https://app.moshq.app/"
 embedded = true
 
 [build]
@@ -20,4 +20,4 @@ uri = "/webhooks/compliance"
 scopes = "read_products,write_products,read_orders,read_content,write_content,read_inventory,write_inventory,read_themes,unauthenticated_read_product_listings"
 
 [auth]
-redirect_urls = [ "https://shopify.moshq.app/auth/callback" ]
+redirect_urls = [ "https://app.moshq.app/auth/callback" ]

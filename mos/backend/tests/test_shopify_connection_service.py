@@ -348,6 +348,47 @@ def test_get_client_shopify_product_rejects_invalid_product_gid():
         raise AssertionError("Expected get_client_shopify_product to reject invalid product gid")
 
 
+def test_sync_client_shopify_catalog_collection_parses_response(monkeypatch):
+    def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
+        assert method == "POST"
+        assert path == "/v1/catalog/collection/sync"
+        assert json_body == {
+            "clientId": "client_1",
+            "productGids": [
+                "gid://shopify/Product/123",
+                "gid://shopify/Product/456",
+            ],
+        }
+        return {
+            "shopDomain": "example.myshopify.com",
+            "collectionId": "gid://shopify/Collection/1",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+            "requestedProductCount": 2,
+            "addedProductCount": 1,
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.sync_client_shopify_catalog_collection(
+        client_id="client_1",
+        product_gids=[
+            "gid://shopify/Product/123",
+            "gid://shopify/Product/456",
+            "gid://shopify/Product/456",
+        ],
+    )
+
+    assert response == {
+        "shopDomain": "example.myshopify.com",
+        "collectionId": "gid://shopify/Collection/1",
+        "collectionHandle": "all",
+        "collectionTitle": "Catalog",
+        "requestedProductCount": 2,
+        "addedProductCount": 1,
+    }
+
+
 def test_create_client_shopify_product_parses_response(monkeypatch):
     def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"

@@ -974,6 +974,44 @@ def test_create_shopify_product_for_product_rejects_existing_mapping(api_client)
     assert "already mapped to Shopify" in response.json()["detail"]
 
 
+def test_update_product_syncs_workspace_catalog_when_shopify_mapping_is_set(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client, name="Shopify Product Mapping Sync")
+    product_id = _create_product(api_client, client_id=client_id, title="Primary Product")
+    observed: dict[str, object] = {}
+
+    def fake_verify(*, client_id: str, product_gid: str) -> None:
+        observed["verified_client_id"] = client_id
+        observed["verified_product_gid"] = product_gid
+
+    def fake_sync(*, session, org_id: str, client_id: str, shop_domain: str | None = None, extra_product_gids=None):
+        del session, shop_domain
+        observed["sync_org_id"] = org_id
+        observed["sync_client_id"] = client_id
+        observed["extra_product_gids"] = extra_product_gids
+        return None
+
+    monkeypatch.setattr(products_router, "verify_shopify_product_exists", fake_verify)
+    monkeypatch.setattr(
+        products_router,
+        "sync_workspace_shopify_catalog_collection",
+        fake_sync,
+    )
+
+    response = api_client.patch(
+        f"/products/{product_id}",
+        json={"shopifyProductGid": "gid://shopify/Product/901"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["shopify_product_gid"] == "gid://shopify/Product/901"
+    assert observed["verified_client_id"] == client_id
+    assert observed["verified_product_gid"] == "gid://shopify/Product/901"
+    assert observed["sync_client_id"] == client_id
+    assert observed["extra_product_gids"] == ["gid://shopify/Product/901"]
+
+
 def test_create_shopify_product_for_product_requires_ready_connection(api_client, monkeypatch):
     client_id = _create_client(api_client, name="Shopify Product Not Ready")
     product_id = _create_product(api_client, client_id=client_id, title="Primary Product")

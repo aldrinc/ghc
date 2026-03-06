@@ -28,6 +28,9 @@ from app.db.repositories.products import (
 from app.services.assets import create_product_upload_asset
 from app.services.media_storage import MediaStorage
 from app.services.shopify_catalog import verify_shopify_product_exists
+from app.services.shopify_collection_sync import (
+    sync_workspace_shopify_catalog_collection,
+)
 from app.services.shopify_connection import (
     create_client_shopify_product,
     get_client_shopify_product,
@@ -1031,6 +1034,7 @@ def update_product(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     fields: dict[str, object] = {}
+    catalog_sync_extra_product_gids: list[str] | None = None
     fields_set = payload.model_fields_set
     if payload.title is not None:
         fields["title"] = payload.title
@@ -1058,6 +1062,7 @@ def update_product(
                 product_gid=normalized_gid,
             )
             fields["shopify_product_gid"] = normalized_gid
+            catalog_sync_extra_product_gids = [normalized_gid]
     if payload.primaryBenefits is not None:
         fields["primary_benefits"] = payload.primaryBenefits
     if payload.featureBullets is not None:
@@ -1087,8 +1092,20 @@ def update_product(
                 )
             fields["primary_asset_id"] = payload.primaryAssetId
 
-    updated = repo.update(org_id=auth.org_id, product_id=product_id, **fields)
-    return jsonable_encoder(updated)
+    if catalog_sync_extra_product_gids is not None:
+        sync_workspace_shopify_catalog_collection(
+            session=session,
+            org_id=auth.org_id,
+            client_id=str(product.client_id),
+            extra_product_gids=catalog_sync_extra_product_gids,
+        )
+
+    for key, value in fields.items():
+        setattr(product, key, value)
+    session.add(product)
+    session.commit()
+    session.refresh(product)
+    return jsonable_encoder(product)
 
 
 @router.post("/{product_id}/variants", status_code=status.HTTP_201_CREATED)

@@ -27,7 +27,7 @@ from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.base import SessionLocal
 from app.db.deps import get_session
-from app.db.models import ClientComplianceProfile, ClientUserPreference, Product
+from app.db.models import ClientComplianceProfile, ClientUserPreference, Funnel, FunnelPage, Product
 from app.db.repositories.assets import AssetsRepository
 from app.db.repositories.client_compliance_profiles import (
     ClientComplianceProfilesRepository,
@@ -47,7 +47,7 @@ from app.db.repositories.shopify_theme_template_drafts import (
 from app.db.repositories.products import ProductOffersRepository, ProductsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
-from app.db.enums import ArtifactTypeEnum, AssetStatusEnum
+from app.db.enums import ArtifactTypeEnum, AssetStatusEnum, FunnelStatusEnum
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
 from app.schemas.preferences import ActiveProductUpdateRequest
 from app.schemas.common import ClientCreate
@@ -110,6 +110,7 @@ from app.services.funnels import (
     resolve_funnel_image_model_config,
 )
 from app.services.media_storage import MediaStorage
+from app.services.public_routing import require_product_route_slug
 from app.services.shopify_connection import (
     audit_client_shopify_theme_brand,
     auto_provision_client_shopify_storefront_token,
@@ -125,6 +126,9 @@ from app.services.shopify_connection import (
     set_client_shopify_storefront_token,
     sync_client_shopify_theme_brand,
     upsert_client_shopify_policy_pages,
+)
+from app.services.shopify_collection_sync import (
+    sync_workspace_shopify_catalog_collection,
 )
 from app.services.shopify_theme_copy_agent import (
     generate_shopify_theme_component_copy,
@@ -195,44 +199,22 @@ _THEME_FEATURE_HIGHLIGHT_MANAGED_TEXT_SLOT_PATHS: frozenset[str] = frozenset(
     for card_paths in _THEME_FEATURE_HIGHLIGHT_CARD_SLOT_PATHS.values()
     for path in card_paths
 )
-_THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
-_THEME_HEADER_NAV_DESKTOP_FILENAME = "snippets/header-nav-desktop.liquid"
-_THEME_HEADER_NAV_DRAWER_FILENAME = "snippets/header-nav-drawer.liquid"
 _THEME_RICH_TEXT_SECTION_FILENAME = "sections/rich-text.liquid"
-_THEME_HEADER_DRAWER_CATALOG_DETAILS_RE = re.compile(
-    r"<li>\s*<details\b[^>]*>.*?<summary[^>]*>\s*(?:Catalog|Shop)\s*</summary>.*?</details>\s*</li>",
-    re.IGNORECASE | re.DOTALL,
-)
-_THEME_HEADER_DRAWER_CATALOG_LINK_RE = re.compile(
-    r"<li>\s*<a\b[^>]*>\s*(?:Catalog|Shop)\s*</a>\s*</li>",
-    re.IGNORECASE | re.DOTALL,
-)
-_THEME_HEADER_DRAWER_COLLECTION_TEST_LINK_RE = re.compile(
-    r'href\s*=\s*(["\'])/collections/test\1',
+_THEME_FOOTER_GROUP_FILENAME = "sections/footer-group.json"
+_THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
+_THEME_INDEX_TEMPLATE_FILENAME = "templates/index.json"
+_THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
+_THEME_MAIN_PAGE_BUTTON_LINK_KEYS: frozenset[str] = frozenset({"button_link", "button_url"})
+_THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE = re.compile(
+    r'href="\{\{\s*product_url\s*\}\}"',
     re.IGNORECASE,
 )
-_THEME_COLLECTION_TEST_PATH_RE = re.compile(
-    r"/collections/test(?=(?:[/?#\"'\\]|$))",
+_THEME_TRACK_ORDER_TITLE_RE = re.compile(
+    r"^\s*track\s+(?:your|my)\s+order\s*$",
     re.IGNORECASE,
 )
-_THEME_SHOPIFY_PRODUCT_LINK_RE = re.compile(
-    r'(?P<quote>["\'])shopify://products/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
-    re.IGNORECASE,
-)
-_THEME_SHOPIFY_COLLECTION_LINK_RE = re.compile(
-    r'(?P<quote>["\'])shopify://collections(?:/(?P<handle>[A-Za-z0-9][A-Za-z0-9-]*))?(?P=quote)',
-    re.IGNORECASE,
-)
-_THEME_RELATIVE_PRODUCT_PATH_LINK_RE = re.compile(
-    r'(?P<quote>["\'])/products/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
-    re.IGNORECASE,
-)
-_THEME_RELATIVE_PAGE_PATH_LINK_RE = re.compile(
-    r'(?P<quote>["\'])/pages/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
-    re.IGNORECASE,
-)
-_THEME_RELATIVE_COLLECTION_PATH_LINK_RE = re.compile(
-    r'(?P<quote>["\'])/collections/(?P<handle>[A-Za-z0-9][A-Za-z0-9-]*)(?P=quote)',
+_THEME_TRACK_ORDER_LINK_HREF_RE = re.compile(
+    r'href\s*=\s*["\']/pages/(?:track-order|track-your-order)["\']',
     re.IGNORECASE,
 )
 _THEME_EXPORT_REQUIRED_TEMPLATE_FILES: tuple[str, ...] = (
@@ -248,7 +230,6 @@ _THEME_EXPORT_REQUIRED_COLLECTION_SECTIONS: tuple[str, ...] = (
     "main-collection-banner",
     "main-collection",
 )
-_THEME_SAFE_FALLBACK_PATH = "/"
 _THEME_SECONDARY_SECTION_BACKGROUND_CSS_VAR = "--color-page-bg-secondary"
 _THEME_SECONDARY_SECTION_BACKGROUND_FILENAMES: tuple[str, ...] = (
     "sections/ss-before-after-4.liquid",
@@ -278,11 +259,6 @@ _THEME_EXPORT_ALLOWED_ROOT_DIRECTORIES: frozenset[str] = frozenset(
         "templates",
     }
 )
-_THEME_HEADER_DRAWER_SAFE_CATALOG_LINK = (
-    '<li><a class="drawer__menu-item block text-2xl font-bold '
-    f'leading-none tracking-tight" href="{_THEME_SAFE_FALLBACK_PATH}">Shop</a></li>'
-)
-_THEME_LIQUID_OUTPUT_TAG_RE = re.compile(r"(\{\{[-\s]*)(.*?)([-\s]*\}\})", re.DOTALL)
 _LOCAL_SHOPIFY_THEME_DEFAULT_SHOP_DOMAIN = "local.mos"
 _LOCAL_SHOPIFY_THEME_DEFAULT_THEME_NAME = "mos-local-theme"
 _LOCAL_SHOPIFY_THEME_DEFAULT_THEME_ROLE = "MAIN"
@@ -546,82 +522,192 @@ def _has_explicit_gemini_hard_quota_signal(message: str) -> bool:
     )
 
 
-def _normalize_theme_export_header_drawer_content(*, content: str) -> str:
-    normalized = content
-    normalized = _THEME_HEADER_DRAWER_CATALOG_DETAILS_RE.sub(
-        _THEME_HEADER_DRAWER_SAFE_CATALOG_LINK,
-        normalized,
-    )
-
-    def _rewrite_catalog_link(match: re.Match[str]) -> str:
-        menu_item = match.group(0)
-        rewritten_menu_item = menu_item
-        if re.search(
-            r'href\s*=\s*["\']/collections/all["\']',
-            menu_item,
-            re.IGNORECASE,
-        ) is None:
-            rewritten_menu_item, replaced = re.subn(
-                r'href\s*=\s*["\'][^"\']*["\']',
-                'href="/collections/all"',
-                menu_item,
-                count=1,
-                flags=re.IGNORECASE,
-            )
-            if replaced == 0:
-                rewritten_menu_item = re.sub(
-                    r"<a\b",
-                    '<a href="/collections/all"',
-                    menu_item,
-                    count=1,
-                    flags=re.IGNORECASE,
-                )
-        return re.sub(
-            r">(\s*)(?:Catalog|Shop)(\s*)<",
-            r">\1Shop\2<",
-            rewritten_menu_item,
-            count=1,
-            flags=re.IGNORECASE,
+def _resolve_theme_export_sales_page_path(
+    *,
+    client_id: str,
+    auth: AuthContext,
+    session: Session,
+) -> tuple[str, str | None]:
+    product = session.scalars(
+        select(Product)
+        .where(Product.org_id == auth.org_id, Product.client_id == client_id)
+        .order_by(Product.created_at.asc(), Product.id.asc())
+        .limit(1)
+    ).first()
+    if not product:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Theme ZIP export requires at least one workspace product to resolve "
+                "Shopify theme links."
+            ),
         )
 
-    normalized = _THEME_HEADER_DRAWER_CATALOG_LINK_RE.sub(
-        _rewrite_catalog_link,
-        normalized,
+    try:
+        require_product_route_slug(product=product)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Theme ZIP export could not resolve a public product slug for the first "
+                f"workspace product: {exc}"
+            ),
+        ) from exc
+
+    def _find_latest_sales_page_for_product(
+        *,
+        product_id: str | None,
+    ) -> Any | None:
+        query = (
+            select(Product, Funnel.route_slug, FunnelPage.slug)
+            .join(Funnel, Funnel.product_id == Product.id)
+            .join(FunnelPage, FunnelPage.funnel_id == Funnel.id)
+            .where(
+                Funnel.org_id == auth.org_id,
+                Funnel.client_id == client_id,
+                Funnel.status.in_((FunnelStatusEnum.draft, FunnelStatusEnum.published)),
+                FunnelPage.template_id == "sales-pdp",
+            )
+            .order_by(
+                FunnelPage.created_at.desc(),
+                FunnelPage.id.desc(),
+                Funnel.created_at.desc(),
+                Funnel.id.desc(),
+                FunnelPage.ordering.desc(),
+            )
+            .limit(1)
+        )
+        if product_id is not None:
+            query = query.where(Funnel.product_id == product_id)
+        return session.execute(query).first()
+
+    def _build_sales_page_path(
+        *,
+        target_product: Product,
+        route_slug: Any,
+        page_slug: Any,
+    ) -> str | None:
+        target_funnel_slug = str(route_slug or "").strip()
+        target_page_slug = str(page_slug or "").strip()
+        if not target_funnel_slug or not target_page_slug:
+            return None
+        try:
+            target_product_slug = require_product_route_slug(product=target_product)
+        except ValueError:
+            return None
+        return f"/f/{target_product_slug}/{target_funnel_slug}/{target_page_slug}"
+
+    first_product_sales_page = _find_latest_sales_page_for_product(product_id=product.id)
+    if first_product_sales_page is not None:
+        first_product_record, first_route_slug, first_page_slug = first_product_sales_page
+        if isinstance(first_product_record, Product):
+            first_product_sales_page_path = _build_sales_page_path(
+                target_product=first_product_record,
+                route_slug=first_route_slug,
+                page_slug=first_page_slug,
+            )
+            if first_product_sales_page_path:
+                return first_product_sales_page_path, None
+
+    latest_workspace_sales_page = _find_latest_sales_page_for_product(product_id=None)
+    if latest_workspace_sales_page is not None:
+        workspace_product, workspace_route_slug, workspace_page_slug = (
+            latest_workspace_sales_page
+        )
+        if isinstance(workspace_product, Product):
+            workspace_sales_page_path = _build_sales_page_path(
+                target_product=workspace_product,
+                route_slug=workspace_route_slug,
+                page_slug=workspace_page_slug,
+            )
+            if workspace_sales_page_path:
+                return (
+                    workspace_sales_page_path,
+                    (
+                        "Theme ZIP downloaded, but sales page was not found for the first "
+                        f"workspace product '{product.title}'. Using latest available sales page "
+                        f"from workspace product '{workspace_product.title}'."
+                    ),
+                )
+
+    return (
+        "",
+        (
+            "Theme ZIP downloaded, but sales page was not found for the first "
+            f"workspace product '{product.title}'. Links were left blank."
+        ),
     )
-    normalized = _THEME_HEADER_DRAWER_COLLECTION_TEST_LINK_RE.sub(
-        'href="/collections/all"',
-        normalized,
-    )
-    return normalized
 
 
-def _normalize_theme_export_header_navigation_link_labels(
+def _normalize_theme_export_main_page_button_links(
     *,
     filename: str,
     content: str,
+    sales_page_path: str,
 ) -> str:
-    if filename not in {
-        _THEME_HEADER_NAV_DESKTOP_FILENAME,
-        _THEME_HEADER_NAV_DRAWER_FILENAME,
-    }:
+    if filename != _THEME_INDEX_TEMPLATE_FILENAME:
         return content
 
-    def _rewrite_liquid_output_tag(match: re.Match[str]) -> str:
-        prefix, expression, suffix = match.groups()
-        updated_expression = re.sub(
-            r"\blink\.title\b(?!\s*\|\s*replace:\s*'Catalog',\s*'Shop')",
-            "link.title | replace: 'Catalog', 'Shop'",
-            expression,
-        )
-        return f"{prefix}{updated_expression}{suffix}"
+    try:
+        parsed_content = json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Theme ZIP export could not parse templates/index.json while rewriting CTA links.",
+        ) from exc
 
-    normalized = _THEME_LIQUID_OUTPUT_TAG_RE.sub(_rewrite_liquid_output_tag, content)
-    normalized = re.sub(
-        r"\becho\s+link\.title\b(?!\s*\|\s*replace:\s*'Catalog',\s*'Shop')",
-        "echo link.title | replace: 'Catalog', 'Shop'",
-        normalized,
+    rewritten_button_count = 0
+
+    def _rewrite_value(value: Any) -> Any:
+        nonlocal rewritten_button_count
+        if isinstance(value, dict):
+            updated: dict[str, Any] = {}
+            for key, nested_value in value.items():
+                if key in _THEME_MAIN_PAGE_BUTTON_LINK_KEYS and isinstance(nested_value, str):
+                    updated[key] = sales_page_path
+                    rewritten_button_count += 1
+                else:
+                    updated[key] = _rewrite_value(nested_value)
+            return updated
+        if isinstance(value, list):
+            return [_rewrite_value(item) for item in value]
+        return value
+
+    normalized_content = json.dumps(_rewrite_value(parsed_content), separators=(",", ":"))
+    if rewritten_button_count == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export could not find any homepage CTA button links to rewrite "
+                "in templates/index.json."
+            ),
+        )
+    return normalized_content
+
+
+def _normalize_theme_export_catalog_product_card_links(
+    *,
+    filename: str,
+    content: str,
+    sales_page_path: str,
+) -> str:
+    if filename != _THEME_PRODUCT_CARD_SNIPPET_FILENAME:
+        return content
+
+    normalized_content, rewritten_link_count = _THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE.subn(
+        f'href="{sales_page_path}"',
+        content,
+        count=3,
     )
-    return normalized
+    if rewritten_link_count != 3:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export could not rewrite the expected catalog product links "
+                "in snippets/product-card.liquid."
+            ),
+        )
+    return normalized_content
 
 
 def _normalize_theme_export_rich_text_section_content(
@@ -659,6 +745,58 @@ def _normalize_theme_export_rich_text_section_content(
         flags=re.IGNORECASE,
     )
     return normalized
+
+
+def _normalize_theme_export_track_order_links(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    normalized = content
+    if filename == _THEME_HEADER_DRAWER_FILENAME:
+        normalized = _THEME_TRACK_ORDER_LINK_HREF_RE.sub(
+            'href="/pages/contact"',
+            normalized,
+        )
+
+    if filename != _THEME_FOOTER_GROUP_FILENAME:
+        return normalized
+
+    template_data = _parse_theme_export_template_json(
+        filename=filename,
+        content=normalized,
+    )
+    sections = template_data.get("sections")
+    if not isinstance(sections, dict):
+        return normalized
+
+    changed = False
+    for section in sections.values():
+        if not isinstance(section, dict):
+            continue
+        blocks = section.get("blocks")
+        if not isinstance(blocks, dict):
+            continue
+        block_keys_to_remove: list[str] = []
+        for block_key, block in blocks.items():
+            if not isinstance(block, dict):
+                continue
+            settings = block.get("settings")
+            if not isinstance(settings, dict):
+                continue
+            title = settings.get("title")
+            if not isinstance(title, str) or not _THEME_TRACK_ORDER_TITLE_RE.match(
+                title.strip()
+            ):
+                continue
+            block_keys_to_remove.append(block_key)
+        for block_key in block_keys_to_remove:
+            blocks.pop(block_key, None)
+            changed = True
+
+    if not changed:
+        return normalized
+    return json.dumps(template_data, separators=(",", ":"))
 
 
 def _normalize_local_theme_shop_domain(*, shop_domain: str | None) -> str:
@@ -887,6 +1025,15 @@ def _collect_local_theme_slots_from_json_value(
     seen_text_slot_paths: set[str],
 ) -> None:
     if isinstance(value, dict):
+        if (
+            value.get("disabled") is True
+            and (
+                path_tokens[:1] == ["sections"]
+                and len(path_tokens) in {2, 4}
+                and (len(path_tokens) == 2 or path_tokens[2] == "blocks")
+            )
+        ):
+            return
         for key, nested_value in value.items():
             next_tokens = [*path_tokens, key]
             if isinstance(nested_value, str) and "settings" in next_tokens:
@@ -1784,64 +1931,26 @@ def _normalize_theme_export_text_file_content(
     *,
     filename: str,
     content: str,
-) -> tuple[str, int]:
-    starting_collection_test_count = len(_THEME_COLLECTION_TEST_PATH_RE.findall(content))
+    sales_page_path: str,
+) -> str:
     normalized = content
-    if filename == _THEME_HEADER_DRAWER_FILENAME:
-        normalized = _normalize_theme_export_header_drawer_content(content=normalized)
-    normalized = _normalize_theme_export_header_navigation_link_labels(
+    normalized = _normalize_theme_export_main_page_button_links(
         filename=filename,
         content=normalized,
+        sales_page_path=sales_page_path,
     )
     normalized = _normalize_theme_export_rich_text_section_content(
         filename=filename,
         content=normalized,
     )
-    normalized = _normalize_theme_export_storefront_link_content(content=normalized)
-    normalized, _ = _THEME_COLLECTION_TEST_PATH_RE.subn(
-        _THEME_SAFE_FALLBACK_PATH,
-        normalized,
+    normalized = _normalize_theme_export_catalog_product_card_links(
+        filename=filename,
+        content=normalized,
+        sales_page_path=sales_page_path,
     )
-    ending_collection_test_count = len(_THEME_COLLECTION_TEST_PATH_RE.findall(normalized))
-    rewritten_collection_link_count = max(
-        0,
-        starting_collection_test_count - ending_collection_test_count,
-    )
-    return normalized, rewritten_collection_link_count
-
-
-def _normalize_theme_export_storefront_link_content(*, content: str) -> str:
-    normalized = _THEME_SHOPIFY_PRODUCT_LINK_RE.sub(
-        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
-        content,
-    )
-    normalized = _THEME_RELATIVE_PRODUCT_PATH_LINK_RE.sub(
-        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
-        normalized,
-    )
-    normalized = _THEME_RELATIVE_PAGE_PATH_LINK_RE.sub(
-        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
-        normalized,
-    )
-
-    def _rewrite_relative_collection_path_link(match: re.Match[str]) -> str:
-        return (
-            f"{match.group('quote')}{_THEME_SAFE_FALLBACK_PATH}{match.group('quote')}"
-        )
-
-    normalized = _THEME_RELATIVE_COLLECTION_PATH_LINK_RE.sub(
-        _rewrite_relative_collection_path_link,
-        normalized,
-    )
-
-    def _rewrite_shopify_collection_link(match: re.Match[str]) -> str:
-        return (
-            f"{match.group('quote')}{_THEME_SAFE_FALLBACK_PATH}{match.group('quote')}"
-        )
-
-    normalized = _THEME_SHOPIFY_COLLECTION_LINK_RE.sub(
-        _rewrite_shopify_collection_link,
-        normalized,
+    normalized = _normalize_theme_export_track_order_links(
+        filename=filename,
+        content=normalized,
     )
     return normalized
 
@@ -6260,26 +6369,35 @@ def _compliance_profile_placeholder_values(
     return values
 
 
+_DEFAULT_TEMPLATE_EXPORT_PAGE_KEYS: tuple[str, ...] = (
+    "privacy_policy",
+    "returns_refunds_policy",
+    "shipping_policy",
+    "terms_of_service",
+)
+
+
 def _select_compliance_page_keys_for_template_export(
     *, requirements: dict[str, Any]
 ) -> list[str]:
-    selected_by_ruleset: list[str] = []
-    for page in requirements["pages"]:
-        classification = page["classification"]
-        if classification == "required":
-            selected_by_ruleset.append(page["pageKey"])
+    classification_by_page_key = {
+        page["pageKey"]: page["classification"]
+        for page in requirements["pages"]
+    }
+    selected_default: list[str] = []
+    for page_key in _DEFAULT_TEMPLATE_EXPORT_PAGE_KEYS:
+        if classification_by_page_key.get(page_key) == "not_applicable":
             continue
-        if classification == "strongly_recommended":
-            selected_by_ruleset.append(page["pageKey"])
-    if not selected_by_ruleset:
+        selected_default.append(page_key)
+    if not selected_default:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "No required or strongly recommended compliance pages are applicable for this workspace "
+                "No default compliance policy pages are applicable for this workspace "
                 "profile. Update the compliance profile business models first."
             ),
         )
-    return selected_by_ruleset
+    return selected_default
 
 
 def _sync_compliance_policy_pages_for_template_export(
@@ -6529,6 +6647,17 @@ def _build_shopify_theme_template_export_zip_response(
         if isinstance(draft_data.themeRole, str) and draft_data.themeRole.strip()
         else default_theme_role
     )
+    sales_page_path_resolution = _resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=auth,
+        session=session,
+    )
+    if isinstance(sales_page_path_resolution, tuple):
+        sales_page_path, sales_page_warning = sales_page_path_resolution
+    else:
+        # Backward-compatible path for tests that monkeypatch this helper with a raw string.
+        sales_page_path = str(sales_page_path_resolution or "")
+        sales_page_warning = None
     exported = _build_local_shopify_theme_export_payload(
         shop_domain=draft_data.shopDomain,
         workspace_name=draft_data.workspaceName,
@@ -6556,9 +6685,7 @@ def _build_shopify_theme_template_export_zip_response(
             )
         ),
     )
-    rewritten_collection_links_by_filename: dict[str, int] = {}
     normalized_text_files_by_filename: dict[str, str] = {}
-    unresolved_collection_link_filenames: set[str] = set()
     exported_archive_filenames: set[str] = set()
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
@@ -6591,18 +6718,11 @@ def _build_shopify_theme_template_export_zip_response(
                     ),
                 )
             if has_text_content:
-                normalized_content, rewritten_collection_link_count = (
-                    _normalize_theme_export_text_file_content(
-                        filename=filename,
-                        content=content,
-                    )
+                normalized_content = _normalize_theme_export_text_file_content(
+                    filename=filename,
+                    content=content,
+                    sales_page_path=sales_page_path,
                 )
-                if rewritten_collection_link_count > 0:
-                    rewritten_collection_links_by_filename[filename] = (
-                        rewritten_collection_link_count
-                    )
-                if _THEME_COLLECTION_TEST_PATH_RE.search(normalized_content):
-                    unresolved_collection_link_filenames.add(filename)
                 normalized_text_files_by_filename[filename] = normalized_content
                 zip_file.writestr(filename, normalized_content)
                 exported_archive_filenames.add(filename)
@@ -6630,17 +6750,6 @@ def _build_shopify_theme_template_export_zip_response(
             zip_file.writestr(filename, file_bytes)
             exported_archive_filenames.add(filename)
 
-        if unresolved_collection_link_filenames:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    "Theme ZIP export contains unresolved /collections/test links after "
-                    "normalization. Update theme navigation links before export. files="
-                    + ", ".join(sorted(unresolved_collection_link_filenames))
-                    + "."
-                ),
-            )
-
         _validate_required_theme_archive_files_in_export(
             exported_filenames=exported_archive_filenames
         )
@@ -6660,6 +6769,8 @@ def _build_shopify_theme_template_export_zip_response(
     filename_theme = _slugify_theme_export_token(str(exported["themeName"]))
     archive_filename = f"{filename_theme}.zip"
     headers = {"Content-Disposition": f'attachment; filename="{archive_filename}"'}
+    if sales_page_warning:
+        headers["X-Marketi-Theme-Export-Notice"] = sales_page_warning
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",
@@ -7760,6 +7871,14 @@ def get_client_shopify_status(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
+    resolved_shop_domain = status_payload.get("shopDomain")
+    if status_payload.get("state") == "ready" and isinstance(resolved_shop_domain, str):
+        sync_workspace_shopify_catalog_collection(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            shop_domain=resolved_shop_domain,
+        )
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
@@ -7800,6 +7919,13 @@ def update_client_shopify_installation(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
+    if status_payload.get("state") == "ready":
+        sync_workspace_shopify_catalog_collection(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            shop_domain=payload.shopDomain,
+        )
     return ShopifyConnectionStatusResponse(**status_payload)
 
 
@@ -7828,6 +7954,13 @@ def auto_provision_client_shopify_installation_storefront_token(
         client_id=client_id,
         selected_shop_domain=selected_shop_domain,
     )
+    if status_payload.get("state") == "ready":
+        sync_workspace_shopify_catalog_collection(
+            session=session,
+            org_id=auth.org_id,
+            client_id=client_id,
+            shop_domain=payload.shopDomain,
+        )
     return ShopifyConnectionStatusResponse(**status_payload)
 
 

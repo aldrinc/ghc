@@ -325,7 +325,7 @@ def test_ensure_catalog_collection_route_is_available_creates_and_publishes_coll
     }
 
 
-def test_ensure_product_in_catalog_collection_adds_product_without_full_resync():
+def test_ensure_catalog_collection_contains_products_adds_only_missing_targets():
     client = ShopifyApiClient()
     observed: dict[str, Any] = {}
 
@@ -345,6 +345,15 @@ def test_ensure_product_in_catalog_collection_adds_product_without_full_resync()
             "addedProductCount": 0,
         }
 
+    async def fake_list_collection_product_ids(
+        *,
+        shop_domain: str,
+        access_token: str,
+        collection_id: str,
+    ) -> list[str]:
+        observed["listed_collection_id"] = collection_id
+        return ["gid://shopify/Product/10"]
+
     async def fake_add_products_to_collection(
         *,
         shop_domain: str,
@@ -352,13 +361,68 @@ def test_ensure_product_in_catalog_collection_adds_product_without_full_resync()
         collection_id: str,
         product_ids: list[str],
     ) -> None:
-        observed["collection_id"] = collection_id
+        observed["added_collection_id"] = collection_id
         observed["product_ids"] = product_ids
 
     client.ensure_catalog_collection_route_is_available = (  # type: ignore[method-assign]
         fake_ensure_catalog_collection_route_is_available
     )
+    client._list_collection_product_ids = fake_list_collection_product_ids  # type: ignore[method-assign]
     client._add_products_to_collection = fake_add_products_to_collection  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.ensure_catalog_collection_contains_products(
+            shop_domain="example.myshopify.com",
+            access_token="admin_token",
+            product_gids=[
+                "gid://shopify/Product/10",
+                "gid://shopify/Product/11",
+                "gid://shopify/Product/11",
+            ],
+        )
+    )
+
+    assert observed == {
+        "shop_domain": "example.myshopify.com",
+        "access_token": "admin_token",
+        "sync_all_products": False,
+        "listed_collection_id": "gid://shopify/Collection/7",
+        "added_collection_id": "gid://shopify/Collection/7",
+        "product_ids": ["gid://shopify/Product/11"],
+    }
+    assert result == {
+        "collectionId": "gid://shopify/Collection/7",
+        "collectionHandle": "all",
+        "collectionTitle": "Catalog",
+        "requestedProductCount": 2,
+        "addedProductCount": 1,
+    }
+
+
+def test_ensure_product_in_catalog_collection_adds_product_without_full_resync():
+    client = ShopifyApiClient()
+    observed: dict[str, Any] = {}
+
+    async def fake_ensure_catalog_collection_contains_products(
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gids: list[str],
+    ):
+        observed["shop_domain"] = shop_domain
+        observed["access_token"] = access_token
+        observed["product_gids"] = product_gids
+        return {
+            "collectionId": "gid://shopify/Collection/7",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+            "requestedProductCount": 1,
+            "addedProductCount": 0,
+        }
+
+    client.ensure_catalog_collection_contains_products = (  # type: ignore[method-assign]
+        fake_ensure_catalog_collection_contains_products
+    )
 
     result = asyncio.run(
         client.ensure_product_in_catalog_collection(
@@ -371,9 +435,7 @@ def test_ensure_product_in_catalog_collection_adds_product_without_full_resync()
     assert observed == {
         "shop_domain": "example.myshopify.com",
         "access_token": "admin_token",
-        "sync_all_products": False,
-        "collection_id": "gid://shopify/Collection/7",
-        "product_ids": ["gid://shopify/Product/10"],
+        "product_gids": ["gid://shopify/Product/10"],
     }
     assert result["collectionId"] == "gid://shopify/Collection/7"
 
@@ -567,7 +629,7 @@ def test_stabilize_main_collection_sidebar_menu_layout_left_aligns_menu():
     )
 
 
-def test_stabilize_header_icons_cart_controls_removes_track_order_and_drawer_attrs():
+def test_stabilize_header_icons_cart_controls_keeps_drawer_attrs_on_cart_link():
     content = (
         '<div class="header__icons">\n'
         '<a href="{{ routes.cart_url }}" class="cart-drawer-button w-fit" is="magnet-link" aria-controls="CartDrawer" aria-expanded="false" data-no-instant>\n'
@@ -589,11 +651,11 @@ def test_stabilize_header_icons_cart_controls_removes_track_order_and_drawer_att
     )
 
     assert "Track my order" not in updated
-    assert "cart-drawer-button" not in updated
-    assert 'aria-controls="CartDrawer"' not in updated
-    assert 'aria-expanded="false"' not in updated
+    assert "cart-drawer-button" in updated
+    assert 'aria-controls="CartDrawer"' in updated
+    assert 'aria-expanded="false"' in updated
     assert "{{ 'general.cart.title' | t }}" not in updated
-    assert "cart-link-button" in updated
+    assert "cart-link-button" not in updated
 
 
 def test_stabilize_product_card_inventory_language_english_labels():
@@ -812,6 +874,154 @@ def test_list_theme_brand_template_slots_uses_deterministic_manifest(monkeypatch
             "path": "templates/index.json.sections.hero.blocks.heading.settings.heading",
             "key": "heading",
             "currentValue": "Hero headline",
+            "role": "headline",
+            "maxLength": 120,
+        }
+    ]
+
+
+def test_list_theme_brand_template_slots_excludes_disabled_sections_and_blocks(monkeypatch):
+    client = ShopifyApiClient()
+    manifest = {
+        "futrgroup2-0theme": {
+            "imageSlots": (
+                {
+                    "path": "templates/index.json.sections.disabled_hero.settings.image",
+                    "key": "image",
+                    "role": "hero",
+                    "recommendedAspect": "landscape",
+                },
+                {
+                    "path": "templates/index.json.sections.gallery.blocks.disabled_card.settings.image",
+                    "key": "image",
+                    "role": "gallery",
+                    "recommendedAspect": "square",
+                },
+                {
+                    "path": "templates/index.json.sections.gallery.blocks.enabled_card.settings.image",
+                    "key": "image",
+                    "role": "gallery",
+                    "recommendedAspect": "square",
+                },
+            ),
+            "textSlots": (
+                {
+                    "path": "templates/index.json.sections.disabled_hero.blocks.heading.settings.heading",
+                    "key": "heading",
+                    "role": "headline",
+                    "maxLength": 120,
+                },
+                {
+                    "path": "templates/index.json.sections.gallery.blocks.disabled_card.settings.heading",
+                    "key": "heading",
+                    "role": "headline",
+                    "maxLength": 120,
+                },
+                {
+                    "path": "templates/index.json.sections.gallery.blocks.enabled_card.settings.heading",
+                    "key": "heading",
+                    "role": "headline",
+                    "maxLength": 120,
+                },
+            ),
+        }
+    }
+    monkeypatch.setattr(
+        shopify_api_module,
+        "_THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME",
+        manifest,
+    )
+    template_json = (
+        json.dumps(
+            {
+                "sections": {
+                    "disabled_hero": {
+                        "disabled": True,
+                        "settings": {"image": "shopify://shop_images/hero.png"},
+                        "blocks": {
+                            "heading": {"settings": {"heading": "Disabled hero"}},
+                        },
+                    },
+                    "gallery": {
+                        "blocks": {
+                            "disabled_card": {
+                                "disabled": True,
+                                "settings": {
+                                    "image": "shopify://shop_images/skip.png",
+                                    "heading": "Skip me",
+                                },
+                            },
+                            "enabled_card": {
+                                "settings": {
+                                    "image": "shopify://shop_images/keep.png",
+                                    "heading": "Keep me",
+                                },
+                            },
+                        },
+                    },
+                }
+            }
+        )
+        + "\n"
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": template_json,
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.list_theme_brand_template_slots(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert result["imageSlots"] == [
+        {
+            "path": "templates/index.json.sections.gallery.blocks.enabled_card.settings.image",
+            "key": "image",
+            "currentValue": "shopify://shop_images/keep.png",
+            "role": "gallery",
+            "recommendedAspect": "square",
+        }
+    ]
+    assert result["textSlots"] == [
+        {
+            "path": "templates/index.json.sections.gallery.blocks.enabled_card.settings.heading",
+            "key": "heading",
+            "currentValue": "Keep me",
             "role": "headline",
             "maxLength": 120,
         }
@@ -1873,14 +2083,13 @@ def test_upsert_policy_pages_creates_missing_page():
         if "mutation menuUpdateForPolicyFooterSync" in query:
             items = ((payload.get("variables") or {}).get("items")) or []
             matched_policy_items = [
-                item
-                for item in items
-                if item.get("resourceId") == "gid://shopify/Page/101"
+                item for item in items if item.get("url") == "/pages/privacy-policy"
             ]
             assert len(matched_policy_items) == 1
             policy_item = matched_policy_items[0]
             assert policy_item["title"] == "Privacy Policy"
-            assert policy_item["type"] == "PAGE"
+            assert policy_item["type"] == "HTTP"
+            assert "resourceId" not in policy_item
             return {
                 "menuUpdate": {
                     "menu": {
@@ -2039,11 +2248,15 @@ def test_upsert_policy_pages_updates_existing_page():
         if "mutation menuUpdateForPolicyFooterSync" in query:
             variables = payload.get("variables") or {}
             items = variables.get("items") or []
-            assert len(items) == 1
-            assert items[0]["id"] == "gid://shopify/MenuItem/10"
-            assert items[0]["title"] == "Terms of Service"
-            assert items[0]["type"] == "PAGE"
-            assert items[0]["resourceId"] == "gid://shopify/Page/101"
+            assert len(items) == 2
+            assert items[0]["title"] == "Search"
+            assert items[0]["type"] == "HTTP"
+            assert items[0]["url"] == "/search"
+            assert items[1]["id"] == "gid://shopify/MenuItem/10"
+            assert items[1]["title"] == "Terms of Service"
+            assert items[1]["type"] == "HTTP"
+            assert items[1]["url"] == "/pages/terms-of-service"
+            assert "resourceId" not in items[1]
             return {
                 "menuUpdate": {
                     "menu": {
@@ -2082,18 +2295,18 @@ def test_apply_policy_pages_to_menu_items_dedupes_footer_links():
     menu_items = [
         {
             "id": "gid://shopify/MenuItem/10",
-            "title": "Contact",
+            "title": "FAQ",
             "type": "HTTP",
-            "url": "/pages/contact",
+            "url": "/pages/faqs",
             "resourceId": None,
             "tags": [],
             "items": [],
         },
         {
             "id": "gid://shopify/MenuItem/11",
-            "title": "Contact Us",
+            "title": "Faqs",
             "type": "HTTP",
-            "url": "/pages/contact",
+            "url": "/pages/faqs",
             "resourceId": None,
             "tags": [],
             "items": [],
@@ -2131,22 +2344,218 @@ def test_apply_policy_pages_to_menu_items_dedupes_footer_links():
     )
 
     assert changed is True
-    assert len(next_items) == 2
-    assert next_items[0]["url"] == "/pages/contact"
+    assert len(next_items) == 3
+    assert next_items[0]["url"] == "/pages/faqs"
+    assert next_items[1]["url"] == "/search"
 
-    privacy_item = next_items[1]
+    privacy_item = next_items[2]
     assert privacy_item["title"] == "Privacy Policy"
     assert privacy_item["type"] == "PAGE"
     assert privacy_item["resourceId"] == "gid://shopify/Page/101"
-    assert privacy_item["url"] == "/policies/privacy-policy"
+    assert privacy_item["url"] == "/pages/privacy-policy"
 
 
-def test_remove_catalog_menu_items_strips_catalog_titles_recursively():
+def test_apply_policy_pages_to_menu_items_removes_stale_managed_policies_and_keeps_search():
+    menu_items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Search",
+            "type": "SEARCH",
+            "url": "/search",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/2",
+            "title": "Privacy Policy",
+            "type": "HTTP",
+            "url": "/pages/privacy-policy",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/3",
+            "title": "Contact and Support",
+            "type": "HTTP",
+            "url": "/pages/contact-support",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/4",
+            "title": "Subscription Terms and Cancellation",
+            "type": "HTTP",
+            "url": "/pages/subscription-terms-and-cancellation",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/5",
+            "title": "Terms",
+            "type": "HTTP",
+            "url": "/pages/terms-of-service",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/6",
+            "title": "Home",
+            "type": "HTTP",
+            "url": "/",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/7",
+            "title": "Shop",
+            "type": "HTTP",
+            "url": "/collections/all",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/8",
+            "title": "Contact",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+    ]
+    policy_pages = [
+        {
+            "pageId": "gid://shopify/Page/101",
+            "title": "Privacy Policy",
+            "handle": "privacy-policy",
+        },
+        {
+            "pageId": "gid://shopify/Page/102",
+            "title": "Returns and Refunds Policy",
+            "handle": "returns-refunds-policy",
+        },
+        {
+            "pageId": "gid://shopify/Page/103",
+            "title": "Shipping Policy",
+            "handle": "shipping-policy",
+        },
+        {
+            "pageId": "gid://shopify/Page/104",
+            "title": "Terms of Service",
+            "handle": "terms-of-service",
+        },
+    ]
+
+    next_items, changed = ShopifyApiClient._apply_policy_pages_to_menu_items(
+        menu_items=menu_items,
+        policy_pages=policy_pages,
+    )
+
+    assert changed is True
+    assert [item["title"] for item in next_items] == [
+        "Search",
+        "Privacy Policy",
+        "Returns and Refunds Policy",
+        "Shipping Policy",
+        "Terms of Service",
+    ]
+    assert [item.get("url") for item in next_items] == [
+        "/search",
+        "/pages/privacy-policy",
+        "/pages/returns-refunds-policy",
+        "/pages/shipping-policy",
+        "/pages/terms-of-service",
+    ]
+
+
+def test_apply_policy_pages_to_menu_items_adds_search_when_missing():
     menu_items = [
         {
             "id": "gid://shopify/MenuItem/1",
             "title": "Home",
             "type": "HTTP",
+            "url": "/",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/2",
+            "title": "Shop",
+            "type": "HTTP",
+            "url": "/collections/all",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/3",
+            "title": "Contact",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+    ]
+    policy_pages = [
+        {
+            "pageId": "gid://shopify/Page/101",
+            "title": "Privacy Policy",
+            "handle": "privacy-policy",
+        },
+        {
+            "pageId": "gid://shopify/Page/102",
+            "title": "Returns and Refunds Policy",
+            "handle": "returns-refunds-policy",
+        },
+        {
+            "pageId": "gid://shopify/Page/103",
+            "title": "Shipping Policy",
+            "handle": "shipping-policy",
+        },
+        {
+            "pageId": "gid://shopify/Page/104",
+            "title": "Terms of Service",
+            "handle": "terms-of-service",
+        },
+    ]
+
+    next_items, changed = ShopifyApiClient._apply_policy_pages_to_menu_items(
+        menu_items=menu_items,
+        policy_pages=policy_pages,
+    )
+
+    assert changed is True
+    assert [item["title"] for item in next_items] == [
+        "Search",
+        "Privacy Policy",
+        "Returns and Refunds Policy",
+        "Shipping Policy",
+        "Terms of Service",
+    ]
+    assert [item.get("url") for item in next_items] == [
+        "/search",
+        "/pages/privacy-policy",
+        "/pages/returns-refunds-policy",
+        "/pages/shipping-policy",
+        "/pages/terms-of-service",
+    ]
+
+
+def test_normalize_catalog_menu_items_enforces_default_top_navigation():
+    menu_items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Home",
+            "type": "FRONTPAGE",
             "url": "/",
             "resourceId": None,
             "tags": [],
@@ -2163,14 +2572,282 @@ def test_remove_catalog_menu_items_strips_catalog_titles_recursively():
         },
         {
             "id": "gid://shopify/MenuItem/3",
-            "title": "Products",
+            "title": "Contact",
+            "type": "PAGE",
+            "url": "/pages/contact",
+            "resourceId": "gid://shopify/Page/1",
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/4",
+            "title": "Track my order",
             "type": "HTTP",
+            "url": "/pages/track-order",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+    ]
+
+    next_items, changed = ShopifyApiClient._normalize_catalog_menu_items(
+        menu_items=menu_items
+    )
+
+    assert changed is True
+    assert [item["title"] for item in next_items] == [
+        "Home",
+        "Shop",
+        "Contact",
+        "Track Your Order",
+    ]
+    assert [item["url"] for item in next_items] == [
+        "/",
+        "/collections/all",
+        "/pages/contact",
+        "/pages/contact",
+    ]
+    assert [item["type"] for item in next_items] == [
+        "HTTP",
+        "HTTP",
+        "HTTP",
+        "HTTP",
+    ]
+    assert all(item["resourceId"] is None for item in next_items)
+    assert all(item["items"] == [] for item in next_items)
+
+
+def test_normalize_catalog_menu_items_noop_when_already_normalized():
+    menu_items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Home",
+            "type": "HTTP",
+            "url": "/",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/2",
+            "title": "Shop",
+            "type": "HTTP",
+            "url": "/collections/all",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/3",
+            "title": "Contact",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/4",
+            "title": "Track Your Order",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+    ]
+
+    next_items, changed = ShopifyApiClient._normalize_catalog_menu_items(
+        menu_items=menu_items
+    )
+
+    assert changed is False
+    assert next_items == menu_items
+
+
+def test_normalize_footer_quick_links_menu_items_enforces_links_and_order():
+    menu_items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Search",
+            "type": "SEARCH",
+            "url": "/search",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/2",
+            "title": "Catalog",
+            "type": "HTTP",
+            "url": "/collections/all",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/3",
+            "title": "Contact",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+    ]
+
+    next_items, changed = ShopifyApiClient._normalize_footer_quick_links_menu_items(
+        menu_items=menu_items
+    )
+
+    assert changed is True
+    assert [item["title"] for item in next_items] == ["Home", "Shop", "Contact"]
+    assert [item["url"] for item in next_items] == [
+        "/",
+        "/collections/all",
+        "/pages/contact",
+    ]
+    assert all(item["type"] == "HTTP" for item in next_items)
+    assert all(item["resourceId"] is None for item in next_items)
+
+
+def test_menu_items_to_update_input_converts_resource_item_without_resource_id_to_http():
+    items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Featured collection",
+            "type": "COLLECTION",
             "url": "/collections/featured",
             "resourceId": None,
             "tags": [],
+            "items": [],
+        }
+    ]
+
+    converted = ShopifyApiClient._menu_items_to_update_input(items=items)
+
+    assert converted == [
+        {
+            "title": "Featured collection",
+            "type": "HTTP",
+            "url": "/collections/featured",
+            "tags": [],
+            "items": [],
+        }
+    ]
+
+
+def test_menu_items_to_update_input_converts_resource_item_with_resource_id_to_http():
+    items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Privacy Policy",
+            "type": "PAGE",
+            "url": "/pages/privacy-policy",
+            "resourceId": "gid://shopify/Page/101",
+            "tags": [],
+            "items": [],
+        }
+    ]
+
+    converted = ShopifyApiClient._menu_items_to_update_input(items=items)
+
+    assert converted == [
+        {
+            "title": "Privacy Policy",
+            "type": "HTTP",
+            "url": "/pages/privacy-policy",
+            "tags": [],
+            "items": [],
+        }
+    ]
+
+
+def test_menu_items_to_update_input_strips_http_resource_binding_and_recreates_item():
+    items = [
+        {
+            "id": "gid://shopify/MenuItem/7",
+            "title": "  Existing Link  ",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "resourceId": "gid://shopify/Page/77",
+            "tags": [],
+            "items": [],
+        }
+    ]
+
+    converted = ShopifyApiClient._menu_items_to_update_input(items=items)
+
+    assert converted == [
+        {
+            "title": "Existing Link",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "tags": [],
+            "items": [],
+        }
+    ]
+
+
+def test_menu_items_to_update_input_rejects_item_missing_resource_and_url():
+    items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Broken",
+            "type": "PAGE",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        }
+    ]
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="missing both resourceId and URL",
+    ):
+        ShopifyApiClient._menu_items_to_update_input(items=items)
+
+
+def test_menu_items_to_update_input_rejects_item_with_blank_title():
+    items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "   ",
+            "type": "HTTP",
+            "url": "/pages/contact",
+            "tags": [],
+            "items": [],
+        }
+    ]
+
+    with pytest.raises(
+        ShopifyApiError,
+        match="empty title",
+    ):
+        ShopifyApiClient._menu_items_to_update_input(items=items)
+
+
+def test_normalize_catalog_in_default_store_navigation_updates_main_menu_and_footer():
+    client = ShopifyApiClient()
+    update_payloads: list[dict[str, Any]] = []
+
+    menu_payloads_by_id = {
+        "gid://shopify/Menu/1": {
+            "id": "gid://shopify/Menu/1",
+            "title": "Main menu",
+            "handle": "main-menu",
             "items": [
                 {
-                    "id": "gid://shopify/MenuItem/4",
+                    "id": "gid://shopify/MenuItem/10",
+                    "title": "Home",
+                    "type": "FRONTPAGE",
+                    "url": "/",
+                    "resourceId": None,
+                    "tags": [],
+                    "items": [],
+                },
+                {
+                    "id": "gid://shopify/MenuItem/11",
                     "title": "Catalog",
                     "type": "HTTP",
                     "url": "/collections/all",
@@ -2179,38 +2856,51 @@ def test_remove_catalog_menu_items_strips_catalog_titles_recursively():
                     "items": [],
                 },
                 {
-                    "id": "gid://shopify/MenuItem/5",
-                    "title": "Guides",
+                    "id": "gid://shopify/MenuItem/12",
+                    "title": "Contact",
+                    "type": "PAGE",
+                    "url": "/pages/contact",
+                    "resourceId": "gid://shopify/Page/1",
+                    "tags": [],
+                    "items": [],
+                },
+            ],
+        },
+        "gid://shopify/Menu/2": {
+            "id": "gid://shopify/Menu/2",
+            "title": "Footer menu",
+            "handle": "footer",
+            "items": [
+                {
+                    "id": "gid://shopify/MenuItem/20",
+                    "title": "Search",
+                    "type": "SEARCH",
+                    "url": "/search",
+                    "resourceId": None,
+                    "tags": [],
+                    "items": [],
+                },
+                {
+                    "id": "gid://shopify/MenuItem/21",
+                    "title": "Contact",
                     "type": "HTTP",
-                    "url": "/pages/guides",
+                    "url": "/pages/contact",
+                    "resourceId": None,
+                    "tags": [],
+                    "items": [],
+                },
+                {
+                    "id": "gid://shopify/MenuItem/22",
+                    "title": "Catalog",
+                    "type": "HTTP",
+                    "url": "/collections/all",
                     "resourceId": None,
                     "tags": [],
                     "items": [],
                 },
             ],
         },
-        {
-            "id": "gid://shopify/MenuItem/6",
-            "title": "Shop",
-            "type": "HTTP",
-            "url": "/collections/all",
-            "resourceId": None,
-            "tags": [],
-            "items": [],
-        },
-    ]
-
-    next_items, changed = ShopifyApiClient._remove_catalog_menu_items(
-        menu_items=menu_items
-    )
-
-    assert changed is True
-    assert [item["title"] for item in next_items] == ["Home", "Products", "Shop"]
-    assert [item["title"] for item in next_items[1]["items"]] == ["Guides"]
-
-
-def test_remove_catalog_from_default_store_navigation_updates_main_menu():
-    client = ShopifyApiClient()
+    }
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
         assert shop_domain == "example.myshopify.com"
@@ -2225,6 +2915,11 @@ def test_remove_catalog_from_default_store_navigation_updates_main_menu():
                             "id": "gid://shopify/Menu/1",
                             "title": "Main menu",
                             "handle": "main-menu",
+                        },
+                        {
+                            "id": "gid://shopify/Menu/2",
+                            "title": "Footer menu",
+                            "handle": "footer",
                         }
                     ],
                     "pageInfo": {"hasNextPage": False, "endCursor": None},
@@ -2233,84 +2928,20 @@ def test_remove_catalog_from_default_store_navigation_updates_main_menu():
 
         if "query menuForPolicyFooterSync" in query:
             variables = payload.get("variables") or {}
-            assert variables.get("id") == "gid://shopify/Menu/1"
-            return {
-                "menu": {
-                    "id": "gid://shopify/Menu/1",
-                    "title": "Main menu",
-                    "handle": "main-menu",
-                    "items": [
-                        {
-                            "id": "gid://shopify/MenuItem/10",
-                            "title": "Home",
-                            "type": "HTTP",
-                            "url": "/",
-                            "resourceId": None,
-                            "tags": [],
-                            "items": [],
-                        },
-                        {
-                            "id": "gid://shopify/MenuItem/11",
-                            "title": "Catalog",
-                            "type": "HTTP",
-                            "url": "/collections/all",
-                            "resourceId": None,
-                            "tags": [],
-                            "items": [],
-                        },
-                        {
-                            "id": "gid://shopify/MenuItem/12",
-                            "title": "Products",
-                            "type": "HTTP",
-                            "url": "/collections/featured",
-                            "resourceId": None,
-                            "tags": [],
-                            "items": [
-                                {
-                                    "id": "gid://shopify/MenuItem/13",
-                                    "title": "Catalog",
-                                    "type": "HTTP",
-                                    "url": "/collections/all",
-                                    "resourceId": None,
-                                    "tags": [],
-                                    "items": [],
-                                },
-                                {
-                                    "id": "gid://shopify/MenuItem/14",
-                                    "title": "Guides",
-                                    "type": "HTTP",
-                                    "url": "/pages/guides",
-                                    "resourceId": None,
-                                    "tags": [],
-                                    "items": [],
-                                },
-                            ],
-                        },
-                        {
-                            "id": "gid://shopify/MenuItem/15",
-                            "title": "Shop",
-                            "type": "HTTP",
-                            "url": "/collections/all",
-                            "resourceId": None,
-                            "tags": [],
-                            "items": [],
-                        },
-                    ],
-                }
-            }
+            menu_id = variables.get("id")
+            if menu_id not in menu_payloads_by_id:
+                raise AssertionError("Unexpected menu id")
+            return {"menu": menu_payloads_by_id[menu_id]}
 
         if "mutation menuUpdateForPolicyFooterSync" in query:
             variables = payload.get("variables") or {}
-            assert variables.get("id") == "gid://shopify/Menu/1"
-            items = variables.get("items") or []
-            assert [item["title"] for item in items] == ["Home", "Products", "Shop"]
-            assert [item["title"] for item in items[1]["items"]] == ["Guides"]
+            update_payloads.append(variables)
             return {
                 "menuUpdate": {
                     "menu": {
-                        "id": "gid://shopify/Menu/1",
-                        "title": "Main menu",
-                        "handle": "main-menu",
+                        "id": variables["id"],
+                        "title": variables["title"],
+                        "handle": variables["handle"],
                     },
                     "userErrors": [],
                 }
@@ -2321,7 +2952,7 @@ def test_remove_catalog_from_default_store_navigation_updates_main_menu():
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
 
     result = asyncio.run(
-        client.remove_catalog_from_default_store_navigation(
+        client.normalize_catalog_in_default_store_navigation(
             shop_domain="example.myshopify.com",
             access_token="token",
         )
@@ -2330,8 +2961,41 @@ def test_remove_catalog_from_default_store_navigation_updates_main_menu():
     assert result == {
         "handle": "main-menu",
         "updated": True,
-        "reason": "catalog_removed",
+        "reason": "catalog_normalized",
+        "menuResults": [
+            {"handle": "main-menu", "updated": True, "reason": "normalized"},
+            {"handle": "footer", "updated": True, "reason": "normalized"},
+        ],
     }
+    main_menu_update = next(
+        payload for payload in update_payloads if payload["id"] == "gid://shopify/Menu/1"
+    )
+    footer_menu_update = next(
+        payload for payload in update_payloads if payload["id"] == "gid://shopify/Menu/2"
+    )
+
+    assert [item["title"] for item in main_menu_update["items"]] == [
+        "Home",
+        "Shop",
+        "Contact",
+        "Track Your Order",
+    ]
+    assert [item["url"] for item in main_menu_update["items"]] == [
+        "/",
+        "/collections/all",
+        "/pages/contact",
+        "/pages/contact",
+    ]
+    assert [item["title"] for item in footer_menu_update["items"]] == [
+        "Home",
+        "Shop",
+        "Contact",
+    ]
+    assert [item["url"] for item in footer_menu_update["items"]] == [
+        "/",
+        "/collections/all",
+        "/pages/contact",
+    ]
 
 
 def test_sync_theme_brand_updates_layout_and_css():
@@ -6679,10 +7343,10 @@ def test_sync_theme_brand_export_includes_url_backed_theme_file():
     )
     assert "snippets/header-icons.liquid" in exported_files
     assert "Track my order" not in exported_files["snippets/header-icons.liquid"]
-    assert "cart-drawer-button" not in exported_files["snippets/header-icons.liquid"]
+    assert "cart-drawer-button" in exported_files["snippets/header-icons.liquid"]
     assert (
         'aria-controls="CartDrawer"'
-        not in exported_files["snippets/header-icons.liquid"]
+        in exported_files["snippets/header-icons.liquid"]
     )
     assert "snippets/product-card.liquid" in exported_files
     assert "En stock" not in exported_files["snippets/product-card.liquid"]

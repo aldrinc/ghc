@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import hmac
@@ -335,6 +336,65 @@ def test_embedded_shell_loads_latest_app_bridge_script(api_client):
     assert "unpkg.com/@shopify/app-bridge" not in response.text
 
 
+def test_apply_shop_connection_defaults_only_ensures_catalog_route(monkeypatch):
+    observed: dict[str, object] = {}
+
+    async def fake_ensure_catalog_collection_route_is_available(
+        *,
+        shop_domain: str,
+        access_token: str,
+        sync_all_products: bool = True,
+    ):
+        observed["shop_domain"] = shop_domain
+        observed["access_token"] = access_token
+        observed["sync_all_products"] = sync_all_products
+        return {
+            "collectionId": "gid://shopify/Collection/1",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+            "addedProductCount": 0,
+        }
+
+    async def fake_normalize_catalog_in_default_store_navigation(
+        *,
+        shop_domain: str,
+        access_token: str,
+    ):
+        observed["normalized_shop_domain"] = shop_domain
+        observed["normalized_access_token"] = access_token
+        return {
+            "handle": "main-menu",
+            "updated": True,
+            "reason": "catalog_normalized",
+        }
+
+    monkeypatch.setattr(
+        main_module.shopify_api,
+        "ensure_catalog_collection_route_is_available",
+        fake_ensure_catalog_collection_route_is_available,
+    )
+    monkeypatch.setattr(
+        main_module.shopify_api,
+        "normalize_catalog_in_default_store_navigation",
+        fake_normalize_catalog_in_default_store_navigation,
+    )
+
+    asyncio.run(
+        main_module._apply_shop_connection_defaults(
+            shop_domain="example.myshopify.com",
+            admin_access_token=" admin_access_token ",
+        )
+    )
+
+    assert observed == {
+        "shop_domain": "example.myshopify.com",
+        "access_token": "admin_access_token",
+        "sync_all_products": False,
+        "normalized_shop_domain": "example.myshopify.com",
+        "normalized_access_token": "admin_access_token",
+    }
+
+
 def test_auto_storefront_token_endpoint_sets_token_for_active_installation(
     api_client, db_session, monkeypatch
 ):
@@ -391,6 +451,75 @@ def test_auto_storefront_token_endpoint_sets_token_for_active_installation(
     assert refreshed is not None
     assert refreshed.storefront_access_token == "shpat_retry"
     assert observed_default_syncs == [("example.myshopify.com", "admin_access_token")]
+
+
+def test_sync_catalog_collection_endpoint_uses_target_product_gids(
+    api_client, db_session, monkeypatch
+):
+    installation = ShopInstallation(
+        shop_domain="example.myshopify.com",
+        client_id="client_1",
+        admin_access_token="admin_access_token",
+        storefront_access_token="storefront_token",
+        scopes="read_products",
+    )
+    db_session.add(installation)
+    db_session.commit()
+
+    observed: dict[str, object] = {}
+
+    async def fake_ensure_catalog_collection_contains_products(
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gids: list[str],
+    ):
+        observed["shop_domain"] = shop_domain
+        observed["access_token"] = access_token
+        observed["product_gids"] = product_gids
+        return {
+            "collectionId": "gid://shopify/Collection/1",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+            "requestedProductCount": 2,
+            "addedProductCount": 1,
+        }
+
+    monkeypatch.setattr(
+        main_module.shopify_api,
+        "ensure_catalog_collection_contains_products",
+        fake_ensure_catalog_collection_contains_products,
+    )
+
+    response = api_client.post(
+        "/v1/catalog/collection/sync",
+        headers={"Authorization": f"Bearer {settings.SHOPIFY_INTERNAL_API_TOKEN}"},
+        json={
+            "clientId": "client_1",
+            "productGids": [
+                "gid://shopify/Product/10",
+                "gid://shopify/Product/11",
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert observed == {
+        "shop_domain": "example.myshopify.com",
+        "access_token": "admin_access_token",
+        "product_gids": [
+            "gid://shopify/Product/10",
+            "gid://shopify/Product/11",
+        ],
+    }
+    assert response.json() == {
+        "shopDomain": "example.myshopify.com",
+        "collectionId": "gid://shopify/Collection/1",
+        "collectionHandle": "all",
+        "collectionTitle": "Catalog",
+        "requestedProductCount": 2,
+        "addedProductCount": 1,
+    }
 
 
 def test_auto_storefront_token_endpoint_rejects_workspace_mismatch(

@@ -841,6 +841,106 @@ def get_client_shopify_product(
     }
 
 
+def sync_client_shopify_catalog_collection(
+    *,
+    client_id: str,
+    product_gids: list[str],
+    shop_domain: str | None = None,
+) -> dict[str, Any]:
+    cleaned_product_gids: list[str] = []
+    seen_product_gids: set[str] = set()
+    for raw_product_gid in product_gids:
+        if not isinstance(raw_product_gid, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="productGids must contain only Shopify product GIDs.",
+            )
+        cleaned_product_gid = raw_product_gid.strip()
+        if not cleaned_product_gid.startswith(_SHOPIFY_PRODUCT_GID_PREFIX):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="productGids must contain only Shopify product GIDs.",
+            )
+        if cleaned_product_gid in seen_product_gids:
+            continue
+        seen_product_gids.add(cleaned_product_gid)
+        cleaned_product_gids.append(cleaned_product_gid)
+
+    request_payload: dict[str, Any] = {"productGids": cleaned_product_gids}
+    if shop_domain is not None:
+        request_payload["shopDomain"] = normalize_shop_domain(shop_domain)
+    else:
+        request_payload["clientId"] = client_id
+
+    payload = _bridge_request(
+        method="POST",
+        path="/v1/catalog/collection/sync",
+        json_body=request_payload,
+    )
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid catalog collection sync payload.",
+        )
+
+    response_shop_domain = payload.get("shopDomain")
+    if not isinstance(response_shop_domain, str) or not response_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid catalog collection sync shopDomain.",
+        )
+
+    response_collection_id = payload.get("collectionId")
+    if not isinstance(response_collection_id, str) or not response_collection_id.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid catalog collection id.",
+        )
+
+    response_collection_handle = payload.get("collectionHandle")
+    if (
+        not isinstance(response_collection_handle, str)
+        or not response_collection_handle.strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid catalog collection handle.",
+        )
+
+    response_collection_title = payload.get("collectionTitle")
+    if (
+        not isinstance(response_collection_title, str)
+        or not response_collection_title.strip()
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid catalog collection title.",
+        )
+
+    requested_product_count = payload.get("requestedProductCount")
+    if not isinstance(requested_product_count, int) or requested_product_count < 0:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid requestedProductCount.",
+        )
+
+    added_product_count = payload.get("addedProductCount")
+    if not isinstance(added_product_count, int) or added_product_count < 0:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify checkout app returned invalid addedProductCount.",
+        )
+
+    return {
+        "shopDomain": response_shop_domain.strip().lower(),
+        "collectionId": response_collection_id.strip(),
+        "collectionHandle": response_collection_handle.strip(),
+        "collectionTitle": response_collection_title.strip(),
+        "requestedProductCount": requested_product_count,
+        "addedProductCount": added_product_count,
+    }
+
+
 def create_client_shopify_product(
     *,
     client_id: str,

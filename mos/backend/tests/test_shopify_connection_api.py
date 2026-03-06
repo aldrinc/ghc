@@ -2,7 +2,7 @@ import base64
 import io
 import json
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
@@ -10,8 +10,16 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException
 from app.auth.dependencies import AuthContext
 from app.routers import clients as clients_router
-from app.db.enums import AssetSourceEnum
-from app.db.models import Asset, Client, ShopifyThemeTemplateDraft, ShopifyThemeTemplateDraftVersion
+from app.db.enums import AssetSourceEnum, FunnelStatusEnum
+from app.db.models import (
+    Asset,
+    Client,
+    Funnel,
+    FunnelPage,
+    Product,
+    ShopifyThemeTemplateDraft,
+    ShopifyThemeTemplateDraftVersion,
+)
 from app.schemas.shopify_connection import (
     ShopifyThemeTemplateFeatureHighlights,
     ShopifyThemeTemplateGenerateImagesRequest,
@@ -24,6 +32,65 @@ def _create_client(api_client, *, name: str = "Shopify Workspace") -> str:
     response = api_client.post("/clients", json={"name": name, "industry": "Retail"})
     assert response.status_code == 201
     return response.json()["id"]
+
+
+def _set_theme_export_sales_page_path(
+    monkeypatch,
+    *,
+    path: str = "/f/11111111/sales-funnel/sales",
+) -> str:
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_theme_export_sales_page_path",
+        lambda **kwargs: path,
+    )
+    return path
+
+
+def _seed_sales_page_for_product(
+    db_session,
+    *,
+    client: Client,
+    product_title: str,
+    product_created_at: datetime,
+    funnel_route_slug: str,
+    funnel_created_at: datetime,
+    page_slug: str,
+) -> tuple[Product, Funnel, FunnelPage]:
+    product = Product(
+        org_id=client.org_id,
+        client_id=client.id,
+        title=product_title,
+        created_at=product_created_at,
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    funnel = Funnel(
+        org_id=client.org_id,
+        client_id=client.id,
+        product_id=product.id,
+        name=f"{product_title} Funnel",
+        status=FunnelStatusEnum.draft,
+        route_slug=funnel_route_slug,
+        created_at=funnel_created_at,
+        updated_at=funnel_created_at,
+    )
+    db_session.add(funnel)
+    db_session.flush()
+
+    page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Sales",
+        slug=page_slug,
+        ordering=0,
+        template_id="sales-pdp",
+        created_at=funnel_created_at,
+        updated_at=funnel_created_at,
+    )
+    db_session.add(page)
+    db_session.commit()
+    return product, funnel, page
 
 
 def test_sanitize_theme_component_text_value_removes_unsupported_characters():
@@ -61,93 +128,67 @@ def test_sanitize_theme_component_text_value_strips_orphan_closing_tag_fragments
     )
 
 
-def test_normalize_theme_export_text_file_content_rewrites_collection_test_links():
-    normalized_content, rewritten_count = (
-        clients_router._normalize_theme_export_text_file_content(
-            filename="sections/custom-featured-collection.liquid",
-            content=(
-                '<a href="/collections/test">Shop</a>'
-                '{"url":"/collections/test"}'
-            ),
-        )
-    )
-    assert rewritten_count == 2
-    assert "/collections/test" not in normalized_content
-    assert 'href="/"' in normalized_content
-    assert '{"url":"/"}' in normalized_content
-
-
-def test_normalize_theme_export_text_file_content_rewrites_risky_storefront_links():
-    normalized_content, _ = clients_router._normalize_theme_export_text_file_content(
+def test_normalize_theme_export_text_file_content_rewrites_homepage_button_links_only():
+    sales_page_path = "/f/11111111/sales-funnel/sales"
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
         filename="templates/index.json",
         content=json.dumps(
             {
-                "product_link": "shopify://products/sample-product",
-                "collection_link": "shopify://collections/featured",
-                "collection_link_safe": "shopify://collections/all",
-                "relative_product_link": "/products/sample-product",
-                "relative_page_link": "/pages/contact",
-                "relative_collection_link": "/collections/featured",
-                "relative_collection_safe_link": "/collections/all",
-                "external_docs": "https://help.shopify.com/manual/products/collections",
+                "sections": {
+                    "hero": {
+                        "settings": {
+                            "button_url": "",
+                            "link": "/collections/test",
+                            "page_link": "/pages/contact",
+                        },
+                        "blocks": {
+                            "primary_button": {
+                                "settings": {
+                                    "button_label": "Shop now",
+                                    "button_link": "/",
+                                }
+                            }
+                        },
+                    }
+                }
             }
         ),
+        sales_page_path=sales_page_path,
     )
+    parsed_content = json.loads(normalized_content)
 
-    assert "shopify://products/sample-product" not in normalized_content
-    assert "shopify://collections/featured" not in normalized_content
-    assert "shopify://collections/all" not in normalized_content
-    assert "/products/sample-product" not in normalized_content
-    assert "/pages/contact" not in normalized_content
-    assert "/collections/featured" not in normalized_content
-    assert normalized_content.count('"/"') >= 6
-    assert "https://help.shopify.com/manual/products/collections" in normalized_content
-
-
-def test_normalize_theme_export_text_file_content_rewrites_catalog_label_to_shop_in_header_drawer():
-    normalized_content, rewritten_count = (
-        clients_router._normalize_theme_export_text_file_content(
-            filename="snippets/header-drawer.liquid",
-            content=(
-                '<ul><li><a class="drawer__menu-item" href="/collections/test">'
-                "Catalog"
-                "</a></li></ul>"
-            ),
-        )
+    assert parsed_content["sections"]["hero"]["settings"]["button_url"] == sales_page_path
+    assert (
+        parsed_content["sections"]["hero"]["blocks"]["primary_button"]["settings"][
+            "button_link"
+        ]
+        == sales_page_path
     )
-
-    assert rewritten_count == 1
-    assert "Catalog" not in normalized_content
-    assert ">Shop<" in normalized_content
-    assert 'href="/"' in normalized_content
+    assert parsed_content["sections"]["hero"]["settings"]["link"] == "/collections/test"
+    assert parsed_content["sections"]["hero"]["settings"]["page_link"] == "/pages/contact"
 
 
-def test_normalize_theme_export_text_file_content_rewrites_catalog_label_to_shop_in_header_nav():
-    normalized_content, _ = clients_router._normalize_theme_export_text_file_content(
-        filename="snippets/header-nav-desktop.liquid",
+def test_normalize_theme_export_text_file_content_rewrites_catalog_product_links_only():
+    sales_page_path = "/f/11111111/sales-funnel/sales"
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="snippets/product-card.liquid",
         content=(
-            "{%- liquid\n"
-            "  echo link.title\n"
-            "-%}\n"
-            "<span>{{ link.title }}</span>\n"
+            '<quick-view data-product-url="{{ product_url }}"></quick-view>\n'
+            '<a href="{{ product_url }}" class="media">Image</a>\n'
+            '<a href="{{ product_url }}" class="button">View product</a>\n'
+            '<a href="{{ product_url }}" class="title">Product title</a>\n'
+            '<a href="{{ product_url }}" class="swatch-overflow">+2</a>\n'
         ),
+        sales_page_path=sales_page_path,
     )
 
-    assert "echo link.title | replace: 'Catalog', 'Shop'" in normalized_content
-    assert "{{ link.title | replace: 'Catalog', 'Shop' }}" in normalized_content
-
-
-def test_normalize_theme_export_text_file_content_rewrites_catalog_label_to_shop_in_header_nav_drawer():
-    normalized_content, _ = clients_router._normalize_theme_export_text_file_content(
-        filename="snippets/header-nav-drawer.liquid",
-        content="<summary>{{- link.title | escape -}}</summary>\n",
-    )
-
-    assert "{{- link.title | replace: 'Catalog', 'Shop' | escape -}}" in normalized_content
+    assert normalized_content.count(f'href="{sales_page_path}"') == 3
+    assert 'data-product-url="{{ product_url }}"' in normalized_content
+    assert '<a href="{{ product_url }}" class="swatch-overflow">+2</a>' in normalized_content
 
 
 def test_normalize_theme_export_text_file_content_removes_rich_text_footer_color_override():
-    normalized_content, _ = clients_router._normalize_theme_export_text_file_content(
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
         filename="sections/rich-text.liquid",
         content=(
             "<style>\n"
@@ -163,12 +204,247 @@ def test_normalize_theme_export_text_file_content_removes_rich_text_footer_color
             "  }\n"
             "</style>\n"
         ),
+        sales_page_path="/f/11111111/sales-funnel/sales",
     )
 
     assert "{%- render 'section-variables', section: section -%}" in normalized_content
     assert "--footer-text-color" not in normalized_content
     assert "settings.footer_text.red" not in normalized_content
     assert "var(--footer-text-color)" not in normalized_content
+
+
+def test_normalize_theme_export_text_file_content_updates_header_track_order_link_to_contact():
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="snippets/header-drawer.liquid",
+        content=(
+            '<li><a href="/pages/track-your-order">Track Your Order</a></li>'
+            '<li><a href="/pages/track-order">Track my order</a></li>'
+        ),
+        sales_page_path="/f/11111111/sales-funnel/sales",
+    )
+
+    assert 'href="/pages/contact"' in normalized_content
+    assert "/pages/track-your-order" not in normalized_content
+    assert "/pages/track-order" not in normalized_content
+
+
+def test_normalize_theme_export_text_file_content_removes_footer_track_order_tab():
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="sections/footer-group.json",
+        content=json.dumps(
+            {
+                "sections": {
+                    "ss_footer_4_9rJacA": {
+                        "type": "a-ss-footer-4",
+                        "blocks": {
+                            "tab_track": {
+                                "type": "tab",
+                                "settings": {
+                                    "title": "Track Your Order",
+                                    "text": "<p>Track your order status in real time.</p>",
+                                },
+                            }
+                        },
+                    }
+                }
+            }
+        ),
+        sales_page_path="/f/11111111/sales-funnel/sales",
+    )
+    parsed_content = json.loads(normalized_content)
+    footer_blocks = parsed_content["sections"]["ss_footer_4_9rJacA"]["blocks"]
+    assert "tab_track" not in footer_blocks
+
+
+def test_resolve_theme_export_sales_page_path_uses_first_workspace_product(db_session, api_client):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    start_time = datetime.now(timezone.utc)
+    first_product, first_funnel, first_page = _seed_sales_page_for_product(
+        db_session,
+        client=client,
+        product_title="First Product",
+        product_created_at=start_time,
+        funnel_route_slug="first-sales-funnel",
+        funnel_created_at=start_time + timedelta(minutes=1),
+        page_slug="sales",
+    )
+    _seed_sales_page_for_product(
+        db_session,
+        client=client,
+        product_title="Second Product",
+        product_created_at=start_time + timedelta(days=1),
+        funnel_route_slug="second-sales-funnel",
+        funnel_created_at=start_time + timedelta(days=1, minutes=1),
+        page_slug="sales",
+    )
+
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+    )
+
+    expected_product_slug = str(first_product.id).split("-", 1)[0][:8]
+    assert sales_page_path == (
+        f"/f/{expected_product_slug}/{first_funnel.route_slug}/{first_page.slug}"
+    )
+    assert warning is None
+
+
+def test_resolve_theme_export_sales_page_path_uses_latest_sales_page_for_first_product(
+    db_session, api_client
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    start_time = datetime.now(timezone.utc)
+    product = Product(
+        org_id=client.org_id,
+        client_id=client.id,
+        title="First Product",
+        created_at=start_time,
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    older_time = start_time + timedelta(minutes=1)
+    older_funnel = Funnel(
+        org_id=client.org_id,
+        client_id=client.id,
+        product_id=product.id,
+        name="Older Funnel",
+        status=FunnelStatusEnum.draft,
+        route_slug="older-sales-funnel",
+        created_at=older_time,
+        updated_at=older_time,
+    )
+    db_session.add(older_funnel)
+    db_session.flush()
+    db_session.add(
+        FunnelPage(
+            funnel_id=older_funnel.id,
+            name="Sales",
+            slug="sales",
+            ordering=0,
+            template_id="sales-pdp",
+            created_at=older_time,
+            updated_at=older_time,
+        )
+    )
+
+    latest_time = start_time + timedelta(days=1)
+    latest_funnel = Funnel(
+        org_id=client.org_id,
+        client_id=client.id,
+        product_id=product.id,
+        name="Latest Funnel",
+        status=FunnelStatusEnum.draft,
+        route_slug="latest-sales-funnel",
+        created_at=latest_time,
+        updated_at=latest_time,
+    )
+    db_session.add(latest_funnel)
+    db_session.flush()
+    db_session.add(
+        FunnelPage(
+            funnel_id=latest_funnel.id,
+            name="Sales",
+            slug="sales",
+            ordering=0,
+            template_id="sales-pdp",
+            created_at=latest_time,
+            updated_at=latest_time,
+        )
+    )
+    db_session.commit()
+
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+    )
+
+    expected_product_slug = str(product.id).split("-", 1)[0][:8]
+    assert sales_page_path == f"/f/{expected_product_slug}/latest-sales-funnel/sales"
+    assert warning is None
+
+
+def test_resolve_theme_export_sales_page_path_uses_latest_workspace_sales_page_when_first_missing(
+    db_session, api_client
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    start_time = datetime.now(timezone.utc)
+    db_session.add(
+        Product(
+            org_id=client.org_id,
+            client_id=client.id,
+            title="First Product",
+            created_at=start_time,
+        )
+    )
+    db_session.commit()
+
+    second_product, second_funnel, second_page = _seed_sales_page_for_product(
+        db_session,
+        client=client,
+        product_title="Second Product",
+        product_created_at=start_time + timedelta(days=1),
+        funnel_route_slug="second-sales-funnel",
+        funnel_created_at=start_time + timedelta(days=1, minutes=1),
+        page_slug="sales",
+    )
+
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+    )
+
+    expected_second_product_slug = str(second_product.id).split("-", 1)[0][:8]
+    assert sales_page_path == (
+        f"/f/{expected_second_product_slug}/{second_funnel.route_slug}/{second_page.slug}"
+    )
+    assert warning is not None
+    assert "Theme ZIP downloaded, but sales page was not found" in warning
+    assert "First Product" in warning
+    assert "Second Product" in warning
+
+
+def test_resolve_theme_export_sales_page_path_returns_blank_when_none_available(
+    db_session, api_client
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    db_session.add(
+        Product(
+            org_id=client.org_id,
+            client_id=client.id,
+            title="First Product",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+    )
+
+    assert sales_page_path == ""
+    assert warning is not None
+    assert "Theme ZIP downloaded, but sales page was not found" in warning
+    assert "First Product" in warning
+    assert "Links were left blank." in warning
 
 
 def test_validate_required_theme_archive_files_in_export_rejects_missing_required_files():
@@ -223,6 +499,102 @@ def test_theme_export_zip_write_order_prioritizes_section_dependencies():
     )
     assert ordered.index("sections/footer-group.json") < ordered.index(
         "templates/collection.json"
+    )
+
+
+def test_list_local_theme_template_slots_skips_disabled_sections_and_blocks(monkeypatch):
+    template_filename = "templates/index.json"
+    template_payload = {
+        "sections": {
+            "disabled_hero": {
+                "disabled": True,
+                "settings": {
+                    "image": "shopify://shop_images/hero.png",
+                    "heading": "Disabled hero",
+                },
+                "blocks": {
+                    "heading": {"settings": {"heading": "Disabled hero heading"}},
+                },
+            },
+            "gallery": {
+                "settings": {
+                    "image": "shopify://shop_images/gallery.png",
+                    "heading": "Gallery heading",
+                },
+                "blocks": {
+                    "disabled_card": {
+                        "disabled": True,
+                        "settings": {
+                            "image": "shopify://shop_images/skip.png",
+                            "heading": "Skip me",
+                        },
+                    },
+                    "enabled_card": {
+                        "settings": {
+                            "image": "shopify://shop_images/keep.png",
+                            "heading": "Keep me",
+                        },
+                    },
+                },
+            },
+        }
+    }
+
+    monkeypatch.setattr(
+        clients_router,
+        "_LOCAL_SHOPIFY_THEME_SLOT_SOURCE_FILENAMES",
+        (template_filename,),
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "_load_local_shopify_theme_baseline_files",
+        lambda: (
+            [template_filename],
+            {
+                template_filename: {
+                    "filename": template_filename,
+                    "content": json.dumps(template_payload),
+                }
+            },
+        ),
+    )
+
+    result = clients_router._list_local_theme_template_slots(
+        theme_id=None,
+        theme_name=None,
+        shop_domain=None,
+    )
+
+    image_paths = {slot["path"] for slot in result["imageSlots"]}
+    text_paths = {slot["path"] for slot in result["textSlots"]}
+
+    assert (
+        "templates/index.json.sections.disabled_hero.settings.image" not in image_paths
+    )
+    assert (
+        "templates/index.json.sections.gallery.blocks.disabled_card.settings.image"
+        not in image_paths
+    )
+    assert (
+        "templates/index.json.sections.gallery.settings.image" in image_paths
+    )
+    assert (
+        "templates/index.json.sections.gallery.blocks.enabled_card.settings.image"
+        in image_paths
+    )
+    assert (
+        "templates/index.json.sections.disabled_hero.settings.heading" not in text_paths
+    )
+    assert (
+        "templates/index.json.sections.gallery.blocks.disabled_card.settings.heading"
+        not in text_paths
+    )
+    assert (
+        "templates/index.json.sections.gallery.settings.heading" in text_paths
+    )
+    assert (
+        "templates/index.json.sections.gallery.blocks.enabled_card.settings.heading"
+        in text_paths
     )
 
 
@@ -861,6 +1233,42 @@ def test_get_shopify_status_returns_service_payload(api_client, monkeypatch):
     assert response.json()["state"] == "ready"
 
 
+def test_get_shopify_status_syncs_workspace_catalog_when_ready(api_client, monkeypatch):
+    client_id = _create_client(api_client)
+    observed: dict[str, str] = {}
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": ["example.myshopify.com"],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_sync(*, session, org_id: str, client_id: str, shop_domain: str | None = None, extra_product_gids=None):
+        del session
+        observed["org_id"] = org_id
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain or ""
+        return None
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router,
+        "sync_workspace_shopify_catalog_collection",
+        fake_sync,
+    )
+
+    response = api_client.get(f"/clients/{client_id}/shopify/status")
+
+    assert response.status_code == 200
+    assert observed["client_id"] == client_id
+    assert observed["shop_domain"] == "example.myshopify.com"
+
+
 def test_create_shopify_install_url_returns_url(api_client, monkeypatch):
     client_id = _create_client(api_client)
 
@@ -927,6 +1335,54 @@ def test_update_shopify_installation_sets_token_and_returns_status(api_client, m
     assert response.json()["state"] == "installed_missing_storefront_token"
 
 
+def test_update_shopify_installation_syncs_workspace_catalog_when_ready(api_client, monkeypatch):
+    client_id = _create_client(api_client)
+    observed: dict[str, str] = {}
+
+    def fake_set_token(*, client_id: str, shop_domain: str, storefront_access_token: str) -> None:
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain
+        observed["storefront_access_token"] = storefront_access_token
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": ["example.myshopify.com"],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_sync(*, session, org_id: str, client_id: str, shop_domain: str | None = None, extra_product_gids=None):
+        del session, extra_product_gids
+        observed["sync_org_id"] = org_id
+        observed["sync_client_id"] = client_id
+        observed["sync_shop_domain"] = shop_domain or ""
+        return None
+
+    monkeypatch.setattr(clients_router, "set_client_shopify_storefront_token", fake_set_token)
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router,
+        "sync_workspace_shopify_catalog_collection",
+        fake_sync,
+    )
+
+    response = api_client.patch(
+        f"/clients/{client_id}/shopify/installation",
+        json={
+            "shopDomain": "example.myshopify.com",
+            "storefrontAccessToken": "shptka_123",
+        },
+    )
+
+    assert response.status_code == 200
+    assert observed["sync_client_id"] == client_id
+    assert observed["sync_shop_domain"] == "example.myshopify.com"
+
+
 def test_auto_provision_shopify_installation_storefront_token_returns_status(
     api_client, monkeypatch
 ):
@@ -967,6 +1423,56 @@ def test_auto_provision_shopify_installation_storefront_token_returns_status(
         "shop_domain": "example.myshopify.com",
     }
     assert response.json()["state"] == "ready"
+
+
+def test_auto_provision_shopify_installation_storefront_token_syncs_workspace_catalog_when_ready(
+    api_client, monkeypatch
+):
+    client_id = _create_client(api_client)
+    observed: dict[str, str] = {}
+
+    def fake_auto_provision(*, client_id: str, shop_domain: str) -> None:
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain
+
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": "example.myshopify.com",
+            "shopDomains": ["example.myshopify.com"],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+        }
+
+    def fake_sync(*, session, org_id: str, client_id: str, shop_domain: str | None = None, extra_product_gids=None):
+        del session, extra_product_gids
+        observed["sync_org_id"] = org_id
+        observed["sync_client_id"] = client_id
+        observed["sync_shop_domain"] = shop_domain or ""
+        return None
+
+    monkeypatch.setattr(
+        clients_router,
+        "auto_provision_client_shopify_storefront_token",
+        fake_auto_provision,
+    )
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+    monkeypatch.setattr(
+        clients_router,
+        "sync_workspace_shopify_catalog_collection",
+        fake_sync,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/installation/auto-storefront-token",
+        json={"shopDomain": "example.myshopify.com"},
+    )
+
+    assert response.status_code == 200
+    assert observed["sync_client_id"] == client_id
+    assert observed["sync_shop_domain"] == "example.myshopify.com"
 
 
 def test_disconnect_shopify_installation_unlinks_workspace_and_returns_status(
@@ -1419,6 +1925,7 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    sales_page_path = _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
     )
@@ -1638,11 +2145,12 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         "templates/index.json"
     )
     exported_header_drawer = archive.read("snippets/header-drawer.liquid").decode("utf-8")
-    assert "/collections/test" not in exported_header_drawer
-    assert "/pages/contact" not in exported_header_drawer
+    assert sales_page_path not in exported_header_drawer
     exported_index_template = archive.read("templates/index.json").decode("utf-8")
-    assert "/collections/test" not in exported_index_template
-    assert "shopify://products/" not in exported_index_template
+    assert sales_page_path in exported_index_template
+    exported_product_card = archive.read("snippets/product-card.liquid").decode("utf-8")
+    assert exported_product_card.count(f'href="{sales_page_path}"') == 3
+    assert 'data-product-url="{{ product_url }}"' in exported_product_card
     exported_collection_template = json.loads(
         archive.read("templates/collection.json").decode("utf-8")
     )
@@ -1668,8 +2176,26 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         == "shopify://shop_images/promo-image.png"
     )
     assert (
+        exported_collection_template["sections"]["main-collection"]["blocks"]["promotion"][
+            "settings"
+        ]["button_link"]
+        == ""
+    )
+    assert (
         exported_footer_group_template["sections"]["footer"]["type"] == "a-footer"
     )
+    footer_blocks = exported_footer_group_template["sections"]["ss_footer_4_9rJacA"][
+        "blocks"
+    ]
+    track_order_tab = next(
+        (
+            block
+            for block in footer_blocks.values()
+            if block.get("settings", {}).get("title") == "Track Your Order"
+        ),
+        None,
+    )
+    assert track_order_tab is None
     assert (
         exported_header_group_template["sections"]["header"]["type"] == "a-header"
     )
@@ -1700,6 +2226,7 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
     )
@@ -1872,6 +2399,7 @@ def test_export_shopify_theme_template_zip_requires_stored_component_image_urls(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
         org_id=client.org_id,
@@ -2082,6 +2610,7 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
         org_id=client.org_id,
@@ -2204,12 +2733,146 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
     )
 
 
+def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_page(
+    api_client, db_session, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    db_session.add(
+        Product(
+            org_id=client.org_id,
+            client_id=client.id,
+            title="The Honest Herbalist",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="futrgroup2-0theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    db_session.add(
+        ShopifyThemeTemplateDraftVersion(
+            draft_id=draft.id,
+            org_id=client.org_id,
+            client_id=client.id,
+            version_number=1,
+            source="build_job",
+            payload={
+                "shopDomain": "example.myshopify.com",
+                "workspaceName": "Acme Workspace",
+                "designSystemId": "design-system-1",
+                "designSystemName": "Acme DS",
+                "brandName": "Draft Snapshot Brand",
+                "logoAssetPublicId": str(uuid4()),
+                "logoUrl": "https://assets.example.com/public/assets/logo-1",
+                "themeId": "gid://shopify/OnlineStoreTheme/123",
+                "themeName": "futrgroup2-0theme",
+                "themeRole": "MAIN",
+                "cssVars": {"--color-brand": "#123456"},
+                "fontUrls": [],
+                "dataTheme": "light",
+                "productId": None,
+                "componentImageAssetMap": {},
+                "componentTextValues": {},
+                "imageSlots": [],
+                "textSlots": [],
+                "metadata": {},
+            },
+            created_by_user_external_id="test-user",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    def fake_sync_compliance_for_export(
+        *,
+        client_id: str,
+        shop_domain: str | None,
+        auth,
+        session,
+        sync_to_shopify: bool = True,
+    ):
+        assert sync_to_shopify is False
+        return {
+            "rulesetVersion": "meta_tiktok_compliance_ruleset_v1",
+            "shopDomain": "example.myshopify.com",
+            "pages": [],
+            "updatedProfileUrls": {},
+            "renderedPages": [],
+        }
+
+    def fake_resolve_latest_snapshot(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        design_system_id: str,
+    ):
+        assert session is not None
+        assert org_id == str(client.org_id)
+        assert client_id
+        assert design_system_id == "design-system-1"
+        return (
+            "Latest Brand Name",
+            "latest-logo",
+            "https://assets.example.com/public/assets/latest-logo",
+            {
+                "--color-brand": "#654321",
+                "--color-page-bg-secondary": "#f4efe7",
+            },
+            [],
+            "dark",
+        )
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_latest_template_publish_design_system_snapshot",
+        fake_resolve_latest_snapshot,
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "_sync_compliance_policy_pages_for_template_export",
+        fake_sync_compliance_for_export,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/template/export-zip",
+        json={"draftId": str(draft.id)},
+    )
+
+    assert response.status_code == 200
+    notice_header = response.headers.get("x-marketi-theme-export-notice")
+    assert notice_header is not None
+    assert "Theme ZIP downloaded, but sales page was not found" in notice_header
+    assert "The Honest Herbalist" in notice_header
+    assert "Links were left blank." in notice_header
+
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    product_card_content = archive.read("snippets/product-card.liquid").decode("utf-8")
+    assert product_card_content.count('href=""') == 3
+
+
 def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(
     api_client, db_session, monkeypatch
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
         org_id=client.org_id,
