@@ -308,6 +308,179 @@ def _stub_prompt_chain_runtime(monkeypatch):
         ]
 
     def _fake_run_prompt_json_object(*, context: str, **_kwargs):
+        advertorial_template_payload = {
+            "hero": {
+                "title": "Approved Headline",
+                "subtitle": "Predictable evenings are possible with a mechanism-first approach.",
+                "badges": [
+                    {
+                        "label": "Mechanism-first",
+                        "icon": {"alt": "Mechanism icon", "prompt": "icon of mechanism-first process"},
+                    },
+                    {
+                        "label": "Evidence-backed",
+                        "icon": {"alt": "Evidence icon", "prompt": "icon of evidence-backed guidance"},
+                    },
+                    {
+                        "label": "Practical nightly use",
+                        "icon": {"alt": "Checklist icon", "prompt": "icon of nightly routine checklist"},
+                    },
+                ],
+            },
+            "reasons": [
+                {
+                    "number": 1,
+                    "title": "Random fixes miss the real bottleneck",
+                    "body": "Mechanism mismatch keeps restarting the same nightly stress loop.",
+                    "image": {
+                        "alt": "Caregiver reviewing a nightly routine checklist",
+                    },
+                }
+            ],
+            "marquee": [
+                "Mechanism-first",
+                "Evidence-backed",
+                "Practical steps",
+            ],
+            "pitch": {
+                "title": "See the full implementation offer",
+                "bullets": [
+                    "Checklist for nightly execution",
+                    "Decision support for common setbacks",
+                    "Mechanism-first guidance for routine resets",
+                    "Clear next steps for tonight's implementation",
+                ],
+                "cta_label": "Continue to the offer",
+                "image": {"alt": "Printed guide and checklist pages"},
+            },
+            "reviews": [
+                {
+                    "text": "We stopped guessing and the evening rhythm is finally stable.",
+                    "author": "K. Parent",
+                    "rating": 5,
+                },
+                {
+                    "text": "The step-by-step flow made execution much easier for our routine.",
+                    "author": "D. Caregiver",
+                    "rating": 5,
+                },
+                {
+                    "text": "Clear boundaries and practical guidance reduced our nightly stress fast.",
+                    "author": "M. Family",
+                    "rating": 5,
+                },
+            ],
+            "review_wall": {
+                "title": "What readers report after switching approach",
+                "button_label": "Open full review examples",
+            },
+            "floating_cta": {
+                "label": "Continue to offer",
+            },
+        }
+        sales_template_payload = {
+            "hero": {
+                "purchase_title": "Start the mechanism-first evening system",
+                "primary_cta_label": "Claim the system",
+                "primary_cta_subbullets": [
+                    "Fast implementation path",
+                    "30-day confidence guarantee",
+                ],
+            },
+            "problem": {
+                "title": "Nightly friction keeps repeating",
+                "paragraphs": [
+                    "Most routines fail because they optimize effort instead of sequence.",
+                ],
+                "emphasis_line": "When sequence is wrong, consistency collapses.",
+            },
+            "mechanism": {
+                "title": "Fix the sequence, then the outcomes follow",
+                "paragraphs": [
+                    "The system targets trigger timing and removes guesswork.",
+                ],
+                "bullets": [
+                    {"title": "Trigger map", "body": "Identify sequence breakpoints before they cascade."},
+                    {"title": "Execution order", "body": "Apply steps in a repeatable nightly progression."},
+                    {"title": "Recovery branch", "body": "Handle misses without resetting the full routine."},
+                    {"title": "Progress markers", "body": "Track wins and frictions with simple checkpoints."},
+                    {"title": "Confidence anchor", "body": "Use evidence-backed cues to stay consistent under stress."},
+                ],
+                "callout": {
+                    "left_title": "Why old routines fail",
+                    "left_body": "They describe tasks but ignore trigger order.",
+                    "right_title": "What this changes",
+                    "right_body": "It aligns actions to sequence so consistency compounds.",
+                },
+                "comparison": {
+                    "badge": "Side-by-side",
+                    "title": "Mechanism-first system vs generic routines",
+                    "swipe_hint": "Swipe to compare",
+                    "columns": {
+                        "pup": "Mechanism-first",
+                        "disposable": "Generic routine",
+                    },
+                    "rows": [
+                        {
+                            "label": "Predictability",
+                            "pup": "High once sequence is set",
+                            "disposable": "Inconsistent",
+                        }
+                    ],
+                },
+            },
+            "social_proof": {
+                "badge": "Verified",
+                "title": "Customer-backed clarity",
+                "rating_label": "4.9 average confidence",
+                "summary": "Families report fewer resets and calmer evenings.",
+            },
+            "whats_inside": {
+                "benefits": [
+                    "Start Faster",
+                    "Stay On Track",
+                    "Ask Better Questions",
+                    "Feel More Certain",
+                ],
+                "offer_helper_text": "Everything needed to execute without guesswork.",
+            },
+            "bonus": {
+                "free_gifts_title": "Included bonus assets",
+                "free_gifts_body": "Rapid-start templates and scenario walkthroughs.",
+            },
+            "guarantee": {
+                "title": "30-day confidence guarantee",
+                "paragraphs": [
+                    "Run the system and evaluate fit using measurable checkpoints.",
+                ],
+                "why_title": "Why this guarantee exists",
+                "why_body": "The process is practical, testable, and low-friction.",
+                "closing_line": "You can adopt this with clear downside protection.",
+            },
+            "faq": {
+                "title": "Frequently asked questions",
+                "items": [
+                    {
+                        "question": "How quickly can we start?",
+                        "answer": "Most families can run the first sequence tonight.",
+                    }
+                ],
+            },
+            "faq_pills": [
+                {
+                    "label": "How quickly can we start?",
+                    "answer": "Most families can run the first sequence tonight.",
+                }
+            ],
+            "marquee_items": [
+                "Mechanism-first",
+                "Practical nightly use",
+                "Evidence-backed",
+                "Confidence guarantee",
+            ],
+            "urgency_message": "Selling out faster than expected. Claim your access before this launch closes.",
+            "cta_close": "Start now and lock in consistent evenings.",
+        }
         if context == "strategy_v2.agent0_output":
             payload = {
                 "category_classification": {"primary": "sleep-support"},
@@ -548,6 +721,10 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 "delivery_test": "Show mechanism mismatch, practical correction path, and evidence language.",
                 "minimum_delivery": "Deliver by midpoint with clear implementation detail.",
             }
+        elif context == "strategy_v2.copy.advertorial_template_payload":
+            payload = {
+                "template_payload": advertorial_template_payload,
+            }
         elif context == "strategy_v2.copy.advertorial":
             payload = {
                 "markdown": (
@@ -566,74 +743,49 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "See the full offer and next-step system details now.\n"
                     "[Continue to the offer](/sales-page)."
                 ),
-                "template_payload": {
-                    "hero": {
-                        "title": "Approved Headline",
-                        "subtitle": "Predictable evenings are possible with a mechanism-first approach.",
-                        "badges": [
-                            {
-                                "label": "Mechanism-first",
-                                "icon": {"alt": "Mechanism icon", "prompt": "icon of mechanism-first process"},
-                            },
-                            {
-                                "label": "Evidence-backed",
-                                "icon": {"alt": "Evidence icon", "prompt": "icon of evidence-backed guidance"},
-                            },
-                            {
-                                "label": "Practical nightly use",
-                                "icon": {"alt": "Checklist icon", "prompt": "icon of nightly routine checklist"},
-                            },
-                        ],
-                    },
-                    "reasons": [
-                        {
-                            "number": 1,
-                            "title": "Random fixes miss the real bottleneck",
-                            "body": "Mechanism mismatch keeps restarting the same nightly stress loop.",
-                            "image": {
-                                "alt": "Caregiver reviewing a nightly routine checklist",
-                            },
-                        }
-                    ],
-                    "marquee": [
-                        "Mechanism-first",
-                        "Evidence-backed",
-                        "Practical steps",
-                    ],
-                    "pitch": {
-                        "title": "See the full implementation offer",
-                        "bullets": [
-                            "Checklist for nightly execution",
-                            "Decision support for common setbacks",
-                        ],
-                        "cta_label": "Continue to the offer",
-                        "image": {"alt": "Printed guide and checklist pages"},
-                    },
-                    "reviews": [
-                        {
-                            "text": "We stopped guessing and the evening rhythm is finally stable.",
-                            "author": "K. Parent",
-                            "rating": 5,
-                        },
-                        {
-                            "text": "The step-by-step flow made execution much easier for our routine.",
-                            "author": "D. Caregiver",
-                            "rating": 5,
-                        },
-                        {
-                            "text": "Clear boundaries and practical guidance reduced our nightly stress fast.",
-                            "author": "M. Family",
-                            "rating": 5,
-                        },
-                    ],
-                    "review_wall": {
-                        "title": "What readers report after switching approach",
-                        "button_label": "Open full review examples",
-                    },
-                    "floating_cta": {
-                        "label": "Continue to offer",
-                    },
-                },
+                "template_payload": advertorial_template_payload,
+            }
+        elif context == "strategy_v2.copy.sales_template_payload_direct":
+            payload = {
+                "template_payload_json": json.dumps(sales_template_payload),
+            }
+        elif context == "strategy_v2.copy.sales_page_markdown":
+            payload = {
+                "markdown": (
+                    "# Approved Headline — Sales Page\n\n"
+                    "## Hero Stack\n"
+                    "Offer summary: predictable evenings with a practical implementation system.\n"
+                    "[Start the offer](/checkout).\n\n"
+                    "## Problem Recap\n"
+                    "The main struggle is repeated nighttime friction and stress from an unresolved bottleneck.\n\n"
+                    "## Mechanism + Comparison\n"
+                    "This mechanism-first method differs from generic routines and explains why older approaches fail.\n\n"
+                    "## Identity Bridge\n"
+                    "You are not inconsistent; the pain came from advice that ignored your real constraint.\n\n"
+                    "## Social Proof\n"
+                    "Proof includes direct buyer language, practical results, and evidence from lived routines.\n\n"
+                    "## CTA #1\n"
+                    "Get the full offer now with clear onboarding steps.\n"
+                    "[Claim the system](/checkout).\n\n"
+                    "## What's Inside\n"
+                    "Inside the value stack: implementation checklist, timeline map, and decision support docs.\n\n"
+                    "## Bonus Stack + Value\n"
+                    "Bonus value stack includes rapid-start templates and scenario examples.\n\n"
+                    "## Guarantee\n"
+                    "Guarantee: 30-day confidence guarantee with compliance-safe expectations and safety guidance.\n\n"
+                    "## CTA #2\n"
+                    "Move forward with the offer while momentum is high.\n"
+                    "[Start now](/checkout).\n\n"
+                    "## FAQ\n"
+                    "Proof and compliance notes: what this includes, what it does not claim, and safe usage boundaries.\n\n"
+                    "## CTA #3 + P.S.\n"
+                    "Final offer step: start today. Price: $49 one-time.\n"
+                    "[Complete checkout](/checkout)."
+                ),
+            }
+        elif context == "strategy_v2.copy.sales_template_payload":
+            payload = {
+                "template_payload_json": json.dumps(sales_template_payload),
             }
         elif context == "strategy_v2.copy.sales_page":
             payload = {
@@ -668,108 +820,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "Final offer step: start today. Price: $49 one-time.\n"
                     "[Complete checkout](/checkout)."
                 ),
-                "template_payload": {
-                    "hero": {
-                        "purchase_title": "Start the mechanism-first evening system",
-                        "primary_cta_label": "Claim the system",
-                        "primary_cta_subbullets": [
-                            "Fast implementation path",
-                            "30-day confidence guarantee",
-                        ],
-                    },
-                    "problem": {
-                        "title": "Nightly friction keeps repeating",
-                        "paragraphs": [
-                            "Most routines fail because they optimize effort instead of sequence.",
-                        ],
-                        "emphasis_line": "When sequence is wrong, consistency collapses.",
-                    },
-                    "mechanism": {
-                        "title": "Fix the sequence, then the outcomes follow",
-                        "paragraphs": [
-                            "The system targets trigger timing and removes guesswork.",
-                        ],
-                        "bullets": [
-                            {"title": "Trigger map", "body": "Identify sequence breakpoints before they cascade."},
-                            {"title": "Execution order", "body": "Apply steps in a repeatable nightly progression."},
-                            {"title": "Recovery branch", "body": "Handle misses without resetting the full routine."},
-                            {"title": "Progress markers", "body": "Track wins and frictions with simple checkpoints."},
-                        ],
-                        "callout": {
-                            "left_title": "Why old routines fail",
-                            "left_body": "They describe tasks but ignore trigger order.",
-                            "right_title": "What this changes",
-                            "right_body": "It aligns actions to sequence so consistency compounds.",
-                        },
-                        "comparison": {
-                            "badge": "Side-by-side",
-                            "title": "Mechanism-first system vs generic routines",
-                            "swipe_hint": "Swipe to compare",
-                            "columns": {
-                                "pup": "Mechanism-first",
-                                "disposable": "Generic routine",
-                            },
-                            "rows": [
-                                {
-                                    "label": "Predictability",
-                                    "pup": "High once sequence is set",
-                                    "disposable": "Inconsistent",
-                                }
-                            ],
-                        },
-                    },
-                    "social_proof": {
-                        "badge": "Verified",
-                        "title": "Customer-backed clarity",
-                        "rating_label": "4.9 average confidence",
-                        "summary": "Families report fewer resets and calmer evenings.",
-                    },
-                    "whats_inside": {
-                        "benefits": [
-                            "Start Faster",
-                            "Stay On Track",
-                            "Ask Better Questions",
-                            "Feel More Certain",
-                        ],
-                        "offer_helper_text": "Everything needed to execute without guesswork.",
-                    },
-                    "bonus": {
-                        "free_gifts_title": "Included bonus assets",
-                        "free_gifts_body": "Rapid-start templates and scenario walkthroughs.",
-                    },
-                    "guarantee": {
-                        "title": "30-day confidence guarantee",
-                        "paragraphs": [
-                            "Run the system and evaluate fit using measurable checkpoints.",
-                        ],
-                        "why_title": "Why this guarantee exists",
-                        "why_body": "The process is practical, testable, and low-friction.",
-                        "closing_line": "You can adopt this with clear downside protection.",
-                    },
-                    "faq": {
-                        "title": "Frequently asked questions",
-                        "items": [
-                            {
-                                "question": "How quickly can we start?",
-                                "answer": "Most families can run the first sequence tonight.",
-                            }
-                        ],
-                    },
-                    "faq_pills": [
-                        {
-                            "label": "How quickly can we start?",
-                            "answer": "Most families can run the first sequence tonight.",
-                        }
-                    ],
-                    "marquee_items": [
-                        "Mechanism-first",
-                        "Practical nightly use",
-                        "Evidence-backed",
-                        "Confidence guarantee",
-                    ],
-                    "urgency_message": "Selling out faster than expected. Claim your access before this launch closes.",
-                    "cta_close": "Start now and lock in consistent evenings.",
-                },
+                "template_payload": sales_template_payload,
             }
         else:
             raise AssertionError(f"Unexpected prompt context in test stub: {context}")
@@ -2299,11 +2350,25 @@ def test_strategy_v2_checkpoint_c4_requires_agent1_handoff(monkeypatch):
         )
 
 
-def test_strategy_v2_checkpoint_c5_requires_voc_scored(monkeypatch):
+def test_strategy_v2_checkpoint_c5_scores_voc_observations_when_voc_scored_missing(monkeypatch):
     monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
     monkeypatch.setattr(strategy_v2_activities, "_validate_step_payload_lineage_prerequisites", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "score_voc_items",
+        lambda rows: {
+            "items": [{"adjusted_score": 1.0, "zero_evidence_gate": False} for _ in rows] or [{"adjusted_score": 1.0, "zero_evidence_gate": False}],
+            "summary": {"count": len(rows)},
+        },
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_prompt_json_object",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("_run_prompt_json_object reached")),
+    )
 
-    with pytest.raises(StrategyV2SchemaValidationError, match="voc_scored"):
+    with pytest.raises(AssertionError, match="_run_prompt_json_object reached"):
         strategy_v2_activities.run_strategy_v2_voc_agent3_synthesis_activity(
             {
                 "org_id": "org-1",
@@ -2323,7 +2388,7 @@ def test_strategy_v2_checkpoint_c5_requires_voc_scored(monkeypatch):
                 ],
                 "existing_step_payload_artifact_ids": {
                     **_stage2b_foundational_artifact_ids(),
-                    "v2-05": "artifact-v2-05",
+                    "v2-04": "artifact-v2-04",
                 },
                 "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
                 "voc_observations": [
@@ -3425,6 +3490,17 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
     )
     monkeypatch.setattr(
         strategy_v2_activities,
+        "_build_policy_footer_links",
+        lambda **_kwargs: (
+            [
+                {"title": "Privacy Policy", "url": "https://example.com/privacy"},
+                {"title": "Terms of Service", "url": "https://example.com/terms"},
+            ],
+            "Example Brand",
+        ),
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
         "score_congruency_extended",
         lambda headline, page_data, promise_contract: {
             "headline": headline,
@@ -3691,8 +3767,6 @@ SEGMENT_HINT: parents
             "workflow_run_id": workflow_run_id,
             "stage2": stage2_result["stage2"],
             "competitor_analysis": voc_angle_result["competitor_analysis"],
-            "voc_observations": voc_angle_result["voc_observations"],
-            "voc_scored": voc_angle_result["voc_scored"],
             "angle_synthesis": {"ranked_candidates": voc_angle_result["ranked_angle_candidates"]},
             "business_model": "one-time",
             "funnel_position": "cold_traffic",
@@ -3829,8 +3903,9 @@ SEGMENT_HINT: parents
         }
     )
     assert copy_result.get("step_payload_artifact_id")
-    assert copy_result["copy_payload"].get("presell_markdown")
-    assert copy_result["copy_payload"].get("sales_page_markdown")
+    assert copy_result["copy_payload"]["copy_generation_mode"] == "template_payload_only"
+    assert copy_result["copy_payload"]["template_payloads"]["pre-sales-listicle"]["fields"]
+    assert copy_result["copy_payload"]["template_payloads"]["sales-pdp"]["fields"]
     assert copy_result["copy_payload"]["copy_contract_profile"]["profile_id"] == "strategy_v2_warm_presell_v1"
     assert copy_result["copy_payload"]["copy_input_packet"]["profile_id"] == "strategy_v2_warm_presell_v1"
     assert copy_result["copy_payload"]["semantic_gates"]["presell"]["passed"] is True

@@ -14567,6 +14567,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 [row for row in raw_voc_observations if isinstance(row, dict)]
             )
             voc_scored = score_voc_items(voc_observations)
+            voc_input_mode = "agent2_full"
             _require_voc_transition_quality(
                 voc_observations=voc_observations,
                 voc_scored=voc_scored,
@@ -14756,7 +14757,15 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 client_id=client_id,
                 objective_type="strategy_v2.agent3_angle_synthesis.prompt_chain",
                 model=settings.STRATEGY_V2_VOC_MODEL,
-                inputs_json={"angle_observation_count": len(angle_observations)},
+                inputs_json={
+                    "angle_observation_count": len(angle_observations),
+                    "voc_input_mode": voc_input_mode,
+                    "voc_observation_count": len(voc_observations),
+                    "voc_scored_item_count": len(voc_scored.get("items"))
+                    if isinstance(voc_scored.get("items"), list)
+                    else 0,
+                    "raw_evidence_row_count": len(evidence_rows),
+                },
                 outputs_json={
                     "ranked_candidates": ranked_candidates,
                     "score_summary": scored_angles_payload.get("summary"),
@@ -14779,6 +14788,10 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "angle_observations": angle_observations,
                     "voc_input_mode": voc_input_mode,
                     "voc_observation_count": len(voc_observations),
+                    "voc_observations": voc_observations,
+                    "voc_scored": voc_scored,
+                    "proof_asset_candidates": proof_asset_candidates,
+                    "competitor_analysis": competitor_analysis,
                     "voc_scored_summary": voc_scored.get("summary") if isinstance(voc_scored, dict) else {},
                     "evidence_diagnostics": evidence_diagnostics,
                     "prompt_provenance": agent03_provenance,

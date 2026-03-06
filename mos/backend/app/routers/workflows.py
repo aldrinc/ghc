@@ -263,7 +263,7 @@ def _strategy_v2_state_from_research_artifacts(
     elif "v2-05a" in step_payloads:
         current_stage = "v2-05"
     elif "v2-04" in step_payloads:
-        current_stage = "v2-06"
+        current_stage = "v2-05a"
     elif "v2-03c" in step_payloads:
         current_stage = "v2-04"
     elif "v2-03b" in step_payloads:
