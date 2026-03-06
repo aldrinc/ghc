@@ -77,6 +77,7 @@ async def generate_image_ad_from_swipe(
                 requirement_index=payload.requirement_index,
                 company_swipe_id=payload.company_swipe_id,
                 swipe_image_url=payload.swipe_image_url,
+                swipe_requires_product_image=payload.swipe_requires_product_image,
                 model=payload.model,
                 render_model_id=payload.render_model_id,
                 max_output_tokens=payload.max_output_tokens,

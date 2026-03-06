@@ -28,6 +28,11 @@ class SwipeImageAdGenerateRequest(BaseModel):
         validation_alias="swipeImageUrl",
         serialization_alias="swipeImageUrl",
     )
+    swipe_requires_product_image: bool | None = Field(
+        None,
+        validation_alias="swipeRequiresProductImage",
+        serialization_alias="swipeRequiresProductImage",
+    )
 
     model: str | None = Field(None, description="Gemini model name to use for swipe prompt generation.")
     render_model_id: str | None = Field(

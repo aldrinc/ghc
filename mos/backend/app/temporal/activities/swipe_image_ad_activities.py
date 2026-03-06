@@ -5,7 +5,9 @@ import os
 import re
 import time
 import json
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
+from urllib.parse import unquote, urlparse
 
 import httpx
 try:
@@ -25,7 +27,6 @@ from app.db.enums import ArtifactTypeEnum
 from app.db.models import DesignSystem, Funnel, ProductOffer, ProductVariant
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.clients import ClientsRepository
-from app.db.repositories.gemini_context_files import GeminiContextFilesRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.swipes import CompanySwipesRepository
 from app.db.repositories.workflows import WorkflowsRepository
@@ -51,12 +52,12 @@ from app.services.gemini_file_search import (
 from app.services.swipe_prompt import (
     SwipePromptParseError,
     extract_new_image_prompt_from_markdown,
+    inline_swipe_render_placeholders,
     load_swipe_to_image_ad_prompt,
 )
 
 # Reuse existing asset generation helpers to keep asset storage consistent.
 from app.temporal.activities.asset_activities import (  # noqa: E402
-    _build_image_reference_text,
     _create_generated_asset_from_url,
     _ensure_remote_reference_asset_ids,
     _extract_brief,
@@ -68,6 +69,99 @@ from app.temporal.activities.asset_activities import (  # noqa: E402
 
 
 _GEMINI_CLIENT: Any | None = None
+_SWIPE_PRODUCT_IMAGE_PROFILE_CACHE: Dict[str, bool] | None = None
+
+
+def _load_swipe_product_image_profiles() -> Dict[str, bool]:
+    global _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE
+    if _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE is not None:
+        return _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE
+
+    configured_path = (os.getenv("SWIPE_PRODUCT_IMAGE_PROFILES_PATH") or "").strip()
+    if configured_path:
+        profile_path = Path(configured_path).expanduser().resolve()
+    else:
+        profile_path = (
+            Path(__file__).resolve().parents[2]
+            / "data"
+            / "swipe_profiles"
+            / "initial_swipe_product_image_profiles_v1.json"
+        )
+
+    if not profile_path.exists() or not profile_path.is_file():
+        raise RuntimeError(f"Swipe product image profiles file not found: {profile_path}")
+
+    try:
+        payload = json.loads(profile_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # noqa: BLE001
+        raise RuntimeError(f"Failed to parse swipe product image profiles at {profile_path}: {exc}") from exc
+
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        raise RuntimeError(
+            "Swipe product image profiles must define an `entries` array "
+            f"(path={profile_path})."
+        )
+
+    profiles: Dict[str, bool] = {}
+    for idx, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            raise RuntimeError(
+                "Swipe product image profile entry must be an object "
+                f"(path={profile_path}, index={idx})."
+            )
+        filename_raw = entry.get("filename")
+        requires_raw = entry.get("requires_product_image")
+        if not isinstance(filename_raw, str) or not filename_raw.strip():
+            raise RuntimeError(
+                "Swipe product image profile entry is missing filename "
+                f"(path={profile_path}, index={idx})."
+            )
+        if not isinstance(requires_raw, bool):
+            raise RuntimeError(
+                "Swipe product image profile entry requires boolean requires_product_image "
+                f"(path={profile_path}, index={idx}, filename={filename_raw!r})."
+            )
+        key = filename_raw.strip().lower()
+        if key in profiles:
+            raise RuntimeError(
+                "Duplicate filename in swipe product image profiles "
+                f"(path={profile_path}, filename={filename_raw!r})."
+            )
+        profiles[key] = requires_raw
+
+    _SWIPE_PRODUCT_IMAGE_PROFILE_CACHE = profiles
+    return profiles
+
+
+def _extract_source_filename(source_url: str | None) -> str | None:
+    if not isinstance(source_url, str) or not source_url.strip():
+        return None
+    raw = source_url.strip()
+    parsed = urlparse(raw)
+    path = parsed.path or raw
+    name = Path(unquote(path)).name.strip()
+    if not name:
+        return None
+    return name
+
+
+def _resolve_swipe_requires_product_image_policy(
+    *,
+    explicit_requires_product_image: bool | None,
+    swipe_source_url: str | None,
+) -> tuple[bool | None, str, str | None]:
+    if explicit_requires_product_image is not None:
+        return explicit_requires_product_image, "explicit_param", _extract_source_filename(swipe_source_url)
+
+    source_filename = _extract_source_filename(swipe_source_url)
+    if source_filename:
+        profile_lookup = _load_swipe_product_image_profiles()
+        matched = profile_lookup.get(source_filename.lower())
+        if matched is not None:
+            return matched, "catalog_filename", source_filename
+
+    return None, "default_optional", source_filename
 
 
 def _ensure_gemini_client():
@@ -315,6 +409,16 @@ def _normalize_prompt_value(value: str | None) -> str:
     return "[UNKNOWN]"
 
 
+def _has_logo_available(*, design_system_tokens: Dict[str, Any]) -> bool:
+    if not isinstance(design_system_tokens, dict):
+        return False
+    brand = design_system_tokens.get("brand")
+    if not isinstance(brand, dict):
+        return False
+    logo_public_id = brand.get("logoAssetPublicId")
+    return isinstance(logo_public_id, str) and bool(logo_public_id.strip())
+
+
 def _prompt_assets_value(*, product_reference_assets: List[Any], design_system_tokens: Dict[str, Any]) -> str:
     packshot_titles: List[str] = []
     for reference in product_reference_assets:
@@ -322,12 +426,7 @@ def _prompt_assets_value(*, product_reference_assets: List[Any], design_system_t
         if isinstance(title, str) and title.strip():
             packshot_titles.append(title.strip())
 
-    has_logo = False
-    if isinstance(design_system_tokens, dict):
-        brand = design_system_tokens.get("brand")
-        if isinstance(brand, dict):
-            logo_public_id = brand.get("logoAssetPublicId")
-            has_logo = isinstance(logo_public_id, str) and bool(logo_public_id.strip())
+    has_logo = _has_logo_available(design_system_tokens=design_system_tokens)
 
     if not packshot_titles and not has_logo:
         return "[UNKNOWN]"
@@ -347,6 +446,8 @@ def _render_swipe_prompt_template(
     brand_colors_fonts: str | None,
     must_avoid_claims: List[str],
     assets_value: str,
+    packshot_available: bool,
+    logo_available: bool,
 ) -> str:
     if not isinstance(prompt_template, str) or not prompt_template.strip():
         raise ValueError("prompt_template is required and must be non-empty.")
@@ -362,6 +463,8 @@ def _render_swipe_prompt_template(
         else "[UNKNOWN]"
     )
     cleaned_assets = _normalize_prompt_value(assets_value)
+    cleaned_packshot_available = "yes" if packshot_available else "no"
+    cleaned_logo_available = "yes" if logo_available else "no"
 
     rendered = prompt_template
     rendered = re.sub(
@@ -394,6 +497,16 @@ def _render_swipe_prompt_template(
         lambda _m: f"Assets: {cleaned_assets} (optional)",
         rendered,
     )
+    rendered = re.sub(
+        r"Packshot available:\s*\[PACKSHOT_AVAILABLE\]",
+        lambda _m: f"Packshot available: {cleaned_packshot_available}",
+        rendered,
+    )
+    rendered = re.sub(
+        r"Logo available:\s*\[LOGO_AVAILABLE\]",
+        lambda _m: f"Logo available: {cleaned_logo_available}",
+        rendered,
+    )
 
     rendered = rendered.replace(
         "[User uploads image]",
@@ -418,6 +531,8 @@ def _render_swipe_prompt_template(
             "[AUDIENCE]",
             "[UNKNOWN if not given]",
             "[PACKSHOT? LOGO?]",
+            "[PACKSHOT_AVAILABLE]",
+            "[LOGO_AVAILABLE]",
             "[User uploads image]",
         )
         if token in rendered
@@ -440,6 +555,15 @@ def _render_swipe_prompt_template(
         rendered = f"{rendered}\n\n{angle_line}"
     if vocc_instruction.lower() not in rendered.lower():
         rendered = f"{rendered}\n\n{vocc_instruction}"
+
+    rendered = (
+        f"{rendered}\n\n"
+        "Hard constraints for NEW IMAGE PROMPT:\n"
+        "- Do NOT output unresolved bracket placeholders such as [BRAND_LOGO], [PRODUCT_PACKSHOT], [HEADLINE], "
+        "[SUBHEAD], [BODY], [EQUATION_LINE], [CTA], [DISCLAIMER], [UNKNOWN], [UNREADABLE].\n"
+        f"- Packshot available: {cleaned_packshot_available}. If no, omit product-packshot references entirely.\n"
+        f"- Logo available: {cleaned_logo_available}. If no, omit logo references entirely."
+    )
 
     return rendered.strip()
 
@@ -564,41 +688,394 @@ def _build_product_offer_context_block(
     return text, signature, metadata
 
 
-def _build_swipe_foundation_seed_doc(
+def _json_payload_bytes(payload: Dict[str, Any]) -> bytes:
+    return json.dumps(payload, ensure_ascii=True, sort_keys=True, default=str).encode("utf-8")
+
+
+def _extract_store_name_from_document_name(document_name: str) -> str:
+    cleaned = (document_name or "").strip()
+    match = re.match(r"^(fileSearchStores/[^/]+)/documents/[^/]+$", cleaned)
+    if not match:
+        raise RuntimeError(
+            "Unexpected Gemini document name format while resolving swipe stage-1 context: "
+            f"{cleaned!r}"
+        )
+    return match.group(1)
+
+
+def _load_required_product_offer_pricing_snapshot(
     *,
-    client_name: str,
-    product_title: str,
-    canon: dict[str, Any],
-    design_system_tokens: dict[str, Any],
-    swipe_context_block: str,
-    offer_context_block: str,
-) -> str:
-    return "\n".join(
-        [
-            "# SWIPE FOUNDATION CONTEXT",
-            f"Brand name: {client_name}",
-            f"Product: {product_title}",
-            "",
-            "## CLIENT_CANON_JSON",
-            "```json",
-            json.dumps(canon, ensure_ascii=True, sort_keys=True),
-            "```",
-            "",
-            "## DESIGN_SYSTEM_TOKENS_JSON",
-            "```json",
-            json.dumps(design_system_tokens, ensure_ascii=True, sort_keys=True),
-            "```",
-            "",
-            "## SWIPE_CONTEXT_BLOCK",
-            swipe_context_block,
-            "",
-            "## OFFER_CONTEXT_BLOCK",
-            offer_context_block,
-        ]
-    ).strip()
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    funnel_id: str | None,
+) -> Dict[str, Any]:
+    selected_offer: ProductOffer | None = None
+    if funnel_id:
+        funnel = session.get(Funnel, funnel_id)
+        if funnel is None:
+            raise ValueError(f"Funnel not found: {funnel_id}")
+        if funnel.selected_offer_id:
+            selected_offer = session.get(ProductOffer, funnel.selected_offer_id)
+            if selected_offer is None:
+                raise ValueError(
+                    "Funnel selected_offer_id is set but the offer could not be found "
+                    f"(funnel_id={funnel_id}, selected_offer_id={funnel.selected_offer_id})."
+                )
+
+    if selected_offer is None:
+        offers = list(
+            session.scalars(
+                select(ProductOffer)
+                .where(
+                    ProductOffer.org_id == org_id,
+                    ProductOffer.client_id == client_id,
+                    ProductOffer.product_id == product_id,
+                )
+                .order_by(ProductOffer.created_at.desc())
+            ).all()
+        )
+        if not offers:
+            raise ValueError(
+                "No product offers found for swipe stage-1 RAG context. "
+                f"product_id={product_id}."
+            )
+        if len(offers) > 1:
+            raise ValueError(
+                "Multiple product offers found and no funnel.selected_offer_id is set; "
+                "cannot deterministically choose offer_pricing snapshot for swipe stage-1 RAG context. "
+                f"product_id={product_id}, funnel_id={funnel_id}, offer_ids={[str(item.id) for item in offers]}."
+            )
+        selected_offer = offers[0]
+
+    variants = list(
+        session.scalars(
+            select(ProductVariant)
+            .where(ProductVariant.offer_id == selected_offer.id)
+            .order_by(ProductVariant.price.asc(), ProductVariant.id.asc())
+        ).all()
+    )
+    if not variants:
+        raise ValueError(
+            "Selected product offer has no pricing variants; cannot build offer_pricing snapshot for swipe stage-1 "
+            f"RAG context (offer_id={selected_offer.id})."
+        )
+
+    return {
+        "offer": {
+            "id": str(selected_offer.id),
+            "org_id": str(selected_offer.org_id),
+            "client_id": str(selected_offer.client_id),
+            "product_id": str(selected_offer.product_id) if selected_offer.product_id else None,
+            "name": selected_offer.name,
+            "description": selected_offer.description,
+            "business_model": selected_offer.business_model,
+            "differentiation_bullets": list(selected_offer.differentiation_bullets or []),
+            "guarantee_text": selected_offer.guarantee_text,
+            "options_schema": selected_offer.options_schema,
+            "created_at": selected_offer.created_at.isoformat() if selected_offer.created_at else None,
+        },
+        "variants": [
+            {
+                "id": str(variant.id),
+                "offer_id": str(variant.offer_id) if variant.offer_id else None,
+                "product_id": str(variant.product_id) if variant.product_id else None,
+                "title": variant.title,
+                "price": int(variant.price),
+                "currency": str(variant.currency),
+                "provider": variant.provider,
+                "external_price_id": variant.external_price_id,
+                "option_values": variant.option_values,
+                "compare_at_price": int(variant.compare_at_price) if variant.compare_at_price is not None else None,
+                "sku": variant.sku,
+                "barcode": variant.barcode,
+                "requires_shipping": bool(variant.requires_shipping),
+                "taxable": bool(variant.taxable),
+                "weight": float(variant.weight) if variant.weight is not None else None,
+                "weight_unit": variant.weight_unit,
+                "inventory_quantity": variant.inventory_quantity,
+                "inventory_policy": variant.inventory_policy,
+                "inventory_management": variant.inventory_management,
+                "incoming": variant.incoming,
+                "next_incoming_date": variant.next_incoming_date.isoformat() if variant.next_incoming_date else None,
+                "unit_price": int(variant.unit_price) if variant.unit_price is not None else None,
+                "unit_price_measurement": variant.unit_price_measurement,
+                "quantity_rule": variant.quantity_rule,
+                "quantity_price_breaks": variant.quantity_price_breaks,
+                "shopify_last_synced_at": (
+                    variant.shopify_last_synced_at.isoformat() if variant.shopify_last_synced_at else None
+                ),
+                "shopify_last_sync_error": variant.shopify_last_sync_error,
+            }
+            for variant in variants
+        ],
+    }
 
 
-def _resolve_gemini_file_search_store_names(
+def _load_required_swipe_stage1_rag_docs(
+    *,
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    campaign_id: str | None,
+    funnel_id: str | None,
+    asset_brief_artifact_id: str,
+) -> list[Dict[str, Any]]:
+    artifacts_repo = ArtifactsRepository(session)
+
+    def _require_latest_product_artifact(*, artifact_type: ArtifactTypeEnum, doc_key: str, title: str) -> Dict[str, Any]:
+        artifact = artifacts_repo.get_latest_by_type(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            artifact_type=artifact_type,
+        )
+        if artifact is None:
+            raise ValueError(
+                "Required swipe stage-1 RAG artifact is missing. "
+                f"artifact_type={artifact_type.value} client_id={client_id} product_id={product_id}."
+            )
+        payload = {
+            "artifact": {
+                "id": str(artifact.id),
+                "type": artifact.type.value,
+                "version": int(artifact.version),
+                "org_id": str(artifact.org_id),
+                "client_id": str(artifact.client_id),
+                "product_id": str(artifact.product_id) if artifact.product_id else None,
+                "campaign_id": str(artifact.campaign_id) if artifact.campaign_id else None,
+                "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
+            },
+            "data": artifact.data,
+        }
+        return {
+            "doc_key": doc_key,
+            "doc_title": title,
+            "source_kind": artifact_type.value,
+            "filename": f"{doc_key}.json",
+            "mime_type": "text/plain",
+            "content_bytes": _json_payload_bytes(payload),
+        }
+
+    def _require_latest_campaign_artifact(*, artifact_type: ArtifactTypeEnum, doc_key: str, title: str) -> Dict[str, Any]:
+        if not campaign_id:
+            raise ValueError(
+                f"campaign_id is required to resolve campaign artifact {artifact_type.value} for swipe stage-1 RAG."
+            )
+        artifact = artifacts_repo.get_latest_by_type_for_campaign(
+            org_id=org_id,
+            campaign_id=campaign_id,
+            artifact_type=artifact_type,
+        )
+        if artifact is None:
+            raise ValueError(
+                "Required swipe stage-1 campaign RAG artifact is missing. "
+                f"artifact_type={artifact_type.value} campaign_id={campaign_id}."
+            )
+        payload = {
+            "artifact": {
+                "id": str(artifact.id),
+                "type": artifact.type.value,
+                "version": int(artifact.version),
+                "org_id": str(artifact.org_id),
+                "client_id": str(artifact.client_id),
+                "product_id": str(artifact.product_id) if artifact.product_id else None,
+                "campaign_id": str(artifact.campaign_id) if artifact.campaign_id else None,
+                "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
+            },
+            "data": artifact.data,
+        }
+        return {
+            "doc_key": doc_key,
+            "doc_title": title,
+            "source_kind": artifact_type.value,
+            "filename": f"{doc_key}.json",
+            "mime_type": "text/plain",
+            "content_bytes": _json_payload_bytes(payload),
+        }
+
+    client = ClientsRepository(session).get(org_id=org_id, client_id=client_id)
+    if client is None:
+        raise ValueError(f"Client not found for swipe stage-1 RAG: {client_id}")
+    design_system_id = getattr(client, "design_system_id", None)
+    if not design_system_id:
+        raise ValueError(f"Client has no design_system_id for swipe stage-1 RAG: {client_id}")
+    design_system = session.get(DesignSystem, design_system_id)
+    if design_system is None:
+        raise ValueError(
+            "Client references a design system that was not found for swipe stage-1 RAG. "
+            f"client_id={client_id}, design_system_id={design_system_id}."
+        )
+    if not isinstance(design_system.tokens, dict):
+        raise ValueError(
+            "Design system tokens must be a JSON object for swipe stage-1 RAG "
+            f"(design_system_id={design_system_id})."
+        )
+    design_system_payload = {
+        "design_system": {
+            "id": str(design_system.id),
+            "org_id": str(design_system.org_id),
+            "client_id": str(design_system.client_id) if design_system.client_id else None,
+            "name": design_system.name,
+            "created_at": design_system.created_at.isoformat() if design_system.created_at else None,
+            "updated_at": design_system.updated_at.isoformat() if design_system.updated_at else None,
+        },
+        "tokens": design_system.tokens,
+    }
+
+    product = ProductsRepository(session).get(org_id=org_id, product_id=product_id)
+    if product is None:
+        raise ValueError(f"Product not found for swipe stage-1 RAG: {product_id}")
+    product_profile_payload = {
+        "product": {
+            "id": str(product.id),
+            "org_id": str(product.org_id),
+            "client_id": str(product.client_id),
+            "title": product.title,
+            "description": product.description,
+            "product_type": product.product_type,
+            "handle": product.handle,
+            "vendor": product.vendor,
+            "tags": list(product.tags or []),
+            "template_suffix": product.template_suffix,
+            "published_at": product.published_at.isoformat() if product.published_at else None,
+            "shopify_product_gid": product.shopify_product_gid,
+            "primary_benefits": list(product.primary_benefits or []),
+            "feature_bullets": list(product.feature_bullets or []),
+            "guarantee_text": product.guarantee_text,
+            "disclaimers": list(product.disclaimers or []),
+            "primary_asset_id": str(product.primary_asset_id) if product.primary_asset_id else None,
+            "created_at": product.created_at.isoformat() if product.created_at else None,
+        }
+    }
+
+    offer_pricing_payload = _load_required_product_offer_pricing_snapshot(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        funnel_id=funnel_id,
+    )
+
+    asset_brief_artifact = artifacts_repo.get(org_id=org_id, artifact_id=asset_brief_artifact_id)
+    if asset_brief_artifact is None:
+        raise ValueError(
+            "Asset brief artifact not found for swipe stage-1 RAG "
+            f"(asset_brief_artifact_id={asset_brief_artifact_id})."
+        )
+    if asset_brief_artifact.type != ArtifactTypeEnum.asset_brief:
+        raise ValueError(
+            "Resolved asset brief artifact has an unexpected type for swipe stage-1 RAG "
+            f"(artifact_id={asset_brief_artifact_id}, type={asset_brief_artifact.type.value})."
+        )
+    asset_brief_payload = {
+        "artifact": {
+            "id": str(asset_brief_artifact.id),
+            "type": asset_brief_artifact.type.value,
+            "version": int(asset_brief_artifact.version),
+            "org_id": str(asset_brief_artifact.org_id),
+            "client_id": str(asset_brief_artifact.client_id),
+            "product_id": str(asset_brief_artifact.product_id) if asset_brief_artifact.product_id else None,
+            "campaign_id": str(asset_brief_artifact.campaign_id) if asset_brief_artifact.campaign_id else None,
+            "created_at": asset_brief_artifact.created_at.isoformat() if asset_brief_artifact.created_at else None,
+        },
+        "data": asset_brief_artifact.data,
+    }
+
+    return [
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.client_canon,
+            doc_key="swipe_stage1_client_canon",
+            title="Swipe Stage1 Client Canon",
+        ),
+        {
+            "doc_key": "swipe_stage1_design_system",
+            "doc_title": "Swipe Stage1 Design System",
+            "source_kind": "design_system_snapshot",
+            "filename": "swipe_stage1_design_system.json",
+            "mime_type": "text/plain",
+            "content_bytes": _json_payload_bytes(design_system_payload),
+        },
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_v2_stage0,
+            doc_key="swipe_stage1_strategy_v2_stage0",
+            title="Swipe Stage1 Strategy V2 Stage0",
+        ),
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_v2_stage1,
+            doc_key="swipe_stage1_strategy_v2_stage1",
+            title="Swipe Stage1 Strategy V2 Stage1",
+        ),
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_v2_stage2,
+            doc_key="swipe_stage1_strategy_v2_stage2",
+            title="Swipe Stage1 Strategy V2 Stage2",
+        ),
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_v2_stage3,
+            doc_key="swipe_stage1_strategy_v2_stage3",
+            title="Swipe Stage1 Strategy V2 Stage3",
+        ),
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_v2_awareness_angle_matrix,
+            doc_key="swipe_stage1_strategy_v2_awareness_angle_matrix",
+            title="Swipe Stage1 Strategy V2 Awareness Angle Matrix",
+        ),
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_v2_offer,
+            doc_key="swipe_stage1_strategy_v2_offer",
+            title="Swipe Stage1 Strategy V2 Offer",
+        ),
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_v2_copy_context,
+            doc_key="swipe_stage1_strategy_v2_copy_context",
+            title="Swipe Stage1 Strategy V2 Copy Context",
+        ),
+        _require_latest_product_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_v2_copy,
+            doc_key="swipe_stage1_strategy_v2_copy",
+            title="Swipe Stage1 Strategy V2 Copy",
+        ),
+        {
+            "doc_key": "swipe_stage1_product_profile",
+            "doc_title": "Swipe Stage1 Product Profile",
+            "source_kind": "product_profile_snapshot",
+            "filename": "swipe_stage1_product_profile.json",
+            "mime_type": "text/plain",
+            "content_bytes": _json_payload_bytes(product_profile_payload),
+        },
+        {
+            "doc_key": "swipe_stage1_offer_pricing",
+            "doc_title": "Swipe Stage1 Offer Pricing",
+            "source_kind": "offer_pricing_snapshot",
+            "filename": "swipe_stage1_offer_pricing.json",
+            "mime_type": "text/plain",
+            "content_bytes": _json_payload_bytes(offer_pricing_payload),
+        },
+        _require_latest_campaign_artifact(
+            artifact_type=ArtifactTypeEnum.strategy_sheet,
+            doc_key="swipe_stage1_campaign_strategy_sheet",
+            title="Swipe Stage1 Campaign Strategy Sheet",
+        ),
+        _require_latest_campaign_artifact(
+            artifact_type=ArtifactTypeEnum.experiment_spec,
+            doc_key="swipe_stage1_campaign_experiment_spec",
+            title="Swipe Stage1 Campaign Experiment Spec",
+        ),
+        {
+            "doc_key": "swipe_stage1_campaign_asset_brief",
+            "doc_title": "Swipe Stage1 Campaign Asset Brief",
+            "source_kind": ArtifactTypeEnum.asset_brief.value,
+            "filename": "swipe_stage1_campaign_asset_brief.json",
+            "mime_type": "text/plain",
+            "content_bytes": _json_payload_bytes(asset_brief_payload),
+        },
+    ]
+
+
+def _resolve_swipe_stage1_gemini_file_search_context(
     *,
     session,
     org_id: str,
@@ -606,82 +1083,174 @@ def _resolve_gemini_file_search_store_names(
     client_id: str,
     product_id: str,
     campaign_id: str | None,
-    client_name: str,
-    product_title: str,
-    canon: dict[str, Any],
-    design_system_tokens: dict[str, Any],
-    swipe_context_block: str,
-    offer_context_block: str,
-) -> list[str]:
+    funnel_id: str | None,
+    asset_brief_artifact_id: str,
+) -> tuple[list[str], list[str], list[str], list[str]]:
     if not is_gemini_file_search_enabled():
         raise RuntimeError(
             "Gemini File Search must be enabled for swipe image ad generation. "
             "Set GEMINI_FILE_SEARCH_ENABLED=true."
         )
 
-    repo = GeminiContextFilesRepository(session)
-    records = repo.list_for_workspace_or_client(
+    rag_docs = _load_required_swipe_stage1_rag_docs(
+        session=session,
         org_id=org_id,
-        idea_workspace_id=idea_workspace_id,
         client_id=client_id,
         product_id=product_id,
         campaign_id=campaign_id,
+        funnel_id=funnel_id,
+        asset_brief_artifact_id=asset_brief_artifact_id,
     )
-    store_names = sorted(
-        {
-            str(getattr(record, "gemini_store_name", "") or "").strip()
-            for record in records
-            if str(getattr(record, "gemini_store_name", "") or "").strip()
+
+    docs_by_key: Dict[str, Dict[str, Any]] = {}
+    for doc in rag_docs:
+        doc_key = str(doc["doc_key"])
+        if doc_key in docs_by_key:
+            raise RuntimeError(f"Duplicate swipe stage-1 RAG doc key encountered: {doc_key}")
+        docs_by_key[doc_key] = doc
+
+    bundle_specs: list[tuple[str, str, list[str]]] = [
+        (
+            "swipe_stage1_bundle_brand_foundation",
+            "Swipe Stage1 Bundle: Brand Foundation",
+            [
+                "swipe_stage1_client_canon",
+                "swipe_stage1_design_system",
+                "swipe_stage1_product_profile",
+            ],
+        ),
+        (
+            "swipe_stage1_bundle_offer_and_pricing",
+            "Swipe Stage1 Bundle: Offer And Pricing",
+            [
+                "swipe_stage1_offer_pricing",
+                "swipe_stage1_strategy_v2_offer",
+            ],
+        ),
+        (
+            "swipe_stage1_bundle_strategy_stages",
+            "Swipe Stage1 Bundle: Strategy Stages",
+            [
+                "swipe_stage1_strategy_v2_stage0",
+                "swipe_stage1_strategy_v2_stage1",
+                "swipe_stage1_strategy_v2_stage2",
+                "swipe_stage1_strategy_v2_stage3",
+                "swipe_stage1_strategy_v2_awareness_angle_matrix",
+            ],
+        ),
+        (
+            "swipe_stage1_bundle_strategy_copy",
+            "Swipe Stage1 Bundle: Strategy Copy",
+            [
+                "swipe_stage1_strategy_v2_copy_context",
+                "swipe_stage1_strategy_v2_copy",
+            ],
+        ),
+        (
+            "swipe_stage1_bundle_campaign_context",
+            "Swipe Stage1 Bundle: Campaign Context",
+            [
+                "swipe_stage1_campaign_strategy_sheet",
+                "swipe_stage1_campaign_experiment_spec",
+                "swipe_stage1_campaign_asset_brief",
+            ],
+        ),
+    ]
+
+    consumed_keys: set[str] = set()
+    bundle_docs: list[Dict[str, Any]] = []
+    for bundle_key, bundle_title, bundle_keys in bundle_specs:
+        entries: list[Dict[str, Any]] = []
+        for key in bundle_keys:
+            doc = docs_by_key.get(key)
+            if doc is None:
+                raise RuntimeError(
+                    f"Missing required swipe stage-1 source doc while building bundle {bundle_key}: {key}"
+                )
+            consumed_keys.add(key)
+            entries.append(
+                {
+                    "doc_key": key,
+                    "doc_title": str(doc["doc_title"]),
+                    "source_kind": str(doc["source_kind"]),
+                    "mime_type": str(doc["mime_type"]),
+                    "content_sha256": hashlib.sha256(doc["content_bytes"]).hexdigest(),
+                    "content_text": doc["content_bytes"].decode("utf-8"),
+                }
+            )
+        payload = {
+            "bundle_key": bundle_key,
+            "bundle_title": bundle_title,
+            "documents": entries,
         }
-    )
-    if store_names:
-        return store_names
+        bundle_docs.append(
+            {
+                "doc_key": bundle_key,
+                "doc_title": bundle_title,
+                "source_kind": "swipe_stage1_bundle",
+                "filename": f"{bundle_key}.json",
+                "mime_type": "text/plain",
+                "content_bytes": _json_payload_bytes(payload),
+            }
+        )
 
-    foundation_text = _build_swipe_foundation_seed_doc(
-        client_name=client_name,
-        product_title=product_title,
-        canon=canon,
-        design_system_tokens=design_system_tokens,
-        swipe_context_block=swipe_context_block,
-        offer_context_block=offer_context_block,
-    )
-    ensure_uploaded_to_gemini_file_search(
-        org_id=org_id,
-        idea_workspace_id=idea_workspace_id,
-        client_id=client_id,
-        product_id=product_id,
-        campaign_id=campaign_id,
-        doc_key="swipe_foundation_context",
-        doc_title="Swipe Foundation Context",
-        source_kind="swipe_foundation_context",
-        step_key="swipe_image_ad",
-        filename="swipe_foundation_context.md",
-        mime_type="text/plain",
-        content_bytes=foundation_text.encode("utf-8"),
-        drive_doc_id=None,
-        drive_url=None,
-    )
+    source_doc_keys = sorted(docs_by_key.keys())
+    missing_from_bundles = sorted(set(source_doc_keys) - consumed_keys)
+    if missing_from_bundles:
+        raise RuntimeError(
+            "Some swipe stage-1 source docs were not included in any Gemini bundle: "
+            f"{missing_from_bundles}"
+        )
 
-    session.expire_all()
-    seeded_records = repo.list_for_workspace_or_client(
-        org_id=org_id,
-        idea_workspace_id=idea_workspace_id,
-        client_id=client_id,
-        product_id=product_id,
-        campaign_id=campaign_id,
-    )
-    seeded_store_names = sorted(
-        {
-            str(getattr(record, "gemini_store_name", "") or "").strip()
-            for record in seeded_records
-            if str(getattr(record, "gemini_store_name", "") or "").strip()
-        }
-    )
-    if seeded_store_names:
-        return seeded_store_names
+    document_names: list[str] = []
+    bundle_doc_keys: list[str] = []
+    store_names: set[str] = set()
+    for doc in bundle_docs:
+        doc_key = str(doc["doc_key"])
+        document_name = ensure_uploaded_to_gemini_file_search(
+            org_id=org_id,
+            idea_workspace_id=idea_workspace_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            doc_key=doc_key,
+            doc_title=str(doc["doc_title"]),
+            source_kind=str(doc["source_kind"]),
+            step_key="swipe_image_ad_stage1",
+            filename=str(doc["filename"]),
+            mime_type=str(doc["mime_type"]),
+            content_bytes=doc["content_bytes"],
+            drive_doc_id=None,
+            drive_url=None,
+        )
+        bundle_doc_keys.append(doc_key)
+        document_names.append(document_name)
+        store_names.add(_extract_store_name_from_document_name(document_name))
 
-    raise RuntimeError(
-        "No Gemini File Search stores are available for this workspace after seeding foundation context."
+    sorted_store_names = sorted(store_names)
+    if not sorted_store_names:
+        raise RuntimeError(
+            "No Gemini File Search stores were resolved for swipe stage-1 context uploads."
+        )
+    return sorted_store_names, source_doc_keys, bundle_doc_keys, document_names
+
+
+def _build_swipe_stage1_prompt_input(
+    *,
+    prompt_template: str,
+    brand_name: str,
+    angle: str | None,
+) -> str:
+    if not isinstance(prompt_template, str) or not prompt_template.strip():
+        raise ValueError("swipe stage-1 prompt template is required and must be non-empty.")
+    clean_brand = _normalize_prompt_value(brand_name)
+    clean_angle = _normalize_prompt_value(angle)
+    return (
+        f"{prompt_template.strip()}\n\n"
+        "RUNTIME INPUTS (INJECTED)\n"
+        f"Brand: {clean_brand}\n"
+        f"Angle: {clean_angle}\n"
+        "Competitor swipe image is attached as image input."
     )
 
 
@@ -782,8 +1351,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
     Generate ONE (or N) image ad(s) by adapting a competitor swipe image.
 
     Flow:
-      1) Use Gemini (vision) with the swipe prompt template + brand/brief context + the competitor swipe image to
-         produce a dense, generation-ready image prompt.
+      1) Use Gemini (vision) with the stage-1 prompt template + runtime brand/angle + attached RAG docs + the
+         competitor swipe image to produce a dense, generation-ready image prompt.
       2) Extract ONLY the prompt from the Gemini markdown output (```text fenced block).
       3) Send ONLY that extracted prompt to the creative service (Freestyle) to render the final image(s).
       4) Persist generated assets attached to the provided asset brief.
@@ -808,6 +1377,13 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
 
     company_swipe_id: str | None = params.get("company_swipe_id")
     swipe_image_url: str | None = params.get("swipe_image_url")
+    swipe_requires_product_image_raw = params.get("swipe_requires_product_image")
+    if swipe_requires_product_image_raw is None:
+        swipe_requires_product_image: bool | None = None
+    elif isinstance(swipe_requires_product_image_raw, bool):
+        swipe_requires_product_image = swipe_requires_product_image_raw
+    else:
+        raise ValueError("swipe_requires_product_image must be a boolean when provided.")
 
     model = (
         params.get("model")
@@ -864,6 +1440,7 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "campaign_id": campaign_id,
             "company_swipe_id": company_swipe_id,
             "swipe_image_url": swipe_image_url,
+            "swipe_requires_product_image": swipe_requires_product_image,
             "model": model_name,
             "render_model_id_requested": requested_render_model_id,
             "render_model_id_used": render_model_id,
@@ -912,22 +1489,9 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(requirement, dict):
             raise ValueError("Asset brief requirement must be an object.")
 
-        creative_concept_raw = brief.get("creativeConcept")
-        if not isinstance(creative_concept_raw, str) or not creative_concept_raw.strip():
-            raise ValueError("Asset brief is missing creativeConcept.")
-        creative_concept = creative_concept_raw.strip()
-
         channel_id = (requirement.get("channel") or "meta").strip()
         fmt = (requirement.get("format") or "image").strip()
         angle = requirement.get("angle") if isinstance(requirement.get("angle"), str) else None
-        hook = requirement.get("hook") if isinstance(requirement.get("hook"), str) else None
-        constraints = [item for item in (brief.get("constraints") or []) if isinstance(item, str) and item.strip()]
-        tone_guidelines = [
-            item for item in (brief.get("toneGuidelines") or []) if isinstance(item, str) and item.strip()
-        ]
-        visual_guidelines = [
-            item for item in (brief.get("visualGuidelines") or []) if isinstance(item, str) and item.strip()
-        ]
 
         # Creative brief / brand context.
         brand_ctx = _extract_brand_context(
@@ -937,34 +1501,58 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             product_id=product_id,
         )
         client_name = brand_ctx.get("client_name") or ""
-        product_title = brand_ctx.get("product_title") or ""
-        canon = brand_ctx.get("canon") if isinstance(brand_ctx.get("canon"), dict) else {}
-        tokens = (
-            brand_ctx.get("design_system_tokens") if isinstance(brand_ctx.get("design_system_tokens"), dict) else {}
+
+        # Swipe image bytes.
+        swipe_bytes, swipe_mime_type, swipe_source_url = _resolve_swipe_image(
+            session=session,
+            org_id=org_id,
+            company_swipe_id=company_swipe_id,
+            swipe_image_url=swipe_image_url,
+        )
+        swipe_image_sha256 = hashlib.sha256(swipe_bytes).hexdigest()
+        swipe_image_size_bytes = len(swipe_bytes)
+        resolved_swipe_requires_product_image, swipe_product_image_policy_source, swipe_source_filename = (
+            _resolve_swipe_requires_product_image_policy(
+                explicit_requires_product_image=swipe_requires_product_image,
+                swipe_source_url=swipe_source_url,
+            )
         )
 
-        audience = _format_audience_from_canon(canon)
-        brand_colors_fonts = _brand_colors_fonts_from_design_tokens(tokens)
-        must_avoid_claims = _must_avoid_claims_from_canon(canon)
-
-        offer_context_metadata = {
-            "offerId": None,
-            "offerName": None,
-            "pricePoints": [],
-        }
-
-        # Product references are optional for this flow. If no product image exists, continue as text-to-image.
-        try:
-            product_reference_assets = _select_product_reference_assets(
-                session=session,
-                org_id=org_id,
-                product_id=product_id,
-            )
-        except ValueError as exc:
-            if "No active source product images are available" in str(exc):
-                product_reference_assets = []
-            else:
+        if resolved_swipe_requires_product_image is False:
+            product_reference_assets = []
+        elif resolved_swipe_requires_product_image is True:
+            try:
+                product_reference_assets = _select_product_reference_assets(
+                    session=session,
+                    org_id=org_id,
+                    product_id=product_id,
+                )
+            except ValueError as exc:
+                if "No active source product images are available" in str(exc):
+                    raise ValueError(
+                        "Swipe requires product image references, but no active source product images are available "
+                        f"(product_id={product_id}, swipe_source={swipe_source_url})."
+                    ) from exc
                 raise
+            if not product_reference_assets:
+                raise ValueError(
+                    "Swipe requires product image references, but product reference selection returned empty "
+                    f"(product_id={product_id}, swipe_source={swipe_source_url})."
+                )
+        else:
+            # Product references remain optional when no explicit or catalog policy is available.
+            try:
+                product_reference_assets = _select_product_reference_assets(
+                    session=session,
+                    org_id=org_id,
+                    product_id=product_id,
+                )
+            except ValueError as exc:
+                if "No active source product images are available" in str(exc):
+                    product_reference_assets = []
+                else:
+                    raise
+
         product_reference_remote_ids: list[str] = []
         if render_provider == "creative_service" and product_reference_assets:
             try:
@@ -977,7 +1565,6 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 creative_client=reference_client,
                 references=product_reference_assets,
             )
-        image_reference_text = _build_image_reference_text(product_reference_assets) if product_reference_assets else ""
         all_product_reference_image_urls = [
             reference.primary_url
             for reference in product_reference_assets
@@ -997,42 +1584,16 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_product_references_v1",
             *reference_signature_parts,
         )
-        prompt_assets_value = _prompt_assets_value(
-            product_reference_assets=product_reference_assets,
-            design_system_tokens=tokens if isinstance(tokens, dict) else {},
-        )
-        rendered_prompt_template = _render_swipe_prompt_template(
+        rendered_prompt_template = _build_swipe_stage1_prompt_input(
             prompt_template=prompt_template,
             brand_name=str(client_name),
-            product_name=str(product_title),
-            audience=audience,
-            angle_from_docs=angle,
-            brand_colors_fonts=brand_colors_fonts,
-            must_avoid_claims=must_avoid_claims,
-            assets_value=prompt_assets_value,
+            angle=angle,
         )
-        if product_reference_image_urls:
-            rendered_prompt_template = (
-                f"{rendered_prompt_template}\n\n"
-                "<product_packshot_image>\n"
-                "Product packshot image is attached below as image input. Use it as the source of truth for "
-                "product silhouette, proportions, and visible hardware details.\n"
-                "</product_packshot_image>"
-            )
         rendered_prompt_signature = _stable_idempotency_key(
             "swipe_prompt_input_v1",
             rendered_prompt_template,
         )
 
-        # Swipe image bytes.
-        swipe_bytes, swipe_mime_type, swipe_source_url = _resolve_swipe_image(
-            session=session,
-            org_id=org_id,
-            company_swipe_id=company_swipe_id,
-            swipe_image_url=swipe_image_url,
-        )
-        swipe_image_sha256 = hashlib.sha256(swipe_bytes).hexdigest()
-        swipe_image_size_bytes = len(swipe_bytes)
         product_prompt_image_bytes: bytes | None = None
         product_prompt_image_mime_type: str | None = None
         product_prompt_image_source_url: str | None = None
@@ -1049,22 +1610,21 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             product_prompt_image_size_bytes = len(product_prompt_image_bytes)
 
         # The Gemini input must be only the rendered swipe prompt template plus the competitor image.
-        # File Search still attaches foundational stores as an external tool context.
-        swipe_context_block = ""
-        offer_context_block = ""
-        gemini_store_names = _resolve_gemini_file_search_store_names(
+        # File Search attaches foundational documents as external context.
+        (
+            gemini_store_names,
+            gemini_rag_doc_keys,
+            gemini_rag_bundle_doc_keys,
+            gemini_rag_document_names,
+        ) = _resolve_swipe_stage1_gemini_file_search_context(
             session=session,
             org_id=org_id,
             idea_workspace_id=idea_workspace_id,
             client_id=client_id,
             product_id=product_id,
             campaign_id=campaign_id,
-            client_name=str(client_name),
-            product_title=str(product_title),
-            canon=canon if isinstance(canon, dict) else {},
-            design_system_tokens=tokens if isinstance(tokens, dict) else {},
-            swipe_context_block=swipe_context_block,
-            offer_context_block=offer_context_block,
+            funnel_id=funnel_id,
+            asset_brief_artifact_id=brief_artifact_id,
         )
 
         # Run Gemini vision with File Search context to generate the generation-ready image prompt.
@@ -1152,15 +1712,13 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         usage_details=_extract_gemini_usage_details(result),
                     )
 
+        extracted_image_prompt_raw: str | None = None
+        inlined_placeholder_map: Dict[str, str] = {}
         try:
-            image_prompt = extract_new_image_prompt_from_markdown(raw_output)
+            extracted_image_prompt_raw = extract_new_image_prompt_from_markdown(raw_output)
+            image_prompt, inlined_placeholder_map = inline_swipe_render_placeholders(extracted_image_prompt_raw)
         except SwipePromptParseError as exc:
             raise RuntimeError(f"Failed to parse swipe prompt output: {exc}") from exc
-        if re.search(r"\[PRODUCT(?::[^\]]*)?\]", image_prompt):
-            raise RuntimeError(
-                "Swipe prompt generation produced an unresolved [PRODUCT] placeholder. "
-                "Expected the exact product name from context."
-            )
 
         idempotency_key = _stable_idempotency_key(
             org_id,
@@ -1188,7 +1746,6 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             )
             image_payload = CreativeServiceImageAdsCreateIn(
                 prompt=image_prompt,
-                reference_text=image_reference_text,
                 reference_asset_ids=product_reference_remote_ids,
                 reference_image_urls=product_reference_image_urls,
                 count=render_count,
@@ -1250,25 +1807,30 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipeRenderModelIdUsed": getattr(completed_job, "model_id", None) or render_model_id,
                 "swipeRenderProvider": render_provider,
                 "swipeGeminiStoreNames": gemini_store_names,
+                "swipeGeminiRagDocKeys": gemini_rag_doc_keys,
+                "swipeGeminiRagBundleDocKeys": gemini_rag_bundle_doc_keys,
+                "swipeGeminiRagDocumentNames": gemini_rag_document_names,
                 "swipePromptTemplateKey": "prompts/swipe/swipe_to_image_ad.md",
                 "swipePromptTemplateSha256": prompt_sha,
                 "swipePromptInputText": rendered_prompt_template,
                 "swipePromptImageAttached": True,
                 "swipePromptImageSourceUrl": swipe_source_url,
+                "swipeSourceFilename": swipe_source_filename,
                 "swipePromptImageMimeType": swipe_mime_type,
                 "swipePromptImageSizeBytes": swipe_image_size_bytes,
                 "swipePromptImageSha256": swipe_image_sha256,
+                "swipeRequiresProductImage": resolved_swipe_requires_product_image,
+                "swipeRequiresProductImagePolicySource": swipe_product_image_policy_source,
                 "swipePromptProductImageAttached": product_prompt_image_bytes is not None,
                 "swipePromptProductImageSourceUrl": product_prompt_image_source_url,
                 "swipePromptProductImageMimeType": product_prompt_image_mime_type,
                 "swipePromptProductImageSizeBytes": product_prompt_image_size_bytes,
                 "swipePromptProductImageSha256": product_prompt_image_sha256,
-                "swipeOfferId": offer_context_metadata.get("offerId"),
-                "swipeOfferName": offer_context_metadata.get("offerName"),
-                "swipeOfferPricePoints": offer_context_metadata.get("pricePoints"),
                 "swipePromptMarkdownSha256": hashlib.sha256(raw_output.encode("utf-8")).hexdigest(),
                 "swipePromptMarkdown": raw_output,
                 "swipePromptMarkdownPreview": raw_output[:4000],
+                "swipePromptExtractedRaw": extracted_image_prompt_raw,
+                "swipePromptInlinedPlaceholderMap": inlined_placeholder_map,
                 "swipeProductReferenceRemoteAssetIds": product_reference_remote_ids,
                 "swipeProductReferenceLocalAssetIds": [
                     reference.local_asset_id for reference in product_reference_assets
@@ -1276,7 +1838,6 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipeProductReferenceTitles": [
                     reference.title for reference in product_reference_assets if isinstance(reference.title, str)
                 ],
-                "swipeProductReferenceText": image_reference_text,
                 "swipeProductReferenceImageUrlsSelected": product_reference_image_urls,
                 "swipeProductReferenceImageUrlsAvailable": all_product_reference_image_urls,
                 "swipeRenderReferenceImageUrlsUsed": [
@@ -1322,6 +1883,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 "swipe_render_provider": render_provider,
                 "prompt_template_sha256": prompt_sha,
                 "stores_attached": len(gemini_store_names),
+                "gemini_rag_doc_keys": gemini_rag_doc_keys,
+                "gemini_rag_bundle_doc_keys": gemini_rag_bundle_doc_keys,
             },
         )
 
@@ -1334,5 +1897,8 @@ def generate_swipe_image_ad_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             "swipe_render_model_id": getattr(completed_job, "model_id", None) or render_model_id,
             "swipe_render_provider": render_provider,
             "stores_attached": len(gemini_store_names),
+            "gemini_rag_doc_keys": gemini_rag_doc_keys,
+            "gemini_rag_bundle_doc_keys": gemini_rag_bundle_doc_keys,
+            "gemini_rag_document_names": gemini_rag_document_names,
             "prompt_template_sha256": prompt_sha,
         }

@@ -60,6 +60,16 @@ class _ProductReferenceAsset:
 @dataclass(frozen=True)
 class _SwipeCandidate:
     company_swipe_id: str
+    swipe_requires_product_image: bool | None
+
+
+def _normalize_requirement_format(value: str) -> str:
+    normalized = value.strip().lower()
+    if normalized in {"image", "image_ad", "image-ad"}:
+        return "image"
+    if normalized in {"video", "video_ad", "video-ad"}:
+        return "video"
+    return normalized
 
 
 def _extract_requirement_swipe_source(requirement: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -92,6 +102,43 @@ def _extract_requirement_swipe_source(requirement: dict[str, Any]) -> tuple[str 
             "(companySwipeId/company_swipe_id OR swipeImageUrl/swipe_image_url)."
         )
     return company_swipe_id, swipe_image_url
+
+
+def _extract_requirement_swipe_requires_product_image(requirement: dict[str, Any]) -> bool | None:
+    raw = requirement.get("swipeRequiresProductImage")
+    if raw is None:
+        raw = requirement.get("swipe_requires_product_image")
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        return raw
+    raise ValueError(
+        "Asset brief requirement swipeRequiresProductImage/swipe_requires_product_image "
+        "must be a boolean when provided."
+    )
+
+
+def _extract_swipe_requires_product_image_from_tags(tags: list[str] | None) -> bool | None:
+    normalized_tags = {
+        tag.strip().lower()
+        for tag in (tags or [])
+        if isinstance(tag, str) and tag.strip()
+    }
+    requires_tag = "swipe:requires_product_image"
+    no_product_tag = "swipe:no_product_image"
+
+    has_requires_tag = requires_tag in normalized_tags
+    has_no_product_tag = no_product_tag in normalized_tags
+    if has_requires_tag and has_no_product_tag:
+        raise ValueError(
+            "Client swipe tags contain conflicting product image policy tags: "
+            "`swipe:requires_product_image` and `swipe:no_product_image`."
+        )
+    if has_requires_tag:
+        return True
+    if has_no_product_tag:
+        return False
+    return None
 
 
 def _repo(session) -> AssetsRepository:
@@ -198,6 +245,9 @@ def _load_swipe_candidates(*, session, org_id: str, client_id: str) -> list[_Swi
         candidates.append(
             _SwipeCandidate(
                 company_swipe_id=company_swipe_id,
+                swipe_requires_product_image=_extract_swipe_requires_product_image_from_tags(
+                    getattr(entry, "tags", None)
+                ),
             )
         )
         seen_company_ids.add(company_swipe_id)
@@ -643,22 +693,13 @@ def _ensure_remote_reference_asset_ids(
     return remote_asset_ids
 
 
-def _build_image_reference_text(references: Sequence[_ProductReferenceAsset]) -> str:
-    lines = [
-        "Use the following product reference images as the source of truth for product appearance and fit.",
-    ]
-    for idx, reference in enumerate(references, start=1):
-        label = reference.title or f"Product reference {idx}"
-        lines.append(f"{idx}. {label}: {reference.primary_url}")
-    return "\n".join(lines)
-
-
 def _create_generated_asset_from_url(
     *,
     session,
     org_id: str,
     client_id: str,
     campaign_id: str | None,
+    experiment_id: str | None = None,
     product_id: str | None,
     funnel_id: str | None,
     brief_artifact_id: str,
@@ -708,6 +749,7 @@ def _create_generated_asset_from_url(
         org_id=org_id,
         client_id=client_id,
         campaign_id=campaign_id,
+        experiment_id=experiment_id,
         product_id=product_id if attach_to_product else None,
         funnel_id=funnel_id,
         variant_id=variant_id,
@@ -870,166 +912,96 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
 
         from app.temporal.activities.swipe_image_ad_activities import generate_swipe_image_ad_activity
 
-        created_asset_ids: list[str] = []
-        selected_swipe_sources: list[dict[str, Any]] = []
-        swipe_candidates: list[_SwipeCandidate] | None = None
-        ordered_swipe_ids: list[str] | None = None
-
-        for requirement_index, req in enumerate(requirements):
-            fmt = req.get("format") or "image"
-            if not isinstance(fmt, str) or not fmt.strip():
-                raise ValueError("Asset requirement format must be a non-empty string.")
-            normalized_format = fmt.strip().lower()
-            if normalized_format != "image":
-                raise ValueError(
-                    "Swipe-only creative generation currently supports image requirements only. "
-                    f"Unsupported format={fmt!r} for requirementIndex={requirement_index}."
-                )
-
-            explicit_company_swipe_id, explicit_swipe_image_url = _extract_requirement_swipe_source(req)
-            selected_company_swipe_id = explicit_company_swipe_id
-            selected_swipe_image_url = explicit_swipe_image_url
-
-            # If requirement payload did not specify a swipe source, choose one deterministic client swipe.
-            if not selected_company_swipe_id and not selected_swipe_image_url:
-                if swipe_candidates is None:
-                    swipe_candidates = _load_swipe_candidates(
-                        session=session,
-                        org_id=org_id,
-                        client_id=client_id,
-                    )
-                    ordered_swipe_ids = sorted({candidate.company_swipe_id for candidate in swipe_candidates})
-                    if not ordered_swipe_ids:
-                        raise ValueError(
-                            "Swipe-only creative generation requires at least one client swipe mapped to company media."
-                        )
-
-                selection_seed = f"{asset_brief_id}:{requirement_index}"
-                digest = hashlib.sha256(selection_seed.encode("utf-8")).hexdigest()
-                pick_index = int(digest[:8], 16) % len(ordered_swipe_ids)
-                selected_company_swipe_id = ordered_swipe_ids[pick_index]
-
-            try:
-                swipe_result = generate_swipe_image_ad_activity(
-                    {
-                        "org_id": org_id,
-                        "client_id": client_id,
-                        "product_id": product_id,
-                        "campaign_id": campaign_id,
-                        "asset_brief_id": asset_brief_id,
-                        "requirement_index": requirement_index,
-                        "company_swipe_id": selected_company_swipe_id,
-                        "swipe_image_url": selected_swipe_image_url,
-                        "count": 1,
-                        "workflow_run_id": workflow_run_id,
-                    },
-                )
-            except Exception as exc:  # noqa: BLE001
-                raise RuntimeError(
-                    "Swipe image ad generation failed "
-                    f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
-                    f"company_swipe_id={selected_company_swipe_id}, swipe_image_url={selected_swipe_image_url}, "
-                    f"error={exc})."
-                ) from exc
-
-            generated_ids = swipe_result.get("asset_ids") if isinstance(swipe_result, dict) else None
-            if not isinstance(generated_ids, list) or not generated_ids:
-                raise RuntimeError(
-                    "Swipe image ad generation returned no asset_ids "
-                    f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
-                    f"company_swipe_id={selected_company_swipe_id}, swipe_image_url={selected_swipe_image_url})."
-                )
-            created_asset_ids.extend([str(asset_id) for asset_id in generated_ids if asset_id])
-            selected_swipe_sources.append(
-                {
-                    "requirement_index": requirement_index,
-                    "company_swipe_id": selected_company_swipe_id,
-                    "swipe_image_url": selected_swipe_image_url,
-                }
-            )
-
-        if not created_asset_ids:
-            raise RuntimeError(f"No swipe-based assets were generated for brief {asset_brief_id}.")
-
-        log_activity(
-            "asset_generation",
-            "completed",
-            payload_out={
-                "asset_brief_id": asset_brief_id,
-                "asset_ids": created_asset_ids,
-                "mode": "swipe_only",
-                "selected_swipe_sources": selected_swipe_sources,
-            },
+        requirement_allocations = _split_requirement_asset_counts(
+            requirements,
+            int(settings.CREATIVE_SERVICE_ASSETS_PER_BRIEF or 6),
         )
-        return {"asset_ids": created_asset_ids}
-
         variant_id = brief.get("variantId") or brief.get("variant_id")
         constraints = [item for item in (brief.get("constraints") or []) if isinstance(item, str)]
         tone_guidelines = [item for item in (brief.get("toneGuidelines") or []) if isinstance(item, str)]
         visual_guidelines = [item for item in (brief.get("visualGuidelines") or []) if isinstance(item, str)]
-        product_reference_assets = _select_product_reference_assets(
-            session=session,
-            org_id=org_id,
-            product_id=product_id,
-        )
-        design_tokens = resolve_design_system_tokens(session=session, org_id=org_id, client_id=client_id) or {}
-        logo_public_id = _extract_brand_logo_public_id(design_tokens=design_tokens)
-        logo_reference_asset: _ProductReferenceAsset | None = None
-        logo_remote_asset_id: str | None = None
-        if logo_public_id:
-            logo_reference_asset = _resolve_brand_logo_reference_asset(
-                session=session,
-                org_id=org_id,
-                logo_public_id=logo_public_id,
-            )
-            # Upload logo as a separate reference so the creative model can use it if desired.
-            logo_remote_asset_id = _ensure_remote_reference_asset_ids(
-                session=session,
-                org_id=org_id,
-                creative_client=creative_client,
-                references=[logo_reference_asset],
-            )[0]
-        product_reference_remote_ids = _ensure_remote_reference_asset_ids(
-            session=session,
-            org_id=org_id,
-            creative_client=creative_client,
-            references=product_reference_assets,
-        )
-        image_reference_asset_ids = list(product_reference_remote_ids)
-        if logo_remote_asset_id:
-            image_reference_asset_ids.append(logo_remote_asset_id)
-        image_reference_text = _build_image_reference_text(product_reference_assets)
-        if logo_reference_asset:
-            image_reference_text = "\n\n".join(
-                [
-                    image_reference_text,
-                    f"Brand logo reference (optional, use if adding a logo): {logo_reference_asset.primary_url}",
-                ]
-            ).strip()
-        product_asset_urls = [item.primary_url for item in product_reference_assets]
-        video_reference_attachments = [
-            CreativeServiceVideoAttachmentIn(
-                asset_id=remote_asset_id,
-                title=product_reference_assets[idx].title if idx < len(product_reference_assets) else None,
-                role="product_reference",
-            )
-            for idx, remote_asset_id in enumerate(product_reference_remote_ids)
-        ]
-        if logo_remote_asset_id and logo_reference_asset:
-            video_reference_attachments.append(
-                CreativeServiceVideoAttachmentIn(
-                    asset_id=logo_remote_asset_id,
-                    title=logo_reference_asset.title,
-                    role="brand_logo",
-                )
-            )
-        reference_signature = _stable_idempotency_key("image_reference_assets_v3", *image_reference_asset_ids)
+        selected_swipe_sources: list[dict[str, Any]] = []
 
+        generic_requirements_present = False
+        for req in requirements:
+            explicit_company_swipe_id, explicit_swipe_image_url = _extract_requirement_swipe_source(req)
+            explicit_swipe_requires_product_image = _extract_requirement_swipe_requires_product_image(req)
+            if explicit_swipe_requires_product_image is not None and not (
+                explicit_company_swipe_id or explicit_swipe_image_url
+            ):
+                raise ValueError(
+                    "swipeRequiresProductImage/swipe_requires_product_image requires an explicit swipe source "
+                    "(companySwipeId/company_swipe_id or swipeImageUrl/swipe_image_url)."
+                )
+            if not explicit_company_swipe_id and not explicit_swipe_image_url:
+                generic_requirements_present = True
+                break
+
+        image_reference_asset_ids: list[str] = []
+        product_asset_urls: list[str] = []
+        video_reference_attachments: list[CreativeServiceVideoAttachmentIn] = []
+        reference_signature = "no_reference_assets"
         retention_expires_at = _retention_expires_at()
         created_asset_ids: list[str] = []
         variant_cursor = 0
 
-        video_orchestrator = VideoAdsOrchestrator(client=creative_client)
+        if generic_requirements_present:
+            try:
+                creative_client = CreativeServiceClient()
+            except CreativeServiceConfigError as exc:
+                raise RuntimeError(str(exc)) from exc
+
+            product_reference_assets = _select_product_reference_assets(
+                session=session,
+                org_id=org_id,
+                product_id=product_id,
+            )
+            design_tokens = resolve_design_system_tokens(session=session, org_id=org_id, client_id=client_id) or {}
+            logo_public_id = _extract_brand_logo_public_id(design_tokens=design_tokens)
+            logo_reference_asset: _ProductReferenceAsset | None = None
+            logo_remote_asset_id: str | None = None
+            if logo_public_id:
+                logo_reference_asset = _resolve_brand_logo_reference_asset(
+                    session=session,
+                    org_id=org_id,
+                    logo_public_id=logo_public_id,
+                )
+                # Upload logo as a separate reference so the creative model can use it if desired.
+                logo_remote_asset_id = _ensure_remote_reference_asset_ids(
+                    session=session,
+                    org_id=org_id,
+                    creative_client=creative_client,
+                    references=[logo_reference_asset],
+                )[0]
+            product_reference_remote_ids = _ensure_remote_reference_asset_ids(
+                session=session,
+                org_id=org_id,
+                creative_client=creative_client,
+                references=product_reference_assets,
+            )
+            image_reference_asset_ids = list(product_reference_remote_ids)
+            if logo_remote_asset_id:
+                image_reference_asset_ids.append(logo_remote_asset_id)
+            product_asset_urls = [item.primary_url for item in product_reference_assets]
+            video_reference_attachments = [
+                CreativeServiceVideoAttachmentIn(
+                    asset_id=remote_asset_id,
+                    title=product_reference_assets[idx].title if idx < len(product_reference_assets) else None,
+                    role="product_reference",
+                )
+                for idx, remote_asset_id in enumerate(product_reference_remote_ids)
+            ]
+            if logo_remote_asset_id and logo_reference_asset:
+                video_reference_attachments.append(
+                    CreativeServiceVideoAttachmentIn(
+                        asset_id=logo_remote_asset_id,
+                        title=logo_reference_asset.title,
+                        role="brand_logo",
+                    )
+                )
+            reference_signature = _stable_idempotency_key("image_reference_assets_v3", *image_reference_asset_ids)
+
+        video_orchestrator = VideoAdsOrchestrator(client=creative_client) if creative_client else None
 
         for requirement_index, req, allocation_count in requirement_allocations:
             channel_id = req.get("channel") or "meta"
@@ -1039,11 +1011,69 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
             if not isinstance(fmt, str) or not fmt.strip():
                 raise ValueError("Asset requirement format must be a non-empty string.")
 
-            normalized_format = fmt.strip().lower()
+            normalized_format = _normalize_requirement_format(fmt)
             if normalized_format not in _SUPPORTED_FORMATS:
                 raise ValueError(
                     f"Unsupported creative brief format '{fmt}'. Supported formats: {sorted(_SUPPORTED_FORMATS)}."
                 )
+
+            explicit_company_swipe_id, explicit_swipe_image_url = _extract_requirement_swipe_source(req)
+            explicit_swipe_requires_product_image = _extract_requirement_swipe_requires_product_image(req)
+            if explicit_company_swipe_id or explicit_swipe_image_url:
+                if normalized_format != "image":
+                    raise ValueError(
+                        "Swipe image ad generation only supports image formats when a swipe source is provided. "
+                        f"Unsupported format={fmt!r} for requirementIndex={requirement_index}."
+                    )
+                try:
+                    swipe_result = generate_swipe_image_ad_activity(
+                        {
+                            "org_id": org_id,
+                            "client_id": client_id,
+                            "product_id": product_id,
+                            "campaign_id": campaign_id,
+                            "asset_brief_id": asset_brief_id,
+                            "requirement_index": requirement_index,
+                            "company_swipe_id": explicit_company_swipe_id,
+                            "swipe_image_url": explicit_swipe_image_url,
+                            "swipe_requires_product_image": explicit_swipe_requires_product_image,
+                            "count": allocation_count,
+                            "workflow_run_id": workflow_run_id,
+                        },
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    raise RuntimeError(
+                        "Swipe image ad generation failed "
+                        f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
+                        f"company_swipe_id={explicit_company_swipe_id}, swipe_image_url={explicit_swipe_image_url}, "
+                        f"error={exc})."
+                    ) from exc
+
+                generated_ids = swipe_result.get("asset_ids") if isinstance(swipe_result, dict) else None
+                if not isinstance(generated_ids, list) or len(generated_ids) < allocation_count:
+                    raise RuntimeError(
+                        "Swipe image ad generation returned fewer asset_ids than requested "
+                        f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index}, "
+                        f"requested={allocation_count}, returned={len(generated_ids) if isinstance(generated_ids, list) else 0})."
+                    )
+                selected_ids = [str(asset_id) for asset_id in generated_ids[:allocation_count] if asset_id]
+                if len(selected_ids) < allocation_count:
+                    raise RuntimeError(
+                        "Swipe image ad generation returned invalid asset ids "
+                        f"(asset_brief_id={asset_brief_id}, requirement_index={requirement_index})."
+                    )
+                created_asset_ids.extend(selected_ids)
+                variant_cursor += allocation_count
+                selected_swipe_sources.append(
+                    {
+                        "requirement_index": requirement_index,
+                        "company_swipe_id": explicit_company_swipe_id,
+                        "swipe_image_url": explicit_swipe_image_url,
+                        "swipe_requires_product_image": explicit_swipe_requires_product_image,
+                        "count": allocation_count,
+                    }
+                )
+                continue
 
             if normalized_format == "image":
                 prompt = _build_image_prompt(
@@ -1095,9 +1125,8 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
 
                 image_payload = CreativeServiceImageAdsCreateIn(
                     prompt=prompt,
-                    reference_text=image_reference_text,
                     reference_asset_ids=image_reference_asset_ids,
-                    count=max(6, allocation_count),
+                    count=allocation_count,
                     aspect_ratio="1:1",
                     client_request_id=idempotency_key,
                 )
@@ -1327,6 +1356,8 @@ def generate_assets_for_brief_activity(params: Dict[str, Any]) -> Dict[str, Any]
                 )
 
             elif normalized_format == "video":
+                if video_orchestrator is None:
+                    raise RuntimeError("Video orchestration client was not initialized.")
                 for _variant_offset in range(allocation_count):
                     current_variant_index = variant_cursor
                     variant_cursor += 1

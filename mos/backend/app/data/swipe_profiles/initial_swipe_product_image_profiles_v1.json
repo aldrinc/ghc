@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "name": "initial_swipe_set_v1",
+  "updated_at": "2026-03-03",
+  "entries": [
+    {
+      "filename": "10.png",
+      "requires_product_image": true,
+      "reason": "Packshot is prominently overlaid in the source ad."
+    },
+    {
+      "filename": "11.png",
+      "requires_product_image": true,
+      "reason": "Packshot is prominently overlaid in the source ad."
+    },
+    {
+      "filename": "12.png",
+      "requires_product_image": true,
+      "reason": "Product jar is held and centered as core visual proof."
+    },
+    {
+      "filename": "5.png",
+      "requires_product_image": true,
+      "reason": "Product package is a primary object in composition."
+    },
+    {
+      "filename": "6.png",
+      "requires_product_image": true,
+      "reason": "Packshot appears as an explicit product callout."
+    },
+    {
+      "filename": "7.png",
+      "requires_product_image": true,
+      "reason": "Product container appears in testimonial inset."
+    },
+    {
+      "filename": "8.png",
+      "requires_product_image": true,
+      "reason": "Packshot is prominently overlaid in the source ad."
+    },
+    {
+      "filename": "9.png",
+      "requires_product_image": true,
+      "reason": "Packshot is prominently overlaid in the source ad."
+    },
+    {
+      "filename": "Static #1.png",
+      "requires_product_image": true,
+      "reason": "Single product item (knife) is the dominant hero visual."
+    },
+    {
+      "filename": "Static #2.png",
+      "requires_product_image": true,
+      "reason": "Insole product is central to the ad's proof visual."
+    },
+    {
+      "filename": "Static #3.png",
+      "requires_product_image": true,
+      "reason": "Foot patch product is the dominant hero visual."
+    },
+    {
+      "filename": "Static #4.png",
+      "requires_product_image": true,
+      "reason": "Handheld detection device is the dominant hero visual."
+    },
+    {
+      "filename": "big_text.jpg",
+      "requires_product_image": false,
+      "reason": "Text-only creative with no product shown."
+    },
+    {
+      "filename": "boss_babe.jpg",
+      "requires_product_image": false,
+      "reason": "Editorial portrait + headline; no product shown."
+    },
+    {
+      "filename": "brush.jpg",
+      "requires_product_image": true,
+      "reason": "Physical product is the sole focus of the frame."
+    },
+    {
+      "filename": "care_bag.jpg",
+      "requires_product_image": true,
+      "reason": "Bag product is foreground hero object."
+    },
+    {
+      "filename": "derm_fag.jpg",
+      "requires_product_image": false,
+      "reason": "Close-up eye + claim block; no product visual."
+    },
+    {
+      "filename": "drawing.jpg",
+      "requires_product_image": false,
+      "reason": "Illustrative character + copy-led card; no product visual."
+    },
+    {
+      "filename": "fatigue.jpg",
+      "requires_product_image": false,
+      "reason": "Copy-led testimonial style without product visual."
+    },
+    {
+      "filename": "fb_message_ad.jpg",
+      "requires_product_image": false,
+      "reason": "Screenshot-style social proof; no product visual."
+    },
+    {
+      "filename": "green.jpg",
+      "requires_product_image": false,
+      "reason": "Abstract/biological visual + headline; no product visual."
+    },
+    {
+      "filename": "grocery.jpg",
+      "requires_product_image": false,
+      "reason": "Manifesto-style text card with no product hero."
+    },
+    {
+      "filename": "health_cute_advertorial.jpg",
+      "requires_product_image": false,
+      "reason": "Advertorial tile with mascot illustration, no packshot."
+    },
+    {
+      "filename": "old_school.jpg",
+      "requires_product_image": false,
+      "reason": "Portrait + story hook card; no visible product object."
+    },
+    {
+      "filename": "raise_a_winner.jpg",
+      "requires_product_image": false,
+      "reason": "Problem-solution copy card with subject portrait only."
+    },
+    {
+      "filename": "researchers.jpg",
+      "requires_product_image": false,
+      "reason": "Expert/authority framing without product visual."
+    },
+    {
+      "filename": "spanish_doctor_cta.jpg",
+      "requires_product_image": false,
+      "reason": "Doctor portrait + CTA card; no product shown."
+    },
+    {
+      "filename": "target_1.jpg",
+      "requires_product_image": true,
+      "reason": "Multiple product packages are the primary visual."
+    },
+    {
+      "filename": "women_health.jpg",
+      "requires_product_image": false,
+      "reason": "Shock-hook editorial card without visible product."
+    }
+  ]
+}

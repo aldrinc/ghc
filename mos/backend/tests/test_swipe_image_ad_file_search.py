@@ -213,7 +213,6 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
             captured["creative_payload_count"] = payload.count
             captured["creative_payload_reference_asset_ids"] = list(payload.reference_asset_ids or [])
             captured["creative_payload_reference_image_urls"] = list(payload.reference_image_urls or [])
-            captured["creative_payload_reference_text"] = payload.reference_text
             captured["creative_payload_model_id"] = payload.model_id
             captured["creative_idempotency_key"] = idempotency_key
             return SimpleNamespace(id="job-123")
@@ -311,11 +310,6 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     )
     monkeypatch.setattr(
         swipe_activity,
-        "_build_image_reference_text",
-        lambda _references: "Use product reference image 1.",
-    )
-    monkeypatch.setattr(
-        swipe_activity,
         "_resolve_swipe_image",
         lambda **_kwargs: (b"image-bytes", "image/png", "https://example.com/swipe.png"),
     )
@@ -358,7 +352,6 @@ def test_generate_swipe_image_ad_activity_uses_file_search_tools(monkeypatch):
     assert captured["creative_payload_count"] == 1
     assert captured["creative_payload_reference_asset_ids"] == ["remote-product-asset-1"]
     assert captured["creative_payload_reference_image_urls"] == ["https://example.com/product-1.png"]
-    assert captured["creative_payload_reference_text"] == "Use product reference image 1."
     assert captured["creative_payload_model_id"] == "models/gemini-3-pro-image-preview"
     prompt_input = captured["contents"][0]
     assert isinstance(prompt_input, str)
@@ -537,3 +530,230 @@ def test_generate_swipe_image_ad_activity_allows_missing_product_images(monkeypa
     assert result["asset_ids"] == ["asset-1"]
     assert captured["creative_payload_reference_image_urls"] == []
     assert len(captured["contents"]) == 2
+
+
+def test_generate_swipe_image_ad_activity_omits_product_images_when_policy_false(monkeypatch):
+    captured: dict[str, object] = {}
+
+    @contextmanager
+    def _fake_session_scope():
+        yield object()
+
+    class _FakeModels:
+        def generate_content(self, *, model, contents, config):
+            captured["contents"] = contents
+            return SimpleNamespace(
+                text="```text\nDense generation-ready prompt.\n```",
+                usage_metadata=SimpleNamespace(prompt_token_count=11, candidates_token_count=22),
+            )
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = _FakeModels()
+
+    class _FakeRenderClient:
+        def create_image_ads(self, payload, idempotency_key):
+            captured["creative_payload_reference_image_urls"] = list(payload.reference_image_urls or [])
+            return SimpleNamespace(id="job-123")
+
+        def get_image_ads_job(self, job_id):
+            assert job_id == "job-123"
+            return SimpleNamespace(
+                id=job_id,
+                status="succeeded",
+                error_detail=None,
+                model_id="nano-banana-pro",
+                references=[],
+                outputs=[
+                    SimpleNamespace(
+                        output_index=0,
+                        asset_id="remote-asset-1",
+                        prompt_used="Dense generation-ready prompt.",
+                        primary_url="https://example.com/generated.png",
+                    )
+                ],
+            )
+
+    monkeypatch.setattr(swipe_activity, "session_scope", _fake_session_scope)
+    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda: "higgsfield")
+    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda: _FakeRenderClient())
+    monkeypatch.setattr(
+        swipe_activity,
+        "load_swipe_to_image_ad_prompt",
+        lambda: (
+            "\n".join(
+                [
+                    "You make ONE static image ad from ONE competitor swipe image.",
+                    "Brand name: [BRAND_NAME]",
+                    "Product: [PRODUCT]",
+                    "Audience: [AUDIENCE] (optional)",
+                    "Brand colors/fonts: [UNKNOWN if not given]",
+                    "Must-avoid claims: [UNKNOWN if not given]",
+                    "Assets: [PACKSHOT? LOGO?] (optional)",
+                    "[User uploads image]",
+                ]
+            ),
+            "prompt-sha",
+        ),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_extract_brief",
+        lambda **_kwargs: (
+            {
+                "creativeConcept": "Concept",
+                "requirements": [{"channel": "meta", "format": "image", "angle": "Clinical proof"}],
+                "constraints": [],
+                "toneGuidelines": [],
+                "visualGuidelines": [],
+            },
+            "brief-artifact-id",
+        ),
+    )
+    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        swipe_activity,
+        "_extract_brand_context",
+        lambda **_kwargs: {
+            "client_name": "Brand Name",
+            "product_title": "Product Name",
+            "canon": {"constraints": {"legal": []}},
+            "design_system_tokens": {},
+        },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_select_product_reference_assets",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            AssertionError("product references should not be selected when swipe_requires_product_image=false")
+        ),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_resolve_swipe_image",
+        lambda **_kwargs: (b"image-bytes", "image/png", "https://example.com/women_health.jpg"),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_download_bytes",
+        lambda _url, *, max_bytes, timeout_seconds: (_ for _ in ()).throw(
+            AssertionError("product image should not be downloaded when swipe_requires_product_image=false")
+        ),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_resolve_gemini_file_search_store_names",
+        lambda **_kwargs: ["fileSearchStores/context-store"],
+    )
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+    monkeypatch.setattr(swipe_activity, "_create_generated_asset_from_url", lambda **_kwargs: "asset-1")
+
+    result = swipe_activity.generate_swipe_image_ad_activity(
+        {
+            "org_id": "00000000-0000-0000-0000-000000000001",
+            "client_id": "00000000-0000-0000-0000-000000000011",
+            "product_id": "00000000-0000-0000-0000-000000000022",
+            "campaign_id": "00000000-0000-0000-0000-000000000033",
+            "asset_brief_id": "asset-brief-1",
+            "requirement_index": 0,
+            "company_swipe_id": "swipe-1",
+            "swipe_requires_product_image": False,
+            "model": "models/gemini-2.5-flash",
+            "count": 1,
+            "aspect_ratio": "1:1",
+            "render_model_id": "nano-banana-pro",
+        }
+    )
+
+    assert result["asset_ids"] == ["asset-1"]
+    assert captured["creative_payload_reference_image_urls"] == []
+    assert len(captured["contents"]) == 2
+
+
+def test_generate_swipe_image_ad_activity_errors_when_policy_true_and_no_product_assets(monkeypatch):
+    @contextmanager
+    def _fake_session_scope():
+        yield object()
+
+    class _FakeGeminiClient:
+        def __init__(self):
+            self.models = SimpleNamespace(generate_content=lambda **_kwargs: None)
+
+    class _FakeRenderClient:
+        def create_image_ads(self, payload, idempotency_key):  # pragma: no cover
+            raise AssertionError("render call should not happen when product policy validation fails early")
+
+    monkeypatch.setattr(swipe_activity, "session_scope", _fake_session_scope)
+    monkeypatch.setattr(swipe_activity, "get_image_render_provider", lambda: "higgsfield")
+    monkeypatch.setattr(swipe_activity, "build_image_render_client", lambda: _FakeRenderClient())
+    monkeypatch.setattr(
+        swipe_activity,
+        "load_swipe_to_image_ad_prompt",
+        lambda: ("Brand name: [BRAND_NAME]\nProduct: [PRODUCT]\n[User uploads image]", "prompt-sha"),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_extract_brief",
+        lambda **_kwargs: (
+            {
+                "creativeConcept": "Concept",
+                "requirements": [{"channel": "meta", "format": "image"}],
+                "constraints": [],
+                "toneGuidelines": [],
+                "visualGuidelines": [],
+            },
+            "brief-artifact-id",
+        ),
+    )
+    monkeypatch.setattr(swipe_activity, "_validate_brief_scope", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        swipe_activity,
+        "_extract_brand_context",
+        lambda **_kwargs: {
+            "client_name": "Brand Name",
+            "product_title": "Product Name",
+            "canon": {"constraints": {"legal": []}},
+            "design_system_tokens": {},
+        },
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_resolve_swipe_image",
+        lambda **_kwargs: (b"image-bytes", "image/png", "https://example.com/5.png"),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_select_product_reference_assets",
+        lambda **_kwargs: (_ for _ in ()).throw(
+            ValueError("No active source product images are available for creative generation references.")
+        ),
+    )
+    monkeypatch.setattr(
+        swipe_activity,
+        "_resolve_gemini_file_search_store_names",
+        lambda **_kwargs: ["fileSearchStores/context-store"],
+    )
+    monkeypatch.setattr(swipe_activity, "_ensure_gemini_client", lambda: _FakeGeminiClient())
+    monkeypatch.setattr(swipe_activity, "_create_generated_asset_from_url", lambda **_kwargs: "asset-1")
+
+    try:
+        swipe_activity.generate_swipe_image_ad_activity(
+            {
+                "org_id": "00000000-0000-0000-0000-000000000001",
+                "client_id": "00000000-0000-0000-0000-000000000011",
+                "product_id": "00000000-0000-0000-0000-000000000022",
+                "campaign_id": "00000000-0000-0000-0000-000000000033",
+                "asset_brief_id": "asset-brief-1",
+                "requirement_index": 0,
+                "company_swipe_id": "swipe-1",
+                "swipe_requires_product_image": True,
+                "model": "models/gemini-2.5-flash",
+                "count": 1,
+                "aspect_ratio": "1:1",
+                "render_model_id": "nano-banana-pro",
+            }
+        )
+    except ValueError as exc:
+        assert "Swipe requires product image references" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected ValueError when swipe_requires_product_image=true and no product assets exist")

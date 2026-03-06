@@ -42,7 +42,6 @@ def test_higgsfield_create_image_ads_uses_model_defaults(monkeypatch) -> None:
 
     payload = CreativeServiceImageAdsCreateIn(
         prompt="Create an ad image",
-        reference_text="Use this product style.",
         count=2,
         aspect_ratio="1:1",
     )
@@ -56,7 +55,7 @@ def test_higgsfield_create_image_ads_uses_model_defaults(monkeypatch) -> None:
     assert captured_requests[0][0] == "POST"
     assert captured_requests[0][1] == "/nano-banana-pro"
     assert captured_requests[0][2] == {
-        "prompt": "Create an ad image\n\nReference context:\nUse this product style.",
+        "prompt": "Create an ad image",
         "aspect_ratio": "1:1",
         "resolution": "1k",
     }
@@ -167,6 +166,59 @@ def test_higgsfield_create_image_ads_uploads_and_attaches_reference_image(monkey
         captured_requests.append((method, path, json_payload))
         assert method == "POST"
         assert path == "/nano-banana-pro"
+        return {"request_id": "req-1"}
+
+    monkeypatch.setattr(client, "_request_json", _fake_request_json)
+    monkeypatch.setattr(
+        client,
+        "_prepare_reference_image_urls",
+        lambda **kwargs: ["https://cdn.higgsfield.ai/uploads/product-ref-1.png"],
+    )
+
+    payload = CreativeServiceImageAdsCreateIn(
+        prompt="Create an ad image",
+        count=1,
+        aspect_ratio="1:1",
+        reference_image_urls=["https://example.com/product-reference.png"],
+    )
+
+    job = client.create_image_ads(payload=payload, idempotency_key="idem-1")
+
+    assert job.status == "queued"
+    assert len(job.references) == 1
+    assert job.references[0].primary_url == "https://cdn.higgsfield.ai/uploads/product-ref-1.png"
+    assert captured_requests[0][2] == {
+        "prompt": "Create an ad image",
+        "input_images": [
+            {
+                "type": "image_url",
+                "image_url": "https://cdn.higgsfield.ai/uploads/product-ref-1.png",
+            }
+        ],
+        "aspect_ratio": "1:1",
+        "resolution": "1k",
+    }
+
+
+def test_higgsfield_create_image_ads_uses_image_url_reference_for_non_nano_models(monkeypatch) -> None:
+    client = image_render.HiggsfieldImageRenderClient(
+        base_url="https://platform.higgsfield.ai",
+        hf_key="hf-test-key",
+        default_model="seedream_v5_lite",
+        default_resolution="1k",
+    )
+
+    captured_requests: list[tuple[str, str, dict[str, object] | None]] = []
+
+    def _fake_request_json(
+        method: str,
+        path: str,
+        *,
+        json_payload: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        captured_requests.append((method, path, json_payload))
+        assert method == "POST"
+        assert path == "/seedream_v5_lite"
         return {"request_id": "req-1"}
 
     monkeypatch.setattr(client, "_request_json", _fake_request_json)
