@@ -61,7 +61,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
         return {
             "variants": [
                 {
-                    "variant_id": "base",
+                    "variant_id": "single_device",
                     "dimensions": {
                         "value_equation": {"raw_score": 8.0, "evidence_quality": "INFERRED"},
                         "objection_coverage": {"raw_score": 8.0, "evidence_quality": "OBSERVED"},
@@ -71,10 +71,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "clarity_simplicity": {"raw_score": 8.0, "evidence_quality": "INFERRED"},
                         "bottleneck_resilience": {"raw_score": 7.5, "evidence_quality": "INFERRED"},
                         "momentum_continuity": {"raw_score": 7.8, "evidence_quality": "INFERRED"},
+                        "pricing_fidelity": {"raw_score": 8.0, "evidence_quality": "OBSERVED"},
+                        "savings_fidelity": {"raw_score": 7.8, "evidence_quality": "OBSERVED"},
+                        "best_value_fidelity": {"raw_score": 7.5, "evidence_quality": "INFERRED"},
                     },
                 },
                 {
-                    "variant_id": "variant_a",
+                    "variant_id": "share_and_save",
                     "dimensions": {
                         "value_equation": {"raw_score": 8.2, "evidence_quality": "INFERRED"},
                         "objection_coverage": {"raw_score": 8.1, "evidence_quality": "OBSERVED"},
@@ -84,10 +87,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "clarity_simplicity": {"raw_score": 8.0, "evidence_quality": "INFERRED"},
                         "bottleneck_resilience": {"raw_score": 7.6, "evidence_quality": "INFERRED"},
                         "momentum_continuity": {"raw_score": 8.0, "evidence_quality": "INFERRED"},
+                        "pricing_fidelity": {"raw_score": 8.4, "evidence_quality": "OBSERVED"},
+                        "savings_fidelity": {"raw_score": 8.3, "evidence_quality": "OBSERVED"},
+                        "best_value_fidelity": {"raw_score": 8.1, "evidence_quality": "INFERRED"},
                     },
                 },
                 {
-                    "variant_id": "variant_b",
+                    "variant_id": "family_bundle",
                     "dimensions": {
                         "value_equation": {"raw_score": 7.8, "evidence_quality": "INFERRED"},
                         "objection_coverage": {"raw_score": 7.7, "evidence_quality": "OBSERVED"},
@@ -97,6 +103,9 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "clarity_simplicity": {"raw_score": 7.7, "evidence_quality": "INFERRED"},
                         "bottleneck_resilience": {"raw_score": 7.4, "evidence_quality": "INFERRED"},
                         "momentum_continuity": {"raw_score": 7.6, "evidence_quality": "INFERRED"},
+                        "pricing_fidelity": {"raw_score": 8.7, "evidence_quality": "OBSERVED"},
+                        "savings_fidelity": {"raw_score": 8.8, "evidence_quality": "OBSERVED"},
+                        "best_value_fidelity": {"raw_score": 8.9, "evidence_quality": "INFERRED"},
                     },
                 },
             ]
@@ -105,7 +114,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
     def _offer_variants_payload() -> list[dict[str, Any]]:
         return [
             {
-                "variant_id": "base",
+                "variant_id": "single_device",
                 "core_promise": "Overwhelm -> calm routine",
                 "value_stack": [
                     {
@@ -135,6 +144,22 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 ],
                 "guarantee": "30-day clarity guarantee",
                 "pricing_rationale": "Single payment for recurring use",
+                "pricing_metadata": {"list_price_cents": 9900, "offer_price_cents": 6900},
+                "savings_metadata": {
+                    "savings_amount_cents": 3000,
+                    "savings_percent": 30.3,
+                    "savings_basis": "vs_list_price",
+                },
+                "best_value_metadata": {
+                    "is_best_value": False,
+                    "rationale": "Lowest commitment option for first-time buyers.",
+                    "compared_variant_ids": ["share_and_save", "family_bundle"],
+                },
+                "bonus_modules": [
+                    {"bonus_id": "bonus-1", "copy": "Nightly startup checklist for first use."},
+                    {"bonus_id": "bonus-2", "copy": "Troubleshooting map for routine disruptions."},
+                    {"bonus_id": "bonus-3", "copy": "Quick reference card for daily consistency."},
+                ],
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 8},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 8},
@@ -147,10 +172,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "clarity_simplicity": 8,
                     "bottleneck_resilience": 7,
                     "momentum_continuity": 8,
+                    "pricing_fidelity": 8,
+                    "savings_fidelity": 8,
+                    "best_value_fidelity": 7,
                 },
             },
             {
-                "variant_id": "variant_a",
+                "variant_id": "share_and_save",
                 "core_promise": "Overwhelm -> calm routine",
                 "value_stack": [
                     {
@@ -180,6 +208,22 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 ],
                 "guarantee": "60-day confidence guarantee",
                 "pricing_rationale": "Action-oriented bundle value",
+                "pricing_metadata": {"list_price_cents": 19800, "offer_price_cents": 11900},
+                "savings_metadata": {
+                    "savings_amount_cents": 7900,
+                    "savings_percent": 39.9,
+                    "savings_basis": "vs_list_price",
+                },
+                "best_value_metadata": {
+                    "is_best_value": False,
+                    "rationale": "Best for two-device households balancing value and flexibility.",
+                    "compared_variant_ids": ["single_device", "family_bundle"],
+                },
+                "bonus_modules": [
+                    {"bonus_id": "bonus-1", "copy": "Shared setup workflow for two users."},
+                    {"bonus_id": "bonus-2", "copy": "Sync checklist to keep routines aligned."},
+                    {"bonus_id": "bonus-3", "copy": "Partner accountability prompts for follow-through."},
+                ],
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 8},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 8},
@@ -192,10 +236,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "clarity_simplicity": 8,
                     "bottleneck_resilience": 8,
                     "momentum_continuity": 8,
+                    "pricing_fidelity": 8,
+                    "savings_fidelity": 8,
+                    "best_value_fidelity": 8,
                 },
             },
             {
-                "variant_id": "variant_b",
+                "variant_id": "family_bundle",
                 "core_promise": "Overwhelm -> calm routine",
                 "value_stack": [
                     {
@@ -225,6 +272,22 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 ],
                 "guarantee": "30-day clarity guarantee",
                 "pricing_rationale": "Anchored bundle value",
+                "pricing_metadata": {"list_price_cents": 29700, "offer_price_cents": 15900},
+                "savings_metadata": {
+                    "savings_amount_cents": 13800,
+                    "savings_percent": 46.46,
+                    "savings_basis": "vs_list_price",
+                },
+                "best_value_metadata": {
+                    "is_best_value": True,
+                    "rationale": "Highest total savings for family usage with the same core system.",
+                    "compared_variant_ids": ["single_device", "share_and_save"],
+                },
+                "bonus_modules": [
+                    {"bonus_id": "bonus-1", "copy": "Family onboarding plan for multiple caregivers."},
+                    {"bonus_id": "bonus-2", "copy": "Shared escalation guide for off-pattern nights."},
+                    {"bonus_id": "bonus-3", "copy": "Printable family tracker for weekly review."},
+                ],
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 7},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 7},
@@ -237,6 +300,9 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "clarity_simplicity": 7,
                     "bottleneck_resilience": 7,
                     "momentum_continuity": 7,
+                    "pricing_fidelity": 9,
+                    "savings_fidelity": 9,
+                    "best_value_fidelity": 9,
                 },
             },
         ]
@@ -505,9 +571,18 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "title": "Approved Headline",
                         "subtitle": "Predictable evenings are possible with a mechanism-first approach.",
                         "badges": [
-                            {"label": "Mechanism-first"},
-                            {"label": "Evidence-backed"},
-                            {"label": "Practical nightly use"},
+                            {
+                                "label": "Mechanism-first",
+                                "icon": {"alt": "Mechanism icon", "prompt": "icon of mechanism-first process"},
+                            },
+                            {
+                                "label": "Evidence-backed",
+                                "icon": {"alt": "Evidence icon", "prompt": "icon of evidence-backed guidance"},
+                            },
+                            {
+                                "label": "Practical nightly use",
+                                "icon": {"alt": "Checklist icon", "prompt": "icon of nightly routine checklist"},
+                            },
                         ],
                     },
                     "reasons": [
@@ -515,6 +590,9 @@ def _stub_prompt_chain_runtime(monkeypatch):
                             "number": 1,
                             "title": "Random fixes miss the real bottleneck",
                             "body": "Mechanism mismatch keeps restarting the same nightly stress loop.",
+                            "image": {
+                                "alt": "Caregiver reviewing a nightly routine checklist",
+                            },
                         }
                     ],
                     "marquee": [
@@ -529,6 +607,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
                             "Decision support for common setbacks",
                         ],
                         "cta_label": "Continue to the offer",
+                        "image": {"alt": "Printed guide and checklist pages"},
                     },
                     "reviews": [
                         {
@@ -647,9 +726,10 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     },
                     "whats_inside": {
                         "benefits": [
-                            "Implementation checklist",
-                            "Timeline map",
-                            "Decision support prompts",
+                            "Start Faster",
+                            "Stay On Track",
+                            "Ask Better Questions",
+                            "Feel More Certain",
                         ],
                         "offer_helper_text": "Everything needed to execute without guesswork.",
                     },
@@ -675,6 +755,19 @@ def _stub_prompt_chain_runtime(monkeypatch):
                             }
                         ],
                     },
+                    "faq_pills": [
+                        {
+                            "label": "How quickly can we start?",
+                            "answer": "Most families can run the first sequence tonight.",
+                        }
+                    ],
+                    "marquee_items": [
+                        "Mechanism-first",
+                        "Practical nightly use",
+                        "Evidence-backed",
+                        "Confidence guarantee",
+                    ],
+                    "urgency_message": "Selling out faster than expected. Claim your access before this launch closes.",
                     "cta_close": "Start now and lock in consistent evenings.",
                 },
             }
@@ -877,6 +970,7 @@ def _agent2_voc_observations_payload() -> list[dict[str, Any]]:
         rows.append(
             {
                 "voc_id": f"V{index + 1:03d}",
+                "evidence_id": f"E{index + 1:016X}",
                 "source": "https://www.reddit.com/r/sleep" if index % 2 == 0 else "https://forum.sleephelp.com/thread",
                 "source_type": "REDDIT" if index % 2 == 0 else "FORUM",
                 "source_url": "https://www.reddit.com/r/sleep" if index % 2 == 0 else "https://forum.sleephelp.com/thread",
@@ -1388,9 +1482,9 @@ def test_start_strategy_v2_and_send_all_hitl_signals(api_client, fake_temporal):
     offer_winner = api_client.post(
         f"/workflows/{run_id}/signals/strategy-v2/select-offer-winner",
         json={
-            "variant_id": "variant_a",
-            "rejected_variant_ids": ["variant_b"],
-            "reviewed_candidate_ids": ["variant_a", "variant_b"],
+            "variant_id": "share_and_save",
+            "rejected_variant_ids": ["family_bundle"],
+            "reviewed_candidate_ids": ["share_and_save", "family_bundle"],
             **_manual_hitl_fields(
                 operator_note="Variant A wins on composite score and decision confidence.",
             ),
@@ -1600,7 +1694,8 @@ def test_strategy_v2_state_from_research_artifacts(api_client, db_session, auth_
         ("v2-03", "v2-03b", None),
         ("v2-03b", "v2-03c", None),
         ("v2-03c", "v2-04", None),
-        ("v2-04", "v2-05", None),
+        ("v2-04", "v2-05a", None),
+        ("v2-05a", "v2-05", None),
         ("v2-05", "v2-06", None),
     ],
 )
@@ -2231,7 +2326,14 @@ def test_strategy_v2_checkpoint_c5_requires_voc_scored(monkeypatch):
                     "v2-05": "artifact-v2-05",
                 },
                 "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
-                "voc_observations": [{"voc_id": "V001", "quote": "Quote", "source_url": "https://source.example"}],
+                "voc_observations": [
+                    {
+                        "voc_id": "V001",
+                        "evidence_id": "E1111111111111111",
+                        "quote": "Quote",
+                        "source_url": "https://source.example",
+                    }
+                ],
                 "voc_scored": None,
             }
         )
@@ -2603,7 +2705,7 @@ def test_campaign_intent_allows_strategy_v2_enabled_client_without_canon_metric(
                 "ums": "UMS core",
                 "core_promise": "Promise",
                 "value_stack_summary": ["Stack item"],
-                "variant_selected": "variant_a",
+                "variant_selected": "share_and_save",
             },
         )
     )
@@ -2614,7 +2716,7 @@ def test_campaign_intent_allows_strategy_v2_enabled_client_without_canon_metric(
             product_id=product_uuid,
             campaign_id=None,
             type=ArtifactTypeEnum.strategy_v2_offer,
-            data={"selected_offer": {"variant_id": "variant_a"}},
+            data={"selected_offer": {"variant_id": "share_and_save"}},
         )
     )
     db_session.add(
@@ -2691,7 +2793,14 @@ def test_strategy_v2_voc_pipeline_accepts_precanon_research_without_client_canon
         "_run_agent2_extractor",
         lambda **_kwargs: {
             "mode": "DUAL",
-            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "voc_observations": [
+                {
+                    "voc_id": "V1",
+                    "evidence_id": "E1111111111111111",
+                    "source": "https://example.com",
+                    "quote": "Sample VOC",
+                }
+            ],
             "rejected_items": [],
             "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
             "prompt_provenance": {},
@@ -2881,7 +2990,14 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
         "_run_agent2_extractor",
         lambda **_kwargs: {
             "mode": "DUAL",
-            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "voc_observations": [
+                {
+                    "voc_id": "V1",
+                    "evidence_id": "E1111111111111111",
+                    "source": "https://example.com",
+                    "quote": "Sample VOC",
+                }
+            ],
             "rejected_items": [],
             "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
             "prompt_provenance": {},
@@ -3206,6 +3322,58 @@ def test_build_offer_variants_requires_nonempty_revision_notes(
                 "workflow_run_id": workflow_run_id,
                 "stage2": stage2_payload,
                 "offer_pipeline_output": offer_pipeline_output,
+                "offer_data_readiness": {
+                    "status": "ready",
+                    "missing_fields": [],
+                    "inconsistent_fields": [],
+                    "context": {
+                        "offer_format": "DISCOUNT_PLUS_3_BONUSES_V1",
+                        "product_type": "digital",
+                        "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
+                        "offer_id": "offer-1",
+                        "offer_name": "Offer Variant Bundle",
+                        "bonus_items": [
+                            {
+                                "bonus_id": "bonus-1",
+                                "linked_product_id": "bonus-prod-1",
+                                "title": "Bonus 1",
+                                "product_type": "digital",
+                                "position": 1,
+                            },
+                            {
+                                "bonus_id": "bonus-2",
+                                "linked_product_id": "bonus-prod-2",
+                                "title": "Bonus 2",
+                                "product_type": "digital",
+                                "position": 2,
+                            },
+                            {
+                                "bonus_id": "bonus-3",
+                                "linked_product_id": "bonus-prod-3",
+                                "title": "Bonus 3",
+                                "product_type": "digital",
+                                "position": 3,
+                            },
+                        ],
+                        "pricing_metadata": {"list_price_cents": 9900, "offer_price_cents": 6900},
+                        "savings_metadata": {
+                            "savings_amount_cents": 3000,
+                            "savings_percent": 30.3,
+                            "savings_basis": "vs_list_price",
+                        },
+                        "bundle_contents": {
+                            "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
+                            "offer_id": "offer-1",
+                            "offer_name": "Offer Variant Bundle",
+                            "bonuses": [
+                                {"bonus_id": "bonus-1", "linked_product_id": "bonus-prod-1", "title": "Bonus 1"},
+                                {"bonus_id": "bonus-2", "linked_product_id": "bonus-prod-2", "title": "Bonus 2"},
+                                {"bonus_id": "bonus-3", "linked_product_id": "bonus-prod-3", "title": "Bonus 3"},
+                            ],
+                            "bonus_count": 3,
+                        },
+                    },
+                },
                 "ump_ums_selection_decision": {
                     "operator_user_id": "operator-1",
                     "pair_id": "pair-a",
@@ -3326,7 +3494,14 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
         "_run_agent2_extractor",
         lambda **_kwargs: {
             "mode": "DUAL",
-            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "voc_observations": [
+                {
+                    "voc_id": "V1",
+                    "evidence_id": "E1111111111111111",
+                    "source": "https://example.com",
+                    "quote": "Sample VOC",
+                }
+            ],
             "rejected_items": [],
             "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
             "prompt_provenance": {},
@@ -3539,6 +3714,58 @@ SEGMENT_HINT: parents
             "workflow_run_id": workflow_run_id,
             "stage2": stage2_result["stage2"],
             "offer_pipeline_output": offer_pipeline_output,
+            "offer_data_readiness": {
+                "status": "ready",
+                "missing_fields": [],
+                "inconsistent_fields": [],
+                "context": {
+                    "offer_format": "DISCOUNT_PLUS_3_BONUSES_V1",
+                    "product_type": "digital",
+                    "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
+                    "offer_id": "offer-1",
+                    "offer_name": "Offer Variant Bundle",
+                    "bonus_items": [
+                        {
+                            "bonus_id": "bonus-1",
+                            "linked_product_id": "bonus-prod-1",
+                            "title": "Bonus 1",
+                            "product_type": "digital",
+                            "position": 1,
+                        },
+                        {
+                            "bonus_id": "bonus-2",
+                            "linked_product_id": "bonus-prod-2",
+                            "title": "Bonus 2",
+                            "product_type": "digital",
+                            "position": 2,
+                        },
+                        {
+                            "bonus_id": "bonus-3",
+                            "linked_product_id": "bonus-prod-3",
+                            "title": "Bonus 3",
+                            "product_type": "digital",
+                            "position": 3,
+                        },
+                    ],
+                    "pricing_metadata": {"list_price_cents": 9900, "offer_price_cents": 6900},
+                    "savings_metadata": {
+                        "savings_amount_cents": 3000,
+                        "savings_percent": 30.3,
+                        "savings_basis": "vs_list_price",
+                    },
+                    "bundle_contents": {
+                        "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
+                        "offer_id": "offer-1",
+                        "offer_name": "Offer Variant Bundle",
+                        "bonuses": [
+                            {"bonus_id": "bonus-1", "linked_product_id": "bonus-prod-1", "title": "Bonus 1"},
+                            {"bonus_id": "bonus-2", "linked_product_id": "bonus-prod-2", "title": "Bonus 2"},
+                            {"bonus_id": "bonus-3", "linked_product_id": "bonus-prod-3", "title": "Bonus 3"},
+                        ],
+                        "bonus_count": 3,
+                    },
+                },
+            },
             "ump_ums_selection_decision": {
                 "operator_user_id": "operator-1",
                 "pair_id": pair_id,

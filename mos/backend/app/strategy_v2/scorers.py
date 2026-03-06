@@ -19,13 +19,21 @@ _MODULE_CACHE: dict[str, ModuleType] = {}
 _MODULE_CACHE_LOCK = Lock()
 _HEADLINE_QA_TRANSIENT_RETRY_ATTEMPTS = max(
     1,
-    int(os.getenv("STRATEGY_V2_HEADLINE_QA_TRANSIENT_RETRY_ATTEMPTS", "3")),
+    int(os.getenv("STRATEGY_V2_HEADLINE_QA_TRANSIENT_RETRY_ATTEMPTS", "6")),
 )
 _HEADLINE_QA_TRANSIENT_RETRY_BASE_SECONDS = max(
     0.0,
-    float(os.getenv("STRATEGY_V2_HEADLINE_QA_TRANSIENT_RETRY_BASE_SECONDS", "2.0")),
+    float(os.getenv("STRATEGY_V2_HEADLINE_QA_TRANSIENT_RETRY_BASE_SECONDS", "3.0")),
 )
 _HEADLINE_QA_REQUEST_ID_RE = re.compile(r"\breq_[A-Za-z0-9]+\b")
+_HEADLINE_QA_CALL_TIMEOUT_SECONDS = max(
+    1.0,
+    float(os.getenv("STRATEGY_V2_HEADLINE_QA_CALL_TIMEOUT_SECONDS", "90")),
+)
+_HEADLINE_QA_CALL_MAX_RETRIES = max(
+    0,
+    int(os.getenv("STRATEGY_V2_HEADLINE_QA_CALL_MAX_RETRIES", "2")),
+)
 
 
 def _repo_root() -> Path:
@@ -357,6 +365,10 @@ def run_headline_qa_loop(
     cleaned_model = model.strip()
     if not cleaned_model:
         raise StrategyV2ScorerError("Headline QA loop requires an explicit model value.")
+
+    # Ensure external QA utility runs with resilient transient retry/timeouts.
+    os.environ["STRATEGY_V2_HEADLINE_QA_CALL_TIMEOUT_SECONDS"] = str(_HEADLINE_QA_CALL_TIMEOUT_SECONDS)
+    os.environ["STRATEGY_V2_HEADLINE_QA_CALL_MAX_RETRIES"] = str(_HEADLINE_QA_CALL_MAX_RETRIES)
 
     module = _load_module(
         "copy_headline_qa_loop",

@@ -461,6 +461,22 @@ def load_strategy_v2_source_context(
         if isinstance(proof_candidates_raw, list):
             proof_asset_candidates = [row for row in proof_candidates_raw if isinstance(row, dict)]
     if competitor_analysis is None:
+        competitor_analysis_v2_06 = v2_06.payload.get("competitor_analysis")
+        if isinstance(competitor_analysis_v2_06, dict):
+            competitor_analysis = competitor_analysis_v2_06
+    if not voc_observations:
+        voc_observations_v2_06 = v2_06.payload.get("voc_observations")
+        if isinstance(voc_observations_v2_06, list):
+            voc_observations = [row for row in voc_observations_v2_06 if isinstance(row, dict)]
+    if not voc_scored:
+        voc_scored_v2_06 = v2_06.payload.get("voc_scored")
+        if isinstance(voc_scored_v2_06, dict):
+            voc_scored = voc_scored_v2_06
+    if not proof_asset_candidates:
+        proof_candidates_v2_06 = v2_06.payload.get("proof_asset_candidates")
+        if isinstance(proof_candidates_v2_06, list):
+            proof_asset_candidates = [row for row in proof_candidates_v2_06 if isinstance(row, dict)]
+    if competitor_analysis is None:
         competitor_analysis = _extract_competitor_analysis_from_foundation(step_payloads)
     if not proof_asset_candidates:
         v2_08_proof_candidates = v2_08.payload.get("proof_asset_candidates")

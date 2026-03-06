@@ -224,6 +224,134 @@ def test_campaign_launch_history_endpoint_returns_launch_status(api_client, db_s
     assert rows[0]["launch_status"] == WorkflowStatusEnum.running.value
 
 
+def test_launch_additional_angle_errors_when_idempotent_rows_span_multiple_launch_runs(
+    api_client,
+    db_session,
+    monkeypatch,
+):
+    client, product, source_run, _ = _seed_strategy_v2_scope(db_session)
+
+    source_context = _fake_source_context()
+    source_context.ranked_angle_candidates = [
+        {"angle": {"angle_id": "A02", "angle_name": "Second angle"}},
+        {"angle": {"angle_id": "A03", "angle_name": "Third angle"}},
+    ]
+    monkeypatch.setattr(
+        workflows_router,
+        "_load_source_context_or_409",
+        lambda **_kwargs: source_context,
+    )
+
+    launch_run_one = WorkflowRun(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        product_id=product.id,
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-angle-launch-one",
+        temporal_run_id="strategy-v2-angle-launch-one-run",
+        kind=WorkflowKindEnum.strategy_v2_angle_launch,
+        status=WorkflowStatusEnum.completed,
+    )
+    launch_run_two = WorkflowRun(
+        org_id=TEST_ORG_ID,
+        client_id=client.id,
+        product_id=product.id,
+        campaign_id=None,
+        temporal_workflow_id="strategy-v2-angle-launch-two",
+        temporal_run_id="strategy-v2-angle-launch-two-run",
+        kind=WorkflowKindEnum.strategy_v2_angle_launch,
+        status=WorkflowStatusEnum.completed,
+    )
+    db_session.add_all([launch_run_one, launch_run_two])
+    db_session.commit()
+    db_session.refresh(launch_run_one)
+    db_session.refresh(launch_run_two)
+
+    channels = ["meta"]
+    asset_brief_types = ["static-image"]
+    launch_key_a02 = strategy_v2_launches.build_launch_key(
+        source_strategy_v2_workflow_run_id=str(source_run.id),
+        launch_type="additional_angle",
+        angle_id="A02",
+        campaign_id=None,
+        selected_ums_id=None,
+        channels=channels,
+        asset_brief_types=asset_brief_types,
+        experiment_variant_policy="angle_branch_standard_v1",
+    )
+    launch_key_a03 = strategy_v2_launches.build_launch_key(
+        source_strategy_v2_workflow_run_id=str(source_run.id),
+        launch_type="additional_angle",
+        angle_id="A03",
+        campaign_id=None,
+        selected_ums_id=None,
+        channels=channels,
+        asset_brief_types=asset_brief_types,
+        experiment_variant_policy="angle_branch_standard_v1",
+    )
+
+    row_one = StrategyV2Launch(
+        org_id=TEST_ORG_ID,
+        source_strategy_v2_workflow_run_id=source_run.id,
+        source_strategy_v2_temporal_workflow_id=source_run.temporal_workflow_id,
+        client_id=client.id,
+        product_id=product.id,
+        campaign_id=None,
+        funnel_id=None,
+        angle_id="A02",
+        angle_run_id="angle-run-2",
+        selected_ums_id=None,
+        selected_variant_id=None,
+        source_stage3_artifact_id=None,
+        source_offer_artifact_id=None,
+        source_copy_artifact_id=None,
+        source_copy_context_artifact_id=None,
+        launch_type="additional_angle",
+        launch_key=launch_key_a02,
+        launch_index=1,
+        launch_workflow_run_id=launch_run_one.id,
+        launch_temporal_workflow_id=launch_run_one.temporal_workflow_id,
+        created_by_user="test-user",
+    )
+    row_two = StrategyV2Launch(
+        org_id=TEST_ORG_ID,
+        source_strategy_v2_workflow_run_id=source_run.id,
+        source_strategy_v2_temporal_workflow_id=source_run.temporal_workflow_id,
+        client_id=client.id,
+        product_id=product.id,
+        campaign_id=None,
+        funnel_id=None,
+        angle_id="A03",
+        angle_run_id="angle-run-3",
+        selected_ums_id=None,
+        selected_variant_id=None,
+        source_stage3_artifact_id=None,
+        source_offer_artifact_id=None,
+        source_copy_artifact_id=None,
+        source_copy_context_artifact_id=None,
+        launch_type="additional_angle",
+        launch_key=launch_key_a03,
+        launch_index=1,
+        launch_workflow_run_id=launch_run_two.id,
+        launch_temporal_workflow_id=launch_run_two.temporal_workflow_id,
+        created_by_user="test-user",
+    )
+    db_session.add_all([row_one, row_two])
+    db_session.commit()
+
+    response = api_client.post(
+        f"/workflows/{source_run.id}/actions/strategy-v2/launch-additional-angle",
+        json={
+            "selectedAngleIds": ["A02", "A03"],
+            "channels": channels,
+            "assetBriefTypes": asset_brief_types,
+        },
+    )
+
+    assert response.status_code == 409, response.text
+    assert "span multiple launch workflows" in response.json()["detail"]
+
+
 def test_launch_source_context_resolves_canonical_run_for_continued_execution(db_session, monkeypatch):
     client, product, source_run, _ = _seed_strategy_v2_scope(db_session)
 

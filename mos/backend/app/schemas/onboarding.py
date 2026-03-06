@@ -7,6 +7,7 @@ class OnboardingStartRequest(BaseModel):
     business_type: Literal["new", "existing"] = "new"
     brand_story: str = Field(..., min_length=10)
     product_name: str = Field(..., min_length=1)
+    product_type: str = Field(..., min_length=1)
     product_customizable: bool
     business_model: str = Field(..., min_length=1)
     funnel_position: str = Field(..., min_length=1)

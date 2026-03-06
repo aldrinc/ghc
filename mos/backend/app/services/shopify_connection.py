@@ -693,6 +693,16 @@ def get_client_shopify_product(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Shopify checkout app returned invalid product status.",
         )
+    response_product_type_raw = payload.get("productType")
+    response_product_type = None
+    if response_product_type_raw is not None:
+        if not isinstance(response_product_type_raw, str):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify checkout app returned invalid productType.",
+            )
+        cleaned_product_type = response_product_type_raw.strip()
+        response_product_type = cleaned_product_type or None
 
     raw_variants = payload.get("variants")
     if not isinstance(raw_variants, list):
@@ -837,6 +847,7 @@ def get_client_shopify_product(
         "title": response_title.strip(),
         "handle": response_handle.strip(),
         "status": response_status.strip(),
+        "productType": response_product_type,
         "variants": parsed_variants,
     }
 

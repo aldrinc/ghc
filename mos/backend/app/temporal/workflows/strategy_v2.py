@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+import os
 from typing import Any, Dict, Optional
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import ApplicationError
 
 with workflow.unsafe.imports_passed_through():
     from app.temporal.activities.strategy_v2_activities import (
@@ -23,20 +25,32 @@ with workflow.unsafe.imports_passed_through():
         prepare_strategy_v2_competitor_asset_candidates_activity,
         run_strategy_v2_copy_pipeline_activity,
         run_strategy_v2_offer_pipeline_activity,
+        validate_strategy_v2_offer_data_readiness_activity,
         run_strategy_v2_voc_agent0_habitat_strategy_activity,
         run_strategy_v2_voc_agent0b_apify_collection_activity,
         run_strategy_v2_voc_agent0b_social_video_strategy_activity,
         run_strategy_v2_voc_agent0b_apify_ingestion_activity,
         run_strategy_v2_voc_agent1_habitat_qualifier_activity,
-        run_strategy_v2_voc_agent2_extraction_activity,
         run_strategy_v2_voc_agent3_synthesis_activity,
     )
 
 _STEP_PAYLOAD_LINEAGE_EXPECTATIONS_BY_CHECKPOINT: Dict[str, list[str]] = {
     "v2-04 Agent 1 habitat qualifier": ["v2-02", "v2-03", "v2-03b", "v2-03c"],
-    "v2-05 Agent 2 VOC extraction": ["v2-04"],
-    "v2-06 Agent 3 angle synthesis": ["v2-05"],
+    "v2-06 Agent 3 angle synthesis": ["v2-04"],
 }
+_COPY_WORKFLOW_HEADLINE_CHUNK_SIZE = 1
+_COPY_WORKFLOW_MAX_HEADLINE_CHUNKS = 1
+_COPY_WORKFLOW_CHUNK_SCHEDULE_TO_CLOSE_TIMEOUT = timedelta(minutes=25)
+_COPY_WORKFLOW_CHUNK_HEARTBEAT_TIMEOUT = timedelta(minutes=10)
+_COPY_WORKFLOW_RAPID_MODE = os.getenv("STRATEGY_V2_COPY_WORKFLOW_RAPID_MODE", "1").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
+_COPY_WORKFLOW_GENERATION_MODE = os.getenv(
+    "STRATEGY_V2_COPY_WORKFLOW_GENERATION_MODE",
+    os.getenv("STRATEGY_V2_COPY_GENERATION_MODE", "template_payload_only"),
+).strip()
 
 
 @dataclass
@@ -55,6 +69,7 @@ class StrategyV2Input:
     existing_proof_assets: Optional[list[str]] = None
     brand_voice_notes: Optional[str] = None
     compliance_notes: Optional[str] = None
+    copy_generation_mode: Optional[str] = None
 
 
 @workflow.defn
@@ -601,6 +616,7 @@ class StrategyV2Workflow:
                 checkpoint_label="v2-03b Apify collection",
                 required_step_keys=["v2-02", "v2-03"],
             )
+            apify_ingestion_artifact_id: str | None = None
             if apify_split_checkpoint_enabled:
                 checkpoint_v2_03b_result = await workflow.execute_activity(
                     run_strategy_v2_voc_agent0b_apify_collection_activity,
@@ -661,6 +677,8 @@ class StrategyV2Workflow:
                     artifact_id=v2_03b_step_payload_artifact_id,
                 )
                 step_payload_artifact_ids["v2-03b"] = v2_03b_step_payload_artifact_id
+                apify_ingestion_artifact_id = v2_03b_step_payload_artifact_id
+                apify_ingestion_artifact_id = v2_03b_step_payload_artifact_id
 
                 self._current_stage = "v2-03c"
                 self._require_step_payload_artifacts(
@@ -693,33 +711,41 @@ class StrategyV2Workflow:
                 )
                 if not isinstance(checkpoint_v2_03c_result, dict):
                     raise RuntimeError("Strategy V2 v2-03c activity returned an invalid payload.")
-                scraped_data_manifest = checkpoint_v2_03c_result.get("scraped_data_manifest")
-                if not isinstance(scraped_data_manifest, dict):
-                    raise RuntimeError("Strategy V2 v2-03c activity did not return scraped_data_manifest.")
-                video_scored = checkpoint_v2_03c_result.get("video_scored")
-                if not isinstance(video_scored, list):
-                    raise RuntimeError("Strategy V2 v2-03c activity did not return video_scored array.")
-                existing_corpus = checkpoint_v2_03c_result.get("existing_corpus")
-                if not isinstance(existing_corpus, list):
-                    raise RuntimeError("Strategy V2 v2-03c activity did not return existing_corpus array.")
-                merged_voc_artifact_rows = checkpoint_v2_03c_result.get("merged_voc_artifact_rows")
-                if not isinstance(merged_voc_artifact_rows, list):
-                    raise RuntimeError(
-                        "Strategy V2 v2-03c activity did not return merged_voc_artifact_rows array."
-                    )
-                corpus_selection_summary = checkpoint_v2_03c_result.get("corpus_selection_summary")
-                if not isinstance(corpus_selection_summary, dict):
-                    raise RuntimeError(
-                        "Strategy V2 v2-03c activity did not return corpus_selection_summary object."
-                    )
-                external_corpus_count = checkpoint_v2_03c_result.get("external_corpus_count")
-                if not isinstance(external_corpus_count, int) or external_corpus_count < 0:
-                    raise RuntimeError(
-                        "Strategy V2 v2-03c activity did not return a valid external_corpus_count integer."
-                    )
-                proof_asset_candidates = checkpoint_v2_03c_result.get("proof_asset_candidates")
-                if not isinstance(proof_asset_candidates, list):
-                    raise RuntimeError("Strategy V2 v2-03c activity did not return proof_asset_candidates array.")
+                scraped_data_manifest = (
+                    checkpoint_v2_03c_result.get("scraped_data_manifest")
+                    if isinstance(checkpoint_v2_03c_result.get("scraped_data_manifest"), dict)
+                    else None
+                )
+                video_scored = (
+                    checkpoint_v2_03c_result.get("video_scored")
+                    if isinstance(checkpoint_v2_03c_result.get("video_scored"), list)
+                    else None
+                )
+                existing_corpus = (
+                    checkpoint_v2_03c_result.get("existing_corpus")
+                    if isinstance(checkpoint_v2_03c_result.get("existing_corpus"), list)
+                    else None
+                )
+                merged_voc_artifact_rows = (
+                    checkpoint_v2_03c_result.get("merged_voc_artifact_rows")
+                    if isinstance(checkpoint_v2_03c_result.get("merged_voc_artifact_rows"), list)
+                    else None
+                )
+                corpus_selection_summary = (
+                    checkpoint_v2_03c_result.get("corpus_selection_summary")
+                    if isinstance(checkpoint_v2_03c_result.get("corpus_selection_summary"), dict)
+                    else None
+                )
+                external_corpus_count = (
+                    checkpoint_v2_03c_result.get("external_corpus_count")
+                    if isinstance(checkpoint_v2_03c_result.get("external_corpus_count"), int)
+                    else None
+                )
+                proof_asset_candidates = (
+                    checkpoint_v2_03c_result.get("proof_asset_candidates")
+                    if isinstance(checkpoint_v2_03c_result.get("proof_asset_candidates"), list)
+                    else None
+                )
                 handoff_audit = checkpoint_v2_03c_result.get("handoff_audit")
                 if handoff_audit is not None and not isinstance(handoff_audit, dict):
                     raise RuntimeError("Strategy V2 v2-03c activity returned invalid handoff_audit payload.")
@@ -755,6 +781,7 @@ class StrategyV2Workflow:
                     artifact_id=v2_03c_step_payload_artifact_id,
                 )
                 step_payload_artifact_ids["v2-03c"] = v2_03c_step_payload_artifact_id
+                apify_ingestion_artifact_id = v2_03c_step_payload_artifact_id
             else:
                 checkpoint_v2_03b_legacy_result = await workflow.execute_activity(
                     run_strategy_v2_voc_agent0b_apify_ingestion_activity,
@@ -876,6 +903,7 @@ class StrategyV2Workflow:
                     "agent00b_output": agent00b_output,
                     "scraped_data_manifest": scraped_data_manifest,
                     "video_scored": video_scored,
+                    "apify_ingestion_artifact_id": apify_ingestion_artifact_id,
                     "strategy_config_run_count": strategy_config_run_count,
                     "planned_actor_run_count": planned_actor_run_count,
                     "executed_actor_run_count": executed_actor_run_count,
@@ -906,64 +934,10 @@ class StrategyV2Workflow:
             )
             step_payload_artifact_ids["v2-04"] = v2_04_step_payload_artifact_id
 
-            self._current_stage = "v2-05"
-            self._require_step_payload_artifacts(
-                checkpoint_label="v2-05 Agent 2 VOC extraction",
-                required_step_keys=["v2-04"],
-            )
-            checkpoint_v2_05_result = await workflow.execute_activity(
-                run_strategy_v2_voc_agent2_extraction_activity,
-                {
-                    "org_id": input.org_id,
-                    "client_id": input.client_id,
-                    "product_id": input.product_id,
-                    "campaign_id": input.campaign_id,
-                    "workflow_run_id": self._workflow_run_id,
-                    "stage0": stage0,
-                    "precanon_research": precanon_research,
-                    "stage1": stage1,
-                    "stage1_artifact_id": stage1_artifact_id,
-                    "existing_step_payload_artifact_ids": step_payload_artifact_ids,
-                    "confirmed_competitor_assets": confirmed_competitor_assets,
-                    "agent01_output": agent01_output,
-                    "habitat_scored": habitat_scored,
-                    "scraped_data_manifest": scraped_data_manifest,
-                    "existing_corpus": existing_corpus,
-                    "merged_voc_artifact_rows": merged_voc_artifact_rows,
-                    "corpus_selection_summary": corpus_selection_summary,
-                    "external_corpus_count": external_corpus_count,
-                    "proof_asset_candidates": proof_asset_candidates,
-                    "competitor_analysis": competitor_analysis,
-                    "operator_user_id": input.operator_user_id or "system",
-                },
-                schedule_to_close_timeout=timedelta(minutes=90),
-                heartbeat_timeout=timedelta(minutes=20),
-                retry_policy=RetryPolicy(maximum_attempts=1),
-            )
-            if not isinstance(checkpoint_v2_05_result, dict):
-                raise RuntimeError("Strategy V2 v2-05 activity returned an invalid payload.")
-            voc_observations = checkpoint_v2_05_result.get("voc_observations")
-            if not isinstance(voc_observations, list):
-                raise RuntimeError("Strategy V2 v2-05 activity did not return voc_observations array.")
-            voc_scored = checkpoint_v2_05_result.get("voc_scored")
-            if not isinstance(voc_scored, dict):
-                raise RuntimeError("Strategy V2 v2-05 activity did not return voc_scored.")
-            proof_asset_candidates = checkpoint_v2_05_result.get("proof_asset_candidates")
-            if not isinstance(proof_asset_candidates, list):
-                raise RuntimeError("Strategy V2 v2-05 activity did not return proof_asset_candidates array.")
-            v2_05_step_payload_artifact_id = checkpoint_v2_05_result.get("step_payload_artifact_id")
-            if not isinstance(v2_05_step_payload_artifact_id, str) or not v2_05_step_payload_artifact_id.strip():
-                raise RuntimeError("Strategy V2 v2-05 activity did not return step_payload_artifact_id.")
-            self._record_step_payload_artifact_ref(
-                step_key="v2-05",
-                artifact_id=v2_05_step_payload_artifact_id,
-            )
-            step_payload_artifact_ids["v2-05"] = v2_05_step_payload_artifact_id
-
             self._current_stage = "v2-06"
             self._require_step_payload_artifacts(
                 checkpoint_label="v2-06 Agent 3 angle synthesis",
-                required_step_keys=["v2-05"],
+                required_step_keys=["v2-04"],
             )
             checkpoint_v2_06_result = await workflow.execute_activity(
                 run_strategy_v2_voc_agent3_synthesis_activity,
@@ -980,8 +954,9 @@ class StrategyV2Workflow:
                     "existing_step_payload_artifact_ids": step_payload_artifact_ids,
                     "confirmed_competitor_assets": confirmed_competitor_assets,
                     "competitor_analysis": competitor_analysis,
-                    "voc_observations": voc_observations,
-                    "voc_scored": voc_scored,
+                    "agent01_output": agent01_output,
+                    "habitat_scored": habitat_scored,
+                    "apify_ingestion_artifact_id": apify_ingestion_artifact_id,
                     "operator_user_id": input.operator_user_id or "system",
                 },
                 schedule_to_close_timeout=timedelta(minutes=60),
@@ -1049,15 +1024,12 @@ class StrategyV2Workflow:
                     "workflow_run_id": self._workflow_run_id,
                     "stage2": stage2,
                     "competitor_analysis": competitor_analysis,
-                    "voc_observations": voc_observations,
-                    "voc_scored": voc_scored,
                     "angle_synthesis": {"ranked_candidates": ranked_angle_candidates},
                     "business_model": input.business_model or "",
                     "funnel_position": input.funnel_position or "",
                     "target_platforms": input.target_platforms or [],
                     "target_regions": input.target_regions or [],
                     "existing_proof_assets": input.existing_proof_assets or [],
-                    "proof_asset_candidates": proof_asset_candidates,
                     "brand_voice_notes": input.brand_voice_notes or "",
                     "operator_user_id": input.operator_user_id or "system",
                 },
@@ -1073,6 +1045,33 @@ class StrategyV2Workflow:
                 step_key="v2-08",
                 artifact_id=offer_pipeline_output.get("step_payload_artifact_id"),
             )
+
+            self._current_stage = "v2-08a"
+            offer_data_readiness = await workflow.execute_activity(
+                validate_strategy_v2_offer_data_readiness_activity,
+                {
+                    "org_id": input.org_id,
+                    "client_id": input.client_id,
+                    "product_id": input.product_id,
+                    "campaign_id": input.campaign_id,
+                    "workflow_run_id": self._workflow_run_id,
+                    "onboarding_payload_id": input.onboarding_payload_id,
+                    "offer_pipeline_output": offer_pipeline_output,
+                },
+                schedule_to_close_timeout=timedelta(minutes=10),
+            )
+            if not isinstance(offer_data_readiness, dict):
+                raise RuntimeError("Strategy V2 offer data readiness returned an invalid payload.")
+            self._record_step_payload_artifact_ref(
+                step_key="v2-08a",
+                artifact_id=offer_data_readiness.get("step_payload_artifact_id"),
+            )
+            if str(offer_data_readiness.get("status") or "").strip().lower() != "ready":
+                raise RuntimeError(
+                    "Offer data readiness blocked variant generation. "
+                    f"missing_fields={offer_data_readiness.get('missing_fields')}; "
+                    f"inconsistent_fields={offer_data_readiness.get('inconsistent_fields')}"
+                )
 
             pair_scoring = offer_pipeline_output.get("pair_scoring")
             ranked_pairs = pair_scoring.get("ranked_pairs") if isinstance(pair_scoring, dict) else None
@@ -1099,6 +1098,7 @@ class StrategyV2Workflow:
                     "workflow_run_id": self._workflow_run_id,
                     "stage2": stage2,
                     "offer_pipeline_output": offer_pipeline_output,
+                    "offer_data_readiness": offer_data_readiness,
                     "ump_ums_selection_decision": self._ump_ums_selection_decision,
                 },
                 schedule_to_close_timeout=timedelta(minutes=60),
@@ -1161,34 +1161,75 @@ class StrategyV2Workflow:
             self._pending_decision_payload = None
 
             self._current_stage = "v2-10"
-            copy_result = await workflow.execute_activity(
-                run_strategy_v2_copy_pipeline_activity,
-                {
-                    "org_id": input.org_id,
-                    "client_id": input.client_id,
-                    "product_id": input.product_id,
-                    "campaign_id": input.campaign_id,
-                    "workflow_run_id": self._workflow_run_id,
-                    "stage3": stage3,
-                    "copy_context": copy_context,
-                    "operator_user_id": input.operator_user_id or "system",
-                },
-                schedule_to_close_timeout=timedelta(minutes=90),
-                heartbeat_timeout=timedelta(minutes=20),
-                retry_policy=RetryPolicy(
-                    maximum_attempts=6,
-                    initial_interval=timedelta(minutes=1),
-                    backoff_coefficient=2.0,
-                    maximum_interval=timedelta(minutes=8),
-                    non_retryable_error_types=[
-                        "StrategyV2DecisionError",
-                        "StrategyV2MissingContextError",
-                        "StrategyV2SchemaValidationError",
-                    ],
-                ),
-            )
+            copy_chunk_reports: list[Dict[str, Any]] = []
+            copy_result: Optional[dict[str, Any]] = None
+            for chunk_index in range(_COPY_WORKFLOW_MAX_HEADLINE_CHUNKS):
+                headline_evaluation_offset = chunk_index * _COPY_WORKFLOW_HEADLINE_CHUNK_SIZE
+                copy_attempt_result = await workflow.execute_activity(
+                    run_strategy_v2_copy_pipeline_activity,
+                    {
+                        "org_id": input.org_id,
+                        "client_id": input.client_id,
+                        "product_id": input.product_id,
+                        "campaign_id": input.campaign_id,
+                        "workflow_run_id": self._workflow_run_id,
+                        "stage3": stage3,
+                        "copy_context": copy_context,
+                        "operator_user_id": input.operator_user_id or "system",
+                        "headline_evaluation_limit": _COPY_WORKFLOW_HEADLINE_CHUNK_SIZE,
+                        "headline_evaluation_offset": headline_evaluation_offset,
+                        "allow_no_bundle_result": True,
+                        "rapid_mode": _COPY_WORKFLOW_RAPID_MODE,
+                        "copy_generation_mode": input.copy_generation_mode or _COPY_WORKFLOW_GENERATION_MODE,
+                    },
+                    schedule_to_close_timeout=_COPY_WORKFLOW_CHUNK_SCHEDULE_TO_CLOSE_TIMEOUT,
+                    heartbeat_timeout=_COPY_WORKFLOW_CHUNK_HEARTBEAT_TIMEOUT,
+                    retry_policy=RetryPolicy(
+                        maximum_attempts=3,
+                        initial_interval=timedelta(seconds=30),
+                        backoff_coefficient=2.0,
+                        maximum_interval=timedelta(minutes=4),
+                        non_retryable_error_types=[
+                            "StrategyV2DecisionError",
+                            "StrategyV2MissingContextError",
+                            "StrategyV2SchemaValidationError",
+                        ],
+                    ),
+                )
+                if not isinstance(copy_attempt_result, dict):
+                    raise RuntimeError("Copy pipeline chunk returned an invalid payload.")
+                copy_chunk_reports.append(
+                    {
+                        "chunk_index": chunk_index + 1,
+                        "headline_evaluation_offset": headline_evaluation_offset,
+                        "headline_evaluation_limit": _COPY_WORKFLOW_HEADLINE_CHUNK_SIZE,
+                        "rapid_mode": _COPY_WORKFLOW_RAPID_MODE,
+                        "copy_generation_mode": input.copy_generation_mode or _COPY_WORKFLOW_GENERATION_MODE,
+                        "selected_bundle_found": bool(copy_attempt_result.get("selected_bundle_found")),
+                        "copy_loop_failure_summary": copy_attempt_result.get("copy_loop_failure_summary"),
+                        "copy_loop_report": copy_attempt_result.get("copy_loop_report"),
+                    }
+                )
+                copy_payload_candidate = copy_attempt_result.get("copy_payload")
+                if isinstance(copy_payload_candidate, dict):
+                    copy_result = copy_attempt_result
+                    break
             if not isinstance(copy_result, dict):
-                raise RuntimeError("Copy pipeline returned an invalid payload.")
+                self._artifact_refs["copy_loop_reports"] = copy_chunk_reports
+                last_chunk = copy_chunk_reports[-1] if copy_chunk_reports else None
+                last_failure_summary = ""
+                if isinstance(last_chunk, dict):
+                    candidate_summary = last_chunk.get("copy_loop_failure_summary")
+                    if isinstance(candidate_summary, str):
+                        last_failure_summary = candidate_summary.strip()
+                suffix = f" Last chunk summary: {last_failure_summary}" if last_failure_summary else ""
+                raise ApplicationError(
+                    "Copy pipeline did not produce a passable bundle in bounded chunk attempts."
+                    f" chunks={len(copy_chunk_reports)}.{suffix}",
+                    type="StrategyV2DecisionError",
+                    non_retryable=True,
+                )
+            self._artifact_refs["copy_loop_reports"] = copy_chunk_reports
             copy_payload = copy_result.get("copy_payload")
             if not isinstance(copy_payload, dict):
                 raise RuntimeError("Copy pipeline did not return copy payload.")
@@ -1235,7 +1276,11 @@ class StrategyV2Workflow:
                 "artifact_refs": self._artifact_refs,
                 "status": "completed",
             }
-        except Exception as exc:
+        except ApplicationError as exc:
             self._current_stage = "failed"
             await self._mark_failed(org_id=input.org_id, error_message=str(exc))
             raise
+        except Exception as exc:
+            self._current_stage = "failed"
+            await self._mark_failed(org_id=input.org_id, error_message=str(exc))
+            raise ApplicationError(str(exc), type=exc.__class__.__name__, non_retryable=True) from exc

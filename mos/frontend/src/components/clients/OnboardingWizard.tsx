@@ -10,6 +10,7 @@ import {
 import { Button, buttonClasses } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { FieldControl, FieldDescription, FieldError, FieldLabel, FieldRoot, FormRoot } from "@/components/ui/field";
@@ -54,6 +55,7 @@ const complianceBusinessModelOptions: Array<{ label: string; value: ComplianceBu
 type ProductDraft = {
   product_name: string;
   product_description: string;
+  product_type: string;
   product_category: string;
   primary_benefits: string;
   feature_bullets: string;
@@ -67,6 +69,7 @@ type ProductDraft = {
 const emptyProductDraft: ProductDraft = {
   product_name: "",
   product_description: "",
+  product_type: "",
   product_category: "",
   primary_benefits: "",
   feature_bullets: "",
@@ -116,6 +119,18 @@ const initialState = (clientName?: string, clientIndustry?: string): WizardState
   client_name: clientName || "",
   client_industry: clientIndustry || "",
 });
+
+const productTypeOptions = [
+  { label: "Select product type", value: "" },
+  { label: "Book", value: "book" },
+  { label: "Digital", value: "digital" },
+  { label: "Supplement", value: "supplement" },
+  { label: "Software", value: "software" },
+  { label: "Service", value: "service" },
+  { label: "Course", value: "course" },
+  { label: "Physical Product", value: "physical_product" },
+  { label: "Other", value: "other" },
+];
 
 function parseListInput(value: string): string[] {
   return value
@@ -194,6 +209,7 @@ export function OnboardingWizard({
       return (
         Boolean(state.products[0]?.product_name?.trim()) &&
         Boolean(state.products[0]?.product_description?.trim()) &&
+        Boolean(state.products[0]?.product_type?.trim()) &&
         Boolean(state.products[0]?.primary_image_file)
       );
     }
@@ -259,6 +275,10 @@ export function OnboardingWizard({
       toast.error("Product description is required.");
       return;
     }
+    if (!firstProduct?.product_type?.trim()) {
+      toast.error("Product type is required.");
+      return;
+    }
     if (!firstProduct?.primary_image_file) {
       toast.error("A primary product image is required.");
       return;
@@ -307,6 +327,7 @@ export function OnboardingWizard({
       brand_voice_notes: state.brand_voice_notes.trim(),
       compliance_notes: state.compliance_notes.trim() || undefined,
       product_description: firstProduct.product_description.trim(),
+      product_type: firstProduct.product_type.trim(),
       product_category: firstProduct.product_category.trim() || undefined,
       primary_benefits: firstProduct.primary_benefits.trim()
         ? firstProduct.primary_benefits.split(",").map((item) => item.trim()).filter(Boolean)
@@ -437,6 +458,10 @@ export function OnboardingWizard({
       toast.error("Product description is required.");
       return;
     }
+    if (!productDraft.product_type.trim()) {
+      toast.error("Product type is required.");
+      return;
+    }
     if (!productDraft.primary_image_file) {
       toast.error("Primary product image is required.");
       return;
@@ -449,6 +474,7 @@ export function OnboardingWizard({
       ...productDraft,
       product_name: productDraft.product_name.trim(),
       product_description: productDraft.product_description.trim(),
+      product_type: productDraft.product_type.trim(),
     };
     setState((s) => {
       const nextProducts = [...s.products];
@@ -568,7 +594,10 @@ export function OnboardingWizard({
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-content">{product.product_name}</div>
                       <div className="mt-1 text-xs text-content-muted">
-                        {product.product_category ? product.product_category : "Category not set"}
+                        Type: {product.product_type || "Missing"}
+                      </div>
+                      <div className="mt-1 text-xs text-content-muted">
+                        {product.product_category ? `Category: ${product.product_category}` : "Category not set"}
                       </div>
                       <div className="mt-1 text-xs text-content-muted">
                         Primary image: {product.primary_image_file?.name || "Missing"}
@@ -618,9 +647,21 @@ export function OnboardingWizard({
                   <FieldError />
                 </FieldRoot>
 
+                <FieldRoot name="product_type">
+                  <FieldLabel>Product type</FieldLabel>
+                  <FieldDescription>Required. This drives offer, copy, image, and Shopify validation.</FieldDescription>
+                  <Select
+                    value={productDraft.product_type}
+                    onValueChange={(value) => setProductDraft((draft) => ({ ...draft, product_type: value }))}
+                    options={productTypeOptions}
+                    disabled={isSubmitting}
+                  />
+                  <FieldError />
+                </FieldRoot>
+
                 <FieldRoot name="product_category">
                   <FieldLabel>Category</FieldLabel>
-                  <FieldDescription>Optional product category or niche.</FieldDescription>
+                  <FieldDescription>Optional category or niche for research context.</FieldDescription>
                   <Input
                     value={productDraft.product_category}
                     onChange={(e) => setProductDraft((draft) => ({ ...draft, product_category: e.target.value }))}
@@ -927,6 +968,9 @@ export function OnboardingWizard({
                 </p>
                 <p>
                   <strong>Description:</strong> {state.products[0].product_description || "Missing"}
+                </p>
+                <p>
+                  <strong>Product type:</strong> {state.products[0].product_type || "Missing"}
                 </p>
                 {state.products[0].product_category ? (
                   <p>

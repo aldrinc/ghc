@@ -136,6 +136,7 @@ def test_onboarding_requires_strategy_v2_enabled(api_client):
             "business_type": "new",
             "brand_story": "Brand story for testing",
             "product_name": "Test Product",
+            "product_type": "book",
             "product_customizable": True,
             "business_model": "one_time",
             "funnel_position": "top_of_funnel",
@@ -168,6 +169,7 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
             "business_type": "new",
             "brand_story": "Brand story for testing",
             "product_name": "Test Product",
+            "product_type": "book",
             "product_customizable": True,
             "business_model": "one_time",
             "funnel_position": "top_of_funnel",
@@ -191,6 +193,7 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
     assert product_detail.status_code == 200
     product_payload = product_detail.json()
     assert product_payload["title"] == "Test Product"
+    assert product_payload["product_type"] == "book"
     assert isinstance(product_payload.get("variants"), list)
 
     short_product_id = product_id.split("-", 1)[0]

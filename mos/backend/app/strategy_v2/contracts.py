@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Mapping, TypeVar
+from typing import Any, Literal, Mapping, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
@@ -59,9 +59,9 @@ class SelectedAngleDefinition(StrictContract):
 
 
 class SelectedAngleEvidenceQuote(StrictContract):
-    voc_id: str = Field(min_length=1)
+    voc_id: str = ""
     quote: str = Field(min_length=1)
-    adjusted_score: float
+    adjusted_score: float | None = None
 
 
 class SelectedAngleEvidence(StrictContract):
@@ -115,6 +115,13 @@ class ProductBriefStage3(ProductBriefStage2):
     sophistication_level: int | None = Field(default=None, ge=1, le=5)
     composite_score: float | None = None
     variant_selected: str | None = None
+    offer_format: Literal["DISCOUNT_PLUS_3_BONUSES_V1"] | None = None
+    product_type: str | None = None
+    pricing_metadata: dict[str, Any] | None = None
+    savings_metadata: dict[str, Any] | None = None
+    best_value_metadata: dict[str, Any] | None = None
+    bundle_contents: dict[str, Any] | None = None
+    bonus_stack: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AwarenessLevelFraming(StrictContract):

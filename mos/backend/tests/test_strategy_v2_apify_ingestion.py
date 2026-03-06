@@ -855,7 +855,7 @@ def test_run_strategy_v2_apify_ingestion_progress_callbacks_run_on_caller_thread
     assert event_types.count("actor_run_terminal") == 3
 
 
-def test_merge_voc_corpus_for_agent2_keeps_prompt_budget() -> None:
+def test_merge_voc_corpus_for_agent2_keeps_prompt_budget_and_preserves_full_artifact_corpus() -> None:
     step4_rows = [
         {
             "voc_id": f"V{idx:03d}",
@@ -864,7 +864,7 @@ def test_merge_voc_corpus_for_agent2_keeps_prompt_budget() -> None:
             "quote": f"Step4 quote {idx} with 3 details and 2 outcomes.",
             "date": "Unknown",
         }
-        for idx in range(1, 61)
+        for idx in range(1, 261)
     ]
     external_rows = [
         {
@@ -875,7 +875,7 @@ def test_merge_voc_corpus_for_agent2_keeps_prompt_budget() -> None:
             "date": "2026-02-01",
             "engagement": {"likes": idx, "replies": idx // 2},
         }
-        for idx in range(1, 61)
+        for idx in range(1, 261)
     ]
 
     merged = strategy_v2_activities._merge_voc_corpus_for_agent2(
@@ -883,10 +883,48 @@ def test_merge_voc_corpus_for_agent2_keeps_prompt_budget() -> None:
         external_rows=external_rows,
     )
     assert len(merged["prompt_rows"]) == 80
-    assert len(merged["artifact_rows"]) <= 400
+    assert len(merged["artifact_rows"]) == 520
     summary = merged["summary"]
-    assert summary["step4_input_count"] == 60
-    assert summary["external_input_count"] == 60
+    assert summary["step4_input_count"] == 260
+    assert summary["external_input_count"] == 260
+
+
+def test_build_agent2_evidence_rows_uses_merged_superset_without_silent_drops() -> None:
+    row = {
+        "voc_id": "V001",
+        "source_type": "FORUM",
+        "source_url": "https://example.com/thread/1",
+        "quote": "I need a clear protocol because random advice keeps failing me.",
+        "author": "user1",
+        "date": "2026-02-01",
+    }
+    evidence_rows, diagnostics = strategy_v2_activities._build_agent2_evidence_rows(
+        existing_corpus=[row],
+        merged_voc_artifact_rows=[row],
+        scraped_data_manifest={"raw_scraped_data_files": []},
+    )
+    assert len(evidence_rows) == 1
+    assert diagnostics["existing_rows_in"] == 1
+    assert diagnostics["merged_rows_in"] == 1
+    assert diagnostics["existing_rows_skipped_due_merged_superset"] == 1
+    assert diagnostics["merged_rows_used"] == 1
+    assert diagnostics["accepted_rows"] == 1
+
+
+def test_build_agent2_evidence_rows_errors_on_missing_required_fields() -> None:
+    with pytest.raises(StrategyV2SchemaValidationError, match="missing required source_url/verbatim"):
+        strategy_v2_activities._build_agent2_evidence_rows(
+            existing_corpus=[
+                {
+                    "voc_id": "V001",
+                    "source_type": "FORUM",
+                    "source_url": "",
+                    "quote": "",
+                }
+            ],
+            merged_voc_artifact_rows=[],
+            scraped_data_manifest={"raw_scraped_data_files": []},
+        )
 
 
 def test_build_proof_candidates_from_voc_requires_two_refs() -> None:

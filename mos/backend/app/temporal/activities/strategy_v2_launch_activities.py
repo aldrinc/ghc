@@ -324,6 +324,14 @@ def persist_strategy_v2_launch_record_activity(params: dict[str, Any]) -> dict[s
                 launch_key=normalized["launch_key"],
             )
             if existing is None:
+                selected_ums_id = normalized.get("selected_ums_id")
+                if isinstance(selected_ums_id, str) and selected_ums_id.strip():
+                    existing = repo.get_by_angle_run_and_ums(
+                        org_id=normalized["org_id"],
+                        angle_run_id=normalized["angle_run_id"],
+                        selected_ums_id=selected_ums_id,
+                    )
+            if existing is None:
                 raise RuntimeError(
                     "Failed to persist launch record due to uniqueness conflict and no existing row was found."
                 )

@@ -4,13 +4,16 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
+from fastapi import HTTPException
 from temporalio import activity
 from sqlalchemy import select
 
+from app.services import funnel_ai
 from app.db.base import session_scope
 from app.db.enums import FunnelPageVersionSourceEnum, FunnelPageVersionStatusEnum, FunnelStatusEnum
 from app.db.models import Campaign, Funnel, FunnelPage, FunnelPageVersion, Product, ProductOffer, ProductVariant
 from app.db.repositories.campaigns import CampaignsRepository
+from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.db.repositories.funnels import FunnelsRepository, FunnelPagesRepository
 from app.services.funnels import generate_unique_slug
@@ -20,15 +23,45 @@ from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.enums import ArtifactTypeEnum
 from app.db.repositories.design_systems import DesignSystemsRepository
 from app.services.design_systems import resolve_design_system_tokens
-from app.services.shopify_connection import get_client_shopify_connection_status
+from app.services.funnel_metadata import normalize_public_page_metadata_for_context
+from app.services.product_types import canonical_product_type, is_book_product_type, product_type_matches
+from app.services.shopify_connection import get_client_shopify_connection_status, get_client_shopify_product
 from app.strategy_v2.downstream import load_strategy_v2_outputs
-from app.strategy_v2.template_bridge import apply_strategy_v2_template_patch
+from app.strategy_v2.template_bridge import (
+    apply_strategy_v2_template_patch,
+    build_strategy_v2_template_patch_operations,
+    upgrade_strategy_v2_template_payload_fields,
+    validate_strategy_v2_template_payload_fields,
+)
 
 
 _DEFAULT_AI_DRAFT_EMPTY_PAGE_MAX_ATTEMPTS = 3
 _EMPTY_PAGE_ERROR_MARKERS = (
     "ai generation produced an empty page",
     "empty page (no content)",
+)
+_FOOTER_PAYMENT_ICON_KEYS: list[str] = [
+    "american_express",
+    "apple_pay",
+    "google_pay",
+    "maestro",
+    "mastercard",
+    "paypal",
+    "visa",
+]
+_BOOK_HELPER_TEXT_DISALLOWED_PHRASES: tuple[str, ...] = (
+    "instant digital access",
+    "digital access",
+    "searchable pdf",
+    "single device",
+    "download",
+    "pdf",
+)
+_BOOK_CTA_DISALLOWED_PHRASES: tuple[str, ...] = (
+    "get instant access",
+    "instant access",
+    "download now",
+    "instant digital access",
 )
 
 
@@ -61,6 +94,147 @@ def _collect_image_generation_errors(
             error_entry["template_id"] = template_id
         errors.append(error_entry)
     return errors
+
+
+def _find_disallowed_phrase(text: str | None, disallowed_phrases: tuple[str, ...]) -> str | None:
+    if not isinstance(text, str):
+        return None
+    normalized = text.strip().lower()
+    if not normalized:
+        return None
+    for phrase in disallowed_phrases:
+        if phrase in normalized:
+            return phrase
+    return None
+
+
+def _assert_strategy_v2_offer_product_type_matches_product(
+    *,
+    product_type: str | None,
+    strategy_v2_packet: dict[str, Any],
+) -> None:
+    offer_payload = strategy_v2_packet.get("offer")
+    if not isinstance(offer_payload, dict):
+        return
+    selected_variant = offer_payload.get("selected_variant")
+    if not isinstance(selected_variant, dict):
+        return
+    variant_product_type = canonical_product_type(str(selected_variant.get("product_type") or ""))
+    expected_product_type = canonical_product_type(product_type)
+    if expected_product_type and variant_product_type and expected_product_type != variant_product_type:
+        raise ValueError(
+            "Strategy V2 selected offer product_type does not match the persisted product record. "
+            f"product={expected_product_type} strategy_v2_offer={variant_product_type}. "
+            "Remediation: regenerate the offer after correcting the product type."
+        )
+
+
+def _assert_sales_payload_matches_product_type(
+    *,
+    template_id: str,
+    payload_fields: dict[str, Any],
+    product_type: str | None,
+) -> None:
+    if template_id != "sales-pdp" or not is_book_product_type(product_type):
+        return
+
+    whats_inside = payload_fields.get("whats_inside")
+    hero = payload_fields.get("hero")
+    helper_text = str(whats_inside.get("offer_helper_text") or "").strip() if isinstance(whats_inside, dict) else ""
+    cta_label = str(hero.get("primary_cta_label") or "").strip() if isinstance(hero, dict) else ""
+
+    helper_phrase = _find_disallowed_phrase(helper_text, _BOOK_HELPER_TEXT_DISALLOWED_PHRASES)
+    if helper_phrase:
+        raise ValueError(
+            "Sales template payload uses digital-only delivery language for a book product. "
+            f"field=whats_inside.offer_helper_text phrase={helper_phrase!r}. "
+            "Remediation: describe the physical book offer, not digital delivery."
+        )
+
+    cta_phrase = _find_disallowed_phrase(cta_label, _BOOK_CTA_DISALLOWED_PHRASES)
+    if cta_phrase:
+        raise ValueError(
+            "Sales template CTA uses digital-only language for a book product. "
+            f"field=hero.primary_cta_label phrase={cta_phrase!r}. "
+            "Remediation: use purchase language that matches a physical book offer."
+        )
+
+
+def _align_sales_pdp_purchase_options_for_selected_offer(
+    *,
+    session,
+    org_id: str,
+    product_id: str,
+    selected_offer_id: str | None,
+    puck_data: dict[str, Any],
+) -> bool:
+    if not isinstance(puck_data, dict):
+        raise ValueError("puck_data must be a JSON object for sales offer alignment.")
+
+    selected_offer = None
+    selected_offer_options_schema: dict[str, Any] | None = None
+    if isinstance(selected_offer_id, str) and selected_offer_id.strip():
+        selected_offer = session.scalars(
+            select(ProductOffer).where(
+                ProductOffer.org_id == org_id,
+                ProductOffer.id == selected_offer_id.strip(),
+                ProductOffer.product_id == product_id,
+            )
+        ).first()
+        if selected_offer is None:
+            raise ValueError(
+                "Cannot align sales offer options because the selected product offer was not found."
+            )
+        if isinstance(selected_offer.options_schema, dict):
+            selected_offer_options_schema = selected_offer.options_schema
+
+    variants_stmt = select(ProductVariant).where(ProductVariant.product_id == product_id)
+    if selected_offer is not None:
+        variants_stmt = variants_stmt.where(ProductVariant.offer_id == selected_offer.id)
+    variants = list(session.scalars(variants_stmt).all())
+    if not variants:
+        raise ValueError(
+            "Cannot align sales offer options because no price point variants were found for the selected product offer."
+        )
+
+    variant_inputs = [
+        {
+            "id": str(variant.id),
+            "title": variant.title,
+            "amount_cents": variant.price,
+            "compare_at_cents": variant.compare_at_price,
+            "option_values": variant.option_values,
+        }
+        for variant in variants
+    ]
+    normalized_variants, variant_schema = funnel_ai._normalize_sales_pdp_variant_option_values(
+        variants=variant_inputs,
+        options_schema=selected_offer_options_schema,
+    )
+
+    aligned = False
+    found_sales_hero = False
+    for _index, props, config, source in funnel_ai._iter_sales_pdp_hero_configs(puck_data):
+        found_sales_hero = True
+        purchase = config.get("purchase")
+        if not isinstance(purchase, dict):
+            raise ValueError("SalesPdpHero.config.purchase must be an object for offer alignment.")
+        if funnel_ai._align_sales_pdp_purchase_options_to_variants(
+            purchase=purchase,
+            variants=variant_inputs,
+            options_schema=selected_offer_options_schema,
+            normalized_variants=normalized_variants,
+            variant_schema=variant_schema,
+        ):
+            aligned = True
+            if source == "configJson":
+                props["configJson"] = json.dumps(config, ensure_ascii=False)
+            else:
+                props["config"] = config
+
+    if not found_sales_hero:
+        raise ValueError("SalesPdpHero block is missing from sales template puck data.")
+    return aligned
 
 
 def _is_empty_page_generation_error(exc: Exception) -> bool:
@@ -137,6 +311,85 @@ def _validate_selected_offer_for_funnel(
         )
 
 
+def _clean_url_for_footer(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    cleaned = value.strip()
+    if not cleaned:
+        return ""
+    lowered = cleaned.lower()
+    if not (lowered.startswith("http://") or lowered.startswith("https://")):
+        return ""
+    return cleaned
+
+
+def _build_policy_footer_payload(*, org_id: str, client_id: str) -> tuple[list[dict[str, str]], str, list[str]]:
+    with session_scope() as session:
+        profile = ClientComplianceProfilesRepository(session).get(org_id=org_id, client_id=client_id)
+        design_systems = DesignSystemsRepository(session).list(org_id=org_id, client_id=client_id)
+    if profile is None:
+        raise ValueError(
+            "Missing client compliance profile. "
+            "Remediation: configure and sync policy pages before funnel generation."
+        )
+
+    privacy_url = _clean_url_for_footer(profile.privacy_policy_url)
+    terms_url = _clean_url_for_footer(profile.terms_of_service_url)
+    returns_url = _clean_url_for_footer(profile.returns_refunds_policy_url)
+    shipping_url = _clean_url_for_footer(profile.shipping_policy_url)
+    subscription_url = _clean_url_for_footer(profile.subscription_terms_and_cancellation_url)
+
+    missing_policy_keys: list[str] = []
+    if not privacy_url:
+        missing_policy_keys.append("privacy_policy_url")
+    if not terms_url:
+        missing_policy_keys.append("terms_of_service_url")
+    if not returns_url:
+        missing_policy_keys.append("returns_refunds_policy_url")
+    if not shipping_url:
+        missing_policy_keys.append("shipping_policy_url")
+    if missing_policy_keys:
+        raise ValueError(
+            "Missing required policy page URLs for footer rendering: "
+            f"{', '.join(missing_policy_keys)}. "
+            "Remediation: sync Shopify policy pages and retry."
+        )
+
+    links: list[dict[str, str]] = [
+        {"label": "Privacy", "href": privacy_url},
+        {"label": "Terms", "href": terms_url},
+        {"label": "Returns", "href": returns_url},
+        {"label": "Shipping", "href": shipping_url},
+    ]
+    if subscription_url:
+        links.append({"label": "Subscription", "href": subscription_url})
+
+    brand_name = ""
+    for design_system in design_systems:
+        tokens = design_system.tokens if isinstance(design_system.tokens, dict) else {}
+        brand = tokens.get("brand")
+        if not isinstance(brand, dict):
+            continue
+        candidate = str(brand.get("name") or "").strip()
+        if candidate:
+            brand_name = candidate
+            break
+    if not brand_name:
+        brand_name = (
+            str(profile.operating_entity_name or "").strip()
+            or str(profile.legal_business_name or "").strip()
+            or str(profile.client_id or "").strip()
+        )
+    if not brand_name:
+        raise ValueError(
+            "Unable to determine brand name for footer copyright. "
+            "Remediation: set design system brand.name or compliance profile entity fields."
+        )
+
+    year = datetime.now(timezone.utc).year
+    return links, f"\u00a9 {year} {brand_name}", list(_FOOTER_PAYMENT_ICON_KEYS)
+
+
 def _assert_shopify_launch_readiness(
     *,
     org_id: str,
@@ -164,6 +417,24 @@ def _assert_shopify_launch_readiness(
                 "Product is not connected to Shopify. Missing products.shopify_product_gid. "
                 "Remediation: connect Shopify product and sync it before launching."
             )
+        expected_product_type = canonical_product_type(str(product.product_type or ""))
+
+        selected_offer = None
+        selected_offer_options_schema: dict[str, Any] | None = None
+        if isinstance(selected_offer_id, str) and selected_offer_id.strip():
+            selected_offer = session.scalars(
+                select(ProductOffer).where(
+                    ProductOffer.org_id == org_id,
+                    ProductOffer.id == selected_offer_id.strip(),
+                    ProductOffer.product_id == product_id,
+                )
+            ).first()
+            if selected_offer is None:
+                raise ValueError(
+                    "Selected offer was not found during Shopify readiness validation."
+                )
+            if isinstance(selected_offer.options_schema, dict):
+                selected_offer_options_schema = selected_offer.options_schema
 
         variants_stmt = select(ProductVariant).where(ProductVariant.product_id == product_id)
         if isinstance(selected_offer_id, str) and selected_offer_id.strip():
@@ -191,6 +462,81 @@ def _assert_shopify_launch_readiness(
                 "(provider=shopify + external_price_id + option_values). "
                 "Remediation: sync Shopify variants and option mappings before launching."
             )
+
+        variant_inputs = [
+            {
+                "id": str(variant.id),
+                "title": variant.title,
+                "amount_cents": variant.price,
+                "compare_at_cents": variant.compare_at_price,
+                "option_values": variant.option_values,
+            }
+            for variant in ready_variants
+        ]
+        try:
+            normalized_variants, _ = funnel_ai._normalize_sales_pdp_variant_option_values(
+                variants=variant_inputs,
+                options_schema=selected_offer_options_schema,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "Shopify launch readiness failed because synced variant option mappings are invalid. "
+                f"Details: {exc}"
+            ) from exc
+
+        if isinstance(selected_offer_id, str) and selected_offer_id.strip():
+            offer_ids = {str(row.get("offerId") or "").strip().lower() for row in normalized_variants}
+            if offer_ids != {"single_device", "share_and_save", "family_bundle"}:
+                raise ValueError(
+                    "Shopify launch readiness failed because the selected offer is missing the canonical offer tiers. "
+                    f"Observed offerIds={sorted(offer_ids)}. "
+                    "Remediation: sync Shopify variants and map option_values.offerId for single_device/share_and_save/family_bundle."
+                )
+
+        resolved_shop_domain = (
+            str(status_payload.get("shopDomain") or "").strip().lower()
+            if isinstance(status_payload.get("shopDomain"), str)
+            else None
+        )
+        try:
+            shopify_product = get_client_shopify_product(
+                client_id=client_id,
+                product_gid=product.shopify_product_gid.strip(),
+                shop_domain=resolved_shop_domain,
+            )
+        except HTTPException as exc:
+            raise ValueError(
+                "Shopify launch readiness failed while verifying the mapped Shopify product. "
+                f"Details: {exc.detail if isinstance(exc.detail, str) else str(exc.detail)}"
+            ) from exc
+
+        remote_product_type = canonical_product_type(
+            str(shopify_product.get("productType") or "")
+        )
+        if expected_product_type and remote_product_type and not product_type_matches(
+            expected_product_type,
+            remote_product_type,
+        ):
+            raise ValueError(
+                "Shopify launch readiness failed because MOS product_type does not match the mapped Shopify productType. "
+                f"mos={expected_product_type} shopify={remote_product_type}. "
+                "Remediation: fix the MOS product type or Shopify productType before launching."
+            )
+
+        if is_book_product_type(expected_product_type):
+            remote_variants = shopify_product.get("variants")
+            if not isinstance(remote_variants, list) or not remote_variants:
+                raise ValueError(
+                    "Shopify launch readiness failed because the mapped Shopify book product returned no variants."
+                )
+            if not all(
+                isinstance(variant, dict) and bool(variant.get("requiresShipping"))
+                for variant in remote_variants
+            ):
+                raise ValueError(
+                    "Shopify launch readiness failed because book variants in Shopify must require shipping. "
+                    "Remediation: set the mapped Shopify product/variants to physical-shipping behavior before launching."
+                )
 
 
 @activity.defn
@@ -334,6 +680,17 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             raise ValueError("Campaign not found for funnel draft creation")
         if campaign.product_id and str(campaign.product_id) != str(product_id):
             raise ValueError("product_id does not match campaign product_id")
+        product = session.scalars(
+            select(Product).where(Product.org_id == org_id, Product.id == product_id)
+        ).first()
+        if product is None:
+            raise ValueError("Product not found for funnel draft creation")
+        product_type = canonical_product_type(str(product.product_type or ""))
+        if strategy_v2_context_present:
+            _assert_strategy_v2_offer_product_type_matches_product(
+                product_type=product_type,
+                strategy_v2_packet=strategy_v2_packet,
+            )
         if strategy_v2_selected_offer_id:
             _validate_selected_offer_for_funnel(
                 session=session,
@@ -398,6 +755,7 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 funnel_id=str(funnel.id),
                 selected_offer_id=strategy_v2_selected_offer_id,
             ) or funnel
+        effective_selected_offer_id = str(funnel.selected_offer_id or "").strip() or None
 
         existing_pages = pages_repo.list(funnel_id=str(funnel.id)) if funnel else []
         existing_pages_by_slug = {page.slug: page for page in existing_pages}
@@ -448,18 +806,110 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                         "Strategy V2 template payload template_id mismatch for funnel page generation. "
                         f"Expected={template_id}, received={payload_template_id or '<empty>'}."
                     )
-                patch_operations = payload_entry.get("template_patch")
-                if not isinstance(patch_operations, list) or not patch_operations:
+                payload_fields = payload_entry.get("fields")
+                if not isinstance(payload_fields, dict):
                     raise ValueError(
-                        f"Strategy V2 template payload for {template_id} is missing template_patch operations."
+                        f"Strategy V2 template payload for {template_id} is missing fields."
+                    )
+                upgraded_fields = upgrade_strategy_v2_template_payload_fields(
+                    template_id=template_id,
+                    payload_fields=payload_fields,
+                )
+                validated_fields = validate_strategy_v2_template_payload_fields(
+                    template_id=template_id,
+                    payload_fields=upgraded_fields,
+                )
+                _assert_sales_payload_matches_product_type(
+                    template_id=template_id,
+                    payload_fields=validated_fields,
+                    product_type=product_type,
+                )
+                patch_operations = build_strategy_v2_template_patch_operations(
+                    template_id=template_id,
+                    payload_fields=validated_fields,
+                )
+                if not patch_operations:
+                    raise ValueError(
+                        f"Strategy V2 template payload for {template_id} could not produce template_patch operations."
                     )
                 puck_data = apply_strategy_v2_template_patch(
                     base_puck_data=puck_data,
                     operations=patch_operations,
                     template_id=template_id,
                 )
-                template_payload_json = json.dumps(payload_entry, ensure_ascii=True)
+                template_payload_json = json.dumps(
+                    {
+                        **payload_entry,
+                        "fields": validated_fields,
+                        "template_patch": patch_operations,
+                    },
+                    ensure_ascii=True,
+                )
                 strategy_v2_payload_applied = True
+                footer_links, footer_copyright, footer_icons = _build_policy_footer_payload(
+                    org_id=org_id,
+                    client_id=client_id,
+                )
+                if template_id == "pre-sales-listicle":
+                    footer_patch_operations = [
+                        {
+                            "component_type": "PreSalesFooter",
+                            "field_path": "props.config.links",
+                            "value": footer_links,
+                        },
+                        {
+                            "component_type": "PreSalesFooter",
+                            "field_path": "props.config.paymentIcons",
+                            "value": footer_icons,
+                        },
+                        {
+                            "component_type": "PreSalesFooter",
+                            "field_path": "props.config.copyright",
+                            "value": footer_copyright,
+                        },
+                    ]
+                elif template_id == "sales-pdp":
+                    footer_patch_operations = [
+                        {
+                            "component_type": "SalesPdpFooter",
+                            "field_path": "props.config.links",
+                            "value": footer_links,
+                        },
+                        {
+                            "component_type": "SalesPdpFooter",
+                            "field_path": "props.config.paymentIcons",
+                            "value": footer_icons,
+                        },
+                        {
+                            "component_type": "SalesPdpFooter",
+                            "field_path": "props.config.copyright",
+                            "value": footer_copyright,
+                        },
+                    ]
+                else:
+                    footer_patch_operations = []
+                if footer_patch_operations:
+                    puck_data = apply_strategy_v2_template_patch(
+                        base_puck_data=puck_data,
+                        operations=footer_patch_operations,
+                        template_id=template_id,
+                    )
+                if template_id == "sales-pdp":
+                    _align_sales_pdp_purchase_options_for_selected_offer(
+                        session=session,
+                        org_id=org_id,
+                        product_id=str(product_id),
+                        selected_offer_id=effective_selected_offer_id,
+                        puck_data=puck_data,
+                    )
+            elif template_id == "sales-pdp" and effective_selected_offer_id:
+                _align_sales_pdp_purchase_options_for_selected_offer(
+                    session=session,
+                    org_id=org_id,
+                    product_id=str(product_id),
+                    selected_offer_id=effective_selected_offer_id,
+                    puck_data=puck_data,
+                )
 
             if page:
                 if page.template_id != template_id:
@@ -493,6 +943,14 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     "strategy_v2_launch": strategy_v2_launch_metadata,
                     "template_id": template_id,
                 }
+
+            normalize_public_page_metadata_for_context(
+                session=session,
+                org_id=org_id,
+                funnel=funnel,
+                page=page,
+                puck_data=puck_data,
+            )
 
             version = FunnelPageVersion(
                 page_id=page.id,

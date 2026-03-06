@@ -132,6 +132,7 @@ from app.services.shopify_theme_copy_agent import (
 from app.services.shopify_theme_content_planner import (
     plan_shopify_theme_component_content,
 )
+from app.services.product_types import canonical_product_type
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from app.temporal.client import get_temporal_client
@@ -8959,8 +8960,13 @@ async def start_client_onboarding(
     product_fields: dict[str, object] = {"title": payload.product_name}
     if payload.product_description is not None:
         product_fields["description"] = payload.product_description
-    if payload.product_category is not None:
-        product_fields["product_type"] = payload.product_category
+    normalized_product_type = canonical_product_type(payload.product_type)
+    if not normalized_product_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="product_type is required.",
+        )
+    product_fields["product_type"] = normalized_product_type
     if payload.primary_benefits is not None:
         product_fields["primary_benefits"] = payload.primary_benefits
     if payload.feature_bullets is not None:
@@ -8995,6 +9001,7 @@ async def start_client_onboarding(
     )
 
     payload_data = payload.model_dump()
+    payload_data["product_type"] = normalized_product_type
     payload_data["product_id"] = str(product.id)
     payload_data["default_offer_id"] = str(default_offer.id)
 
