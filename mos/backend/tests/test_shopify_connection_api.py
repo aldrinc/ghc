@@ -3,6 +3,7 @@ import io
 import json
 import zipfile
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 from uuid import UUID, uuid4
 
@@ -502,6 +503,29 @@ def test_apply_local_theme_secondary_background_color_to_sections_rewrites_targe
         'fill="{{ background_color }}"'
         not in files_by_filename["sections/ss-countdown-timer-4.liquid"]["content"]
     )
+
+
+def test_local_theme_baseline_secondary_background_sections_expose_rewritable_bindings():
+    baseline_zip_path = (
+        Path(__file__).resolve().parents[3]
+        / clients_router._LOCAL_SHOPIFY_THEME_BASELINE_ZIP_RELATIVE_PATH
+    )
+
+    with zipfile.ZipFile(baseline_zip_path) as archive:
+        for filename in clients_router._THEME_SECONDARY_SECTION_BACKGROUND_FILENAMES:
+            content = archive.read(filename).decode("utf-8")
+            assert clients_router._THEME_SECONDARY_SECTION_BACKGROUND_COLOR_RE.search(content), (
+                f"{filename} must keep a raw background_color binding in the baseline theme."
+            )
+            assert clients_router._THEME_SECONDARY_SECTION_BACKGROUND_IMAGE_RE.search(content), (
+                f"{filename} must keep a raw background_gradient binding in the baseline theme."
+            )
+
+        countdown_content = archive.read("sections/ss-countdown-timer-4.liquid").decode("utf-8")
+        assert clients_router._THEME_SECONDARY_COUNTDOWN_SHAPE_FILL_RE.search(countdown_content), (
+            "sections/ss-countdown-timer-4.liquid must keep a raw background_color fill binding "
+            "in the baseline theme."
+        )
 
 
 def test_validate_collection_template_component_values_in_export_accepts_collection_mappings():
