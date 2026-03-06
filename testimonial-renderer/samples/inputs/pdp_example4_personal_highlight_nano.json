@@ -26,13 +26,7 @@
   },
   "background": {
     "imageModel": "gemini-3.1-flash-image-preview",
-    "promptVars": {
-      "product": "a black jar of PURE SHILAJIT GUMMIES held in one hand with the label facing the camera",
-      "subject": "a 60-65 year old man in good shape, smiling, flexing his bicep",
-      "scene": "gym setting with equipment softly blurred in the background",
-      "extra": "Shot from chest up. Natural gym lighting. Realistic skin texture. Reserve clean empty background space in the top-left.",
-      "avoid": ["on-image captions", "watermarks", "UI overlays", "speech bubbles", "chat bubbles", "text boxes", "callout cards", "stickers", "extra hands", "distorted arms"]
-    }
+    "promptFile": "../prompts/pdp_example4_personal_highlight_nano.md"
   },
   "comment": {
     "handle": "jaimondavis63",

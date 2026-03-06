@@ -2141,6 +2141,199 @@ def test_apply_policy_pages_to_menu_items_dedupes_footer_links():
     assert privacy_item["url"] == "/policies/privacy-policy"
 
 
+def test_remove_catalog_menu_items_strips_catalog_titles_recursively():
+    menu_items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Home",
+            "type": "HTTP",
+            "url": "/",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/2",
+            "title": "Catalog",
+            "type": "HTTP",
+            "url": "/collections/all",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/3",
+            "title": "Products",
+            "type": "HTTP",
+            "url": "/collections/featured",
+            "resourceId": None,
+            "tags": [],
+            "items": [
+                {
+                    "id": "gid://shopify/MenuItem/4",
+                    "title": "Catalog",
+                    "type": "HTTP",
+                    "url": "/collections/all",
+                    "resourceId": None,
+                    "tags": [],
+                    "items": [],
+                },
+                {
+                    "id": "gid://shopify/MenuItem/5",
+                    "title": "Guides",
+                    "type": "HTTP",
+                    "url": "/pages/guides",
+                    "resourceId": None,
+                    "tags": [],
+                    "items": [],
+                },
+            ],
+        },
+        {
+            "id": "gid://shopify/MenuItem/6",
+            "title": "Shop",
+            "type": "HTTP",
+            "url": "/collections/all",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+    ]
+
+    next_items, changed = ShopifyApiClient._remove_catalog_menu_items(
+        menu_items=menu_items
+    )
+
+    assert changed is True
+    assert [item["title"] for item in next_items] == ["Home", "Products", "Shop"]
+    assert [item["title"] for item in next_items[1]["items"]] == ["Guides"]
+
+
+def test_remove_catalog_from_default_store_navigation_updates_main_menu():
+    client = ShopifyApiClient()
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "token"
+        query = payload.get("query", "")
+
+        if "query menusForPolicyFooterSync" in query:
+            return {
+                "menus": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/Menu/1",
+                            "title": "Main menu",
+                            "handle": "main-menu",
+                        }
+                    ],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+
+        if "query menuForPolicyFooterSync" in query:
+            variables = payload.get("variables") or {}
+            assert variables.get("id") == "gid://shopify/Menu/1"
+            return {
+                "menu": {
+                    "id": "gid://shopify/Menu/1",
+                    "title": "Main menu",
+                    "handle": "main-menu",
+                    "items": [
+                        {
+                            "id": "gid://shopify/MenuItem/10",
+                            "title": "Home",
+                            "type": "HTTP",
+                            "url": "/",
+                            "resourceId": None,
+                            "tags": [],
+                            "items": [],
+                        },
+                        {
+                            "id": "gid://shopify/MenuItem/11",
+                            "title": "Catalog",
+                            "type": "HTTP",
+                            "url": "/collections/all",
+                            "resourceId": None,
+                            "tags": [],
+                            "items": [],
+                        },
+                        {
+                            "id": "gid://shopify/MenuItem/12",
+                            "title": "Products",
+                            "type": "HTTP",
+                            "url": "/collections/featured",
+                            "resourceId": None,
+                            "tags": [],
+                            "items": [
+                                {
+                                    "id": "gid://shopify/MenuItem/13",
+                                    "title": "Catalog",
+                                    "type": "HTTP",
+                                    "url": "/collections/all",
+                                    "resourceId": None,
+                                    "tags": [],
+                                    "items": [],
+                                },
+                                {
+                                    "id": "gid://shopify/MenuItem/14",
+                                    "title": "Guides",
+                                    "type": "HTTP",
+                                    "url": "/pages/guides",
+                                    "resourceId": None,
+                                    "tags": [],
+                                    "items": [],
+                                },
+                            ],
+                        },
+                        {
+                            "id": "gid://shopify/MenuItem/15",
+                            "title": "Shop",
+                            "type": "HTTP",
+                            "url": "/collections/all",
+                            "resourceId": None,
+                            "tags": [],
+                            "items": [],
+                        },
+                    ],
+                }
+            }
+
+        if "mutation menuUpdateForPolicyFooterSync" in query:
+            variables = payload.get("variables") or {}
+            assert variables.get("id") == "gid://shopify/Menu/1"
+            items = variables.get("items") or []
+            assert [item["title"] for item in items] == ["Home", "Products", "Shop"]
+            assert [item["title"] for item in items[1]["items"]] == ["Guides"]
+            return {
+                "menuUpdate": {
+                    "menu": {
+                        "id": "gid://shopify/Menu/1",
+                        "title": "Main menu",
+                        "handle": "main-menu",
+                    },
+                    "userErrors": [],
+                }
+            }
+
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.remove_catalog_from_default_store_navigation(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+        )
+    )
+
+    assert result == {
+        "handle": "main-menu",
+        "updated": True,
+        "reason": "catalog_removed",
+    }
+
+
 def test_sync_theme_brand_updates_layout_and_css():
     client = ShopifyApiClient()
     observed_payloads: list[dict] = []

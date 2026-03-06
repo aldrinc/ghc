@@ -298,6 +298,31 @@ async def _provision_storefront_token_if_missing(
     return True
 
 
+async def _apply_shop_connection_defaults(
+    *,
+    shop_domain: str,
+    admin_access_token: str,
+) -> None:
+    cleaned_access_token = admin_access_token.strip()
+    if not cleaned_access_token:
+        raise ShopifyApiError(
+            message=(
+                "Cannot apply Shopify connection defaults because the installation "
+                "admin_access_token is missing."
+            ),
+            status_code=409,
+        )
+
+    await shopify_api.ensure_catalog_collection_route_is_available(
+        shop_domain=shop_domain,
+        access_token=cleaned_access_token,
+    )
+    await shopify_api.remove_catalog_from_default_store_navigation(
+        shop_domain=shop_domain,
+        access_token=cleaned_access_token,
+    )
+
+
 @app.get("/auth/install")
 def auth_install(
     shop: str,
@@ -379,9 +404,9 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
             shop_domain=shop_domain,
             admin_access_token=admin_access_token,
         )
-        await shopify_api.ensure_catalog_collection_route_is_available(
+        await _apply_shop_connection_defaults(
             shop_domain=shop_domain,
-            access_token=admin_access_token,
+            admin_access_token=admin_access_token,
         )
         session.delete(oauth_state)
         session.commit()
@@ -623,7 +648,7 @@ def app_api_session(
 
 
 @app.post("/app/api/link-workspace", response_model=EmbeddedSessionResponse)
-def app_api_link_workspace(
+async def app_api_link_workspace(
     payload: LinkWorkspaceRequest,
     shop_domain: str = Depends(require_shopify_session_shop_domain),
     session: Session = Depends(get_session),
@@ -646,10 +671,19 @@ def app_api_link_workspace(
             ),
         )
 
-    if installation.client_id != client_id:
+    should_apply_defaults = installation.client_id != client_id
+    if should_apply_defaults:
         installation.client_id = client_id
         installation.updated_at = datetime.now(timezone.utc)
         session.add(installation)
+        try:
+            await _apply_shop_connection_defaults(
+                shop_domain=installation.shop_domain,
+                admin_access_token=installation.admin_access_token,
+            )
+        except ShopifyApiError as exc:
+            session.rollback()
+            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
         session.commit()
         session.refresh(installation)
 
@@ -695,9 +729,9 @@ async def app_api_auto_provision_storefront_token(
             installation=installation,
             session=session,
         )
-        await shopify_api.ensure_catalog_collection_route_is_available(
+        await _apply_shop_connection_defaults(
             shop_domain=installation.shop_domain,
-            access_token=installation.admin_access_token,
+            admin_access_token=installation.admin_access_token,
         )
     except ShopifyApiError as exc:
         session.rollback()
@@ -718,7 +752,7 @@ def list_installations(session: Session = Depends(get_session)):
     "/admin/installations/{shop_domain}",
     dependencies=[Depends(require_internal_api_token)],
 )
-def update_installation(
+async def update_installation(
     shop_domain: str,
     payload: UpdateInstallationRequest,
     session: Session = Depends(get_session),
@@ -742,8 +776,28 @@ def update_installation(
             token = token.strip()
         installation.storefront_access_token = token or None
 
+    should_apply_defaults = (
+        installation.uninstalled_at is None
+        and installation.client_id is not None
+        and (
+            ("clientId" in fields_set and payload.clientId is not None)
+            or (
+                "storefrontAccessToken" in fields_set
+                and installation.storefront_access_token is not None
+            )
+        )
+    )
     installation.updated_at = datetime.now(timezone.utc)
     session.add(installation)
+    if should_apply_defaults:
+        try:
+            await _apply_shop_connection_defaults(
+                shop_domain=installation.shop_domain,
+                admin_access_token=installation.admin_access_token,
+            )
+        except ShopifyApiError as exc:
+            session.rollback()
+            raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
     session.commit()
     session.refresh(installation)
     return _serialize_installation(installation)
@@ -797,9 +851,9 @@ async def auto_provision_installation_storefront_token(
             installation=installation,
             session=session,
         )
-        await shopify_api.ensure_catalog_collection_route_is_available(
+        await _apply_shop_connection_defaults(
             shop_domain=installation.shop_domain,
-            access_token=installation.admin_access_token,
+            admin_access_token=installation.admin_access_token,
         )
     except ShopifyApiError as exc:
         session.rollback()

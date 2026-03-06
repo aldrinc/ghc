@@ -26,12 +26,7 @@
   },
   "background": {
     "imageModel": "gemini-3-pro-image-preview",
-    "promptVars": {
-      "product": "a white pouch of PURIFIED SHILAJIT GUMMIES standing upright on a clean tabletop, a few dark gummies in front, cucumber and a couple nuts beside it",
-      "scene": "bright minimal background, natural soft light, clean tabletop",
-      "extra": "Keep the pouch in the lower-middle of the frame with clean empty background space in the top-right.",
-      "avoid": ["on-image captions", "watermarks", "UI overlays", "speech bubbles", "chat bubbles", "text boxes", "callout cards", "stickers"]
-    }
+    "promptFile": "../prompts/pdp_example3_bold_claim_nano.md"
   },
   "comment": {
     "handle": "PeytonJackson",

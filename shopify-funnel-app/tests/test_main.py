@@ -84,6 +84,7 @@ def test_auth_callback_auto_provisions_storefront_token(api_client, db_session, 
     oauth_state = OAuthState(state="state_1", shop_domain=shop_domain, client_id="client_1")
     db_session.add(oauth_state)
     db_session.commit()
+    observed_default_syncs: list[tuple[str, str]] = []
 
     async def fake_exchange_code_for_access_token(*, shop_domain: str, code: str):
         assert shop_domain == "example.myshopify.com"
@@ -102,21 +103,14 @@ def test_auth_callback_auto_provisions_storefront_token(api_client, db_session, 
         assert title == "Marketi Funnel Checkout"
         return "shpat_auto_token"
 
-    async def fake_ensure_catalog_collection_route_is_available(
+    async def fake_apply_shop_connection_defaults(
         *,
         shop_domain: str,
-        access_token: str,
-        sync_all_products: bool = True,
+        admin_access_token: str,
     ):
+        observed_default_syncs.append((shop_domain, admin_access_token))
         assert shop_domain == "example.myshopify.com"
-        assert access_token == "admin_access_token"
-        assert sync_all_products is True
-        return {
-            "collectionId": "gid://shopify/Collection/1",
-            "collectionHandle": "all",
-            "collectionTitle": "Catalog",
-            "addedProductCount": 0,
-        }
+        assert admin_access_token == "admin_access_token"
 
     monkeypatch.setattr(
         main_module.shopify_api,
@@ -134,9 +128,9 @@ def test_auth_callback_auto_provisions_storefront_token(api_client, db_session, 
         fake_create_storefront_access_token,
     )
     monkeypatch.setattr(
-        main_module.shopify_api,
-        "ensure_catalog_collection_route_is_available",
-        fake_ensure_catalog_collection_route_is_available,
+        main_module,
+        "_apply_shop_connection_defaults",
+        fake_apply_shop_connection_defaults,
     )
 
     response = api_client.get(
@@ -160,6 +154,7 @@ def test_auth_callback_auto_provisions_storefront_token(api_client, db_session, 
     assert installation is not None
     assert installation.client_id == "client_1"
     assert installation.storefront_access_token == "shpat_auto_token"
+    assert observed_default_syncs == [("example.myshopify.com", "admin_access_token")]
 
 
 def test_auth_callback_keeps_installation_when_auto_provision_fails(
@@ -169,6 +164,7 @@ def test_auth_callback_keeps_installation_when_auto_provision_fails(
     oauth_state = OAuthState(state="state_2", shop_domain=shop_domain, client_id="client_2")
     db_session.add(oauth_state)
     db_session.commit()
+    observed_default_syncs: list[tuple[str, str]] = []
 
     async def fake_exchange_code_for_access_token(*, shop_domain: str, code: str):
         return "admin_access_token", "read_products,write_products"
@@ -182,21 +178,14 @@ def test_auth_callback_keeps_installation_when_auto_provision_fails(
             status_code=409,
         )
 
-    async def fake_ensure_catalog_collection_route_is_available(
+    async def fake_apply_shop_connection_defaults(
         *,
         shop_domain: str,
-        access_token: str,
-        sync_all_products: bool = True,
+        admin_access_token: str,
     ):
+        observed_default_syncs.append((shop_domain, admin_access_token))
         assert shop_domain == "example.myshopify.com"
-        assert access_token == "admin_access_token"
-        assert sync_all_products is True
-        return {
-            "collectionId": "gid://shopify/Collection/1",
-            "collectionHandle": "all",
-            "collectionTitle": "Catalog",
-            "addedProductCount": 0,
-        }
+        assert admin_access_token == "admin_access_token"
 
     monkeypatch.setattr(
         main_module.shopify_api,
@@ -214,9 +203,9 @@ def test_auth_callback_keeps_installation_when_auto_provision_fails(
         fake_create_storefront_access_token,
     )
     monkeypatch.setattr(
-        main_module.shopify_api,
-        "ensure_catalog_collection_route_is_available",
-        fake_ensure_catalog_collection_route_is_available,
+        main_module,
+        "_apply_shop_connection_defaults",
+        fake_apply_shop_connection_defaults,
     )
 
     response = api_client.get(
@@ -241,6 +230,7 @@ def test_auth_callback_keeps_installation_when_auto_provision_fails(
     assert installation.client_id == "client_2"
     assert installation.admin_access_token == "admin_access_token"
     assert installation.storefront_access_token is None
+    assert observed_default_syncs == [("example.myshopify.com", "admin_access_token")]
 
 
 def test_auth_callback_redirects_to_embedded_app(api_client, db_session, monkeypatch):
@@ -257,21 +247,13 @@ def test_auth_callback_redirects_to_embedded_app(api_client, db_session, monkeyp
     async def fake_create_storefront_access_token(*, shop_domain: str, access_token: str, title: str = "Marketi Funnel Checkout"):
         return "shpat_public"
 
-    async def fake_ensure_catalog_collection_route_is_available(
+    async def fake_apply_shop_connection_defaults(
         *,
         shop_domain: str,
-        access_token: str,
-        sync_all_products: bool = True,
+        admin_access_token: str,
     ):
         assert shop_domain == "example.myshopify.com"
-        assert access_token == "admin_access_token"
-        assert sync_all_products is True
-        return {
-            "collectionId": "gid://shopify/Collection/1",
-            "collectionHandle": "all",
-            "collectionTitle": "Catalog",
-            "addedProductCount": 0,
-        }
+        assert admin_access_token == "admin_access_token"
 
     monkeypatch.setattr(
         main_module.shopify_api,
@@ -289,9 +271,9 @@ def test_auth_callback_redirects_to_embedded_app(api_client, db_session, monkeyp
         fake_create_storefront_access_token,
     )
     monkeypatch.setattr(
-        main_module.shopify_api,
-        "ensure_catalog_collection_route_is_available",
-        fake_ensure_catalog_collection_route_is_available,
+        main_module,
+        "_apply_shop_connection_defaults",
+        fake_apply_shop_connection_defaults,
     )
 
     response = api_client.get(
@@ -356,6 +338,7 @@ def test_embedded_shell_loads_latest_app_bridge_script(api_client):
 def test_auto_storefront_token_endpoint_sets_token_for_active_installation(
     api_client, db_session, monkeypatch
 ):
+    observed_default_syncs: list[tuple[str, str]] = []
     installation = ShopInstallation(
         shop_domain="example.myshopify.com",
         client_id="client_1",
@@ -371,21 +354,14 @@ def test_auto_storefront_token_endpoint_sets_token_for_active_installation(
         assert access_token == "admin_access_token"
         return "shpat_retry"
 
-    async def fake_ensure_catalog_collection_route_is_available(
+    async def fake_apply_shop_connection_defaults(
         *,
         shop_domain: str,
-        access_token: str,
-        sync_all_products: bool = True,
+        admin_access_token: str,
     ):
+        observed_default_syncs.append((shop_domain, admin_access_token))
         assert shop_domain == "example.myshopify.com"
-        assert access_token == "admin_access_token"
-        assert sync_all_products is True
-        return {
-            "collectionId": "gid://shopify/Collection/1",
-            "collectionHandle": "all",
-            "collectionTitle": "Catalog",
-            "addedProductCount": 0,
-        }
+        assert admin_access_token == "admin_access_token"
 
     monkeypatch.setattr(
         main_module.shopify_api,
@@ -393,9 +369,9 @@ def test_auto_storefront_token_endpoint_sets_token_for_active_installation(
         fake_create_storefront_access_token,
     )
     monkeypatch.setattr(
-        main_module.shopify_api,
-        "ensure_catalog_collection_route_is_available",
-        fake_ensure_catalog_collection_route_is_available,
+        main_module,
+        "_apply_shop_connection_defaults",
+        fake_apply_shop_connection_defaults,
     )
 
     response = api_client.post(
@@ -414,6 +390,7 @@ def test_auto_storefront_token_endpoint_sets_token_for_active_installation(
     ).first()
     assert refreshed is not None
     assert refreshed.storefront_access_token == "shpat_retry"
+    assert observed_default_syncs == [("example.myshopify.com", "admin_access_token")]
 
 
 def test_auto_storefront_token_endpoint_rejects_workspace_mismatch(
@@ -599,8 +576,9 @@ def test_embedded_session_reports_installation_state(api_client, db_session):
     assert payload["installationState"] == "installed"
 
 
-def test_embedded_link_workspace_updates_client_binding(api_client, db_session):
+def test_embedded_link_workspace_updates_client_binding(api_client, db_session, monkeypatch):
     shop_domain = "example.myshopify.com"
+    observed_default_syncs: list[tuple[str, str]] = []
     db_session.add(
         ShopInstallation(
             shop_domain=shop_domain,
@@ -611,6 +589,21 @@ def test_embedded_link_workspace_updates_client_binding(api_client, db_session):
         )
     )
     db_session.commit()
+
+    async def fake_apply_shop_connection_defaults(
+        *,
+        shop_domain: str,
+        admin_access_token: str,
+    ):
+        observed_default_syncs.append((shop_domain, admin_access_token))
+        assert shop_domain == "example.myshopify.com"
+        assert admin_access_token == "admin_access_token"
+
+    monkeypatch.setattr(
+        main_module,
+        "_apply_shop_connection_defaults",
+        fake_apply_shop_connection_defaults,
+    )
 
     api_client.app.dependency_overrides[
         main_module.require_shopify_session_shop_domain
@@ -633,10 +626,12 @@ def test_embedded_link_workspace_updates_client_binding(api_client, db_session):
     ).first()
     assert refreshed is not None
     assert refreshed.client_id == "client_abc"
+    assert observed_default_syncs == [("example.myshopify.com", "admin_access_token")]
 
 
 def test_embedded_auto_storefront_token_provisions_token(api_client, db_session, monkeypatch):
     shop_domain = "example.myshopify.com"
+    observed_default_syncs: list[tuple[str, str]] = []
     db_session.add(
         ShopInstallation(
             shop_domain=shop_domain,
@@ -659,21 +654,14 @@ def test_embedded_auto_storefront_token_provisions_token(api_client, db_session,
         assert title == "Marketi Funnel Checkout"
         return "shpat_embedded"
 
-    async def fake_ensure_catalog_collection_route_is_available(
+    async def fake_apply_shop_connection_defaults(
         *,
         shop_domain: str,
-        access_token: str,
-        sync_all_products: bool = True,
+        admin_access_token: str,
     ):
+        observed_default_syncs.append((shop_domain, admin_access_token))
         assert shop_domain == "example.myshopify.com"
-        assert access_token == "admin_access_token"
-        assert sync_all_products is True
-        return {
-            "collectionId": "gid://shopify/Collection/1",
-            "collectionHandle": "all",
-            "collectionTitle": "Catalog",
-            "addedProductCount": 0,
-        }
+        assert admin_access_token == "admin_access_token"
 
     monkeypatch.setattr(
         main_module.shopify_api,
@@ -681,9 +669,9 @@ def test_embedded_auto_storefront_token_provisions_token(api_client, db_session,
         fake_create_storefront_access_token,
     )
     monkeypatch.setattr(
-        main_module.shopify_api,
-        "ensure_catalog_collection_route_is_available",
-        fake_ensure_catalog_collection_route_is_available,
+        main_module,
+        "_apply_shop_connection_defaults",
+        fake_apply_shop_connection_defaults,
     )
 
     api_client.app.dependency_overrides[
@@ -706,6 +694,7 @@ def test_embedded_auto_storefront_token_provisions_token(api_client, db_session,
     ).first()
     assert refreshed is not None
     assert refreshed.storefront_access_token == "shpat_embedded"
+    assert observed_default_syncs == [("example.myshopify.com", "admin_access_token")]
 
 
 def test_embedded_auto_storefront_token_rejects_workspace_mismatch(

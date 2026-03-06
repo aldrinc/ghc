@@ -27,6 +27,7 @@ _THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
 _THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
 _CATALOG_COLLECTION_HANDLE = "all"
 _CATALOG_COLLECTION_TITLE = "Catalog"
+_DEFAULT_STORE_NAVIGATION_MENU_HANDLE = "main-menu"
 _GRAPHQL_MAX_PAGE_SIZE = 250
 _COLLECTION_ADD_PRODUCTS_BATCH_SIZE = 50
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
@@ -3401,6 +3402,56 @@ class ShopifyApiClient:
 
         return deduped_items, changed
 
+    @staticmethod
+    def _menu_item_matches_catalog_title(*, item: dict[str, Any]) -> bool:
+        title = item.get("title")
+        return (
+            isinstance(title, str)
+            and title.strip().lower() == _CATALOG_COLLECTION_TITLE.lower()
+        )
+
+    @classmethod
+    def _remove_catalog_menu_items(
+        cls,
+        *,
+        menu_items: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], bool]:
+        next_items: list[dict[str, Any]] = []
+        changed = False
+
+        for item in menu_items:
+            if not isinstance(item, dict):
+                raise ShopifyApiError(
+                    message="Cannot sync storefront navigation because a menu item is invalid.",
+                    status_code=409,
+                )
+
+            next_item = deepcopy(item)
+            raw_children = next_item.get("items") or []
+            if not isinstance(raw_children, list):
+                raise ShopifyApiError(
+                    message=(
+                        "Cannot sync storefront navigation because a menu item has "
+                        "invalid nested items."
+                    ),
+                    status_code=409,
+                )
+
+            filtered_children, child_changed = cls._remove_catalog_menu_items(
+                menu_items=raw_children
+            )
+            if child_changed:
+                next_item["items"] = filtered_children
+                changed = True
+
+            if cls._menu_item_matches_catalog_title(item=next_item):
+                changed = True
+                continue
+
+            next_items.append(next_item)
+
+        return next_items, changed
+
     @classmethod
     def _coerce_menu_summary_node(
         cls,
@@ -4117,6 +4168,67 @@ class ShopifyApiClient:
             node=update_data.get("menu"),
             query_name="menuUpdate",
         )
+
+    async def remove_catalog_from_default_store_navigation(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+    ) -> dict[str, Any]:
+        all_menus = await self._list_shop_menus(
+            shop_domain=shop_domain,
+            access_token=access_token,
+        )
+        matching_menus = [
+            menu
+            for menu in all_menus
+            if menu["handle"] == _DEFAULT_STORE_NAVIGATION_MENU_HANDLE
+        ]
+        if not matching_menus:
+            return {
+                "handle": _DEFAULT_STORE_NAVIGATION_MENU_HANDLE,
+                "updated": False,
+                "reason": "menu_not_found",
+            }
+        if len(matching_menus) > 1:
+            menu_ids = ", ".join(menu["id"] for menu in matching_menus)
+            raise ShopifyApiError(
+                message=(
+                    "Multiple menus matched the default storefront navigation handle. "
+                    f"handle={_DEFAULT_STORE_NAVIGATION_MENU_HANDLE}, matchedMenuIds={menu_ids}"
+                ),
+                status_code=409,
+            )
+
+        menu_summary = matching_menus[0]
+        menu_details = await self._load_menu_details(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            menu_id=menu_summary["id"],
+        )
+        next_items, changed = self._remove_catalog_menu_items(
+            menu_items=menu_details["items"]
+        )
+        if not changed:
+            return {
+                "handle": menu_details["handle"],
+                "updated": False,
+                "reason": "catalog_not_present",
+            }
+
+        await self._update_menu(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            menu_id=menu_details["id"],
+            title=menu_details["title"],
+            handle=menu_details["handle"],
+            items=next_items,
+        )
+        return {
+            "handle": menu_details["handle"],
+            "updated": True,
+            "reason": "catalog_removed",
+        }
 
     async def _sync_policy_pages_to_footer_menus(
         self,

@@ -129,7 +129,10 @@ npx playwright install chromium
 If you omit `background.imageUrl`, the service will generate the background image via Nano Banana when you provide **either**:
 
 - `background.prompt` (string), or
+- `background.promptFile` (path to a local UTF-8 text/markdown file when using file-based inputs), or
 - `background.promptVars` (object: `product` required; optional `scene`, `subject`, `extra`, `avoid[]`)
+
+`background.promptFile` is resolved relative to the JSON input file for `npm run render` / `npm run render:nano`.
 
 This requires `GEMINI_API_KEY` and a configured model (`NANO_BANANA_MODEL` or `background.imageModel` / `imageModel`).
 
