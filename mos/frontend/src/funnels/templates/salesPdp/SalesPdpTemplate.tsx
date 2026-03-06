@@ -1693,6 +1693,8 @@ type SalesPdpComparisonProps = {
 
 export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonProps) {
   const resolvedConfig = parseJson<ComparisonConfig>(configJson) ?? config ?? salesPdpDefaults.config.comparison
+  const comparisonGoodColor = 'var(--pdp-comparison-good, #16a34a)'
+  const comparisonBadColor = 'var(--pdp-comparison-bad, #dc2626)'
   return (
     <section id={resolvedConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad} ${styles.comparisonSection}`}>
       <Container>
@@ -1717,7 +1719,11 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
                   <td className={styles.tableLabel}>{r.label}</td>
                   <td>
                     <div className={styles.cell}>
-                      <span className={`${styles.comparisonIcon} ${styles.comparisonIconGood}`} aria-hidden="true">
+                      <span
+                        className={`${styles.comparisonIcon} ${styles.comparisonIconGood}`}
+                        aria-hidden="true"
+                        style={{ color: comparisonGoodColor, borderColor: comparisonGoodColor }}
+                      >
                         <IconCheck size={12} />
                       </span>
                       {r.pup}
@@ -1725,7 +1731,11 @@ export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonPro
                   </td>
                   <td>
                     <div className={styles.cell}>
-                      <span className={`${styles.comparisonIcon} ${styles.comparisonIconBad}`} aria-hidden="true">
+                      <span
+                        className={`${styles.comparisonIcon} ${styles.comparisonIconBad}`}
+                        aria-hidden="true"
+                        style={{ color: comparisonBadColor, borderColor: comparisonBadColor }}
+                      >
                         <IconClose size={12} />
                       </span>
                       {r.disposable}
