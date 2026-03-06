@@ -37,6 +37,10 @@ from app.db.models import (
     FunnelPublicationPage,
     Product,
 )
+from app.services.funnel_metadata import (
+    build_public_page_metadata_for_context,
+    normalize_public_page_metadata_for_context,
+)
 from app.services.public_routing import require_product_route_slug
 from app.services.media_storage import MediaStorage
 
@@ -249,12 +253,21 @@ def publish_funnel(*, session: Session, org_id: str, user_id: str, funnel_id: st
         extracted_links.append((str(page.id), auto_link))
 
     for page in pages:
+        metadata = build_public_page_metadata_for_context(
+            session=session,
+            org_id=str(funnel.org_id),
+            funnel=funnel,
+            page=page,
+            puck_data=version_by_page[str(page.id)].puck_data,
+        )
         session.add(
             FunnelPublicationPage(
                 publication_id=publication.id,
                 page_id=page.id,
                 page_version_id=version_by_page[str(page.id)].id,
                 slug_at_publish=page.slug,
+                title_at_publish=metadata["title"],
+                description_at_publish=metadata["description"] or None,
             )
         )
 
@@ -395,11 +408,19 @@ def duplicate_funnel(
                 versions_to_copy.append(draft)
 
         for v in versions_to_copy:
+            copied_puck_data = rewrite_internal_target_ids(v.puck_data, id_map)
+            normalize_public_page_metadata_for_context(
+                session=session,
+                org_id=org_id,
+                funnel=new_funnel,
+                page=new_pages[str(page.id)],
+                puck_data=copied_puck_data,
+            )
             session.add(
                 FunnelPageVersion(
                     page_id=new_page_id,
                     status=v.status,
-                    puck_data=rewrite_internal_target_ids(v.puck_data, id_map),
+                    puck_data=copied_puck_data,
                     source=FunnelPageVersionSourceEnum.duplicate,
                     ai_metadata=v.ai_metadata,
                     created_at=datetime.now(timezone.utc),

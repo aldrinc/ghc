@@ -5,7 +5,8 @@
 .list {
   list-style: none;
   padding: 0;
-  margin: 0;
+  margin: 0 auto;
+  max-width: 1000px;
 
   display: grid;
   gap: var(--listicle-card-gap);
@@ -31,6 +32,7 @@
 .media {
   position: relative;
   min-height: var(--listicle-media-min-height);
+  overflow: hidden;
 }
 
 .image {
@@ -38,6 +40,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
 }
 
 .placeholder {
@@ -103,6 +106,7 @@
 
   .media {
     min-height: var(--listicle-media-min-height-mobile);
+    height: var(--listicle-media-frame-height-mobile);
   }
 
   .content {

@@ -704,6 +704,160 @@ def test_collect_image_plans_normalizes_sales_guarantee_slots_to_testimonial_tar
     assert "prompt" not in feed_images[0]
 
 
+def test_collect_image_plans_locks_sales_carousel_slots_to_testimonial_renderer():
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "SalesPdpHero",
+                "props": {
+                    "id": "hero",
+                    "config": {
+                        "gallery": {
+                            "slides": [
+                                {
+                                    "alt": "Carousel 1",
+                                    "assetPublicId": "",
+                                    "prompt": "Lifestyle scene 1",
+                                    "imageSource": "unsplash",
+                                },
+                                {
+                                    "alt": "Carousel 2",
+                                    "assetPublicId": "",
+                                    "prompt": "Lifestyle scene 2",
+                                    "imageSource": "ai",
+                                    "referenceAssetPublicId": "ref-id",
+                                },
+                            ],
+                            "freeGifts": {
+                                "icon": {
+                                    "alt": "Gift icon",
+                                    "assetPublicId": "",
+                                    "prompt": "Flat gift icon",
+                                },
+                                "title": "Free Gifts",
+                                "body": "Includes bonuses",
+                                "ctaLabel": "Preview",
+                            },
+                        }
+                    },
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+    plans = funnel_ai._collect_image_plans(puck_data=puck_data, config_contexts=[])
+
+    assert len(plans) == 1
+    assert "gallery.freeGifts.icon" in plans[0]["path"]
+    assert all("gallery.slides" not in plan["path"] for plan in plans)
+
+    slides = puck_data["content"][0]["props"]["config"]["gallery"]["slides"]
+    assert "prompt" not in slides[0]
+    assert "imageSource" not in slides[0]
+    assert "prompt" not in slides[1]
+    assert "imageSource" not in slides[1]
+    assert "referenceAssetPublicId" not in slides[1]
+
+
+def test_collect_image_plans_locks_sales_carousel_slots_in_config_json():
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "SalesPdpHero",
+                "props": {
+                    "id": "hero",
+                    "configJson": json.dumps(
+                        {
+                            "gallery": {
+                                "slides": [
+                                    {
+                                        "alt": "Carousel 1",
+                                        "assetPublicId": "",
+                                        "prompt": "Lifestyle scene 1",
+                                        "imageSource": "unsplash",
+                                    },
+                                    {
+                                        "alt": "Carousel 2",
+                                        "assetPublicId": "",
+                                        "prompt": "Lifestyle scene 2",
+                                        "imageSource": "ai",
+                                        "referenceAssetPublicId": "ref-id",
+                                    },
+                                ],
+                                "freeGifts": {
+                                    "icon": {
+                                        "alt": "Gift icon",
+                                        "assetPublicId": "",
+                                        "prompt": "Flat gift icon",
+                                    },
+                                    "title": "Free Gifts",
+                                    "body": "Includes bonuses",
+                                    "ctaLabel": "Preview",
+                                },
+                            }
+                        }
+                    ),
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+    config_contexts = funnel_ai._collect_config_json_contexts_all(puck_data)
+    plans = funnel_ai._collect_image_plans(puck_data=puck_data, config_contexts=config_contexts)
+    funnel_ai._sync_config_json_contexts(config_contexts)
+
+    assert len(plans) == 1
+    assert "gallery.freeGifts.icon" in plans[0]["path"]
+    assert all("gallery.slides" not in plan["path"] for plan in plans)
+
+    config = json.loads(puck_data["content"][0]["props"]["configJson"])
+    slides = config["gallery"]["slides"]
+    assert "prompt" not in slides[0]
+    assert "imageSource" not in slides[0]
+    assert "prompt" not in slides[1]
+    assert "imageSource" not in slides[1]
+    assert "referenceAssetPublicId" not in slides[1]
+
+
+def test_validate_template_images_ignores_sales_carousel_slots_without_prompts():
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "SalesPdpHero",
+                "props": {
+                    "id": "hero",
+                    "config": {
+                        "gallery": {
+                            "slides": [
+                                {"alt": "Carousel 1", "assetPublicId": ""},
+                                {"alt": "Carousel 2", "assetPublicId": ""},
+                            ],
+                            "freeGifts": {
+                                "icon": {
+                                    "alt": "Gift icon",
+                                    "assetPublicId": "",
+                                    "prompt": "Flat gift icon",
+                                },
+                                "title": "Free Gifts",
+                                "body": "Includes bonuses",
+                                "ctaLabel": "Preview",
+                            },
+                        }
+                    },
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+    funnel_ai._validate_required_template_images(puck_data=puck_data, config_contexts=[])
+
+
 def test_keeps_ai_for_product_specific_prompts():
     puck_data = _puck_with_images(
         [
@@ -779,7 +933,7 @@ def test_image_generation_count_allows_up_to_cap():
     assert count == 50
 
 
-def test_pre_sales_reasons_always_use_product_reference_image(monkeypatch: pytest.MonkeyPatch):
+def test_pre_sales_pre_marquee_images_stay_editorial_until_pitch(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         funnel_ai,
         "_collect_product_image_public_ids",
@@ -789,6 +943,23 @@ def test_pre_sales_reasons_always_use_product_reference_image(monkeypatch: pytes
     puck_data = {
         "root": {"props": {}},
         "content": [
+            {
+                "type": "PreSalesHero",
+                "props": {
+                    "id": "hero",
+                    "config": {
+                        "hero": {
+                            "title": "Why most nighttime mask routines go wrong",
+                            "subtitle": "A better way to screen the steps before you buy anything.",
+                            "media": {
+                                "type": "image",
+                                "prompt": "Branded product image in a soft bedroom scene.",
+                            },
+                        },
+                        "badges": [],
+                    },
+                },
+            },
             {
                 "type": "PreSalesReasons",
                 "props": {
@@ -814,6 +985,24 @@ def test_pre_sales_reasons_always_use_product_reference_image(monkeypatch: pytes
                         },
                     ],
                 },
+            },
+            {
+                "type": "PreSalesPitch",
+                "props": {
+                    "id": "pitch",
+                    "config": {
+                        "title": "A safer way to screen before you buy",
+                        "bullets": [
+                            "Step-by-step triage",
+                            "Clear red flags",
+                            "Better clinician questions",
+                            "Faster preparation",
+                        ],
+                        "image": {
+                            "prompt": "Show the product clearly in a reassuring home setting.",
+                        },
+                    },
+                },
             }
         ],
         "zones": {},
@@ -837,12 +1026,27 @@ def test_pre_sales_reasons_always_use_product_reference_image(monkeypatch: pytes
         product=product,
     )
 
-    reasons = puck_data["content"][0]["props"]["config"]
+    hero_media = puck_data["content"][0]["props"]["config"]["hero"]["media"]
+    assert hero_media["imageSource"] == "ai"
+    assert hero_media["aspectRatio"] == "1:1"
+    assert "referenceAssetPublicId" not in hero_media
+    assert "assetPublicId" not in hero_media
+    assert "editorial article image" in hero_media["prompt"].lower()
+    assert "product reference image" in hero_media["prompt"].lower()
+
+    reasons = puck_data["content"][1]["props"]["config"]
     for reason in reasons:
         image = reason["image"]
-        assert image["referenceAssetPublicId"] == "prod-ref-public-id"
+        assert "referenceAssetPublicId" not in image
+        assert "assetPublicId" not in image
         assert image["imageSource"] == "ai"
         assert image["aspectRatio"] == "1:1"
+        assert "editorial imagery" in image["prompt"].lower()
+        assert "product reference image" in image["prompt"].lower()
+
+    pitch_image = puck_data["content"][2]["props"]["config"]["image"]
+    assert pitch_image["referenceAssetPublicId"] == "prod-ref-public-id"
+    assert pitch_image["imageSource"] == "ai"
 
 
 def test_extract_image_prompt_target_normalizes_same_asset_and_reference_id():
@@ -863,3 +1067,73 @@ def test_extract_image_prompt_target_normalizes_same_asset_and_reference_id():
     assert image_source == "ai"
     assert aspect_ratio is None
     assert "assetPublicId" not in image
+
+
+def test_sales_pdp_hero_gallery_slides_are_not_overridden_with_product_assets(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        funnel_ai,
+        "_collect_product_image_public_ids",
+        lambda **_: ["prod-ref-public-id", "prod-alt-public-id"],
+    )
+
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "SalesPdpHero",
+                "props": {
+                    "id": "hero",
+                    "config": {
+                        "gallery": {
+                            "slides": [
+                                {"src": "/assets/slide-1.webp", "alt": "Slide 1"},
+                                {"src": "/assets/slide-2.webp", "alt": "Slide 2"},
+                            ]
+                        },
+                        "purchase": {
+                            "offer": {
+                                "options": [
+                                    {
+                                        "id": "offer-1",
+                                        "title": "Bundle 1",
+                                        "image": {"src": "/assets/offer-1.webp", "alt": "Offer 1"},
+                                        "price": 99,
+                                    }
+                                ]
+                            }
+                        },
+                    },
+                },
+            }
+        ],
+        "zones": {},
+    }
+
+    product = SimpleNamespace(
+        id="product-1",
+        primary_asset_id=None,
+        product_type="supplement",
+        title="Hair Gummies",
+        description="Hair gummies",
+    )
+
+    funnel_ai._apply_product_image_overrides_for_ai(
+        session=None,
+        org_id="org-1",
+        client_id="client-1",
+        puck_data=puck_data,
+        config_contexts=[],
+        template_kind="sales-pdp",
+        product=product,
+    )
+
+    hero_config = puck_data["content"][0]["props"]["config"]
+    slides = hero_config["gallery"]["slides"]
+    assert slides[0] == {"src": "/assets/slide-1.webp", "alt": "Slide 1"}
+    assert slides[1] == {"src": "/assets/slide-2.webp", "alt": "Slide 2"}
+
+    offer_image = hero_config["purchase"]["offer"]["options"][0]["image"]
+    assert offer_image["referenceAssetPublicId"] == "prod-ref-public-id"
+    assert offer_image["imageSource"] == "ai"

@@ -13,7 +13,7 @@
 .badge {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
 }
 
 .iconFrame {
@@ -41,7 +41,7 @@
   font-weight: var(--badge-text-weight);
   letter-spacing: var(--badge-letter-spacing);
   text-transform: uppercase;
-  color: var(--color-brand);
+  color: var(--badge-text-color);
   white-space: nowrap;
 }
 
@@ -57,7 +57,39 @@
 
 @media (max-width: 720px) {
   .row {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 12px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .row::-webkit-scrollbar {
+    display: none;
+  }
+
+    .badge {
+      flex: 0 0 auto;
+      min-width: 148px;
+      gap: 8px;
+    }
+
+    .iconFrame {
+      width: 40px;
+      height: 40px;
+    }
+
+  .text {
     flex-direction: column;
-    gap: 16px;
+    align-items: flex-start;
+    gap: 4px;
+    white-space: normal;
+  }
+
+  .value,
+  .label {
+    line-height: 1.1;
   }
 }

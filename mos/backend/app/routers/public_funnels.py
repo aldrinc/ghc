@@ -33,6 +33,7 @@ from app.db.repositories.funnels import (
 from app.schemas.commerce import PublicCheckoutRequest
 from app.schemas.funnels import PublicEventsIngestRequest
 from app.services.design_systems import resolve_design_system_tokens
+from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services.media_storage import MediaStorage
 from app.services.public_routing import normalize_route_token, require_product_route_slug
 from app.services.shopify_checkout import create_shopify_checkout
@@ -113,6 +114,18 @@ def _publication_id_for_public_response(funnel: Funnel) -> str:
     """
 
     return str(funnel.active_publication_id or funnel.id)
+
+
+def _is_checkout_ready_variant(variant: ProductVariant) -> bool:
+    provider = str(variant.provider or "").strip().lower()
+    if not provider:
+        return False
+    external_price_id = str(variant.external_price_id or "").strip()
+    if provider == "shopify":
+        return external_price_id.startswith("gid://shopify/ProductVariant/")
+    if provider == "stripe":
+        return bool(external_price_id)
+    return False
 
 
 def _allowed_hosts(request: Request) -> set[str]:
@@ -287,6 +300,13 @@ def public_funnel_page(
             funnel=funnel,
             page=page,
         )
+        metadata = build_public_page_metadata_for_context(
+            session=session,
+            org_id=str(funnel.org_id),
+            funnel=funnel,
+            page=page,
+            puck_data=version.puck_data,
+        )
         response.headers["X-Robots-Tag"] = "noindex, nofollow"
         return {
             "productSlug": resolved_product_slug,
@@ -297,6 +317,7 @@ def public_funnel_page(
             "puckData": version.puck_data,
             "pageMap": page_map,
             "designSystemTokens": design_system_tokens,
+            "metadata": metadata,
             "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
         }
 
@@ -326,6 +347,13 @@ def public_funnel_page(
         funnel=funnel,
         page=page,
     )
+    metadata = build_public_page_metadata_for_context(
+        session=session,
+        org_id=str(funnel.org_id),
+        funnel=funnel,
+        page=page,
+        puck_data=version.puck_data,
+    )
     response.headers["X-Robots-Tag"] = "noindex, nofollow"
     return {
         "productSlug": resolved_product_slug,
@@ -336,6 +364,7 @@ def public_funnel_page(
         "puckData": version.puck_data,
         "pageMap": page_map,
         "designSystemTokens": design_system_tokens,
+        "metadata": metadata,
         "nextPageId": str(page.next_page_id) if page.next_page_id else None,
     }
 
@@ -414,8 +443,14 @@ def public_funnel_commerce(
             status_code=status.HTTP_409_CONFLICT,
             detail="Product variants are not configured for this funnel product.",
         )
+    checkout_ready_variants = [variant for variant in variants if _is_checkout_ready_variant(variant)]
+    if not checkout_ready_variants:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Product variants are not configured for checkout for this funnel product.",
+        )
     serialized_variants: list[dict] = []
-    for variant in variants:
+    for variant in checkout_ready_variants:
         data = jsonable_encoder(variant)
         data.pop("external_price_id", None)
         serialized_variants.append(data)
@@ -480,7 +515,13 @@ def public_checkout(
         if funnel.selected_offer_id:
             candidates_query = candidates_query.where(ProductVariant.offer_id == funnel.selected_offer_id)
         candidates = session.scalars(candidates_query).all()
-        matches = [item for item in candidates if item.option_values == payload.selection]
+        checkout_ready_candidates = [item for item in candidates if _is_checkout_ready_variant(item)]
+        if not checkout_ready_candidates:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="No checkout-ready variants are configured for this funnel product.",
+            )
+        matches = [item for item in checkout_ready_candidates if item.option_values == payload.selection]
         if len(matches) != 1:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

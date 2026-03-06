@@ -81,6 +81,10 @@
         "**Replaces Over 1,000 Disposable Pads** - Just wash & reuse (saves $2000/year)",
         "**Absorbs In Less Than 5 Seconds** & Holds Up To 4 Pees With No Smell"
       ],
+      "cta": {
+        "label": "Learn more",
+        "linkType": "nextPage"
+      },
       "image": {
         "src": "/assets/reviews-preview.webp",
         "alt": "PuppyPad layers diagram"
@@ -241,10 +245,13 @@
       "logo": {
         "src": "/assets/puppypad-logo.svg",
         "alt": "PuppyPad"
-      }
+      },
+      "copyright": "© 2025 PuppyPad",
+      "links": [],
+      "paymentIcons": []
     },
     "floatingCta": {
-      "label": "SHOP NOW",
+      "label": "Learn more",
       "linkType": "nextPage",
       "showAfterId": "listicle-end"
     }

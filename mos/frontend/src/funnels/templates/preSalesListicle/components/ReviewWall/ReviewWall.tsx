@@ -87,10 +87,6 @@ export function ReviewWall({ wall, modalCopy }: Props) {
     <section className={styles.section} aria-label={wall.title}>
       <h2 className={styles.title}>{wall.title}</h2>
 
-      <button type="button" className={styles.viewButton} onClick={() => openReview()}>
-        {wall.buttonLabel}
-      </button>
-
       <div className={styles.preview}>
         <div className={styles.scroll}>
           <ReviewGrid

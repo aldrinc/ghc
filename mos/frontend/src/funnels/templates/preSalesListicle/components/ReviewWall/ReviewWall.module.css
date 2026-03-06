@@ -16,32 +16,8 @@
   color: var(--color-brand);
 }
 
-.viewButton {
-  margin-top: 18px;
-  background: var(--wall-button-bg);
-  color: var(--wall-button-text);
-  border: 0;
-  border-radius: var(--wall-button-radius);
-  padding: var(--wall-button-pad);
-  font-family: var(--font-sans);
-  font-size: var(--wall-button-font-size);
-  font-weight: var(--wall-button-weight);
-  letter-spacing: var(--wall-button-letter-spacing);
-  text-transform: uppercase;
-  cursor: pointer;
-}
-
-.viewButton:hover {
-  filter: brightness(0.98);
-}
-
-.viewButton:focus-visible {
-  outline: var(--focus-outline-soft);
-  outline-offset: 3px;
-}
-
 .preview {
-  margin-top: 40px;
+  margin-top: 24px;
   width: 100%;
   height: var(--wall-height);
   overflow: hidden;

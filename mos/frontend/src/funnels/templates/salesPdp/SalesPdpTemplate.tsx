@@ -30,6 +30,7 @@ import { useDesignSystemTokens } from "@/components/design-system/DesignSystemPr
 import { useFunnelRuntime } from "@/funnels/puckConfig";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
 import { useTemplateFonts } from "@/funnels/templates/templateFonts";
+import { PaymentIconStrip } from "@/funnels/templates/shared/PaymentIconStrip";
 
 export const salesPdpDefaults = defaults as {
   config: PdpConfig;
@@ -58,8 +59,23 @@ const URGENCY_MONTH_FORMATTER = new Intl.DateTimeFormat("en-US", {
 // Keep layout geometry consistent with the base template.
 // Brand design systems can still change colors and font families.
 const LOCKED_TEMPLATE_CSS_VARS = new Set([
+  "--radius-sm",
+  "--radius-md",
+  "--radius-lg",
   "--container-max",
   "--container-pad",
+  "--section-pad-y",
+  "--section-pad-y-mobile",
+  "--heading-line",
+  "--heading-size",
+  "--heading-size-mobile",
+  "--heading-weight",
+  "--hero-min-height",
+  "--hero-pad-x",
+  "--hero-pad-y",
+  "--hero-title-max",
+  "--hero-subtitle-max",
+  "--hero-title-line",
   "--marquee-border",
   "--marquee-font-size",
   "--marquee-font-weight",
@@ -67,6 +83,41 @@ const LOCKED_TEMPLATE_CSS_VARS = new Set([
   "--marquee-height",
   "--marquee-letter-spacing",
   "--marquee-pad-x",
+  "--badge-strip-pad-y",
+  "--badge-strip-gap",
+  "--pitch-pad-y",
+  "--pitch-gap",
+  "--pitch-content-max",
+  "--pitch-media-max",
+  "--reviews-height",
+  "--reviews-card-width",
+  "--reviews-card-pad",
+  "--wall-pad-y",
+  "--wall-pad-top",
+  "--wall-height",
+  "--wall-gap",
+  "--wall-pad-x",
+  "--wall-fade-height",
+  "--pdp-radius-5",
+  "--pdp-radius-8",
+  "--pdp-radius-12",
+  "--pdp-radius-pill",
+  "--pdp-urgency-bg",
+  "--pdp-urgency-border",
+  "--pdp-urgency-text",
+  "--pdp-urgency-muted-bg",
+  "--pdp-urgency-highlight-bg",
+  "--pdp-urgency-highlight-text",
+  "--pdp-urgency-muted-text",
+  "--pdp-urgency-row-border",
+  "--pdp-urgency-icon-bg",
+  "--pdp-urgency-icon-border",
+  "--pdp-urgency-highlight-border",
+  "--faq-card-gap",
+  "--faq-heading-margin-bottom",
+  "--footer-pad-y",
+  "--footer-logo-height",
+  "--footer-gap",
 ]);
 
 function toCssVarName(key: string): string {
@@ -137,7 +188,7 @@ function resolveAssetSrc(assetPublicId?: string, fallback?: string): string | un
 
 function resolveImageSrc(image?: ImageAsset): string | undefined {
   if (!image) return undefined;
-  return resolveAssetSrc(image.assetPublicId, image.src);
+  return resolveAssetSrc(image.assetPublicId ?? image.referenceAssetPublicId, image.src);
 }
 
 function clampIndex(next: number, length: number) {
@@ -149,6 +200,15 @@ function clampIndex(next: number, length: number) {
 
 function currency(n: number) {
   return `$${Math.round(n)}`
+}
+
+function normalizeStepTitle(title: string): string {
+  return title.replace(/^\s*\d+\s*[\.\):-]?\s*/, "").replace(/\s*:\s*$/, "").trim()
+}
+
+function formatStepTitle(title: string, stepNumber: number | null) {
+  const baseTitle = normalizeStepTitle(title)
+  return stepNumber ? `${stepNumber}. ${baseTitle}` : baseTitle
 }
 
 function resolveUrgencyMonthLabels(now: Date = new Date()) {
@@ -442,14 +502,8 @@ function HeaderBar({
 
 function Gallery({
   slides,
-  watchLabel,
-  freeGifts,
-  onFreeGiftsClick,
 }: {
   slides: PdpConfig['hero']['gallery']['slides']
-  watchLabel: string
-  freeGifts?: PdpConfig['hero']['gallery']['freeGifts']
-  onFreeGiftsClick?: () => void
 }) {
   const [index, setIndex] = useState(0)
   const active = slides[index]
@@ -458,32 +512,6 @@ function Gallery({
     <div className={styles.galleryCard}>
       <div className={styles.galleryMain}>
         <img src={resolveImageSrc(active)} alt={active.alt} loading="eager" decoding="async" fetchPriority="high" />
-
-        {freeGifts && index === 0 ? (
-          <button
-            type="button"
-            className={styles.giftOverlay}
-            onClick={onFreeGiftsClick}
-            aria-label={freeGifts.ctaLabel}
-          >
-            <img
-              className={styles.giftOverlayIcon}
-              src={resolveImageSrc(freeGifts.icon)}
-              alt={freeGifts.icon.alt}
-            />
-            <div className={styles.giftOverlayText}>
-              <p className={styles.giftOverlayTitle}>{freeGifts.title}</p>
-              <p className={styles.giftOverlayBody}>{freeGifts.body}</p>
-            </div>
-          </button>
-        ) : null}
-
-        <button type="button" className={styles.watchButton}>
-          {watchLabel}
-          <span className={styles.watchPlay} aria-hidden="true">
-            <IconPlayTriangle size={10} />
-          </span>
-        </button>
       </div>
 
       <div className={styles.galleryControls}>
@@ -604,9 +632,11 @@ function OfferCard({
 	            <IconCheck size={18} />
 	          </span>
 	        </span>
-	      ) : null}
+      ) : null}
 
-      <img className={styles.offerCardImage} src={resolveImageSrc(option.image)} alt={option.image.alt} />
+      <div className={styles.offerCardMedia}>
+        <img className={styles.offerCardImage} src={resolveImageSrc(option.image)} alt={option.image.alt} />
+      </div>
       <p className={styles.offerLabel}>{option.title}</p>
       <div className={styles.price}>
         {typeof option.compareAt === 'number' && option.compareAt > option.price ? (
@@ -778,18 +808,20 @@ export function SalesPdpHeader({ config, configJson }: SalesPdpHeaderProps) {
       return
     }
 
-    const obs = new IntersectionObserver(
-      (entries) => {
-        const entry = entries[0]
-        if (!entry) return
-        const pastTrigger = entry.isIntersecting || entry.boundingClientRect.top < 0
-        setShowHeader(pastTrigger)
-      },
-      { threshold: 0 }
-    )
+    const updateHeaderVisibility = () => {
+      const rect = el.getBoundingClientRect()
+      const triggerOffset = Math.min(Math.max(el.offsetHeight * 0.28, 140), 240)
+      setShowHeader(rect.top <= -triggerOffset)
+    }
 
-    obs.observe(el)
-    return () => obs.disconnect()
+    updateHeaderVisibility()
+    window.addEventListener("scroll", updateHeaderVisibility, { passive: true })
+    window.addEventListener("resize", updateHeaderVisibility)
+
+    return () => {
+      window.removeEventListener("scroll", updateHeaderVisibility)
+      window.removeEventListener("resize", updateHeaderVisibility)
+    }
   }, [showAfterSectionId])
 
   useEffect(() => {
@@ -864,9 +896,10 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
   const showColorSelector = !hasExplicitVariantSchema || hasSchemaDimensionType("color")
   const showOfferSelector = true
 
-  const [selectedSize, setSelectedSize] = useState(sizeOptions[0]?.id)
-  const [selectedColor, setSelectedColor] = useState(colorOptions[0]?.id)
-  const [selectedOffer, setSelectedOffer] = useState(offerOptions[1]?.id ?? offerOptions[0]?.id)
+  const defaultSelection = resolvedHero.purchase.variantSchema?.defaults
+  const [selectedSize, setSelectedSize] = useState(defaultSelection?.sizeId ?? sizeOptions[0]?.id)
+  const [selectedColor, setSelectedColor] = useState(defaultSelection?.colorId ?? colorOptions[0]?.id)
+  const [selectedOffer, setSelectedOffer] = useState(defaultSelection?.offerId ?? offerOptions[0]?.id)
 
   const [openPillIndex, setOpenPillIndex] = useState<number | null>(null)
   const [isPillDragging, setIsPillDragging] = useState(false)
@@ -958,7 +991,6 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
 
   const [openSizeChart, setOpenSizeChart] = useState(false)
   const [openWhyBundle, setOpenWhyBundle] = useState(false)
-  const [openFreeGifts, setOpenFreeGifts] = useState(false)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
 
@@ -1036,6 +1068,30 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
     () => offerOptions.find((o) => o.id === selectedOffer) ?? offerOptions[0],
     [offerOptions, selectedOffer]
   )
+  const selectorTitleMap = useMemo(() => {
+    const visibleSelectors = [
+      showSizeSelector ? "size" : null,
+      showColorSelector ? "color" : null,
+      showOfferSelector ? "offer" : null,
+    ].filter(Boolean) as Array<"size" | "color" | "offer">
+    const showNumbers = visibleSelectors.length > 1
+    const sequence = new Map<"size" | "color" | "offer", number | null>()
+    visibleSelectors.forEach((key, index) => {
+      sequence.set(key, showNumbers ? index + 1 : null)
+    })
+    return {
+      size: formatStepTitle(resolvedHero.purchase.size.title, sequence.get("size") ?? null),
+      color: formatStepTitle(resolvedHero.purchase.color.title, sequence.get("color") ?? null),
+      offer: formatStepTitle(resolvedHero.purchase.offer.title, sequence.get("offer") ?? null),
+    }
+  }, [
+    resolvedHero.purchase.color.title,
+    resolvedHero.purchase.offer.title,
+    resolvedHero.purchase.size.title,
+    showColorSelector,
+    showOfferSelector,
+    showSizeSelector,
+  ])
 
   const showOutOfStock = isRuleMatch(resolvedHero.purchase.outOfStock, selectedSize, selectedColor)
   const showShippingDelay = isRuleMatch(resolvedHero.purchase.shippingDelay, selectedSize, selectedColor)
@@ -1050,6 +1106,9 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
     urgencyHighlightIndex >= 0
       ? urgencyMessage.slice(urgencyHighlightIndex + urgencyHighlight.length)
       : ''
+  const visibleCtaSubBullets = resolvedHero.purchase.cta.subBullets.filter(
+    (text) => !/\bbonus(?:es)?\b|\bgift(?:s)?\b/i.test(text)
+  )
   const urgencyRows = useMemo(() => {
     const rows = resolvedHero.purchase.cta.urgency.rows
     if (rows.length < 2) return rows
@@ -1081,9 +1140,9 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
       return;
     }
     const selection = selectionFromIds({
-      sizeId: selectedSizeObj?.id,
-      colorId: selectedColorObj?.id,
       offerId: selectedOfferObj?.id,
+      ...(showSizeSelector ? { sizeId: selectedSizeObj?.id } : {}),
+      ...(showColorSelector ? { colorId: selectedColorObj?.id } : {}),
     });
     const variant = variants.find((item) => matchesOptionValues(item.option_values, selection));
     if (!variant) {
@@ -1187,15 +1246,10 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
     <>
       <section className={`${styles.sectionPeach} ${styles.heroSection}`}>
         <Container>
-          <div className={styles.heroGrid}>
-            <div>
-              <Gallery
-                slides={resolvedHero.gallery.slides}
-                watchLabel={resolvedHero.gallery.watchInAction.label}
-                freeGifts={resolvedHero.gallery.freeGifts}
-                onFreeGiftsClick={() => setOpenFreeGifts(true)}
-              />
-            </div>
+              <div className={styles.heroGrid}>
+                <div>
+              <Gallery slides={resolvedHero.gallery.slides} />
+                </div>
 
             <div id={ORDER_NOW_SCROLL_TARGET_ID}>
               {/*
@@ -1312,7 +1366,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
               {showSizeSelector ? (
                 <div>
                   <div className={styles.sectionTitleRow}>
-                    <div className={styles.stepTitle}>{resolvedHero.purchase.size.title}</div>
+                    <div className={styles.stepTitle}>{selectorTitleMap.size}</div>
                     <button type="button" className={styles.helpLink} onClick={() => setOpenSizeChart(true)}>
                       {resolvedHero.purchase.size.helpLinkLabel}
                     </button>
@@ -1345,7 +1399,7 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
               {showColorSelector ? (
                 <div>
                   <div className={styles.sectionTitleRow}>
-                    <div className={styles.stepTitle}>{resolvedHero.purchase.color.title}</div>
+                    <div className={styles.stepTitle}>{selectorTitleMap.color}</div>
                   </div>
                   <div className={styles.colorRow}>
                     {colorOptions.map((c) => (
@@ -1373,13 +1427,18 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
               {showOfferSelector ? (
                 <div>
                   <div className={styles.sectionTitleRow}>
-                    <div className={styles.stepTitle}>{resolvedHero.purchase.offer.title}</div>
+                    <div className={styles.stepTitle}>{selectorTitleMap.offer}</div>
                   </div>
                   <div className={styles.offerHelper}>
-                    {resolvedHero.purchase.offer.helperText}{" "}
-                    <button type="button" className={styles.seeWhy} onClick={() => setOpenWhyBundle(true)}>
-                      {resolvedHero.purchase.offer.seeWhyLabel}
-                    </button>
+                    {resolvedHero.purchase.offer.helperText}
+                    {resolvedHero.purchase.offer.seeWhyLabel.trim() ? (
+                      <>
+                        {" "}
+                        <button type="button" className={styles.seeWhy} onClick={() => setOpenWhyBundle(true)}>
+                          {resolvedHero.purchase.offer.seeWhyLabel}
+                        </button>
+                      </>
+                    ) : null}
                   </div>
 
                   <div className={styles.offerGrid}>
@@ -1411,16 +1470,18 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
                     </div>
                   ) : null}
 
-                  <div className={styles.ctaSubBullets}>
-                    {resolvedHero.purchase.cta.subBullets.map((t) => (
-                      <span key={t}>
-                        <span className={styles.checkCircle} aria-hidden="true">
-                          <IconCheck size={18} />
+                  {visibleCtaSubBullets.length > 0 ? (
+                    <div className={styles.ctaSubBullets}>
+                      {visibleCtaSubBullets.map((t) => (
+                        <span key={t}>
+                          <span className={styles.checkCircle} aria-hidden="true">
+                            <IconCheck size={18} />
+                          </span>
+                          {t}
                         </span>
-                        {t}
-                      </span>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : null}
 
                   <div className={styles.urgency}>
                     <div className={styles.urgencyTop}>
@@ -1521,16 +1582,6 @@ export function SalesPdpHero({ config, configJson, modals, modalsJson, copy, cop
           ))}
         </div>
       </Modal>
-
-      <Modal
-        open={openFreeGifts}
-        onClose={() => setOpenFreeGifts(false)}
-        ariaLabel={resolvedModals.freeGifts.title}
-        copy={resolvedCopy.modal}
-      >
-        <h2 style={{ marginTop: 0 }}>{resolvedModals.freeGifts.title}</h2>
-        <p style={{ color: 'var(--pdp-black-70)' }}>{resolvedModals.freeGifts.body}</p>
-      </Modal>
     </>
   )
 }
@@ -1541,19 +1592,9 @@ type SalesPdpVideosProps = {
 }
 
 export function SalesPdpVideos({ config, configJson }: SalesPdpVideosProps) {
-  const resolvedConfig = parseJson<VideoSectionConfig>(configJson) ?? config ?? salesPdpDefaults.config.videos
-
-  return (
-    <section className={`${styles.sectionBlue} ${styles.sectionPad}`}>
-      <Container>
-        <div style={{ textAlign: 'center' }}>
-          <div className={styles.sectionBadge}>{resolvedConfig.badge}</div>
-          <h2 className={styles.sectionHeading}>{resolvedConfig.title}</h2>
-        </div>
-        <VideoGrid videos={resolvedConfig.videos} />
-      </Container>
-    </section>
-  )
+  void config
+  void configJson
+  return null
 }
 
 type SalesPdpMarqueeProps = {
@@ -1594,13 +1635,17 @@ function SalesPdpStorySection({
         <div className={`${styles.storyGrid} ${gridLayoutClass}`}>
           {layout === 'textRight' ? (
             <>
-              <img className={styles.storyImage} src={resolveImageSrc(section.image)} alt={section.image.alt} />
+              <div className={styles.storyMediaFrame}>
+                <img className={styles.storyImage} src={resolveImageSrc(section.image)} alt={section.image.alt} />
+              </div>
               <StoryText section={section} />
             </>
           ) : (
             <>
               <StoryText section={section} />
-              <img className={styles.storyImage} src={resolveImageSrc(section.image)} alt={section.image.alt} />
+              <div className={styles.storyMediaFrame}>
+                <img className={styles.storyImage} src={resolveImageSrc(section.image)} alt={section.image.alt} />
+              </div>
             </>
           )}
         </div>
@@ -1649,7 +1694,7 @@ type SalesPdpComparisonProps = {
 export function SalesPdpComparison({ config, configJson }: SalesPdpComparisonProps) {
   const resolvedConfig = parseJson<ComparisonConfig>(configJson) ?? config ?? salesPdpDefaults.config.comparison
   return (
-    <section id={resolvedConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad}`}>
+    <section id={resolvedConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad} ${styles.comparisonSection}`}>
       <Container>
         <div style={{ textAlign: 'center' }}>
           <div className={styles.sectionBadge}>{resolvedConfig.badge}</div>
@@ -1858,7 +1903,7 @@ export function SalesPdpFaq({ config, configJson }: SalesPdpFaqProps) {
     <section id={resolvedConfig.id} className={`${styles.sectionPeach} ${styles.sectionPad}`}>
       <Container>
         <div className={styles.faqWrap}>
-          <h2 className={styles.faqHeading}>{resolvedConfig.title}</h2>
+          <h2 className={styles.faqHeading}>Frequently Asked Questions</h2>
           <FaqAccordion items={resolvedConfig.items} />
         </div>
       </Container>
@@ -1916,11 +1961,31 @@ type SalesPdpFooterProps = {
 
 export function SalesPdpFooter({ config, configJson }: SalesPdpFooterProps) {
   const resolvedConfig = parseJson<FooterConfig>(configJson) ?? config ?? salesPdpDefaults.config.footer
+  const links = Array.isArray(resolvedConfig.links) ? resolvedConfig.links : []
+  const paymentIcons = Array.isArray(resolvedConfig.paymentIcons) ? resolvedConfig.paymentIcons : []
   return (
     <footer className={`${styles.sectionPeach} ${styles.footer}`}>
       <Container>
         <img className={styles.footerLogo} src={resolveImageSrc(resolvedConfig.logo)} alt={resolvedConfig.logo.alt} />
         <div className={styles.footerText}>{resolvedConfig.copyright}</div>
+        {links.length > 0 ? (
+          <nav className={styles.footerLinks} aria-label="Policy links">
+            {links.map((link) => (
+              <a
+                key={`${link.label}-${link.href}`}
+                href={link.href}
+                className={styles.footerLink}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+        ) : null}
+        {paymentIcons.length > 0 ? (
+          <PaymentIconStrip iconKeys={paymentIcons} className={styles.footerPaymentIcons} />
+        ) : null}
       </Container>
     </footer>
   )
@@ -1948,7 +2013,6 @@ export function SalesPdpTemplate(props: Props) {
       <>
         <SalesPdpHeader config={resolvedConfig.hero.header} />
         <SalesPdpHero config={resolvedConfig.hero} modals={resolvedConfig.modals} copy={resolvedCopy} />
-        <SalesPdpVideos config={resolvedConfig.videos} />
         <SalesPdpMarquee config={resolvedConfig.marquee} />
         <SalesPdpStoryProblem config={resolvedConfig.story.problem} />
         <SalesPdpStorySolution config={resolvedConfig.story.solution} />

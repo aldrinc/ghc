@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 import httpx
 
 from app.config import settings
+from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services import namecheap_dns as namecheap_dns_service
 
 
@@ -921,6 +922,13 @@ def build_client_funnel_runtime_artifact_payload(
                 funnel=client_funnel,
                 page=page,
             )
+            metadata = build_public_page_metadata_for_context(
+                session=session,
+                org_id=str(client_funnel.org_id),
+                funnel=client_funnel,
+                page=page,
+                puck_data=version.puck_data,
+            )
             page_context_label = (
                 f"Funnel '{client_funnel.id}' page '{page_id}' ({product_slug}/{route_slug}/{artifact_slug})"
             )
@@ -940,6 +948,7 @@ def build_client_funnel_runtime_artifact_payload(
                 "puckData": version.puck_data,
                 "pageMap": page_map,
                 "designSystemTokens": tokens,
+                "metadata": metadata,
                 "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
             }
 

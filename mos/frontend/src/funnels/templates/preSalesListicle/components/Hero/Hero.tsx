@@ -20,31 +20,33 @@ export function Hero({ title, subtitle, media, badges }: Props) {
         </div>
 
         <div className={styles.right}>
-          {media ? (
-            media.type === 'video' ? (
-              <video
-                className={styles.media}
-                src={resolveAssetSrc(media.assetPublicId, media.srcMp4)}
-                muted
-                autoPlay
-                loop
-                playsInline
-                controls={false}
-                poster={resolveAssetSrc(media.posterAssetPublicId, media.poster)}
-              />
+          <div className={styles.mediaFrame}>
+            {media ? (
+              media.type === 'video' ? (
+                <video
+                  className={styles.media}
+                  src={resolveAssetSrc(media.assetPublicId, media.srcMp4)}
+                  muted
+                  autoPlay
+                  loop
+                  playsInline
+                  controls={false}
+                  poster={resolveAssetSrc(media.posterAssetPublicId, media.poster)}
+                />
+              ) : (
+                <img
+                  className={styles.media}
+                  src={resolveImageSrc(media)}
+                  alt={media.alt}
+                  loading="eager"
+                  decoding="async"
+                  fetchPriority="high"
+                />
+              )
             ) : (
-              <img
-                className={styles.media}
-                src={resolveImageSrc(media)}
-                alt={media.alt}
-                loading="eager"
-                decoding="async"
-                fetchPriority="high"
-              />
-            )
-          ) : (
-            <div className={styles.mediaPlaceholder} aria-hidden="true" />
-          )}
+              <div className={styles.mediaPlaceholder} aria-hidden="true" />
+            )}
+          </div>
         </div>
       </div>
 

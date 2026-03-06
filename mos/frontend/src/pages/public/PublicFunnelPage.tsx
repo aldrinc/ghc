@@ -12,18 +12,26 @@ import { DesignSystemProvider } from "@/components/design-system/DesignSystemPro
 const apiBaseUrl = resolvePublicApiBaseUrl();
 const runtimeConfig = createFunnelPuckConfig();
 const managedFaviconAttr = "data-mos-managed-favicon";
+const managedMetaAttr = "data-mos-managed-meta";
+
+type ResolvedPageMetadata = {
+  title: string;
+  description: string;
+  lang: string;
+  brandName: string | null;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function getBrandLogoAssetPublicId(tokens: unknown): string | null {
+function getBrandName(tokens: unknown): string | null {
   if (!isRecord(tokens)) return null;
   const brand = tokens.brand;
   if (!isRecord(brand)) return null;
-  const logoAssetPublicId = brand.logoAssetPublicId;
-  if (typeof logoAssetPublicId !== "string") return null;
-  const trimmed = logoAssetPublicId.trim();
+  const name = brand.name;
+  if (typeof name !== "string") return null;
+  const trimmed = name.trim();
   return trimmed || null;
 }
 
@@ -33,22 +41,56 @@ function clearManagedFavicons() {
     .forEach((node) => node.parentNode?.removeChild(node));
 }
 
-function appendManagedFavicon(rel: string, href: string) {
+function clearManagedMetaTags() {
+  document
+    .querySelectorAll(`meta[${managedMetaAttr}="true"]`)
+    .forEach((node) => node.parentNode?.removeChild(node));
+}
+
+function appendManagedFavicon(rel: string, href: string, type?: string) {
   const link = document.createElement("link");
   link.setAttribute("rel", rel);
   link.setAttribute("href", href);
+  if (type) {
+    link.setAttribute("type", type);
+  }
   link.setAttribute(managedFaviconAttr, "true");
   document.head.appendChild(link);
 }
 
-function setPageFavicon(logoAssetPublicId: string | null) {
+function hashBrandName(value: string) {
+  let hash = 0;
+  for (let idx = 0; idx < value.length; idx += 1) {
+    hash = (hash * 31 + value.charCodeAt(idx)) >>> 0;
+  }
+  return hash;
+}
+
+function buildBrandInitialFaviconHref(brandName: string) {
+  const cleanBrandName = brandName.trim();
+  const match = cleanBrandName.match(/[A-Za-z0-9]/);
+  if (!match) return null;
+  const initial = match[0].toUpperCase();
+  const hue = hashBrandName(cleanBrandName) % 360;
+  const fill = `hsl(${hue} 62% 42%)`;
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">`,
+    `<rect width="64" height="64" rx="18" fill="${fill}"/>`,
+    `<text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" fill="#ffffff"`,
+    ` font-family="Arial, sans-serif" font-size="32" font-weight="700">${initial}</text>`,
+    `</svg>`,
+  ].join("");
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+
+function setPageFavicon(brandName: string | null) {
   clearManagedFavicons();
-  if (!logoAssetPublicId) return;
-  const trimmedApiBase = apiBaseUrl.replace(/\/$/, "");
-  const logoHref = `${trimmedApiBase}/public/assets/${encodeURIComponent(logoAssetPublicId)}`;
-  appendManagedFavicon("icon", logoHref);
-  appendManagedFavicon("shortcut icon", logoHref);
-  appendManagedFavicon("apple-touch-icon", logoHref);
+  if (!brandName) return;
+  const faviconHref = buildBrandInitialFaviconHref(brandName);
+  if (!faviconHref) return;
+  appendManagedFavicon("icon", faviconHref, "image/svg+xml");
+  appendManagedFavicon("shortcut icon", faviconHref, "image/svg+xml");
+  appendManagedFavicon("apple-touch-icon", faviconHref, "image/svg+xml");
 }
 
 function ensureNoIndex() {
@@ -65,22 +107,86 @@ function ensureNoIndex() {
   document.head.appendChild(meta);
 }
 
-function setPageMetadata(title?: string, description?: string) {
-  if (typeof title === "string" && title.trim()) {
-    document.title = title.trim();
-  }
-  if (typeof description === "string") {
-    const name = "description";
-    const existing = document.querySelector(`meta[name="${name}"]`);
-    if (existing) {
-      existing.setAttribute("content", description);
-      return;
+function syncManagedMeta({
+  name,
+  property,
+  content,
+}: {
+  name?: string;
+  property?: string;
+  content?: string;
+}) {
+  const selector = name ? `meta[name="${name}"]` : property ? `meta[property="${property}"]` : null;
+  if (!selector) return;
+
+  const existing = document.querySelector(selector);
+  const trimmedContent = typeof content === "string" ? content.trim() : "";
+  if (!trimmedContent) {
+    if (existing && existing.getAttribute(managedMetaAttr) === "true") {
+      existing.parentNode?.removeChild(existing);
     }
-    const meta = document.createElement("meta");
-    meta.setAttribute("name", name);
-    meta.setAttribute("content", description);
-    document.head.appendChild(meta);
+    return;
   }
+
+  if (existing) {
+    existing.setAttribute("content", trimmedContent);
+    existing.setAttribute(managedMetaAttr, "true");
+    return;
+  }
+
+  const meta = document.createElement("meta");
+  if (name) {
+    meta.setAttribute("name", name);
+  }
+  if (property) {
+    meta.setAttribute("property", property);
+  }
+  meta.setAttribute("content", trimmedContent);
+  meta.setAttribute(managedMetaAttr, "true");
+  document.head.appendChild(meta);
+}
+
+function setPageMetadata(metadata: ResolvedPageMetadata | null) {
+  if (!metadata) return;
+  if (metadata.title.trim()) {
+    document.title = metadata.title.trim();
+  }
+  if (metadata.lang.trim()) {
+    document.documentElement.setAttribute("lang", metadata.lang.trim());
+  }
+  syncManagedMeta({ name: "description", content: metadata.description });
+  syncManagedMeta({ property: "og:title", content: metadata.title });
+  syncManagedMeta({ property: "og:description", content: metadata.description });
+  syncManagedMeta({ property: "og:type", content: "website" });
+  syncManagedMeta({ property: "og:url", content: window.location.href });
+  syncManagedMeta({ property: "og:site_name", content: metadata.brandName || metadata.title });
+  syncManagedMeta({ name: "twitter:card", content: "summary" });
+  syncManagedMeta({ name: "twitter:title", content: metadata.title });
+  syncManagedMeta({ name: "twitter:description", content: metadata.description });
+}
+
+function resolvePageMetadata(page: PublicFunnelPageType | null): ResolvedPageMetadata | null {
+  if (!page) return null;
+  const metadata = page.metadata;
+  if (metadata && typeof metadata.title === "string" && metadata.title.trim()) {
+    return {
+      title: metadata.title.trim(),
+      description: typeof metadata.description === "string" ? metadata.description.trim() : "",
+      lang: typeof metadata.lang === "string" && metadata.lang.trim() ? metadata.lang.trim() : "en",
+      brandName:
+        typeof metadata.brandName === "string" && metadata.brandName.trim() ? metadata.brandName.trim() : null,
+    };
+  }
+
+  const rootProps = (page.puckData as { root?: { props?: Record<string, unknown> } } | undefined)?.root?.props;
+  const title = typeof rootProps?.title === "string" ? rootProps.title.trim() : "";
+  if (!title) return null;
+  return {
+    title,
+    description: typeof rootProps?.description === "string" ? rootProps.description.trim() : "",
+    lang: typeof rootProps?.lang === "string" && rootProps.lang.trim() ? rootProps.lang.trim() : "en",
+    brandName: getBrandName(page.designSystemTokens),
+  };
 }
 
 function getOrCreateId(storage: Storage, key: string) {
@@ -249,19 +355,18 @@ export function PublicFunnelPage() {
 
   useEffect(() => {
     if (!page) return;
-    const rootProps = (page.puckData as { root?: { props?: Record<string, unknown> } } | undefined)?.root?.props;
-    if (!rootProps) return;
-    const title = typeof rootProps.title === "string" ? rootProps.title : undefined;
-    const description = typeof rootProps.description === "string" ? rootProps.description : undefined;
-    setPageMetadata(title, description);
+    setPageMetadata(resolvePageMetadata(page));
+    return () => {
+      clearManagedMetaTags();
+    };
   }, [page]);
 
   useEffect(() => {
-    setPageFavicon(getBrandLogoAssetPublicId(page?.designSystemTokens));
+    setPageFavicon(resolvePageMetadata(page)?.brandName ?? null);
     return () => {
       clearManagedFavicons();
     };
-  }, [page?.designSystemTokens]);
+  }, [page]);
 
   useEffect(() => {
     if (!page || !meta) return;

@@ -10,7 +10,7 @@ export function BadgeRow({ badges }: { badges: Badge[] }) {
           <div className={styles.iconFrame}>
             <img
               className={styles.icon}
-              src={resolveAssetSrc(b.iconAssetPublicId, b.iconSrc)}
+              src={resolveAssetSrc(b.iconAssetPublicId ?? b.referenceAssetPublicId, b.iconSrc)}
               alt={b.iconAlt}
               loading="eager"
               decoding="async"

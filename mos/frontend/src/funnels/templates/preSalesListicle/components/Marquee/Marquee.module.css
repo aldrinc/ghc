@@ -9,21 +9,23 @@
 }
 
 .viewport {
-  height: var(--marquee-height);
+  min-height: var(--marquee-height);
+  padding: var(--marquee-pad-y) 0;
   overflow: hidden;
 }
 
 .track {
   display: flex;
-  height: 100%;
+  min-height: 100%;
   width: max-content;
+  align-items: center;
   animation: scroll var(--marquee-speed) linear infinite;
 }
 
 .group {
   display: flex;
   align-items: center;
-  height: 100%;
+  min-height: 100%;
   gap: var(--marquee-gap);
   padding: 0 var(--marquee-pad-x);
   margin-right: var(--marquee-gap);

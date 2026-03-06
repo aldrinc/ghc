@@ -84,6 +84,12 @@ class PublicFunnelMetaResponse(BaseModel):
 
 
 class PublicFunnelPageResponse(BaseModel):
+    class Metadata(BaseModel):
+        title: str
+        description: str
+        lang: str = "en"
+        brandName: Optional[str] = None
+
     productSlug: str
     funnelId: str
     publicationId: str
@@ -92,6 +98,7 @@ class PublicFunnelPageResponse(BaseModel):
     puckData: dict[str, Any]
     pageMap: dict[str, str]
     designSystemTokens: Optional[dict[str, Any]] = None
+    metadata: Metadata
     nextPageId: Optional[str] = None
 
 
@@ -165,6 +172,7 @@ class FunnelPageAIGenerateResponse(BaseModel):
     puckData: dict[str, Any]
     draftVersionId: str
     generatedImages: list[dict[str, Any]] = Field(default_factory=list)
+    generatedCarouselImages: list[dict[str, Any]] = Field(default_factory=list)
     imagePlans: list[dict[str, Any]] = Field(default_factory=list)
 
 
