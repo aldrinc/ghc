@@ -502,14 +502,17 @@ def novelty_calculator(elements: dict) -> dict:
 # =============================================================================
 
 DIMENSION_WEIGHTS = {
-    "value_equation": 0.15,
-    "objection_coverage": 0.15,
-    "competitive_differentiation": 0.15,
+    "value_equation": 0.12,
+    "objection_coverage": 0.10,
+    "competitive_differentiation": 0.10,
     "compliance_safety": 0.10,
-    "internal_consistency": 0.10,
-    "clarity_simplicity": 0.10,
-    "bottleneck_resilience": 0.10,
-    "momentum_continuity": 0.15,
+    "internal_consistency": 0.08,
+    "clarity_simplicity": 0.08,
+    "bottleneck_resilience": 0.08,
+    "momentum_continuity": 0.10,
+    "pricing_fidelity": 0.10,
+    "savings_fidelity": 0.07,
+    "best_value_fidelity": 0.07,
 }
 
 SAFETY_FACTORS = {
@@ -528,10 +531,10 @@ def composite_scorer(evaluation: dict, config: dict | None = None) -> dict:
         evaluation: {
             variants: [
                 {
-                    variant_id: "base" | "variant_a" | "variant_b" | "variant_c",
+                    variant_id: "...",
                     dimensions: {
                         "value_equation": { raw_score, evidence_quality, competitor_baseline?, kill_condition },
-                        ... (8 dimensions)
+                        ... (11 dimensions)
                     }
                 },
                 ...
@@ -541,7 +544,7 @@ def composite_scorer(evaluation: dict, config: dict | None = None) -> dict:
         OR (backwards compatible single-variant):
 
         evaluation: {
-            dimensions: { ... 8 dimensions ... }
+            dimensions: { ... 11 dimensions ... }
         }
 
         config: {
@@ -561,7 +564,7 @@ def composite_scorer(evaluation: dict, config: dict | None = None) -> dict:
     if "variants" in evaluation:
         variants = evaluation["variants"]
     else:
-        variants = [{"variant_id": "base", "dimensions": evaluation.get("dimensions", {})}]
+        variants = [{"variant_id": "single_device", "dimensions": evaluation.get("dimensions", {})}]
 
     variant_results = []
 
