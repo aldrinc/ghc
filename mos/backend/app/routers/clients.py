@@ -109,6 +109,10 @@ from app.services.funnels import (
     create_funnel_unsplash_asset,
     resolve_funnel_image_model_config,
 )
+from app.services.funnel_testimonials import (
+    TestimonialGenerationError,
+    generate_shopify_theme_testimonial_image_asset,
+)
 from app.services.media_storage import MediaStorage
 from app.services.public_routing import require_product_route_slug
 from app.services.shopify_connection import (
@@ -174,6 +178,13 @@ _THEME_RICHTEXT_MARKUP_RE = re.compile(
 )
 _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
     r"^templates/index\.json\.sections\.ss_feature_1_pro_[^.]+\.blocks\.slide_[^.]+\.settings\.image$",
+    re.IGNORECASE,
+)
+_THEME_TESTIMONIAL_IMAGE_SLOT_PATH_RE = re.compile(
+    (
+        r"^templates/index\.json\.sections\.ss_testimonial(?:s)?_[^.]+"
+        r"\.blocks\.image_[^.]+\.settings\.image$"
+    ),
     re.IGNORECASE,
 )
 _THEME_FEATURE_HIGHLIGHT_CARD_SLOT_PATHS: dict[str, tuple[str, str]] = {
@@ -2960,6 +2971,10 @@ def _is_theme_feature_image_slot_path(slot_path: str) -> bool:
     return bool(_THEME_FEATURE_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
 
 
+def _is_theme_testimonial_image_slot_path(slot_path: str) -> bool:
+    return bool(_THEME_TESTIMONIAL_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
+
+
 def _is_theme_feature_highlight_text_slot_path(slot_path: str) -> bool:
     return slot_path.strip() in _THEME_FEATURE_HIGHLIGHT_MANAGED_TEXT_SLOT_PATHS
 
@@ -3578,34 +3593,72 @@ def _generate_theme_sync_ai_image_assets(
     ) -> dict[str, Any]:
         with SessionLocal() as slot_session:
             try:
-                generated_asset = create_funnel_image_asset(
-                    session=slot_session,
-                    org_id=org_id,
-                    client_id=client_id,
-                    prompt=prompt,
-                    aspect_ratio=aspect_ratio,
-                    usage_context={
-                        "kind": "shopify_theme_sync_component_image",
-                        "slotPath": slot_path,
-                        "slotRole": slot_role,
-                        "recommendedAspect": slot_recommended_aspect,
-                    },
-                    reference_image_bytes=reference_image_bytes,
-                    reference_image_mime_type=reference_image_mime_type,
-                    reference_asset_public_id=reference_asset_public_id,
-                    reference_asset_id=reference_asset_id,
-                    product_id=product_id,
-                    tags=["shopify_theme_sync", "component_image", "ai_generated"],
-                )
+                if _is_theme_testimonial_image_slot_path(slot_path):
+                    generated_asset = generate_shopify_theme_testimonial_image_asset(
+                        org_id=org_id,
+                        client_id=client_id,
+                        slot_path=slot_path,
+                        direction_prompt=prompt,
+                        aspect_ratio=aspect_ratio,
+                        usage_context={
+                            "kind": "shopify_theme_sync_component_image",
+                            "slotPath": slot_path,
+                            "slotRole": slot_role,
+                            "recommendedAspect": slot_recommended_aspect,
+                            "imageGenerationService": "testimonial",
+                        },
+                        reference_image_bytes=reference_image_bytes,
+                        reference_image_mime_type=reference_image_mime_type,
+                        reference_asset_public_id=reference_asset_public_id,
+                        reference_asset_id=reference_asset_id,
+                        product_id=product_id,
+                        tags=[
+                            "shopify_theme_sync",
+                            "component_image",
+                            "testimonial",
+                            "ai_generated",
+                        ],
+                    )
+                    source_name = "testimonial_service"
+                else:
+                    generated_asset = create_funnel_image_asset(
+                        session=slot_session,
+                        org_id=org_id,
+                        client_id=client_id,
+                        prompt=prompt,
+                        aspect_ratio=aspect_ratio,
+                        usage_context={
+                            "kind": "shopify_theme_sync_component_image",
+                            "slotPath": slot_path,
+                            "slotRole": slot_role,
+                            "recommendedAspect": slot_recommended_aspect,
+                        },
+                        reference_image_bytes=reference_image_bytes,
+                        reference_image_mime_type=reference_image_mime_type,
+                        reference_asset_public_id=reference_asset_public_id,
+                        reference_asset_id=reference_asset_id,
+                        product_id=product_id,
+                        tags=["shopify_theme_sync", "component_image", "ai_generated"],
+                    )
+                    source_name = "ai"
                 return {
                     "slotPath": slot_path,
                     "asset": generated_asset,
-                    "source": "ai",
+                    "source": source_name,
                     "rateLimited": False,
                     "quotaExhausted": False,
                     "error": None,
                 }
             except Exception as exc:  # noqa: BLE001
+                if isinstance(exc, TestimonialGenerationError):
+                    return {
+                        "slotPath": slot_path,
+                        "asset": None,
+                        "source": None,
+                        "rateLimited": False,
+                        "quotaExhausted": False,
+                        "error": str(exc),
+                    }
                 if _is_gemini_hard_quota_exhaustion_error(exc):
                     return {
                         "slotPath": slot_path,

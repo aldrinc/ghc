@@ -951,6 +951,113 @@ def _generate_testimonial_image_asset(
         return _generated_testimonial_asset(asset)
 
 
+def generate_shopify_theme_testimonial_image_asset(
+    *,
+    org_id: str,
+    client_id: str,
+    slot_path: str,
+    direction_prompt: str,
+    aspect_ratio: str,
+    usage_context: Optional[dict[str, Any]] = None,
+    reference_image_bytes: Optional[bytes] = None,
+    reference_image_mime_type: Optional[str] = None,
+    reference_asset_public_id: Optional[str] = None,
+    reference_asset_id: Optional[str] = None,
+    product_id: Optional[str] = None,
+    tags: Optional[list[str]] = None,
+) -> Asset:
+    normalized_slot_path = _clean_single_line(slot_path or "")
+    if not normalized_slot_path:
+        raise TestimonialGenerationError(
+            "slot_path is required to generate a Shopify testimonial image asset."
+        )
+    normalized_direction = _clean_single_line(direction_prompt or "")
+    if not normalized_direction:
+        raise TestimonialGenerationError(
+            "direction_prompt is required to generate a Shopify testimonial image asset."
+        )
+    normalized_aspect_ratio = _clean_single_line(aspect_ratio or "")
+    if not normalized_aspect_ratio:
+        raise TestimonialGenerationError(
+            "aspect_ratio is required to generate a Shopify testimonial image asset."
+        )
+
+    if normalized_aspect_ratio == "1:1":
+        prompt = _build_distinct_avatar_prompt(
+            render_label=normalized_slot_path,
+            display_name="Customer",
+            persona="satisfied customer sharing a real product experience",
+            direction=_truncate(normalized_direction, limit=220),
+            variant_label="shopify-theme-testimonial",
+        )
+    else:
+        scene_seed = _seed_value(
+            normalized_slot_path,
+            normalized_direction,
+            normalized_aspect_ratio,
+        )
+        scene_mode = _select_single_scene_mode(scene_seed)
+        prompt = _build_testimonial_scene_prompt(
+            scene_mode=scene_mode,
+            render_label=normalized_slot_path,
+            persona="satisfied customer sharing a real product experience",
+            setting=(
+                "an authentic everyday environment with natural clutter and believable "
+                "smartphone lighting"
+            ),
+            action=(
+                "capturing a candid in-the-moment product-use scene that feels naturally "
+                "user-generated"
+            ),
+            direction=_truncate(normalized_direction, limit=260),
+            prohibit_visible_text=True,
+        )
+        if normalized_aspect_ratio != "9:16":
+            prompt = (
+                f"{prompt}\n\n"
+                "COMPOSITION REQUIREMENT: Keep the subject crop-safe for aspect ratio "
+                f"{normalized_aspect_ratio} and avoid clipping key facial/product details."
+            )
+
+    resolved_usage_context = {
+        "kind": "shopify_theme_testimonial_image",
+        "slotPath": normalized_slot_path,
+    }
+    if isinstance(usage_context, dict):
+        resolved_usage_context.update(usage_context)
+
+    resolved_tags = [
+        "shopify_theme_sync",
+        "component_image",
+        "testimonial",
+        "ai_generated",
+    ]
+    if isinstance(tags, list):
+        for raw_tag in tags:
+            if not isinstance(raw_tag, str):
+                continue
+            normalized_tag = raw_tag.strip()
+            if not normalized_tag or normalized_tag in resolved_tags:
+                continue
+            resolved_tags.append(normalized_tag)
+
+    with SessionLocal() as thread_session:
+        return create_funnel_image_asset(
+            session=thread_session,
+            org_id=org_id,
+            client_id=client_id,
+            prompt=prompt,
+            aspect_ratio=normalized_aspect_ratio,
+            usage_context=resolved_usage_context,
+            reference_image_bytes=reference_image_bytes,
+            reference_image_mime_type=reference_image_mime_type,
+            reference_asset_public_id=reference_asset_public_id,
+            reference_asset_id=reference_asset_id,
+            product_id=product_id,
+            tags=resolved_tags,
+        )
+
+
 def _resolve_testimonial_template(image: dict[str, Any]) -> str:
     raw = image.get("testimonialTemplate") or image.get("testimonial_template") or image.get("testimonial_type")
     if raw is None:

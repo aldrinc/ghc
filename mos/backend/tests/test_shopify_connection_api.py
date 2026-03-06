@@ -1097,6 +1097,87 @@ def test_build_theme_sync_slot_image_prompt_applies_feature_icon_constraints():
     assert "Feature context: We deliver worldwide Get your package anywhere!." in prompt
 
 
+def test_is_theme_testimonial_image_slot_path_matches_theme_testimonial_grid_paths():
+    testimonial_slot_path = (
+        "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image"
+    )
+    non_testimonial_slot_path = (
+        "templates/collection.json.sections.main-collection.blocks.promotion.settings.image"
+    )
+
+    assert clients_router._is_theme_testimonial_image_slot_path(testimonial_slot_path)
+    assert not clients_router._is_theme_testimonial_image_slot_path(non_testimonial_slot_path)
+
+
+def test_generate_theme_sync_ai_image_assets_routes_testimonial_slots_to_testimonial_service(
+    db_session, monkeypatch
+):
+    testimonial_slot_path = (
+        "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image"
+    )
+    captured: dict[str, object] = {}
+    fake_public_id = str(uuid4())
+
+    def fake_generate_shopify_theme_testimonial_image_asset(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(
+            public_id=fake_public_id,
+            width=1080,
+            height=1080,
+            ai_metadata={"model": "gemini-testimonial", "source": "testimonial_service"},
+            file_source="testimonial_service",
+        )
+
+    def fail_create_funnel_image_asset(**kwargs):
+        raise AssertionError(
+            "Expected testimonial image slots to route through testimonial service generation."
+        )
+
+    monkeypatch.setattr(
+        clients_router,
+        "generate_shopify_theme_testimonial_image_asset",
+        fake_generate_shopify_theme_testimonial_image_asset,
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "create_funnel_image_asset",
+        fail_create_funnel_image_asset,
+    )
+
+    (
+        generated_assets,
+        rate_limited_slot_paths,
+        generated_asset_by_slot_path,
+        quota_exhausted_slot_paths,
+        slot_error_by_path,
+    ) = clients_router._generate_theme_sync_ai_image_assets(
+        session=db_session,
+        org_id=str(uuid4()),
+        client_id=str(uuid4()),
+        product_id=None,
+        image_slots=[
+            {
+                "path": testimonial_slot_path,
+                "key": "image",
+                "role": "supporting",
+                "recommendedAspect": "square",
+            }
+        ],
+        text_slots=[],
+        max_concurrency=1,
+    )
+
+    assert len(generated_assets) == 1
+    assert generated_asset_by_slot_path[testimonial_slot_path].public_id == fake_public_id
+    assert rate_limited_slot_paths == []
+    assert quota_exhausted_slot_paths == []
+    assert slot_error_by_path == {}
+    assert captured["slot_path"] == testimonial_slot_path
+    assert captured["aspect_ratio"] == "1:1"
+    assert captured["direction_prompt"]
+    assert captured["usage_context"]["imageGenerationService"] == "testimonial"
+
+
 def test_build_theme_sync_default_general_prompt_context_includes_page_background_token():
     context = clients_router._build_theme_sync_default_general_prompt_context(
         draft_data=SimpleNamespace(
