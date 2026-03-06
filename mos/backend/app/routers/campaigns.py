@@ -2,16 +2,18 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import AuthContext, get_current_user
 from app.config import settings
 from app.db.deps import get_session
 from app.db.enums import ArtifactTypeEnum, WorkflowStatusEnum
-from app.db.models import WorkflowRun
+from app.db.models import Asset, Funnel, FunnelPage, WorkflowRun
 from app.db.repositories.artifacts import ArtifactsRepository
 from app.db.repositories.campaigns import CampaignsRepository
 from app.db.repositories.funnels import FunnelsRepository
+from app.db.repositories.meta_ads import MetaAdsRepository
 from app.db.repositories.products import ProductsRepository
 from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepository
 from app.db.repositories.workflows import WorkflowsRepository
@@ -19,6 +21,8 @@ from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
 from app.schemas.creative_production import CreativeProductionRequest
 from app.schemas.experiment_spec import ExperimentSpecSet, ExperimentSpecsUpdateRequest
+from app.schemas.meta_ads import CampaignMetaReviewSetupRequest
+from app.services.public_routing import require_product_route_slug
 from app.temporal.client import get_temporal_client
 from app.temporal.workflows.campaign_planning import CampaignPlanningInput, CampaignPlanningWorkflow
 from app.temporal.workflows.campaign_funnel_generation import (
@@ -55,6 +59,75 @@ def _workflow_status_map() -> dict[object, WorkflowStatusEnum]:
         if member is not None:
             mapping[member] = internal_status
     return mapping
+
+
+def _load_campaign_asset_brief_map(
+    *,
+    org_id: str,
+    client_id: str,
+    campaign_id: str,
+    session: Session,
+) -> dict[str, dict]:
+    artifacts_repo = ArtifactsRepository(session)
+    brief_artifacts = artifacts_repo.list(
+        org_id=org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        artifact_type=ArtifactTypeEnum.asset_brief,
+        limit=200,
+    )
+    brief_map: dict[str, dict] = {}
+    for artifact in brief_artifacts:
+        data = artifact.data if isinstance(artifact.data, dict) else {}
+        briefs = data.get("asset_briefs") or data.get("assetBriefs") or []
+        if not isinstance(briefs, list):
+            continue
+        for brief in briefs:
+            if not isinstance(brief, dict):
+                continue
+            brief_id = brief.get("id")
+            if isinstance(brief_id, str) and brief_id.strip() and brief_id.strip() not in brief_map:
+                brief_map[brief_id.strip()] = brief
+    return brief_map
+
+
+def _resolve_funnel_review_paths(
+    *,
+    org_id: str,
+    product_id: str,
+    funnel_ids: set[str],
+    session: Session,
+) -> dict[str, dict[str, str]]:
+    if not funnel_ids:
+        return {}
+
+    product = ProductsRepository(session).get(org_id=org_id, product_id=product_id)
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+    product_route_slug = require_product_route_slug(product=product)
+
+    funnels = session.scalars(
+        select(Funnel).where(
+            Funnel.org_id == org_id,
+            Funnel.id.in_(list(funnel_ids)),
+        )
+    ).all()
+    funnel_map = {str(funnel.id): funnel for funnel in funnels}
+    pages = session.scalars(
+        select(FunnelPage).where(
+            FunnelPage.funnel_id.in_(list(funnel_ids)),
+        )
+    ).all()
+
+    by_funnel_id: dict[str, dict[str, str]] = {}
+    for page in pages:
+        funnel = funnel_map.get(str(page.funnel_id))
+        if not funnel:
+            continue
+        by_funnel_id.setdefault(str(page.funnel_id), {})[page.slug] = (
+            f"/f/{product_route_slug}/{funnel.route_slug}/{page.slug}"
+        )
+    return by_funnel_id
 
 
 def _validate_planning_prereqs(
@@ -611,6 +684,220 @@ async def start_creative_production(
     )
 
     return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}
+
+
+@router.post("/{campaign_id}/meta/review-setup")
+def setup_campaign_meta_review(
+    campaign_id: str,
+    payload: CampaignMetaReviewSetupRequest,
+    auth: AuthContext = Depends(get_current_user),
+    session: Session = Depends(get_session),
+):
+    repo = CampaignsRepository(session)
+    campaign = repo.get(org_id=auth.org_id, campaign_id=campaign_id)
+    if not campaign:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Campaign not found")
+    if not campaign.product_id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Campaign is missing a product_id. Attach a product before setting up Meta review.",
+        )
+
+    brief_map = _load_campaign_asset_brief_map(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        campaign_id=str(campaign.id),
+        session=session,
+    )
+    if not brief_map:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="No asset briefs exist for this campaign. Generate briefs before setting up Meta review.",
+        )
+
+    selected_brief_ids = payload.assetBriefIds or list(brief_map.keys())
+    missing_brief_ids = [brief_id for brief_id in selected_brief_ids if brief_id not in brief_map]
+    if missing_brief_ids:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "message": "Some asset briefs were not found for this campaign.",
+                "missingAssetBriefIds": missing_brief_ids,
+            },
+        )
+
+    campaign_assets = session.scalars(
+        select(Asset).where(
+            Asset.org_id == auth.org_id,
+            Asset.campaign_id == str(campaign.id),
+            Asset.file_status == "ready",
+        )
+    ).all()
+
+    assets_by_brief_id: dict[str, list[Asset]] = {brief_id: [] for brief_id in selected_brief_ids}
+    for asset in campaign_assets:
+        metadata = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
+        brief_id = metadata.get("assetBriefId")
+        if isinstance(brief_id, str) and brief_id in assets_by_brief_id:
+            assets_by_brief_id[brief_id].append(asset)
+
+    missing_asset_briefs = [brief_id for brief_id, assets in assets_by_brief_id.items() if not assets]
+    if missing_asset_briefs:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "message": "No generated campaign assets exist for some selected briefs. Run creative generation first.",
+                "missingAssetBriefIds": missing_asset_briefs,
+            },
+        )
+
+    funnel_ids = {
+        str(brief.get("funnelId")).strip()
+        for brief in (brief_map[brief_id] for brief_id in selected_brief_ids)
+        if isinstance(brief.get("funnelId"), str) and brief.get("funnelId").strip()
+    }
+    review_paths_by_funnel_id = _resolve_funnel_review_paths(
+        org_id=auth.org_id,
+        product_id=str(campaign.product_id),
+        funnel_ids=funnel_ids,
+        session=session,
+    )
+
+    meta_repo = MetaAdsRepository(session)
+    existing_creative_specs = {
+        str(record.asset_id): record
+        for record in meta_repo.list_creative_specs(org_id=auth.org_id, campaign_id=str(campaign.id))
+    }
+    existing_adset_specs_by_experiment: dict[str, object] = {}
+    for record in meta_repo.list_adset_specs(org_id=auth.org_id, campaign_id=str(campaign.id)):
+        metadata = record.metadata_json if isinstance(record.metadata_json, dict) else {}
+        experiment_key = None
+        if record.experiment_id:
+            experiment_key = str(record.experiment_id)
+        elif isinstance(metadata.get("experimentSpecId"), str) and metadata.get("experimentSpecId").strip():
+            experiment_key = metadata.get("experimentSpecId").strip()
+        if experiment_key and experiment_key not in existing_adset_specs_by_experiment:
+            existing_adset_specs_by_experiment[experiment_key] = record
+
+    created_creative_spec_ids: list[str] = []
+    reused_creative_spec_ids: list[str] = []
+    created_adset_spec_ids: list[str] = []
+    reused_adset_spec_ids: list[str] = []
+
+    for brief_id in selected_brief_ids:
+        brief = brief_map[brief_id]
+        experiment_id = brief.get("experimentId")
+        if not isinstance(experiment_id, str) or not experiment_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Asset brief '{brief_id}' is missing experimentId.",
+            )
+        experiment_id = experiment_id.strip()
+
+        adset_spec = existing_adset_specs_by_experiment.get(experiment_id)
+        if adset_spec is None:
+            new_adset_spec = meta_repo.create_adset_spec(
+                org_id=auth.org_id,
+                campaign_id=str(campaign.id),
+                name=brief.get("variantName") or brief.get("creativeConcept") or experiment_id,
+                status="draft",
+                metadata_json={
+                    "source": "campaign_meta_review_setup",
+                    "experimentSpecId": experiment_id,
+                    "campaignGoalDescription": campaign.goal_description,
+                    "campaignChannels": campaign.channels or [],
+                    "variantId": brief.get("variantId"),
+                    "variantName": brief.get("variantName"),
+                    "assetBriefIds": [candidate for candidate in selected_brief_ids if brief_map[candidate].get("experimentId") == experiment_id],
+                },
+            )
+            existing_adset_specs_by_experiment[experiment_id] = new_adset_spec
+            created_adset_spec_ids.append(str(new_adset_spec.id))
+        else:
+            reused_adset_spec_ids.append(str(adset_spec.id))
+
+        requirements = brief.get("requirements") or []
+        if not isinstance(requirements, list) or not requirements:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Asset brief '{brief_id}' has no requirements.",
+            )
+
+        review_paths = {}
+        raw_funnel_id = brief.get("funnelId")
+        if isinstance(raw_funnel_id, str) and raw_funnel_id.strip():
+            review_paths = review_paths_by_funnel_id.get(raw_funnel_id.strip(), {})
+
+        for asset in assets_by_brief_id[brief_id]:
+            existing_creative = existing_creative_specs.get(str(asset.id))
+            if existing_creative is not None:
+                reused_creative_spec_ids.append(str(existing_creative.id))
+                continue
+
+            metadata = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
+            requirement_index = metadata.get("requirementIndex")
+            if not isinstance(requirement_index, int):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Generated asset '{asset.id}' is missing an integer ai_metadata.requirementIndex.",
+                )
+            if requirement_index < 0 or requirement_index >= len(requirements):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Generated asset '{asset.id}' requirementIndex={requirement_index} is out of range "
+                        f"for asset brief '{brief_id}'."
+                    ),
+                )
+
+            requirement = requirements[requirement_index]
+            if not isinstance(requirement, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Asset brief '{brief_id}' requirement at index {requirement_index} must be an object.",
+                )
+
+            new_creative_spec = meta_repo.create_creative_spec(
+                org_id=auth.org_id,
+                asset_id=str(asset.id),
+                campaign_id=str(campaign.id),
+                name=" · ".join(
+                    [
+                        str(campaign.name).strip(),
+                        str(brief.get("variantName") or experiment_id).strip(),
+                        str(requirement.get("funnelStage") or requirement.get("channel") or "creative").strip(),
+                    ]
+                ),
+                primary_text=brief.get("creativeConcept"),
+                headline=requirement.get("hook"),
+                description=requirement.get("angle"),
+                page_id=settings.META_PAGE_ID,
+                instagram_actor_id=settings.META_INSTAGRAM_ACTOR_ID,
+                status="draft",
+                metadata_json={
+                    "source": "campaign_meta_review_setup",
+                    "experimentSpecId": experiment_id,
+                    "experimentName": brief.get("variantName") or experiment_id,
+                    "assetBriefId": brief_id,
+                    "requirementIndex": requirement_index,
+                    "requirement": requirement,
+                    "reviewPaths": review_paths,
+                    "variantId": brief.get("variantId"),
+                    "variantName": brief.get("variantName"),
+                    "funnelId": raw_funnel_id,
+                },
+            )
+            created_creative_spec_ids.append(str(new_creative_spec.id))
+
+    return {
+        "campaignId": str(campaign.id),
+        "assetBriefIds": selected_brief_ids,
+        "assetCount": sum(len(items) for items in assets_by_brief_id.values()),
+        "createdCreativeSpecIds": created_creative_spec_ids,
+        "reusedCreativeSpecIds": reused_creative_spec_ids,
+        "createdAdSetSpecIds": created_adset_spec_ids,
+        "reusedAdSetSpecIds": reused_adset_spec_ids,
+    }
 
 
 @router.post("/{campaign_id}/experiment-specs", status_code=status.HTTP_201_CREATED)

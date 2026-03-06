@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHeadCell, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { CampaignMetaAdsPanel } from "@/components/campaigns/CampaignMetaAdsPanel";
 import { useArtifacts, useLatestArtifact } from "@/api/artifacts";
 import { useApiClient, type ApiError } from "@/api/client";
 import { useCampaign, useCampaignStrategyV2Launches, useUpdateExperimentSpecs } from "@/api/campaigns";
@@ -1035,6 +1036,9 @@ export function CampaignDetailPage() {
           <TabsTrigger value="funnels" className="data-[selected]:!text-black">
             Funnels
           </TabsTrigger>
+          <TabsTrigger value="meta" className="data-[selected]:!text-black">
+            Meta ads
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" flush>
@@ -1851,6 +1855,12 @@ export function CampaignDetailPage() {
                 No funnels connected to this campaign yet.
               </div>
             )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="meta" flush>
+          <div className={READABILITY_MAX_WIDTH_CLASS}>
+            <CampaignMetaAdsPanel campaign={campaign} assetBriefs={assetBriefs} />
           </div>
         </TabsContent>
       </Tabs>

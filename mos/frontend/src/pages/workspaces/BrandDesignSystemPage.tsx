@@ -876,7 +876,6 @@ export function BrandDesignSystemPage() {
   const [complianceProfileForm, setComplianceProfileForm] = useState<ComplianceProfileFormState>(() =>
     buildComplianceProfileFormState(null, workspace?.name)
   );
-  const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
   const autoCreateBaseTemplateDraftAttemptKeyRef = useRef("");
   const complianceProfileFormSeedRef = useRef("");
@@ -2985,6 +2984,48 @@ export function BrandDesignSystemPage() {
             </TabsList>
 
             <TabsContent value="preview" flush>
+              <div className="mb-4 space-y-2 rounded-md border border-border bg-surface p-3 shadow-sm">
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <select
+                    className="w-full rounded-md border border-input-border bg-input px-2 py-2 text-xs text-content shadow-sm"
+                    value={selectedLogoPublicId}
+                    onChange={(e) => setSelectedLogoPublicId(e.target.value)}
+                    disabled={isLoadingLogoAssets || !logoAssetOptions.length}
+                  >
+                    <option value="">
+                      {isLoadingLogoAssets
+                        ? "Loading image assets…"
+                        : logoAssetOptions.length
+                          ? "Select existing image asset"
+                          : "No image assets available"}
+                    </option>
+                    {logoAssetOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    type="button"
+                    onClick={applySelectedLogoAsset}
+                    disabled={!selectedLogoPublicId || updateDesignSystem.isPending}
+                  >
+                    {updateDesignSystem.isPending ? "Applying…" : "Set logo"}
+                  </Button>
+                  <Input
+                    type="file"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                    onChange={handleLogoUpload}
+                    disabled={uploadDesignSystemLogo.isPending}
+                    className="h-9 max-w-[220px] text-xs file:mr-3 file:cursor-pointer file:text-xs"
+                    aria-label="Upload logo"
+                  />
+                </div>
+                <div className="text-[11px] text-content-muted">
+                  Selecting or uploading a logo updates this design system token automatically.
+                </div>
+              </div>
               <DesignSystemProvider tokens={previewTokens}>
                 <div
                   className="rounded-md overflow-hidden"
@@ -3043,54 +3084,6 @@ export function BrandDesignSystemPage() {
                                 Unable to load logo from <span className="font-mono">{previewLogoSrc}</span>
                               </div>
                             ) : null}
-                          </div>
-                          <div className="mt-3 space-y-2">
-                            <input
-                              ref={logoUploadInputRef}
-                              className="hidden"
-                              type="file"
-                              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-                              onChange={handleLogoUpload}
-                            />
-                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                              <select
-                                className="w-full rounded-md border border-input-border bg-input px-2 py-2 text-xs text-content shadow-sm"
-                                value={selectedLogoPublicId}
-                                onChange={(e) => setSelectedLogoPublicId(e.target.value)}
-                                disabled={isLoadingLogoAssets || !logoAssetOptions.length}
-                              >
-                                <option value="">
-                                  {isLoadingLogoAssets
-                                    ? "Loading image assets…"
-                                    : logoAssetOptions.length
-                                      ? "Select existing image asset"
-                                      : "No image assets available"}
-                                </option>
-                                {logoAssetOptions.map((option) => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <Button
-                                size="sm"
-                                onClick={applySelectedLogoAsset}
-                                disabled={!selectedLogoPublicId || updateDesignSystem.isPending}
-                              >
-                                {updateDesignSystem.isPending ? "Applying…" : "Set logo"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => logoUploadInputRef.current?.click()}
-                                disabled={uploadDesignSystemLogo.isPending}
-                              >
-                                {uploadDesignSystemLogo.isPending ? "Uploading…" : "Upload logo"}
-                              </Button>
-                            </div>
-                            <div className="text-[11px]" style={{ color: "var(--color-muted)" }}>
-                              Selecting or uploading a logo updates this design system token automatically.
-                            </div>
                           </div>
                         </div>
                       </div>

@@ -22,9 +22,13 @@ from app.db.repositories.claude_context_files import ClaudeContextFilesRepositor
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.claude_files import build_document_blocks, call_claude_structured_message
 from app.services.design_systems import resolve_design_system_tokens
+from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.funnel_templates import get_funnel_template
 from app.services.funnels import extract_internal_links, publish_funnel
-from app.services.funnel_testimonials import generate_funnel_page_testimonials
+from app.services.funnel_testimonials import (
+    generate_funnel_page_testimonials,
+    generate_sales_pdp_carousel_images,
+)
 
 # Reuse funnel_ai internals to keep behavior consistent while we split orchestration.
 from app.services import funnel_ai as funnel_ai
@@ -582,6 +586,7 @@ class DraftGeneratePageTool(BaseTool[DraftGeneratePageArgs]):
                 "- Add a `prompt` on every image object inside props.config/props.modals/props.copy that should be generated.\n"
                 "- Do NOT add prompts to brand logos (logo objects). Keep logo assetPublicId intact.\n"
                 "- Do NOT add prompts to testimonial images (objects with testimonialTemplate); those are rendered separately.\n"
+                "- For Sales PDP, do NOT add prompt/imageSource/referenceAssetPublicId to SalesPdpHero.config.gallery.slides[]; those carousel images are rendered by the testimonials service.\n"
                 "- Leave the corresponding *AssetPublicId field empty so the backend can generate and fill it.\n"
                 "- Placeholder /assets/ph-* images must be replaced with prompts or assetPublicId.\n"
                 "- Prefer Unsplash for stock-appropriate imagery (lifestyle, generic product-in-use, backgrounds).\n"
@@ -1792,6 +1797,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                         "id": str(variant.id),
                         "title": variant.title,
                         "amount_cents": variant.price,
+                        "compare_at_cents": variant.compare_at_price,
                         "option_values": variant.option_values,
                     }
                 )
@@ -1901,6 +1907,7 @@ class DraftApplyOverridesTool(BaseTool[DraftApplyOverridesArgs]):
                     if isinstance(template_reference_puck, dict)
                     else base_puck_for_restore
                 ),
+                product_title=product.title,
             )
 
         if args.templateKind == "pre-sales-listicle":
@@ -2172,6 +2179,14 @@ class DraftPersistVersionTool(BaseTool[DraftPersistVersionArgs]):
         if args.attachmentSummaries:
             ai_metadata["attachedAssets"] = args.attachmentSummaries
 
+        normalize_public_page_metadata_for_context(
+            session=ctx.session,
+            org_id=ctx.org_id,
+            funnel=funnel,
+            page=page,
+            puck_data=args.puckData,
+        )
+
         version = FunnelPageVersion(
             page_id=page.id,
             status=FunnelPageVersionStatusEnum.draft,
@@ -2248,6 +2263,67 @@ class TestimonialsGenerateAndApplyTool(BaseTool[TestimonialsGenerateAndApplyArgs
             "draftVersionId": str(version.id),
             "puckData": puck_data,
             "generatedTestimonials": generated,
+        }
+        llm_output = json.dumps({"draftVersionId": str(version.id)}, separators=(",", ":"))
+        return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
+
+
+class SalesPdpCarouselGenerateAndApplyArgs(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    orgId: str
+    userId: str
+    funnelId: str
+    pageId: str
+    draftVersionId: Optional[str] = None
+    currentPuckData: Optional[dict[str, Any]] = None
+    templateId: Optional[str] = None
+    ideaWorkspaceId: Optional[str] = None
+    model: Optional[str] = None
+    temperature: float = 0.3
+    maxTokens: Optional[int] = None
+    maxDurationSeconds: Optional[int] = None
+    agentRunId: Optional[str] = None
+
+
+class SalesPdpCarouselGenerateAndApplyTool(BaseTool[SalesPdpCarouselGenerateAndApplyArgs]):
+    name = "sales_pdp_carousel.generate_and_apply"
+    ArgsModel = SalesPdpCarouselGenerateAndApplyArgs
+
+    def run(self, *, ctx: ToolContext, args: SalesPdpCarouselGenerateAndApplyArgs) -> ToolResult:
+        if args.orgId != ctx.org_id:
+            raise ValueError("orgId mismatch")
+        if args.userId != ctx.user_id:
+            raise ValueError("userId mismatch")
+
+        version, puck_data, generated = generate_sales_pdp_carousel_images(
+            session=ctx.session,
+            org_id=ctx.org_id,
+            user_id=args.userId,
+            funnel_id=args.funnelId,
+            page_id=args.pageId,
+            draft_version_id=args.draftVersionId,
+            current_puck_data=args.currentPuckData,
+            template_id=args.templateId,
+            idea_workspace_id=args.ideaWorkspaceId,
+            model=args.model,
+            temperature=args.temperature,
+            max_tokens=args.maxTokens,
+            max_duration_seconds=args.maxDurationSeconds,
+        )
+
+        if args.agentRunId:
+            if not isinstance(version.ai_metadata, dict):
+                version.ai_metadata = {}
+            version.ai_metadata["agentRunId"] = args.agentRunId
+            ctx.session.add(version)
+            ctx.session.commit()
+            ctx.session.refresh(version)
+
+        ui_details = {
+            "draftVersionId": str(version.id),
+            "puckData": puck_data,
+            "generatedCarouselImages": generated,
         }
         llm_output = json.dumps({"draftVersionId": str(version.id)}, separators=(",", ":"))
         return ToolResult(llm_output=llm_output, ui_details=ui_details, attachments=[])
