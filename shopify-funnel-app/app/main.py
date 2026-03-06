@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
@@ -64,6 +65,7 @@ from app.shopify_api import ShopifyApiClient, ShopifyApiError
 
 app = FastAPI(title="Marketi Shopify Funnel App", default_response_class=ORJSONResponse)
 shopify_api = ShopifyApiClient()
+logger = logging.getLogger(__name__)
 
 _SHOPIFY_COMPLIANCE_TOPICS = frozenset(
     {"customers/data_request", "customers/redact", "shop/redact"}
@@ -416,6 +418,12 @@ async def auth_callback(request: Request, session: Session = Depends(get_session
         session.refresh(installation)
 
     except ShopifyApiError as exc:
+        logger.error(
+            "OAuth callback failed for shop=%s client_id=%s detail=%s",
+            shop_domain,
+            oauth_state.client_id,
+            str(exc),
+        )
         session.rollback()
         raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 

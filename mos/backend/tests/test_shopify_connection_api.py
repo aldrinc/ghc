@@ -213,6 +213,49 @@ def test_normalize_theme_export_text_file_content_removes_rich_text_footer_color
     assert "var(--footer-text-color)" not in normalized_content
 
 
+def test_normalize_theme_export_text_file_content_updates_header_track_order_link_to_contact():
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="snippets/header-drawer.liquid",
+        content=(
+            '<li><a href="/pages/track-your-order">Track Your Order</a></li>'
+            '<li><a href="/pages/track-order">Track my order</a></li>'
+        ),
+        sales_page_path="/f/11111111/sales-funnel/sales",
+    )
+
+    assert 'href="/pages/contact"' in normalized_content
+    assert "/pages/track-your-order" not in normalized_content
+    assert "/pages/track-order" not in normalized_content
+
+
+def test_normalize_theme_export_text_file_content_removes_footer_track_order_tab():
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="sections/footer-group.json",
+        content=json.dumps(
+            {
+                "sections": {
+                    "ss_footer_4_9rJacA": {
+                        "type": "a-ss-footer-4",
+                        "blocks": {
+                            "tab_track": {
+                                "type": "tab",
+                                "settings": {
+                                    "title": "Track Your Order",
+                                    "text": "<p>Track your order status in real time.</p>",
+                                },
+                            }
+                        },
+                    }
+                }
+            }
+        ),
+        sales_page_path="/f/11111111/sales-funnel/sales",
+    )
+    parsed_content = json.loads(normalized_content)
+    footer_blocks = parsed_content["sections"]["ss_footer_4_9rJacA"]["blocks"]
+    assert "tab_track" not in footer_blocks
+
+
 def test_resolve_theme_export_sales_page_path_uses_first_workspace_product(db_session, api_client):
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
@@ -238,7 +281,7 @@ def test_resolve_theme_export_sales_page_path_uses_first_workspace_product(db_se
         page_slug="sales",
     )
 
-    sales_page_path = clients_router._resolve_theme_export_sales_page_path(
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
         client_id=client_id,
         auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
         session=db_session,
@@ -248,9 +291,89 @@ def test_resolve_theme_export_sales_page_path_uses_first_workspace_product(db_se
     assert sales_page_path == (
         f"/f/{expected_product_slug}/{first_funnel.route_slug}/{first_page.slug}"
     )
+    assert warning is None
 
 
-def test_resolve_theme_export_sales_page_path_requires_sales_page_for_first_product(
+def test_resolve_theme_export_sales_page_path_uses_latest_sales_page_for_first_product(
+    db_session, api_client
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    start_time = datetime.now(timezone.utc)
+    product = Product(
+        org_id=client.org_id,
+        client_id=client.id,
+        title="First Product",
+        created_at=start_time,
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    older_time = start_time + timedelta(minutes=1)
+    older_funnel = Funnel(
+        org_id=client.org_id,
+        client_id=client.id,
+        product_id=product.id,
+        name="Older Funnel",
+        status=FunnelStatusEnum.draft,
+        route_slug="older-sales-funnel",
+        created_at=older_time,
+        updated_at=older_time,
+    )
+    db_session.add(older_funnel)
+    db_session.flush()
+    db_session.add(
+        FunnelPage(
+            funnel_id=older_funnel.id,
+            name="Sales",
+            slug="sales",
+            ordering=0,
+            template_id="sales-pdp",
+            created_at=older_time,
+            updated_at=older_time,
+        )
+    )
+
+    latest_time = start_time + timedelta(days=1)
+    latest_funnel = Funnel(
+        org_id=client.org_id,
+        client_id=client.id,
+        product_id=product.id,
+        name="Latest Funnel",
+        status=FunnelStatusEnum.draft,
+        route_slug="latest-sales-funnel",
+        created_at=latest_time,
+        updated_at=latest_time,
+    )
+    db_session.add(latest_funnel)
+    db_session.flush()
+    db_session.add(
+        FunnelPage(
+            funnel_id=latest_funnel.id,
+            name="Sales",
+            slug="sales",
+            ordering=0,
+            template_id="sales-pdp",
+            created_at=latest_time,
+            updated_at=latest_time,
+        )
+    )
+    db_session.commit()
+
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+    )
+
+    expected_product_slug = str(product.id).split("-", 1)[0][:8]
+    assert sales_page_path == f"/f/{expected_product_slug}/latest-sales-funnel/sales"
+    assert warning is None
+
+
+def test_resolve_theme_export_sales_page_path_uses_latest_workspace_sales_page_when_first_missing(
     db_session, api_client
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
@@ -268,7 +391,7 @@ def test_resolve_theme_export_sales_page_path_requires_sales_page_for_first_prod
     )
     db_session.commit()
 
-    _seed_sales_page_for_product(
+    second_product, second_funnel, second_page = _seed_sales_page_for_product(
         db_session,
         client=client,
         product_title="Second Product",
@@ -278,16 +401,50 @@ def test_resolve_theme_export_sales_page_path_requires_sales_page_for_first_prod
         page_slug="sales",
     )
 
-    try:
-        clients_router._resolve_theme_export_sales_page_path(
-            client_id=client_id,
-            auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
-            session=db_session,
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+    )
+
+    expected_second_product_slug = str(second_product.id).split("-", 1)[0][:8]
+    assert sales_page_path == (
+        f"/f/{expected_second_product_slug}/{second_funnel.route_slug}/{second_page.slug}"
+    )
+    assert warning is not None
+    assert "Theme ZIP downloaded, but sales page was not found" in warning
+    assert "First Product" in warning
+    assert "Second Product" in warning
+
+
+def test_resolve_theme_export_sales_page_path_returns_blank_when_none_available(
+    db_session, api_client
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    db_session.add(
+        Product(
+            org_id=client.org_id,
+            client_id=client.id,
+            title="First Product",
+            created_at=datetime.now(timezone.utc),
         )
-        assert False, "Expected missing first-product sales page to raise an error."
-    except HTTPException as exc:
-        assert exc.status_code == 409
-        assert "First Product" in str(exc.detail)
+    )
+    db_session.commit()
+
+    sales_page_path, warning = clients_router._resolve_theme_export_sales_page_path(
+        client_id=client_id,
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+    )
+
+    assert sales_page_path == ""
+    assert warning is not None
+    assert "Theme ZIP downloaded, but sales page was not found" in warning
+    assert "First Product" in warning
+    assert "Links were left blank." in warning
 
 
 def test_validate_required_theme_archive_files_in_export_rejects_missing_required_files():
@@ -2027,6 +2184,18 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     assert (
         exported_footer_group_template["sections"]["footer"]["type"] == "a-footer"
     )
+    footer_blocks = exported_footer_group_template["sections"]["ss_footer_4_9rJacA"][
+        "blocks"
+    ]
+    track_order_tab = next(
+        (
+            block
+            for block in footer_blocks.values()
+            if block.get("settings", {}).get("title") == "Track Your Order"
+        ),
+        None,
+    )
+    assert track_order_tab is None
     assert (
         exported_header_group_template["sections"]["header"]["type"] == "a-header"
     )
@@ -2562,6 +2731,139 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
         entry.startswith("assets/") and entry.endswith("workspace-brand.css")
         for entry in archive.namelist()
     )
+
+
+def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_page(
+    api_client, db_session, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    db_session.add(
+        Product(
+            org_id=client.org_id,
+            client_id=client.id,
+            title="The Honest Herbalist",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="futrgroup2-0theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    db_session.add(
+        ShopifyThemeTemplateDraftVersion(
+            draft_id=draft.id,
+            org_id=client.org_id,
+            client_id=client.id,
+            version_number=1,
+            source="build_job",
+            payload={
+                "shopDomain": "example.myshopify.com",
+                "workspaceName": "Acme Workspace",
+                "designSystemId": "design-system-1",
+                "designSystemName": "Acme DS",
+                "brandName": "Draft Snapshot Brand",
+                "logoAssetPublicId": str(uuid4()),
+                "logoUrl": "https://assets.example.com/public/assets/logo-1",
+                "themeId": "gid://shopify/OnlineStoreTheme/123",
+                "themeName": "futrgroup2-0theme",
+                "themeRole": "MAIN",
+                "cssVars": {"--color-brand": "#123456"},
+                "fontUrls": [],
+                "dataTheme": "light",
+                "productId": None,
+                "componentImageAssetMap": {},
+                "componentTextValues": {},
+                "imageSlots": [],
+                "textSlots": [],
+                "metadata": {},
+            },
+            created_by_user_external_id="test-user",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    def fake_sync_compliance_for_export(
+        *,
+        client_id: str,
+        shop_domain: str | None,
+        auth,
+        session,
+        sync_to_shopify: bool = True,
+    ):
+        assert sync_to_shopify is False
+        return {
+            "rulesetVersion": "meta_tiktok_compliance_ruleset_v1",
+            "shopDomain": "example.myshopify.com",
+            "pages": [],
+            "updatedProfileUrls": {},
+            "renderedPages": [],
+        }
+
+    def fake_resolve_latest_snapshot(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        design_system_id: str,
+    ):
+        assert session is not None
+        assert org_id == str(client.org_id)
+        assert client_id
+        assert design_system_id == "design-system-1"
+        return (
+            "Latest Brand Name",
+            "latest-logo",
+            "https://assets.example.com/public/assets/latest-logo",
+            {
+                "--color-brand": "#654321",
+                "--color-page-bg-secondary": "#f4efe7",
+            },
+            [],
+            "dark",
+        )
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_latest_template_publish_design_system_snapshot",
+        fake_resolve_latest_snapshot,
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "_sync_compliance_policy_pages_for_template_export",
+        fake_sync_compliance_for_export,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/template/export-zip",
+        json={"draftId": str(draft.id)},
+    )
+
+    assert response.status_code == 200
+    notice_header = response.headers.get("x-marketi-theme-export-notice")
+    assert notice_header is not None
+    assert "Theme ZIP downloaded, but sales page was not found" in notice_header
+    assert "The Honest Herbalist" in notice_header
+    assert "Links were left blank." in notice_header
+
+    archive = zipfile.ZipFile(io.BytesIO(response.content))
+    product_card_content = archive.read("snippets/product-card.liquid").decode("utf-8")
+    assert product_card_content.count('href=""') == 3
 
 
 def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(

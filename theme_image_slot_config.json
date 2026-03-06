@@ -180,6 +180,8 @@
         "key": "image",
         "role": "hero",
         "recommendedAspect": "landscape",
+        "promptAspectRatio": "16:9",
+        "promptRenderHint": "Render target: desktop collection hero frame at 1920x1080 (16:9). Keep the image full-bleed edge-to-edge with no borders, letterboxing, or embedded frames. Reserve a clean header-safe strip across the full top width: approximately 1920x180 (top ~17% of height) with low visual detail so the storefront header/navigation remains readable. Keep the main subject below this strip and compose for a natural, forest-forward scene (trees, foliage, outdoor light) with no on-image text, logos, or UI.",
         "allowMissing": true
       },
       {
@@ -187,6 +189,8 @@
         "key": "image_mobile",
         "role": "hero",
         "recommendedAspect": "landscape",
+        "promptAspectRatio": "9:16",
+        "promptRenderHint": "Render target: mobile collection hero frame at 1080x1920 (9:16). Keep the image full-bleed edge-to-edge with no borders, letterboxing, or embedded frames. Reserve a clean header-safe strip across the full top width: approximately 1080x280 (top ~15% of height) with low visual detail so the mobile header/navigation remains readable. Keep the primary subject in the middle-lower area and compose for a nature-oriented forest scene (woodland textures, leaves, natural light) with no on-image text, logos, or UI.",
         "allowMissing": true
       },
       {

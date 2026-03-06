@@ -8,10 +8,10 @@ single-app architecture (no separate internal Shopify app).
 ## 1) Pre-flight (must be true before submission)
 
 1. Stable production domain is live (no ngrok for review):
-   - `https://shopify.moshq.app`
+   - `https://app.moshq.app`
 2. App config values are deployed and correct:
-   - `application_url`: `https://shopify.moshq.app/`
-   - OAuth callback: `https://shopify.moshq.app/auth/callback`
+   - `application_url`: `https://app.moshq.app/`
+   - OAuth callback: `https://app.moshq.app/auth/callback`
 3. Embedded app entry is reachable in Shopify admin:
    - `GET /app` loads inside admin iframe.
 4. Compliance webhook endpoint is live:
@@ -28,9 +28,9 @@ single-app architecture (no separate internal Shopify app).
 In Partner Dashboard -> your app -> **App setup**:
 
 1. `App URL`:
-   - `https://shopify.moshq.app/`
+   - `https://app.moshq.app/`
 2. `Allowed redirection URL(s)`:
-   - `https://shopify.moshq.app/auth/callback`
+   - `https://app.moshq.app/auth/callback`
 3. Embedded app:
    - Enabled (`embedded = true`)
 4. Admin API scopes:

@@ -200,11 +200,21 @@ _THEME_FEATURE_HIGHLIGHT_MANAGED_TEXT_SLOT_PATHS: frozenset[str] = frozenset(
     for path in card_paths
 )
 _THEME_RICH_TEXT_SECTION_FILENAME = "sections/rich-text.liquid"
+_THEME_FOOTER_GROUP_FILENAME = "sections/footer-group.json"
+_THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
 _THEME_INDEX_TEMPLATE_FILENAME = "templates/index.json"
 _THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
 _THEME_MAIN_PAGE_BUTTON_LINK_KEYS: frozenset[str] = frozenset({"button_link", "button_url"})
 _THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE = re.compile(
     r'href="\{\{\s*product_url\s*\}\}"',
+    re.IGNORECASE,
+)
+_THEME_TRACK_ORDER_TITLE_RE = re.compile(
+    r"^\s*track\s+(?:your|my)\s+order\s*$",
+    re.IGNORECASE,
+)
+_THEME_TRACK_ORDER_LINK_HREF_RE = re.compile(
+    r'href\s*=\s*["\']/pages/(?:track-order|track-your-order)["\']',
     re.IGNORECASE,
 )
 _THEME_EXPORT_REQUIRED_TEMPLATE_FILES: tuple[str, ...] = (
@@ -517,7 +527,7 @@ def _resolve_theme_export_sales_page_path(
     client_id: str,
     auth: AuthContext,
     session: Session,
-) -> str:
+) -> tuple[str, str | None]:
     product = session.scalars(
         select(Product)
         .where(Product.org_id == auth.org_id, Product.client_id == client_id)
@@ -534,7 +544,7 @@ def _resolve_theme_export_sales_page_path(
         )
 
     try:
-        product_slug = require_product_route_slug(product=product)
+        require_product_route_slug(product=product)
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -544,55 +554,89 @@ def _resolve_theme_export_sales_page_path(
             ),
         ) from exc
 
-    sales_page = session.execute(
-        select(Funnel.route_slug, FunnelPage.slug)
-        .join(FunnelPage, FunnelPage.funnel_id == Funnel.id)
-        .where(
-            Funnel.org_id == auth.org_id,
-            Funnel.client_id == client_id,
-            Funnel.product_id == product.id,
-            Funnel.status.in_((FunnelStatusEnum.draft, FunnelStatusEnum.published)),
-            FunnelPage.template_id == "sales-pdp",
+    def _find_latest_sales_page_for_product(
+        *,
+        product_id: str | None,
+    ) -> Any | None:
+        query = (
+            select(Product, Funnel.route_slug, FunnelPage.slug)
+            .join(Funnel, Funnel.product_id == Product.id)
+            .join(FunnelPage, FunnelPage.funnel_id == Funnel.id)
+            .where(
+                Funnel.org_id == auth.org_id,
+                Funnel.client_id == client_id,
+                Funnel.status.in_((FunnelStatusEnum.draft, FunnelStatusEnum.published)),
+                FunnelPage.template_id == "sales-pdp",
+            )
+            .order_by(
+                FunnelPage.created_at.desc(),
+                FunnelPage.id.desc(),
+                Funnel.created_at.desc(),
+                Funnel.id.desc(),
+                FunnelPage.ordering.desc(),
+            )
+            .limit(1)
         )
-        .order_by(
-            Funnel.created_at.asc(),
-            Funnel.id.asc(),
-            FunnelPage.ordering.asc(),
-            FunnelPage.created_at.asc(),
-            FunnelPage.id.asc(),
-        )
-        .limit(1)
-    ).first()
-    if not sales_page:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Theme ZIP export requires a sales page for the first workspace product "
-                f"'{product.title}'."
-            ),
-        )
+        if product_id is not None:
+            query = query.where(Funnel.product_id == product_id)
+        return session.execute(query).first()
 
-    funnel_slug = str(sales_page.route_slug or "").strip()
-    if not funnel_slug:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Theme ZIP export could not resolve a funnel route slug for the first "
-                f"workspace product '{product.title}'."
-            ),
-        )
+    def _build_sales_page_path(
+        *,
+        target_product: Product,
+        route_slug: Any,
+        page_slug: Any,
+    ) -> str | None:
+        target_funnel_slug = str(route_slug or "").strip()
+        target_page_slug = str(page_slug or "").strip()
+        if not target_funnel_slug or not target_page_slug:
+            return None
+        try:
+            target_product_slug = require_product_route_slug(product=target_product)
+        except ValueError:
+            return None
+        return f"/f/{target_product_slug}/{target_funnel_slug}/{target_page_slug}"
 
-    page_slug = str(sales_page.slug or "").strip()
-    if not page_slug:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Theme ZIP export could not resolve a sales page slug for the first "
-                f"workspace product '{product.title}'."
-            ),
-        )
+    first_product_sales_page = _find_latest_sales_page_for_product(product_id=product.id)
+    if first_product_sales_page is not None:
+        first_product_record, first_route_slug, first_page_slug = first_product_sales_page
+        if isinstance(first_product_record, Product):
+            first_product_sales_page_path = _build_sales_page_path(
+                target_product=first_product_record,
+                route_slug=first_route_slug,
+                page_slug=first_page_slug,
+            )
+            if first_product_sales_page_path:
+                return first_product_sales_page_path, None
 
-    return f"/f/{product_slug}/{funnel_slug}/{page_slug}"
+    latest_workspace_sales_page = _find_latest_sales_page_for_product(product_id=None)
+    if latest_workspace_sales_page is not None:
+        workspace_product, workspace_route_slug, workspace_page_slug = (
+            latest_workspace_sales_page
+        )
+        if isinstance(workspace_product, Product):
+            workspace_sales_page_path = _build_sales_page_path(
+                target_product=workspace_product,
+                route_slug=workspace_route_slug,
+                page_slug=workspace_page_slug,
+            )
+            if workspace_sales_page_path:
+                return (
+                    workspace_sales_page_path,
+                    (
+                        "Theme ZIP downloaded, but sales page was not found for the first "
+                        f"workspace product '{product.title}'. Using latest available sales page "
+                        f"from workspace product '{workspace_product.title}'."
+                    ),
+                )
+
+    return (
+        "",
+        (
+            "Theme ZIP downloaded, but sales page was not found for the first "
+            f"workspace product '{product.title}'. Links were left blank."
+        ),
+    )
 
 
 def _normalize_theme_export_main_page_button_links(
@@ -701,6 +745,58 @@ def _normalize_theme_export_rich_text_section_content(
         flags=re.IGNORECASE,
     )
     return normalized
+
+
+def _normalize_theme_export_track_order_links(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    normalized = content
+    if filename == _THEME_HEADER_DRAWER_FILENAME:
+        normalized = _THEME_TRACK_ORDER_LINK_HREF_RE.sub(
+            'href="/pages/contact"',
+            normalized,
+        )
+
+    if filename != _THEME_FOOTER_GROUP_FILENAME:
+        return normalized
+
+    template_data = _parse_theme_export_template_json(
+        filename=filename,
+        content=normalized,
+    )
+    sections = template_data.get("sections")
+    if not isinstance(sections, dict):
+        return normalized
+
+    changed = False
+    for section in sections.values():
+        if not isinstance(section, dict):
+            continue
+        blocks = section.get("blocks")
+        if not isinstance(blocks, dict):
+            continue
+        block_keys_to_remove: list[str] = []
+        for block_key, block in blocks.items():
+            if not isinstance(block, dict):
+                continue
+            settings = block.get("settings")
+            if not isinstance(settings, dict):
+                continue
+            title = settings.get("title")
+            if not isinstance(title, str) or not _THEME_TRACK_ORDER_TITLE_RE.match(
+                title.strip()
+            ):
+                continue
+            block_keys_to_remove.append(block_key)
+        for block_key in block_keys_to_remove:
+            blocks.pop(block_key, None)
+            changed = True
+
+    if not changed:
+        return normalized
+    return json.dumps(template_data, separators=(",", ":"))
 
 
 def _normalize_local_theme_shop_domain(*, shop_domain: str | None) -> str:
@@ -1851,6 +1947,10 @@ def _normalize_theme_export_text_file_content(
         filename=filename,
         content=normalized,
         sales_page_path=sales_page_path,
+    )
+    normalized = _normalize_theme_export_track_order_links(
+        filename=filename,
+        content=normalized,
     )
     return normalized
 
@@ -6269,26 +6369,35 @@ def _compliance_profile_placeholder_values(
     return values
 
 
+_DEFAULT_TEMPLATE_EXPORT_PAGE_KEYS: tuple[str, ...] = (
+    "privacy_policy",
+    "returns_refunds_policy",
+    "shipping_policy",
+    "terms_of_service",
+)
+
+
 def _select_compliance_page_keys_for_template_export(
     *, requirements: dict[str, Any]
 ) -> list[str]:
-    selected_by_ruleset: list[str] = []
-    for page in requirements["pages"]:
-        classification = page["classification"]
-        if classification == "required":
-            selected_by_ruleset.append(page["pageKey"])
+    classification_by_page_key = {
+        page["pageKey"]: page["classification"]
+        for page in requirements["pages"]
+    }
+    selected_default: list[str] = []
+    for page_key in _DEFAULT_TEMPLATE_EXPORT_PAGE_KEYS:
+        if classification_by_page_key.get(page_key) == "not_applicable":
             continue
-        if classification == "strongly_recommended":
-            selected_by_ruleset.append(page["pageKey"])
-    if not selected_by_ruleset:
+        selected_default.append(page_key)
+    if not selected_default:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "No required or strongly recommended compliance pages are applicable for this workspace "
+                "No default compliance policy pages are applicable for this workspace "
                 "profile. Update the compliance profile business models first."
             ),
         )
-    return selected_by_ruleset
+    return selected_default
 
 
 def _sync_compliance_policy_pages_for_template_export(
@@ -6538,11 +6647,17 @@ def _build_shopify_theme_template_export_zip_response(
         if isinstance(draft_data.themeRole, str) and draft_data.themeRole.strip()
         else default_theme_role
     )
-    sales_page_path = _resolve_theme_export_sales_page_path(
+    sales_page_path_resolution = _resolve_theme_export_sales_page_path(
         client_id=client_id,
         auth=auth,
         session=session,
     )
+    if isinstance(sales_page_path_resolution, tuple):
+        sales_page_path, sales_page_warning = sales_page_path_resolution
+    else:
+        # Backward-compatible path for tests that monkeypatch this helper with a raw string.
+        sales_page_path = str(sales_page_path_resolution or "")
+        sales_page_warning = None
     exported = _build_local_shopify_theme_export_payload(
         shop_domain=draft_data.shopDomain,
         workspace_name=draft_data.workspaceName,
@@ -6654,6 +6769,8 @@ def _build_shopify_theme_template_export_zip_response(
     filename_theme = _slugify_theme_export_token(str(exported["themeName"]))
     archive_filename = f"{filename_theme}.zip"
     headers = {"Content-Disposition": f'attachment; filename="{archive_filename}"'}
+    if sales_page_warning:
+        headers["X-Marketi-Theme-Export-Notice"] = sales_page_warning
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",

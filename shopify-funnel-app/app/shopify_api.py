@@ -28,7 +28,87 @@ _THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
 _CATALOG_COLLECTION_HANDLE = "all"
 _CATALOG_COLLECTION_TITLE = "Catalog"
 _SHOP_MENU_TITLE = "Shop"
+_CONTACT_MENU_TITLE = "Contact"
+_HOME_MENU_TITLE = "Home"
+_TRACK_ORDER_MENU_TITLE = "Track Your Order"
 _DEFAULT_STORE_NAVIGATION_MENU_HANDLE = "main-menu"
+_DEFAULT_FOOTER_QUICK_LINKS_MENU_HANDLE = "footer"
+_MANAGED_POLICY_PAGE_HANDLES = frozenset(
+    {
+        "privacy-policy",
+        "returns-refunds-policy",
+        "shipping-policy",
+        "terms-of-service",
+        "contact-support",
+        "company-information",
+        "subscription-terms-and-cancellation",
+    }
+)
+_MANAGED_POLICY_CANONICAL_PATHS = frozenset(
+    f"/pages/{handle}" for handle in _MANAGED_POLICY_PAGE_HANDLES
+)
+_DEFAULT_FOOTER_QUICK_LINK_CANONICAL_PATHS = frozenset(
+    {
+        "/",
+        f"/collections/{_CATALOG_COLLECTION_HANDLE}",
+        "/pages/contact",
+    }
+)
+_POLICY_MENU_SEARCH_PATH = "/search"
+_POLICY_MENU_SEARCH_TITLE = "Search"
+_DEFAULT_MAIN_MENU_ITEMS: tuple[dict[str, Any], ...] = (
+    {
+        "title": _HOME_MENU_TITLE,
+        "type": "HTTP",
+        "url": "/",
+        "resourceId": None,
+        "aliases": ("home",),
+    },
+    {
+        "title": _SHOP_MENU_TITLE,
+        "type": "HTTP",
+        "url": "/collections/all",
+        "resourceId": None,
+        "aliases": ("shop", "catalog"),
+    },
+    {
+        "title": _CONTACT_MENU_TITLE,
+        "type": "HTTP",
+        "url": "/pages/contact",
+        "resourceId": None,
+        "aliases": ("contact",),
+    },
+    {
+        "title": _TRACK_ORDER_MENU_TITLE,
+        "type": "HTTP",
+        "url": "/pages/contact",
+        "resourceId": None,
+        "aliases": ("track your order", "track my order"),
+    },
+)
+_DEFAULT_FOOTER_QUICK_LINKS_ITEMS: tuple[dict[str, Any], ...] = (
+    {
+        "title": _HOME_MENU_TITLE,
+        "type": "HTTP",
+        "url": "/",
+        "resourceId": None,
+        "aliases": ("home",),
+    },
+    {
+        "title": _SHOP_MENU_TITLE,
+        "type": "HTTP",
+        "url": "/collections/all",
+        "resourceId": None,
+        "aliases": ("shop", "catalog"),
+    },
+    {
+        "title": _CONTACT_MENU_TITLE,
+        "type": "HTTP",
+        "url": "/pages/contact",
+        "resourceId": None,
+        "aliases": ("contact",),
+    },
+)
 _GRAPHQL_MAX_PAGE_SIZE = 250
 _COLLECTION_ADD_PRODUCTS_BATCH_SIZE = 50
 _THEME_BRAND_MARKER_START = "<!-- MOS_WORKSPACE_BRAND_START -->"
@@ -3473,63 +3553,51 @@ class ShopifyApiClient:
         return deduped_items, changed
 
     @staticmethod
-    def _menu_item_matches_catalog_title(*, item: dict[str, Any]) -> bool:
-        title = item.get("title")
-        return (
-            isinstance(title, str)
-            and title.strip().lower() == _CATALOG_COLLECTION_TITLE.lower()
-        )
-
-    @staticmethod
-    def _menu_item_matches_shop_title(*, item: dict[str, Any]) -> bool:
-        title = item.get("title")
-        return (
-            isinstance(title, str)
-            and title.strip().lower() == _SHOP_MENU_TITLE.lower()
-        )
+    def _normalize_menu_item_title_for_matching(*, title: Any) -> str | None:
+        if not isinstance(title, str):
+            return None
+        normalized_title = " ".join(title.strip().split()).lower()
+        if not normalized_title:
+            return None
+        return normalized_title
 
     @classmethod
-    def _normalize_storefront_shop_menu_item(
-        cls,
-        *,
-        item: dict[str, Any],
-    ) -> tuple[dict[str, Any], bool]:
-        changed = False
-        target_url = f"/collections/{_CATALOG_COLLECTION_HANDLE}"
-
-        if item.get("type") != "HTTP":
-            item["type"] = "HTTP"
-            changed = True
-        if item.get("url") != target_url:
-            item["url"] = target_url
-            changed = True
-        if item.get("resourceId") is not None:
-            item["resourceId"] = None
-            changed = True
-
-        return item, changed
-
-    @classmethod
-    def _normalize_catalog_menu_items(
+    def _find_matching_menu_item_index(
         cls,
         *,
         menu_items: list[dict[str, Any]],
-    ) -> tuple[list[dict[str, Any]], bool]:
-        next_items: list[dict[str, Any]] = []
-        changed = False
-        shop_title_present = any(
-            isinstance(item, dict) and cls._menu_item_matches_shop_title(item=item)
-            for item in menu_items
-        )
-        preserved_shop_entry = shop_title_present
+        aliases: tuple[str, ...],
+        used_indexes: set[int],
+    ) -> int | None:
+        normalized_aliases = {
+            alias.strip().lower() for alias in aliases if isinstance(alias, str)
+        }
+        if not normalized_aliases:
+            return None
+        for index, item in enumerate(menu_items):
+            if index in used_indexes:
+                continue
+            normalized_title = cls._normalize_menu_item_title_for_matching(
+                title=item.get("title")
+            )
+            if normalized_title in normalized_aliases:
+                return index
+        return None
 
+    @classmethod
+    def _normalize_required_navigation_menu_items(
+        cls,
+        *,
+        menu_items: list[dict[str, Any]],
+        required_items: tuple[dict[str, Any], ...],
+    ) -> tuple[list[dict[str, Any]], bool]:
+        validated_items: list[dict[str, Any]] = []
         for item in menu_items:
             if not isinstance(item, dict):
                 raise ShopifyApiError(
                     message="Cannot sync storefront navigation because a menu item is invalid.",
                     status_code=409,
                 )
-
             next_item = deepcopy(item)
             raw_children = next_item.get("items")
             if raw_children is not None and not isinstance(raw_children, list):
@@ -3540,35 +3608,106 @@ class ShopifyApiClient:
                     ),
                     status_code=409,
                 )
+            validated_items.append(next_item)
 
-            if cls._menu_item_matches_shop_title(item=next_item):
-                next_item, item_changed = cls._normalize_storefront_shop_menu_item(
-                    item=next_item
+        next_items: list[dict[str, Any]] = []
+        used_indexes: set[int] = set()
+        selected_indexes: list[int] = []
+        changed = False
+
+        for required_item in required_items:
+            required_title = required_item["title"]
+            required_type = required_item["type"]
+            required_url = required_item["url"]
+            required_resource_id = required_item["resourceId"]
+            aliases = tuple(required_item.get("aliases") or ())
+
+            matching_index = cls._find_matching_menu_item_index(
+                menu_items=validated_items,
+                aliases=aliases,
+                used_indexes=used_indexes,
+            )
+            if matching_index is None:
+                next_items.append(
+                    {
+                        "title": required_title,
+                        "type": required_type,
+                        "url": required_url,
+                        "resourceId": required_resource_id,
+                        "tags": [],
+                        "items": [],
+                    }
                 )
-                if item_changed:
-                    changed = True
-                preserved_shop_entry = True
-                next_items.append(next_item)
-                continue
-
-            if cls._menu_item_matches_catalog_title(item=next_item):
-                if not preserved_shop_entry:
-                    next_item["title"] = _SHOP_MENU_TITLE
-                    next_item, item_changed = cls._normalize_storefront_shop_menu_item(
-                        item=next_item
-                    )
-                    preserved_shop_entry = True
-                    changed = True
-                    if item_changed:
-                        changed = True
-                    next_items.append(next_item)
-                    continue
                 changed = True
                 continue
 
+            used_indexes.add(matching_index)
+            selected_indexes.append(matching_index)
+            next_item = validated_items[matching_index]
+            original_type = next_item.get("type")
+            original_url = next_item.get("url")
+            original_resource_id = next_item.get("resourceId")
+
+            if next_item.get("title") != required_title:
+                next_item["title"] = required_title
+                changed = True
+            if next_item.get("type") != required_type:
+                next_item["type"] = required_type
+                changed = True
+            if next_item.get("url") != required_url:
+                next_item["url"] = required_url
+                changed = True
+            if next_item.get("resourceId") != required_resource_id:
+                next_item["resourceId"] = required_resource_id
+                changed = True
+            if next_item.get("items") != []:
+                next_item["items"] = []
+                changed = True
+            if "tags" not in next_item:
+                next_item["tags"] = []
+                changed = True
+
+            if (
+                (
+                    original_type != required_type
+                    or original_url != required_url
+                    or original_resource_id != required_resource_id
+                )
+                and isinstance(next_item.get("id"), str)
+            ):
+                next_item.pop("id", None)
+                changed = True
+
             next_items.append(next_item)
 
+        if len(used_indexes) != len(validated_items):
+            changed = True
+        if selected_indexes != sorted(selected_indexes):
+            changed = True
+
         return next_items, changed
+
+    @classmethod
+    def _normalize_catalog_menu_items(
+        cls,
+        *,
+        menu_items: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], bool]:
+        return cls._normalize_required_navigation_menu_items(
+            menu_items=menu_items,
+            required_items=_DEFAULT_MAIN_MENU_ITEMS,
+        )
+
+    @classmethod
+    def _normalize_footer_quick_links_menu_items(
+        cls,
+        *,
+        menu_items: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], bool]:
+        return cls._normalize_required_navigation_menu_items(
+            menu_items=menu_items,
+            required_items=_DEFAULT_FOOTER_QUICK_LINKS_ITEMS,
+        )
 
     @classmethod
     def _coerce_menu_summary_node(
@@ -3802,19 +3941,79 @@ class ShopifyApiClient:
                     message="Cannot sync footer menu because an existing menu item is invalid.",
                     status_code=409,
                 )
+            normalized_title = title.strip()
+            if not normalized_title:
+                raise ShopifyApiError(
+                    message=(
+                        "Cannot sync footer menu because an existing menu item has "
+                        "an empty title."
+                    ),
+                    status_code=409,
+                )
+            normalized_type = item_type.strip().upper()
+            if not normalized_type:
+                raise ShopifyApiError(
+                    message=(
+                        "Cannot sync footer menu because an existing menu item has "
+                        "an empty type."
+                    ),
+                    status_code=409,
+                )
             converted: dict[str, Any] = {
-                "title": title,
-                "type": item_type,
+                "title": normalized_title,
+                "type": normalized_type,
             }
             item_id = item.get("id")
             if isinstance(item_id, str) and item_id:
                 converted["id"] = item_id
             item_url = item.get("url")
             if isinstance(item_url, str):
-                converted["url"] = item_url
+                normalized_url = item_url.strip()
+                if normalized_url:
+                    converted["url"] = normalized_url
             resource_id = item.get("resourceId")
             if isinstance(resource_id, str):
-                converted["resourceId"] = resource_id
+                normalized_resource_id = resource_id.strip()
+                if normalized_resource_id:
+                    converted["resourceId"] = normalized_resource_id
+
+            has_url = isinstance(converted.get("url"), str)
+            has_resource_id = isinstance(converted.get("resourceId"), str)
+            force_recreate = False
+            if normalized_type == "HTTP":
+                if not has_url:
+                    raise ShopifyApiError(
+                        message=(
+                            "Cannot sync footer menu because menu item "
+                            f"{normalized_title!r} has type HTTP without a URL."
+                        ),
+                        status_code=409,
+                    )
+                if has_resource_id:
+                    # HTTP items should not carry a resource binding in update payloads.
+                    converted.pop("resourceId", None)
+                    has_resource_id = False
+                    force_recreate = True
+            elif has_url:
+                # Keep update payloads URL-based for non-HTTP entries to avoid
+                # resource subject validation failures on menuUpdate.
+                converted["type"] = "HTTP"
+                converted.pop("resourceId", None)
+                has_resource_id = False
+                force_recreate = True
+            elif not has_resource_id:
+                raise ShopifyApiError(
+                    message=(
+                        "Cannot sync footer menu because menu item "
+                        f"{normalized_title!r} (type {normalized_type}) is missing both "
+                        "resourceId and URL."
+                    ),
+                    status_code=409,
+                )
+            if force_recreate:
+                # Recreate items when transitioning resource bindings/types to avoid
+                # Shopify rejecting in-place updates with ambiguous subject errors.
+                converted.pop("id", None)
             tags = item.get("tags")
             if isinstance(tags, list) and all(isinstance(tag, str) for tag in tags):
                 converted["tags"] = tags
@@ -3880,20 +4079,9 @@ class ShopifyApiClient:
         policy_pages: list[dict[str, str]],
     ) -> tuple[list[dict[str, Any]], bool]:
         next_items = deepcopy(menu_items)
-        existing_by_resource_id: dict[str, dict[str, Any]] = {}
-        existing_by_path: dict[str, dict[str, Any]] = {}
-        for item in next_items:
-            resource_id = item.get("resourceId")
-            if isinstance(resource_id, str) and resource_id:
-                existing_by_resource_id.setdefault(resource_id, item)
-            normalized_path = cls._normalize_menu_item_path(item.get("url"))
-            if normalized_path is not None:
-                canonical_path = cls._canonicalize_menu_item_path_for_dedupe(
-                    path=normalized_path
-                )
-                existing_by_path.setdefault(canonical_path, item)
-
-        changed = False
+        normalized_policy_pages: list[dict[str, str]] = []
+        expected_policy_resource_ids: set[str] = set()
+        expected_policy_paths: set[str] = set()
         for policy_page in policy_pages:
             raw_page_id = policy_page.get("pageId")
             raw_title = policy_page.get("title")
@@ -3914,34 +4102,177 @@ class ShopifyApiClient:
                     status_code=409,
                 )
 
-            normalized_path = cls._canonicalize_menu_item_path_for_dedupe(
-                path=cls._build_policy_page_path(handle=raw_handle)
+            expected_path = cls._build_policy_page_path(handle=raw_handle)
+            canonical_path = cls._canonicalize_menu_item_path_for_dedupe(
+                path=expected_path
             )
-            existing_item = existing_by_resource_id.get(raw_page_id)
-            if existing_item is None:
-                existing_item = existing_by_path.get(normalized_path)
+            expected_policy_resource_ids.add(raw_page_id)
+            expected_policy_paths.add(canonical_path)
+            normalized_policy_pages.append(
+                {
+                    "pageId": raw_page_id,
+                    "title": raw_title.strip(),
+                    "handle": raw_handle.strip(),
+                    "path": expected_path,
+                    "canonicalPath": canonical_path,
+                }
+            )
 
-            if existing_item is None:
-                next_items.append(
-                    {
-                        "title": raw_title.strip(),
-                        "type": "PAGE",
-                        "resourceId": raw_page_id,
-                        "items": [],
-                    }
-                )
+        changed = False
+        filtered_items: list[dict[str, Any]] = []
+        for item in next_items:
+            normalized_path = cls._normalize_menu_item_path(item.get("url"))
+            canonical_path = (
+                cls._canonicalize_menu_item_path_for_dedupe(path=normalized_path)
+                if normalized_path is not None
+                else None
+            )
+            if canonical_path in _DEFAULT_FOOTER_QUICK_LINK_CANONICAL_PATHS:
                 changed = True
                 continue
 
-            if existing_item.get("title") != raw_title.strip():
-                existing_item["title"] = raw_title.strip()
+            if canonical_path not in _MANAGED_POLICY_CANONICAL_PATHS:
+                filtered_items.append(item)
+                continue
+
+            resource_id = item.get("resourceId")
+            has_matching_resource_id = (
+                isinstance(resource_id, str) and resource_id in expected_policy_resource_ids
+            )
+            has_matching_path = canonical_path in expected_policy_paths
+            if has_matching_resource_id or has_matching_path:
+                filtered_items.append(item)
+                continue
+
+            changed = True
+        next_items = filtered_items
+
+        existing_by_resource_id: dict[str, dict[str, Any]] = {}
+        existing_by_path: dict[str, dict[str, Any]] = {}
+        for item in next_items:
+            resource_id = item.get("resourceId")
+            if isinstance(resource_id, str) and resource_id:
+                existing_by_resource_id.setdefault(resource_id, item)
+            normalized_path = cls._normalize_menu_item_path(item.get("url"))
+            if normalized_path is not None:
+                canonical_path = cls._canonicalize_menu_item_path_for_dedupe(
+                    path=normalized_path
+                )
+                existing_by_path.setdefault(canonical_path, item)
+
+        for policy_page in normalized_policy_pages:
+            page_id = policy_page["pageId"]
+            title = policy_page["title"]
+            path = policy_page["path"]
+            canonical_path = policy_page["canonicalPath"]
+            existing_item = existing_by_resource_id.get(page_id)
+            if existing_item is None:
+                existing_item = existing_by_path.get(canonical_path)
+
+            if existing_item is None:
+                existing_item = {
+                    "title": title,
+                    "type": "PAGE",
+                    "url": path,
+                    "resourceId": page_id,
+                    "items": [],
+                }
+                next_items.append(existing_item)
+                existing_by_resource_id[page_id] = existing_item
+                existing_by_path[canonical_path] = existing_item
+                changed = True
+
+            if existing_item.get("title") != title:
+                existing_item["title"] = title
                 changed = True
             if existing_item.get("type") != "PAGE":
                 existing_item["type"] = "PAGE"
                 changed = True
-            if existing_item.get("resourceId") != raw_page_id:
-                existing_item["resourceId"] = raw_page_id
+            if existing_item.get("resourceId") != page_id:
+                existing_item["resourceId"] = page_id
                 changed = True
+            if existing_item.get("url") != path:
+                existing_item["url"] = path
+                changed = True
+
+        search_item: dict[str, Any] | None = None
+        for item in next_items:
+            normalized_path = cls._normalize_menu_item_path(item.get("url"))
+            if normalized_path != _POLICY_MENU_SEARCH_PATH:
+                continue
+            search_item = item
+            break
+        if search_item is None:
+            next_items.append(
+                {
+                    "title": _POLICY_MENU_SEARCH_TITLE,
+                    "type": "HTTP",
+                    "url": _POLICY_MENU_SEARCH_PATH,
+                    "resourceId": None,
+                    "items": [],
+                }
+            )
+            changed = True
+        else:
+            if search_item.get("title") != _POLICY_MENU_SEARCH_TITLE:
+                search_item["title"] = _POLICY_MENU_SEARCH_TITLE
+                changed = True
+            if search_item.get("type") != "HTTP":
+                search_item["type"] = "HTTP"
+                changed = True
+            if search_item.get("url") != _POLICY_MENU_SEARCH_PATH:
+                search_item["url"] = _POLICY_MENU_SEARCH_PATH
+                changed = True
+            if search_item.get("resourceId") is not None:
+                search_item["resourceId"] = None
+                changed = True
+            if search_item.get("items") != []:
+                search_item["items"] = []
+                changed = True
+
+        selected_policy_indexes: list[int] = []
+        used_policy_indexes: set[int] = set()
+        for policy_page in normalized_policy_pages:
+            page_id = policy_page["pageId"]
+            canonical_path = policy_page["canonicalPath"]
+            for index, item in enumerate(next_items):
+                if index in used_policy_indexes:
+                    continue
+                resource_id = item.get("resourceId")
+                if isinstance(resource_id, str) and resource_id == page_id:
+                    selected_policy_indexes.append(index)
+                    used_policy_indexes.add(index)
+                    break
+                normalized_path = cls._normalize_menu_item_path(item.get("url"))
+                if normalized_path is None:
+                    continue
+                item_canonical_path = cls._canonicalize_menu_item_path_for_dedupe(
+                    path=normalized_path
+                )
+                if item_canonical_path == canonical_path:
+                    selected_policy_indexes.append(index)
+                    used_policy_indexes.add(index)
+                    break
+
+        if selected_policy_indexes:
+            reordered_items: list[dict[str, Any]] = []
+            for index, item in enumerate(next_items):
+                if index in used_policy_indexes:
+                    continue
+                normalized_path = cls._normalize_menu_item_path(item.get("url"))
+                canonical_path = (
+                    cls._canonicalize_menu_item_path_for_dedupe(path=normalized_path)
+                    if normalized_path is not None
+                    else None
+                )
+                if canonical_path in expected_policy_paths:
+                    changed = True
+                    continue
+                reordered_items.append(item)
+            reordered_items.extend(next_items[index] for index in selected_policy_indexes)
+            if reordered_items != next_items:
+                changed = True
+                next_items = reordered_items
 
         deduped_items, dedupe_changed = cls._dedupe_menu_items(menu_items=next_items)
         if dedupe_changed:
@@ -4297,55 +4628,89 @@ class ShopifyApiClient:
             shop_domain=shop_domain,
             access_token=access_token,
         )
-        matching_menus = [
-            menu
-            for menu in all_menus
-            if menu["handle"] == _DEFAULT_STORE_NAVIGATION_MENU_HANDLE
-        ]
-        if not matching_menus:
-            return {
-                "handle": _DEFAULT_STORE_NAVIGATION_MENU_HANDLE,
-                "updated": False,
-                "reason": "menu_not_found",
-            }
-        if len(matching_menus) > 1:
-            menu_ids = ", ".join(menu["id"] for menu in matching_menus)
-            raise ShopifyApiError(
-                message=(
-                    "Multiple menus matched the default storefront navigation handle. "
-                    f"handle={_DEFAULT_STORE_NAVIGATION_MENU_HANDLE}, matchedMenuIds={menu_ids}"
-                ),
-                status_code=409,
+        menu_definitions: tuple[tuple[str, str], ...] = (
+            (_DEFAULT_STORE_NAVIGATION_MENU_HANDLE, "main"),
+            (_DEFAULT_FOOTER_QUICK_LINKS_MENU_HANDLE, "footer"),
+        )
+        menu_summaries_by_handle: dict[str, list[dict[str, str]]] = {}
+        for menu in all_menus:
+            menu_summaries_by_handle.setdefault(menu["handle"], []).append(menu)
+
+        menu_results: list[dict[str, Any]] = []
+        for menu_handle, menu_kind in menu_definitions:
+            matching_menus = menu_summaries_by_handle.get(menu_handle, [])
+            if not matching_menus:
+                menu_results.append(
+                    {
+                        "handle": menu_handle,
+                        "updated": False,
+                        "reason": "menu_not_found",
+                    }
+                )
+                continue
+            if len(matching_menus) > 1:
+                menu_ids = ", ".join(menu["id"] for menu in matching_menus)
+                raise ShopifyApiError(
+                    message=(
+                        "Multiple menus matched the default storefront navigation handle. "
+                        f"handle={menu_handle}, matchedMenuIds={menu_ids}"
+                    ),
+                    status_code=409,
+                )
+
+            menu_summary = matching_menus[0]
+            menu_details = await self._load_menu_details(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                menu_id=menu_summary["id"],
+            )
+            if menu_kind == "main":
+                next_items, changed = self._normalize_catalog_menu_items(
+                    menu_items=menu_details["items"]
+                )
+            else:
+                next_items, changed = self._normalize_footer_quick_links_menu_items(
+                    menu_items=menu_details["items"]
+                )
+            if not changed:
+                menu_results.append(
+                    {
+                        "handle": menu_details["handle"],
+                        "updated": False,
+                        "reason": "already_normalized",
+                    }
+                )
+                continue
+
+            await self._update_menu(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                menu_id=menu_details["id"],
+                title=menu_details["title"],
+                handle=menu_details["handle"],
+                items=next_items,
+            )
+            menu_results.append(
+                {
+                    "handle": menu_details["handle"],
+                    "updated": True,
+                    "reason": "normalized",
+                }
             )
 
-        menu_summary = matching_menus[0]
-        menu_details = await self._load_menu_details(
-            shop_domain=shop_domain,
-            access_token=access_token,
-            menu_id=menu_summary["id"],
-        )
-        next_items, changed = self._normalize_catalog_menu_items(
-            menu_items=menu_details["items"]
-        )
-        if not changed:
-            return {
-                "handle": menu_details["handle"],
-                "updated": False,
-                "reason": "catalog_not_present",
-            }
+        updated = any(result["updated"] for result in menu_results)
+        if updated:
+            reason = "catalog_normalized"
+        elif all(result["reason"] == "menu_not_found" for result in menu_results):
+            reason = "menu_not_found"
+        else:
+            reason = "catalog_not_present"
 
-        await self._update_menu(
-            shop_domain=shop_domain,
-            access_token=access_token,
-            menu_id=menu_details["id"],
-            title=menu_details["title"],
-            handle=menu_details["handle"],
-            items=next_items,
-        )
         return {
-            "handle": menu_details["handle"],
-            "updated": True,
-            "reason": "catalog_normalized",
+            "handle": _DEFAULT_STORE_NAVIGATION_MENU_HANDLE,
+            "updated": updated,
+            "reason": reason,
+            "menuResults": menu_results,
         }
 
     async def _sync_policy_pages_to_footer_menus(
@@ -4475,7 +4840,16 @@ class ShopifyApiClient:
     ) -> None:
         if not user_errors:
             return
-        messages = "; ".join(str(error.get("message")) for error in user_errors)
+        formatted_errors: list[str] = []
+        for error in user_errors:
+            message = str(error.get("message"))
+            field = error.get("field")
+            if isinstance(field, list) and field:
+                field_path = ".".join(str(part) for part in field)
+                formatted_errors.append(f"{message} (field: {field_path})")
+            else:
+                formatted_errors.append(message)
+        messages = "; ".join(formatted_errors)
         raise ShopifyApiError(
             message=f"{mutation_name} failed: {messages}", status_code=409
         )
@@ -7749,22 +8123,8 @@ class ShopifyApiClient:
             count=1,
         )
 
-        # Keep the remaining cart control as a plain link (disable cart drawer trigger attrs/classes).
-        updated_content = re.sub(
-            r"\bcart-drawer-button\b",
-            "cart-link-button",
-            updated_content,
-        )
-        updated_content = re.sub(
-            r'\saria-controls="CartDrawer"',
-            "",
-            updated_content,
-        )
-        updated_content = re.sub(
-            r'\saria-expanded="false"',
-            "",
-            updated_content,
-        )
+        # Keep the native cart drawer trigger wiring on the remaining cart control.
+        # Some storefront scripts bind cart state updates and drawer state to those hooks.
 
         # Render icon/count only in the top-right cart control.
         updated_content = re.sub(

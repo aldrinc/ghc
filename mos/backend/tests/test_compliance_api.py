@@ -254,22 +254,6 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
                     "url": "https://example.myshopify.com/pages/shipping-policy",
                     "operation": "updated",
                 },
-                {
-                    "pageKey": "contact_support",
-                    "pageId": "gid://shopify/Page/105",
-                    "title": "Contact and Support",
-                    "handle": "contact-support",
-                    "url": "https://example.myshopify.com/pages/contact-support",
-                    "operation": "updated",
-                },
-                {
-                    "pageKey": "company_information",
-                    "pageId": "gid://shopify/Page/106",
-                    "title": "Company Information",
-                    "handle": "company-information",
-                    "url": "https://example.myshopify.com/pages/company-information",
-                    "operation": "updated",
-                },
             ],
         }
 
@@ -283,7 +267,7 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
 
     body = sync_response.json()
     assert body["shopDomain"] == "example.myshopify.com"
-    assert len(body["pages"]) == 6
+    assert len(body["pages"]) == 4
     assert observed["client_id"] == client_id
     assert observed["shop_domain"] is None
     assert set(observed["page_keys"]) == {
@@ -291,8 +275,6 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
         "terms_of_service",
         "returns_refunds_policy",
         "shipping_policy",
-        "contact_support",
-        "company_information",
     }
     page_map = {page["pageKey"]: page for page in observed["pages"]}  # type: ignore[index]
     assert "Compliance Workspace" in page_map["privacy_policy"]["bodyHtml"]
@@ -304,8 +286,6 @@ def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client
     assert profile["termsOfServiceUrl"] == "https://example.myshopify.com/pages/terms-of-service"
     assert profile["returnsRefundsPolicyUrl"] == "https://example.myshopify.com/pages/returns-refunds-policy"
     assert profile["shippingPolicyUrl"] == "https://example.myshopify.com/pages/shipping-policy"
-    assert profile["contactSupportUrl"] == "https://example.myshopify.com/pages/contact-support"
-    assert profile["companyInformationUrl"] == "https://example.myshopify.com/pages/company-information"
 
 
 def test_sync_compliance_policy_pages_requires_placeholder_values(api_client):
@@ -450,9 +430,6 @@ def test_sync_compliance_policy_pages_for_subscription_model(api_client, monkeyp
         "privacy_policy",
         "terms_of_service",
         "returns_refunds_policy",
-        "contact_support",
-        "company_information",
-        "subscription_terms_and_cancellation",
     }
     assert "shipping_policy" not in set(observed["page_keys"])
 
@@ -460,10 +437,6 @@ def test_sync_compliance_policy_pages_for_subscription_model(api_client, monkeyp
     assert profile_response.status_code == 200
     profile = profile_response.json()
     assert profile["shippingPolicyUrl"] is None
-    assert profile["subscriptionTermsAndCancellationUrl"] == (
-        "https://example.myshopify.com/pages/subscription-terms-and-cancellation"
-    )
-    assert profile["contactSupportUrl"] == "https://example.myshopify.com/pages/contact-support"
     assert profile["returnsRefundsPolicyUrl"] == "https://example.myshopify.com/pages/returns-refunds-policy"
 
 
@@ -501,7 +474,4 @@ def test_sync_compliance_policy_pages_for_ecommerce_and_subscription_includes_al
         "terms_of_service",
         "returns_refunds_policy",
         "shipping_policy",
-        "contact_support",
-        "company_information",
-        "subscription_terms_and_cancellation",
     }
