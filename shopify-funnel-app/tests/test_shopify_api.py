@@ -325,7 +325,7 @@ def test_ensure_catalog_collection_route_is_available_creates_and_publishes_coll
     }
 
 
-def test_ensure_product_in_catalog_collection_adds_product_without_full_resync():
+def test_ensure_catalog_collection_contains_products_adds_only_missing_targets():
     client = ShopifyApiClient()
     observed: dict[str, Any] = {}
 
@@ -345,6 +345,15 @@ def test_ensure_product_in_catalog_collection_adds_product_without_full_resync()
             "addedProductCount": 0,
         }
 
+    async def fake_list_collection_product_ids(
+        *,
+        shop_domain: str,
+        access_token: str,
+        collection_id: str,
+    ) -> list[str]:
+        observed["listed_collection_id"] = collection_id
+        return ["gid://shopify/Product/10"]
+
     async def fake_add_products_to_collection(
         *,
         shop_domain: str,
@@ -352,13 +361,68 @@ def test_ensure_product_in_catalog_collection_adds_product_without_full_resync()
         collection_id: str,
         product_ids: list[str],
     ) -> None:
-        observed["collection_id"] = collection_id
+        observed["added_collection_id"] = collection_id
         observed["product_ids"] = product_ids
 
     client.ensure_catalog_collection_route_is_available = (  # type: ignore[method-assign]
         fake_ensure_catalog_collection_route_is_available
     )
+    client._list_collection_product_ids = fake_list_collection_product_ids  # type: ignore[method-assign]
     client._add_products_to_collection = fake_add_products_to_collection  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.ensure_catalog_collection_contains_products(
+            shop_domain="example.myshopify.com",
+            access_token="admin_token",
+            product_gids=[
+                "gid://shopify/Product/10",
+                "gid://shopify/Product/11",
+                "gid://shopify/Product/11",
+            ],
+        )
+    )
+
+    assert observed == {
+        "shop_domain": "example.myshopify.com",
+        "access_token": "admin_token",
+        "sync_all_products": False,
+        "listed_collection_id": "gid://shopify/Collection/7",
+        "added_collection_id": "gid://shopify/Collection/7",
+        "product_ids": ["gid://shopify/Product/11"],
+    }
+    assert result == {
+        "collectionId": "gid://shopify/Collection/7",
+        "collectionHandle": "all",
+        "collectionTitle": "Catalog",
+        "requestedProductCount": 2,
+        "addedProductCount": 1,
+    }
+
+
+def test_ensure_product_in_catalog_collection_adds_product_without_full_resync():
+    client = ShopifyApiClient()
+    observed: dict[str, Any] = {}
+
+    async def fake_ensure_catalog_collection_contains_products(
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gids: list[str],
+    ):
+        observed["shop_domain"] = shop_domain
+        observed["access_token"] = access_token
+        observed["product_gids"] = product_gids
+        return {
+            "collectionId": "gid://shopify/Collection/7",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+            "requestedProductCount": 1,
+            "addedProductCount": 0,
+        }
+
+    client.ensure_catalog_collection_contains_products = (  # type: ignore[method-assign]
+        fake_ensure_catalog_collection_contains_products
+    )
 
     result = asyncio.run(
         client.ensure_product_in_catalog_collection(
@@ -371,9 +435,7 @@ def test_ensure_product_in_catalog_collection_adds_product_without_full_resync()
     assert observed == {
         "shop_domain": "example.myshopify.com",
         "access_token": "admin_token",
-        "sync_all_products": False,
-        "collection_id": "gid://shopify/Collection/7",
-        "product_ids": ["gid://shopify/Product/10"],
+        "product_gids": ["gid://shopify/Product/10"],
     }
     assert result["collectionId"] == "gid://shopify/Collection/7"
 
@@ -812,6 +874,154 @@ def test_list_theme_brand_template_slots_uses_deterministic_manifest(monkeypatch
             "path": "templates/index.json.sections.hero.blocks.heading.settings.heading",
             "key": "heading",
             "currentValue": "Hero headline",
+            "role": "headline",
+            "maxLength": 120,
+        }
+    ]
+
+
+def test_list_theme_brand_template_slots_excludes_disabled_sections_and_blocks(monkeypatch):
+    client = ShopifyApiClient()
+    manifest = {
+        "futrgroup2-0theme": {
+            "imageSlots": (
+                {
+                    "path": "templates/index.json.sections.disabled_hero.settings.image",
+                    "key": "image",
+                    "role": "hero",
+                    "recommendedAspect": "landscape",
+                },
+                {
+                    "path": "templates/index.json.sections.gallery.blocks.disabled_card.settings.image",
+                    "key": "image",
+                    "role": "gallery",
+                    "recommendedAspect": "square",
+                },
+                {
+                    "path": "templates/index.json.sections.gallery.blocks.enabled_card.settings.image",
+                    "key": "image",
+                    "role": "gallery",
+                    "recommendedAspect": "square",
+                },
+            ),
+            "textSlots": (
+                {
+                    "path": "templates/index.json.sections.disabled_hero.blocks.heading.settings.heading",
+                    "key": "heading",
+                    "role": "headline",
+                    "maxLength": 120,
+                },
+                {
+                    "path": "templates/index.json.sections.gallery.blocks.disabled_card.settings.heading",
+                    "key": "heading",
+                    "role": "headline",
+                    "maxLength": 120,
+                },
+                {
+                    "path": "templates/index.json.sections.gallery.blocks.enabled_card.settings.heading",
+                    "key": "heading",
+                    "role": "headline",
+                    "maxLength": 120,
+                },
+            ),
+        }
+    }
+    monkeypatch.setattr(
+        shopify_api_module,
+        "_THEME_TEMPLATE_SLOT_MANIFEST_BY_NAME",
+        manifest,
+    )
+    template_json = (
+        json.dumps(
+            {
+                "sections": {
+                    "disabled_hero": {
+                        "disabled": True,
+                        "settings": {"image": "shopify://shop_images/hero.png"},
+                        "blocks": {
+                            "heading": {"settings": {"heading": "Disabled hero"}},
+                        },
+                    },
+                    "gallery": {
+                        "blocks": {
+                            "disabled_card": {
+                                "disabled": True,
+                                "settings": {
+                                    "image": "shopify://shop_images/skip.png",
+                                    "heading": "Skip me",
+                                },
+                            },
+                            "enabled_card": {
+                                "settings": {
+                                    "image": "shopify://shop_images/keep.png",
+                                    "heading": "Keep me",
+                                },
+                            },
+                        },
+                    },
+                }
+            }
+        )
+        + "\n"
+    )
+
+    async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
+        query = payload.get("query", "")
+        if "query themesForBrandSync" in query:
+            return {
+                "themes": {
+                    "nodes": [
+                        {
+                            "id": "gid://shopify/OnlineStoreTheme/1",
+                            "name": "futrgroup2-0theme",
+                            "role": "MAIN",
+                        }
+                    ]
+                }
+            }
+        if "query themeFileByName" in query:
+            return {
+                "theme": {
+                    "files": {
+                        "nodes": [
+                            {
+                                "filename": "templates/index.json",
+                                "body": {
+                                    "__typename": "OnlineStoreThemeFileBodyText",
+                                    "content": template_json,
+                                },
+                            }
+                        ],
+                        "userErrors": [],
+                    }
+                }
+            }
+        raise AssertionError("Unexpected query payload")
+
+    client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
+
+    result = asyncio.run(
+        client.list_theme_brand_template_slots(
+            shop_domain="example.myshopify.com",
+            access_token="token",
+            theme_name="futrgroup2-0theme",
+        )
+    )
+
+    assert result["imageSlots"] == [
+        {
+            "path": "templates/index.json.sections.gallery.blocks.enabled_card.settings.image",
+            "key": "image",
+            "currentValue": "shopify://shop_images/keep.png",
+            "role": "gallery",
+            "recommendedAspect": "square",
+        }
+    ]
+    assert result["textSlots"] == [
+        {
+            "path": "templates/index.json.sections.gallery.blocks.enabled_card.settings.heading",
+            "key": "heading",
+            "currentValue": "Keep me",
             "role": "headline",
             "maxLength": 120,
         }
@@ -2141,7 +2351,7 @@ def test_apply_policy_pages_to_menu_items_dedupes_footer_links():
     assert privacy_item["url"] == "/policies/privacy-policy"
 
 
-def test_remove_catalog_menu_items_strips_catalog_titles_recursively():
+def test_normalize_catalog_menu_items_removes_top_level_catalog_when_shop_exists():
     menu_items = [
         {
             "id": "gid://shopify/MenuItem/1",
@@ -2193,6 +2403,39 @@ def test_remove_catalog_menu_items_strips_catalog_titles_recursively():
             "id": "gid://shopify/MenuItem/6",
             "title": "Shop",
             "type": "HTTP",
+            "url": "/collections/featured",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+    ]
+
+    next_items, changed = ShopifyApiClient._normalize_catalog_menu_items(
+        menu_items=menu_items
+    )
+
+    assert changed is True
+    assert [item["title"] for item in next_items] == ["Home", "Products", "Shop"]
+    assert [item["title"] for item in next_items[1]["items"]] == ["Catalog", "Guides"]
+    assert next_items[2]["url"] == "/collections/all"
+    assert next_items[2]["type"] == "HTTP"
+
+
+def test_normalize_catalog_menu_items_renames_top_level_catalog_when_shop_missing():
+    menu_items = [
+        {
+            "id": "gid://shopify/MenuItem/1",
+            "title": "Home",
+            "type": "HTTP",
+            "url": "/",
+            "resourceId": None,
+            "tags": [],
+            "items": [],
+        },
+        {
+            "id": "gid://shopify/MenuItem/2",
+            "title": "Catalog",
+            "type": "HTTP",
             "url": "/collections/all",
             "resourceId": None,
             "tags": [],
@@ -2200,16 +2443,17 @@ def test_remove_catalog_menu_items_strips_catalog_titles_recursively():
         },
     ]
 
-    next_items, changed = ShopifyApiClient._remove_catalog_menu_items(
+    next_items, changed = ShopifyApiClient._normalize_catalog_menu_items(
         menu_items=menu_items
     )
 
     assert changed is True
-    assert [item["title"] for item in next_items] == ["Home", "Products", "Shop"]
-    assert [item["title"] for item in next_items[1]["items"]] == ["Guides"]
+    assert [item["title"] for item in next_items] == ["Home", "Shop"]
+    assert next_items[1]["url"] == "/collections/all"
+    assert next_items[1]["type"] == "HTTP"
 
 
-def test_remove_catalog_from_default_store_navigation_updates_main_menu():
+def test_normalize_catalog_in_default_store_navigation_updates_main_menu():
     client = ShopifyApiClient()
 
     async def fake_admin_graphql(*, shop_domain: str, access_token: str, payload: dict):
@@ -2290,7 +2534,7 @@ def test_remove_catalog_from_default_store_navigation_updates_main_menu():
                             "id": "gid://shopify/MenuItem/15",
                             "title": "Shop",
                             "type": "HTTP",
-                            "url": "/collections/all",
+                            "url": "/collections/featured",
                             "resourceId": None,
                             "tags": [],
                             "items": [],
@@ -2304,7 +2548,9 @@ def test_remove_catalog_from_default_store_navigation_updates_main_menu():
             assert variables.get("id") == "gid://shopify/Menu/1"
             items = variables.get("items") or []
             assert [item["title"] for item in items] == ["Home", "Products", "Shop"]
-            assert [item["title"] for item in items[1]["items"]] == ["Guides"]
+            assert [item["title"] for item in items[1]["items"]] == ["Catalog", "Guides"]
+            assert items[2]["url"] == "/collections/all"
+            assert items[2]["type"] == "HTTP"
             return {
                 "menuUpdate": {
                     "menu": {
@@ -2321,7 +2567,7 @@ def test_remove_catalog_from_default_store_navigation_updates_main_menu():
     client._admin_graphql = fake_admin_graphql  # type: ignore[method-assign]
 
     result = asyncio.run(
-        client.remove_catalog_from_default_store_navigation(
+        client.normalize_catalog_in_default_store_navigation(
             shop_domain="example.myshopify.com",
             access_token="token",
         )
@@ -2330,7 +2576,7 @@ def test_remove_catalog_from_default_store_navigation_updates_main_menu():
     assert result == {
         "handle": "main-menu",
         "updated": True,
-        "reason": "catalog_removed",
+        "reason": "catalog_normalized",
     }
 
 

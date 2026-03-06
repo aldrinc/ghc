@@ -90,6 +90,29 @@ class ListProductsResponse(BaseModel):
     products: list[CatalogProductSummary]
 
 
+class SyncCatalogCollectionRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    productGids: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "SyncCatalogCollectionRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        return self
+
+
+class SyncCatalogCollectionResponse(BaseModel):
+    shopDomain: str
+    collectionId: str
+    collectionHandle: str
+    collectionTitle: str
+    requestedProductCount: int
+    addedProductCount: int
+
+
 class GetProductRequest(BaseModel):
     clientId: str | None = None
     shopDomain: str | None = None

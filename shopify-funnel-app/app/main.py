@@ -40,6 +40,8 @@ from app.schemas import (
     ListProductsResponse,
     ResolveImageUrlsToShopifyFilesRequest,
     ResolveImageUrlsToShopifyFilesResponse,
+    SyncCatalogCollectionRequest,
+    SyncCatalogCollectionResponse,
     SyncThemeBrandRequest,
     SyncThemeBrandResponse,
     UpsertedPolicyPage,
@@ -316,8 +318,9 @@ async def _apply_shop_connection_defaults(
     await shopify_api.ensure_catalog_collection_route_is_available(
         shop_domain=shop_domain,
         access_token=cleaned_access_token,
+        sync_all_products=False,
     )
-    await shopify_api.remove_catalog_from_default_store_navigation(
+    await shopify_api.normalize_catalog_in_default_store_navigation(
         shop_domain=shop_domain,
         access_token=cleaned_access_token,
     )
@@ -996,6 +999,39 @@ async def list_catalog_products(
             )
             for item in products
         ],
+    )
+
+
+@app.post(
+    "/v1/catalog/collection/sync",
+    response_model=SyncCatalogCollectionResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def sync_catalog_collection(
+    payload: SyncCatalogCollectionRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        result = await shopify_api.ensure_catalog_collection_contains_products(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            product_gids=payload.productGids,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+
+    return SyncCatalogCollectionResponse(
+        shopDomain=installation.shop_domain,
+        collectionId=result["collectionId"],
+        collectionHandle=result["collectionHandle"],
+        collectionTitle=result["collectionTitle"],
+        requestedProductCount=result["requestedProductCount"],
+        addedProductCount=result["addedProductCount"],
     )
 
 

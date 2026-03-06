@@ -27,6 +27,7 @@ _THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
 _THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
 _CATALOG_COLLECTION_HANDLE = "all"
 _CATALOG_COLLECTION_TITLE = "Catalog"
+_SHOP_MENU_TITLE = "Shop"
 _DEFAULT_STORE_NAVIGATION_MENU_HANDLE = "main-menu"
 _GRAPHQL_MAX_PAGE_SIZE = 250
 _COLLECTION_ADD_PRODUCTS_BATCH_SIZE = 50
@@ -1783,6 +1784,82 @@ class ShopifyApiClient:
             "addedProductCount": added_product_count,
         }
 
+    @staticmethod
+    def _normalize_catalog_collection_product_gids(
+        *, product_gids: list[str]
+    ) -> list[str]:
+        normalized_product_gids: list[str] = []
+        seen_product_gids: set[str] = set()
+
+        for raw_product_gid in product_gids:
+            if not isinstance(raw_product_gid, str):
+                raise ShopifyApiError(
+                    message="product_gids must contain only Shopify Product GIDs.",
+                    status_code=400,
+                )
+            cleaned_product_gid = raw_product_gid.strip()
+            if not cleaned_product_gid.startswith("gid://shopify/Product/"):
+                raise ShopifyApiError(
+                    message="product_gids must contain only Shopify Product GIDs.",
+                    status_code=400,
+                )
+            if cleaned_product_gid in seen_product_gids:
+                continue
+            seen_product_gids.add(cleaned_product_gid)
+            normalized_product_gids.append(cleaned_product_gid)
+
+        return normalized_product_gids
+
+    async def ensure_catalog_collection_contains_products(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        product_gids: list[str],
+    ) -> dict[str, Any]:
+        normalized_product_gids = self._normalize_catalog_collection_product_gids(
+            product_gids=product_gids
+        )
+        collection = await self.ensure_catalog_collection_route_is_available(
+            shop_domain=shop_domain,
+            access_token=access_token,
+            sync_all_products=False,
+        )
+
+        added_product_count = 0
+        if normalized_product_gids:
+            collection_product_ids = await self._list_collection_product_ids(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                collection_id=collection["collectionId"],
+            )
+            existing_product_ids = set(collection_product_ids)
+            missing_product_ids = [
+                product_gid
+                for product_gid in normalized_product_gids
+                if product_gid not in existing_product_ids
+            ]
+            for start in range(
+                0, len(missing_product_ids), _COLLECTION_ADD_PRODUCTS_BATCH_SIZE
+            ):
+                await self._add_products_to_collection(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    collection_id=collection["collectionId"],
+                    product_ids=missing_product_ids[
+                        start : start + _COLLECTION_ADD_PRODUCTS_BATCH_SIZE
+                    ],
+                )
+            added_product_count = len(missing_product_ids)
+
+        return {
+            "collectionId": collection["collectionId"],
+            "collectionHandle": collection["collectionHandle"],
+            "collectionTitle": collection["collectionTitle"],
+            "requestedProductCount": len(normalized_product_gids),
+            "addedProductCount": added_product_count,
+        }
+
     async def _get_collection_by_handle(
         self,
         *,
@@ -2289,18 +2366,11 @@ class ShopifyApiClient:
                 message="product_gid must be a valid Shopify Product GID.",
                 status_code=400,
             )
-        collection = await self.ensure_catalog_collection_route_is_available(
+        return await self.ensure_catalog_collection_contains_products(
             shop_domain=shop_domain,
             access_token=access_token,
-            sync_all_products=False,
+            product_gids=[cleaned_product_gid],
         )
-        await self._add_products_to_collection(
-            shop_domain=shop_domain,
-            access_token=access_token,
-            collection_id=collection["collectionId"],
-            product_ids=[cleaned_product_gid],
-        )
-        return collection
 
     @staticmethod
     def _price_cents_to_decimal_string(price_cents: int) -> str:
@@ -3410,14 +3480,48 @@ class ShopifyApiClient:
             and title.strip().lower() == _CATALOG_COLLECTION_TITLE.lower()
         )
 
+    @staticmethod
+    def _menu_item_matches_shop_title(*, item: dict[str, Any]) -> bool:
+        title = item.get("title")
+        return (
+            isinstance(title, str)
+            and title.strip().lower() == _SHOP_MENU_TITLE.lower()
+        )
+
     @classmethod
-    def _remove_catalog_menu_items(
+    def _normalize_storefront_shop_menu_item(
+        cls,
+        *,
+        item: dict[str, Any],
+    ) -> tuple[dict[str, Any], bool]:
+        changed = False
+        target_url = f"/collections/{_CATALOG_COLLECTION_HANDLE}"
+
+        if item.get("type") != "HTTP":
+            item["type"] = "HTTP"
+            changed = True
+        if item.get("url") != target_url:
+            item["url"] = target_url
+            changed = True
+        if item.get("resourceId") is not None:
+            item["resourceId"] = None
+            changed = True
+
+        return item, changed
+
+    @classmethod
+    def _normalize_catalog_menu_items(
         cls,
         *,
         menu_items: list[dict[str, Any]],
     ) -> tuple[list[dict[str, Any]], bool]:
         next_items: list[dict[str, Any]] = []
         changed = False
+        shop_title_present = any(
+            isinstance(item, dict) and cls._menu_item_matches_shop_title(item=item)
+            for item in menu_items
+        )
+        preserved_shop_entry = shop_title_present
 
         for item in menu_items:
             if not isinstance(item, dict):
@@ -3427,8 +3531,8 @@ class ShopifyApiClient:
                 )
 
             next_item = deepcopy(item)
-            raw_children = next_item.get("items") or []
-            if not isinstance(raw_children, list):
+            raw_children = next_item.get("items")
+            if raw_children is not None and not isinstance(raw_children, list):
                 raise ShopifyApiError(
                     message=(
                         "Cannot sync storefront navigation because a menu item has "
@@ -3437,14 +3541,28 @@ class ShopifyApiClient:
                     status_code=409,
                 )
 
-            filtered_children, child_changed = cls._remove_catalog_menu_items(
-                menu_items=raw_children
-            )
-            if child_changed:
-                next_item["items"] = filtered_children
-                changed = True
+            if cls._menu_item_matches_shop_title(item=next_item):
+                next_item, item_changed = cls._normalize_storefront_shop_menu_item(
+                    item=next_item
+                )
+                if item_changed:
+                    changed = True
+                preserved_shop_entry = True
+                next_items.append(next_item)
+                continue
 
             if cls._menu_item_matches_catalog_title(item=next_item):
+                if not preserved_shop_entry:
+                    next_item["title"] = _SHOP_MENU_TITLE
+                    next_item, item_changed = cls._normalize_storefront_shop_menu_item(
+                        item=next_item
+                    )
+                    preserved_shop_entry = True
+                    changed = True
+                    if item_changed:
+                        changed = True
+                    next_items.append(next_item)
+                    continue
                 changed = True
                 continue
 
@@ -4169,7 +4287,7 @@ class ShopifyApiClient:
             query_name="menuUpdate",
         )
 
-    async def remove_catalog_from_default_store_navigation(
+    async def normalize_catalog_in_default_store_navigation(
         self,
         *,
         shop_domain: str,
@@ -4206,7 +4324,7 @@ class ShopifyApiClient:
             access_token=access_token,
             menu_id=menu_summary["id"],
         )
-        next_items, changed = self._remove_catalog_menu_items(
+        next_items, changed = self._normalize_catalog_menu_items(
             menu_items=menu_details["items"]
         )
         if not changed:
@@ -4227,7 +4345,7 @@ class ShopifyApiClient:
         return {
             "handle": menu_details["handle"],
             "updated": True,
-            "reason": "catalog_removed",
+            "reason": "catalog_normalized",
         }
 
     async def _sync_policy_pages_to_footer_menus(
@@ -5000,6 +5118,44 @@ class ShopifyApiClient:
         if len(tokens) == 1:
             return [current[index]]
         return cls._read_json_path_values_tokens(node=current[index], tokens=tokens[1:])
+
+    @classmethod
+    def _is_theme_template_settings_path_disabled(
+        cls,
+        *,
+        template_data: Any,
+        path: str,
+    ) -> bool:
+        if not isinstance(template_data, dict):
+            return False
+        tokens = cls._parse_settings_path_tokens(path)
+        if len(tokens) < 2 or tokens[0] != ("sections", None):
+            return False
+
+        sections = template_data.get("sections")
+        if not isinstance(sections, dict):
+            return False
+
+        section_id, section_index = tokens[1]
+        if section_index is not None:
+            return False
+        section = sections.get(section_id)
+        if not isinstance(section, dict):
+            return False
+        if section.get("disabled") is True:
+            return True
+
+        if len(tokens) < 4 or tokens[2] != ("blocks", None):
+            return False
+
+        block_id, block_index = tokens[3]
+        if block_index is not None:
+            return False
+        blocks = section.get("blocks")
+        if not isinstance(blocks, dict):
+            return False
+        block = blocks.get(block_id)
+        return isinstance(block, dict) and block.get("disabled") is True
 
     @staticmethod
     def _build_settings_path_candidates(path: str) -> list[str]:
@@ -7090,15 +7246,9 @@ class ShopifyApiClient:
         parsed_templates_by_filename: dict[str, dict[str, Any]] = {}
         missing_paths: list[str] = []
 
-        def resolve_current_value(
-            *, setting_path: str, allow_missing: bool = False
-        ) -> str | None:
-            template_filename, json_path = cls._split_theme_template_setting_path(
-                setting_path=setting_path
-            )
+        def get_template_data(*, template_filename: str) -> dict[str, Any] | None:
             template_content = template_contents_by_filename.get(template_filename)
             if template_content is None:
-                missing_paths.append(setting_path)
                 return None
             template_data = parsed_templates_by_filename.get(template_filename)
             if template_data is None:
@@ -7107,6 +7257,30 @@ class ShopifyApiClient:
                     template_content=template_content,
                 )
                 parsed_templates_by_filename[template_filename] = template_data
+            return template_data
+
+        def is_disabled_slot(*, setting_path: str) -> bool:
+            template_filename, json_path = cls._split_theme_template_setting_path(
+                setting_path=setting_path
+            )
+            template_data = get_template_data(template_filename=template_filename)
+            if template_data is None:
+                return False
+            return cls._is_theme_template_settings_path_disabled(
+                template_data=template_data,
+                path=json_path,
+            )
+
+        def resolve_current_value(
+            *, setting_path: str, allow_missing: bool = False
+        ) -> str | None:
+            template_filename, json_path = cls._split_theme_template_setting_path(
+                setting_path=setting_path
+            )
+            template_data = get_template_data(template_filename=template_filename)
+            if template_data is None:
+                missing_paths.append(setting_path)
+                return None
             values = cls._read_json_path_values(node=template_data, path=json_path)
             if not values:
                 if not allow_missing:
@@ -7153,6 +7327,8 @@ class ShopifyApiClient:
                     status_code=500,
                 )
             normalized_path = path.strip()
+            if is_disabled_slot(setting_path=normalized_path):
+                continue
             if normalized_path in image_paths_seen:
                 raise ShopifyApiError(
                     message=(
@@ -7210,6 +7386,8 @@ class ShopifyApiClient:
                     status_code=500,
                 )
             normalized_path = path.strip()
+            if is_disabled_slot(setting_path=normalized_path):
+                continue
             if normalized_path in text_paths_seen:
                 raise ShopifyApiError(
                     message=(
