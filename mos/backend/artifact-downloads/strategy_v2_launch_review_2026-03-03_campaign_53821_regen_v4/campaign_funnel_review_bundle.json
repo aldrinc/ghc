@@ -1,0 +1,17 @@
+{
+  "funnel_id": "12467441-09c4-4697-87f9-eaca03adca03",
+  "pages": [
+    {
+      "slug": "pre-sales",
+      "page_id": "a5886d01-efe6-4977-b74f-9332b6850507",
+      "latest_version_id": "28365936-fc1a-44b1-b70f-cd6997651499",
+      "file": "artifact-downloads/strategy_v2_launch_review_2026-03-03_campaign_53821_regen_v4/pre-sales_latest_version.json"
+    },
+    {
+      "slug": "sales",
+      "page_id": "e55263fe-a957-47fd-9cd3-920f5dda0091",
+      "latest_version_id": "ec795a1c-6451-4434-8053-a77fb0c72ed7",
+      "file": "artifact-downloads/strategy_v2_launch_review_2026-03-03_campaign_53821_regen_v4/sales_latest_version.json"
+    }
+  ]
+}

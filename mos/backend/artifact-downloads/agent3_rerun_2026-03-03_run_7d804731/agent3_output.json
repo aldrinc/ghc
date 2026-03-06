@@ -1,0 +1,676 @@
+{
+  "research_mode": "VOC-Fed",
+  "product": "The Honest Herbalist Handbook",
+  "saturated_angles": [
+    "Encyclopedia-style home reference + steep discount/urgency bonuses",
+    "Ancient/Lost remedies 'forgotten cures' survivalist framing",
+    "High-ticket herbal immersion/certification programs (1,200-hr etc.)",
+    "Spiritual/energetics-heavy herbalism (intuition/angelic framing)",
+    "Big Pharma/industry conspiracy: 'they hide natural medicines'"
+  ],
+  "purple_ocean_candidates": [
+    {
+      "rank": 1,
+      "name": "Teething-Night Triage (Natural first, safe escalation)",
+      "primitive": {
+        "who": "Sleep-deprived parents of teething babies seeking \u201cnatural remedies\u201d first (E7BC66D367EA97727, EA46ADBF444B6C7F0).",
+        "trigger": "Baby teething pain spikes + naps/bedtime disrupted (E7BC66D367EA97727, EE17F7351E52B1080).",
+        "pain": "Bought \u201cevery single alternative to Tylenol\u201d\u2026 nothing works >10 min; fear of meds (E7BC66D367EA97727, EED9976A2F03CBD74).",
+        "desired_outcome": "Comfort that lasts long enough for sleep + clear \u201cwhat\u2019s unsafe/when meds ok\u201d (EE17F7351E52B1080, E1E813C24634DA100).",
+        "enemy": "Unregulated teething products + internet advice loops (E1E813C24634DA100, E88F94DDDFA3EBC05).",
+        "mechanism": "Quick-lookup pages for kid comfort options, red-flag \u2018call pedi\u2019 cues, and \u2018avoid\u2019 lists; customizable checklists for age/meds/allergies (product brief: customizable handbook).",
+        "belief_shift": {
+          "before": "\u201cI didn\u2019t want to give my baby Tylenol\u2026 I thought it was bad\u201d (E6C196E60F895CF59).",
+          "after": "\u201cSome \u2018teething relief\u2019 products are unsafe\u2026 better off with infant Tylenol when needed\u201d (E1E813C24634DA100)."
+        },
+        "failed_fixes": [
+          "Bought/found many alternatives (drops, oils, gels, frozen teethers) but \u201cnothing works\u202610 minutes\u201d (E7BC66D367EA97727).",
+          "Internet symptom searching spirals (E88F94DDDFA3EBC05).",
+          "Waiting it out / exhaustion (\u201cexpire from exhaustion\u201d) (EA46ADBF444B6C7F0)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 10,
+        "habitat_types": 1,
+        "contradiction_count": 3,
+        "top_quotes": [
+          {
+            "voc_id": "E7BC66D367EA97727",
+            "quote": "This is a rant but also advice needed if it\u2019s different than what\u2019s already out there. My baby boy started teething at 3-4 months... I have purchased every single alternative to Tylenol... Nothing works longer than maybe 10 minutes."
+          },
+          {
+            "voc_id": "EB7EB6562D8D6DE05",
+            "quote": "After a few hours of him crying... I reach for the Tylenol and he\u2019s fine for like 3-5 hrs."
+          },
+          {
+            "voc_id": "EED9976A2F03CBD74",
+            "quote": "I have this fear of giving him any nurofen and he doesn\u2019t need it"
+          },
+          {
+            "voc_id": "EA46ADBF444B6C7F0",
+            "quote": "Any magic tricks or do we just wait it out and expire from exhaustion?"
+          },
+          {
+            "voc_id": "E1E813C24634DA100",
+            "quote": "Are you in the US? I know you requested natural remedies but unfortunately anything labeled such as teething relief here is pretty unsafe and not FDA tested or approved. You're better off giving infant Tylenol..."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 10.0,
+        "pain_intensity": 10,
+        "distinctiveness": 7,
+        "plausibility": 8,
+        "proof_density": 6.0,
+        "compliance_safety": 4,
+        "saturation": 3
+      },
+      "compliance_risk": "HIGH",
+      "evidence_floor": "MET",
+      "source_diversity": "SINGLE SOURCE RISK",
+      "recommended_stack": {
+        "primary": "Teething-Night Triage (Natural first, safe escalation)",
+        "secondary": "Herb\u2013Drug Interaction \u2018Non-Answer\u2019 Fix",
+        "tertiary": "Build Your \u2018Little Apothecary\u2019 (Starter Kit + How-To)"
+      }
+    },
+    {
+      "rank": 2,
+      "name": "Herb\u2013Drug Interaction \u2018Non-Answer\u2019 Fix",
+      "primitive": {
+        "who": "People trying to add herbs/supplements but told by a doctor they \u201ccan\u2019t predict any interactions\u201d (E3E243033358F647D).",
+        "trigger": "They ask a clinician to check herb\u2013drug interactions before starting (E3E243033358F647D, E3AA3DD53496004C2).",
+        "pain": "Get non-answers (\u201cnot regulated by FDA\u201d) and feel pushed toward \u201cmore drugs\u201d (E3E243033358F647D).",
+        "desired_outcome": "A practical way to screen interactions + ask better questions (E1D7F3783EC93494F, E45D91BC6498C9E32).",
+        "enemy": "Pharma-first care + \u201cFDA/unregulated\u201d shutdowns (E3E243033358F647D, E46CD90915768227E).",
+        "mechanism": "Handbook provides an interaction-screening workflow: list your meds, check contraindication flags, and bring a focused question list to your clinician.",
+        "belief_shift": {
+          "before": "\u201cOnly my doctor\u2026 would have the authority to check for interactions\u201d (E3E243033358F647D).",
+          "after": "\u201cSome will, most won\u2019t\u2026 do your own research and decide\u201d (E45D91BC6498C9E32, E46CD90915768227E)."
+        },
+        "failed_fixes": [
+          "Asked doctor; got \u201caren\u2019t regulated\u2026 can\u2019t predict interactions\u201d (E3E243033358F647D).",
+          "Asked a pharmacist friend; unclear answer (E3AA3DD53496004C2).",
+          "Googling gives mixed results (E564D1ACA4DA511D8)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 10,
+        "habitat_types": 1,
+        "contradiction_count": 2,
+        "top_quotes": [
+          {
+            "voc_id": "E3E243033358F647D",
+            "quote": "Hey all... my doctor... doesn't recommend taking any herbs or supplements because they 'aren't regulated by the FDA'... and she 'can't predict any interactions'... I feel like she just wants me to come in so she can put me on more drugs..."
+          },
+          {
+            "voc_id": "E45D91BC6498C9E32",
+            "quote": "Some will, most won\u2019t. Ask anyway, then ask your pharmacist, then check online."
+          },
+          {
+            "voc_id": "E1D7F3783EC93494F",
+            "quote": "For common herbs like chamomile, you can try drugs.com interaction checker. https://www.drugs.com/drug_interactions.html"
+          },
+          {
+            "voc_id": "E46CD90915768227E",
+            "quote": "A good herbalist could probably offer info... doctors and pharm go hand in hand and very few have training about herbs and use fear as a reason not to use herbs..."
+          },
+          {
+            "voc_id": "EEE0C84CF1C46795F",
+            "quote": "the doctor suggested giving him honey... The doctor was confused and actually googled it right in front of my wife."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 10.0,
+        "pain_intensity": 6.0,
+        "distinctiveness": 9,
+        "plausibility": 9,
+        "proof_density": 6.0,
+        "compliance_safety": 5,
+        "saturation": 2
+      },
+      "compliance_risk": "HIGH",
+      "evidence_floor": "MET",
+      "source_diversity": "SINGLE SOURCE RISK",
+      "recommended_stack": {
+        "primary": "Herb\u2013Drug Interaction \u2018Non-Answer\u2019 Fix",
+        "secondary": "\u2018Google Says Yes / Google Says No\u2019 Remedy Decision System",
+        "tertiary": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference"
+      }
+    },
+    {
+      "rank": 3,
+      "name": "HRT + Supplement Stack: \u2018What do I stop?\u2019",
+      "primitive": {
+        "who": "Peri/menopause people starting HRT while taking a supplement stack (EA656374C0620FE74, E0DED9F511FA41606).",
+        "trigger": "Right after getting an HRT script, they email a supplement list for safety (EA656374C0620FE74).",
+        "pain": "Doctor won\u2019t/can\u2019t say what\u2019s safe; \u201cnot tested\u2026 not regulated\u201d (EA656374C0620FE74, E0DED9F511FA41606).",
+        "desired_outcome": "Know what to pause/avoid and what to keep simple (E669B8F7E39A19825, E1C8B93AB5D65BEA0).",
+        "enemy": "Testing/regulation gap for supplements + uncertainty in guidance (EA656374C0620FE74).",
+        "mechanism": "Handbook offers evidence-graded notes + caution flags for common herbs/supplements, plus prompts for clinician discussions (info-only).",
+        "belief_shift": {
+          "before": "\u201cMy doctor can say what supplements should not be taken while on HRT\u201d (EA656374C0620FE74).",
+          "after": "\u201cIt\u2019s not possible to say\u2026 herbal remedies\u2026 safe with HRT\u2026 not tested\u2026 not regulated\u201d (EA656374C0620FE74)."
+        },
+        "failed_fixes": [
+          "Emailed doctor a supplement list; got a non-answer (EA656374C0620FE74).",
+          "Stopped herbals after starting HRT because things felt simpler (E669B8F7E39A19825).",
+          "Avoided herbals due to blood pressure/allergies (EE9AC790313B3EB64)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 7,
+        "habitat_types": 2,
+        "contradiction_count": 2,
+        "top_quotes": [
+          {
+            "voc_id": "EA656374C0620FE74",
+            "quote": "TL,DR: My doctor can't say what supplements should not be taken while on HRT...? ... \"It's not possible to say that other herbal remedies and supplements are safe to take with HRT... They're not tested... not regulated...\""
+          },
+          {
+            "voc_id": "E1C8B93AB5D65BEA0",
+            "quote": "St John's wart ? Often not compatible with medications..."
+          },
+          {
+            "voc_id": "EE9AC790313B3EB64",
+            "quote": "My doctors have no problem with vitamins, magnesium, and D3... I don\u2019t do herbals because of my blood pressure and allergies"
+          },
+          {
+            "voc_id": "E669B8F7E39A19825",
+            "quote": "Starting HRT has allowed me to decrease and eliminate many of the supps I was taking... Before I was taking a few herbals, Ashwaganda etc... It\u2019s liberating not to do all that anymore..."
+          },
+          {
+            "voc_id": "E57D3C0C2E16AF67C",
+            "quote": "I\u2019m pretty sure it\u2019s grapefruit and bergamot which has issues with medication, but there could be others."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 7.0,
+        "pain_intensity": 4.3,
+        "distinctiveness": 9,
+        "plausibility": 9,
+        "proof_density": 5.6,
+        "compliance_safety": 4,
+        "saturation": 3
+      },
+      "compliance_risk": "HIGH",
+      "evidence_floor": "LOW",
+      "source_diversity": "OK",
+      "recommended_stack": {
+        "primary": "HRT + Supplement Stack: \u2018What do I stop?\u2019",
+        "secondary": "Herb\u2013Drug Interaction \u2018Non-Answer\u2019 Fix",
+        "tertiary": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference"
+      }
+    },
+    {
+      "rank": 4,
+      "name": "Anti-AI Herbal Book Safety Filter",
+      "primitive": {
+        "who": "Herbal learners shopping Amazon who fear AI-written herbalism books (E37E8AB347B85267A, EC753EED230FE0F15).",
+        "trigger": "They notice multiple \u201ctincture making\u201d books are AI-written (E37E8AB347B85267A).",
+        "pain": "Worried AI misinformation can cause harm (poisoning story) (E37E8AB347B85267A).",
+        "desired_outcome": "A trust filter: how to vet authors + \u201crule of 3\u201d cross-checking (E485F7647D6E3E654, EB1B673A33DE59ECE).",
+        "enemy": "AI content farms + fake authors/sellers (E37E8AB347B85267A, E887B52E3DEE26679).",
+        "mechanism": "Handbook differentiator: transparent sourcing + \u2018cross-check\u2019 method (citations, author credentials, and a repeatable vetting checklist).",
+        "belief_shift": {
+          "before": "\u201cIf it\u2019s on Amazon, it\u2019s fine\u201d (implied by browsing for tincture books) (E37E8AB347B85267A).",
+          "after": "\u201cDon\u2019t trust\u2026 AI herbalism books\u2026 cross-reference (\u2018rule of 3\u2019)\u201d (E37E8AB347B85267A, E485F7647D6E3E654)."
+        },
+        "failed_fixes": [
+          "Clicked multiple AI-written tincture books (E37E8AB347B85267A).",
+          "Saw YouTube/ads teaching AI book publishing with no expertise (E887B52E3DEE26679).",
+          "Relying on \u2018top comment\u2019 recs can still be dangerous/misinfo (EE80C9ED4557D7A84)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 7,
+        "habitat_types": 2,
+        "contradiction_count": 2,
+        "top_quotes": [
+          {
+            "voc_id": "E37E8AB347B85267A",
+            "quote": "There's a new plague going around... a scourge of crappy AI herbalism books being pedaled on Amazon... There was a recent case of someone poisoning themselves... Please don't trust any of these..."
+          },
+          {
+            "voc_id": "EC753EED230FE0F15",
+            "quote": "there is a scourge of crappy AI herbalism books being pedaled on Amazon."
+          },
+          {
+            "voc_id": "E887B52E3DEE26679",
+            "quote": "Every time I\u2019m on YouTube I get these video ads... publish and sell books on Amazon... using AI to write them... you don\u2019t need any knowledge on the topic..."
+          },
+          {
+            "voc_id": "E485F7647D6E3E654",
+            "quote": "I find having multiple books on herbs for reference a good thing... I have a library of 10 or so books and use a rule of 3. I want 3 different books/authors to agree..."
+          },
+          {
+            "voc_id": "EE80C9ED4557D7A84",
+            "quote": "Lmfao... you posted complaining about ai generated books... and the top comment is some jackass trying to sell you a book full of misinfo... For now you can still rely on primary sources..."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 7.0,
+        "pain_intensity": 10,
+        "distinctiveness": 9,
+        "plausibility": 8,
+        "proof_density": 5.6,
+        "compliance_safety": 7,
+        "saturation": 2
+      },
+      "compliance_risk": "LOW",
+      "evidence_floor": "LOW",
+      "source_diversity": "OK",
+      "recommended_stack": {
+        "primary": "Anti-AI Herbal Book Safety Filter",
+        "secondary": "Scam-Proof Buying: Price Gaps, TikTok Stores, Fake Reviews",
+        "tertiary": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference"
+      }
+    },
+    {
+      "rank": 5,
+      "name": "\u2018Google Says Yes / Google Says No\u2019 Remedy Decision System",
+      "primitive": {
+        "who": "DIY remedy seekers who Google and get contradictory safety answers (E564D1ACA4DA511D8, E048E31932AA73AC4).",
+        "trigger": "Searching \u201cis this herb safe?\u201d or symptom info in the moment (E564D1ACA4DA511D8, E88F94DDDFA3EBC05).",
+        "pain": "\u201cOne article will say\u2026safe and the next says no\u201d; even docs Google (E564D1ACA4DA511D8, EEE0C84CF1C46795F).",
+        "desired_outcome": "A single decision framework + a short list of trusted sources (E59183CE3376BE47A, E55C22928AE473AEC).",
+        "enemy": "SEO noise + inconsistent advice (E564D1ACA4DA511D8).",
+        "mechanism": "Handbook acts as a pre-vetted reference: decision checklists + citations + \u2018when to avoid / when to seek care\u2019 guardrails.",
+        "belief_shift": {
+          "before": "\u201cGoogle will tell me if it\u2019s safe\u201d (E564D1ACA4DA511D8).",
+          "after": "\u201cGoogle gives mixed results\u2026 one says safe, next says no\u201d (E564D1ACA4DA511D8)."
+        },
+        "failed_fixes": [
+          "Googling yields contradictory safety advice (E564D1ACA4DA511D8).",
+          "Symptom-searching online makes things worse (E88F94DDDFA3EBC05).",
+          "Doctor Googled it in front of them (EEE0C84CF1C46795F)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 8,
+        "habitat_types": 1,
+        "contradiction_count": 2,
+        "top_quotes": [
+          {
+            "voc_id": "E564D1ACA4DA511D8",
+            "quote": "I use google, but sometimes it gives mixed results. One article will say yes it\u2019s perfectly safe and the next says no it\u2019s not."
+          },
+          {
+            "voc_id": "E88F94DDDFA3EBC05",
+            "quote": "It\u2019s the internet of course! I looked up symptoms and it made it worse..."
+          },
+          {
+            "voc_id": "E3E243033358F647D",
+            "quote": "Hey all... my doctor... doesn't recommend taking any herbs or supplements because they 'aren't regulated by the FDA'... and she 'can't predict any interactions'..."
+          },
+          {
+            "voc_id": "E59183CE3376BE47A",
+            "quote": "I have a few resources you can look up... both published by government agencies... Pretty trustworthy. https://medlineplus.gov/druginfo/herb_All.html https://www.efsa.europa.eu/... This one is used by medical and pharmacy schools..."
+          },
+          {
+            "voc_id": "EEE0C84CF1C46795F",
+            "quote": "the doctor suggested giving him honey... The doctor was confused and actually googled it right in front of my wife."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 8.0,
+        "pain_intensity": 5.0,
+        "distinctiveness": 8,
+        "plausibility": 9,
+        "proof_density": 4.8,
+        "compliance_safety": 6,
+        "saturation": 3
+      },
+      "compliance_risk": "MEDIUM",
+      "evidence_floor": "LOW",
+      "source_diversity": "SINGLE SOURCE RISK",
+      "recommended_stack": {
+        "primary": "\u2018Google Says Yes / Google Says No\u2019 Remedy Decision System",
+        "secondary": "Anti-AI Herbal Book Safety Filter",
+        "tertiary": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference"
+      }
+    },
+    {
+      "rank": 6,
+      "name": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference",
+      "primitive": {
+        "who": "Book shoppers who want herbal remedies info that \u201cisn\u2019t too woo woo\u201d (E46A41159CA297AC0, E937233AAD876F668).",
+        "trigger": "They\u2019re asking for a book recommendation / intro resource (E937233AAD876F668).",
+        "pain": "Turned off by \u201cwoo woo,\u201d but also distrust shallow \u201cthis for that\u201d guides (EF5776A689AD752CD, E471510CA86541721).",
+        "desired_outcome": "Science/facts + cited studies + practical recipes (E19986C29467209EF, E3ECFB4499AB667F0).",
+        "enemy": "Woo-woo marketing + outdated/toxic old herb lore (E246521A4F9542050, EF5776A689AD752CD).",
+        "mechanism": "Handbook positions as \u2018honest\u2019: practical remedies with evidence grading + safety notes (contraindications/when to seek care), avoiding spiritual framing.",
+        "belief_shift": {
+          "before": "\u201cHerbalism is mostly woo woo\u201d (E46A41159CA297AC0).",
+          "after": "\u201cIt can cite studies / facts\u201d + \u201cbe careful with old books\u2026 plant toxicity\u201d (E3ECFB4499AB667F0, E246521A4F9542050)."
+        },
+        "failed_fixes": [
+          "Bought/received a book that felt \u201creductive\u2026 infomercial-like\u201d (E471510CA86541721).",
+          "Avoiding old herb books due to new toxicity knowledge (E246521A4F9542050).",
+          "Sorting through \u2018woo woo\u2019 recommendations (EF5776A689AD752CD)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 10,
+        "habitat_types": 1,
+        "contradiction_count": 2,
+        "top_quotes": [
+          {
+            "voc_id": "E46A41159CA297AC0",
+            "quote": "I'm rather fond of your reference to something that \"isn't too woo woo\"."
+          },
+          {
+            "voc_id": "E19986C29467209EF",
+            "quote": "I wrote this book specifically to address the woo woo factor. I packed my book with science and FACTS."
+          },
+          {
+            "voc_id": "E3ECFB4499AB667F0",
+            "quote": "Alchemy of Herbs... It can get a little bit crunchy, but she sites clinical studies for her claims..."
+          },
+          {
+            "voc_id": "E246521A4F9542050",
+            "quote": "Be extremely careful with old books... as we continue to learn about plant toxicity, and many plants that were thought to be harmless are a big hell no in the present day."
+          },
+          {
+            "voc_id": "E471510CA86541721",
+            "quote": "I got it for Christmas... demoted to the bottom shelf... has the feel of \u201cthis for that\u201d herbalism... author's ads... feels reductive. Almost infomercial-like."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 10.0,
+        "pain_intensity": 7.0,
+        "distinctiveness": 8,
+        "plausibility": 9,
+        "proof_density": 6.0,
+        "compliance_safety": 6,
+        "saturation": 4
+      },
+      "compliance_risk": "MEDIUM",
+      "evidence_floor": "MET",
+      "source_diversity": "SINGLE SOURCE RISK",
+      "recommended_stack": {
+        "primary": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference",
+        "secondary": "\u2018Google Says Yes / Google Says No\u2019 Remedy Decision System",
+        "tertiary": "Science-First Herbalist Path (DIY Curriculum, Not $3k Courses)"
+      }
+    },
+    {
+      "rank": 7,
+      "name": "Scam-Proof Buying: Price Gaps, TikTok Stores, Fake Reviews",
+      "primitive": {
+        "who": "Buyers seeing huge price gaps + TikTok stores + review uncertainty (E670DBE0EEAC59294, EBDC45042A45E1494).",
+        "trigger": "They go to buy and find $78 Amazon vs $37 direct, or $17 TikTok stores (E670DBE0EEAC59294, EBDC45042A45E1494).",
+        "pain": "Fear scams/fake reviews; distrust sellers pushing supplements (E6FA363B6277FFA64, ECEC24E5BA03B0619).",
+        "desired_outcome": "Know where to buy legit + how to vet sellers/reviews before trusting (EB1B673A33DE59ECE, ECEC24E5BA03B0619).",
+        "enemy": "Scammers, fake reviews, and low-trust sellers (E6FA363B6277FFA64, ECEC24E5BA03B0619).",
+        "mechanism": "Handbook includes \u2018how to buy safely\u2019 pages: where to buy, how to spot counterfeit listings, and how to cross-check claims/reviews before use.",
+        "belief_shift": {
+          "before": "\u201cIf it\u2019s cheaper, it\u2019s the same thing\u201d (implied by TikTok store pricing) (EBDC45042A45E1494).",
+          "after": "\u201cVerify the seller/source; cross-reference\u201d (EBDC45042A45E1494, ECEC24E5BA03B0619)."
+        },
+        "failed_fixes": [
+          "Comparing Amazon vs author website pricing (E670DBE0EEAC59294).",
+          "Buying from TikTok stores (EBDC45042A45E1494).",
+          "Trusting sellers with fake reviews / scammy supplement pushes (E6FA363B6277FFA64)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 7,
+        "habitat_types": 1,
+        "contradiction_count": 2,
+        "top_quotes": [
+          {
+            "voc_id": "E670DBE0EEAC59294",
+            "quote": "The book is currently going for $78 on Amazon... author\u2019s website... $37... I bought the bundle and got two extra books."
+          },
+          {
+            "voc_id": "EBDC45042A45E1494",
+            "quote": "There are tik tok stores selling it for $17 dollars. Its a wonderful book, although I would always cross reference with others..."
+          },
+          {
+            "voc_id": "E6FA363B6277FFA64",
+            "quote": "This is a scam... any functional \u201cdoctor\u201d who sells their own supplements should be avoided as well."
+          },
+          {
+            "voc_id": "ECEC24E5BA03B0619",
+            "quote": "This is a Fakespot Reviews Analysis bot... Fakespot detects fake reviews, fake products and unreliable sellers using AI."
+          },
+          {
+            "voc_id": "E887B52E3DEE26679",
+            "quote": "Every time I\u2019m on YouTube I get these video ads... publish and sell books on Amazon making a lot of money using AI to write them..."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 7.0,
+        "pain_intensity": 8.6,
+        "distinctiveness": 8,
+        "plausibility": 8,
+        "proof_density": 4.2,
+        "compliance_safety": 7,
+        "saturation": 3
+      },
+      "compliance_risk": "LOW",
+      "evidence_floor": "LOW",
+      "source_diversity": "SINGLE SOURCE RISK",
+      "recommended_stack": {
+        "primary": "Scam-Proof Buying: Price Gaps, TikTok Stores, Fake Reviews",
+        "secondary": "Anti-AI Herbal Book Safety Filter",
+        "tertiary": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference"
+      }
+    },
+    {
+      "rank": 8,
+      "name": "Build Your \u2018Little Apothecary\u2019 (Starter Kit + How-To)",
+      "primitive": {
+        "who": "People newly drawn to herbalism who want to \u201ccreate my own little apothecary\u201d (E22CE2B51182B4D96, E489DC8F1CEB5470E).",
+        "trigger": "Heard \u201capothecary,\u201d Googled it, and herbalism \u201cBOOM\u201d appeared (E489DC8F1CEB5470E).",
+        "pain": "Motivated to start, but unclear what to stock / how to prep safely (E22CE2B51182B4D96, E357A19AAF54239C6).",
+        "desired_outcome": "A simple starter list + basic making methods for home use (EF1A10A2BEAB5BE88).",
+        "enemy": "Overload + unsafe/outdated or AI content (E246521A4F9542050, E37E8AB347B85267A).",
+        "mechanism": "Handbook provides a starter apothecary plan: minimal set of herbs, prep methods, storage notes, and safety flags; customizable by household needs.",
+        "belief_shift": {
+          "before": "\u201cNo idea where to start\u2014just googling \u2018apothecary\u2019\u201d (E489DC8F1CEB5470E).",
+          "after": "\u201cA small, safe starter kit beats random stocking\u201d (E22CE2B51182B4D96; safety limits: E246521A4F9542050)."
+        },
+        "failed_fixes": [
+          "Googled \u2018apothecary\u2019 to figure out what it even is (E489DC8F1CEB5470E).",
+          "Relying on unsafe/outdated sources (E246521A4F9542050).",
+          "Trusting random Amazon books that may be AI (E37E8AB347B85267A)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 6,
+        "habitat_types": 1,
+        "contradiction_count": 2,
+        "top_quotes": [
+          {
+            "voc_id": "E489DC8F1CEB5470E",
+            "quote": "I was introduced to herbalism when I heard the word \u2018apothecary\u2019 and googled what it was and then...BOOM...herbalism was presented to me."
+          },
+          {
+            "voc_id": "E22CE2B51182B4D96",
+            "quote": "it suddenly just made sense for me to immediately begin researching and figuring out how I can use herbalism in my life and create my own little apothecary."
+          },
+          {
+            "voc_id": "EE4AB464F30E74705",
+            "quote": "I\u2019ve been curious about is starting my own apothecary."
+          },
+          {
+            "voc_id": "E357A19AAF54239C6",
+            "quote": "Home Apothecary\u2026show us yours!"
+          },
+          {
+            "voc_id": "E246521A4F9542050",
+            "quote": "Be extremely careful with old books... as we continue to learn about plant toxicity, and many plants that were thought to be harmless are a big hell no in the present day."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 6.0,
+        "pain_intensity": 0.0,
+        "distinctiveness": 7,
+        "plausibility": 8,
+        "proof_density": 3.6,
+        "compliance_safety": 7,
+        "saturation": 5
+      },
+      "compliance_risk": "MEDIUM",
+      "evidence_floor": "LOW",
+      "source_diversity": "SINGLE SOURCE RISK",
+      "recommended_stack": {
+        "primary": "Build Your \u2018Little Apothecary\u2019 (Starter Kit + How-To)",
+        "secondary": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference",
+        "tertiary": "Anti-AI Herbal Book Safety Filter"
+      }
+    },
+    {
+      "rank": 9,
+      "name": "Science-First Herbalist Path (DIY Curriculum, Not $3k Courses)",
+      "primitive": {
+        "who": "Aspiring herbalists who want to \u201cprovide to communities\u201d and learn the right way (E4C645FB6972D0460).",
+        "trigger": "They decide to start studying and seek guidance on what to learn first (EB5F95127A1C9971F).",
+        "pain": "Hard to know who to trust; some courses are \u201cpaywalled behind a pricey course\u201d (ED126E4A24B91C8AB).",
+        "desired_outcome": "A DIY curriculum: science foundation + research-first resources (EB5F95127A1C9971F, E55C22928AE473AEC).",
+        "enemy": "Low-trust writers + paywalled pricey courses (ED126E4A24B91C8AB).",
+        "mechanism": "Handbook acts as a \u2018curriculum + reference\u2019: science basics, how to read studies, and safe home-use frameworks (info-only).",
+        "belief_shift": {
+          "before": "\u201cI can learn herbalism from any course/book\u201d (implied) (ED126E4A24B91C8AB).",
+          "after": "\u201cFoundation in science\u2026 then do your own research (Google Scholar)\u201d (EB5F95127A1C9971F)."
+        },
+        "failed_fixes": [
+          "Expensive/paywalled training (\u201cpaywalled behind a pricey course\u201d) (ED126E4A24B91C8AB).",
+          "Relying on intuition alone (E486E844839A89B27).",
+          "Depending on doctors who \u2018use fear\u2019 / don\u2019t know herbs (E46CD90915768227E)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 7,
+        "habitat_types": 1,
+        "contradiction_count": 2,
+        "top_quotes": [
+          {
+            "voc_id": "E4C645FB6972D0460",
+            "quote": "I want to become an Herbalist... long term to provide to communities."
+          },
+          {
+            "voc_id": "EB5F95127A1C9971F",
+            "quote": "I'll give you the advice I was given when I first started studying. Make sure you have a foundation in science before you start studying herbs... Use Google Scholar... Join the American Herbalists Guild..."
+          },
+          {
+            "voc_id": "ED126E4A24B91C8AB",
+            "quote": "Not GP, but I\u2019d recommend Cech\u2019s Making Plant Medicine... Cech I trust with my and my family\u2019s health... The materials from Chestnut School seem legit but paywalled behind a pricey course."
+          },
+          {
+            "voc_id": "E55C22928AE473AEC",
+            "quote": "The National Institute of Health has one also, it\u2019s called HerbList. The listings in the app link back to the research done on the herbs, so it\u2019s a great way to find peer-reviewed resources!"
+          },
+          {
+            "voc_id": "E486E844839A89B27",
+            "quote": "in intuition i trust."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 7.0,
+        "pain_intensity": 1.4,
+        "distinctiveness": 7,
+        "plausibility": 9,
+        "proof_density": 4.2,
+        "compliance_safety": 8,
+        "saturation": 4
+      },
+      "compliance_risk": "MEDIUM",
+      "evidence_floor": "LOW",
+      "source_diversity": "SINGLE SOURCE RISK",
+      "recommended_stack": {
+        "primary": "Science-First Herbalist Path (DIY Curriculum, Not $3k Courses)",
+        "secondary": "Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference",
+        "tertiary": "Build Your \u2018Little Apothecary\u2019 (Starter Kit + How-To)"
+      }
+    },
+    {
+      "rank": 10,
+      "name": "Wilderness + Herbal First Aid Field Reference",
+      "primitive": {
+        "who": "Outdoor/adventure people training for wilderness first aid / responder work (E336B47C6FC2BF9CD, EF92BB57B33C6F88E).",
+        "trigger": "Trips \u201cmiles away from the nearest clinic\u201d with no cell service (E31F9A5613EAF3870, E5F9A8E49E0ADFD78).",
+        "pain": "Need to handle emergencies when far from a hospital (E31F9A5613EAF3870).",
+        "desired_outcome": "Portable reference that pairs modern + herbal first aid techniques (E5F9A8E49E0ADFD78, E4E62B39B662DC58B).",
+        "enemy": "Distance/time from care + unpredictable adventures (E4E62B39B662DC58B, E31F9A5613EAF3870).",
+        "mechanism": "Handbook adds a field-ready structure: checklists and \u2018common scenarios\u2019 pages that pair herbal options with standard first aid basics (education, not treatment).",
+        "belief_shift": {
+          "before": "\u201cI\u2019m close to care / have cell service\u201d (implied) (E31F9A5613EAF3870).",
+          "after": "\u201cWhen you\u2019re miles away\u2026 knowing wilderness first aid\u2026 + herbal techniques\u201d (E5F9A8E49E0ADFD78)."
+        },
+        "failed_fixes": [
+          "Assuming you can reach a hospital / have cell service (E31F9A5613EAF3870).",
+          "Assuming one modality fits everyone (\u201cNot every healing modality is the right fit\u201d) (E4CB557CADF7AB7E7).",
+          "Only learning modern first aid without herbal options (E4E62B39B662DC58B)."
+        ]
+      },
+      "evidence": {
+        "supporting_voc_count": 8,
+        "habitat_types": 2,
+        "contradiction_count": 1,
+        "top_quotes": [
+          {
+            "voc_id": "E4E62B39B662DC58B",
+            "quote": "Adventure is unpredictable\u2014your training shouldn\u2019t be. Get certified in Wilderness First Aid and learn Herbal First Aid skills you won\u2019t find in standard courses..."
+          },
+          {
+            "voc_id": "E5F9A8E49E0ADFD78",
+            "quote": "Adventure is unpredictable. Are you ready when things don\u2019t go as planned? When you\u2019re miles away from the nearest clinic, knowing Wilderness First Aid could make all the difference... Use both modern & herbal first aid techniques..."
+          },
+          {
+            "voc_id": "E336B47C6FC2BF9CD",
+            "quote": "Become a Certified Wilderness First Responder!... This unique program fuses..."
+          },
+          {
+            "voc_id": "E167791446BA41853",
+            "quote": "Wilderness first responder, Bandera TX. Running students through the low light mass casualty training today. #scenariobasedtraining #wildernessfirstresponder..."
+          },
+          {
+            "voc_id": "E4CB557CADF7AB7E7",
+            "quote": "Not every healing modality is the right fit for everyone, and that\u2019s completely okay."
+          }
+        ]
+      },
+      "scores": {
+        "demand_signal": 8.0,
+        "pain_intensity": 0.0,
+        "distinctiveness": 8,
+        "plausibility": 7,
+        "proof_density": 6.4,
+        "compliance_safety": 6,
+        "saturation": 4
+      },
+      "compliance_risk": "MEDIUM",
+      "evidence_floor": "LOW",
+      "source_diversity": "OK",
+      "recommended_stack": {
+        "primary": "Wilderness + Herbal First Aid Field Reference",
+        "secondary": "Herb\u2013Drug Interaction \u2018Non-Answer\u2019 Fix",
+        "tertiary": "Build Your \u2018Little Apothecary\u2019 (Starter Kit + How-To)"
+      }
+    }
+  ],
+  "angle_stacks": [
+    "PRIMARY: Teething-Night Triage (Natural first, safe escalation) | SECONDARY: Herb\u2013Drug Interaction \u2018Non-Answer\u2019 Fix | TERTIARY: Build Your \u2018Little Apothecary\u2019 (Starter Kit + How-To)",
+    "PRIMARY: Anti-AI Herbal Book Safety Filter | SECONDARY: Scam-Proof Buying: Price Gaps, TikTok Stores, Fake Reviews | TERTIARY: Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference",
+    "PRIMARY: HRT + Supplement Stack: \u2018What do I stop?\u2019 | SECONDARY: Herb\u2013Drug Interaction \u2018Non-Answer\u2019 Fix | TERTIARY: Not-Woo, Not-Reckless: Evidence-Graded Herbal Reference"
+  ],
+  "orphan_signals": [
+    "Seasonal allergy relief content is frequent in corpus but buyer-intent VOC is thin vs other clusters.",
+    "Heavy-metal/contamination warnings appear, but not enough buyer stories to form a distinct angle here.",
+    "Politicization/anti-vax discourse shows up as noise; unclear conversion relevance for a handbook offer.",
+    "Many \u2018VIDEO_HOOK\u2019 items are brand/creator posts (not buyer speech), increasing signal-noise risk."
+  ],
+  "confidence": "Medium (VOC volume high but noisy; competitor angle copy largely",
+  "biggest_gap": "Competitor saturation mapping is weak (provided competitor pages lacked on-page copy), so distinctiveness/saturation scores are conservative."
+}

@@ -1,0 +1,1265 @@
+{
+  "page": {
+    "id": "1d33fce4-3df3-4c26-80c8-ca15e1fba881",
+    "name": "Sales",
+    "slug": "sales",
+    "template_id": "sales-pdp",
+    "review_status": "review"
+  },
+  "latest_version": {
+    "id": "0f296589-dcf2-4f32-b3e7-568167391989",
+    "source": "ai",
+    "status": "draft",
+    "created_at": "2026-03-03T00:28:07.261617+00:00"
+  },
+  "copy_text_samples": [
+    "PuppyPad PDP Template",
+    "Yes, I want the safety-screened handbook \u2192",
+    "How It Works",
+    "Guarantee",
+    "FAQ",
+    "Reviews",
+    "#1: 'Is It Safe?' Quick-Scan Sheets ($19). #2: Med/HRT Conversation Pack ($17). #3: Interaction Tripwires Checklist ($15). #4: Patch/Pill Change Tracker ($12). Total value: $63 \u2014 free today.",
+    "Four Free Bonuses Included With Your Order",
+    "WATCH IN ACTION",
+    "FEBRUARY",
+    "MARCH",
+    "1. Select Your Size:",
+    "Default Size",
+    "2. Select Your Color:",
+    "Default Color",
+    "3. Select Your Offer:",
+    "Default Title",
+    "The Honest Herbalist Handbook \u2014 Anxiety-After-Meds/HRT Quick-Reference Edition",
+    "Symptom-to-options index organized by situation, not just by plant",
+    "Contraindication Quick-Scan Tables \u2014 Green/Yellow/Red flag system for every herb",
+    "Conservative dosage guidance adjusted for post-medication and post-HRT contexts",
+    "'When to avoid' plain-language notes including specific drug classes",
+    "'When to seek care' triage guidance \u2014 know when herbs aren't the right tool",
+    "Evidence grading per remedy \u2014 research-supported vs. traditional use only",
+    "How does it work?",
+    "Will my dog use it?",
+    "How long does it last?",
+    "Will the pee not make it smell?",
+    "How strong is it?",
+    "How quick does it absorb?",
+    "How do I wash it?",
+    "Is it slippery?",
+    "What if I don't like it?",
+    "Offer",
+    "Drop your downloadable gift links or preview images here.",
+    "Your Free Gifts",
+    "SMALL",
+    "MEDIUM",
+    "LARGE",
+    "Size Comparison Chart",
+    "Families often choose a larger bundle so they can rotate pads while washing/drying.",
+    "Why Get 6 PuppyPads?",
+    "We love having extras so we can swap and wash without stress.",
+    "One in the laundry, one on the floor \u2014 it just works.",
+    "The savings made sense for our two dogs.",
+    "See It In Action",
+    "Why Herb Guides Fail People on Prescriptions",
+    "How the Contraindication Quick-Scan Tables Work",
+    "A symptom-to-options index points you to conservative starting choices for post-medication or post-HRT anxiety \u2014 not every herb ever studied, just the ones with the gentlest profiles for your context.",
+    "Start with your situation, not the herb",
+    "Every herb entry carries a flag: Green (generally well-tolerated), Yellow (check with prescriber first), Red (avoid with this drug class). You see it in seconds, not after reading three paragraphs.",
+    "Run the Contraindication Quick-Scan",
+    "Each entry includes a conservative starting range and plain-language notes on when that herb is not appropriate \u2014 specific drug classes, health conditions, and timing considerations included.",
+    "Check dosage and 'when to avoid' notes",
+    "The included Patch/Pill Change Tracker lets you log what you tried, when, and what changed. Patterns become visible. Guessing becomes optional.",
+    "Track what happens",
+    "Interaction flags for common meds",
+    "'When to avoid' guidance",
+    "Conservative dosage guidance",
+    "Tracking tools",
+    "Clinician conversation support",
+    "What You Get vs. What Most Herb Guides Provide",
+    "My dog finally chose the pad on her own. No drips, no smell, and it\u2019s much easier to clean.",
+    "You Can Manually Scroll",
+    "I got 4 and I love them. Added surprise, one of my cats uses them!",
+    "They work great!!!!!",
+    "My gracie likes to pee on one and poo on the other. Still going strong.",
+    "The 30-Day No-Guessing Money-Back Guarantee",
+    "Your Questions About the Handbook and Herb Safety",
+    "Most recent",
+    "Highest rating",
+    "Lowest rating",
+    "Most helpful",
+    "5",
+    "4",
+    "3",
+    "2",
+    "1",
+    "United States",
+    "Canada",
+    "United Kingdom",
+    "I have had my Sauna Blanket for over 4 years now. I can not live without it. I suffer from insomnia but have the best night sleep after using it. After a long stressful day nothing relaxes me better than using it. I get compliments on how my skin just glows. My routine is to first use my copper brush and then hop in for 40 minutes. Easy to clean and store.",
+    "Cant live without my Sauna Blanket!",
+    "Warm-up is quick and consistent. The materials feel durable and the zipper area holds up well. I use it a few times a week and it\u2019s been an easy way to decompress after training.",
+    "Heats fast and feels premium",
+    "I\u2019m seeing solid results and love the overall experience. The only downside is that it\u2019s a bit bulky to pack for travel, but at home it\u2019s perfect. Cleaning is straightforward.",
+    "Great results, a little bulky",
+    "I was worried about sizing, but it fits comfortably and I can fold it up without a fight. Using it after workouts has become part of my weekly routine.",
+    "Fits well and easy to store",
+    "pain",
+    "length",
+    "size",
+    "fit",
+    "results",
+    "material",
+    "smell",
+    "bag",
+    "heat",
+    "sleep",
+    "setup",
+    "cleaning",
+    "What Readers Say About the Handbook"
+  ],
+  "puck_data": {
+    "root": {
+      "props": {
+        "title": "PuppyPad PDP Template",
+        "description": "A React + Vite template that recreates the PuppyPad PDP layout."
+      }
+    },
+    "zones": {},
+    "content": [
+      {
+        "type": "SalesPdpPage",
+        "props": {
+          "id": "sales-pdp-page",
+          "theme": {
+            "tokens": {}
+          },
+          "content": [
+            {
+              "type": "SalesPdpHeader",
+              "props": {
+                "id": "sales-pdp-header",
+                "config": {
+                  "cta": {
+                    "href": "#top",
+                    "label": "Yes, I want the safety-screened handbook \u2192"
+                  },
+                  "nav": [
+                    {
+                      "href": "#how-it-works",
+                      "label": "How It Works"
+                    },
+                    {
+                      "href": "#guarantee",
+                      "label": "Guarantee"
+                    },
+                    {
+                      "href": "#faq",
+                      "label": "FAQ"
+                    },
+                    {
+                      "href": "#reviews",
+                      "label": "Reviews"
+                    }
+                  ],
+                  "logo": {
+                    "alt": "The Honest Herbalist - Clinical Grade Botanicals",
+                    "src": "/assets/puppypad-logo.svg",
+                    "href": "#top",
+                    "assetPublicId": "74772eba-9822-424e-a260-92a92095fd0f"
+                  }
+                }
+              }
+            },
+            {
+              "type": "SalesPdpHero",
+              "props": {
+                "id": "sales-pdp-hero",
+                "copy": {
+                  "modal": {
+                    "closeAriaLabel": "Close dialog",
+                    "dialogAriaLabel": "Dialog window"
+                  },
+                  "common": {
+                    "starsAriaLabelTemplate": "{rating} out of five stars"
+                  },
+                  "reviews": {
+                    "dotsAriaLabel": "Review navigation",
+                    "sectionAriaLabel": "Customer reviews",
+                    "nextButtonAriaLabel": "Next review",
+                    "prevButtonAriaLabel": "Previous review",
+                    "goToReviewAriaLabelTemplate": "Go to review {index}"
+                  },
+                  "reviewWall": {
+                    "verifiedLabel": "Verified"
+                  }
+                },
+                "config": {
+                  "header": {
+                    "cta": {
+                      "href": "#top",
+                      "label": "Yes, I want the safety-screened handbook \u2192"
+                    },
+                    "nav": [
+                      {
+                        "href": "#how-it-works",
+                        "label": "How It Works"
+                      },
+                      {
+                        "href": "#guarantee",
+                        "label": "Guarantee"
+                      },
+                      {
+                        "href": "#faq",
+                        "label": "FAQ"
+                      },
+                      {
+                        "href": "#reviews",
+                        "label": "Reviews"
+                      }
+                    ],
+                    "logo": {
+                      "alt": "The Honest Herbalist - Clinical Grade Botanicals",
+                      "src": "/assets/puppypad-logo.svg",
+                      "href": "#top",
+                      "assetPublicId": "74772eba-9822-424e-a260-92a92095fd0f"
+                    }
+                  },
+                  "gallery": {
+                    "slides": [
+                      {
+                        "alt": "PuppyPad in a home",
+                        "src": "/assets/Product-IMG-3-Gray.webp",
+                        "assetPublicId": "6ea833db-9a77-4131-87ea-5b6b2251b35d"
+                      },
+                      {
+                        "alt": "Dog on PuppyPad",
+                        "src": "/assets/Attraction.webp",
+                        "assetPublicId": "4b77b343-f9c4-4f0c-afb8-946d30d85443"
+                      },
+                      {
+                        "alt": "Placeholder slide",
+                        "src": "/assets/ph-4x3.svg",
+                        "assetPublicId": "ab8e1b25-683f-432e-9e73-3e1a51f68940"
+                      },
+                      {
+                        "alt": "Placeholder slide",
+                        "src": "/assets/ph-4x3.svg",
+                        "assetPublicId": "8920a401-66bb-4ad8-a847-90a1582c7026"
+                      },
+                      {
+                        "alt": "Placeholder slide",
+                        "src": "/assets/ph-4x3.svg",
+                        "assetPublicId": "ff794ddb-84e2-48dc-9e1c-10fbf930eff6"
+                      },
+                      {
+                        "alt": "Placeholder slide",
+                        "src": "/assets/ph-4x3.svg",
+                        "assetPublicId": "5780c8eb-3dc0-47ca-a6f1-f7a269816496"
+                      }
+                    ],
+                    "freeGifts": {
+                      "body": "#1: 'Is It Safe?' Quick-Scan Sheets ($19). #2: Med/HRT Conversation Pack ($17). #3: Interaction Tripwires Checklist ($15). #4: Patch/Pill Change Tracker ($12). Total value: $63 \u2014 free today.",
+                      "icon": {
+                        "alt": "Free gifts",
+                        "src": "/assets/ph-square.svg",
+                        "assetPublicId": "f50b8685-d9ac-450a-9c25-6c4429ca9839"
+                      },
+                      "title": "Four Free Bonuses Included With Your Order",
+                      "ctaLabel": "Preview"
+                    },
+                    "watchInAction": {
+                      "label": "WATCH IN ACTION"
+                    }
+                  },
+                  "purchase": {
+                    "cta": {
+                      "urgency": {
+                        "rows": [
+                          {
+                            "tone": "muted",
+                            "label": "FEBRUARY",
+                            "value": "Sold Out (4,780 PuppyPads Were Sold)"
+                          },
+                          {
+                            "tone": "highlight",
+                            "label": "MARCH",
+                            "value": "99% Sold (5,346 out of 5,400 PuppyPads)"
+                          }
+                        ],
+                        "message": "We are selling out more than expected. Order now before we run out again."
+                      },
+                      "subBullets": [
+                        "Instant digital access \u2014 download today",
+                        "30-day no-guessing money-back guarantee"
+                      ],
+                      "labelTemplate": "Yes, I want the safety-screened handbook \u2192"
+                    },
+                    "size": {
+                      "title": "1. Select Your Size:",
+                      "options": [
+                        {
+                          "id": "__default_size",
+                          "label": "Default Size",
+                          "sizeCm": "(40x60cm)",
+                          "sizeIn": "16x24 Inches"
+                        }
+                      ],
+                      "helpLinkLabel": "Unsure What Size To Get?",
+                      "shippingDelayLabel": "Please Allow An Additional 5 Days For Shipping This Color & Size Due To High Demand"
+                    },
+                    "color": {
+                      "title": "2. Select Your Color:",
+                      "options": [
+                        {
+                          "id": "__default_color",
+                          "label": "Default Color",
+                          "swatch": "#9CA3AF"
+                        }
+                      ],
+                      "outOfStockBody": "Please try a different color or size.",
+                      "outOfStockTitle": "This color in this size is currently out of stock."
+                    },
+                    "offer": {
+                      "title": "3. Select Your Offer:",
+                      "options": [
+                        {
+                          "id": "variant_a",
+                          "image": {
+                            "alt": "Bundle: 1 PuppyPad",
+                            "src": "/assets/ph-square.svg",
+                            "assetPublicId": "9b5b0612-8a5c-41ad-b847-50ee4dcb9b96"
+                          },
+                          "price": 50,
+                          "title": "Default Title",
+                          "compareAt": 0,
+                          "saveLabel": ""
+                        }
+                      ],
+                      "helperText": "Everything is designed to be used in under five minutes. Look up your situation, run the Quick-Scan, check the flags, make a more informed decision. Educational reference only \u2014 not medical advice.",
+                      "seeWhyLabel": "Click to see why."
+                    },
+                    "title": "The Honest Herbalist Handbook \u2014 Anxiety-After-Meds/HRT Quick-Reference Edition",
+                    "benefits": [
+                      {
+                        "text": "Symptom-to-options index organized by situation, not just by plant"
+                      },
+                      {
+                        "text": "Contraindication Quick-Scan Tables \u2014 Green/Yellow/Red flag system for every herb"
+                      },
+                      {
+                        "text": "Conservative dosage guidance adjusted for post-medication and post-HRT contexts"
+                      },
+                      {
+                        "text": "'When to avoid' plain-language notes including specific drug classes"
+                      },
+                      {
+                        "text": "'When to seek care' triage guidance \u2014 know when herbs aren't the right tool"
+                      },
+                      {
+                        "text": "Evidence grading per remedy \u2014 research-supported vs. traditional use only"
+                      }
+                    ],
+                    "faqPills": [
+                      {
+                        "label": "How does it work?",
+                        "answer": "Our patented pheromone technology naturally attracts dogs to the pad - no training needed. The 4-layer system instantly absorbs and locks in moisture while the antimicrobial layer prevents odors."
+                      },
+                      {
+                        "label": "Will my dog use it?",
+                        "answer": "Most dogs naturally recognize PuppyPad as a bathroom spot thanks to our pheromone scent signals. Place it where your dog usually goes and they'll quickly learn it's their designated area."
+                      },
+                      {
+                        "label": "How long does it last?",
+                        "answer": "One PuppyPad is built to last 300+ washes (often more than a year) with normal use and proper care."
+                      },
+                      {
+                        "label": "Will the pee not make it smell?",
+                        "answer": "No \u2014 PuppyPad's antimicrobial core traps and neutralizes odor at the source, so your home stays fresh between washes."
+                      },
+                      {
+                        "label": "How strong is it?",
+                        "answer": "It uses military-grade, chew-resistant fabric designed to withstand scratching, digging, and typical chewing much better than disposables."
+                      },
+                      {
+                        "label": "How quick does it absorb?",
+                        "answer": "The multi-layer core absorbs quickly and locks in moisture so liquid does not pool or spread across the surface."
+                      },
+                      {
+                        "label": "How do I wash it?",
+                        "answer": "Machine wash on a regular cycle. Tumble dry low or hang dry. The pad is designed to maintain performance across hundreds of washes."
+                      },
+                      {
+                        "label": "Is it slippery?",
+                        "answer": "No \u2014 the anti-slip backing is designed to stay in place on common floor types to help prevent slips and shifting."
+                      },
+                      {
+                        "label": "What if I don't like it?",
+                        "answer": "You are covered by the risk-free guarantee. If you are not satisfied, you can request a refund according to the guarantee terms."
+                      }
+                    ],
+                    "outOfStock": [
+                      {
+                        "sizeId": "medium",
+                        "colorId": "white"
+                      }
+                    ],
+                    "shippingDelay": [
+                      {
+                        "sizeId": "medium",
+                        "colorId": "brave-beige"
+                      }
+                    ],
+                    "variantSchema": {
+                      "defaults": {
+                        "sizeId": "__default_size",
+                        "colorId": "__default_color"
+                      },
+                      "dimensions": [
+                        {
+                          "id": "offerId",
+                          "type": "offer",
+                          "label": "Offer",
+                          "sourceKey": "offerId"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "modals": {
+                  "freeGifts": {
+                    "body": "Drop your downloadable gift links or preview images here.",
+                    "title": "Your Free Gifts"
+                  },
+                  "sizeChart": {
+                    "note": "Tip: if you\u2019re between sizes, choose the larger size for more coverage.",
+                    "sizes": [
+                      {
+                        "size": "16x24 in (40x60 cm)",
+                        "label": "SMALL",
+                        "weight": "Up to ~15 lbs",
+                        "idealFor": "Puppies, small breeds"
+                      },
+                      {
+                        "size": "28x32 in (70x80 cm)",
+                        "label": "MEDIUM",
+                        "weight": "~15\u201355 lbs",
+                        "idealFor": "Most dogs, apartments"
+                      },
+                      {
+                        "size": "32x35 in (80x90 cm)",
+                        "label": "LARGE",
+                        "weight": "55+ lbs",
+                        "idealFor": "Large breeds, multiple pets"
+                      }
+                    ],
+                    "title": "Size Comparison Chart"
+                  },
+                  "whyBundle": {
+                    "body": "Families often choose a larger bundle so they can rotate pads while washing/drying.",
+                    "title": "Why Get 6 PuppyPads?",
+                    "quotes": [
+                      {
+                        "text": "We love having extras so we can swap and wash without stress.",
+                        "author": "A. Customer"
+                      },
+                      {
+                        "text": "One in the laundry, one on the floor \u2014 it just works.",
+                        "author": "B. Customer"
+                      },
+                      {
+                        "text": "The savings made sense for our two dogs.",
+                        "author": "C. Customer"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "type": "SalesPdpVideos",
+              "props": {
+                "id": "sales-pdp-videos",
+                "config": {
+                  "badge": "CUSTOMERS LOVE THIS",
+                  "title": "See It In Action",
+                  "videos": [
+                    {
+                      "id": "v1",
+                      "thumbnail": {
+                        "alt": "Video testimonial 1",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b"
+                      }
+                    },
+                    {
+                      "id": "v2",
+                      "thumbnail": {
+                        "alt": "Video testimonial 2",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b"
+                      }
+                    },
+                    {
+                      "id": "v3",
+                      "thumbnail": {
+                        "alt": "Video testimonial 3",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b"
+                      }
+                    },
+                    {
+                      "id": "v4",
+                      "thumbnail": {
+                        "alt": "Video testimonial 4",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "SalesPdpMarquee",
+              "props": {
+                "id": "sales-pdp-marquee",
+                "config": {
+                  "items": [
+                    "SUPER STRONG",
+                    "COMFY",
+                    "ANTI-SLIP",
+                    "FAST ABSORPTION",
+                    "NO TRAINING REQUIRED",
+                    "REUSABLE",
+                    "NO SMELLS"
+                  ],
+                  "repeat": 2
+                }
+              }
+            },
+            {
+              "type": "SalesPdpStoryProblem",
+              "props": {
+                "id": "sales-pdp-story-problem",
+                "config": {
+                  "bg": "peach",
+                  "id": "how-it-works",
+                  "badge": "THE PROBLEM",
+                  "image": {
+                    "alt": "Kitchen mess comparison image",
+                    "src": "/assets/ph-4x3.svg",
+                    "assetPublicId": "7346466f-c3fc-4398-8dd2-dcc993bdab89"
+                  },
+                  "title": "Why Herb Guides Fail People on Prescriptions",
+                  "layout": "textLeft",
+                  "paragraphs": [
+                    "If gabapentin made your anxiety worse \u2014 or HRT sent your symptoms in the wrong direction \u2014 you already know the frustration of looking for a gentler alternative and hitting a wall.",
+                    "Most herb guides hand you a list. Ashwagandha. Lemon balm. Valerian. Maybe a dosage range. What they almost never include: which of those herbs amplify sedation when combined with CNS-active medications, which ones conflict with hormone-based therapies, or when you should call your doctor instead of trying something new.",
+                    "One person on Reddit put it plainly: 'I'm on several prescription meds and I'm always hesitant to use herbs because I can't find interaction info.' Those aren't edge-case questions. They're the question most herb guides quietly ignore \u2014 and the gap that creates real risk."
+                  ],
+                  "emphasisLine": "The problem isn't herbs. The problem is herb guides written as if nobody takes prescriptions."
+                }
+              }
+            },
+            {
+              "type": "SalesPdpStorySolution",
+              "props": {
+                "id": "sales-pdp-story-solution",
+                "config": {
+                  "bg": "blue",
+                  "id": "solution",
+                  "badge": "THE SOLUTION",
+                  "image": {
+                    "alt": "Dog resting near PuppyPad",
+                    "src": "/assets/Attraction.webp",
+                    "assetPublicId": "415de636-4df3-453b-a5eb-b615f80abe9e"
+                  },
+                  "title": "How the Contraindication Quick-Scan Tables Work",
+                  "layout": "textRight",
+                  "bullets": [
+                    {
+                      "body": "A symptom-to-options index points you to conservative starting choices for post-medication or post-HRT anxiety \u2014 not every herb ever studied, just the ones with the gentlest profiles for your context.",
+                      "title": "Start with your situation, not the herb"
+                    },
+                    {
+                      "body": "Every herb entry carries a flag: Green (generally well-tolerated), Yellow (check with prescriber first), Red (avoid with this drug class). You see it in seconds, not after reading three paragraphs.",
+                      "title": "Run the Contraindication Quick-Scan"
+                    },
+                    {
+                      "body": "Each entry includes a conservative starting range and plain-language notes on when that herb is not appropriate \u2014 specific drug classes, health conditions, and timing considerations included.",
+                      "title": "Check dosage and 'when to avoid' notes"
+                    },
+                    {
+                      "body": "The included Patch/Pill Change Tracker lets you log what you tried, when, and what changed. Patterns become visible. Guessing becomes optional.",
+                      "title": "Track what happens"
+                    }
+                  ],
+                  "callout": {
+                    "leftBody": "Organized by plant. Interaction data buried in footnotes or missing entirely. Generic dosage ranges. No tracking tools. Written as if nobody takes prescriptions.",
+                    "leftTitle": "Typical Herb Guide",
+                    "rightBody": "Organized by situation. Contraindication Quick-Scan flags built into every entry. Conservative dosage for post-med/HRT context. Tracking tools and clinician conversation pack included.",
+                    "rightTitle": "Honest Herbalist Handbook"
+                  },
+                  "paragraphs": [
+                    "A 2020 review in the British Journal of Clinical Pharmacology found that herb-drug interactions are underreported and rarely flagged in consumer references. The consequence: people combining sedating herbs with CNS-active medications without knowing the additive risk. That's what happens when herb guides skip the interaction data.",
+                    "The Honest Herbalist Handbook is built around triage logic \u2014 your situation first, the herb second. Every entry carries a Quick-Scan flag so you know in seconds whether an herb is appropriate for your medication context."
+                  ]
+                }
+              }
+            },
+            {
+              "type": "SalesPdpComparison",
+              "props": {
+                "id": "sales-pdp-comparison",
+                "config": {
+                  "id": "comparison",
+                  "rows": [
+                    {
+                      "pup": "Built into every entry",
+                      "label": "Interaction flags for common meds",
+                      "disposable": "Rarely included"
+                    },
+                    {
+                      "pup": "Prominent Quick-Scan flag",
+                      "label": "'When to avoid' guidance",
+                      "disposable": "Buried or missing"
+                    },
+                    {
+                      "pup": "Adjusted for post-med/HRT context",
+                      "label": "Conservative dosage guidance",
+                      "disposable": "Generic ranges only"
+                    },
+                    {
+                      "pup": "Patch/Pill Change Tracker included",
+                      "label": "Tracking tools",
+                      "disposable": "Not included"
+                    },
+                    {
+                      "pup": "Med/HRT Conversation Pack included",
+                      "label": "Clinician conversation support",
+                      "disposable": "Not included"
+                    }
+                  ],
+                  "badge": "Side-by-Side Comparison",
+                  "title": "What You Get vs. What Most Herb Guides Provide",
+                  "columns": {
+                    "pup": "Honest Herbalist Handbook",
+                    "disposable": "Typical Herb Guide"
+                  },
+                  "swipeHint": "Swipe to compare \u2192"
+                }
+              }
+            },
+            {
+              "type": "SalesPdpGuarantee",
+              "props": {
+                "id": "sales-pdp-guarantee",
+                "config": {
+                  "id": "guarantee",
+                  "badge": "NO RISK PROMISE",
+                  "right": {
+                    "image": {
+                      "alt": "Customer photo",
+                      "src": "/assets/ph-4x3.svg",
+                      "assetPublicId": "bb38757e-d3df-4347-ae48-1e5846c429d2",
+                      "testimonialTemplate": "review_card"
+                    },
+                    "reviewCard": {
+                      "name": "Maria Fig",
+                      "text": "My dog finally chose the pad on her own. No drips, no smell, and it\u2019s much easier to clean.",
+                      "rating": 5,
+                      "verifiedLabel": "Verified Customer"
+                    },
+                    "commentThread": {
+                      "label": "You Can Manually Scroll",
+                      "comments": [
+                        {
+                          "name": "Terri Applegate Johnson",
+                          "text": "I got 4 and I love them. Added surprise, one of my cats uses them!"
+                        },
+                        {
+                          "name": "Mary Lou Samuel",
+                          "text": "They work great!!!!!"
+                        },
+                        {
+                          "name": "Lynda Hartwick",
+                          "text": "My gracie likes to pee on one and poo on the other. Still going strong."
+                        }
+                      ]
+                    }
+                  },
+                  "title": "The 30-Day No-Guessing Money-Back Guarantee",
+                  "whyBody": "Because we're confident the handbook delivers what it promises: a safety-screened, organized reference built for people already on medications who need real interaction guidance. If it doesn't do that for you, you shouldn't pay for it.",
+                  "whyTitle": "Why We Offer This Guarantee",
+                  "paragraphs": [
+                    "If the Honest Herbalist Handbook isn't clearer, more organized, and more useful for your medication situation than searching forums \u2014 email us within 30 days for a full refund. No forms, no hoops, no questions designed to talk you out of it.",
+                    "We offer this guarantee because the people who need this handbook most have already been burned by incomplete information. You should be able to try it without risk."
+                  ],
+                  "closingLine": "This handbook is an educational reference only \u2014 not medical care, diagnosis, or treatment. Always consult your healthcare provider before making changes to your health routine."
+                },
+                "feedImages": [
+                  {
+                    "alt": "Customer review 1",
+                    "src": "/assets/reason5.webp",
+                    "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 2",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Customer review 3",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 4",
+                    "src": "/assets/reason5.webp",
+                    "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 5",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Customer review 6",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 7",
+                    "src": "/assets/reason5.webp",
+                    "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 8",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Customer review 9",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 10",
+                    "src": "/assets/reason5.webp",
+                    "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 11",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Customer review 12",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 13",
+                    "src": "/assets/reason5.webp",
+                    "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Customer review 14",
+                    "src": "/assets/ph-3x4.svg",
+                    "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                    "testimonialTemplate": "social_comment"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "SalesPdpFaq",
+              "props": {
+                "id": "sales-pdp-faq",
+                "config": {
+                  "id": "faq",
+                  "items": [
+                    {
+                      "answer": "The handbook is an educational reference designed specifically for people who are on medications. It includes Contraindication Quick-Scan Tables and 'when to avoid' flags for each herb. It is not a substitute for medical advice \u2014 it's a tool to support better-informed conversations with your prescriber.",
+                      "question": "Is this handbook safe to use if I'm on prescription medications?"
+                    },
+                    {
+                      "answer": "The handbook covers the most common drug classes relevant to anxiety and sleep: gabapentin and related anticonvulsants, benzodiazepines, SSRIs and SNRIs, hormone therapies including HRT patches and pills, and common OTC sleep aids. A 'Common Interaction Tripwires' checklist is also included.",
+                      "question": "What medications does the interaction guidance cover?"
+                    },
+                    {
+                      "answer": "Most herb guides are organized by plant and written for people who aren't on medications. This handbook is organized by situation and built around triage logic: your symptoms first, then a safety screen, then conservative options with clear flags. The Quick-Scan Tables are built into every entry \u2014 not buried in footnotes.",
+                      "question": "I've tried herb guides before and they didn't address my situation. How is this different?"
+                    },
+                    {
+                      "answer": "The handbook is a digital download in PDF format, accessible immediately after purchase on any device. The Quick-Scan Sheets and Tracker are printable if you prefer a physical reference.",
+                      "question": "What format is the handbook?"
+                    },
+                    {
+                      "answer": "Email us within 30 days for a full refund. No questions designed to talk you out of it. The 30-day no-guessing guarantee is unconditional.",
+                      "question": "What if I'm not satisfied?"
+                    },
+                    {
+                      "answer": "No. The Honest Herbalist Handbook is an educational reference only. It is not intended to diagnose, treat, cure, or prevent any condition. It is designed to support \u2014 not replace \u2014 the guidance of your healthcare provider.",
+                      "question": "Is this medical advice?"
+                    }
+                  ],
+                  "title": "Your Questions About the Handbook and Herb Safety"
+                }
+              }
+            },
+            {
+              "type": "SalesPdpReviews",
+              "props": {
+                "id": "sales-pdp-reviews",
+                "config": {
+                  "id": "reviews",
+                  "data": {
+                    "filters": {
+                      "sorts": [
+                        {
+                          "label": "Most recent",
+                          "value": "most_recent"
+                        },
+                        {
+                          "label": "Highest rating",
+                          "value": "highest_rating"
+                        },
+                        {
+                          "label": "Lowest rating",
+                          "value": "lowest_rating"
+                        },
+                        {
+                          "label": "Most helpful",
+                          "value": "most_helpful"
+                        }
+                      ],
+                      "ratings": [
+                        {
+                          "label": "5",
+                          "value": 5
+                        },
+                        {
+                          "label": "4",
+                          "value": 4
+                        },
+                        {
+                          "label": "3",
+                          "value": 3
+                        },
+                        {
+                          "label": "2",
+                          "value": 2
+                        },
+                        {
+                          "label": "1",
+                          "value": 1
+                        }
+                      ],
+                      "countries": [
+                        {
+                          "code": "US",
+                          "label": "United States"
+                        },
+                        {
+                          "code": "CA",
+                          "label": "Canada"
+                        },
+                        {
+                          "code": "GB",
+                          "label": "United Kingdom"
+                        }
+                      ]
+                    },
+                    "reviews": [
+                      {
+                        "id": "r_1001",
+                        "body": "I have had my Sauna Blanket for over 4 years now. I can not live without it. I suffer from insomnia but have the best night sleep after using it. After a long stressful day nothing relaxes me better than using it. I get compliments on how my skin just glows. My routine is to first use my copper brush and then hop in for 40 minutes. Easy to clean and store.",
+                        "title": "Cant live without my Sauna Blanket!",
+                        "author": {
+                          "name": "DENISE B.",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "country": "US",
+                        "topicIds": [
+                          "sleep",
+                          "results",
+                          "cleaning"
+                        ],
+                        "createdAt": "2026-02-04T00:00:00.000Z",
+                        "helpfulCount": 28
+                      },
+                      {
+                        "id": "r_1002",
+                        "body": "Warm-up is quick and consistent. The materials feel durable and the zipper area holds up well. I use it a few times a week and it\u2019s been an easy way to decompress after training.",
+                        "media": [
+                          {
+                            "id": "rm_1",
+                            "alt": "Blanket close-up",
+                            "url": "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=900&q=60",
+                            "type": "image"
+                          }
+                        ],
+                        "title": "Heats fast and feels premium",
+                        "author": {
+                          "name": "MARCUS L.",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "country": "CA",
+                        "topicIds": [
+                          "heat",
+                          "material"
+                        ],
+                        "createdAt": "2026-01-28T00:00:00.000Z",
+                        "helpfulCount": 11
+                      },
+                      {
+                        "id": "r_1003",
+                        "body": "I\u2019m seeing solid results and love the overall experience. The only downside is that it\u2019s a bit bulky to pack for travel, but at home it\u2019s perfect. Cleaning is straightforward.",
+                        "title": "Great results, a little bulky",
+                        "author": {
+                          "name": "ALEX R.",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 4,
+                        "country": "US",
+                        "topicIds": [
+                          "results",
+                          "bag"
+                        ],
+                        "createdAt": "2026-01-17T00:00:00.000Z",
+                        "helpfulCount": 6
+                      },
+                      {
+                        "id": "r_1004",
+                        "body": "I was worried about sizing, but it fits comfortably and I can fold it up without a fight. Using it after workouts has become part of my weekly routine.",
+                        "title": "Fits well and easy to store",
+                        "author": {
+                          "name": "PRIYA S.",
+                          "verifiedBuyer": false
+                        },
+                        "rating": 5,
+                        "country": "GB",
+                        "topicIds": [
+                          "fit",
+                          "size"
+                        ],
+                        "createdAt": "2026-01-05T00:00:00.000Z",
+                        "helpfulCount": 3
+                      }
+                    ],
+                    "summary": {
+                      "topics": [
+                        {
+                          "id": "pain",
+                          "label": "pain"
+                        },
+                        {
+                          "id": "length",
+                          "label": "length"
+                        },
+                        {
+                          "id": "size",
+                          "label": "size"
+                        },
+                        {
+                          "id": "fit",
+                          "label": "fit"
+                        },
+                        {
+                          "id": "results",
+                          "label": "results"
+                        },
+                        {
+                          "id": "material",
+                          "label": "material"
+                        },
+                        {
+                          "id": "smell",
+                          "label": "smell"
+                        },
+                        {
+                          "id": "bag",
+                          "label": "bag"
+                        },
+                        {
+                          "id": "heat",
+                          "label": "heat"
+                        },
+                        {
+                          "id": "sleep",
+                          "label": "sleep"
+                        },
+                        {
+                          "id": "setup",
+                          "label": "setup"
+                        },
+                        {
+                          "id": "cleaning",
+                          "label": "cleaning"
+                        }
+                      ],
+                      "breakdown": [
+                        {
+                          "count": 2046,
+                          "rating": 5
+                        },
+                        {
+                          "count": 162,
+                          "rating": 4
+                        },
+                        {
+                          "count": 24,
+                          "rating": 3
+                        },
+                        {
+                          "count": 7,
+                          "rating": 2
+                        },
+                        {
+                          "count": 4,
+                          "rating": 1
+                        }
+                      ],
+                      "customersSay": "Readers consistently say this is the first herb reference that actually addresses their medication situation \u2014 with Quick-Scan tables, honest interaction flags, and a tone that respects their intelligence without making wild claims.",
+                      "mediaGallery": [
+                        {
+                          "id": "m1",
+                          "alt": "Blanket photo",
+                          "url": "https://images.unsplash.com/photo-1520975682071-a8bcd44b2d7a?auto=format&fit=crop&w=900&q=60",
+                          "type": "image"
+                        },
+                        {
+                          "id": "m2",
+                          "alt": "Blanket close-up",
+                          "url": "https://images.unsplash.com/photo-1523413651479-597eb2da0ad6?auto=format&fit=crop&w=900&q=60",
+                          "type": "image"
+                        },
+                        {
+                          "id": "m3",
+                          "alt": "Packaging",
+                          "url": "https://images.unsplash.com/photo-1520975594319-4d681c0f9cbb?auto=format&fit=crop&w=900&q=60",
+                          "type": "image"
+                        },
+                        {
+                          "id": "m4",
+                          "alt": "Bag detail",
+                          "url": "https://images.unsplash.com/photo-1520975890466-8e21b9b0e8ff?auto=format&fit=crop&w=900&q=60",
+                          "type": "image"
+                        },
+                        {
+                          "id": "m5",
+                          "alt": "Product materials",
+                          "url": "https://images.unsplash.com/photo-1523413691479-671119f9bb9a?auto=format&fit=crop&w=900&q=60",
+                          "type": "image"
+                        },
+                        {
+                          "id": "m6",
+                          "alt": "Product in use",
+                          "url": "https://images.unsplash.com/photo-1519710164239-da123dc03ef4?auto=format&fit=crop&w=900&q=60",
+                          "type": "image"
+                        },
+                        {
+                          "id": "m7",
+                          "alt": "Logo tag",
+                          "url": "https://images.unsplash.com/photo-1520975687844-6c3e0b7b0b09?auto=format&fit=crop&w=900&q=60",
+                          "type": "image"
+                        },
+                        {
+                          "id": "m8",
+                          "alt": "Zipper detail",
+                          "url": "https://images.unsplash.com/photo-1520975741711-7b6b8a436b28?auto=format&fit=crop&w=900&q=60",
+                          "type": "image"
+                        }
+                      ],
+                      "totalReviews": 2243,
+                      "averageRating": 4.9
+                    },
+                    "productId": "infrared-sauna-blanket",
+                    "pagination": {
+                      "page": 1,
+                      "pageSize": 10,
+                      "totalPages": 225,
+                      "totalReviews": 2243
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "SalesPdpReviewWall",
+              "props": {
+                "id": "sales-pdp-review-wall",
+                "config": {
+                  "id": "reviews",
+                  "badge": "Rated 4.8/5 across 340+ verified readers",
+                  "tiles": [
+                    {
+                      "id": "tile-1",
+                      "image": {
+                        "alt": "Customer review 1",
+                        "src": "/assets/reason5.webp",
+                        "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-2",
+                      "image": {
+                        "alt": "Customer review 2",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-3",
+                      "image": {
+                        "alt": "Customer review 3",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-4",
+                      "image": {
+                        "alt": "Customer review 4",
+                        "src": "/assets/reason5.webp",
+                        "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-5",
+                      "image": {
+                        "alt": "Customer review 5",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-6",
+                      "image": {
+                        "alt": "Customer review 6",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-7",
+                      "image": {
+                        "alt": "Customer review 7",
+                        "src": "/assets/reason5.webp",
+                        "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-8",
+                      "image": {
+                        "alt": "Customer review 8",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-9",
+                      "image": {
+                        "alt": "Customer review 9",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-10",
+                      "image": {
+                        "alt": "Customer review 10",
+                        "src": "/assets/reason5.webp",
+                        "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-11",
+                      "image": {
+                        "alt": "Customer review 11",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-12",
+                      "image": {
+                        "alt": "Customer review 12",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-13",
+                      "image": {
+                        "alt": "Customer review 13",
+                        "src": "/assets/reason5.webp",
+                        "assetPublicId": "fa478f09-4bb4-4f8d-a24d-feb909d1b330",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-14",
+                      "image": {
+                        "alt": "Customer review 14",
+                        "src": "/assets/ph-3x4.svg",
+                        "assetPublicId": "7ae4d9d4-b972-4272-99df-dd878724043b",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    }
+                  ],
+                  "title": "What Readers Say About the Handbook",
+                  "ratingLabel": "4.8 out of 5 stars",
+                  "showMoreLabel": "Show more reviews"
+                },
+                "hidden": true
+              }
+            },
+            {
+              "type": "SalesPdpFooter",
+              "props": {
+                "id": "sales-pdp-footer",
+                "config": {
+                  "logo": {
+                    "alt": "The Honest Herbalist - Clinical Grade Botanicals",
+                    "src": "/assets/puppypad-logo.svg",
+                    "assetPublicId": "74772eba-9822-424e-a260-92a92095fd0f"
+                  },
+                  "copyright": "\u00a9 All rights reserved."
+                }
+              }
+            }
+          ],
+          "anchorId": "top"
+        }
+      }
+    ]
+  }
+}

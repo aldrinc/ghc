@@ -1,0 +1,414 @@
+{
+  "page": {
+    "id": "1423b2d9-8bed-4531-a03c-7620d19b922c",
+    "name": "Pre-Sales",
+    "slug": "pre-sales",
+    "template_id": "pre-sales-listicle",
+    "review_status": "review"
+  },
+  "latest_version": {
+    "id": "2dd169c7-78ca-4ba6-be65-1dabad6811e1",
+    "source": "ai",
+    "status": "draft",
+    "created_at": "2026-03-03T16:19:06.551132+00:00"
+  },
+  "copy_text_samples": [
+    "PuppyPad Listicle Template",
+    "A React + Vite template that recreates the PuppyPad listicle pre-sales layout.",
+    "/assets/Attraction.webp",
+    "6ea833db-9a77-4131-87ea-5b6b2251b35d",
+    "What Most Herb Guides Get Wrong About Your Prescriptions",
+    "New research reveals the interaction gap that leaves medicated readers guessing — and what a safety-first herb reference actually looks like.",
+    "Safety-First Reference",
+    "Contraindication Quick-Scan Tables",
+    "Safety-First Reference icon",
+    "/assets/5-stars-reviews-icon.webp",
+    "86c16d41-927c-4470-a0d3-081ff7883c34",
+    "Built for Medicated Readers",
+    "Herb–Drug Interaction Guidance",
+    "Built for Medicated Readers icon",
+    "/assets/free-shipping-icon.webp",
+    "f0c90501-66bf-4a74-906c-bef6d1db1a31",
+    "30-Day No-Guessing Guarantee",
+    "30-Day No-Guessing Guarantee icon",
+    "/assets/risk-free-icon.webp",
+    "903e6b5b-9c42-4f62-8258-c64108d49c46",
+    "General herb references list benefits and broad cautions — but they were written for a baseline population not managing gabapentin, HRT, blood pressure drugs, or antidepressants. If you're on a prescription, the standard guide is missing the chapter that applies to you.",
+    "Most herb guides were written for people not on any medications visual",
+    "8a9c3f46-b717-4be5-8cd8-9a64456e3377",
+    "Most herb guides were written for people not on any medications",
+    "Over a decade of herb-drug interaction research has accumulated in clinical literature. The gap isn't in the science. It's in whether that science has been organized into a format a non-clinician can use before making a decision — not after something goes wrong.",
+    "The interaction data exists — it just hasn't been translated for home use visual",
+    "2fe01ef3-9b3f-4bd6-8333-9762e3e9679d",
+    "The interaction data exists — it just hasn't been translated for home use",
+    "A safety-first reference starts with your medication situation and works outward: what are the conservative starting points, what should you flag first, and what should you avoid entirely. That structure — contraindication scan before herb selection — is what's missing from most guides.",
+    "Triage before trial changes the entire decision visual",
+    "8fb34cfa-4b0f-48d0-b640-cf09056a902d",
+    "Triage before trial changes the entire decision",
+    "Doctors unfamiliar with herbs often say 'just avoid it all' — honest but unhelpful. A structured quick-scan reference gives you something concrete to bring to that conversation, so you're not starting from zero every time.",
+    "Vague advice leaves you stuck between guessing and avoiding everything visual",
+    "a8ec96cb-2088-4191-99f1-9325e22893c2",
+    "Vague advice leaves you stuck between guessing and avoiding everything",
+    "When anxiety or dizziness spikes after a new medication or hormone adjustment, the cause isn't always obvious. A simple log that captures what you tried, when, and what changed gives you real data to work with over time.",
+    "Tracking patterns after a med change is how you find what actually helps visual",
+    "ee8cd491-eaa8-41fe-9a9d-11098577a020",
+    "Tracking patterns after a med change is how you find what actually helps"
+  ],
+  "puck_data": {
+    "root": {
+      "props": {
+        "title": "PuppyPad Listicle Template",
+        "description": "A React + Vite template that recreates the PuppyPad listicle pre-sales layout."
+      }
+    },
+    "zones": {},
+    "content": [
+      {
+        "type": "PreSalesPage",
+        "props": {
+          "id": "pre-sales-page",
+          "theme": {
+            "tokens": {}
+          },
+          "content": [
+            {
+              "type": "PreSalesHero",
+              "props": {
+                "id": "pre-sales-hero",
+                "config": {
+                  "hero": {
+                    "media": {
+                      "alt": "PuppyPad in use",
+                      "src": "/assets/Attraction.webp",
+                      "type": "image",
+                      "assetPublicId": "6ea833db-9a77-4131-87ea-5b6b2251b35d"
+                    },
+                    "title": "What Most Herb Guides Get Wrong About Your Prescriptions",
+                    "subtitle": "New research reveals the interaction gap that leaves medicated readers guessing — and what a safety-first herb reference actually looks like."
+                  },
+                  "badges": [
+                    {
+                      "label": "Safety-First Reference",
+                      "value": "Contraindication Quick-Scan Tables",
+                      "iconAlt": "Safety-First Reference icon",
+                      "iconSrc": "/assets/5-stars-reviews-icon.webp",
+                      "iconAssetPublicId": "86c16d41-927c-4470-a0d3-081ff7883c34"
+                    },
+                    {
+                      "label": "Built for Medicated Readers",
+                      "value": "Herb–Drug Interaction Guidance",
+                      "iconAlt": "Built for Medicated Readers icon",
+                      "iconSrc": "/assets/free-shipping-icon.webp",
+                      "iconAssetPublicId": "f0c90501-66bf-4a74-906c-bef6d1db1a31"
+                    },
+                    {
+                      "label": "30-Day No-Guessing Guarantee",
+                      "iconAlt": "30-Day No-Guessing Guarantee icon",
+                      "iconSrc": "/assets/risk-free-icon.webp",
+                      "iconAssetPublicId": "903e6b5b-9c42-4f62-8258-c64108d49c46"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "PreSalesReasons",
+              "props": {
+                "id": "pre-sales-reasons",
+                "config": [
+                  {
+                    "body": "General herb references list benefits and broad cautions — but they were written for a baseline population not managing gabapentin, HRT, blood pressure drugs, or antidepressants. If you're on a prescription, the standard guide is missing the chapter that applies to you.",
+                    "image": {
+                      "alt": "Most herb guides were written for people not on any medications visual",
+                      "assetPublicId": "8a9c3f46-b717-4be5-8cd8-9a64456e3377"
+                    },
+                    "title": "Most herb guides were written for people not on any medications",
+                    "number": 1
+                  },
+                  {
+                    "body": "Over a decade of herb-drug interaction research has accumulated in clinical literature. The gap isn't in the science. It's in whether that science has been organized into a format a non-clinician can use before making a decision — not after something goes wrong.",
+                    "image": {
+                      "alt": "The interaction data exists — it just hasn't been translated for home use visual",
+                      "assetPublicId": "2fe01ef3-9b3f-4bd6-8333-9762e3e9679d"
+                    },
+                    "title": "The interaction data exists — it just hasn't been translated for home use",
+                    "number": 2
+                  },
+                  {
+                    "body": "A safety-first reference starts with your medication situation and works outward: what are the conservative starting points, what should you flag first, and what should you avoid entirely. That structure — contraindication scan before herb selection — is what's missing from most guides.",
+                    "image": {
+                      "alt": "Triage before trial changes the entire decision visual",
+                      "assetPublicId": "8fb34cfa-4b0f-48d0-b640-cf09056a902d"
+                    },
+                    "title": "Triage before trial changes the entire decision",
+                    "number": 3
+                  },
+                  {
+                    "body": "Doctors unfamiliar with herbs often say 'just avoid it all' — honest but unhelpful. A structured quick-scan reference gives you something concrete to bring to that conversation, so you're not starting from zero every time.",
+                    "image": {
+                      "alt": "Vague advice leaves you stuck between guessing and avoiding everything visual",
+                      "assetPublicId": "a8ec96cb-2088-4191-99f1-9325e22893c2"
+                    },
+                    "title": "Vague advice leaves you stuck between guessing and avoiding everything",
+                    "number": 4
+                  },
+                  {
+                    "body": "When anxiety or dizziness spikes after a new medication or hormone adjustment, the cause isn't always obvious. A simple log that captures what you tried, when, and what changed gives you real data to work with over time.",
+                    "image": {
+                      "alt": "Tracking patterns after a med change is how you find what actually helps visual",
+                      "assetPublicId": "ee8cd491-eaa8-41fe-9a9d-11098577a020"
+                    },
+                    "title": "Tracking patterns after a med change is how you find what actually helps",
+                    "number": 5
+                  }
+                ]
+              }
+            },
+            {
+              "type": "PreSalesReviews",
+              "props": {
+                "id": "pre-sales-reviews",
+                "config": {
+                  "slides": [
+                    {
+                      "text": "I'd been avoiding herbs entirely because I couldn't find clear interaction info anywhere. This gave me a starting point I actually trusted. I finally felt like I had a process instead of just guessing.",
+                      "author": "Renee M.",
+                      "images": [
+                        {
+                          "alt": "Dog on PuppyPad",
+                          "src": "/assets/Attraction.webp",
+                          "assetPublicId": "f1c37723-9094-40dc-b6b5-37524873f9f6",
+                          "testimonialTemplate": "testimonial_media"
+                        },
+                        {
+                          "alt": "PuppyPad close up",
+                          "src": "/assets/Product-IMG-3-Gray.webp",
+                          "assetPublicId": "1e66d86b-9604-452c-aa74-d2d1c561d5a7",
+                          "testimonialTemplate": "testimonial_media"
+                        },
+                        {
+                          "alt": "PuppyPad guarantee",
+                          "src": "/assets/reason5.webp",
+                          "assetPublicId": "9b506e20-83de-44c3-afb5-04cea00def93",
+                          "testimonialTemplate": "testimonial_media"
+                        }
+                      ],
+                      "rating": 5,
+                      "verified": true
+                    },
+                    {
+                      "text": "I brought the quick-scan sheet to my doctor's appointment. She said it was the clearest summary of herb-drug considerations she'd seen from a patient. That alone was worth it.",
+                      "author": "Patricia W.",
+                      "images": [
+                        {
+                          "alt": "PuppyPad on floor",
+                          "src": "/assets/Product-IMG-3-Gray.webp",
+                          "assetPublicId": "1e66d86b-9604-452c-aa74-d2d1c561d5a7",
+                          "testimonialTemplate": "testimonial_media"
+                        },
+                        {
+                          "alt": "Dog using the pad",
+                          "src": "/assets/Attraction.webp",
+                          "assetPublicId": "f1c37723-9094-40dc-b6b5-37524873f9f6",
+                          "testimonialTemplate": "testimonial_media"
+                        },
+                        {
+                          "alt": "Risk-free trial",
+                          "src": "/assets/reason5.webp",
+                          "assetPublicId": "9b506e20-83de-44c3-afb5-04cea00def93",
+                          "testimonialTemplate": "testimonial_media"
+                        }
+                      ],
+                      "rating": 5,
+                      "verified": true
+                    },
+                    {
+                      "text": "After gabapentin made my anxiety worse, I was scared to try anything else. The contraindication tables helped me understand what to check first. I didn't feel like I was flying blind anymore.",
+                      "author": "Sandra K.",
+                      "images": [
+                        {
+                          "alt": "PuppyPad product badge",
+                          "src": "/assets/reason5.webp",
+                          "assetPublicId": "9b506e20-83de-44c3-afb5-04cea00def93",
+                          "testimonialTemplate": "testimonial_media"
+                        },
+                        {
+                          "alt": "Reusable PuppyPad",
+                          "src": "/assets/Product-IMG-3-Gray.webp",
+                          "assetPublicId": "1e66d86b-9604-452c-aa74-d2d1c561d5a7",
+                          "testimonialTemplate": "testimonial_media"
+                        },
+                        {
+                          "alt": "Dog near pad",
+                          "src": "/assets/Attraction.webp",
+                          "assetPublicId": "f1c37723-9094-40dc-b6b5-37524873f9f6",
+                          "testimonialTemplate": "testimonial_media"
+                        }
+                      ],
+                      "rating": 5,
+                      "verified": true
+                    },
+                    {
+                      "text": "I expected another generic herb list. This is completely different — organized around what you're already taking, not just what the herb does in isolation. That's the reference I needed.",
+                      "author": "Diane L.",
+                      "images": [
+                        {
+                          "alt": "Dog on pad",
+                          "src": "/assets/Attraction.webp",
+                          "assetPublicId": "f1c37723-9094-40dc-b6b5-37524873f9f6",
+                          "testimonialTemplate": "testimonial_media"
+                        },
+                        {
+                          "alt": "Limited time offer",
+                          "src": "/assets/reason5.webp",
+                          "assetPublicId": "9b506e20-83de-44c3-afb5-04cea00def93",
+                          "testimonialTemplate": "testimonial_media"
+                        },
+                        {
+                          "alt": "PuppyPad details",
+                          "src": "/assets/Product-IMG-3-Gray.webp",
+                          "assetPublicId": "1e66d86b-9604-452c-aa74-d2d1c561d5a7",
+                          "testimonialTemplate": "testimonial_media"
+                        }
+                      ],
+                      "rating": 5,
+                      "verified": true
+                    }
+                  ],
+                  "autoAdvanceMs": 6500
+                }
+              }
+            },
+            {
+              "type": "PreSalesMarquee",
+              "props": {
+                "id": "pre-sales-marquee",
+                "config": [
+                  "Contraindication Quick-Scan Tables",
+                  "Herb–Drug Interaction Flags",
+                  "When-to-Avoid Guidance",
+                  "Dosage Notes for Medicated Readers",
+                  "Common Interaction Tripwires Checklist",
+                  "30-Day No-Guessing Guarantee"
+                ]
+              }
+            },
+            {
+              "type": "PreSalesPitch",
+              "props": {
+                "id": "pre-sales-pitch",
+                "config": {
+                  "image": {
+                    "alt": "A safety-screened herb reference built for people already on prescriptions visual",
+                    "src": "/assets/reviews-preview.webp",
+                    "assetPublicId": "b1914b0c-8b5a-40a4-b8f8-01e27c42eb0e"
+                  },
+                  "title": "A safety-screened herb reference built for people already on prescriptions",
+                  "bullets": [
+                    "Contraindication Quick-Scan Tables organized by medication class — check before you try anything",
+                    "Printable Quick-Scan Sheets you can bring to your next appointment",
+                    "Common Interaction Tripwires Checklist covering sedating herbs and common anxiety medications",
+                    "Med/HRT Conversation Pack: what to track and how to describe what you're experiencing",
+                    "Patch/Pill Change Tracker to spot patterns after a medication or hormone adjustment",
+                    "Education-only, clearly labeled — a structured way to make a more informed decision"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "PreSalesReviewWall",
+              "props": {
+                "id": "pre-sales-review-wall",
+                "config": {
+                  "title": "What readers say about finally having a safety-first herb reference",
+                  "columns": [
+                    [
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "src": "/assets/reviews-preview.webp",
+                          "assetPublicId": "fc222361-7337-42b7-ad0b-309d7c08f1fb",
+                          "testimonialTemplate": "review_card"
+                        }
+                      },
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "src": "/assets/ph-3x4.svg",
+                          "assetPublicId": "338b593b-fcca-4325-82ca-f9186165b357",
+                          "testimonialTemplate": "review_card"
+                        }
+                      }
+                    ],
+                    [
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "src": "/assets/ph-3x4.svg",
+                          "assetPublicId": "338b593b-fcca-4325-82ca-f9186165b357",
+                          "testimonialTemplate": "review_card"
+                        }
+                      },
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "src": "/assets/ph-3x4.svg",
+                          "assetPublicId": "338b593b-fcca-4325-82ca-f9186165b357",
+                          "testimonialTemplate": "review_card"
+                        }
+                      }
+                    ],
+                    [
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "src": "/assets/ph-3x4.svg",
+                          "assetPublicId": "338b593b-fcca-4325-82ca-f9186165b357",
+                          "testimonialTemplate": "review_card"
+                        }
+                      },
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "src": "/assets/ph-3x4.svg",
+                          "assetPublicId": "338b593b-fcca-4325-82ca-f9186165b357",
+                          "testimonialTemplate": "review_card"
+                        }
+                      }
+                    ]
+                  ],
+                  "buttonLabel": "See What's Inside the Handbook"
+                }
+              }
+            },
+            {
+              "type": "PreSalesFooter",
+              "props": {
+                "id": "pre-sales-footer",
+                "config": {
+                  "logo": {
+                    "alt": "The Honest Herbalist - Clinical Grade Botanicals",
+                    "src": "/assets/puppypad-logo.svg",
+                    "assetPublicId": "74772eba-9822-424e-a260-92a92095fd0f"
+                  }
+                }
+              }
+            },
+            {
+              "type": "PreSalesFloatingCta",
+              "props": {
+                "id": "pre-sales-floating-cta",
+                "config": {
+                  "label": "See What's Inside the Handbook →",
+                  "linkType": "nextPage",
+                  "showAfterId": "listicle-end"
+                }
+              }
+            }
+          ],
+          "anchorId": "top"
+        }
+      }
+    ]
+  }
+}

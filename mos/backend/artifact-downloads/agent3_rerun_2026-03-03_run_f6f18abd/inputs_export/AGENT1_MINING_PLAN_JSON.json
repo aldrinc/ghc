@@ -1,0 +1,117 @@
+[
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "compliance_flags": "child, drug, hrt, interaction, pregnant, prescription, safe in pregnancy",
+    "estimated_yield": 14,
+    "evidence_refs": [
+      "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json::item[0]"
+    ],
+    "habitat_name": "apify_instagram-scraper_VqEmoxp38D3Au5qk3.json",
+    "habitat_type": "Social_Video",
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 287
+      },
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json::item[100]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S2",
+        "word_count": 175
+      },
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json::item[199]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "Y",
+        "sample_id": "S3",
+        "word_count": 212
+      }
+    ],
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "Y",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "Y",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "Y",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "Y",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "Y",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "Y",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "SOME",
+      "purchasing_comparing": "Y",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "Y",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "Y",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "Y",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "Y"
+    },
+    "platform_behavior_note": "Instagram scrape: 200 items; median text length ~196 words in captured fields — watch for missing context (e.g., comments not fully captured).",
+    "priority_rank": 1,
+    "rank_score": 35,
+    "sampling_strategy": "Process chronologically across items in the file; include early/mid/late items. Extract full title+body (or caption/description). Include mundane low-engagement items alongside any high-engagement ones to avoid popularity bias.",
+    "source_file": "apify_instagram-scraper_VqEmoxp38D3Au5qk3.json",
+    "target_voc_types": [
+      "BUYER_COMPARISONS",
+      "DESIRED_OUTCOMES",
+      "FAILED_SOLUTIONS",
+      "IDENTITY_LANGUAGE",
+      "OBJECTIONS",
+      "POST_PURCHASE",
+      "PROOF_DEMANDS",
+      "TRIGGER_EVENTS"
+    ],
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "video_extension": {
+      "comment_avg_length": "SHORT",
+      "comment_sections_active": "Y",
+      "contains_objection_language": "N",
+      "contains_purchase_intent": "N",
+      "contains_testimonial_language": "N",
+      "creator_diversity": "MANY",
+      "hook_formats_identifiable": "Y",
+      "median_view_count": 91435,
+      "video_count_scraped": 133,
+      "viral_video_count": 0,
+      "viral_videos_found": "N"
+    }
+  }
+]

@@ -1,0 +1,466 @@
+{
+  "page": {
+    "id": "a5886d01-efe6-4977-b74f-9332b6850507",
+    "name": "Pre-Sales",
+    "slug": "pre-sales",
+    "template_id": "pre-sales-listicle",
+    "review_status": "review"
+  },
+  "latest_version": {
+    "id": "28365936-fc1a-44b1-b70f-cd6997651499",
+    "source": "ai",
+    "status": "draft",
+    "created_at": "2026-03-03T17:43:57.865632+00:00"
+  },
+  "copy_text_samples": [
+    "The Honest Herbalist Handbook — Pre-Sales",
+    "A safety-first, quick-reference herb guide for people whose anxiety worsened after gabapentin or HRT. Education-only; not medical advice.",
+    "PreSalesPage",
+    "pre-sales-page",
+    "top",
+    "PreSalesHero",
+    "pre-sales-hero",
+    "What Most Herb Guides Get Wrong About Your Prescriptions",
+    "If gabapentin or HRT made your anxiety worse — not better — this is the safety-first quick-reference built for exactly that situation. No guessing. No forum rabbit holes.",
+    "Woman sitting calmly at a desk reviewing a printed herb reference guide, warm natural light, lifestyle photography",
+    "image",
+    "6ea833db-9a77-4131-87ea-5b6b2251b35d",
+    "Safety-First Reference",
+    "Contraindication Quick-Scan Tables",
+    "Safety shield icon for contraindication quick-scan tables",
+    "/assets/5-stars-reviews-icon.webp",
+    "dcc3fbfb-8db1-4190-b8f3-b5397f807734",
+    "Built for Medicated Readers",
+    "Herb–Drug Interaction Guidance",
+    "Pill and herb leaf interaction icon for medicated readers",
+    "/assets/free-shipping-icon.webp",
+    "2b4f55b6-f3a6-4f51-9878-28bfb6f979b0",
+    "30-Day No-Guessing Guarantee",
+    "Money-back guarantee badge icon",
+    "/assets/risk-free-icon.webp",
+    "05b60986-1074-4a94-ae04-0d588d879c01",
+    "PreSalesReasons",
+    "pre-sales-reasons",
+    "General herb references list benefits and broad cautions — but they were written for a baseline population not managing gabapentin, HRT, blood pressure drugs, or antidepressants. If you're on a prescription, the standard guide is missing the chapter that applies to you.",
+    "Most herb guides were written for people not on any medications",
+    "Open herb reference book next to prescription medication bottles on a table, illustrating the gap between general herb guides and medicated readers",
+    "4e3ac35d-1b90-4d55-b77a-9c8affe0cd80",
+    "Herb-drug interaction research has accumulated in clinical literature. The gap isn't in the science — it's in whether that science has been organized into a format a non-clinician can use before making a decision, not after something goes wrong.",
+    "The interaction data exists — it just hasn't been translated for home use",
+    "Person reading a clinical research paper at home, highlighting text, warm desk lamp light, illustrating the translation gap between research and everyday use",
+    "cc9afe95-a59d-4b15-a450-06a004b5462f",
+    "A safety-first reference starts with your medication situation and works outward: what are the conservative starting points, what should you flag first, and what should you avoid entirely. That structure — contraindication scan before herb selection — is what's missing from most guides.",
+    "Triage before trial changes the entire decision",
+    "Printed checklist with herb names and checkboxes on a desk, representing a contraindication quick-scan triage process",
+    "def94b5e-e805-44a9-818e-18ef8d897251",
+    "Doctors unfamiliar with herbs often say 'just avoid it all' — honest but unhelpful. A structured quick-scan reference gives you something concrete to bring to that conversation, so you're not starting from zero every time.",
+    "Vague advice leaves you stuck between guessing and avoiding everything",
+    "Woman looking frustrated at a laptop screen showing conflicting forum advice about herbs and medications",
+    "dba482ca-0ba0-489e-b02b-5b5b84d8b075",
+    "When anxiety or dizziness spikes after a new medication or hormone adjustment, the cause isn't always obvious. A simple log that captures what you tried, when, and what changed gives you real data to work with — and something meaningful to share at your next appointment.",
+    "Tracking patterns after a med change is how you find what actually helps",
+    "Person writing in a simple health tracking journal next to a cup of herbal tea, representing the Patch and Pill Change Tracker",
+    "a8e60ae1-32eb-48db-8535-9537031e44e8",
+    "PreSalesReviews",
+    "pre-sales-reviews",
+    "I'd been avoiding herbs entirely because I couldn't find clear interaction info anywhere. This gave me a starting point I actually trusted. I finally felt like I had a process instead of just guessing.",
+    "Renee M.",
+    "Renee M. review",
+    "e54d5295-bee1-421b-85c0-1861441197ac",
+    "social_comment",
+    "Handbook quick-scan table example",
+    "2f2f5c73-719b-40f3-8d81-18f04423045f",
+    "review_card",
+    "Printable quick-scan sheet",
+    "f9180a9f-25fc-46b7-a050-edc34925b14d",
+    "I brought the quick-scan sheet to my doctor's appointment. She said it was the clearest summary of herb-drug considerations she'd seen from a patient. That alone was worth it.",
+    "Patricia W.",
+    "Patricia W. review",
+    "3718c727-6da9-4644-b3bc-b7cfcd2c925f",
+    "Med conversation pack example",
+    "14ec73e7-65a1-4fab-94e9-cbb22a0b914c",
+    "Handbook cover",
+    "42197b03-2a27-48f1-8cf0-ebe8eea4192f",
+    "After gabapentin made my anxiety worse, I was scared to try anything else. The contraindication tables helped me understand what to check first. I didn't feel like I was flying blind anymore.",
+    "Sandra K.",
+    "Sandra K. review",
+    "b28cc4a6-b793-46e0-9890-1a0e051d2492",
+    "Interaction tripwires checklist",
+    "8a9dbdb1-40bf-4ab7-95b2-8e59f050d55f",
+    "Patch pill change tracker",
+    "5de75ff5-b744-461b-a318-3cceb8067b05",
+    "I expected another generic herb list. This is completely different — organized around what you're already taking, not just what the herb does in isolation. That's the reference I needed.",
+    "Diane L.",
+    "Diane L. review",
+    "a1aad1d0-8d3b-4a32-ba4a-953eef2db5e3",
+    "Handbook open to contraindication tables",
+    "49551bf9-b4f1-406f-a752-8b6f61b032a9",
+    "Wallet size safety cards",
+    "49f5f47a-830b-4a97-8c70-3b3dbf545a7f",
+    "PreSalesMarquee",
+    "pre-sales-marquee",
+    "PreSalesPitch",
+    "pre-sales-pitch",
+    "A safety-screened herb reference built for people already on prescriptions",
+    "See What's Inside the Handbook →",
+    "nextPage",
+    "The Honest Herbalist Handbook open to the Contraindication Quick-Scan Tables section, shown on a clean desk with a cup of herbal tea",
+    "1ca5e731-cd4e-4e2d-bd77-1342e02f3252",
+    "PreSalesReviewWall",
+    "pre-sales-review-wall",
+    "What readers say about finally having a safety-first herb reference",
+    "See What's Inside the Handbook",
+    "Customer review card",
+    "b25faca3-4df8-4af6-aa7e-fb2d892fa81a",
+    "f11d0346-52f5-46de-ae0e-b56cc276f67b",
+    "PreSalesFooter",
+    "pre-sales-footer",
+    "The Honest Herbalist - Clinical Grade Botanicals",
+    "74772eba-9822-424e-a260-92a92095fd0f",
+    "PreSalesFloatingCta",
+    "pre-sales-floating-cta",
+    "listicle-end"
+  ],
+  "puck_data": {
+    "root": {
+      "props": {
+        "title": "The Honest Herbalist Handbook — Pre-Sales",
+        "description": "A safety-first, quick-reference herb guide for people whose anxiety worsened after gabapentin or HRT. Education-only; not medical advice."
+      }
+    },
+    "zones": {},
+    "content": [
+      {
+        "type": "PreSalesPage",
+        "props": {
+          "id": "pre-sales-page",
+          "theme": {
+            "tokens": {}
+          },
+          "content": [
+            {
+              "type": "PreSalesHero",
+              "props": {
+                "id": "pre-sales-hero",
+                "config": {
+                  "hero": {
+                    "media": {
+                      "alt": "Woman sitting calmly at a desk reviewing a printed herb reference guide, warm natural light, lifestyle photography",
+                      "type": "image",
+                      "assetPublicId": "6ea833db-9a77-4131-87ea-5b6b2251b35d"
+                    },
+                    "title": "What Most Herb Guides Get Wrong About Your Prescriptions",
+                    "subtitle": "If gabapentin or HRT made your anxiety worse — not better — this is the safety-first quick-reference built for exactly that situation. No guessing. No forum rabbit holes."
+                  },
+                  "badges": [
+                    {
+                      "label": "Safety-First Reference",
+                      "value": "Contraindication Quick-Scan Tables",
+                      "iconAlt": "Safety shield icon for contraindication quick-scan tables",
+                      "iconSrc": "/assets/5-stars-reviews-icon.webp",
+                      "iconAssetPublicId": "dcc3fbfb-8db1-4190-b8f3-b5397f807734"
+                    },
+                    {
+                      "label": "Built for Medicated Readers",
+                      "value": "Herb–Drug Interaction Guidance",
+                      "iconAlt": "Pill and herb leaf interaction icon for medicated readers",
+                      "iconSrc": "/assets/free-shipping-icon.webp",
+                      "iconAssetPublicId": "2b4f55b6-f3a6-4f51-9878-28bfb6f979b0"
+                    },
+                    {
+                      "label": "30-Day No-Guessing Guarantee",
+                      "iconAlt": "Money-back guarantee badge icon",
+                      "iconSrc": "/assets/risk-free-icon.webp",
+                      "iconAssetPublicId": "05b60986-1074-4a94-ae04-0d588d879c01"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "PreSalesReasons",
+              "props": {
+                "id": "pre-sales-reasons",
+                "config": [
+                  {
+                    "body": "General herb references list benefits and broad cautions — but they were written for a baseline population not managing gabapentin, HRT, blood pressure drugs, or antidepressants. If you're on a prescription, the standard guide is missing the chapter that applies to you.",
+                    "image": {
+                      "alt": "Open herb reference book next to prescription medication bottles on a table, illustrating the gap between general herb guides and medicated readers",
+                      "assetPublicId": "4e3ac35d-1b90-4d55-b77a-9c8affe0cd80"
+                    },
+                    "title": "Most herb guides were written for people not on any medications",
+                    "number": 1
+                  },
+                  {
+                    "body": "Herb-drug interaction research has accumulated in clinical literature. The gap isn't in the science — it's in whether that science has been organized into a format a non-clinician can use before making a decision, not after something goes wrong.",
+                    "image": {
+                      "alt": "Person reading a clinical research paper at home, highlighting text, warm desk lamp light, illustrating the translation gap between research and everyday use",
+                      "assetPublicId": "cc9afe95-a59d-4b15-a450-06a004b5462f"
+                    },
+                    "title": "The interaction data exists — it just hasn't been translated for home use",
+                    "number": 2
+                  },
+                  {
+                    "body": "A safety-first reference starts with your medication situation and works outward: what are the conservative starting points, what should you flag first, and what should you avoid entirely. That structure — contraindication scan before herb selection — is what's missing from most guides.",
+                    "image": {
+                      "alt": "Printed checklist with herb names and checkboxes on a desk, representing a contraindication quick-scan triage process",
+                      "assetPublicId": "def94b5e-e805-44a9-818e-18ef8d897251"
+                    },
+                    "title": "Triage before trial changes the entire decision",
+                    "number": 3
+                  },
+                  {
+                    "body": "Doctors unfamiliar with herbs often say 'just avoid it all' — honest but unhelpful. A structured quick-scan reference gives you something concrete to bring to that conversation, so you're not starting from zero every time.",
+                    "image": {
+                      "alt": "Woman looking frustrated at a laptop screen showing conflicting forum advice about herbs and medications",
+                      "assetPublicId": "dba482ca-0ba0-489e-b02b-5b5b84d8b075"
+                    },
+                    "title": "Vague advice leaves you stuck between guessing and avoiding everything",
+                    "number": 4
+                  },
+                  {
+                    "body": "When anxiety or dizziness spikes after a new medication or hormone adjustment, the cause isn't always obvious. A simple log that captures what you tried, when, and what changed gives you real data to work with — and something meaningful to share at your next appointment.",
+                    "image": {
+                      "alt": "Person writing in a simple health tracking journal next to a cup of herbal tea, representing the Patch and Pill Change Tracker",
+                      "assetPublicId": "a8e60ae1-32eb-48db-8535-9537031e44e8"
+                    },
+                    "title": "Tracking patterns after a med change is how you find what actually helps",
+                    "number": 5
+                  }
+                ]
+              }
+            },
+            {
+              "type": "PreSalesReviews",
+              "props": {
+                "id": "pre-sales-reviews",
+                "config": {
+                  "slides": [
+                    {
+                      "text": "I'd been avoiding herbs entirely because I couldn't find clear interaction info anywhere. This gave me a starting point I actually trusted. I finally felt like I had a process instead of just guessing.",
+                      "author": "Renee M.",
+                      "images": [
+                        {
+                          "alt": "Renee M. review",
+                          "assetPublicId": "e54d5295-bee1-421b-85c0-1861441197ac",
+                          "testimonialTemplate": "social_comment"
+                        },
+                        {
+                          "alt": "Handbook quick-scan table example",
+                          "assetPublicId": "2f2f5c73-719b-40f3-8d81-18f04423045f",
+                          "testimonialTemplate": "review_card"
+                        },
+                        {
+                          "alt": "Printable quick-scan sheet",
+                          "assetPublicId": "f9180a9f-25fc-46b7-a050-edc34925b14d",
+                          "testimonialTemplate": "social_comment"
+                        }
+                      ],
+                      "rating": 5,
+                      "verified": true
+                    },
+                    {
+                      "text": "I brought the quick-scan sheet to my doctor's appointment. She said it was the clearest summary of herb-drug considerations she'd seen from a patient. That alone was worth it.",
+                      "author": "Patricia W.",
+                      "images": [
+                        {
+                          "alt": "Patricia W. review",
+                          "assetPublicId": "3718c727-6da9-4644-b3bc-b7cfcd2c925f",
+                          "testimonialTemplate": "review_card"
+                        },
+                        {
+                          "alt": "Med conversation pack example",
+                          "assetPublicId": "14ec73e7-65a1-4fab-94e9-cbb22a0b914c",
+                          "testimonialTemplate": "social_comment"
+                        },
+                        {
+                          "alt": "Handbook cover",
+                          "assetPublicId": "42197b03-2a27-48f1-8cf0-ebe8eea4192f",
+                          "testimonialTemplate": "review_card"
+                        }
+                      ],
+                      "rating": 5,
+                      "verified": true
+                    },
+                    {
+                      "text": "After gabapentin made my anxiety worse, I was scared to try anything else. The contraindication tables helped me understand what to check first. I didn't feel like I was flying blind anymore.",
+                      "author": "Sandra K.",
+                      "images": [
+                        {
+                          "alt": "Sandra K. review",
+                          "assetPublicId": "b28cc4a6-b793-46e0-9890-1a0e051d2492",
+                          "testimonialTemplate": "social_comment"
+                        },
+                        {
+                          "alt": "Interaction tripwires checklist",
+                          "assetPublicId": "8a9dbdb1-40bf-4ab7-95b2-8e59f050d55f",
+                          "testimonialTemplate": "social_comment"
+                        },
+                        {
+                          "alt": "Patch pill change tracker",
+                          "assetPublicId": "5de75ff5-b744-461b-a318-3cceb8067b05",
+                          "testimonialTemplate": "review_card"
+                        }
+                      ],
+                      "rating": 5,
+                      "verified": true
+                    },
+                    {
+                      "text": "I expected another generic herb list. This is completely different — organized around what you're already taking, not just what the herb does in isolation. That's the reference I needed.",
+                      "author": "Diane L.",
+                      "images": [
+                        {
+                          "alt": "Diane L. review",
+                          "assetPublicId": "a1aad1d0-8d3b-4a32-ba4a-953eef2db5e3",
+                          "testimonialTemplate": "social_comment"
+                        },
+                        {
+                          "alt": "Handbook open to contraindication tables",
+                          "assetPublicId": "49551bf9-b4f1-406f-a752-8b6f61b032a9",
+                          "testimonialTemplate": "review_card"
+                        },
+                        {
+                          "alt": "Wallet size safety cards",
+                          "assetPublicId": "49f5f47a-830b-4a97-8c70-3b3dbf545a7f",
+                          "testimonialTemplate": "social_comment"
+                        }
+                      ],
+                      "rating": 5,
+                      "verified": true
+                    }
+                  ],
+                  "autoAdvanceMs": 6500
+                }
+              }
+            },
+            {
+              "type": "PreSalesMarquee",
+              "props": {
+                "id": "pre-sales-marquee",
+                "config": [
+                  "Contraindication Quick-Scan Tables",
+                  "Herb–Drug Interaction Flags",
+                  "When-to-Avoid Guidance",
+                  "Common Interaction Tripwires Checklist",
+                  "Med/HRT Conversation Pack",
+                  "Patch & Pill Change Tracker",
+                  "30-Day No-Guessing Guarantee",
+                  "Education-Only — Not Medical Advice"
+                ]
+              }
+            },
+            {
+              "type": "PreSalesPitch",
+              "props": {
+                "id": "pre-sales-pitch",
+                "config": {
+                  "cta": {
+                    "label": "See What's Inside the Handbook →",
+                    "linkType": "nextPage"
+                  },
+                  "image": {
+                    "alt": "The Honest Herbalist Handbook open to the Contraindication Quick-Scan Tables section, shown on a clean desk with a cup of herbal tea",
+                    "assetPublicId": "1ca5e731-cd4e-4e2d-bd77-1342e02f3252"
+                  },
+                  "title": "A safety-screened herb reference built for people already on prescriptions",
+                  "bullets": [
+                    "Contraindication Quick-Scan Tables organized by medication class — check before you try anything",
+                    "\"Is It Safe?\" Printable Quick-Scan Sheets you can bring to your next appointment",
+                    "Common Interaction Tripwires Checklist: sedating herbs, alcohol, and common anxiety/sleep meds — what to double-check first",
+                    "Med/HRT Conversation Pack: what to track and how to describe what you're experiencing to your clinician",
+                    "Patch/Pill Change Tracker: a simple log to spot patterns after a medication or hormone adjustment",
+                    "Education-only, clearly labeled — a structured way to make a more informed decision without guessing"
+                  ]
+                }
+              }
+            },
+            {
+              "type": "PreSalesReviewWall",
+              "props": {
+                "id": "pre-sales-review-wall",
+                "config": {
+                  "title": "What readers say about finally having a safety-first herb reference",
+                  "columns": [
+                    [
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "assetPublicId": "b25faca3-4df8-4af6-aa7e-fb2d892fa81a",
+                          "testimonialTemplate": "review_card"
+                        }
+                      },
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "assetPublicId": "f11d0346-52f5-46de-ae0e-b56cc276f67b",
+                          "testimonialTemplate": "social_comment"
+                        }
+                      }
+                    ],
+                    [
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "assetPublicId": "e54d5295-bee1-421b-85c0-1861441197ac",
+                          "testimonialTemplate": "social_comment"
+                        }
+                      },
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "assetPublicId": "2f2f5c73-719b-40f3-8d81-18f04423045f",
+                          "testimonialTemplate": "review_card"
+                        }
+                      }
+                    ],
+                    [
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "assetPublicId": "f9180a9f-25fc-46b7-a050-edc34925b14d",
+                          "testimonialTemplate": "social_comment"
+                        }
+                      },
+                      {
+                        "image": {
+                          "alt": "Customer review card",
+                          "assetPublicId": "3718c727-6da9-4644-b3bc-b7cfcd2c925f",
+                          "testimonialTemplate": "review_card"
+                        }
+                      }
+                    ]
+                  ],
+                  "buttonLabel": "See What's Inside the Handbook"
+                }
+              }
+            },
+            {
+              "type": "PreSalesFooter",
+              "props": {
+                "id": "pre-sales-footer",
+                "config": {
+                  "logo": {
+                    "alt": "The Honest Herbalist - Clinical Grade Botanicals",
+                    "assetPublicId": "74772eba-9822-424e-a260-92a92095fd0f"
+                  }
+                }
+              }
+            },
+            {
+              "type": "PreSalesFloatingCta",
+              "props": {
+                "id": "pre-sales-floating-cta",
+                "config": {
+                  "label": "See What's Inside the Handbook →",
+                  "linkType": "nextPage",
+                  "showAfterId": "listicle-end"
+                }
+              }
+            }
+          ],
+          "anchorId": "top"
+        }
+      }
+    ]
+  }
+}
