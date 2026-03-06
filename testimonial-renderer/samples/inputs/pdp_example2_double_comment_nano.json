@@ -30,8 +30,8 @@
       "product": "a supplement bottle with a bright pink label that reads HAIR, SKIN AND NAILS GUMMY, white cap, brand name covered by a black rectangle",
       "subject": "a 50-60 year old blonde woman smiling",
       "scene": "indoors at home, neutral background, casual smartphone photo",
-      "extra": "She is holding the bottle close to the camera and lightly pointing at it with a finger. Label faces the camera. Keep her face centered in frame and fully visible. Keep the bottle and hands near the center/right-center, not in corners. Reserve clean empty background space in the top-left and lower-right, with visible space below the lower-right reserved area. Realistic skin texture.",
-      "avoid": ["on-image captions", "watermarks", "UI overlays", "speech bubbles", "chat bubbles", "text boxes", "callout cards", "stickers", "extra fingers", "distorted hands", "product in lower-left corner", "subject or product cropped/occluded by overlay area"]
+      "extra": "She is holding the bottle close to the camera and lightly pointing at it with a finger. Label faces the camera. Keep her face centered and fully visible. Keep the bottle and label in the lower-left or lower-middle-left area, above the banner and clear of the open space on the right side. Keep the pointing hand near the bottle on the left side. Leave the top-left and right-side overlay areas visually simple and empty, but do not draw any placeholder shapes or masks. Realistic skin texture.",
+      "avoid": ["on-image captions", "watermarks", "UI overlays", "speech bubbles", "chat bubbles", "text boxes", "callout cards", "stickers", "extra fingers", "distorted hands", "product cropped by banner", "subject or product cropped/occluded by overlay area", "face overlapping top-left overlay area", "product or hands overlapping right-side overlay area", "label hidden behind right-side overlay area", "placeholder blocks", "dark masks", "guide panels"]
     }
   },
   "comments": [

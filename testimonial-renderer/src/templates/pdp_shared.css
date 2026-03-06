@@ -280,16 +280,20 @@ body {
 }
 
 .pdp-comment-box .pdp-verified {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 0;
+  line-height: 0;
   margin-left: 2px;
   margin-right: 2px;
-  width: 8.75px;
-  height: 8.75px;
+  width: 9.25px;
+  height: 9.25px;
   transform: translate(0, -0.5px);
 }
 
 #card.is-feed .pdp-comment-box .pdp-verified {
-  width: 7.75px;
-  height: 7.75px;
+  width: 9.25px;
+  height: 9.25px;
 }
 
 .pdp-comment-box .pdp-bubble-text {
