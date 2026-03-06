@@ -3,6 +3,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CMD_SHOPIFY_APP="cd \"$ROOT\" && ./scripts/start-shopify-funnel-app.sh"
+CMD_SHOPIFY_FUNNEL="cd \"$ROOT\" && ./scripts/start-shopify-funnel.sh"
+CMD_SHOPIFY_NGROK="cd \"$ROOT\" && ./scripts/start-shopify-ngrok.sh"
 CMD_TEMPORAL="cd \"$ROOT\" && ./scripts/start-temporal.sh"
 CMD_BACKEND="cd \"$ROOT\" && ./scripts/start-backend.sh"
 CMD_WORKER="cd \"$ROOT\" && SKIP_PIP_INSTALL=1 ./scripts/start-worker.sh"
@@ -13,6 +15,8 @@ if command -v osascript >/dev/null 2>&1; then
   osascript <<EOF
 tell application "Terminal"
   do script "cd '$ROOT'; ./scripts/start-shopify-funnel-app.sh"
+  do script "cd '$ROOT'; ./scripts/start-shopify-funnel.sh"
+  do script "cd '$ROOT'; ./scripts/start-shopify-ngrok.sh"
   do script "cd '$ROOT'; ./scripts/start-temporal.sh"
   do script "cd '$ROOT'; ./scripts/start-backend.sh"
   do script "cd '$ROOT'; ./scripts/start-worker.sh"
@@ -25,6 +29,8 @@ fi
 
 if command -v gnome-terminal >/dev/null 2>&1; then
   gnome-terminal -- bash -lc "$CMD_SHOPIFY_APP; exec bash" &
+  gnome-terminal -- bash -lc "$CMD_SHOPIFY_FUNNEL; exec bash" &
+  gnome-terminal -- bash -lc "$CMD_SHOPIFY_NGROK; exec bash" &
   gnome-terminal -- bash -lc "$CMD_TEMPORAL; exec bash" &
   gnome-terminal -- bash -lc "$CMD_BACKEND; exec bash" &
   gnome-terminal -- bash -lc "$CMD_WORKER; exec bash" &
@@ -34,6 +40,8 @@ fi
 
 echo "Could not auto-launch terminals. Run these in separate shells:"
 echo "$CMD_SHOPIFY_APP"
+echo "$CMD_SHOPIFY_FUNNEL"
+echo "$CMD_SHOPIFY_NGROK"
 echo "$CMD_TEMPORAL"
 echo "$CMD_BACKEND"
 echo "$CMD_WORKER"
