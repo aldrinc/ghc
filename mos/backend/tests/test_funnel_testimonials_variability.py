@@ -82,6 +82,198 @@ def test_collect_testimonial_targets_prefers_config_json_over_stale_config_for_s
     assert len(contexts) == 1
 
 
+def test_collect_sales_pdp_carousel_slots_truncates_to_expected_count():
+    puck_data = {
+        "content": [
+            {
+                "type": "SalesPdpHero",
+                "props": {
+                    "config": {
+                        "gallery": {
+                            "slides": [
+                                {"src": f"/assets/slide-{idx}.webp", "alt": f"Slide {idx}"}
+                                for idx in range(7)
+                            ]
+                        }
+                    }
+                },
+            }
+        ]
+    }
+
+    slots, contexts = funnel_testimonials._collect_sales_pdp_carousel_slots(puck_data, expected_count=6)
+
+    assert len(slots) == 6
+    assert all(len(slot) == 1 for slot in slots)
+    assert len(contexts) == 0
+    slides = puck_data["content"][0]["props"]["config"]["gallery"]["slides"]
+    assert len(slides) == 6
+    assert slots[0][0].label == "sales_pdp.hero.gallery.slides[0]"
+    assert slots[5][0].label == "sales_pdp.hero.gallery.slides[5]"
+
+
+def test_collect_sales_pdp_carousel_slots_appends_missing_slides():
+    puck_data = {
+        "content": [
+            {
+                "type": "SalesPdpHero",
+                "props": {
+                    "config": {
+                        "gallery": {
+                            "slides": [
+                                {"src": f"/assets/slide-{idx}.webp", "alt": f"Slide {idx}"}
+                                for idx in range(4)
+                            ]
+                        }
+                    }
+                },
+            }
+        ]
+    }
+
+    slots, _ = funnel_testimonials._collect_sales_pdp_carousel_slots(puck_data, expected_count=6)
+
+    assert len(slots) == 6
+    assert all(len(slot) == 1 for slot in slots)
+    slides = puck_data["content"][0]["props"]["config"]["gallery"]["slides"]
+    assert len(slides) == 6
+    assert slides[4]["alt"] == "Sales PDP carousel image 5"
+    assert slides[5]["alt"] == "Sales PDP carousel image 6"
+
+
+def test_sales_pdp_carousel_variant_contract_matches_requested_examples():
+    variants = [spec["variantId"] for spec in funnel_testimonials._SALES_PDP_CAROUSEL_VARIANTS]
+    assert variants == [
+        "standard_ugc",
+        "qa_ugc",
+        "bold_claim",
+        "personal_highlight",
+        "dorm_selfie",
+    ]
+
+    sample_inputs = [spec["sampleInput"] for spec in funnel_testimonials._SALES_PDP_CAROUSEL_VARIANTS]
+    assert sample_inputs == [
+        "testimonial-renderer/samples/inputs/pdp_example1_standard_ugc_nano.json",
+        "testimonial-renderer/samples/inputs/pdp_example2_qa_nano.json",
+        "testimonial-renderer/samples/inputs/pdp_example3_bold_claim_nano.json",
+        "testimonial-renderer/samples/inputs/pdp_example4_personal_highlight_nano.json",
+        "testimonial-renderer/samples/inputs/pdp_example5_dorm_selfie_nano.json",
+    ]
+
+
+def test_validate_sales_pdp_carousel_plan_rejects_missing_variant_id():
+    payload = {
+        "slides": [
+            {
+                "variantId": "standard_ugc",
+                "template": "pdp_ugc_standard",
+                "logoText": "Brand",
+                "stripBgColor": "#123456",
+                "stripTextColor": "#ffffff",
+                "ratingValueText": "4.9/5",
+                "ratingDetailText": "Rated by users",
+                "ctaText": "See why",
+                "commentHandle": "user_one",
+                "commentText": "Great fit for my routine.",
+                "commentVerified": True,
+                "backgroundPromptVars": {
+                    "product": "Product in hand",
+                    "subject": "Customer selfie",
+                    "scene": "Kitchen morning light",
+                    "extra": "Natural smartphone framing.",
+                    "avoid": ["watermarks"],
+                },
+            },
+            {
+                "variantId": "qa_ugc",
+                "template": "pdp_ugc_standard",
+                "logoText": "Brand",
+                "stripBgColor": "#123456",
+                "stripTextColor": "#ffffff",
+                "ratingValueText": "4.9/5",
+                "ratingDetailText": "Rated by users",
+                "ctaText": "See why",
+                "commentHandle": "user_two",
+                "commentText": "I asked if it was hype and it wasn't.",
+                "commentVerified": True,
+                "backgroundPromptVars": {
+                    "product": "Product bottle close-up",
+                    "subject": "Customer pointing to product",
+                    "scene": "Bedroom daylight",
+                    "extra": "Question-answer reaction vibe.",
+                    "avoid": ["watermarks"],
+                },
+            },
+            {
+                "variantId": "bold_claim",
+                "template": "pdp_bold_claim",
+                "logoText": "Brand",
+                "stripBgColor": "#123456",
+                "stripTextColor": "#ffffff",
+                "ratingValueText": "4.9/5",
+                "ratingDetailText": "Rated by users",
+                "ctaText": "See why",
+                "commentHandle": "user_three",
+                "commentText": "Best value in my stack.",
+                "commentVerified": True,
+                "backgroundPromptVars": {
+                    "product": "Product on countertop",
+                    "scene": "Clean tabletop",
+                    "extra": "Product-forward composition.",
+                    "avoid": ["watermarks"],
+                },
+            },
+            {
+                "variantId": "personal_highlight",
+                "template": "pdp_personal_highlight",
+                "logoText": "Brand",
+                "stripBgColor": "#123456",
+                "stripTextColor": "#ffffff",
+                "ratingValueText": "4.9/5",
+                "ratingDetailText": "Rated by users",
+                "ctaText": "See why",
+                "commentHandle": "user_four",
+                "commentText": "This is my keep-using-it product.",
+                "commentVerified": True,
+                "backgroundPromptVars": {
+                    "product": "Product with customer",
+                    "subject": "Customer hugging product",
+                    "scene": "Home office",
+                    "extra": "Personal milestone moment.",
+                    "avoid": ["watermarks"],
+                },
+            },
+            {
+                # Duplicate standard_ugc means dorm_selfie is missing.
+                "variantId": "standard_ugc",
+                "template": "pdp_ugc_standard",
+                "logoText": "Brand",
+                "stripBgColor": "#123456",
+                "stripTextColor": "#ffffff",
+                "ratingValueText": "4.9/5",
+                "ratingDetailText": "Rated by users",
+                "ctaText": "See why",
+                "commentHandle": "user_five",
+                "commentText": "Dorm vibe test",
+                "commentVerified": True,
+                "backgroundPromptVars": {
+                    "product": "Product on desk",
+                    "subject": "Younger user selfie",
+                    "scene": "Messy dorm room",
+                    "extra": "Unpolished social selfie style.",
+                    "avoid": ["watermarks"],
+                },
+            },
+        ]
+    }
+
+    with pytest.raises(
+        funnel_testimonials.TestimonialGenerationError,
+        match="Duplicate variantId in carousel plan: standard_ugc",
+    ):
+        funnel_testimonials._validate_sales_pdp_carousel_plan(payload)
+
+
 def test_social_comment_without_attachment_indices_empty_for_small_totals():
     assert funnel_testimonials._select_social_comment_without_attachment_indices(0, seed=123) == set()
     assert funnel_testimonials._select_social_comment_without_attachment_indices(1, seed=123) == set()

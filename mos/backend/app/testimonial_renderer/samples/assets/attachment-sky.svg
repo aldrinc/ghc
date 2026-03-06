@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="440" height="620" viewBox="0 0 440 620">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="45%" stop-color="#1d4ed8"/>
+      <stop offset="70%" stop-color="#f97316"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <rect width="440" height="620" fill="url(#sky)"/>
+  <rect y="420" width="440" height="200" fill="rgba(0,0,0,0.25)"/>
+  <circle cx="90" cy="120" r="40" fill="rgba(255,255,255,0.25)"/>
+  <circle cx="140" cy="100" r="22" fill="rgba(255,255,255,0.2)"/>
+  <text x="20" y="600" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="rgba(255,255,255,0.85)">Placeholder camera label</text>
+</svg>

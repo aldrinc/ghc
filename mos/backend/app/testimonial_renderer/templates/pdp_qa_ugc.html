@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PDP QA UGC</title>
+    <link rel="stylesheet" href="./shared.css" />
+    <link rel="stylesheet" href="./pdp_shared.css" />
+    <style>
+      #bubble-question {
+        top: 24px;
+        right: 20px;
+        max-width: 48%;
+      }
+
+      #card.is-feed #bubble-question {
+        top: 16px;
+        right: 14px;
+      }
+
+      #bubble-question .pdp-bubble-text {
+        margin-top: 0;
+        font-size: 13px;
+        line-height: 1.15;
+        font-weight: 800;
+      }
+
+      #card.is-feed #bubble-question .pdp-bubble-text {
+        font-size: 11px;
+      }
+
+      #bubble-primary {
+        left: 22px;
+        bottom: calc(var(--strip-h) + 22px);
+      }
+
+      #card.is-feed #bubble-primary {
+        left: 16px;
+        right: auto;
+        bottom: calc(var(--strip-h) + 14px);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="card">
+      <img id="bg" class="pdp-bg" alt="" />
+      <div class="pdp-vignette"></div>
+
+      <div id="bubble-question" class="pdp-bubble small">
+        <div id="qa-question" class="pdp-bubble-text"></div>
+      </div>
+
+      <div id="bubble-primary" class="pdp-bubble pdp-comment-box">
+        <div class="pdp-bubble-row">
+          <div id="primary-avatar" class="pdp-avatar" aria-label="Comment avatar"></div>
+          <div class="pdp-bubble-copy">
+            <div id="primary-context" class="pdp-bubble-header"></div>
+            <div id="primary-text" class="pdp-bubble-text"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pdp-strip">
+        <div class="pdp-strip-left">
+          <div class="pdp-rating-row">
+            <div class="pdp-stars" aria-hidden="true">
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+            </div>
+            <div class="pdp-rating-text">
+              <span id="rating-value"></span>
+              <span id="rating-detail"></span>
+            </div>
+          </div>
+          <div id="cta" class="pdp-cta"></div>
+        </div>
+
+        <div class="pdp-logo">
+          <img id="logo-img" alt="" />
+          <div id="logo-text" class="pdp-logo-text"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const waitForImage = (img) =>
+        new Promise((resolve, reject) => {
+          if (!img) {
+            reject(new Error('Image element not found.'));
+            return;
+          }
+          if (img.complete && img.naturalWidth > 0) {
+            resolve();
+            return;
+          }
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => reject(new Error('Failed to load image.')), { once: true });
+        });
+
+      const setLogo = (brand, waits) => {
+        const img = document.getElementById('logo-img');
+        const text = document.getElementById('logo-text');
+        img.style.display = 'none';
+        text.style.display = 'none';
+
+        if (brand.logoUrl) {
+          img.src = brand.logoUrl;
+          img.alt = 'Brand logo';
+          img.style.display = 'block';
+          waits.push(waitForImage(img));
+          return;
+        }
+
+        text.textContent = brand.logoText;
+        text.style.display = 'block';
+      };
+
+      const setOutputPreset = (output) => {
+        const preset = output && output.preset;
+        const card = document.getElementById('card');
+        card.classList.remove('is-feed', 'is-square');
+        if (preset === 'feed') {
+          card.classList.add('is-feed');
+          return;
+        }
+        if (preset === 'square') {
+          card.classList.add('is-feed', 'is-square');
+          return;
+        }
+        if (preset === 'tiktok') {
+          return;
+        }
+        throw new Error(`Unsupported output.preset: ${preset}`);
+      };
+
+      const setContextLine = (el, handle, verified = true) => {
+        el.innerHTML = '';
+        const prefix = document.createElement('span');
+        prefix.textContent = 'Reply to ';
+        const handleSpan = document.createElement('span');
+        handleSpan.className = 'pdp-handle';
+        handleSpan.textContent = `${handle}'s`;
+        const verifiedBadge = document.createElement('span');
+        verifiedBadge.className = 'pdp-verified';
+        verifiedBadge.title = 'Verified';
+        verifiedBadge.setAttribute('aria-label', 'Verified');
+        verifiedBadge.innerHTML =
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.3 12.8 7.1 10.6 6 11.7l3.3 3.3L18 6.3l-1.1-1.1z"></path></svg>';
+        const suffix = document.createElement('span');
+        suffix.textContent = ' comment';
+        el.appendChild(prefix);
+        el.appendChild(handleSpan);
+        if (verified) {
+          el.appendChild(verifiedBadge);
+        }
+        el.appendChild(suffix);
+      };
+
+      const initialsFromHandle = (handle) => {
+        const cleaned = String(handle || '').replace(/^@+/, '').trim();
+        if (!cleaned) return 'U';
+        const tokens = cleaned
+          .split(/[\s._-]+/)
+          .map((token) => token.trim())
+          .filter(Boolean);
+        if (tokens.length >= 2) {
+          return `${tokens[0][0]}${tokens[1][0]}`.toUpperCase();
+        }
+        return cleaned.slice(0, 2).toUpperCase();
+      };
+
+      const waitForBackgroundImage = (url) =>
+        new Promise((resolve, reject) => {
+          const img = new Image();
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => reject(new Error('Failed to load avatar image.')), {
+            once: true,
+          });
+          img.src = url;
+        });
+
+      const setAvatar = (el, comment) => {
+        const avatarUrl = typeof comment.avatarUrl === 'string' ? comment.avatarUrl.trim() : '';
+        if (avatarUrl) {
+          el.classList.add('has-image');
+          el.style.backgroundImage = `url("${avatarUrl.replace(/"/g, '\\"')}")`;
+          el.textContent = '';
+          return waitForBackgroundImage(avatarUrl);
+        }
+        el.classList.remove('has-image');
+        el.style.backgroundImage = 'none';
+        el.textContent = initialsFromHandle(comment.handle);
+        return null;
+      };
+
+      window.setCardData = async (data) => {
+        if (!data || typeof data !== 'object') {
+          throw new Error('Payload must be an object.');
+        }
+
+        const questionText =
+          data.comment && typeof data.comment.questionText === 'string' ? data.comment.questionText.trim() : '';
+        if (!questionText) {
+          throw new Error('comment.questionText is required for pdp_qa_ugc.');
+        }
+
+        setOutputPreset(data.output);
+
+        const card = document.getElementById('card');
+        card.style.setProperty('--strip-bg', data.brand.stripBgColor);
+        card.style.setProperty('--strip-text', data.brand.stripTextColor);
+
+        const waits = [];
+
+        const bg = document.getElementById('bg');
+        bg.src = data.background.imageUrl;
+        bg.alt = data.background.alt || '';
+        waits.push(waitForImage(bg));
+
+        document.getElementById('qa-question').textContent = questionText;
+
+        const avatar = document.getElementById('primary-avatar');
+        const avatarWait = setAvatar(avatar, data.comment);
+        if (avatarWait) {
+          waits.push(avatarWait);
+        }
+
+        const handle = data.comment.handle;
+        const showVerified = data.comment.verified !== false;
+        setContextLine(document.getElementById('primary-context'), handle, showVerified);
+        document.getElementById('primary-text').textContent = data.comment.text;
+
+        document.getElementById('rating-value').textContent = data.rating.valueText;
+        document.getElementById('rating-detail').textContent = ` ${data.rating.detailText}`;
+        document.getElementById('cta').textContent = data.cta.text;
+
+        setLogo(data.brand, waits);
+
+        await Promise.all(waits);
+      };
+    </script>
+  </body>
+</html>
