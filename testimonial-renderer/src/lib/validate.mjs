@@ -17,8 +17,11 @@ const MAX_HEADER_TITLE = 40;
 const MAX_META_LABEL = 24;
 const MAX_VIEW_REPLIES = 40;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-const PDP_OUTPUT_PRESETS = new Set(['tiktok', 'feed']);
-const PDP_DEFAULT_OUTPUT_PRESET = 'tiktok';
+const PDP_OUTPUT_PRESETS = new Set(['feed']);
+const PDP_DEFAULT_OUTPUT_PRESET = 'feed';
+const PDP_DEFAULT_COMMENT_TAIL_SCALE = 1.2;
+const PDP_MIN_COMMENT_TAIL_SCALE = 0.5;
+const PDP_MAX_COMMENT_TAIL_SCALE = 2;
 const PDP_COLOR_PATTERN = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
 const MAX_PDP_HANDLE = 40;
 const MAX_PDP_COMMENT = 220;
@@ -149,12 +152,15 @@ const assertNanoReferenceImageUrl = (resolvedUrl, field) => {
 
 const validatePdpOutput = (output) => {
   if (output == null) {
-    return { preset: PDP_DEFAULT_OUTPUT_PRESET };
+    return {
+      preset: PDP_DEFAULT_OUTPUT_PRESET,
+      commentTailScale: PDP_DEFAULT_COMMENT_TAIL_SCALE,
+    };
   }
   if (!isPlainObject(output)) {
     throw new Error('output must be an object when provided.');
   }
-  const allowedKeys = new Set(['preset']);
+  const allowedKeys = new Set(['preset', 'commentTailScale']);
   for (const key of Object.keys(output)) {
     if (!allowedKeys.has(key)) {
       throw new Error(`output contains unsupported key: ${key}`);
@@ -163,9 +169,29 @@ const validatePdpOutput = (output) => {
 
   const preset = assertString(output.preset, 'output.preset', 24).toLowerCase();
   if (!PDP_OUTPUT_PRESETS.has(preset)) {
-    throw new Error(`output.preset must be one of: ${Array.from(PDP_OUTPUT_PRESETS).join(', ')}`);
+    throw new Error('output.preset must be "feed".');
   }
-  return { preset };
+
+  let commentTailScale = PDP_DEFAULT_COMMENT_TAIL_SCALE;
+  if (output.commentTailScale != null) {
+    if (
+      typeof output.commentTailScale !== 'number' ||
+      !Number.isFinite(output.commentTailScale)
+    ) {
+      throw new Error('output.commentTailScale must be a finite number.');
+    }
+    if (
+      output.commentTailScale < PDP_MIN_COMMENT_TAIL_SCALE ||
+      output.commentTailScale > PDP_MAX_COMMENT_TAIL_SCALE
+    ) {
+      throw new Error(
+        `output.commentTailScale must be between ${PDP_MIN_COMMENT_TAIL_SCALE} and ${PDP_MAX_COMMENT_TAIL_SCALE}.`,
+      );
+    }
+    commentTailScale = output.commentTailScale;
+  }
+
+  return { preset, commentTailScale };
 };
 
 const validatePdpBrand = (brand, baseDir) => {
@@ -456,6 +482,30 @@ const validatePdpComment = (comment, options) => {
   return { handle, text, avatarUrl, verified };
 };
 
+const validatePdpComments = ({ comment, comments, baseDir }) => {
+  if (comment != null && comments != null) {
+    throw new Error('Provide either comment or comments, not both.');
+  }
+
+  if (comments != null) {
+    if (!Array.isArray(comments) || comments.length === 0) {
+      throw new Error('comments must be a non-empty array.');
+    }
+    if (comments.length > 2) {
+      throw new Error('comments must contain at most 2 items for pdp_ugc_standard.');
+    }
+    return comments.map((entry, index) =>
+      validatePdpComment(entry, { baseDir, prefix: `comments[${index}]` }),
+    );
+  }
+
+  if (comment == null) {
+    throw new Error('comment is required.');
+  }
+
+  return [validatePdpComment(comment, { baseDir, prefix: 'comment' })];
+};
+
 const validateMeta = (meta, options = {}) => {
   const {
     allowedKeys = ['location', 'date', 'timeAgo', 'reactionCount'],
@@ -682,11 +732,54 @@ export const validatePayload = (payload, options = {}) => {
     };
   }
 
-  if (
-    template === 'pdp_ugc_standard' ||
-    template === 'pdp_bold_claim' ||
-    template === 'pdp_personal_highlight'
-  ) {
+  if (template === 'pdp_ugc_standard') {
+    const allowedKeys = new Set([
+      'template',
+      'output',
+      'brand',
+      'rating',
+      'cta',
+      'background',
+      'comment',
+      'comments',
+      'imageModel',
+    ]);
+    for (const key of Object.keys(payload)) {
+      if (!allowedKeys.has(key)) {
+        throw new Error(`Payload contains unsupported key: ${key}`);
+      }
+    }
+
+    const output = validatePdpOutput(payload.output);
+    const brand = validatePdpBrand(payload.brand, options.baseDir);
+    const rating = validatePdpRating(payload.rating);
+    const cta = validatePdpCta(payload.cta);
+    const background = validatePdpBackground(payload.background, options.baseDir);
+
+    let imageModel;
+    if (payload.imageModel != null) {
+      imageModel = assertString(payload.imageModel, 'imageModel', 120);
+    }
+
+    const comments = validatePdpComments({
+      comment: payload.comment,
+      comments: payload.comments,
+      baseDir: options.baseDir,
+    });
+    return {
+      template,
+      output,
+      brand,
+      rating,
+      cta,
+      background,
+      comment: comments[0],
+      comments,
+      imageModel,
+    };
+  }
+
+  if (template === 'pdp_bold_claim' || template === 'pdp_personal_highlight') {
     const allowedKeys = new Set([
       'template',
       'output',

@@ -36,6 +36,15 @@ class Settings(BaseSettings):
             self.SHOPIFY_ENABLE_ORDER_FORWARDING
             or self.SHOPIFY_ENABLE_COMPLIANCE_FORWARDING
         )
+        configured_scopes = {
+            scope.strip()
+            for scope in self.SHOPIFY_APP_SCOPES.split(",")
+            if scope.strip()
+        }
+        if self.SHOPIFY_ENABLE_ORDER_FORWARDING and "read_orders" not in configured_scopes:
+            raise ValueError(
+                "SHOPIFY_APP_SCOPES must include read_orders when SHOPIFY_ENABLE_ORDER_FORWARDING=true"
+            )
         if requires_mos_forwarding:
             if not self.MOS_BACKEND_BASE_URL:
                 raise ValueError(
@@ -59,6 +68,12 @@ class Settings(BaseSettings):
     @property
     def admin_scopes_csv(self) -> str:
         return self.SHOPIFY_APP_SCOPES
+
+    @property
+    def admin_scopes_set(self) -> set[str]:
+        return {
+            scope.strip() for scope in self.SHOPIFY_APP_SCOPES.split(",") if scope.strip()
+        }
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

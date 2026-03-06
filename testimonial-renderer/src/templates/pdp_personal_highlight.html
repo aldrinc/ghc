@@ -8,13 +8,13 @@
     <link rel="stylesheet" href="./pdp_shared.css" />
     <style>
       #bubble-primary {
-        top: 28px;
-        left: 18px;
+        top: 40px;
+        left: 30px;
       }
 
       #card.is-feed #bubble-primary {
-        top: 20px;
-        left: 14px;
+        top: 30px;
+        left: 24px;
       }
     </style>
   </head>
@@ -37,11 +37,11 @@
         <div class="pdp-strip-left">
           <div class="pdp-rating-row">
             <div class="pdp-stars" aria-hidden="true">
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
-              <svg class="pdp-star" viewBox="0 0 24 24"><path d="M12 2.4l2.6 5.4 6 .9-4.3 4.2 1 5.9L12 16.9l-5.3 2.9 1-5.9-4.3-4.2 6-.9L12 2.4z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
+              <svg class="pdp-star" viewBox="0 0 16 16"><path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.523 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187z"/></svg>
             </div>
             <div class="pdp-rating-text">
               <span id="rating-value"></span>
@@ -75,14 +75,71 @@
 
       const setOutputPreset = (output) => {
         const preset = output && output.preset;
-        if (preset === 'feed') {
+        if (!preset || preset === 'feed') {
           document.getElementById('card').classList.add('is-feed');
           return;
         }
-        if (preset === 'tiktok') {
+        throw new Error(`Unsupported output.preset: ${preset}. Only "feed" is supported.`);
+      };
+
+      const fitContextLine = (el) => {
+        if (!el) {
           return;
         }
-        throw new Error(`Unsupported output.preset: ${preset}`);
+
+        el.style.fontSize = '';
+
+        const computedFontSize = Number.parseFloat(window.getComputedStyle(el).fontSize);
+        if (!Number.isFinite(computedFontSize) || computedFontSize <= 0) {
+          return;
+        }
+
+        if (el.clientWidth <= 0) {
+          return;
+        }
+
+        const isFeed = document.getElementById('card').classList.contains('is-feed');
+        const minFontSize = isFeed ? 4.75 : 5;
+        let nextFontSize = computedFontSize;
+
+        if (el.scrollWidth > el.clientWidth) {
+          nextFontSize = Math.max(minFontSize, (computedFontSize * el.clientWidth) / el.scrollWidth);
+          el.style.fontSize = `${nextFontSize}px`;
+        }
+
+        while (el.scrollWidth > el.clientWidth && nextFontSize > minFontSize) {
+          nextFontSize = Math.max(minFontSize, nextFontSize - 0.25);
+          el.style.fontSize = `${nextFontSize}px`;
+        }
+      };
+
+      const alignAvatarToFirstTextLine = (avatarEl, textEl) => {
+        if (!avatarEl || !textEl || avatarEl.style.display === 'none') {
+          return;
+        }
+
+        const row = avatarEl.parentElement;
+        if (!row) {
+          return;
+        }
+
+        avatarEl.style.marginTop = '0px';
+
+        const rowBox = row.getBoundingClientRect();
+        const avatarBox = avatarEl.getBoundingClientRect();
+        const textBox = textEl.getBoundingClientRect();
+        const computedStyle = window.getComputedStyle(textEl);
+        let lineHeight = Number.parseFloat(computedStyle.lineHeight);
+        if (!Number.isFinite(lineHeight) || lineHeight <= 0) {
+          const fontSize = Number.parseFloat(computedStyle.fontSize);
+          if (!Number.isFinite(fontSize) || fontSize <= 0) {
+            return;
+          }
+          lineHeight = fontSize * 1.2;
+        }
+
+        const desiredTop = textBox.top - rowBox.top + lineHeight / 2 - avatarBox.height / 2;
+        avatarEl.style.marginTop = `${Math.max(0, desiredTop)}px`;
       };
 
       const setLogo = (brand, waits) => {
@@ -103,18 +160,47 @@
         text.style.display = 'block';
       };
 
+      const setCtaText = (el, text) => {
+        const raw = typeof text === 'string' ? text.trim() : '';
+        el.replaceChildren();
+
+        if (!raw) {
+          return;
+        }
+
+        const match = raw.match(/^(.*?)(\s*FREE TODAY!?)$/i);
+        if (!match || !match[1].trim()) {
+          el.textContent = raw;
+          return;
+        }
+
+        const strong = document.createElement('span');
+        strong.className = 'pdp-cta-strong';
+        strong.textContent = match[1].trimEnd();
+        el.appendChild(strong);
+        el.appendChild(document.createTextNode(' '));
+
+        const soft = document.createElement('span');
+        soft.className = 'pdp-cta-soft';
+        soft.textContent = match[2].trimStart();
+        el.appendChild(soft);
+      };
+
       const setContextLine = (el, handle) => {
         el.innerHTML = '';
         const prefix = document.createElement('span');
+        prefix.className = 'pdp-context-prefix';
         prefix.textContent = 'Reply to ';
         const handleSpan = document.createElement('span');
         handleSpan.className = 'pdp-handle';
         handleSpan.textContent = handle;
         const suffix = document.createElement('span');
+        suffix.className = 'pdp-context-suffix';
         suffix.textContent = "'s comment";
         el.appendChild(prefix);
         el.appendChild(handleSpan);
         el.appendChild(suffix);
+        fitContextLine(el);
       };
 
       window.setCardData = async (data) => {
@@ -127,6 +213,7 @@
         const card = document.getElementById('card');
         card.style.setProperty('--strip-bg', data.brand.stripBgColor);
         card.style.setProperty('--strip-text', data.brand.stripTextColor);
+        card.style.setProperty('--pdp-comment-tail-scale', String(data.output.commentTailScale));
 
         const waits = [];
 
@@ -149,11 +236,14 @@
 
         document.getElementById('rating-value').textContent = data.rating.valueText;
         document.getElementById('rating-detail').textContent = ` ${data.rating.detailText}`;
-        document.getElementById('cta').textContent = data.cta.text;
+        setCtaText(document.getElementById('cta'), data.cta.text);
 
         setLogo(data.brand, waits);
 
         await Promise.all(waits);
+        await document.fonts.ready;
+        fitContextLine(document.getElementById('primary-context'));
+        alignAvatarToFirstTextLine(avatar, document.getElementById('primary-text'));
       };
     </script>
   </body>

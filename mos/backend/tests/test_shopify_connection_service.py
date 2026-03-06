@@ -679,6 +679,76 @@ def test_upsert_client_shopify_policy_pages_rejects_empty_pages():
         raise AssertionError("Expected upsert_client_shopify_policy_pages to reject empty pages")
 
 
+def test_resolve_client_shopify_image_urls_to_files_parses_response(monkeypatch):
+    def fake_bridge_request(
+        *, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"
+    ):
+        assert method == "POST"
+        assert path == "/v1/files/images/resolve"
+        assert (
+            timeout_seconds
+            == shopify_connection.settings.SHOPIFY_THEME_OPERATIONS_TIMEOUT_SECONDS
+        )
+        assert json_body == {
+            "shopDomain": "example.myshopify.com",
+            "imageUrls": {
+                "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-1",
+            },
+        }
+        return {
+            "shopDomain": "example.myshopify.com",
+            "resolvedImageUrls": {
+                "templates/index.json.sections.hero.settings.image": "shopify://shop_images/hero-1.png",
+            },
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    response = shopify_connection.resolve_client_shopify_image_urls_to_files(
+        client_id="client_1",
+        shop_domain="example.myshopify.com",
+        image_urls_by_key={
+            "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-1",
+        },
+    )
+
+    assert response == {
+        "shopDomain": "example.myshopify.com",
+        "resolvedImageUrls": {
+            "templates/index.json.sections.hero.settings.image": "shopify://shop_images/hero-1.png",
+        },
+    }
+
+
+def test_resolve_client_shopify_image_urls_to_files_requires_shopify_urls(monkeypatch):
+    def fake_bridge_request(
+        *, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"
+    ):
+        return {
+            "shopDomain": "example.myshopify.com",
+            "resolvedImageUrls": {
+                "templates/index.json.sections.hero.settings.image": "https://cdn.example.com/not-shopify.png",
+            },
+        }
+
+    monkeypatch.setattr(shopify_connection, "_bridge_request", fake_bridge_request)
+
+    try:
+        shopify_connection.resolve_client_shopify_image_urls_to_files(
+            client_id="client_1",
+            image_urls_by_key={
+                "templates/index.json.sections.hero.settings.image": "https://assets.example.com/public/assets/hero-1",
+            },
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 502
+        assert "did not return a Shopify file reference" in exc.detail
+    else:
+        raise AssertionError(
+            "Expected resolve_client_shopify_image_urls_to_files to require shopify:// response URLs"
+        )
+
+
 def test_sync_client_shopify_theme_brand_parses_response(monkeypatch):
     def fake_bridge_request(*, method: str, path: str, json_body=None, timeout_seconds=None, bridge_mode="public"):
         assert method == "POST"

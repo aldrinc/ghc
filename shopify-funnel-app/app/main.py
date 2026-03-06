@@ -38,6 +38,8 @@ from app.schemas import (
     ThemeTemplateTextSlot,
     ListProductsRequest,
     ListProductsResponse,
+    ResolveImageUrlsToShopifyFilesRequest,
+    ResolveImageUrlsToShopifyFilesResponse,
     SyncThemeBrandRequest,
     SyncThemeBrandResponse,
     UpsertedPolicyPage,
@@ -76,12 +78,73 @@ def health() -> dict[str, bool]:
     return {"ok": True}
 
 
+@app.get("/", include_in_schema=False)
+def app_url_entrypoint(request: Request):
+    """
+    Shopify-owned entrypoint for the configured App URL.
+
+    Behavior:
+    - When launched from Shopify admin with a host param, route into /app.
+    - When launched with a shop param (install context), route into /auth/install.
+    - Otherwise return a non-error informational page.
+    """
+    raw_shop = request.query_params.get("shop")
+    raw_host = request.query_params.get("host")
+    raw_client_id = request.query_params.get("client_id")
+
+    host = raw_host.strip() if isinstance(raw_host, str) else ""
+    if host:
+        query: dict[str, str] = {"host": host}
+        if isinstance(raw_shop, str) and raw_shop.strip():
+            query["shop"] = normalize_shop_domain(raw_shop)
+        return RedirectResponse(
+            url=f"{settings.app_base_url}/app?{urlencode(query)}",
+            status_code=302,
+        )
+
+    if isinstance(raw_shop, str) and raw_shop.strip():
+        query = {"shop": normalize_shop_domain(raw_shop)}
+        if isinstance(raw_client_id, str) and raw_client_id.strip():
+            query["client_id"] = raw_client_id.strip()
+        return RedirectResponse(
+            url=f"{settings.app_base_url}/auth/install?{urlencode(query)}",
+            status_code=302,
+        )
+
+    html = """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mOS Shopify App</title>
+  </head>
+  <body>
+    <main style="max-width:760px;margin:40px auto;padding:0 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+      <h1>mOS Shopify App</h1>
+      <p>This URL is reserved for Shopify app launch and install flows.</p>
+      <p>Install or open the app from Shopify Admin to continue.</p>
+    </main>
+  </body>
+</html>"""
+    return HTMLResponse(content=html, status_code=200)
+
+
 def _reject_direct_theme_write_operations() -> None:
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
         detail=(
             "Direct theme write operations are disabled. "
             "Use template ZIP export and extension-based rollout for storefront updates."
+        ),
+    )
+
+
+def _reject_manual_theme_export_operations() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail=(
+            "Theme file export for manual storefront code changes is disabled. "
+            "Use theme app extensions for storefront updates."
         ),
     )
 
@@ -367,6 +430,7 @@ def embedded_app_shell() -> HTMLResponse:
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>mOS Shopify App</title>
+    <meta name="shopify-api-key" content="{settings.SHOPIFY_APP_API_KEY}" />
     <style>
       body {{
         margin: 0;
@@ -391,39 +455,151 @@ def embedded_app_shell() -> HTMLResponse:
         border-radius: 8px;
         padding: 12px;
       }}
+      .actions {{
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }}
+      .actions input {{
+        width: 100%;
+        box-sizing: border-box;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+      }}
+      .actions-row {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }}
+      .actions button {{
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 12px;
+        background: #111827;
+        color: #fff;
+        font-size: 13px;
+        cursor: pointer;
+      }}
+      .actions button.secondary {{
+        background: #374151;
+      }}
+      .note {{
+        margin-top: 10px;
+        font-size: 13px;
+        color: #374151;
+      }}
     </style>
-    <script src="https://unpkg.com/@shopify/app-bridge@3"></script>
-    <script src="https://unpkg.com/@shopify/app-bridge-utils@3"></script>
+    <script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
   </head>
   <body>
     <div class="card">
       <h1>mOS Shopify App</h1>
-      <p>Embedded admin session is active. Link this installation to your mOS workspace from mOS.</p>
+      <p>Embedded admin session is active. Complete workspace linking and storefront token setup here.</p>
       <div id="status" class="status">Loading embedded session…</div>
+      <div class="actions">
+        <input id="workspaceId" type="text" placeholder="Workspace ID (UUID)" />
+        <div class="actions-row">
+          <button id="linkBtn" type="button">Link Workspace</button>
+          <button id="storefrontBtn" type="button" class="secondary">Provision Storefront Token</button>
+          <button id="refreshBtn" type="button" class="secondary">Refresh</button>
+        </div>
+      </div>
+      <div class="note">No manual shop-domain entry is required. This app uses Shopify launch context.</div>
     </div>
     <script>
       (async function bootstrap() {{
         const statusEl = document.getElementById("status");
+        const workspaceInput = document.getElementById("workspaceId");
+        const linkBtn = document.getElementById("linkBtn");
+        const storefrontBtn = document.getElementById("storefrontBtn");
+        const refreshBtn = document.getElementById("refreshBtn");
+        let sessionState = null;
+
+        async function apiCall(path, init) {{
+          const response = await fetch(path, {{
+            credentials: "same-origin",
+            ...(init || {{}})
+          }});
+          let body = null;
+          try {{
+            body = await response.json();
+          }} catch (_) {{
+            body = null;
+          }}
+          if (!response.ok) {{
+            throw new Error(body && body.detail ? body.detail : `Request failed (${{response.status}})`);
+          }}
+          if (!body || typeof body !== "object") {{
+            throw new Error("Unexpected API response.");
+          }}
+          return body;
+        }}
+
+        function renderSession() {{
+          statusEl.textContent = JSON.stringify(sessionState, null, 2);
+          if (sessionState && typeof sessionState.linkedWorkspaceId === "string" && sessionState.linkedWorkspaceId) {{
+            workspaceInput.value = sessionState.linkedWorkspaceId;
+          }}
+        }}
+
+        async function refreshSession() {{
+          sessionState = await apiCall("/app/api/session");
+          renderSession();
+        }}
+
         try {{
           const params = new URLSearchParams(window.location.search);
           const host = params.get("host");
           if (!host) {{
             throw new Error("Missing host query parameter for embedded app context.");
           }}
-          const app = window["app-bridge"].default({{
-            apiKey: {settings.SHOPIFY_APP_API_KEY!r},
-            host: host,
-            forceRedirect: true
+          await refreshSession();
+
+          linkBtn.addEventListener("click", async function () {{
+            try {{
+              const value = workspaceInput.value.trim();
+              if (!value) {{
+                throw new Error("Workspace ID is required.");
+              }}
+              sessionState = await apiCall("/app/api/link-workspace", {{
+                method: "POST",
+                headers: {{ "Content-Type": "application/json" }},
+                body: JSON.stringify({{ clientId: value }})
+              }});
+              renderSession();
+            }} catch (err) {{
+              const message = err instanceof Error ? err.message : String(err);
+              statusEl.textContent = `Embedded app error: ${{message}}`;
+            }}
           }});
-          const token = await window["app-bridge-utils"].getSessionToken(app);
-          const response = await fetch("/app/api/session", {{
-            headers: {{ Authorization: `Bearer ${{token}}` }}
+
+          storefrontBtn.addEventListener("click", async function () {{
+            try {{
+              const value = workspaceInput.value.trim();
+              const payload = value ? {{ clientId: value }} : {{}};
+              sessionState = await apiCall("/app/api/storefront-token/auto", {{
+                method: "POST",
+                headers: {{ "Content-Type": "application/json" }},
+                body: JSON.stringify(payload)
+              }});
+              renderSession();
+            }} catch (err) {{
+              const message = err instanceof Error ? err.message : String(err);
+              statusEl.textContent = `Embedded app error: ${{message}}`;
+            }}
           }});
-          const body = await response.json();
-          if (!response.ok) {{
-            throw new Error(body?.detail || "Failed to load embedded session.");
-          }}
-          statusEl.textContent = JSON.stringify(body, null, 2);
+
+          refreshBtn.addEventListener("click", async function () {{
+            try {{
+              await refreshSession();
+            }} catch (err) {{
+              const message = err instanceof Error ? err.message : String(err);
+              statusEl.textContent = `Embedded app error: ${{message}}`;
+            }}
+          }});
         }} catch (err) {{
           const message = err instanceof Error ? err.message : String(err);
           statusEl.textContent = `Embedded app error: ${{message}}`;
@@ -476,6 +652,56 @@ def app_api_link_workspace(
         session.add(installation)
         session.commit()
         session.refresh(installation)
+
+    return _serialize_embedded_session(shop_domain=shop_domain, installation=installation)
+
+
+@app.post("/app/api/storefront-token/auto", response_model=EmbeddedSessionResponse)
+async def app_api_auto_provision_storefront_token(
+    payload: AutoProvisionStorefrontTokenRequest,
+    shop_domain: str = Depends(require_shopify_session_shop_domain),
+    session: Session = Depends(get_session),
+):
+    installation = session.scalars(
+        select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
+    ).first()
+    if not installation or installation.uninstalled_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Shop installation not found. Install the app first.",
+        )
+
+    requested_client_id = (
+        payload.clientId.strip() if isinstance(payload.clientId, str) else None
+    )
+    if requested_client_id:
+        if installation.client_id and installation.client_id != requested_client_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "This Shopify store is already linked to a different mOS workspace. "
+                    f"linkedWorkspaceId={installation.client_id}"
+                ),
+            )
+        if installation.client_id != requested_client_id:
+            installation.client_id = requested_client_id
+            installation.updated_at = datetime.now(timezone.utc)
+            session.add(installation)
+            session.commit()
+            session.refresh(installation)
+
+    try:
+        await _provision_storefront_token_if_missing(
+            installation=installation,
+            session=session,
+        )
+        await shopify_api.ensure_catalog_collection_route_is_available(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+        )
+    except ShopifyApiError as exc:
+        session.rollback()
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
 
     return _serialize_embedded_session(shop_domain=shop_domain, installation=installation)
 
@@ -906,6 +1132,43 @@ async def upsert_policy_pages(
 
 
 @app.post(
+    "/v1/files/images/resolve",
+    response_model=ResolveImageUrlsToShopifyFilesResponse,
+    dependencies=[Depends(require_internal_api_token)],
+)
+async def resolve_image_urls_to_shopify_files(
+    payload: ResolveImageUrlsToShopifyFilesRequest,
+    session: Session = Depends(get_session),
+):
+    installation = _resolve_active_installation(
+        client_id=payload.clientId,
+        shop_domain=payload.shopDomain,
+        session=session,
+    )
+    try:
+        resolved = await shopify_api.resolve_image_urls_to_shopify_files(
+            shop_domain=installation.shop_domain,
+            access_token=installation.admin_access_token,
+            image_urls=payload.imageUrls,
+        )
+    except ShopifyApiError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Unexpected Shopify file image URL resolve error "
+                f"({type(exc).__name__}): {exc}"
+            ),
+        ) from exc
+
+    return ResolveImageUrlsToShopifyFilesResponse(
+        shopDomain=installation.shop_domain,
+        resolvedImageUrls=resolved,
+    )
+
+
+@app.post(
     "/v1/themes/brand/sync",
     response_model=SyncThemeBrandResponse,
     dependencies=[Depends(require_internal_api_token)],
@@ -967,56 +1230,9 @@ async def export_theme_brand(
     payload: SyncThemeBrandRequest,
     session: Session = Depends(get_session),
 ):
-    installation = _resolve_active_installation(
-        client_id=payload.clientId,
-        shop_domain=payload.shopDomain,
-        session=session,
-    )
-    try:
-        await shopify_api.ensure_catalog_collection_route_is_available(
-            shop_domain=installation.shop_domain,
-            access_token=installation.admin_access_token,
-        )
-        exported = await shopify_api.sync_theme_brand(
-            shop_domain=installation.shop_domain,
-            access_token=installation.admin_access_token,
-            workspace_name=payload.workspaceName,
-            brand_name=payload.brandName,
-            logo_url=payload.logoUrl,
-            css_vars=payload.cssVars,
-            font_urls=payload.fontUrls,
-            component_image_urls=payload.componentImageUrls,
-            component_text_values=payload.componentTextValues,
-            auto_component_image_urls=payload.autoComponentImageUrls,
-            data_theme=payload.dataTheme,
-            theme_id=payload.themeId,
-            theme_name=payload.themeName,
-            upsert_theme_files=False,
-            include_file_payloads=True,
-            include_all_theme_text_files=True,
-            resolve_external_images_to_shopify_files=True,
-        )
-    except ShopifyApiError as exc:
-        raise HTTPException(status_code=exc.status_code, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Unexpected theme export error ({type(exc).__name__}): {exc}",
-        ) from exc
-
-    return ExportThemeBrandResponse(
-        shopDomain=installation.shop_domain,
-        themeId=exported["themeId"],
-        themeName=exported["themeName"],
-        themeRole=exported["themeRole"],
-        layoutFilename=exported["layoutFilename"],
-        cssFilename=exported["cssFilename"],
-        settingsFilename=exported.get("settingsFilename"),
-        jobId=exported.get("jobId"),
-        coverage=exported["coverage"],
-        settingsSync=exported["settingsSync"],
-        files=exported["files"],
-    )
+    _ = payload
+    _ = session
+    _reject_manual_theme_export_operations()
 
 
 @app.post(

@@ -1,302 +1,528 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FB-Style Comment Section</title>
+    <title>Comment Bubble Template</title>
+    <style>
+      :root {
+        --bubble-bg: #ffffff;
+        --text-main: #000000;
+        --text-light: #666666;
+        --avatar-placeholder: #eeeeee;
+        --badge-teal: #00c8f5;
+        --placeholder-border: #cccccc;
+        --card-bg: #111111;
+        --meta-text: rgba(255, 255, 255, 0.72);
+      }
 
-    <script src="https://cdn.tailwindcss.com"></script>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+        margin: 0;
+        background: transparent;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        padding: 0;
+      }
 
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            fontFamily: {
-              fb: [
-                '-apple-system',
-                'BlinkMacSystemFont',
-                '"Segoe UI"',
-                'Roboto',
-                '"Helvetica Neue"',
-                'Arial',
-                'sans-serif',
-              ],
-            },
-            colors: {
-              fbBlue: '#1877F2',
-              fbText: '#050505',
-              fbMuted: '#65676B',
-              fbLine: '#E4E6EB',
-              fbBg: '#F0F2F5',
-            },
-          },
-        },
-      };
-    </script>
+      #card {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 28px;
+        min-width: 720px;
+        max-width: 1120px;
+        padding: 72px;
+        background: var(--card-bg);
+        color: white;
+        box-sizing: border-box;
+      }
+
+      #section-header {
+        display: none;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        color: rgba(255, 255, 255, 0.92);
+      }
+
+      #section-header.is-visible {
+        display: flex;
+      }
+
+      .section-title {
+        font-size: 28px;
+        line-height: 1.1;
+        font-weight: 700;
+      }
+
+      .section-sort {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: rgba(255, 255, 255, 0.78);
+        font-size: 18px;
+      }
+
+      .section-sort svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      #comment-section {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        align-items: flex-start;
+      }
+
+      .thread-block {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        width: 100%;
+      }
+
+      .thread-block.reply {
+        margin-left: 84px;
+      }
+
+      .reply-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        margin-top: 4px;
+      }
+
+      .bubble-frame {
+        display: inline-block;
+        position: relative;
+        padding-left: 20px;
+        max-width: 100%;
+      }
+
+      .bubble {
+        display: grid;
+        grid-template-areas:
+          "avatar header"
+          "avatar body"
+          "avatar attachment";
+        grid-template-columns: min-content minmax(0, 1fr);
+        grid-template-rows: auto auto auto;
+        gap: 16px 20px;
+        background-color: var(--bubble-bg);
+        border-radius: 20px 20px 20px 0;
+        padding: 24px 32px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        max-width: min(860px, calc(100vw - 220px));
+        color: var(--text-main);
+        box-sizing: border-box;
+      }
+
+      .thread-block.reply .bubble {
+        gap: 12px 16px;
+        padding: 20px 24px;
+        max-width: min(700px, calc(100vw - 260px));
+      }
+
+      .avatar {
+        grid-area: avatar;
+        width: 60px;
+        height: 60px;
+        border-radius: 50%;
+        background-color: var(--avatar-placeholder);
+        align-self: start;
+        border: 1px solid var(--placeholder-border);
+        object-fit: cover;
+      }
+
+      .thread-block.reply .avatar {
+        width: 44px;
+        height: 44px;
+      }
+
+      .comment-head {
+        grid-area: header;
+        color: var(--text-light);
+        font-size: 20px;
+        font-weight: 400;
+        line-height: 1.2;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        min-width: 0;
+      }
+
+      .thread-block.reply .comment-head {
+        font-size: 16px;
+      }
+
+      .reply-to,
+      .comment-suffix {
+        white-space: nowrap;
+      }
+
+      .comment-name {
+        display: inline-block;
+        margin: 0 6px;
+        color: var(--text-light);
+        font-weight: 500;
+        white-space: nowrap;
+        max-width: 280px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .thread-block.reply .comment-name {
+        max-width: 220px;
+      }
+
+      .verification-badge {
+        display: inline-flex;
+        align-items: center;
+        margin: 0 4px;
+        flex-shrink: 0;
+      }
+
+      .verification-badge svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      .thread-block.reply .verification-badge svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .comment-body {
+        grid-area: body;
+        color: var(--text-main);
+        font-size: 40px;
+        font-weight: 800;
+        line-height: 1.04;
+        letter-spacing: -0.03em;
+        overflow-wrap: anywhere;
+      }
+
+      .thread-block.reply .comment-body {
+        font-size: 28px;
+      }
+
+      .comment-attachment {
+        grid-area: attachment;
+        max-width: 420px;
+        overflow: hidden;
+        border-radius: 14px;
+      }
+
+      .comment-attachment img {
+        display: block;
+        width: 100%;
+        height: auto;
+        object-fit: cover;
+      }
+
+      .bubble-tail {
+        position: absolute;
+        left: 0;
+        bottom: 0;
+        width: 0;
+        height: 0;
+        border-right: 20px solid var(--bubble-bg);
+        border-top: 20px solid transparent;
+        border-bottom: 20px solid transparent;
+        z-index: 1;
+        transform: translateY(-0.1px);
+      }
+
+      .comment-meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 16px;
+        padding-left: 40px;
+        color: var(--meta-text);
+        font-size: 18px;
+        line-height: 1.2;
+      }
+
+      .thread-block.reply .comment-meta {
+        padding-left: 28px;
+        font-size: 16px;
+      }
+
+      .comment-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .comment-chip.action {
+        font-weight: 600;
+      }
+
+      .comment-chip.reaction {
+        color: white;
+      }
+
+      .comment-chip.reaction svg {
+        width: 18px;
+        height: 18px;
+      }
+
+      .view-replies {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 40px;
+        color: rgba(255, 255, 255, 0.86);
+        font-size: 17px;
+        font-weight: 600;
+      }
+
+      .view-replies::before {
+        content: "";
+        width: 26px;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.36);
+      }
+
+      .thread-block.reply + .view-replies {
+        margin-top: -6px;
+      }
+    </style>
   </head>
-
-  <body class="bg-fbBg font-fb text-fbText antialiased">
-    <div id="card" class="mx-auto w-full max-w-[430px] bg-white">
-      <div id="comment-section" class="pb-6"></div>
+  <body>
+    <div id="card">
+      <div id="section-header">
+        <div id="section-title" class="section-title"></div>
+        <div id="section-sort" class="section-sort">
+          <span>Sort</span>
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M7 10L12 15L17 10"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </div>
+      </div>
+      <div id="comment-section"></div>
     </div>
 
     <script>
       const waitForImage = (img) =>
         new Promise((resolve, reject) => {
           if (!img) {
-            reject(new Error('Image element not found.'));
+            reject(new Error("Image element not found."));
             return;
           }
           if (img.complete && img.naturalWidth > 0) {
             resolve();
             return;
           }
-          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener("load", () => resolve(), { once: true });
           img.addEventListener(
-            'error',
+            "error",
             () => {
-              const src = String(img.currentSrc || img.src || '');
+              const src = String(img.currentSrc || img.src || "");
               let summary = src;
-              if (src.startsWith('data:')) {
-                const comma = src.indexOf(',');
+              if (src.startsWith("data:")) {
+                const comma = src.indexOf(",");
                 const header = comma >= 0 ? src.slice(0, comma) : src.slice(0, 80);
                 summary = `${header},... (len=${src.length})`;
               } else if (src.length > 200) {
                 summary = `${src.slice(0, 200)}...`;
               }
-              reject(new Error('Failed to load image (src=' + summary + ').'));
+              reject(new Error("Failed to load image (src=" + summary + ")."));
             },
             { once: true }
           );
         });
 
-      const createIconButton = (svg, label) => {
-        const button = document.createElement('button');
-        button.className = '-m-2 p-2 active:opacity-60';
-        button.type = 'button';
-        button.setAttribute('aria-label', label);
-        button.innerHTML = svg;
-        return button;
+      const createEl = (tag, className, text) => {
+        const el = document.createElement(tag);
+        if (className) {
+          el.className = className;
+        }
+        if (text != null) {
+          el.textContent = text;
+        }
+        return el;
       };
 
-      const buildReactionCount = (count) => {
-        const container = document.createElement('div');
-        container.className = 'flex items-center gap-1';
-        container.innerHTML =
-          '<span class="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-fbBlue">' +
-          '<svg viewBox="0 0 24 24" class="h-[12px] w-[12px] text-white" fill="currentColor">' +
-          '<path d="M7.8 10.7v9.3c0 .6-.5 1-1 1H5.2c-.6 0-1-.4-1-1v-7.3c0-.5.4-1 1-1h2.6Zm2.1-.1 4.6-6.2c.5-.7 1.6-.3 1.5.6l-.4 4.4h5c.9 0 1.5.8 1.3 1.7l-1.4 6.6c-.2.8-.9 1.4-1.8 1.4H11.4c-.8 0-1.5-.7-1.5-1.5v-6.6Z"/>' +
-          '</svg>' +
-          '</span>';
-        const value = document.createElement('span');
-        value.textContent = String(count);
-        container.appendChild(value);
-        return container;
-      };
-
-      const buildAuthorBadge = (label) => {
-        const badge = document.createElement('div');
-        badge.className = 'inline-flex items-center gap-1 text-[13px] font-semibold text-fbBlue';
+      const buildVerifiedBadge = () => {
+        const badge = createEl("span", "verification-badge");
         badge.innerHTML =
-          '<svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8">' +
-          '<path stroke-linecap="round" stroke-linejoin="round" d="M12 20h9" />' +
-          '<path stroke-linecap="round" stroke-linejoin="round" d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" />' +
-          '</svg>';
-        const text = document.createElement('span');
-        text.textContent = label;
-        badge.appendChild(text);
+          '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+          '<circle cx="12" cy="12" r="10" fill="#00c8f5"></circle>' +
+          '<path d="M10 16L6 12L7.41 10.59L10 13.17L16.59 6.58L18 8L10 16Z" fill="white"></path>' +
+          "</svg>";
         return badge;
       };
 
-      const buildAvatar = (avatarUrl, sizeClass, imageList) => {
-        const wrapper = document.createElement('div');
-        wrapper.className = `mt-[2px] ${sizeClass} shrink-0 overflow-hidden rounded-full bg-[#DADDE1]`;
-        const img = document.createElement('img');
-        img.className = 'h-full w-full object-cover';
-        img.alt = 'Avatar';
-        img.src = avatarUrl;
+      const buildAvatar = (comment, imageList) => {
+        const avatar = document.createElement("img");
+        avatar.className = "avatar";
+        avatar.alt = `${comment.name} avatar`;
+        avatar.src = comment.avatarUrl;
+        imageList.push(avatar);
+        return avatar;
+      };
+
+      const buildHeader = (comment) => {
+        const head = createEl("div", "comment-head");
+        head.appendChild(createEl("span", "reply-to", "Reply to"));
+        head.appendChild(createEl("span", "comment-name", comment.name));
+        head.appendChild(buildVerifiedBadge());
+        head.appendChild(createEl("span", "comment-suffix", "'s comment"));
+        return head;
+      };
+
+      const buildAttachment = (attachmentUrl, imageList) => {
+        const wrapper = createEl("div", "comment-attachment");
+        const img = document.createElement("img");
+        img.alt = "Comment attachment";
+        img.src = attachmentUrl;
         wrapper.appendChild(img);
         imageList.push(img);
         return wrapper;
       };
 
-      const buildCommentRow = (comment, options) => {
-        const { imageList, isReply, isFirst } = options;
-        const container = document.createElement('div');
-        container.className = `flex gap-3 px-4 ${isFirst ? 'pt-4' : 'pt-5'}`;
-
-        const avatarSize = isReply ? 'h-9 w-9' : 'h-10 w-10';
-        const avatar = buildAvatar(comment.avatarUrl, avatarSize, imageList);
-
-        const body = document.createElement('div');
-        body.className = 'min-w-0 flex-1';
-
-        const headerRow = document.createElement('div');
-        headerRow.className = 'flex items-baseline gap-2';
-
-        const name = document.createElement('div');
-        name.className = 'truncate text-[15px] font-semibold';
-        name.textContent = comment.name;
-
-        const meta = document.createElement('div');
-        meta.className = 'flex items-center gap-1 text-[13px] text-fbMuted';
-
-        const dot = document.createElement('span');
-        dot.textContent = '·';
-        const time = document.createElement('span');
-        time.textContent = comment.meta.time;
-
-        meta.appendChild(dot.cloneNode(true));
-        meta.appendChild(time);
-
-        const followLabel = comment.meta.followLabel;
-        const authorLabel = comment.meta.authorLabel;
-        if (followLabel || authorLabel) {
-          meta.appendChild(dot.cloneNode(true));
-        }
-
-        headerRow.appendChild(name);
-        headerRow.appendChild(meta);
-
-        if (followLabel) {
-          const follow = document.createElement('a');
-          follow.className = 'text-[13px] font-semibold text-fbBlue';
-          follow.href = '#';
-          follow.textContent = followLabel;
-          headerRow.appendChild(follow);
-        }
-
-        if (authorLabel) {
-          headerRow.appendChild(buildAuthorBadge(authorLabel));
-        }
-
-        const text = document.createElement('div');
-        text.className = 'text-[15px] leading-[18px]';
-        text.textContent = comment.text;
-
-        body.appendChild(headerRow);
-        body.appendChild(text);
-
-        if (comment.attachmentUrl) {
-          const attachment = document.createElement('div');
-          attachment.className = 'mt-2 w-[220px] overflow-hidden rounded-2xl';
-          const img = document.createElement('img');
-          img.className = 'h-auto w-full object-cover';
-          img.alt = 'Attachment';
-          img.src = comment.attachmentUrl;
-          attachment.appendChild(img);
-          body.appendChild(attachment);
-          imageList.push(img);
-        }
-
-        const actionsRow = document.createElement('div');
-        actionsRow.className = 'mt-1 flex items-center justify-between';
-
-        const leftActions = document.createElement('div');
-        leftActions.className = 'flex items-center gap-4 text-[13px] font-semibold text-fbMuted';
-
-        const replyBtn = document.createElement('button');
-        replyBtn.className = 'active:opacity-60';
-        replyBtn.type = 'button';
-        replyBtn.textContent = 'Reply';
-        leftActions.appendChild(replyBtn);
-
-        if (typeof comment.reactionCount === 'number' && comment.reactionCount > 0) {
-          leftActions.appendChild(buildReactionCount(comment.reactionCount));
-        }
-
-        const rightActions = document.createElement('div');
-        rightActions.className = 'flex items-center gap-5 text-fbMuted';
-
-        const likeIcon =
-          '<svg viewBox="0 0 24 24" class="h-[20px] w-[20px]" fill="none" stroke="currentColor" stroke-width="1.6">' +
-          '<path stroke-linecap="round" stroke-linejoin="round" d="M7.5 10.6v9.6H5.2a1.4 1.4 0 0 1-1.4-1.4v-7a1.4 1.4 0 0 1 1.4-1.4h2.3Zm0 0 5-6.6c.7-1 2.3-.4 2.2.9l-.4 4.4h5.1c1.2 0 2 .9 1.8 2l-1.4 6.5c-.2 1-1 1.7-2 1.7H9.2a1.7 1.7 0 0 1-1.7-1.7v-7.2Z" />' +
-          '</svg>';
-        const replyIcon =
-          '<svg viewBox="0 0 24 24" class="h-[20px] w-[20px]" fill="none" stroke="currentColor" stroke-width="1.6">' +
-          '<path stroke-linecap="round" stroke-linejoin="round" d="M20 14.5c0 1.7-1.6 3-3.5 3H9l-4.2 2.3c-.4.2-.8-.2-.7-.6l.7-2.9C3.6 15.7 3 15.2 3 14.5V7.8C3 6 4.6 4.5 6.5 4.5h10C18.4 4.5 20 6 20 7.8v6.7Z" />' +
-          '</svg>';
-
-        rightActions.appendChild(createIconButton(likeIcon, 'Like'));
-        rightActions.appendChild(createIconButton(replyIcon, 'Reply'));
-
-        actionsRow.appendChild(leftActions);
-        actionsRow.appendChild(rightActions);
-
-        body.appendChild(actionsRow);
-
-        if (comment.viewRepliesText) {
-          const viewReplies = document.createElement('button');
-          viewReplies.className = 'mt-2 text-[13px] font-semibold text-fbMuted active:opacity-60';
-          viewReplies.type = 'button';
-          viewReplies.textContent = comment.viewRepliesText;
-          body.appendChild(viewReplies);
-        }
-
-        container.appendChild(avatar);
-        container.appendChild(body);
-
-        return container;
+      const buildReactionChip = (count) => {
+        const chip = createEl("span", "comment-chip reaction");
+        chip.innerHTML =
+          '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">' +
+          '<circle cx="12" cy="12" r="11" fill="#00c8f5"></circle>' +
+          '<path d="M8.2 12.9 10.5 15.1 15.9 9.7" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>' +
+          "</svg>";
+        chip.appendChild(createEl("span", "", String(count)));
+        return chip;
       };
 
-      const buildReplies = (replies, options) => {
-        const { viewRepliesText, imageList } = options;
-        const wrapper = document.createElement('div');
-        wrapper.className = 'relative mt-2 pl-4';
+      const buildMetaRow = (comment) => {
+        const row = createEl("div", "comment-meta");
+        let hasContent = false;
 
-        const line = document.createElement('div');
-        line.className = 'absolute left-[34px] top-0 h-full w-[2px] bg-fbLine';
-        const curve = document.createElement('div');
-        curve.className = 'absolute left-[34px] top-[6px] h-4 w-4 rounded-bl-[10px] border-b-[2px] border-l-[2px] border-fbLine';
-
-        const inner = document.createElement('div');
-        inner.className = 'ml-9';
-
-        replies.forEach((reply, index) => {
-          inner.appendChild(buildCommentRow(reply, { imageList, isReply: true, isFirst: index === 0 }));
-        });
-
-        if (viewRepliesText) {
-          const viewReplies = document.createElement('button');
-          viewReplies.className = 'mt-2 text-[13px] font-semibold text-fbMuted active:opacity-60';
-          viewReplies.type = 'button';
-          viewReplies.textContent = viewRepliesText;
-          inner.appendChild(viewReplies);
+        if (comment.meta && comment.meta.time) {
+          row.appendChild(createEl("span", "comment-chip", comment.meta.time));
+          hasContent = true;
         }
 
-        wrapper.appendChild(line);
-        wrapper.appendChild(curve);
-        wrapper.appendChild(inner);
+        if (comment.meta && comment.meta.followLabel) {
+          row.appendChild(createEl("span", "comment-chip action", comment.meta.followLabel));
+          hasContent = true;
+        }
+
+        if (comment.meta && comment.meta.authorLabel) {
+          row.appendChild(createEl("span", "comment-chip action", comment.meta.authorLabel));
+          hasContent = true;
+        }
+
+        if (typeof comment.reactionCount === "number" && comment.reactionCount > 0) {
+          row.appendChild(buildReactionChip(comment.reactionCount));
+          hasContent = true;
+        }
+
+        return hasContent ? row : null;
+      };
+
+      const buildBubble = (comment, imageList) => {
+        const frame = createEl("div", "bubble-frame");
+        const bubble = createEl("div", "bubble");
+        bubble.appendChild(buildAvatar(comment, imageList));
+        bubble.appendChild(buildHeader(comment));
+        bubble.appendChild(createEl("div", "comment-body", comment.text));
+
+        if (comment.attachmentUrl) {
+          bubble.appendChild(buildAttachment(comment.attachmentUrl, imageList));
+        }
+
+        frame.appendChild(bubble);
+        frame.appendChild(createEl("div", "bubble-tail"));
+        return frame;
+      };
+
+      const buildCommentBlock = (comment, options) => {
+        const { imageList, isReply } = options;
+        const block = createEl("div", `thread-block${isReply ? " reply" : ""}`);
+        block.appendChild(buildBubble(comment, imageList));
+
+        const metaRow = buildMetaRow(comment);
+        if (metaRow) {
+          block.appendChild(metaRow);
+        }
+
+        return block;
+      };
+
+      const buildReplies = (comment, imageList) => {
+        const wrapper = createEl("div", "reply-stack");
+
+        comment.replies.forEach((reply) => {
+          wrapper.appendChild(buildCommentBlock(reply, { imageList, isReply: true }));
+        });
+
+        if (comment.viewRepliesText) {
+          wrapper.appendChild(createEl("div", "view-replies", comment.viewRepliesText));
+        }
+
         return wrapper;
       };
 
-      window.setCardData = async (data) => {
-        if (!data || typeof data !== 'object') {
-          throw new Error('Payload must be an object.');
+      const renderHeader = (header) => {
+        const headerEl = document.getElementById("section-header");
+        const titleEl = document.getElementById("section-title");
+        const sortEl = document.getElementById("section-sort");
+
+        titleEl.textContent = header.title || "";
+        sortEl.style.display = header.showSortIcon ? "inline-flex" : "none";
+
+        if (header.title || header.showSortIcon) {
+          headerEl.classList.add("is-visible");
+        } else {
+          headerEl.classList.remove("is-visible");
         }
-        const header = data.header;
-        if (!header || typeof header !== 'object') {
-          throw new Error('header is required.');
+      };
+
+      window.setCardData = async (data) => {
+        if (!data || typeof data !== "object") {
+          throw new Error("Payload must be an object.");
         }
 
-        const section = document.getElementById('comment-section');
-        section.innerHTML = '';
+        const header = data.header;
+        if (!header || typeof header !== "object") {
+          throw new Error("header is required.");
+        }
 
         if (!Array.isArray(data.comments) || data.comments.length === 0) {
-          throw new Error('comments must be a non-empty array.');
+          throw new Error("comments must be a non-empty array.");
         }
+
+        renderHeader(header);
+
+        const section = document.getElementById("comment-section");
+        section.replaceChildren();
 
         const fragment = document.createDocumentFragment();
         const imageList = [];
 
-        data.comments.forEach((comment, index) => {
-          fragment.appendChild(buildCommentRow(comment, { imageList, isReply: false, isFirst: index === 0 }));
+        data.comments.forEach((comment) => {
+          fragment.appendChild(buildCommentBlock(comment, { imageList, isReply: false }));
 
           if (Array.isArray(comment.replies) && comment.replies.length > 0) {
-            fragment.appendChild(buildReplies(comment.replies, {
-              imageList,
-              viewRepliesText: comment.viewRepliesText,
-            }));
+            fragment.appendChild(buildReplies(comment, imageList));
           }
         });
 

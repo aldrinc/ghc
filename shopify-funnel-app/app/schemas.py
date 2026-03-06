@@ -277,6 +277,25 @@ class SyncThemeBrandRequest(BaseModel):
         return self
 
 
+class ResolveImageUrlsToShopifyFilesRequest(BaseModel):
+    clientId: str | None = None
+    shopDomain: str | None = None
+    imageUrls: dict[str, str] = Field(default_factory=dict, min_length=1)
+
+    @model_validator(mode="after")
+    def validate_target(self) -> "ResolveImageUrlsToShopifyFilesRequest":
+        has_client = bool(self.clientId)
+        has_shop = bool(self.shopDomain)
+        if has_client == has_shop:
+            raise ValueError("Exactly one of clientId or shopDomain is required")
+        return self
+
+
+class ResolveImageUrlsToShopifyFilesResponse(BaseModel):
+    shopDomain: str
+    resolvedImageUrls: dict[str, str] = Field(default_factory=dict)
+
+
 class ThemeBrandCoverageSummary(BaseModel):
     requiredSourceVars: list[str] = Field(default_factory=list)
     requiredThemeVars: list[str] = Field(default_factory=list)

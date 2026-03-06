@@ -145,6 +145,7 @@ export type ClientShopifyThemeTemplateBuildPayload = {
   productId?: string;
   componentImageAssetMap?: Record<string, string>;
   componentTextValues?: Record<string, string>;
+  featureHighlights?: ClientShopifyThemeTemplateFeatureHighlights;
   shopDomain?: string;
   themeId?: string;
   themeName?: string;
@@ -164,6 +165,18 @@ export type ClientShopifyThemeTemplateTextSlot = {
   currentValue?: string | null;
 };
 
+export type ClientShopifyThemeTemplateFeatureHighlightCard = {
+  header?: string | null;
+  subtext?: string | null;
+};
+
+export type ClientShopifyThemeTemplateFeatureHighlights = {
+  card1?: ClientShopifyThemeTemplateFeatureHighlightCard | null;
+  card2?: ClientShopifyThemeTemplateFeatureHighlightCard | null;
+  card3?: ClientShopifyThemeTemplateFeatureHighlightCard | null;
+  card4?: ClientShopifyThemeTemplateFeatureHighlightCard | null;
+};
+
 export type ClientShopifyThemeTemplateDraftData = {
   shopDomain: string;
   workspaceName: string;
@@ -181,6 +194,7 @@ export type ClientShopifyThemeTemplateDraftData = {
   productId?: string | null;
   componentImageAssetMap: Record<string, string>;
   componentTextValues: Record<string, string>;
+  featureHighlights?: ClientShopifyThemeTemplateFeatureHighlights | null;
   imageSlots: ClientShopifyThemeTemplateImageSlot[];
   textSlots: ClientShopifyThemeTemplateTextSlot[];
   metadata: Record<string, unknown>;
@@ -221,6 +235,7 @@ export type ClientShopifyThemeTemplateBuildResponse = {
 export type ClientShopifyThemeTemplateDraftUpdatePayload = {
   componentImageAssetMap?: Record<string, string>;
   componentTextValues?: Record<string, string>;
+  featureHighlights?: ClientShopifyThemeTemplateFeatureHighlights;
   notes?: string;
 };
 
@@ -228,6 +243,7 @@ export type ClientShopifyThemeTemplateGenerateImagesPayload = {
   draftId: string;
   productId?: string;
   slotPaths?: string[];
+  featureHighlights?: ClientShopifyThemeTemplateFeatureHighlights;
 };
 
 export type ClientShopifyThemeTemplateGenerateImagesResponse = {

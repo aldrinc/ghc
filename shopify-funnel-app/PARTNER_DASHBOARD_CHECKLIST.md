@@ -1,6 +1,6 @@
-# Shopify Partner Dashboard Checklist (Single Public App, Unlisted)
+# Shopify Partner Dashboard Checklist (Single Public App, Listed)
 
-Last updated: 2026-03-03
+Last updated: 2026-03-05
 
 This checklist matches the current code/config in this repository and the
 single-app architecture (no separate internal Shopify app).
@@ -18,8 +18,10 @@ single-app architecture (no separate internal Shopify app).
    - `POST /webhooks/compliance`
 5. Direct theme write operations are intentionally disabled by policy:
    - `/v1/themes/brand/sync` returns `403`
+   - `/v1/themes/brand/export` returns `403`
    - mOS `/shopify/theme/brand/sync*` and publish endpoints return `409`
-6. Template ZIP export flow is working end-to-end.
+6. App URL entrypoint is operational:
+   - `GET /` returns `200` (informational page) or valid Shopify-context redirect.
 
 ## 2) Partner Dashboard: App Setup
 
@@ -32,7 +34,7 @@ In Partner Dashboard -> your app -> **App setup**:
 3. Embedded app:
    - Enabled (`embedded = true`)
 4. Admin API scopes:
-   - `read_products,write_products,read_orders,write_orders,read_discounts,write_discounts,read_content,write_content,read_inventory,write_inventory,read_themes,unauthenticated_read_product_listings`
+   - `read_products,write_products,read_orders,read_content,write_content,read_inventory,write_inventory,read_themes,unauthenticated_read_product_listings`
 5. Webhooks API version:
    - `2026-04` (keep aligned with `shopify.app.toml`)
 6. Compliance webhook subscriptions:
@@ -46,7 +48,7 @@ In Partner Dashboard -> your app -> **App setup**:
 In Partner Dashboard -> **Distribution**:
 
 1. Select **Public distribution**.
-2. Set visibility to **Unlisted**.
+2. Set visibility to **Listed** (full visibility) after review approval.
 3. Confirm install link works on multiple stores.
 
 ## 4) Partner Dashboard: Listing + Review Metadata
@@ -59,14 +61,15 @@ In Partner Dashboard -> **Listing** / **Store listing**:
 4. Pricing set to **Free** (launch state).
 5. Screenshots + demo assets.
 6. Clear statement of storefront behavior:
-   - app supports template export/extension rollout path
-   - does not directly push theme code on merchant behalf
+   - app does not provide manual theme-code edit/export workflows
+   - storefront changes are delivered through approved extension-based rollout
 
 ## 5) Partner Dashboard: Data & Compliance
 
 1. Confirm privacy webhooks are configured and reachable.
-2. Verify compliance secret is configured in production:
-   - `SHOPIFY_COMPLIANCE_WEBHOOK_SECRET`
+2. Verify production secrets are configured:
+   - `SHOPIFY_APP_API_SECRET` (Shopify webhook HMAC verification)
+   - `MOS_WEBHOOK_SHARED_SECRET` (bridge-to-mOS forwarding authentication)
 3. If Partner Dashboard flags protected customer data requirements for your
    scopes/features, complete that request before/with submission.
 
@@ -77,8 +80,8 @@ Use this in the “Notes for reviewer” field (edit as needed):
 1. Install app from generated install link.
 2. Open embedded admin page (`/app`) after install.
 3. Connect workspace and verify Shopify status is `ready`.
-4. Run template generation/export and download ZIP.
-5. Confirm direct theme sync/publish endpoints are intentionally blocked and
+4. Confirm storefront token status becomes `ready` in the embedded app.
+5. Confirm direct theme sync/export/publish endpoints are intentionally blocked and
    storefront changes are handled through the approved extension-based rollout.
 6. Compliance webhooks are implemented for `customers/data_request`,
    `customers/redact`, and `shop/redact`.

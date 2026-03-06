@@ -86,6 +86,7 @@ const DESIGN_SYSTEM_TEMPLATE = `{
     "--heading-line": "1.4",
     "--heading-weight": "500",
     "--color-page-bg": "rgb(255, 249, 244)",
+    "--color-page-bg-secondary": "rgb(243, 240, 234)",
     "--color-brand": "#061a70",
     "--color-bg": "#ffffff",
     "--color-text": "var(--color-brand)",
@@ -394,7 +395,7 @@ const DESIGN_SYSTEM_PROMPT = `Update our DESIGN SYSTEM TEMPLATE for a specific b
   - CTA: --color-cta, --color-cta-icon (and only if needed: --color-cta-text, --pdp-cta-bg, --pdp-check-bg)
   - Marquee: --marquee-bg, --marquee-text
   - Badges: --badge-strip-bg, --badge-text-color, --badge-strip-border
-  - Section backgrounds: --hero-bg, --pitch-bg (optional: --color-page-bg)
+  - Section backgrounds: --hero-bg, --pitch-bg (optional: --color-page-bg, --color-page-bg-secondary)
 - Maintain accessibility: CTA text must stay readable on the CTA background; marquee text must stay readable on marquee background; keep surfaces light.
 Brand details: [describe your brand, industry, vibe, and any required colors/fonts].
 Return the full updated tokens JSON (same shape/keys as the template).`;
@@ -1545,10 +1546,6 @@ export function BrandDesignSystemPage() {
 
   const handleCreateBaseTemplateDraft = async () => {
     if (!workspace?.id) return;
-    if (!canUseAdvancedShopifyFeatures) {
-      toast.error("Connect Shopify and resolve setup errors before using template build/export features.");
-      return;
-    }
     const nextThemeName = themeSyncThemeName.trim();
 
     const payload: {
@@ -1606,9 +1603,6 @@ export function BrandDesignSystemPage() {
     if (!hasFetchedShopifyThemeTemplateDrafts || isLoadingShopifyThemeTemplateDrafts) return;
     if (shopifyThemeTemplateDrafts.length) return;
     if (buildShopifyThemeTemplateDraft.isPending) return;
-    if (shopifyState !== "ready") return;
-    if (!canUseAdvancedShopifyFeatures) return;
-    if (!hasShopifyConnectionTarget) return;
     const nextThemeName = themeSyncThemeName.trim();
 
     const attemptKey = [
@@ -1627,9 +1621,6 @@ export function BrandDesignSystemPage() {
     isLoadingShopifyThemeTemplateDrafts,
     shopifyThemeTemplateDrafts.length,
     buildShopifyThemeTemplateDraft.isPending,
-    shopifyState,
-    canUseAdvancedShopifyFeatures,
-    hasShopifyConnectionTarget,
     shopifySyncShopDomain,
     themeSyncDesignSystemId,
     themeSyncProductId,
@@ -1638,10 +1629,6 @@ export function BrandDesignSystemPage() {
 
   const handleGenerateTemplateDraftImages = async () => {
     if (!workspace?.id) return;
-    if (!canUseAdvancedShopifyFeatures) {
-      toast.error("Connect Shopify and resolve setup errors before generating template images or text.");
-      return;
-    }
     if (!selectedTemplateDraftId) {
       toast.error("Select a template draft first.");
       return;
@@ -1703,10 +1690,6 @@ export function BrandDesignSystemPage() {
 
   const handleClearTemplateDraftImageMappings = async () => {
     if (!workspace?.id) return;
-    if (!canUseAdvancedShopifyFeatures) {
-      toast.error("Connect Shopify and resolve setup errors before editing template mappings.");
-      return;
-    }
     if (!selectedTemplateDraftId) {
       toast.error("Select a template draft first.");
       return;
@@ -1731,10 +1714,6 @@ export function BrandDesignSystemPage() {
 
   const handleClearTemplateDraftImageMapping = async (slotPath: string) => {
     if (!workspace?.id) return;
-    if (!canUseAdvancedShopifyFeatures) {
-      toast.error("Connect Shopify and resolve setup errors before editing template mappings.");
-      return;
-    }
     if (!selectedTemplateDraftId) {
       toast.error("Select a template draft first.");
       return;
@@ -1945,10 +1924,6 @@ export function BrandDesignSystemPage() {
 
   const handleDownloadTemplateZip = async () => {
     if (!workspace?.id) return;
-    if (!canUseAdvancedShopifyFeatures) {
-      toast.error("Connect Shopify and resolve setup errors before exporting template ZIP files.");
-      return;
-    }
     if (!selectedTemplateDraftId.trim()) {
       toast.error("Select a template draft first.");
       return;
@@ -2050,6 +2025,7 @@ export function BrandDesignSystemPage() {
   const coreColorKeys = useMemo(
     () => [
       "--color-page-bg",
+      "--color-page-bg-secondary",
       "--color-brand",
       "--color-bg",
       "--color-text",
@@ -2722,7 +2698,7 @@ export function BrandDesignSystemPage() {
                   onClick={() => {
                     void handleClearTemplateDraftImageMappings();
                   }}
-                  disabled={updateShopifyThemeTemplateDraft.isPending || !canUseAdvancedShopifyFeatures}
+                  disabled={updateShopifyThemeTemplateDraft.isPending}
                 >
                   {updateShopifyThemeTemplateDraft.isPending ? "Clearing…" : "Clear all mapped image slots"}
                 </Button>
@@ -2732,7 +2708,7 @@ export function BrandDesignSystemPage() {
                   onClick={() => {
                     void handleGenerateTemplateDraftImages();
                   }}
-                  disabled={generateShopifyThemeTemplateImages.isPending || !canUseAdvancedShopifyFeatures}
+                  disabled={generateShopifyThemeTemplateImages.isPending}
                 >
                   {generateShopifyThemeTemplateImages.isPending
                     ? "Generating…"
@@ -2754,8 +2730,6 @@ export function BrandDesignSystemPage() {
                   disabled={
                     downloadShopifyThemeTemplateZip.isPending ||
                     updateShopifyThemeTemplateDraft.isPending ||
-                    !canUseAdvancedShopifyFeatures ||
-                    !hasShopifyConnectionTarget ||
                     !selectedTemplateDraftId.trim()
                   }
                 >
@@ -2783,12 +2757,7 @@ export function BrandDesignSystemPage() {
                   onClick={() => {
                     void handleCreateBaseTemplateDraft();
                   }}
-                  disabled={
-                    buildShopifyThemeTemplateDraft.isPending ||
-                    shopifyState !== "ready" ||
-                    !canUseAdvancedShopifyFeatures ||
-                    !hasShopifyConnectionTarget
-                  }
+                  disabled={buildShopifyThemeTemplateDraft.isPending}
                 >
                   {buildShopifyThemeTemplateDraft.isPending
                     ? "Creating base draft…"

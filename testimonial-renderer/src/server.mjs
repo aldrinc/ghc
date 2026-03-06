@@ -35,15 +35,20 @@ const PDP_TEMPLATES = new Set([
 const resolvePdpPreset = (payload) => {
   const preset = payload?.output?.preset;
   if (!preset) {
-    return 'tiktok';
+    return 'feed';
   }
-  if (preset === 'tiktok' || preset === 'feed') {
+  if (preset === 'feed') {
     return preset;
   }
-  throw new Error('output.preset must be one of: tiktok, feed');
+  throw new Error('output.preset must be "feed".');
 };
 
-const aspectRatioForPreset = (preset) => (preset === 'feed' ? '4:5' : '9:16');
+const aspectRatioForPreset = (preset) => {
+  if (preset !== 'feed') {
+    throw new Error(`Unsupported output preset: ${preset}. Only "feed" is supported.`);
+  }
+  return '4:5';
+};
 
 const dedupeStringArray = (values) => {
   const out = [];
@@ -203,9 +208,15 @@ const maybeGeneratePdpBackground = async (payload) => {
   }
 
   const preset = resolvePdpPreset(payload);
+  const commentCount = Array.isArray(payload.comments) && payload.comments.length > 0 ? payload.comments.length : 1;
   const basePrompt = hasPrompt
     ? background.prompt.trim()
-    : buildPdpBackgroundPrompt({ template: payload.template, preset, vars: background.promptVars });
+    : buildPdpBackgroundPrompt({
+        template: payload.template,
+        preset,
+        vars: background.promptVars,
+        commentCount,
+      });
   const brandPromptGuidance = buildBrandPromptGuidance(payload.brand);
   const prompt = brandPromptGuidance ? `${basePrompt} ${brandPromptGuidance}` : basePrompt;
 

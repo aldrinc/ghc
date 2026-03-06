@@ -4,9 +4,18 @@
     "preset": "feed"
   },
   "brand": {
+    "name": "SampleLogo",
     "logoText": "SampleLogo",
-    "stripBgColor": "#14532d",
-    "stripTextColor": "#ffffff"
+    "logoUrl": "../assets/unnamed.jpg",
+    "stripBgColor": "#0f4d36",
+    "stripTextColor": "#ffffff",
+    "assets": {
+      "palette": {
+        "primary": "#0f4d36",
+        "accent": "#0a2419"
+      },
+      "notes": "Clean supplement tabletop creative with soft natural light and clear empty space in the upper-right."
+    }
   },
   "rating": {
     "valueText": "4.9/5",
@@ -16,17 +25,17 @@
     "text": "BUY ONE, GET ONE FREE TODAY!"
   },
   "background": {
+    "imageModel": "gemini-3-pro-image-preview",
     "promptVars": {
       "product": "a white pouch of PURIFIED SHILAJIT GUMMIES standing upright on a clean tabletop, a few dark gummies in front, cucumber and a couple nuts beside it",
       "scene": "bright minimal background, natural soft light, clean tabletop",
-      "extra": "Keep the pouch in the lower-middle of the frame with clean negative space in the top-right.",
-      "avoid": ["on-image captions", "watermarks", "UI overlays"]
+      "extra": "Keep the pouch in the lower-middle of the frame with clean empty background space in the top-right.",
+      "avoid": ["on-image captions", "watermarks", "UI overlays", "speech bubbles", "chat bubbles", "text boxes", "callout cards", "stickers"]
     }
   },
   "comment": {
     "handle": "PeytonJackson",
     "text": "the hype is real on these let me be clear... she noticed before i even did. fellas, this is the one.",
-    "avatarUrl": "samples/assets/avatar-omar.svg"
+    "avatarUrl": "../assets/avatar-omar.svg"
   }
 }
-

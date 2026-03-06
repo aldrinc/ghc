@@ -1,11 +1,11 @@
 {
   "template": "pdp_ugc_standard",
   "output": {
-    "preset": "tiktok"
+    "preset": "feed"
   },
   "brand": {
     "logoText": "SampleLogo",
-    "stripBgColor": "#be3b7a",
+    "stripBgColor": "#0f4d36",
     "stripTextColor": "#ffffff"
   },
   "rating": {
@@ -21,7 +21,6 @@
   },
   "comment": {
     "handle": "your_handle",
-    "text": "YOUR COMMENT TEXT HERE"
+    "text": "People ask me all the time if i got extensions, this stuff is the REAL DEAL!!! insane."
   }
 }
-

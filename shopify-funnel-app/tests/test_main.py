@@ -310,6 +310,49 @@ def test_auth_callback_redirects_to_embedded_app(api_client, db_session, monkeyp
     assert response.headers["location"].startswith(f"{settings.app_base_url}/app?shop={shop_domain}")
 
 
+def test_app_url_entrypoint_redirects_install_when_shop_is_present(api_client):
+    response = api_client.get(
+        "/",
+        params={"shop": "Example-Store.myshopify.com", "client_id": "client_123"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert (
+        response.headers["location"]
+        == f"{settings.app_base_url}/auth/install?shop=example-store.myshopify.com&client_id=client_123"
+    )
+
+
+def test_app_url_entrypoint_redirects_to_embedded_shell_when_host_is_present(api_client):
+    response = api_client.get(
+        "/",
+        params={"host": "Zm9vLmJhcg==", "shop": "example.myshopify.com"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert (
+        response.headers["location"]
+        == f"{settings.app_base_url}/app?host=Zm9vLmJhcg%3D%3D&shop=example.myshopify.com"
+    )
+
+
+def test_app_url_entrypoint_returns_info_page_without_shop_context(api_client):
+    response = api_client.get("/")
+
+    assert response.status_code == 200
+    assert "reserved for Shopify app launch and install flows" in response.text
+
+
+def test_embedded_shell_loads_latest_app_bridge_script(api_client):
+    response = api_client.get("/app")
+
+    assert response.status_code == 200
+    assert "https://cdn.shopify.com/shopifycloud/app-bridge.js" in response.text
+    assert "unpkg.com/@shopify/app-bridge" not in response.text
+
+
 def test_auto_storefront_token_endpoint_sets_token_for_active_installation(
     api_client, db_session, monkeypatch
 ):
@@ -489,9 +532,7 @@ def test_compliance_shop_redact_webhook_purges_shop_data(api_client, db_session)
     assert remaining_events == []
 
 
-def test_export_theme_brand_enables_external_image_resolution(
-    api_client, db_session, monkeypatch
-):
+def test_export_theme_brand_endpoint_is_disabled(api_client, db_session):
     installation = ShopInstallation(
         shop_domain="example.myshopify.com",
         client_id="client_1",
@@ -501,90 +542,6 @@ def test_export_theme_brand_enables_external_image_resolution(
     )
     db_session.add(installation)
     db_session.commit()
-
-    observed: dict[str, object] = {}
-
-    async def fake_ensure_catalog_collection_route_is_available(
-        *,
-        shop_domain: str,
-        access_token: str,
-    ):
-        observed["catalog_collection_shop_domain"] = shop_domain
-        observed["catalog_collection_access_token"] = access_token
-        return {
-            "collectionId": "gid://shopify/Collection/1",
-            "collectionHandle": "all",
-            "collectionTitle": "Catalog",
-            "addedProductCount": 0,
-        }
-
-    async def fake_sync_theme_brand(
-        *,
-        shop_domain: str,
-        access_token: str,
-        workspace_name: str,
-        brand_name: str,
-        logo_url: str,
-        css_vars: dict[str, str],
-        font_urls: list[str],
-        component_image_urls: dict[str, str] | None = None,
-        component_text_values: dict[str, str] | None = None,
-        auto_component_image_urls: list[str] | None = None,
-        data_theme: str | None = None,
-        theme_id: str | None = None,
-        theme_name: str | None = None,
-        upsert_theme_files: bool = True,
-        include_file_payloads: bool = False,
-        include_all_theme_text_files: bool = False,
-        resolve_external_images_to_shopify_files: bool = True,
-    ):
-        observed["shop_domain"] = shop_domain
-        observed["access_token"] = access_token
-        observed["upsert_theme_files"] = upsert_theme_files
-        observed["include_file_payloads"] = include_file_payloads
-        observed["include_all_theme_text_files"] = include_all_theme_text_files
-        observed["resolve_external_images_to_shopify_files"] = (
-            resolve_external_images_to_shopify_files
-        )
-        return {
-            "themeId": "gid://shopify/OnlineStoreTheme/1",
-            "themeName": "futrgroup2-0theme",
-            "themeRole": "MAIN",
-            "layoutFilename": "layout/theme.liquid",
-            "cssFilename": "assets/acme-workspace-workspace-brand.css",
-            "settingsFilename": "config/settings_data.json",
-            "jobId": None,
-            "coverage": {
-                "requiredSourceVars": [],
-                "requiredThemeVars": [],
-                "missingSourceVars": [],
-                "missingThemeVars": [],
-            },
-            "settingsSync": {
-                "settingsFilename": "config/settings_data.json",
-                "expectedPaths": [],
-                "updatedPaths": [],
-                "missingPaths": [],
-                "requiredMissingPaths": [],
-                "semanticUpdatedPaths": [],
-                "unmappedColorPaths": [],
-                "semanticTypographyUpdatedPaths": [],
-                "unmappedTypographyPaths": [],
-            },
-            "files": [
-                {
-                    "filename": "layout/theme.liquid",
-                    "content": "<!-- managed -->",
-                }
-            ],
-        }
-
-    monkeypatch.setattr(
-        main_module.shopify_api,
-        "ensure_catalog_collection_route_is_available",
-        fake_ensure_catalog_collection_route_is_available,
-    )
-    monkeypatch.setattr(main_module.shopify_api, "sync_theme_brand", fake_sync_theme_brand)
 
     response = api_client.post(
         "/v1/themes/brand/export",
@@ -606,15 +563,11 @@ def test_export_theme_brand_enables_external_image_resolution(
         },
     )
 
-    assert response.status_code == 200
-    assert observed["shop_domain"] == "example.myshopify.com"
-    assert observed["access_token"] == "admin_access_token"
-    assert observed["catalog_collection_shop_domain"] == "example.myshopify.com"
-    assert observed["catalog_collection_access_token"] == "admin_access_token"
-    assert observed["upsert_theme_files"] is False
-    assert observed["include_file_payloads"] is True
-    assert observed["include_all_theme_text_files"] is True
-    assert observed["resolve_external_images_to_shopify_files"] is True
+    assert response.status_code == 403
+    assert (
+        response.json()["detail"]
+        == "Theme file export for manual storefront code changes is disabled. Use theme app extensions for storefront updates."
+    )
 
 
 def test_embedded_session_reports_installation_state(api_client, db_session):
@@ -680,6 +633,112 @@ def test_embedded_link_workspace_updates_client_binding(api_client, db_session):
     ).first()
     assert refreshed is not None
     assert refreshed.client_id == "client_abc"
+
+
+def test_embedded_auto_storefront_token_provisions_token(api_client, db_session, monkeypatch):
+    shop_domain = "example.myshopify.com"
+    db_session.add(
+        ShopInstallation(
+            shop_domain=shop_domain,
+            client_id="client_1",
+            admin_access_token="admin_access_token",
+            storefront_access_token=None,
+            scopes="read_products",
+        )
+    )
+    db_session.commit()
+
+    async def fake_create_storefront_access_token(
+        *,
+        shop_domain: str,
+        access_token: str,
+        title: str = "Marketi Funnel Checkout",
+    ):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "admin_access_token"
+        assert title == "Marketi Funnel Checkout"
+        return "shpat_embedded"
+
+    async def fake_ensure_catalog_collection_route_is_available(
+        *,
+        shop_domain: str,
+        access_token: str,
+        sync_all_products: bool = True,
+    ):
+        assert shop_domain == "example.myshopify.com"
+        assert access_token == "admin_access_token"
+        assert sync_all_products is True
+        return {
+            "collectionId": "gid://shopify/Collection/1",
+            "collectionHandle": "all",
+            "collectionTitle": "Catalog",
+            "addedProductCount": 0,
+        }
+
+    monkeypatch.setattr(
+        main_module.shopify_api,
+        "create_storefront_access_token",
+        fake_create_storefront_access_token,
+    )
+    monkeypatch.setattr(
+        main_module.shopify_api,
+        "ensure_catalog_collection_route_is_available",
+        fake_ensure_catalog_collection_route_is_available,
+    )
+
+    api_client.app.dependency_overrides[
+        main_module.require_shopify_session_shop_domain
+    ] = lambda: shop_domain
+    try:
+        response = api_client.post(
+            "/app/api/storefront-token/auto",
+            json={"clientId": "client_1"},
+        )
+    finally:
+        api_client.app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["hasStorefrontAccessToken"] is True
+    assert response.json()["installationState"] == "installed"
+
+    refreshed = db_session.scalars(
+        select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
+    ).first()
+    assert refreshed is not None
+    assert refreshed.storefront_access_token == "shpat_embedded"
+
+
+def test_embedded_auto_storefront_token_rejects_workspace_mismatch(
+    api_client, db_session
+):
+    shop_domain = "example.myshopify.com"
+    db_session.add(
+        ShopInstallation(
+            shop_domain=shop_domain,
+            client_id="client_existing",
+            admin_access_token="admin_access_token",
+            storefront_access_token=None,
+            scopes="read_products",
+        )
+    )
+    db_session.commit()
+
+    api_client.app.dependency_overrides[
+        main_module.require_shopify_session_shop_domain
+    ] = lambda: shop_domain
+    try:
+        response = api_client.post(
+            "/app/api/storefront-token/auto",
+            json={"clientId": "client_other"},
+        )
+    finally:
+        api_client.app.dependency_overrides.clear()
+
+    assert response.status_code == 409
+    assert (
+        response.json()["detail"]
+        == "This Shopify store is already linked to a different mOS workspace. linkedWorkspaceId=client_existing"
+    )
 
 
 def test_theme_write_endpoint_is_disabled(api_client, db_session, monkeypatch):

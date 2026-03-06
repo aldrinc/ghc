@@ -3,10 +3,12 @@ import binascii
 import concurrent.futures
 from contextvars import ContextVar
 from datetime import datetime, timezone
+from html import escape
 import io
 import json
 import logging
 import os
+from pathlib import Path
 import re
 import threading
 import time
@@ -78,6 +80,7 @@ from app.schemas.shopify_connection import (
     ShopifyThemeTemplateDraftResponse,
     ShopifyThemeTemplateDraftUpdateRequest,
     ShopifyThemeTemplateDraftVersionResponse,
+    ShopifyThemeTemplateFeatureHighlights,
     ShopifyThemeTemplateGenerateImagesJobStartResponse,
     ShopifyThemeTemplateGenerateImagesJobStatusResponse,
     ShopifyThemeTemplateGenerateImagesRequest,
@@ -113,12 +116,12 @@ from app.services.shopify_connection import (
     build_client_shopify_install_urls,
     create_client_shopify_product,
     disconnect_client_shopify_store,
-    export_client_shopify_theme_brand,
     get_client_shopify_connection_status,
     list_client_shopify_theme_template_slots,
     list_client_shopify_products,
     list_shopify_installations,
     normalize_shop_domain,
+    resolve_client_shopify_image_urls_to_files,
     set_client_shopify_storefront_token,
     sync_client_shopify_theme_brand,
     upsert_client_shopify_policy_pages,
@@ -157,17 +160,51 @@ _THEME_COMPONENT_ORPHAN_CLOSING_TAG_RE = re.compile(
     r"/\s*(?:p|strong|em|span|b|i|u|br|div|h[1-6]|li|ul|ol|a)\b",
     re.IGNORECASE,
 )
+_THEME_RICHTEXT_TOP_LEVEL_TAG_RE = re.compile(
+    r"^\s*<(?:p|ul|ol|h[1-6])\b",
+    re.IGNORECASE,
+)
+_THEME_RICHTEXT_MARKUP_RE = re.compile(
+    r"<(?:p|ul|ol|h[1-6]|li|br)\b",
+    re.IGNORECASE,
+)
 _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
     r"^templates/index\.json\.sections\.ss_feature_1_pro_[^.]+\.blocks\.slide_[^.]+\.settings\.image$",
     re.IGNORECASE,
 )
+_THEME_FEATURE_HIGHLIGHT_CARD_SLOT_PATHS: dict[str, tuple[str, str]] = {
+    "card1": (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV.settings.title",
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_RCFhqV.settings.text",
+    ),
+    "card2": (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN.settings.title",
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_HnJEzN.settings.text",
+    ),
+    "card3": (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.title",
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_47f4ep.settings.text",
+    ),
+    "card4": (
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp.settings.title",
+        "templates/index.json.sections.ss_feature_1_pro_MNXtYb.blocks.slide_4LDkHp.settings.text",
+    ),
+}
+_THEME_FEATURE_HIGHLIGHT_MANAGED_TEXT_SLOT_PATHS: frozenset[str] = frozenset(
+    path
+    for card_paths in _THEME_FEATURE_HIGHLIGHT_CARD_SLOT_PATHS.values()
+    for path in card_paths
+)
 _THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
+_THEME_HEADER_NAV_DESKTOP_FILENAME = "snippets/header-nav-desktop.liquid"
+_THEME_HEADER_NAV_DRAWER_FILENAME = "snippets/header-nav-drawer.liquid"
+_THEME_RICH_TEXT_SECTION_FILENAME = "sections/rich-text.liquid"
 _THEME_HEADER_DRAWER_CATALOG_DETAILS_RE = re.compile(
-    r"<li>\s*<details\b[^>]*>.*?<summary[^>]*>\s*Catalog\s*</summary>.*?</details>\s*</li>",
+    r"<li>\s*<details\b[^>]*>.*?<summary[^>]*>\s*(?:Catalog|Shop)\s*</summary>.*?</details>\s*</li>",
     re.IGNORECASE | re.DOTALL,
 )
 _THEME_HEADER_DRAWER_CATALOG_LINK_RE = re.compile(
-    r"<li>\s*<a\b[^>]*>\s*Catalog\s*</a>\s*</li>",
+    r"<li>\s*<a\b[^>]*>\s*(?:Catalog|Shop)\s*</a>\s*</li>",
     re.IGNORECASE | re.DOTALL,
 )
 _THEME_HEADER_DRAWER_COLLECTION_TEST_LINK_RE = re.compile(
@@ -178,18 +215,138 @@ _THEME_COLLECTION_TEST_PATH_RE = re.compile(
     r"/collections/test(?=(?:[/?#\"'\\]|$))",
     re.IGNORECASE,
 )
+_THEME_SHOPIFY_PRODUCT_LINK_RE = re.compile(
+    r'(?P<quote>["\'])shopify://products/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
+    re.IGNORECASE,
+)
+_THEME_SHOPIFY_COLLECTION_LINK_RE = re.compile(
+    r'(?P<quote>["\'])shopify://collections(?:/(?P<handle>[A-Za-z0-9][A-Za-z0-9-]*))?(?P=quote)',
+    re.IGNORECASE,
+)
+_THEME_RELATIVE_PRODUCT_PATH_LINK_RE = re.compile(
+    r'(?P<quote>["\'])/products/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
+    re.IGNORECASE,
+)
+_THEME_RELATIVE_PAGE_PATH_LINK_RE = re.compile(
+    r'(?P<quote>["\'])/pages/[A-Za-z0-9][A-Za-z0-9-]*(?P=quote)',
+    re.IGNORECASE,
+)
+_THEME_RELATIVE_COLLECTION_PATH_LINK_RE = re.compile(
+    r'(?P<quote>["\'])/collections/(?P<handle>[A-Za-z0-9][A-Za-z0-9-]*)(?P=quote)',
+    re.IGNORECASE,
+)
 _THEME_EXPORT_REQUIRED_TEMPLATE_FILES: tuple[str, ...] = (
     "templates/collection.json",
     "templates/list-collections.json",
+)
+_THEME_EXPORT_REQUIRED_ARCHIVE_FILES: tuple[str, ...] = (
+    "templates/index.json",
+    "templates/collection.json",
+    "sections/footer-group.json",
 )
 _THEME_EXPORT_REQUIRED_COLLECTION_SECTIONS: tuple[str, ...] = (
     "main-collection-banner",
     "main-collection",
 )
+_THEME_SAFE_FALLBACK_PATH = "/"
+_THEME_SECONDARY_SECTION_BACKGROUND_CSS_VAR = "--color-page-bg-secondary"
+_THEME_SECONDARY_SECTION_BACKGROUND_FILENAMES: tuple[str, ...] = (
+    "sections/ss-before-after-4.liquid",
+    "sections/ss-before-after-image-4.liquid",
+    "sections/ss-countdown-timer-4.liquid",
+)
+_THEME_SECONDARY_SECTION_BACKGROUND_COLOR_RE = re.compile(
+    r"background-color:\s*\{\{\s*background_color\s*\}\}\s*;",
+    re.IGNORECASE,
+)
+_THEME_SECONDARY_SECTION_BACKGROUND_IMAGE_RE = re.compile(
+    r"background-image:\s*\{\{\s*background_gradient\s*\}\}\s*;",
+    re.IGNORECASE,
+)
+_THEME_SECONDARY_COUNTDOWN_SHAPE_FILL_RE = re.compile(
+    r'fill="\{\{\s*background_color\s*\}\}"',
+    re.IGNORECASE,
+)
+_THEME_EXPORT_ALLOWED_ROOT_DIRECTORIES: frozenset[str] = frozenset(
+    {
+        "assets",
+        "config",
+        "layout",
+        "locales",
+        "sections",
+        "snippets",
+        "templates",
+    }
+)
 _THEME_HEADER_DRAWER_SAFE_CATALOG_LINK = (
     '<li><a class="drawer__menu-item block text-2xl font-bold '
-    'leading-none tracking-tight" href="/collections/all">Catalog</a></li>'
+    f'leading-none tracking-tight" href="{_THEME_SAFE_FALLBACK_PATH}">Shop</a></li>'
 )
+_THEME_LIQUID_OUTPUT_TAG_RE = re.compile(r"(\{\{[-\s]*)(.*?)([-\s]*\}\})", re.DOTALL)
+_LOCAL_SHOPIFY_THEME_DEFAULT_SHOP_DOMAIN = "local.mos"
+_LOCAL_SHOPIFY_THEME_DEFAULT_THEME_NAME = "mos-local-theme"
+_LOCAL_SHOPIFY_THEME_DEFAULT_THEME_ROLE = "MAIN"
+_LOCAL_SHOPIFY_THEME_DEFAULT_NAVIGATION_SIZE_PX = 18
+_LOCAL_SHOPIFY_THEME_BASELINE_ZIP_RELATIVE_PATH = os.path.join(
+    "shopify-funnel-app",
+    "theme",
+    "futrgroup2-theme.zip",
+)
+_LOCAL_SHOPIFY_THEME_SLOT_SOURCE_FILENAMES: tuple[str, ...] = (
+    "templates/index.json",
+    "templates/collection.json",
+)
+_LOCAL_SHOPIFY_THEME_BASELINE_EXCLUDED_PREFIXES: tuple[str, ...] = (
+    "mos-template-export/",
+)
+_LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES: dict[str, str] = {
+    "header": "a-header",
+    "footer": "a-footer",
+    "search-drawer": "a-search-drawer",
+    "multicolumn-with-icons": "a-multicolumn-with-icons",
+    "ss-footer-4": "a-ss-footer-4",
+}
+_LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_FILENAMES: tuple[str, ...] = (
+    "sections/header-group.json",
+    "sections/footer-group.json",
+    "sections/overlay-group.json",
+)
+_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME = "config/settings_data.json"
+_LOCAL_SHOPIFY_THEME_INDEX_TEMPLATE_FILENAME = "templates/index.json"
+_LOCAL_SHOPIFY_THEME_RICH_TEXT_SECTION_ID = "rich_text_U6caVk"
+_LOCAL_SHOPIFY_THEME_RICH_TEXT_HEADING_BLOCK_ID = "heading_PpFgCk"
+_LOCAL_SHOPIFY_THEME_RICH_TEXT_HEADING_EMPHASIS_WORD_COUNT = 3
+_LOCAL_SHOPIFY_THEME_MAX_DISCOVERED_IMAGE_SLOTS = 24
+_LOCAL_SHOPIFY_THEME_MAX_DISCOVERED_TEXT_SLOTS = 80
+_LOCAL_SHOPIFY_THEME_IMAGE_FILE_EXTENSION_RE = re.compile(
+    r"\.(?:avif|gif|jpe?g|png|svg|webp)(?:$|[?#])",
+    re.IGNORECASE,
+)
+_LOCAL_SHOPIFY_THEME_LAYOUT_WORKSPACE_CSS_RE = re.compile(
+    r"""['"](?P<asset>[^'"]*workspace-brand\.css)['"]\s*\|\s*asset_url""",
+    re.IGNORECASE,
+)
+_LOCAL_SHOPIFY_THEME_CSS_IMPORT_URL_RE = re.compile(
+    r"""@import\s+url\((?P<quote>["']?)(?P<url>[^"')]+)(?P=quote)\)\s*;""",
+    re.IGNORECASE,
+)
+_ASSET_SHOPIFY_FILE_URLS_CACHE_KEY = "shopifyFileUrlsByShopDomain"
+_LOCAL_SHOPIFY_THEME_TEXT_ENUM_VALUES = {
+    "adapt",
+    "auto",
+    "center",
+    "false",
+    "left",
+    "large",
+    "medium",
+    "none",
+    "no",
+    "right",
+    "small",
+    "solid",
+    "true",
+    "yes",
+}
 _THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH = 180
 _THEME_IMAGE_PROMPT_GENERAL_CONTEXT_MAX_LENGTH = 2000
 _THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH = 600
@@ -204,12 +361,21 @@ _THEME_SYNC_AI_IMAGE_PROMPT_BASE = (
     "No text, no logos, no watermark, no UI."
 )
 _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME = {
-    "hero": "Hero composition with the product as the focal subject in a wide cinematic frame.",
+    "hero": "Hero composition with the product as the focal subject, fully utilizing the requested aspect ratio.",
     "gallery": "Product detail composition showing materials, features, and craftsmanship.",
     "supporting": "Clean supporting visual tied to documented product benefits and usage context.",
     "background": "Ambient background scene that complements the product identity.",
     "generic": "Lifestyle composition aligned to the product and brand positioning.",
 }
+_THEME_SYNC_AI_FEATURE_ICON_ROLE_GUIDANCE = (
+    "Create a clean ecommerce feature icon that directly symbolizes the feature claim."
+)
+_THEME_SYNC_AI_FEATURE_ICON_CONSTRAINTS = (
+    "Icon-style requirements: single symbolic icon, simple centered composition, clear silhouette, "
+    "minimal background detail, no text, no letters, no numbers, no people, no product photography. "
+    "Background policy: always use a flat solid background that exactly matches the --color-page-bg value "
+    "provided in context."
+)
 _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
     "landscape": "16:9",
     "portrait": "3:4",
@@ -221,6 +387,129 @@ _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT = {
     "3:4": "3:4",
     "1:1": "1:1",
 }
+_THEME_SYNC_AI_IMAGE_MIN_SIZE_BY_ASPECT_RATIO = {
+    "16:9": "1920x1080",
+    "9:16": "1080x1920",
+    "4:3": "1600x1200",
+    "3:4": "1200x1600",
+    "1:1": "1600x1600",
+}
+_THEME_IMAGE_SLOT_CONFIG_PATH = (
+    Path(__file__).resolve().parents[4] / "theme_image_slot_config.json"
+)
+
+
+def _load_theme_sync_slot_prompt_overrides() -> tuple[dict[str, str], dict[str, str]]:
+    try:
+        parsed = json.loads(_THEME_IMAGE_SLOT_CONFIG_PATH.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            "Shared theme image slot config file is missing. "
+            f"path={_THEME_IMAGE_SLOT_CONFIG_PATH}."
+        ) from exc
+    except OSError as exc:
+        raise RuntimeError(
+            "Shared theme image slot config file could not be read. "
+            f"path={_THEME_IMAGE_SLOT_CONFIG_PATH}, error={exc}."
+        ) from exc
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            "Shared theme image slot config file is invalid JSON. "
+            f"path={_THEME_IMAGE_SLOT_CONFIG_PATH}, error={exc}."
+        ) from exc
+
+    raw_theme_map = (
+        parsed.get("themeImageSlotsByName") if isinstance(parsed, dict) else None
+    )
+    if not isinstance(raw_theme_map, dict):
+        raise RuntimeError(
+            "Shared theme image slot config is invalid. "
+            "Expected object key `themeImageSlotsByName`."
+        )
+
+    aspect_ratio_overrides: dict[str, str] = {}
+    render_hint_overrides: dict[str, str] = {}
+    for raw_theme_name, raw_slots in raw_theme_map.items():
+        if not isinstance(raw_theme_name, str) or not raw_theme_name.strip():
+            raise RuntimeError(
+                "Shared theme image slot config contains an invalid theme key. "
+                f"theme={raw_theme_name!r}."
+            )
+        if not isinstance(raw_slots, list):
+            raise RuntimeError(
+                "Shared theme image slot config contains an invalid slot list. "
+                f"theme={raw_theme_name}."
+            )
+
+        for index, raw_slot in enumerate(raw_slots):
+            if not isinstance(raw_slot, dict):
+                raise RuntimeError(
+                    "Shared theme image slot config contains a non-object slot entry. "
+                    f"theme={raw_theme_name}, index={index}."
+                )
+            raw_path = raw_slot.get("path")
+            if not isinstance(raw_path, str) or not raw_path.strip():
+                raise RuntimeError(
+                    "Shared theme image slot config contains an invalid path value. "
+                    f"theme={raw_theme_name}, index={index}."
+                )
+            slot_path = raw_path.strip()
+
+            prompt_aspect_ratio = raw_slot.get("promptAspectRatio")
+            if prompt_aspect_ratio is not None:
+                if (
+                    not isinstance(prompt_aspect_ratio, str)
+                    or not prompt_aspect_ratio.strip()
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an invalid "
+                        "promptAspectRatio value. "
+                        f"theme={raw_theme_name}, index={index}."
+                    )
+                normalized_aspect_ratio = prompt_aspect_ratio.strip()
+                existing_aspect_ratio = aspect_ratio_overrides.get(slot_path)
+                if (
+                    existing_aspect_ratio is not None
+                    and existing_aspect_ratio != normalized_aspect_ratio
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains conflicting "
+                        "promptAspectRatio values. "
+                        f"path={slot_path}."
+                    )
+                aspect_ratio_overrides[slot_path] = normalized_aspect_ratio
+
+            prompt_render_hint = raw_slot.get("promptRenderHint")
+            if prompt_render_hint is not None:
+                if (
+                    not isinstance(prompt_render_hint, str)
+                    or not prompt_render_hint.strip()
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an invalid "
+                        "promptRenderHint value. "
+                        f"theme={raw_theme_name}, index={index}."
+                    )
+                normalized_render_hint = prompt_render_hint.strip()
+                existing_render_hint = render_hint_overrides.get(slot_path)
+                if (
+                    existing_render_hint is not None
+                    and existing_render_hint != normalized_render_hint
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains conflicting "
+                        "promptRenderHint values. "
+                        f"path={slot_path}."
+                    )
+                render_hint_overrides[slot_path] = normalized_render_hint
+
+    return aspect_ratio_overrides, render_hint_overrides
+
+
+(
+    _THEME_SYNC_SLOT_ASPECT_RATIO_OVERRIDE_BY_PATH,
+    _THEME_SYNC_SLOT_IMAGE_RENDER_HINT_BY_PATH,
+) = _load_theme_sync_slot_prompt_overrides()
 _GEMINI_IMAGE_REFERENCES_ENABLED_TRUE_VALUES = {"1", "true", "yes", "on"}
 _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY = max(
     1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY
@@ -266,25 +555,31 @@ def _normalize_theme_export_header_drawer_content(*, content: str) -> str:
 
     def _rewrite_catalog_link(match: re.Match[str]) -> str:
         menu_item = match.group(0)
+        rewritten_menu_item = menu_item
         if re.search(
             r'href\s*=\s*["\']/collections/all["\']',
             menu_item,
             re.IGNORECASE,
-        ):
-            return menu_item
-        rewritten_menu_item, replaced = re.subn(
-            r'href\s*=\s*["\'][^"\']*["\']',
-            'href="/collections/all"',
-            menu_item,
-            count=1,
-            flags=re.IGNORECASE,
-        )
-        if replaced > 0:
-            return rewritten_menu_item
+        ) is None:
+            rewritten_menu_item, replaced = re.subn(
+                r'href\s*=\s*["\'][^"\']*["\']',
+                'href="/collections/all"',
+                menu_item,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+            if replaced == 0:
+                rewritten_menu_item = re.sub(
+                    r"<a\b",
+                    '<a href="/collections/all"',
+                    menu_item,
+                    count=1,
+                    flags=re.IGNORECASE,
+                )
         return re.sub(
-            r"<a\b",
-            '<a href="/collections/all"',
-            menu_item,
+            r">(\s*)(?:Catalog|Shop)(\s*)<",
+            r">\1Shop\2<",
+            rewritten_menu_item,
             count=1,
             flags=re.IGNORECASE,
         )
@@ -300,6 +595,1191 @@ def _normalize_theme_export_header_drawer_content(*, content: str) -> str:
     return normalized
 
 
+def _normalize_theme_export_header_navigation_link_labels(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    if filename not in {
+        _THEME_HEADER_NAV_DESKTOP_FILENAME,
+        _THEME_HEADER_NAV_DRAWER_FILENAME,
+    }:
+        return content
+
+    def _rewrite_liquid_output_tag(match: re.Match[str]) -> str:
+        prefix, expression, suffix = match.groups()
+        updated_expression = re.sub(
+            r"\blink\.title\b(?!\s*\|\s*replace:\s*'Catalog',\s*'Shop')",
+            "link.title | replace: 'Catalog', 'Shop'",
+            expression,
+        )
+        return f"{prefix}{updated_expression}{suffix}"
+
+    normalized = _THEME_LIQUID_OUTPUT_TAG_RE.sub(_rewrite_liquid_output_tag, content)
+    normalized = re.sub(
+        r"\becho\s+link\.title\b(?!\s*\|\s*replace:\s*'Catalog',\s*'Shop')",
+        "echo link.title | replace: 'Catalog', 'Shop'",
+        normalized,
+    )
+    return normalized
+
+
+def _normalize_theme_export_rich_text_section_content(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    if filename != _THEME_RICH_TEXT_SECTION_FILENAME:
+        return content
+
+    normalized = re.sub(
+        r"^\s*--footer-text-color:\s*\{\{\s*settings\.footer_text\s*\}\}\s*;\s*\n",
+        "",
+        content,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    normalized = re.sub(
+        (
+            r"^\s*--color-foreground:\s*\{\{\s*settings\.footer_text\.red\s*\}\}"
+            r"\s*\{\{\s*settings\.footer_text\.green\s*\}\}\s*"
+            r"\{\{\s*settings\.footer_text\.blue\s*\}\}\s*;\s*\n"
+        ),
+        "",
+        normalized,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    normalized = re.sub(
+        (
+            r"\n\s*#shopify-section-\{\{\s*section\.id\s*\}\}\s+\.rich-text\s*\{\s*\n"
+            r"\s*color:\s*var\(--footer-text-color\);\s*\n"
+            r"\s*\}\s*"
+        ),
+        "\n",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    return normalized
+
+
+def _normalize_local_theme_shop_domain(*, shop_domain: str | None) -> str:
+    if not isinstance(shop_domain, str) or not shop_domain.strip():
+        return _LOCAL_SHOPIFY_THEME_DEFAULT_SHOP_DOMAIN
+    normalized = shop_domain.strip().lower()
+    if any(char.isspace() for char in normalized):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="shopDomain must not include whitespace characters.",
+        )
+    if any(char in normalized for char in ('"', "'", "<", ">", "\n", "\r")):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="shopDomain contains unsupported characters.",
+        )
+    return normalized
+
+
+def _resolve_local_theme_selector(
+    *,
+    theme_id: str | None,
+    theme_name: str | None,
+) -> tuple[str, str, str]:
+    resolved_theme_name = (
+        theme_name.strip()
+        if isinstance(theme_name, str) and theme_name.strip()
+        else _LOCAL_SHOPIFY_THEME_DEFAULT_THEME_NAME
+    )
+    resolved_theme_id = (
+        theme_id.strip() if isinstance(theme_id, str) and theme_id.strip() else None
+    )
+    if not resolved_theme_id:
+        theme_slug = _slugify_theme_export_token(resolved_theme_name)
+        resolved_theme_id = f"local://themes/{theme_slug}"
+    return resolved_theme_id, resolved_theme_name, _LOCAL_SHOPIFY_THEME_DEFAULT_THEME_ROLE
+
+
+def _resolve_local_shopify_theme_baseline_zip_path() -> str:
+    repo_root = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
+    )
+    baseline_zip_path = os.path.join(repo_root, _LOCAL_SHOPIFY_THEME_BASELINE_ZIP_RELATIVE_PATH)
+    if not os.path.isfile(baseline_zip_path):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline archive is missing. "
+                f"Expected file at {_LOCAL_SHOPIFY_THEME_BASELINE_ZIP_RELATIVE_PATH}."
+            ),
+        )
+    return baseline_zip_path
+
+
+def _normalize_local_shopify_theme_baseline_filename(*, raw_filename: str) -> str:
+    if not isinstance(raw_filename, str) or not raw_filename.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Local Shopify theme baseline contains an empty filename entry.",
+        )
+    normalized = raw_filename.strip().replace("\\", "/").lstrip("/")
+    path_parts = [part for part in normalized.split("/") if part and part != "."]
+    if not path_parts or any(part == ".." for part in path_parts):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline contains an unsupported filename path "
+                f"entry={raw_filename!r}."
+            ),
+        )
+    return "/".join(path_parts)
+
+
+def _load_local_shopify_theme_baseline_files() -> tuple[list[str], dict[str, dict[str, str]]]:
+    baseline_zip_path = _resolve_local_shopify_theme_baseline_zip_path()
+    try:
+        zip_file = zipfile.ZipFile(baseline_zip_path)
+    except (FileNotFoundError, OSError, zipfile.BadZipFile) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to open the local Shopify theme baseline archive.",
+        ) from exc
+
+    ordered_filenames: list[str] = []
+    files_by_filename: dict[str, dict[str, str]] = {}
+    with zip_file:
+        for info in zip_file.infolist():
+            if info.is_dir():
+                continue
+            filename = _normalize_local_shopify_theme_baseline_filename(
+                raw_filename=info.filename
+            )
+            if any(
+                filename.startswith(prefix)
+                for prefix in _LOCAL_SHOPIFY_THEME_BASELINE_EXCLUDED_PREFIXES
+            ):
+                continue
+            if filename in files_by_filename:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Local Shopify theme baseline contains duplicate filename entries. "
+                        f"filename={filename}."
+                    ),
+                )
+            file_bytes = zip_file.read(info.filename)
+            file_entry: dict[str, str] = {"filename": filename}
+            try:
+                file_entry["content"] = file_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                file_entry["contentBase64"] = base64.b64encode(file_bytes).decode("ascii")
+            ordered_filenames.append(filename)
+            files_by_filename[filename] = file_entry
+
+    if not ordered_filenames:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Local Shopify theme baseline archive does not contain any files.",
+        )
+    return ordered_filenames, files_by_filename
+
+
+def _is_local_theme_image_setting_candidate(*, key: str, value: str) -> bool:
+    key_lower = key.strip().lower()
+    if not key_lower:
+        return False
+    if not (
+        key_lower in {"image", "mobile_image", "image_mobile", "desktop_image", "logo", "logo_mobile"}
+        or key_lower.endswith("_image")
+        or re.fullmatch(r"image_\d+", key_lower)
+    ):
+        return False
+
+    value_text = value.strip()
+    if not value_text:
+        return True
+    if value_text.startswith(("shopify://", "http://", "https://", "/", "gid://")):
+        return True
+    return bool(_LOCAL_SHOPIFY_THEME_IMAGE_FILE_EXTENSION_RE.search(value_text))
+
+
+def _is_local_theme_text_setting_candidate(*, key: str, value: str) -> bool:
+    key_lower = key.strip().lower()
+    if not key_lower:
+        return False
+    is_allowed_key = (
+        key_lower
+        in {
+            "button_label",
+            "caption",
+            "content",
+            "description",
+            "heading",
+            "label",
+            "overline",
+            "preheading",
+            "subheading",
+            "text",
+            "title",
+            "body",
+        }
+        or re.fullmatch(
+            r"(?:heading|title|subheading|text|label|description|caption|content|body)_\d+",
+            key_lower,
+        )
+        is not None
+    )
+    if not is_allowed_key:
+        return False
+
+    normalized_value = value.strip()
+    if not normalized_value:
+        return True
+    lowered_value = normalized_value.lower()
+    if lowered_value in _LOCAL_SHOPIFY_THEME_TEXT_ENUM_VALUES:
+        return False
+    if lowered_value.startswith(("shopify://", "http://", "https://", "gid://")):
+        return False
+    if re.fullmatch(r"#[0-9a-f]{3,8}", lowered_value):
+        return False
+    if re.fullmatch(r"\d+(?:\.\d+)?(?:px|rem|em|%|vh|vw)?", lowered_value):
+        return False
+    return True
+
+
+def _infer_local_theme_image_slot_role(*, setting_path: str) -> str:
+    lowered = setting_path.lower()
+    if any(token in lowered for token in ("hero", "banner", "slideshow", "featured-product")):
+        return "hero"
+    if any(
+        token in lowered
+        for token in (
+            "gallery",
+            "collage",
+            "lookbook",
+            "slider",
+            "carousel",
+            "before_after",
+            "before-after",
+            "testimonial",
+        )
+    ):
+        return "gallery"
+    return "supporting"
+
+
+def _infer_local_theme_image_slot_recommended_aspect(*, setting_path: str) -> str:
+    lowered = setting_path.lower()
+    if "logo" in lowered or "icon" in lowered:
+        return "square"
+    if "mobile" in lowered:
+        return "portrait"
+    if "before_image" in lowered or "after_image" in lowered:
+        return "portrait"
+    return "landscape"
+
+
+def _collect_local_theme_slots_from_json_value(
+    *,
+    filename: str,
+    value: Any,
+    path_tokens: list[str],
+    image_slots: list[dict[str, str]],
+    text_slots: list[dict[str, str]],
+    seen_image_slot_paths: set[str],
+    seen_text_slot_paths: set[str],
+) -> None:
+    if isinstance(value, dict):
+        for key, nested_value in value.items():
+            next_tokens = [*path_tokens, key]
+            if isinstance(nested_value, str) and "settings" in next_tokens:
+                setting_path = f"{filename}." + ".".join(next_tokens)
+                normalized_current_value = nested_value.strip() or None
+                if (
+                    len(image_slots) < _LOCAL_SHOPIFY_THEME_MAX_DISCOVERED_IMAGE_SLOTS
+                    and setting_path not in seen_image_slot_paths
+                    and _is_local_theme_image_setting_candidate(
+                        key=key,
+                        value=nested_value,
+                    )
+                ):
+                    seen_image_slot_paths.add(setting_path)
+                    image_slots.append(
+                        {
+                            "path": setting_path,
+                            "key": key.strip(),
+                            "role": _infer_local_theme_image_slot_role(
+                                setting_path=setting_path
+                            ),
+                            "recommendedAspect": _infer_local_theme_image_slot_recommended_aspect(
+                                setting_path=setting_path
+                            ),
+                            "currentValue": normalized_current_value,
+                        }
+                    )
+                if (
+                    len(text_slots) < _LOCAL_SHOPIFY_THEME_MAX_DISCOVERED_TEXT_SLOTS
+                    and setting_path not in seen_text_slot_paths
+                    and _is_local_theme_text_setting_candidate(
+                        key=key,
+                        value=nested_value,
+                    )
+                ):
+                    seen_text_slot_paths.add(setting_path)
+                    text_slots.append(
+                        {
+                            "path": setting_path,
+                            "key": key.strip(),
+                            "currentValue": normalized_current_value,
+                        }
+                    )
+                continue
+            _collect_local_theme_slots_from_json_value(
+                filename=filename,
+                value=nested_value,
+                path_tokens=next_tokens,
+                image_slots=image_slots,
+                text_slots=text_slots,
+                seen_image_slot_paths=seen_image_slot_paths,
+                seen_text_slot_paths=seen_text_slot_paths,
+            )
+        return
+    if isinstance(value, list):
+        for list_index, nested_value in enumerate(value):
+            _collect_local_theme_slots_from_json_value(
+                filename=filename,
+                value=nested_value,
+                path_tokens=[*path_tokens, str(list_index)],
+                image_slots=image_slots,
+                text_slots=text_slots,
+                seen_image_slot_paths=seen_image_slot_paths,
+                seen_text_slot_paths=seen_text_slot_paths,
+            )
+
+
+def _load_local_theme_json_file_from_export_files(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+    filename: str,
+) -> Any:
+    file_entry = files_by_filename.get(filename)
+    if not isinstance(file_entry, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Template export setting path targets a file that does not exist in the local "
+                f"Shopify baseline archive. filename={filename}."
+            ),
+        )
+    content = file_entry.get("content")
+    if not isinstance(content, str) or not content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Template export setting path targets a file without text content in the local "
+                f"Shopify baseline archive. filename={filename}."
+            ),
+        )
+    return _parse_theme_export_template_json(filename=filename, content=content)
+
+
+def _list_local_theme_template_slots(
+    *,
+    theme_id: str | None,
+    theme_name: str | None,
+    shop_domain: str | None,
+) -> dict[str, Any]:
+    resolved_theme_id, resolved_theme_name, resolved_theme_role = (
+        _resolve_local_theme_selector(theme_id=theme_id, theme_name=theme_name)
+    )
+    _ordered_filenames, files_by_filename = _load_local_shopify_theme_baseline_files()
+    image_slots: list[dict[str, str]] = []
+    text_slots: list[dict[str, str]] = []
+    seen_image_slot_paths: set[str] = set()
+    seen_text_slot_paths: set[str] = set()
+    for filename in _LOCAL_SHOPIFY_THEME_SLOT_SOURCE_FILENAMES:
+        template_data = _load_local_theme_json_file_from_export_files(
+            files_by_filename=files_by_filename,
+            filename=filename,
+        )
+        _collect_local_theme_slots_from_json_value(
+            filename=filename,
+            value=template_data,
+            path_tokens=[],
+            image_slots=image_slots,
+            text_slots=text_slots,
+            seen_image_slot_paths=seen_image_slot_paths,
+            seen_text_slot_paths=seen_text_slot_paths,
+        )
+    if not image_slots and not text_slots:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline did not provide any image or text "
+                "template slots for draft generation."
+            ),
+        )
+    return {
+        "shopDomain": _normalize_local_theme_shop_domain(shop_domain=shop_domain),
+        "themeId": resolved_theme_id,
+        "themeName": resolved_theme_name,
+        "themeRole": resolved_theme_role,
+        "imageSlots": image_slots,
+        "textSlots": text_slots,
+    }
+
+
+def _set_theme_template_json_path_value(
+    *,
+    template_data: Any,
+    setting_path: str,
+    path_tokens: list[str],
+    value: str,
+) -> None:
+    current: Any = template_data
+    for token_index, token in enumerate(path_tokens):
+        is_last_token = token_index == len(path_tokens) - 1
+        if isinstance(current, dict):
+            if is_last_token:
+                current[token] = value
+                return
+            next_token = path_tokens[token_index + 1]
+            next_value = current.get(token)
+            if next_value is None:
+                next_value = [] if next_token.isdigit() else {}
+                current[token] = next_value
+            elif not isinstance(next_value, (dict, list)):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Template export could not apply a setting path because an intermediate token "
+                        f"is not a JSON object/list. path={setting_path}, token={token}."
+                    ),
+                )
+            current = next_value
+            continue
+        if isinstance(current, list):
+            if not token.isdigit():
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Template export expected a numeric index while applying a list path token. "
+                        f"path={setting_path}, token={token!r}."
+                    ),
+                )
+            list_index = int(token)
+            while len(current) <= list_index:
+                current.append(None)
+            if is_last_token:
+                current[list_index] = value
+                return
+            next_token = path_tokens[token_index + 1]
+            next_value = current[list_index]
+            if next_value is None:
+                next_value = [] if next_token.isdigit() else {}
+                current[list_index] = next_value
+            elif not isinstance(next_value, (dict, list)):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Template export could not apply a setting path because a list entry "
+                        f"is not a JSON object/list. path={setting_path}, token={token}."
+                    ),
+                )
+            current = next_value
+            continue
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Template export encountered a non-container value while resolving "
+                f"path={setting_path}."
+            ),
+        )
+
+
+def _coerce_theme_setting_value_for_existing_type(
+    *,
+    existing_value: Any,
+    next_value: str,
+) -> str:
+    if (
+        isinstance(existing_value, str)
+        and _THEME_RICHTEXT_MARKUP_RE.search(existing_value) is not None
+    ):
+        if _THEME_RICHTEXT_TOP_LEVEL_TAG_RE.search(next_value) is not None:
+            return next_value
+
+        normalized_text = next_value.replace("\r", "").strip()
+        if not normalized_text:
+            return ""
+
+        paragraphs = [
+            paragraph.strip()
+            for paragraph in normalized_text.split("\n")
+            if paragraph.strip()
+        ]
+        if not paragraphs:
+            return ""
+        return "".join(
+            f"<p>{escape(paragraph, quote=False)}</p>"
+            for paragraph in paragraphs
+        )
+    return next_value
+
+
+def _apply_theme_template_setting_values_to_local_files(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+    values_by_setting_path: dict[str, str],
+) -> None:
+    parsed_json_files_by_filename: dict[str, Any] = {}
+    for setting_path, value in sorted(values_by_setting_path.items()):
+        template_filename, path_tokens = _split_theme_template_setting_path(
+            setting_path=setting_path
+        )
+        template_data = parsed_json_files_by_filename.get(template_filename)
+        if template_data is None:
+            template_data = _load_local_theme_json_file_from_export_files(
+                files_by_filename=files_by_filename,
+                filename=template_filename,
+            )
+            parsed_json_files_by_filename[template_filename] = template_data
+        existing_value: Any = None
+        try:
+            existing_value = _resolve_theme_template_json_path_value(
+                template_data=template_data,
+                setting_path=setting_path,
+                path_tokens=path_tokens,
+            )
+        except HTTPException:
+            existing_value = None
+        coerced_value = _coerce_theme_setting_value_for_existing_type(
+            existing_value=existing_value,
+            next_value=value,
+        )
+        _set_theme_template_json_path_value(
+            template_data=template_data,
+            setting_path=setting_path,
+            path_tokens=path_tokens,
+            value=coerced_value,
+        )
+    for filename, template_data in parsed_json_files_by_filename.items():
+        file_entry = files_by_filename[filename]
+        file_entry["content"] = json.dumps(
+            template_data,
+            indent=2,
+            sort_keys=True,
+        )
+        file_entry.pop("contentBase64", None)
+
+
+def _apply_local_theme_section_group_import_compatibility(
+    *,
+    ordered_filenames: list[str],
+    files_by_filename: dict[str, dict[str, str]],
+) -> None:
+    for source_type, alias_type in (
+        _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES.items()
+    ):
+        source_filename = f"sections/{source_type}.liquid"
+        source_entry = files_by_filename.get(source_filename)
+        source_content = (
+            source_entry.get("content") if isinstance(source_entry, dict) else None
+        )
+        if not isinstance(source_content, str) or not source_content.strip():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline is missing a required section file "
+                    "for ZIP import compatibility. "
+                    f"filename={source_filename}."
+                ),
+            )
+        alias_filename = f"sections/{alias_type}.liquid"
+        existing_alias_entry = files_by_filename.get(alias_filename)
+        if existing_alias_entry is None:
+            files_by_filename[alias_filename] = {
+                "filename": alias_filename,
+                "content": source_content,
+            }
+            ordered_filenames.append(alias_filename)
+        else:
+            existing_alias_content = existing_alias_entry.get("content")
+            if (
+                not isinstance(existing_alias_content, str)
+                or existing_alias_content != source_content
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Local Shopify theme baseline contains an unexpected section "
+                        "alias file for ZIP import compatibility. "
+                        f"filename={alias_filename}."
+                    ),
+                )
+
+    for group_filename in _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_FILENAMES:
+        group_entry = files_by_filename.get(group_filename)
+        group_content = (
+            group_entry.get("content") if isinstance(group_entry, dict) else None
+        )
+        if not isinstance(group_content, str) or not group_content.strip():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline is missing a required section-group "
+                    "JSON file for ZIP import compatibility. "
+                    f"filename={group_filename}."
+                ),
+            )
+        group_data = _parse_theme_export_template_json(
+            filename=group_filename,
+            content=group_content,
+        )
+        sections = group_data.get("sections")
+        if not isinstance(sections, dict):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme section-group file is missing sections object "
+                    f"for ZIP import compatibility. filename={group_filename}."
+                ),
+            )
+
+        for section_payload in sections.values():
+            if not isinstance(section_payload, dict):
+                continue
+            section_type = section_payload.get("type")
+            if not isinstance(section_type, str) or not section_type.strip():
+                continue
+            alias_type = _LOCAL_SHOPIFY_THEME_SECTION_GROUP_IMPORT_COMPAT_TYPE_ALIASES.get(
+                section_type.strip()
+            )
+            if alias_type:
+                section_payload["type"] = alias_type
+
+        group_entry["content"] = json.dumps(
+            group_data,
+            indent=2,
+            sort_keys=True,
+        )
+        group_entry.pop("contentBase64", None)
+
+
+def _resolve_local_theme_workspace_css_filename(*, layout_content: str) -> str:
+    match = _LOCAL_SHOPIFY_THEME_LAYOUT_WORKSPACE_CSS_RE.search(layout_content)
+    if not match:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline layout/theme.liquid does not include a "
+                "workspace-brand CSS asset reference."
+            ),
+        )
+    asset_filename = match.group("asset").strip().lstrip("/")
+    if not asset_filename:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline layout/theme.liquid contains an invalid "
+                "workspace-brand CSS asset reference."
+            ),
+        )
+    if "/" in asset_filename:
+        return asset_filename
+    return f"assets/{asset_filename}"
+
+
+def _merge_local_theme_export_css(
+    *,
+    existing_content: str,
+    css_vars: dict[str, str],
+    font_urls: list[str],
+) -> str:
+    merged_content = existing_content
+
+    existing_import_urls = {
+        match.group("url").strip()
+        for match in _LOCAL_SHOPIFY_THEME_CSS_IMPORT_URL_RE.finditer(existing_content)
+        if isinstance(match.group("url"), str) and match.group("url").strip()
+    }
+    missing_font_urls = [
+        font_url for font_url in font_urls if font_url not in existing_import_urls
+    ]
+    if missing_font_urls:
+        import_block = "".join(
+            f'@import url("{font_url}");\n' for font_url in missing_font_urls
+        )
+        merged_content = f"{import_block}\n{merged_content.lstrip()}"
+
+    missing_css_var_lines: list[str] = []
+    for css_var_name, css_var_value in sorted(css_vars.items()):
+        var_pattern = re.compile(
+            rf"(?m)^(\s*{re.escape(css_var_name)}\s*:\s*)([^;]*)(;)"
+        )
+        merged_content, replaced_count = var_pattern.subn(
+            lambda var_match: (
+                f"{var_match.group(1)}"
+                f"{css_var_value} !important"
+                if "!important" in var_match.group(2).strip().lower()
+                else f"{var_match.group(1)}{css_var_value}"
+            )
+            + var_match.group(3),
+            merged_content,
+        )
+        if replaced_count > 0:
+            continue
+        missing_css_var_lines.append(f"  {css_var_name}: {css_var_value};")
+
+    if missing_css_var_lines:
+        appended_block = "\n".join(
+            [
+                "",
+                "/* Added by mOS local template export variable patch. */",
+                ":root {",
+                *missing_css_var_lines,
+                "}",
+                "",
+            ]
+        )
+        merged_content = f"{merged_content.rstrip()}{appended_block}"
+
+    return merged_content if merged_content.endswith("\n") else f"{merged_content}\n"
+
+
+def _require_local_theme_secondary_background_css_var(
+    *,
+    css_vars: dict[str, str],
+) -> None:
+    value = css_vars.get(_THEME_SECONDARY_SECTION_BACKGROUND_CSS_VAR)
+    if not isinstance(value, str) or not value.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Template ZIP export requires design system token "
+                f"cssVars[{_THEME_SECONDARY_SECTION_BACKGROUND_CSS_VAR}] to style "
+                "SS - Before / After #4 and SS - Countdown Timer #4 section backgrounds."
+            ),
+        )
+
+
+def _apply_local_theme_secondary_background_color_to_sections(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+) -> None:
+    replacement_color = f"background-color: var({_THEME_SECONDARY_SECTION_BACKGROUND_CSS_VAR});"
+    replacement_image = "background-image: none;"
+    for filename in _THEME_SECONDARY_SECTION_BACKGROUND_FILENAMES:
+        file_entry = files_by_filename.get(filename)
+        section_content = file_entry.get("content") if isinstance(file_entry, dict) else None
+        if not isinstance(section_content, str) or not section_content.strip():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline is missing or has invalid section content "
+                    f"required for secondary background token wiring. filename={filename}."
+                ),
+            )
+
+        updated_content, replaced_background_count = (
+            _THEME_SECONDARY_SECTION_BACKGROUND_COLOR_RE.subn(
+                replacement_color,
+                section_content,
+            )
+        )
+        if replaced_background_count < 1:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline section does not expose a supported "
+                    f"background_color binding for secondary token wiring. filename={filename}."
+                ),
+            )
+        updated_content, replaced_background_image_count = (
+            _THEME_SECONDARY_SECTION_BACKGROUND_IMAGE_RE.subn(
+                replacement_image,
+                updated_content,
+            )
+        )
+        if replaced_background_image_count < 1:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=(
+                    "Local Shopify theme baseline section does not expose a supported "
+                    f"background_gradient binding for secondary token wiring. filename={filename}."
+                ),
+            )
+
+        if filename == "sections/ss-countdown-timer-4.liquid":
+            updated_content, replaced_fill_count = _THEME_SECONDARY_COUNTDOWN_SHAPE_FILL_RE.subn(
+                f'fill="var({_THEME_SECONDARY_SECTION_BACKGROUND_CSS_VAR})"',
+                updated_content,
+            )
+            if replaced_fill_count < 1:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Local Shopify theme baseline countdown section does not expose a "
+                        "supported shape fill binding for secondary token wiring."
+                    ),
+                )
+
+        file_entry["content"] = updated_content
+        file_entry.pop("contentBase64", None)
+
+
+def _apply_local_theme_export_default_navigation_size(
+    *,
+    settings_file_entry: dict[str, str],
+) -> None:
+    settings_content = settings_file_entry.get("content")
+    if not isinstance(settings_content, str) or not settings_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline settings_data.json is empty or not UTF-8 "
+                "text content."
+            ),
+        )
+    try:
+        settings_payload = json.loads(settings_content)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline config/settings_data.json is not valid JSON."
+            ),
+        ) from exc
+    if not isinstance(settings_payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline config/settings_data.json has an invalid "
+                "JSON root."
+            ),
+        )
+    current_settings = settings_payload.get("current")
+    if not isinstance(current_settings, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline config/settings_data.json is missing a "
+                "valid current settings object."
+            ),
+        )
+
+    current_settings["type_navigation_size"] = (
+        _LOCAL_SHOPIFY_THEME_DEFAULT_NAVIGATION_SIZE_PX
+    )
+    settings_file_entry["content"] = json.dumps(
+        settings_payload,
+        indent=2,
+        sort_keys=True,
+    )
+    settings_file_entry.pop("contentBase64", None)
+
+
+def _apply_local_theme_rich_text_footer_color_styling(
+    *,
+    files_by_filename: dict[str, dict[str, str]],
+) -> None:
+    settings_file_entry = files_by_filename.get(_LOCAL_SHOPIFY_THEME_SETTINGS_FILENAME)
+    settings_content = (
+        settings_file_entry.get("content")
+        if isinstance(settings_file_entry, dict)
+        else None
+    )
+    if not isinstance(settings_content, str) or not settings_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline settings file is missing or invalid for "
+                "rich text color synchronization."
+            ),
+        )
+    try:
+        settings_payload = json.loads(settings_content)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline settings file is not valid JSON for rich text "
+                "color synchronization."
+            ),
+        ) from exc
+    if not isinstance(settings_payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline settings JSON root is invalid for rich text "
+                "color synchronization."
+            ),
+        )
+    current_settings = settings_payload.get("current")
+    if not isinstance(current_settings, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline settings file is missing a valid current settings "
+                "object for rich text color synchronization."
+            ),
+        )
+    footer_background = current_settings.get("footer_background")
+    if not isinstance(footer_background, str) or not footer_background.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline current.footer_background is missing for rich text "
+                "background synchronization."
+            ),
+        )
+    color_bg = current_settings.get("color_image_background")
+    if not isinstance(color_bg, str) or not color_bg.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline current.color_image_background is missing for rich "
+                "text highlight synchronization."
+            ),
+        )
+
+    template_file_entry = files_by_filename.get(_LOCAL_SHOPIFY_THEME_INDEX_TEMPLATE_FILENAME)
+    template_content = (
+        template_file_entry.get("content")
+        if isinstance(template_file_entry, dict)
+        else None
+    )
+    if not isinstance(template_content, str) or not template_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline index template is missing or invalid for rich text "
+                "style synchronization."
+            ),
+        )
+    template_payload = _parse_theme_export_template_json(
+        filename=_LOCAL_SHOPIFY_THEME_INDEX_TEMPLATE_FILENAME,
+        content=template_content,
+    )
+    sections = template_payload.get("sections")
+    if not isinstance(sections, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline index template is missing a valid sections object "
+                "for rich text style synchronization."
+            ),
+        )
+    rich_text_section = sections.get(_LOCAL_SHOPIFY_THEME_RICH_TEXT_SECTION_ID)
+    if not isinstance(rich_text_section, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline index template is missing the expected rich text "
+                f"section ({_LOCAL_SHOPIFY_THEME_RICH_TEXT_SECTION_ID})."
+            ),
+        )
+    section_settings = rich_text_section.get("settings")
+    if not isinstance(section_settings, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline rich text section is missing a valid settings "
+                "object."
+            ),
+        )
+    section_settings["color_background"] = footer_background.strip()
+    section_settings["color_highlight"] = color_bg.strip()
+
+    section_blocks = rich_text_section.get("blocks")
+    if not isinstance(section_blocks, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline rich text section is missing a valid blocks object."
+            ),
+        )
+    heading_block = section_blocks.get(_LOCAL_SHOPIFY_THEME_RICH_TEXT_HEADING_BLOCK_ID)
+    if not isinstance(heading_block, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline rich text section is missing the expected heading "
+                f"block ({_LOCAL_SHOPIFY_THEME_RICH_TEXT_HEADING_BLOCK_ID})."
+            ),
+        )
+    heading_settings = heading_block.get("settings")
+    if not isinstance(heading_settings, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline rich text heading block is missing a valid "
+                "settings object."
+            ),
+        )
+    raw_heading = heading_settings.get("heading")
+    if not isinstance(raw_heading, str) or not raw_heading.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline rich text heading value is missing and cannot be "
+                "formatted for scribble emphasis."
+            ),
+        )
+    sanitized_heading = _sanitize_theme_component_text_value(raw_heading)
+    heading_words = sanitized_heading.split()
+    if len(heading_words) < _LOCAL_SHOPIFY_THEME_RICH_TEXT_HEADING_EMPHASIS_WORD_COUNT:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline rich text heading does not include enough words to "
+                "italicize the trailing phrase for scribble emphasis."
+            ),
+        )
+    emphasized_words = heading_words[-_LOCAL_SHOPIFY_THEME_RICH_TEXT_HEADING_EMPHASIS_WORD_COUNT :]
+    leading_words = heading_words[: -_LOCAL_SHOPIFY_THEME_RICH_TEXT_HEADING_EMPHASIS_WORD_COUNT]
+    emphasized_phrase = " ".join(emphasized_words)
+    leading_phrase = " ".join(leading_words).strip()
+    heading_settings["heading"] = (
+        f"{leading_phrase} <em>{emphasized_phrase}</em>"
+        if leading_phrase
+        else f"<em>{emphasized_phrase}</em>"
+    )
+    heading_settings["highlighted_text"] = "scribble"
+
+    template_file_entry["content"] = json.dumps(
+        template_payload,
+        indent=2,
+        sort_keys=True,
+    )
+    if not template_file_entry["content"].endswith("\n"):
+        template_file_entry["content"] = f"{template_file_entry['content']}\n"
+    template_file_entry.pop("contentBase64", None)
+
+
+def _build_local_shopify_theme_export_payload(
+    *,
+    shop_domain: str,
+    workspace_name: str,
+    brand_name: str,
+    logo_url: str,
+    css_vars: dict[str, str],
+    font_urls: list[str],
+    data_theme: str,
+    component_image_urls: dict[str, str],
+    component_text_values: dict[str, str],
+    theme_id: str,
+    theme_name: str,
+    theme_role: str,
+) -> dict[str, Any]:
+    ordered_filenames, files_by_filename = _load_local_shopify_theme_baseline_files()
+    layout_filename = "layout/theme.liquid"
+    layout_file_entry = files_by_filename.get(layout_filename)
+    if not isinstance(layout_file_entry, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Local Shopify theme baseline is missing layout/theme.liquid.",
+        )
+    layout_content = layout_file_entry.get("content")
+    if not isinstance(layout_content, str) or not layout_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline layout/theme.liquid is empty or not UTF-8 "
+                "text content."
+            ),
+        )
+    css_filename = _resolve_local_theme_workspace_css_filename(layout_content=layout_content)
+    css_file_entry = files_by_filename.get(css_filename)
+    if not isinstance(css_file_entry, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline is missing the workspace-brand CSS asset "
+                f"referenced by layout/theme.liquid. filename={css_filename}."
+            ),
+        )
+    settings_filename = "config/settings_data.json"
+    settings_file_entry = files_by_filename.get(settings_filename)
+    if not isinstance(settings_file_entry, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Local Shopify theme baseline is missing config/settings_data.json.",
+        )
+
+    css_content = css_file_entry.get("content")
+    if not isinstance(css_content, str) or not css_content.strip():
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Local Shopify theme baseline workspace-brand CSS asset is empty or not "
+                f"UTF-8 text content. filename={css_filename}."
+            ),
+        )
+    _require_local_theme_secondary_background_css_var(css_vars=css_vars)
+    css_vars_with_defaults = dict(css_vars)
+    css_vars_with_defaults["--font-navigation-size"] = (
+        f"{_LOCAL_SHOPIFY_THEME_DEFAULT_NAVIGATION_SIZE_PX}px"
+    )
+    css_file_entry["content"] = _merge_local_theme_export_css(
+        existing_content=css_content,
+        css_vars=css_vars_with_defaults,
+        font_urls=font_urls,
+    )
+    css_file_entry.pop("contentBase64", None)
+    _apply_local_theme_export_default_navigation_size(
+        settings_file_entry=settings_file_entry,
+    )
+
+    _apply_theme_template_setting_values_to_local_files(
+        files_by_filename=files_by_filename,
+        values_by_setting_path=component_image_urls,
+    )
+    _apply_theme_template_setting_values_to_local_files(
+        files_by_filename=files_by_filename,
+        values_by_setting_path=component_text_values,
+    )
+    _apply_local_theme_rich_text_footer_color_styling(
+        files_by_filename=files_by_filename,
+    )
+    _apply_local_theme_section_group_import_compatibility(
+        ordered_filenames=ordered_filenames,
+        files_by_filename=files_by_filename,
+    )
+    _apply_local_theme_secondary_background_color_to_sections(
+        files_by_filename=files_by_filename
+    )
+    files = [dict(files_by_filename[filename]) for filename in ordered_filenames]
+    return {
+        "shopDomain": _normalize_local_theme_shop_domain(shop_domain=shop_domain),
+        "themeId": theme_id,
+        "themeName": theme_name,
+        "themeRole": theme_role,
+        "layoutFilename": layout_filename,
+        "cssFilename": css_filename,
+        "settingsFilename": settings_filename,
+        "jobId": None,
+        "coverage": {
+            "requiredSourceVars": sorted(css_vars.keys()),
+            "requiredThemeVars": sorted(css_vars.keys()),
+            "missingSourceVars": [],
+            "missingThemeVars": [],
+        },
+        "settingsSync": {
+            "settingsFilename": settings_filename,
+            "expectedPaths": [],
+            "updatedPaths": [],
+            "missingPaths": [],
+            "requiredMissingPaths": [],
+            "requiredMismatchedPaths": [],
+            "semanticUpdatedPaths": [],
+            "semanticMismatchedPaths": [],
+            "unmappedColorPaths": [],
+            "semanticTypographyUpdatedPaths": [],
+            "semanticTypographyMismatchedPaths": [],
+            "unmappedTypographyPaths": [],
+        },
+        "files": files,
+    }
+
+
 def _normalize_theme_export_text_file_content(
     *,
     filename: str,
@@ -309,8 +1789,17 @@ def _normalize_theme_export_text_file_content(
     normalized = content
     if filename == _THEME_HEADER_DRAWER_FILENAME:
         normalized = _normalize_theme_export_header_drawer_content(content=normalized)
+    normalized = _normalize_theme_export_header_navigation_link_labels(
+        filename=filename,
+        content=normalized,
+    )
+    normalized = _normalize_theme_export_rich_text_section_content(
+        filename=filename,
+        content=normalized,
+    )
+    normalized = _normalize_theme_export_storefront_link_content(content=normalized)
     normalized, _ = _THEME_COLLECTION_TEST_PATH_RE.subn(
-        "/collections/all",
+        _THEME_SAFE_FALLBACK_PATH,
         normalized,
     )
     ending_collection_test_count = len(_THEME_COLLECTION_TEST_PATH_RE.findall(normalized))
@@ -319,6 +1808,65 @@ def _normalize_theme_export_text_file_content(
         starting_collection_test_count - ending_collection_test_count,
     )
     return normalized, rewritten_collection_link_count
+
+
+def _normalize_theme_export_storefront_link_content(*, content: str) -> str:
+    normalized = _THEME_SHOPIFY_PRODUCT_LINK_RE.sub(
+        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
+        content,
+    )
+    normalized = _THEME_RELATIVE_PRODUCT_PATH_LINK_RE.sub(
+        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
+        normalized,
+    )
+    normalized = _THEME_RELATIVE_PAGE_PATH_LINK_RE.sub(
+        f'\\g<quote>{_THEME_SAFE_FALLBACK_PATH}\\g<quote>',
+        normalized,
+    )
+
+    def _rewrite_relative_collection_path_link(match: re.Match[str]) -> str:
+        return (
+            f"{match.group('quote')}{_THEME_SAFE_FALLBACK_PATH}{match.group('quote')}"
+        )
+
+    normalized = _THEME_RELATIVE_COLLECTION_PATH_LINK_RE.sub(
+        _rewrite_relative_collection_path_link,
+        normalized,
+    )
+
+    def _rewrite_shopify_collection_link(match: re.Match[str]) -> str:
+        return (
+            f"{match.group('quote')}{_THEME_SAFE_FALLBACK_PATH}{match.group('quote')}"
+        )
+
+    normalized = _THEME_SHOPIFY_COLLECTION_LINK_RE.sub(
+        _rewrite_shopify_collection_link,
+        normalized,
+    )
+    return normalized
+
+
+def _theme_export_zip_write_order_key(*, filename: str) -> tuple[int, int, str]:
+    normalized_filename = filename.strip().lower()
+    root_segment = normalized_filename.split("/", 1)[0]
+    root_priority = {
+        "assets": 10,
+        "snippets": 20,
+        "sections": 30,
+        "layout": 40,
+        "config": 50,
+        "locales": 60,
+        "templates": 70,
+    }.get(root_segment, 90)
+
+    if normalized_filename.endswith(".liquid"):
+        extension_priority = 0
+    elif normalized_filename.endswith(".json"):
+        extension_priority = 2
+    else:
+        extension_priority = 1
+
+    return root_priority, extension_priority, normalized_filename
 
 
 def _parse_theme_export_template_json(
@@ -438,6 +1986,68 @@ def _validate_required_collection_templates_in_export(
         "requiredCollectionSections": list(_THEME_EXPORT_REQUIRED_COLLECTION_SECTIONS),
         "validatedCollectionSections": sorted(sections.keys()),
     }
+
+
+def _validate_required_theme_archive_files_in_export(
+    *,
+    exported_filenames: set[str],
+) -> dict[str, Any]:
+    missing_files = sorted(
+        filename
+        for filename in _THEME_EXPORT_REQUIRED_ARCHIVE_FILES
+        if filename not in exported_filenames
+    )
+    if missing_files:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export is missing required archive files: "
+                + ", ".join(missing_files)
+                + "."
+            ),
+        )
+    return {
+        "requiredFiles": list(_THEME_EXPORT_REQUIRED_ARCHIVE_FILES),
+        "validatedFiles": sorted(_THEME_EXPORT_REQUIRED_ARCHIVE_FILES),
+    }
+
+
+def _validate_template_file_format_uniqueness_in_export(
+    *,
+    exported_filenames: set[str],
+) -> None:
+    template_formats_by_key: dict[str, set[str]] = {}
+    for filename in sorted(exported_filenames):
+        normalized_filename = filename.strip()
+        if not normalized_filename.startswith("templates/"):
+            continue
+        if normalized_filename.endswith(".json"):
+            extension = "json"
+        elif normalized_filename.endswith(".liquid"):
+            extension = "liquid"
+        else:
+            continue
+        template_key = normalized_filename.rsplit(".", 1)[0].lower()
+        template_formats_by_key.setdefault(template_key, set()).add(extension)
+
+    duplicate_template_keys = sorted(
+        template_key
+        for template_key, formats in template_formats_by_key.items()
+        if "json" in formats and "liquid" in formats
+    )
+    if duplicate_template_keys:
+        duplicate_pairs = ", ".join(
+            f"{template_key}.json + {template_key}.liquid"
+            for template_key in duplicate_template_keys
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export contains template-format collisions. "
+                "A template key can be JSON or Liquid, not both. "
+                f"collisions={duplicate_pairs}."
+            ),
+        )
 
 
 def _split_theme_template_setting_path(*, setting_path: str) -> tuple[str, list[str]]:
@@ -1241,6 +2851,131 @@ def _is_theme_feature_image_slot_path(slot_path: str) -> bool:
     return bool(_THEME_FEATURE_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
 
 
+def _is_theme_feature_highlight_text_slot_path(slot_path: str) -> bool:
+    return slot_path.strip() in _THEME_FEATURE_HIGHLIGHT_MANAGED_TEXT_SLOT_PATHS
+
+
+def _split_theme_text_slots_for_copy_generation(
+    *,
+    text_slots: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    ai_text_slots: list[dict[str, Any]] = []
+    managed_feature_text_slots: list[dict[str, Any]] = []
+    for raw_slot in text_slots:
+        if not isinstance(raw_slot, dict):
+            continue
+        raw_path = raw_slot.get("path")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            continue
+        normalized_path = raw_path.strip()
+        if _is_theme_feature_highlight_text_slot_path(normalized_path):
+            managed_feature_text_slots.append(raw_slot)
+            continue
+        ai_text_slots.append(raw_slot)
+    return ai_text_slots, managed_feature_text_slots
+
+
+def _sanitize_theme_feature_highlight_value(
+    *,
+    card_key: str,
+    field_name: str,
+    value: str | None,
+) -> str | None:
+    if value is None:
+        return None
+    sanitized_value = _sanitize_theme_component_text_value(value)
+    if not sanitized_value:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "featureHighlights value became empty after sanitization. "
+                f"path=featureHighlights.{card_key}.{field_name}."
+            ),
+        )
+    return sanitized_value
+
+
+def _resolve_theme_template_feature_highlights(
+    *,
+    feature_highlights: ShopifyThemeTemplateFeatureHighlights | None = None,
+    existing_feature_highlights: ShopifyThemeTemplateFeatureHighlights | None = None,
+    component_text_values: dict[str, str] | None = None,
+    text_slots: list[dict[str, Any]] | None = None,
+) -> tuple[ShopifyThemeTemplateFeatureHighlights | None, dict[str, str]]:
+    text_values_by_path = _collect_theme_sync_text_values_by_path(
+        text_slots=text_slots or [],
+        component_text_values=component_text_values,
+    )
+    resolved_cards: dict[str, dict[str, str]] = {}
+    resolved_component_text_values: dict[str, str] = {}
+    for card_key, (header_path, subtext_path) in _THEME_FEATURE_HIGHLIGHT_CARD_SLOT_PATHS.items():
+        resolved_header: str | None = None
+        resolved_subtext: str | None = None
+
+        existing_card = (
+            getattr(existing_feature_highlights, card_key, None)
+            if existing_feature_highlights is not None
+            else None
+        )
+        if existing_card is not None:
+            existing_header = _sanitize_theme_feature_highlight_value(
+                card_key=card_key,
+                field_name="header",
+                value=existing_card.header,
+            )
+            if existing_header:
+                resolved_header = existing_header
+            existing_subtext = _sanitize_theme_feature_highlight_value(
+                card_key=card_key,
+                field_name="subtext",
+                value=existing_card.subtext,
+            )
+            if existing_subtext:
+                resolved_subtext = existing_subtext
+
+        seeded_header = text_values_by_path.get(header_path)
+        if seeded_header:
+            resolved_header = seeded_header
+        seeded_subtext = text_values_by_path.get(subtext_path)
+        if seeded_subtext:
+            resolved_subtext = seeded_subtext
+
+        manual_card = (
+            getattr(feature_highlights, card_key, None)
+            if feature_highlights is not None
+            else None
+        )
+        if manual_card is not None:
+            manual_header = _sanitize_theme_feature_highlight_value(
+                card_key=card_key,
+                field_name="header",
+                value=manual_card.header,
+            )
+            if manual_header:
+                resolved_header = manual_header
+            manual_subtext = _sanitize_theme_feature_highlight_value(
+                card_key=card_key,
+                field_name="subtext",
+                value=manual_card.subtext,
+            )
+            if manual_subtext:
+                resolved_subtext = manual_subtext
+
+        resolved_card: dict[str, str] = {}
+        if resolved_header:
+            resolved_card["header"] = resolved_header
+            resolved_component_text_values[header_path] = resolved_header
+        if resolved_subtext:
+            resolved_card["subtext"] = resolved_subtext
+            resolved_component_text_values[subtext_path] = resolved_subtext
+        if resolved_card:
+            resolved_cards[card_key] = resolved_card
+
+    if not resolved_cards:
+        return None, resolved_component_text_values
+    return ShopifyThemeTemplateFeatureHighlights(**resolved_cards), resolved_component_text_values
+
+
 def _collect_theme_sync_text_values_by_path(
     *,
     text_slots: list[dict[str, Any]],
@@ -1439,6 +3174,11 @@ def _build_theme_sync_default_general_prompt_context(
     color_cta = draft_data.cssVars.get("--color-cta")
     if isinstance(color_cta, str) and color_cta.strip():
         context_segments.append(f"CTA color: {color_cta.strip()}.")
+    color_page_bg = draft_data.cssVars.get("--color-page-bg")
+    if isinstance(color_page_bg, str) and color_page_bg.strip():
+        context_segments.append(
+            f"Page background token (--color-page-bg): {color_page_bg.strip()}."
+        )
 
     combined_context = " ".join(context_segments).strip()
     if not combined_context:
@@ -1473,20 +3213,28 @@ def _build_theme_sync_default_slot_prompt_context_by_path(
             else "image"
         )
         slot_role = _normalize_theme_slot_role(raw_slot.get("role"))
-        slot_aspect = _normalize_theme_slot_recommended_aspect(
-            raw_slot.get("recommendedAspect")
+        slot_aspect_ratio = _resolve_theme_slot_aspect_ratio(
+            raw_slot.get("recommendedAspect"),
+            slot_path=slot_path,
         )
         display_name = _derive_theme_sync_slot_display_name(
             slot_path=slot_path,
             slot_key=slot_key,
             slot_role=slot_role,
         )
+        is_feature_icon_slot = _is_theme_feature_image_slot_path(slot_path)
         context_segments = [
             f"Purpose: {display_name}.",
             f"Slot role: {slot_role}.",
             f"Target slot key: {slot_key}.",
-            f"Preferred aspect: {slot_aspect}.",
+            f"Preferred aspect ratio: {slot_aspect_ratio}.",
         ]
+        if is_feature_icon_slot:
+            context_segments.append("Creative format: icon-style feature illustration.")
+            context_segments.append(_THEME_SYNC_AI_FEATURE_ICON_CONSTRAINTS)
+        slot_render_hint = _THEME_SYNC_SLOT_IMAGE_RENDER_HINT_BY_PATH.get(slot_path)
+        if slot_render_hint:
+            context_segments.append(f"Rendering guidance: {slot_render_hint}")
         text_fragments = _build_theme_sync_slot_text_fragments(
             slot_path=slot_path,
             text_values_by_path=text_values_by_path,
@@ -1496,7 +3244,12 @@ def _build_theme_sync_default_slot_prompt_context_by_path(
             if len(related_text) > _THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH:
                 related_text = related_text[:_THEME_IMAGE_PROMPT_TEXT_HINT_MAX_LENGTH].rstrip()
             if related_text:
-                context_segments.append(f"Related copy context: {related_text}.")
+                if is_feature_icon_slot:
+                    context_segments.append(
+                        f"Feature message to represent as an icon: {related_text}."
+                    )
+                else:
+                    context_segments.append(f"Related copy context: {related_text}.")
         context_text = " ".join(context_segments).strip()
         if len(context_text) > _THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH:
             context_text = context_text[:_THEME_IMAGE_PROMPT_SLOT_CONTEXT_MAX_LENGTH].rstrip()
@@ -1523,7 +3276,15 @@ def _normalize_theme_slot_recommended_aspect(raw_aspect: Any) -> str:
     return "any"
 
 
-def _resolve_theme_slot_aspect_ratio(raw_recommended_aspect: Any) -> str:
+def _resolve_theme_slot_aspect_ratio(
+    raw_recommended_aspect: Any,
+    *,
+    slot_path: str | None = None,
+) -> str:
+    if isinstance(slot_path, str):
+        normalized_slot_path = slot_path.strip()
+        if normalized_slot_path in _THEME_SYNC_SLOT_ASPECT_RATIO_OVERRIDE_BY_PATH:
+            return _THEME_SYNC_SLOT_ASPECT_RATIO_OVERRIDE_BY_PATH[normalized_slot_path]
     normalized = _normalize_theme_slot_recommended_aspect(raw_recommended_aspect)
     return _THEME_SYNC_AI_IMAGE_ASPECT_RATIO_BY_RECOMMENDED_ASPECT[normalized]
 
@@ -1539,21 +3300,38 @@ def _build_theme_sync_slot_image_prompt(
     slot_key: str,
     aspect_ratio: str,
     variant_index: int,
+    slot_path: str | None = None,
     slot_text_hint: str | None = None,
     general_prompt_context: str | None = None,
     slot_prompt_context: str | None = None,
 ) -> str:
-    role_guidance = _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME.get(
-        slot_role,
-        _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME["generic"],
+    is_feature_icon_slot = (
+        isinstance(slot_path, str)
+        and slot_path.strip()
+        and _is_theme_feature_image_slot_path(slot_path)
+    )
+    role_guidance = (
+        _THEME_SYNC_AI_FEATURE_ICON_ROLE_GUIDANCE
+        if is_feature_icon_slot
+        else _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME.get(
+            slot_role,
+            _THEME_SYNC_AI_IMAGE_ROLE_GUIDANCE_BY_NAME["generic"],
+        )
+    )
+    size_requirement = _THEME_SYNC_AI_IMAGE_MIN_SIZE_BY_ASPECT_RATIO.get(
+        aspect_ratio,
+        "1600x1200",
     )
     base_prompt = (
         f"{_THEME_SYNC_AI_IMAGE_PROMPT_BASE} "
         f"{role_guidance} "
         f"Target slot key: {slot_key}. "
         f"Aspect ratio: {aspect_ratio}. "
+        f"Required output size: at least {size_requirement}. "
         f"Variation: {variant_index}."
     )
+    if is_feature_icon_slot:
+        base_prompt = f"{base_prompt} {_THEME_SYNC_AI_FEATURE_ICON_CONSTRAINTS}"
     if isinstance(general_prompt_context, str) and general_prompt_context.strip():
         base_prompt = (
             f"{base_prompt} "
@@ -1765,7 +3543,10 @@ def _generate_theme_sync_ai_image_assets(
         slot_recommended_aspect = _normalize_theme_slot_recommended_aspect(
             slot.get("recommendedAspect")
         )
-        aspect_ratio = _resolve_theme_slot_aspect_ratio(slot_recommended_aspect)
+        aspect_ratio = _resolve_theme_slot_aspect_ratio(
+            slot_recommended_aspect,
+            slot_path=slot_path,
+        )
         role_aspect = (slot_role, slot_recommended_aspect)
         variant_count = variant_count_by_role_aspect.get(role_aspect, 0) + 1
         variant_count_by_role_aspect[role_aspect] = variant_count
@@ -1774,6 +3555,7 @@ def _generate_theme_sync_ai_image_assets(
             slot_key=slot_key,
             aspect_ratio=aspect_ratio,
             variant_index=variant_count,
+            slot_path=slot_path,
             slot_text_hint=slot_text_hints.get(slot_path),
             general_prompt_context=general_prompt_context,
             slot_prompt_context=normalized_slot_prompt_context_by_path.get(slot_path),
@@ -2031,6 +3813,46 @@ def _normalize_theme_template_component_image_asset_map(
     return normalized_component_image_asset_map
 
 
+def _normalize_theme_template_component_image_urls(
+    component_image_urls_raw: dict[str, str] | None,
+) -> dict[str, str]:
+    normalized_component_image_urls: dict[str, str] = {}
+    for raw_setting_path, raw_image_url in (component_image_urls_raw or {}).items():
+        if not isinstance(raw_setting_path, str) or not raw_setting_path.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="componentImageUrls keys must be non-empty strings.",
+            )
+        setting_path = raw_setting_path.strip()
+        if setting_path in normalized_component_image_urls:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentImageUrls contains duplicate path after normalization: "
+                    f"{setting_path}"
+                ),
+            )
+        if not isinstance(raw_image_url, str) or not raw_image_url.strip():
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentImageUrls values must be non-empty strings. "
+                    f"Invalid value at path {setting_path}."
+                ),
+            )
+        image_url = raw_image_url.strip()
+        if not image_url.startswith("shopify://"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "componentImageUrls values must be Shopify file URLs (shopify://...). "
+                    f"Invalid value at path {setting_path}."
+                ),
+            )
+        normalized_component_image_urls[setting_path] = image_url
+    return normalized_component_image_urls
+
+
 def _normalize_theme_template_component_text_values(
     component_text_values_raw: dict[str, str] | None,
 ) -> dict[str, str]:
@@ -2091,19 +3913,8 @@ def _prepare_shopify_theme_template_build_data(
         client_id=client_id,
         user_external_id=auth.user_id,
     )
-    effective_shop_domain = payload.shopDomain or selected_shop_domain
-    status_payload = get_client_shopify_connection_status(
-        client_id=client_id,
-        selected_shop_domain=effective_shop_domain,
-    )
-    if status_payload["state"] != "ready":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Shopify connection is not ready: {status_payload['message']}",
-        )
-    _require_internal_install_for_advanced_shopify(
-        status_payload=status_payload,
-        action_label="template build",
+    effective_shop_domain = _normalize_local_theme_shop_domain(
+        shop_domain=payload.shopDomain or selected_shop_domain
     )
 
     requested_design_system_id = payload.designSystemId.strip() if payload.designSystemId else None
@@ -2242,6 +4053,11 @@ def _prepare_shopify_theme_template_build_data(
     normalized_manual_component_text_values = _normalize_theme_template_component_text_values(
         payload.componentTextValues
     )
+    normalized_non_feature_manual_component_text_values = {
+        setting_path: value
+        for setting_path, value in normalized_manual_component_text_values.items()
+        if not _is_theme_feature_highlight_text_slot_path(setting_path)
+    }
     copy_settings = _normalize_theme_copy_settings(
         tone_guidelines=payload.toneGuidelines,
         must_avoid_claims=payload.mustAvoidClaims,
@@ -2308,8 +4124,7 @@ def _prepare_shopify_theme_template_build_data(
             "message": "Discovering theme component slots for template build.",
         }
     )
-    discovered_slots = list_client_shopify_theme_template_slots(
-        client_id=client_id,
+    discovered_slots = _list_local_theme_template_slots(
         theme_id=payload.themeId,
         theme_name=payload.themeName,
         shop_domain=effective_shop_domain,
@@ -2318,6 +4133,16 @@ def _prepare_shopify_theme_template_build_data(
     raw_text_slots = discovered_slots.get("textSlots")
     image_slots = raw_image_slots if isinstance(raw_image_slots, list) else []
     text_slots = raw_text_slots if isinstance(raw_text_slots, list) else []
+    planner_text_slots, managed_feature_text_slots = _split_theme_text_slots_for_copy_generation(
+        text_slots=text_slots
+    )
+    resolved_feature_highlights, managed_feature_component_text_values = (
+        _resolve_theme_template_feature_highlights(
+            feature_highlights=payload.featureHighlights,
+            component_text_values=normalized_manual_component_text_values,
+            text_slots=text_slots,
+        )
+    )
 
     explicit_image_paths = set(normalized_component_image_asset_map.keys())
     planner_image_slots = [
@@ -2332,11 +4157,16 @@ def _prepare_shopify_theme_template_build_data(
             "stage": "discover_slots",
             "message": "Theme component slot discovery completed.",
             "totalImageSlots": len(planner_image_slots),
-            "totalTextSlots": len(text_slots),
+            "totalTextSlots": len(planner_text_slots),
         }
     )
 
-    if requested_product_id and not planner_image_slots and not text_slots:
+    if (
+        requested_product_id
+        and not planner_image_slots
+        and not planner_text_slots
+        and not managed_feature_text_slots
+    ):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
@@ -2473,7 +4303,7 @@ def _prepare_shopify_theme_template_build_data(
                 "stage": "planning_content",
                 "message": "Planning product copy and image-to-slot assignments.",
                 "totalImageSlots": len(planner_image_slots),
-                "totalTextSlots": len(text_slots),
+                "totalTextSlots": len(planner_text_slots),
             }
         )
         try:
@@ -2482,7 +4312,7 @@ def _prepare_shopify_theme_template_build_data(
                 offers=offers,
                 product_image_assets=product_image_assets,
                 image_slots=planner_image_slots,
-                text_slots=text_slots,
+                text_slots=planner_text_slots,
                 **planner_copy_kwargs,
             )
         except ValueError as exc:
@@ -2560,6 +4390,14 @@ def _prepare_shopify_theme_template_build_data(
                     ),
                 )
             normalized_path = setting_path.strip()
+            if _is_theme_feature_highlight_text_slot_path(normalized_path):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "AI theme component planner returned a managed feature highlight text slot path: "
+                        f"{normalized_path}."
+                    ),
+                )
             sanitized_value = _sanitize_theme_component_text_value(value)
             if not sanitized_value:
                 raise HTTPException(
@@ -2601,13 +4439,8 @@ def _prepare_shopify_theme_template_build_data(
     for setting_path, asset_public_id in normalized_component_image_asset_map.items():
         component_image_asset_map[setting_path] = asset_public_id
 
-    component_text_values.update(normalized_manual_component_text_values)
-
-    component_image_urls: dict[str, str] = {}
-    for setting_path, asset_public_id in component_image_asset_map.items():
-        component_image_urls[setting_path] = (
-            f"{public_asset_base_url}/public/assets/{asset_public_id}"
-        )
+    component_text_values.update(normalized_non_feature_manual_component_text_values)
+    component_text_values.update(managed_feature_component_text_values)
 
     discovered_theme_id_raw = discovered_slots.get("themeId")
     discovered_theme_name_raw = discovered_slots.get("themeName")
@@ -2681,7 +4514,7 @@ def _prepare_shopify_theme_template_build_data(
         )
 
     metadata = {
-        "componentImageUrlCount": len(component_image_urls),
+        "componentImageUrlCount": 0,
         "componentTextValueCount": len(component_text_values),
         "generatedImageCount": len(generated_theme_assets),
         "rateLimitedSlotPaths": sorted(rate_limited_slot_paths),
@@ -2709,7 +4542,7 @@ def _prepare_shopify_theme_template_build_data(
         )
 
     return ShopifyThemeTemplateDraftData(
-        shopDomain=effective_shop_domain or str(status_payload.get("shopDomain") or ""),
+        shopDomain=effective_shop_domain,
         workspaceName=workspace_name,
         designSystemId=str(design_system.id),
         designSystemName=str(design_system.name),
@@ -2724,7 +4557,9 @@ def _prepare_shopify_theme_template_build_data(
         dataTheme=data_theme,
         productId=requested_product_id,
         componentImageAssetMap=component_image_asset_map,
+        componentImageUrls={},
         componentTextValues=component_text_values,
+        featureHighlights=resolved_feature_highlights,
         imageSlots=image_slot_payloads,
         textSlots=text_slot_payloads,
         metadata=metadata,
@@ -2822,6 +4657,235 @@ def _resolve_component_image_urls_from_asset_map(
             f"{public_asset_base_url}/public/assets/{asset_public_id}"
         )
     return component_image_urls
+
+
+def _resolve_template_export_component_image_urls_to_shopify_files(
+    *,
+    client_id: str,
+    shop_domain: str,
+    component_image_urls: dict[str, str],
+) -> dict[str, str]:
+    if not component_image_urls:
+        return {}
+
+    external_image_urls = {
+        setting_path: image_url
+        for setting_path, image_url in component_image_urls.items()
+        if not image_url.strip().startswith("shopify://")
+    }
+    if not external_image_urls:
+        return dict(component_image_urls)
+
+    resolved_payload = resolve_client_shopify_image_urls_to_files(
+        client_id=client_id,
+        shop_domain=shop_domain,
+        image_urls_by_key=external_image_urls,
+    )
+    raw_resolved_urls = resolved_payload.get("resolvedImageUrls")
+    if not isinstance(raw_resolved_urls, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Shopify image URL resolver returned an invalid payload for template ZIP export.",
+        )
+
+    resolved_component_image_urls = dict(component_image_urls)
+    for setting_path, resolved_url in raw_resolved_urls.items():
+        if not isinstance(setting_path, str) or setting_path not in component_image_urls:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Shopify image URL resolver returned an unexpected setting path.",
+            )
+        if not isinstance(resolved_url, str) or not resolved_url.strip().startswith(
+            "shopify://"
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Shopify image URL resolver did not return a Shopify file URL "
+                    f"for settingPath={setting_path}."
+                ),
+            )
+        resolved_component_image_urls[setting_path] = resolved_url.strip()
+    return resolved_component_image_urls
+
+
+def _read_asset_cached_shopify_file_url(
+    *,
+    asset: Any,
+    shop_domain: str,
+) -> str | None:
+    normalized_shop_domain = normalize_shop_domain(shop_domain)
+    raw_ai_metadata = getattr(asset, "ai_metadata", None)
+    if raw_ai_metadata is None:
+        return None
+    if not isinstance(raw_ai_metadata, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Asset metadata is malformed for Shopify file URL cache lookup. "
+                f"assetPublicId={getattr(asset, 'public_id', '<unknown>')}."
+            ),
+        )
+    raw_cache = raw_ai_metadata.get(_ASSET_SHOPIFY_FILE_URLS_CACHE_KEY)
+    if raw_cache is None:
+        return None
+    if not isinstance(raw_cache, dict):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Asset metadata Shopify file URL cache is malformed. "
+                f"assetPublicId={getattr(asset, 'public_id', '<unknown>')}."
+            ),
+        )
+    cached_url = raw_cache.get(normalized_shop_domain)
+    if cached_url is None:
+        return None
+    if not isinstance(cached_url, str) or not cached_url.strip().startswith("shopify://"):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Asset metadata Shopify file URL cache contains an invalid entry. "
+                f"assetPublicId={getattr(asset, 'public_id', '<unknown>')}."
+            ),
+        )
+    return cached_url.strip()
+
+
+def _write_asset_cached_shopify_file_url(
+    *,
+    asset: Any,
+    shop_domain: str,
+    shopify_file_url: str,
+) -> None:
+    normalized_shop_domain = normalize_shop_domain(shop_domain)
+    normalized_shopify_file_url = shopify_file_url.strip()
+    if not normalized_shopify_file_url.startswith("shopify://"):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Cannot write a non-Shopify file URL into asset cache. "
+                f"assetPublicId={getattr(asset, 'public_id', '<unknown>')}."
+            ),
+        )
+
+    raw_ai_metadata = getattr(asset, "ai_metadata", None)
+    if raw_ai_metadata is None:
+        next_ai_metadata: dict[str, Any] = {}
+    elif isinstance(raw_ai_metadata, dict):
+        next_ai_metadata = dict(raw_ai_metadata)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Asset metadata is malformed for Shopify file URL cache update. "
+                f"assetPublicId={getattr(asset, 'public_id', '<unknown>')}."
+            ),
+        )
+
+    raw_cache = next_ai_metadata.get(_ASSET_SHOPIFY_FILE_URLS_CACHE_KEY)
+    if raw_cache is None:
+        cache_by_shop_domain: dict[str, str] = {}
+    elif isinstance(raw_cache, dict):
+        cache_by_shop_domain = dict(raw_cache)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "Asset metadata Shopify file URL cache is malformed during update. "
+                f"assetPublicId={getattr(asset, 'public_id', '<unknown>')}."
+            ),
+        )
+
+    cache_by_shop_domain[normalized_shop_domain] = normalized_shopify_file_url
+    next_ai_metadata[_ASSET_SHOPIFY_FILE_URLS_CACHE_KEY] = cache_by_shop_domain
+    asset.ai_metadata = next_ai_metadata
+
+
+def _resolve_template_export_component_image_urls_from_asset_map_with_cache(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    shop_domain: str,
+    component_image_asset_map: dict[str, str],
+) -> dict[str, str]:
+    if not component_image_asset_map:
+        return {}
+
+    public_asset_base_url = _require_public_asset_base_url()
+    assets_repo = AssetsRepository(session)
+    resolved_component_image_urls: dict[str, str] = {}
+    unresolved_component_image_urls: dict[str, str] = {}
+    unresolved_assets_by_setting_path: dict[str, Any] = {}
+
+    for setting_path, asset_public_id in component_image_asset_map.items():
+        mapped_asset = assets_repo.get_by_public_id(
+            org_id=org_id,
+            public_id=asset_public_id,
+            client_id=client_id,
+        )
+        if not mapped_asset:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    "Stored theme template draft references an asset that does not exist for this workspace. "
+                    f"path={setting_path}, assetPublicId={asset_public_id}."
+                ),
+            )
+
+        cached_shopify_file_url = _read_asset_cached_shopify_file_url(
+            asset=mapped_asset,
+            shop_domain=shop_domain,
+        )
+        if cached_shopify_file_url is not None:
+            resolved_component_image_urls[setting_path] = cached_shopify_file_url
+            continue
+
+        unresolved_component_image_urls[setting_path] = (
+            f"{public_asset_base_url}/public/assets/{asset_public_id}"
+        )
+        unresolved_assets_by_setting_path[setting_path] = mapped_asset
+
+    if unresolved_component_image_urls:
+        newly_resolved_component_image_urls = (
+            _resolve_template_export_component_image_urls_to_shopify_files(
+                client_id=client_id,
+                shop_domain=shop_domain,
+                component_image_urls=unresolved_component_image_urls,
+            )
+        )
+        expected_paths = set(unresolved_component_image_urls.keys())
+        actual_paths = set(newly_resolved_component_image_urls.keys())
+        if expected_paths != actual_paths:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    "Shopify image URL resolver returned an unexpected setting path set during "
+                    "template ZIP export image cache update. "
+                    f"expected={sorted(expected_paths)} got={sorted(actual_paths)}."
+                ),
+            )
+
+        for setting_path, shopify_file_url in newly_resolved_component_image_urls.items():
+            mapped_asset = unresolved_assets_by_setting_path.get(setting_path)
+            if mapped_asset is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Template ZIP export image cache update encountered an unknown setting path. "
+                        f"path={setting_path}."
+                    ),
+                )
+            _write_asset_cached_shopify_file_url(
+                asset=mapped_asset,
+                shop_domain=shop_domain,
+                shopify_file_url=shopify_file_url,
+            )
+            session.add(mapped_asset)
+            resolved_component_image_urls[setting_path] = shopify_file_url
+        session.commit()
+
+    return resolved_component_image_urls
 
 
 def _resolve_latest_template_publish_logo(
@@ -3290,6 +5354,7 @@ def _generate_shopify_theme_template_draft_images(
         if isinstance(slot.path, str) and slot.path.strip()
     ]
     text_slots = [slot.model_dump(mode="json") for slot in latest_data.textSlots]
+    ai_text_slots, _ = _split_theme_text_slots_for_copy_generation(text_slots=text_slots)
     if not image_slots and not text_slots:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -3326,9 +5391,34 @@ def _generate_shopify_theme_template_draft_images(
     else:
         generation_scope_slot_path_set = set(all_slot_paths)
         generation_scope_slot_paths = list(all_slot_paths)
-    next_component_image_asset_map = dict(latest_data.componentImageAssetMap)
+    latest_component_image_asset_map = _normalize_theme_template_component_image_asset_map(
+        latest_data.componentImageAssetMap
+    )
+    latest_component_image_urls = _normalize_theme_template_component_image_urls(
+        latest_data.componentImageUrls
+    )
+    next_component_image_asset_map = dict(latest_component_image_asset_map)
     next_component_text_values = dict(latest_data.componentTextValues)
+    resolved_feature_highlights, managed_feature_component_text_values = (
+        _resolve_theme_template_feature_highlights(
+            feature_highlights=payload.featureHighlights,
+            existing_feature_highlights=latest_data.featureHighlights,
+            component_text_values=next_component_text_values,
+            text_slots=text_slots,
+        )
+    )
+    next_component_text_values.update(managed_feature_component_text_values)
     latest_metadata = dict(latest_data.metadata or {})
+    latest_feature_highlights_payload = (
+        latest_data.featureHighlights.model_dump(mode="json", exclude_none=True)
+        if latest_data.featureHighlights is not None
+        else {}
+    )
+    next_feature_highlights_payload = (
+        resolved_feature_highlights.model_dump(mode="json", exclude_none=True)
+        if resolved_feature_highlights is not None
+        else {}
+    )
     mapped_slot_paths = {
         raw_path.strip()
         for raw_path, raw_asset_public_id in next_component_image_asset_map.items()
@@ -3346,8 +5436,105 @@ def _generate_shopify_theme_template_draft_images(
         and str(slot.get("path")).strip() not in mapped_slot_paths
     ]
     should_generate_images = bool(image_slots_pending_generation)
-    should_generate_text = bool(text_slots) and generate_text
+    should_generate_text = bool(ai_text_slots) and generate_text
     if not should_generate_images and not should_generate_text:
+        normalized_component_image_asset_map = (
+            _normalize_theme_template_component_image_asset_map(next_component_image_asset_map)
+        )
+        normalized_component_text_values = _normalize_theme_template_component_text_values(
+            next_component_text_values
+        )
+        latest_component_image_urls_for_current_map = {
+            setting_path: image_url
+            for setting_path, image_url in latest_component_image_urls.items()
+            if setting_path in normalized_component_image_asset_map
+        }
+        missing_component_image_url_paths = {
+            setting_path
+            for setting_path in normalized_component_image_asset_map
+            if setting_path not in latest_component_image_urls_for_current_map
+        }
+        if missing_component_image_url_paths:
+            normalized_component_image_urls = (
+                _resolve_template_export_component_image_urls_from_asset_map_with_cache(
+                    session=session,
+                    org_id=auth.org_id,
+                    client_id=client_id,
+                    shop_domain=latest_data.shopDomain,
+                    component_image_asset_map=normalized_component_image_asset_map,
+                )
+            )
+        else:
+            normalized_component_image_urls = latest_component_image_urls_for_current_map
+
+        component_image_urls_changed = (
+            set(latest_component_image_urls.keys())
+            != set(normalized_component_image_asset_map.keys())
+            or normalized_component_image_urls != latest_component_image_urls_for_current_map
+        )
+        component_text_values_changed = (
+            normalized_component_text_values
+            != _normalize_theme_template_component_text_values(latest_data.componentTextValues)
+        )
+        feature_highlights_changed = (
+            next_feature_highlights_payload != latest_feature_highlights_payload
+        )
+        if (
+            component_image_urls_changed
+            or component_text_values_changed
+            or feature_highlights_changed
+        ):
+            merged_metadata = dict(latest_metadata)
+            merged_metadata.update(
+                {
+                    "componentImageAssetCount": len(normalized_component_image_asset_map),
+                    "componentImageUrlCount": len(normalized_component_image_urls),
+                    "componentTextValueCount": len(normalized_component_text_values),
+                }
+            )
+            next_data = latest_data.model_copy(
+                update={
+                    "componentImageAssetMap": normalized_component_image_asset_map,
+                    "componentImageUrls": normalized_component_image_urls,
+                    "componentTextValues": normalized_component_text_values,
+                    "featureHighlights": resolved_feature_highlights,
+                    "metadata": merged_metadata,
+                }
+            )
+            next_version = drafts_repo.create_version(
+                draft=draft,
+                payload=next_data.model_dump(mode="json"),
+                source="agent_image_generation_job",
+                created_by_user_external_id=auth.user_id,
+            )
+            serialized_draft = _serialize_shopify_theme_template_draft(
+                draft=draft,
+                latest_version=next_version,
+            )
+            serialized_version = _serialize_shopify_theme_template_draft_version(
+                version=next_version
+            )
+            return ShopifyThemeTemplateGenerateImagesResponse(
+                draft=serialized_draft,
+                version=serialized_version,
+                generatedImageCount=0,
+                generatedTextCount=0,
+                copyAgentModel=None,
+                requestedImageModel=requested_image_model,
+                requestedImageModelSource=requested_image_model_source,
+                generatedSlotPaths=[],
+                imageModels=[],
+                imageModelBySlotPath={},
+                imageSourceBySlotPath={},
+                promptTokenCountBySlotPath={},
+                promptTokenCountTotal=0,
+                rateLimitedSlotPaths=[],
+                remainingSlotPaths=[],
+                quotaExhaustedSlotPaths=[],
+                slotErrorsByPath={},
+                imageGenerationError=None,
+                copyGenerationError=None,
+            )
         serialized_draft = _serialize_shopify_theme_template_draft(
             draft=draft,
             latest_version=latest_version,
@@ -3428,7 +5615,7 @@ def _generate_shopify_theme_template_draft_images(
             default_slot_context_by_path = _build_theme_sync_default_slot_prompt_context_by_path(
                 image_slots=image_slots,
                 text_slots=text_slots,
-                component_text_values=latest_data.componentTextValues,
+                component_text_values=next_component_text_values,
             )
             effective_general_context = default_general_context
             effective_slot_context_by_path = dict(default_slot_context_by_path)
@@ -3595,14 +5782,14 @@ def _generate_shopify_theme_template_draft_images(
                 {
                     "stage": "planning_content",
                     "message": "Generating template copy for discovered text slots.",
-                    "totalTextSlots": len(text_slots),
+                    "totalTextSlots": len(ai_text_slots),
                 }
             )
             try:
                 copy_agent_output = generate_shopify_theme_component_copy(
                     product=resolved_product,
                     offers=offers,
-                    text_slots=text_slots,
+                    text_slots=ai_text_slots,
                     **planner_copy_kwargs,
                 )
             except ValueError as exc:
@@ -3622,7 +5809,7 @@ def _generate_shopify_theme_template_draft_images(
                 )
             expected_text_slot_paths = {
                 str(slot.get("path")).strip()
-                for slot in text_slots
+                for slot in ai_text_slots
                 if isinstance(slot.get("path"), str) and str(slot.get("path")).strip()
             }
             for setting_path, value in copy_text_values.items():
@@ -3695,7 +5882,7 @@ def _generate_shopify_theme_template_draft_images(
                 {
                     "stage": "planning_content",
                     "message": copy_generation_error,
-                    "totalTextSlots": len(text_slots),
+                    "totalTextSlots": len(ai_text_slots),
                 }
             )
 
@@ -3704,6 +5891,45 @@ def _generate_shopify_theme_template_draft_images(
     )
     normalized_component_text_values = _normalize_theme_template_component_text_values(
         next_component_text_values
+    )
+    latest_component_image_urls_for_current_map = {
+        setting_path: image_url
+        for setting_path, image_url in latest_component_image_urls.items()
+        if setting_path in normalized_component_image_asset_map
+    }
+    component_image_asset_map_changed_paths = {
+        setting_path
+        for setting_path, asset_public_id in normalized_component_image_asset_map.items()
+        if latest_component_image_asset_map.get(setting_path) != asset_public_id
+    }
+    missing_component_image_url_paths = {
+        setting_path
+        for setting_path in normalized_component_image_asset_map
+        if setting_path not in latest_component_image_urls_for_current_map
+    }
+    if component_image_asset_map_changed_paths or missing_component_image_url_paths:
+        normalized_component_image_urls = (
+            _resolve_template_export_component_image_urls_from_asset_map_with_cache(
+                session=session,
+                org_id=auth.org_id,
+                client_id=client_id,
+                shop_domain=latest_data.shopDomain,
+                component_image_asset_map=normalized_component_image_asset_map,
+            )
+        )
+    else:
+        normalized_component_image_urls = latest_component_image_urls_for_current_map
+
+    component_image_urls_changed = (
+        set(latest_component_image_urls.keys()) != set(normalized_component_image_asset_map.keys())
+        or normalized_component_image_urls != latest_component_image_urls_for_current_map
+    )
+    component_text_values_changed = (
+        normalized_component_text_values
+        != _normalize_theme_template_component_text_values(latest_data.componentTextValues)
+    )
+    feature_highlights_changed = (
+        next_feature_highlights_payload != latest_feature_highlights_payload
     )
     image_models = sorted(
         {
@@ -3721,7 +5947,13 @@ def _generate_shopify_theme_template_draft_images(
         }
     )
 
-    if not generated_slot_paths and not generated_component_text_values:
+    if (
+        not generated_slot_paths
+        and not generated_component_text_values
+        and not component_text_values_changed
+        and not feature_highlights_changed
+        and not component_image_urls_changed
+    ):
         serialized_draft = _serialize_shopify_theme_template_draft(
             draft=draft,
             latest_version=latest_version,
@@ -3768,6 +6000,7 @@ def _generate_shopify_theme_template_draft_images(
             "promptTokenCountBySlotPath": prompt_token_count_by_slot_path,
             "promptTokenCountTotal": prompt_token_count_total,
             "componentImageAssetCount": len(normalized_component_image_asset_map),
+            "componentImageUrlCount": len(normalized_component_image_urls),
             "componentTextValueCount": len(normalized_component_text_values),
         }
     )
@@ -3790,7 +6023,9 @@ def _generate_shopify_theme_template_draft_images(
         update={
             "productId": resolved_product_id,
             "componentImageAssetMap": normalized_component_image_asset_map,
+            "componentImageUrls": normalized_component_image_urls,
             "componentTextValues": normalized_component_text_values,
+            "featureHighlights": resolved_feature_highlights,
             "metadata": merged_metadata,
         }
     )
@@ -4053,6 +6288,7 @@ def _sync_compliance_policy_pages_for_template_export(
     shop_domain: str | None,
     auth: AuthContext,
     session: Session,
+    sync_to_shopify: bool = True,
 ) -> dict[str, Any]:
     client = _get_client_or_404(session=session, org_id=auth.org_id, client_id=client_id)
     workspace_name = str(client.name).strip()
@@ -4124,6 +6360,29 @@ def _sync_compliance_policy_pages_for_template_export(
                 "markdown": rendered_markdown,
             }
         )
+
+    if not sync_to_shopify:
+        local_pages: list[dict[str, str]] = []
+        for rendered_page in rendered_pages_payload:
+            handle = rendered_page["handle"]
+            local_pages.append(
+                {
+                    "pageKey": rendered_page["pageKey"],
+                    "pageId": f"local-policy-page:{handle}",
+                    "title": rendered_page["title"],
+                    "handle": handle,
+                    "url": f"/pages/{handle}",
+                    "operation": "generated_local",
+                }
+            )
+            rendered_page["url"] = f"/pages/{handle}"
+        return {
+            "rulesetVersion": profile.ruleset_version,
+            "shopDomain": _normalize_local_theme_shop_domain(shop_domain=effective_shop_domain),
+            "pages": local_pages,
+            "updatedProfileUrls": {},
+            "renderedPages": rendered_pages_payload,
+        }
 
     sync_payload = upsert_client_shopify_policy_pages(
         client_id=client_id,
@@ -4200,35 +6459,15 @@ def _build_shopify_theme_template_export_zip_response(
             detail="Shopify theme template draft has no versions to export.",
         )
 
-    version, draft_data = _refresh_shopify_theme_template_draft_slots_for_export(
-        client_id=client_id,
-        drafts_repo=drafts_repo,
-        draft=draft,
-        version=version,
-        auth=auth,
-    )
-    status_payload = get_client_shopify_connection_status(
-        client_id=client_id,
-        selected_shop_domain=draft_data.shopDomain,
-    )
-    if status_payload["state"] != "ready":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Shopify connection is not ready for template export: "
-                f"{status_payload['message']}"
-            ),
-        )
-    _require_internal_install_for_advanced_shopify(
-        status_payload=status_payload,
-        action_label="template ZIP export",
-    )
+    serialized_version = _serialize_shopify_theme_template_draft_version(version=version)
+    draft_data = serialized_version.data
 
     policy_sync_payload = _sync_compliance_policy_pages_for_template_export(
         client_id=client_id,
         shop_domain=draft_data.shopDomain,
         auth=auth,
         session=session,
+        sync_to_shopify=False,
     )
 
     component_image_asset_map = _normalize_theme_template_component_image_asset_map(
@@ -4237,12 +6476,35 @@ def _build_shopify_theme_template_export_zip_response(
     component_text_values = _normalize_theme_template_component_text_values(
         draft_data.componentTextValues
     )
-    component_image_urls = _resolve_component_image_urls_from_asset_map(
-        session=session,
-        org_id=auth.org_id,
-        client_id=client_id,
-        component_image_asset_map=component_image_asset_map,
+    stored_component_image_urls = _normalize_theme_template_component_image_urls(
+        draft_data.componentImageUrls
     )
+    component_image_urls = {
+        setting_path: stored_component_image_urls[setting_path]
+        for setting_path in component_image_asset_map
+        if setting_path in stored_component_image_urls
+    }
+    missing_component_image_url_paths = sorted(
+        set(component_image_asset_map.keys()) - set(component_image_urls.keys())
+    )
+    unexpected_component_image_url_paths = sorted(
+        set(stored_component_image_urls.keys()) - set(component_image_asset_map.keys())
+    )
+    if missing_component_image_url_paths or unexpected_component_image_url_paths:
+        details: list[str] = []
+        if missing_component_image_url_paths:
+            details.append("missing=" + ", ".join(missing_component_image_url_paths))
+        if unexpected_component_image_url_paths:
+            details.append("unexpected=" + ", ".join(unexpected_component_image_url_paths))
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Template ZIP export requires stored Shopify image URLs for every mapped image slot. "
+                "Regenerate template images before exporting. "
+                + " ".join(details)
+                + "."
+            ),
+        )
     (
         latest_brand_name,
         _latest_logo_asset_public_id,
@@ -4256,9 +6518,19 @@ def _build_shopify_theme_template_export_zip_response(
         client_id=client_id,
         design_system_id=draft_data.designSystemId,
     )
-
-    exported = export_client_shopify_theme_brand(
-        client_id=client_id,
+    resolved_theme_id, resolved_theme_name, default_theme_role = (
+        _resolve_local_theme_selector(
+            theme_id=draft_data.themeId,
+            theme_name=draft_data.themeName,
+        )
+    )
+    resolved_theme_role = (
+        draft_data.themeRole.strip()
+        if isinstance(draft_data.themeRole, str) and draft_data.themeRole.strip()
+        else default_theme_role
+    )
+    exported = _build_local_shopify_theme_export_payload(
+        shop_domain=draft_data.shopDomain,
         workspace_name=draft_data.workspaceName,
         brand_name=latest_brand_name,
         logo_url=latest_logo_url,
@@ -4267,25 +6539,44 @@ def _build_shopify_theme_template_export_zip_response(
         data_theme=latest_data_theme,
         component_image_urls=component_image_urls,
         component_text_values=component_text_values,
-        auto_component_image_urls=[],
-        theme_id=draft_data.themeId,
-        theme_name=None,
-        shop_domain=draft_data.shopDomain,
+        theme_id=resolved_theme_id,
+        theme_name=resolved_theme_name,
+        theme_role=resolved_theme_role,
     )
 
     exported_files = exported["files"]
-    compliance_policy_file_paths: list[str] = []
+    ordered_exported_files = sorted(
+        exported_files,
+        key=lambda file_entry: _theme_export_zip_write_order_key(
+            filename=(
+                file_entry.get("filename")
+                if isinstance(file_entry, dict)
+                and isinstance(file_entry.get("filename"), str)
+                else ""
+            )
+        ),
+    )
     rewritten_collection_links_by_filename: dict[str, int] = {}
     normalized_text_files_by_filename: dict[str, str] = {}
     unresolved_collection_link_filenames: set[str] = set()
+    exported_archive_filenames: set[str] = set()
     zip_buffer = io.BytesIO()
     with zipfile.ZipFile(zip_buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as zip_file:
-        for file_entry in exported_files:
+        for file_entry in ordered_exported_files:
             filename = file_entry["filename"].strip()
             if not filename:
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail="Shopify export returned a file with an empty filename.",
+                    detail="Template export returned a file with an empty filename.",
+                )
+            root_directory = filename.split("/", 1)[0].strip().lower()
+            if root_directory not in _THEME_EXPORT_ALLOWED_ROOT_DIRECTORIES:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        "Theme ZIP export includes a file outside Shopify theme roots. "
+                        f"filename={filename}."
+                    ),
                 )
             content = file_entry.get("content")
             content_base64 = file_entry.get("contentBase64")
@@ -4295,7 +6586,7 @@ def _build_shopify_theme_template_export_zip_response(
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail=(
-                        "Shopify export returned an invalid file payload. "
+                        "Template export returned an invalid file payload. "
                         "Expected exactly one of content or contentBase64."
                     ),
                 )
@@ -4314,6 +6605,7 @@ def _build_shopify_theme_template_export_zip_response(
                     unresolved_collection_link_filenames.add(filename)
                 normalized_text_files_by_filename[filename] = normalized_content
                 zip_file.writestr(filename, normalized_content)
+                exported_archive_filenames.add(filename)
                 continue
 
             cleaned_content_base64 = content_base64.strip()
@@ -4321,7 +6613,7 @@ def _build_shopify_theme_template_export_zip_response(
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail=(
-                        "Shopify export returned an empty contentBase64 payload "
+                        "Template export returned an empty contentBase64 payload "
                         f"for filename={filename}."
                     ),
                 )
@@ -4331,11 +6623,12 @@ def _build_shopify_theme_template_export_zip_response(
                 raise HTTPException(
                     status_code=status.HTTP_502_BAD_GATEWAY,
                     detail=(
-                        "Shopify export returned malformed contentBase64 payload "
+                        "Template export returned malformed contentBase64 payload "
                         f"for filename={filename}."
                     ),
                 ) from exc
             zip_file.writestr(filename, file_bytes)
+            exported_archive_filenames.add(filename)
 
         if unresolved_collection_link_filenames:
             raise HTTPException(
@@ -4348,60 +6641,19 @@ def _build_shopify_theme_template_export_zip_response(
                 ),
             )
 
-        collection_template_files_validation = (
-            _validate_required_collection_templates_in_export(
-                exported_text_files_by_filename=normalized_text_files_by_filename
-            )
+        _validate_required_theme_archive_files_in_export(
+            exported_filenames=exported_archive_filenames
         )
-        collection_template_validation = (
-            _validate_collection_template_component_values_in_export(
-                exported_text_files_by_filename=normalized_text_files_by_filename,
-                component_image_urls=component_image_urls,
-                component_text_values=component_text_values,
-            )
+        _validate_template_file_format_uniqueness_in_export(
+            exported_filenames=exported_archive_filenames
         )
-
-        for rendered_page in policy_sync_payload["renderedPages"]:
-            file_path = f"mos-template-export/policies/{rendered_page['handle']}.md"
-            zip_file.writestr(file_path, rendered_page["markdown"])
-            compliance_policy_file_paths.append(file_path)
-
-        manifest_payload = {
-            "generatedAt": datetime.now(timezone.utc).isoformat(),
-            "workspaceId": client_id,
-            "draftId": str(draft.id),
-            "draftVersionId": str(version.id),
-            "draftVersionNumber": int(version.version_number),
-            "shopDomain": exported["shopDomain"],
-            "themeId": exported["themeId"],
-            "themeName": exported["themeName"],
-            "themeRole": exported["themeRole"],
-            "layoutFilename": exported["layoutFilename"],
-            "cssFilename": exported["cssFilename"],
-            "settingsFilename": exported.get("settingsFilename"),
-            "coverage": exported["coverage"],
-            "settingsSync": exported["settingsSync"],
-            "exportedFiles": [entry["filename"] for entry in exported_files],
-            "componentImageAssetMap": component_image_asset_map,
-            "componentImageUrls": component_image_urls,
-            "componentTextValues": component_text_values,
-            "rewrittenCollectionLinks": {
-                "totalReplacements": sum(rewritten_collection_links_by_filename.values()),
-                "filesByName": rewritten_collection_links_by_filename,
-            },
-            "collectionTemplateFilesValidation": collection_template_files_validation,
-            "collectionTemplateValidation": collection_template_validation,
-            "compliancePolicyFiles": compliance_policy_file_paths,
-            "compliancePolicySync": {
-                "rulesetVersion": policy_sync_payload["rulesetVersion"],
-                "shopDomain": policy_sync_payload["shopDomain"],
-                "pages": policy_sync_payload["pages"],
-                "updatedProfileUrls": policy_sync_payload["updatedProfileUrls"],
-            },
-        }
-        zip_file.writestr(
-            "mos-template-export/manifest.json",
-            json.dumps(manifest_payload, indent=2, sort_keys=True),
+        _validate_required_collection_templates_in_export(
+            exported_text_files_by_filename=normalized_text_files_by_filename
+        )
+        _validate_collection_template_component_values_in_export(
+            exported_text_files_by_filename=normalized_text_files_by_filename,
+            component_image_urls=component_image_urls,
+            component_text_values=component_text_values,
         )
 
     zip_buffer.seek(0)
@@ -4627,6 +6879,18 @@ def _refresh_shopify_theme_template_draft_slots_for_export(
     ):
         for path in upgraded_overlay_image_slot_paths:
             pruned_component_image_asset_map[path] = legacy_overlay_asset_public_id.strip()
+    normalized_component_image_urls = _normalize_theme_template_component_image_urls(
+        refreshed_data.componentImageUrls
+    )
+    pruned_component_image_urls = {
+        raw_path.strip(): raw_url.strip()
+        for raw_path, raw_url in normalized_component_image_urls.items()
+        if isinstance(raw_path, str)
+        and raw_path.strip()
+        and isinstance(raw_url, str)
+        and raw_url.strip()
+        and raw_path.strip() in refreshed_image_slot_paths
+    }
     pruned_component_text_values = {
         raw_path.strip(): raw_value.strip()
         for raw_path, raw_value in refreshed_data.componentTextValues.items()
@@ -4636,10 +6900,31 @@ def _refresh_shopify_theme_template_draft_slots_for_export(
         and raw_value.strip()
         and raw_path.strip() in refreshed_text_slot_paths
     }
+    pruned_non_feature_component_text_values = {
+        setting_path: value
+        for setting_path, value in pruned_component_text_values.items()
+        if not _is_theme_feature_highlight_text_slot_path(setting_path)
+    }
+    refreshed_text_slot_payloads = [slot.model_dump(mode="json") for slot in refreshed_text_slots]
+    resolved_feature_highlights, managed_feature_component_text_values = (
+        _resolve_theme_template_feature_highlights(
+            existing_feature_highlights=refreshed_data.featureHighlights,
+            component_text_values=pruned_component_text_values,
+            text_slots=refreshed_text_slot_payloads,
+        )
+    )
+    pruned_component_text_values = _normalize_theme_template_component_text_values(
+        {
+            **pruned_non_feature_component_text_values,
+            **managed_feature_component_text_values,
+        }
+    )
     refreshed_data = refreshed_data.model_copy(
         update={
             "componentImageAssetMap": pruned_component_image_asset_map,
+            "componentImageUrls": pruned_component_image_urls,
             "componentTextValues": pruned_component_text_values,
+            "featureHighlights": resolved_feature_highlights,
         }
     )
 
@@ -5898,12 +8183,53 @@ def update_client_shopify_theme_template_draft_route(
         component_image_asset_map = _normalize_theme_template_component_image_asset_map(
             payload.componentImageAssetMap
         )
+    latest_component_image_urls = _normalize_theme_template_component_image_urls(
+        latest_data.componentImageUrls
+    )
+    if payload.componentImageAssetMap is None:
+        component_image_urls = {
+            setting_path: image_url
+            for setting_path, image_url in latest_component_image_urls.items()
+            if setting_path in component_image_asset_map
+        }
+    else:
+        previous_component_image_asset_map = dict(latest_data.componentImageAssetMap)
+        component_image_urls = {}
+        for setting_path, asset_public_id in component_image_asset_map.items():
+            previous_asset_public_id = previous_component_image_asset_map.get(setting_path)
+            if previous_asset_public_id != asset_public_id:
+                continue
+            cached_image_url = latest_component_image_urls.get(setting_path)
+            if isinstance(cached_image_url, str) and cached_image_url.strip().startswith(
+                "shopify://"
+            ):
+                component_image_urls[setting_path] = cached_image_url.strip()
     if payload.componentTextValues is None:
         component_text_values = dict(latest_data.componentTextValues)
     else:
         component_text_values = _normalize_theme_template_component_text_values(
             payload.componentTextValues
         )
+    non_feature_component_text_values = {
+        setting_path: value
+        for setting_path, value in component_text_values.items()
+        if not _is_theme_feature_highlight_text_slot_path(setting_path)
+    }
+    latest_text_slots = [slot.model_dump(mode="json") for slot in latest_data.textSlots]
+    resolved_feature_highlights, managed_feature_component_text_values = (
+        _resolve_theme_template_feature_highlights(
+            feature_highlights=payload.featureHighlights,
+            existing_feature_highlights=latest_data.featureHighlights,
+            component_text_values=component_text_values,
+            text_slots=latest_text_slots,
+        )
+    )
+    component_text_values = _normalize_theme_template_component_text_values(
+        {
+            **non_feature_component_text_values,
+            **managed_feature_component_text_values,
+        }
+    )
 
     _resolve_component_image_urls_from_asset_map(
         session=session,
@@ -5914,12 +8240,15 @@ def update_client_shopify_theme_template_draft_route(
 
     merged_metadata = dict(latest_data.metadata or {})
     merged_metadata["componentImageAssetCount"] = len(component_image_asset_map)
+    merged_metadata["componentImageUrlCount"] = len(component_image_urls)
     merged_metadata["componentTextValueCount"] = len(component_text_values)
 
     next_data = latest_data.model_copy(
         update={
             "componentImageAssetMap": component_image_asset_map,
+            "componentImageUrls": component_image_urls,
             "componentTextValues": component_text_values,
+            "featureHighlights": resolved_feature_highlights,
             "metadata": merged_metadata,
         }
     )
