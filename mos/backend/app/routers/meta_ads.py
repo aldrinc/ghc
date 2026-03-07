@@ -1046,6 +1046,7 @@ def list_meta_pipeline_assets(
                     "height": asset.height,
                     "created_at": asset.created_at,
                     "public_url": f"/public/assets/{asset.public_id}",
+                    "ai_metadata": asset.ai_metadata if isinstance(asset.ai_metadata, dict) else None,
                 },
                 "campaign": {
                     "id": str(campaign.id),

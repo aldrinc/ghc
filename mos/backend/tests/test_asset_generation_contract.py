@@ -1,4 +1,7 @@
 from app.temporal.activities.asset_activities import (
+    _DefaultSwipeSource,
+    _build_creative_generation_plan_items,
+    _extract_source_filename,
     _extract_requirement_swipe_source,
     _extract_requirement_swipe_requires_product_image,
     _extract_remote_reference_asset_id,
@@ -100,6 +103,10 @@ def test_extract_requirement_swipe_requires_product_image() -> None:
         raise AssertionError("Expected ValueError for non-boolean swipeRequiresProductImage")
 
 
+def test_extract_source_filename_decodes_percent_encoded_swipe_labels() -> None:
+    assert _extract_source_filename("http://127.0.0.1:8099/Static%20%231.png") == "Static #1.png"
+
+
 def test_extract_swipe_requires_product_image_from_tags() -> None:
     assert _extract_swipe_requires_product_image_from_tags([]) is None
     assert _extract_swipe_requires_product_image_from_tags(["swipe:requires_product_image"]) is True
@@ -113,3 +120,77 @@ def test_extract_swipe_requires_product_image_from_tags() -> None:
         assert "conflicting product image policy tags" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("Expected ValueError for conflicting swipe product image tags")
+
+
+def test_build_creative_generation_plan_items_expands_all_default_swipes_deterministically() -> None:
+    requirements = [
+        {
+            "channel": "facebook",
+            "format": "image_ad",
+            "funnelStage": "top-of-funnel",
+            "angle": "Structured triage",
+            "hook": "A better way to screen interactions",
+        },
+        {
+            "channel": "facebook",
+            "format": "video_ad",
+            "funnelStage": "top-of-funnel",
+        },
+        {
+            "channel": "facebook",
+            "format": "image_ad",
+            "funnelStage": "middle-of-funnel",
+            "angle": "Workflow clarity",
+            "hook": "Stop guessing",
+        },
+    ]
+    default_swipes = [
+        _DefaultSwipeSource(
+            company_swipe_id="swipe-a",
+            source_label="10.png",
+            source_media_url="https://example.com/10.png",
+            product_image_policy=False,
+        ),
+        _DefaultSwipeSource(
+            company_swipe_id="swipe-b",
+            source_label="11.png",
+            source_media_url="https://example.com/11.png",
+            product_image_policy=True,
+        ),
+    ]
+
+    first = _build_creative_generation_plan_items(
+        asset_brief_id="brief-123",
+        batch_id="batch-1",
+        requirements=requirements,
+        default_swipes=default_swipes,
+        copy_pack_ids_by_requirement={0: "copy-0", 2: "copy-2"},
+    )
+    second = _build_creative_generation_plan_items(
+        asset_brief_id="brief-123",
+        batch_id="batch-1",
+        requirements=requirements,
+        default_swipes=default_swipes,
+        copy_pack_ids_by_requirement={0: "copy-0", 2: "copy-2"},
+    )
+
+    assert [item.id for item in first] == [item.id for item in second]
+    assert len(first) == 4
+    assert [item.requirement_index for item in first] == [0, 0, 2, 2]
+    assert [item.source_label for item in first] == ["10.png", "11.png", "10.png", "11.png"]
+    assert [item.copy_pack_id for item in first] == ["copy-0", "copy-0", "copy-2", "copy-2"]
+
+
+def test_build_creative_generation_plan_items_errors_when_image_requirement_has_no_copy_pack() -> None:
+    try:
+        _build_creative_generation_plan_items(
+            asset_brief_id="brief-123",
+            batch_id="batch-1",
+            requirements=[{"channel": "facebook", "format": "image_ad"}],
+            default_swipes=[],
+            copy_pack_ids_by_requirement={},
+        )
+    except ValueError as exc:
+        assert "missing_requirement_index=0" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected ValueError when an image requirement has no copy pack id.")

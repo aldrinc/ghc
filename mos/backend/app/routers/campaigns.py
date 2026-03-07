@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -19,6 +20,7 @@ from app.db.repositories.strategy_v2_launches import StrategyV2LaunchesRepositor
 from app.db.repositories.workflows import WorkflowsRepository
 from app.schemas.common import CampaignCreate
 from app.schemas.campaign_funnels import CampaignFunnelGenerationRequest
+from app.schemas.creative_generation import AdCopyPackArtifact
 from app.schemas.creative_production import CreativeProductionRequest
 from app.schemas.experiment_spec import ExperimentSpecSet, ExperimentSpecsUpdateRequest
 from app.schemas.meta_ads import CampaignMetaReviewSetupRequest
@@ -89,6 +91,82 @@ def _load_campaign_asset_brief_map(
             if isinstance(brief_id, str) and brief_id.strip() and brief_id.strip() not in brief_map:
                 brief_map[brief_id.strip()] = brief
     return brief_map
+
+
+def _load_campaign_ad_copy_pack_map(
+    *,
+    org_id: str,
+    client_id: str,
+    campaign_id: str,
+    session: Session,
+) -> dict[str, tuple[object, AdCopyPackArtifact]]:
+    artifacts_repo = ArtifactsRepository(session)
+    artifacts = artifacts_repo.list(
+        org_id=org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        artifact_type=ArtifactTypeEnum.ad_copy_pack,
+        limit=200,
+    )
+    result: dict[str, tuple[object, AdCopyPackArtifact]] = {}
+    for artifact in artifacts:
+        data = artifact.data if isinstance(artifact.data, dict) else None
+        if not isinstance(data, dict):
+            continue
+        if data.get("schemaVersion") != 2:
+            continue
+        brief_id = data.get("assetBriefId")
+        if not isinstance(brief_id, str) or not brief_id.strip() or brief_id.strip() in result:
+            continue
+        try:
+            validated = AdCopyPackArtifact.model_validate(data)
+        except ValidationError:
+            continue
+        result[brief_id.strip()] = (artifact, validated)
+    return result
+
+
+def _select_assets_for_meta_review(
+    assets: list[Asset],
+    *,
+    generation_batch_id: str | None = None,
+) -> list[Asset]:
+    if generation_batch_id:
+        selected_assets = [
+            asset
+            for asset in assets
+            if isinstance(asset.ai_metadata, dict)
+            and isinstance(asset.ai_metadata.get("creativeGenerationBatchId"), str)
+            and asset.ai_metadata.get("creativeGenerationBatchId").strip() == generation_batch_id
+        ]
+        selected_assets.sort(key=lambda asset: getattr(asset, "created_at", None) or 0)
+        return selected_assets
+
+    latest_batch_assets: dict[str, list[Asset]] = {}
+    latest_batch_timestamps: dict[str, object] = {}
+
+    for asset in assets:
+        metadata = asset.ai_metadata if isinstance(asset.ai_metadata, dict) else {}
+        batch_id = metadata.get("creativeGenerationBatchId")
+        if not isinstance(batch_id, str) or not batch_id.strip():
+            continue
+        normalized_batch_id = batch_id.strip()
+        latest_batch_assets.setdefault(normalized_batch_id, []).append(asset)
+        created_at = getattr(asset, "created_at", None)
+        current_latest = latest_batch_timestamps.get(normalized_batch_id)
+        if current_latest is None or (created_at is not None and created_at > current_latest):
+            latest_batch_timestamps[normalized_batch_id] = created_at
+
+    if not latest_batch_assets:
+        return assets
+
+    selected_batch_id = max(
+        latest_batch_assets.keys(),
+        key=lambda batch_id: latest_batch_timestamps.get(batch_id) or 0,
+    )
+    selected_assets = latest_batch_assets[selected_batch_id]
+    selected_assets.sort(key=lambda asset: getattr(asset, "created_at", None) or 0)
+    return selected_assets
 
 
 def _resolve_funnel_review_paths(
@@ -714,8 +792,15 @@ def setup_campaign_meta_review(
             status_code=status.HTTP_409_CONFLICT,
             detail="No asset briefs exist for this campaign. Generate briefs before setting up Meta review.",
         )
+    ad_copy_pack_map = _load_campaign_ad_copy_pack_map(
+        org_id=auth.org_id,
+        client_id=str(campaign.client_id),
+        campaign_id=str(campaign.id),
+        session=session,
+    )
 
     selected_brief_ids = payload.assetBriefIds or list(brief_map.keys())
+    selected_generation_batch_id = payload.generationBatchId
     missing_brief_ids = [brief_id for brief_id in selected_brief_ids if brief_id not in brief_map]
     if missing_brief_ids:
         raise HTTPException(
@@ -740,6 +825,12 @@ def setup_campaign_meta_review(
         brief_id = metadata.get("assetBriefId")
         if isinstance(brief_id, str) and brief_id in assets_by_brief_id:
             assets_by_brief_id[brief_id].append(asset)
+
+    for brief_id, assets in assets_by_brief_id.items():
+        assets_by_brief_id[brief_id] = _select_assets_for_meta_review(
+            assets,
+            generation_batch_id=selected_generation_batch_id,
+        )
 
     missing_asset_briefs = [brief_id for brief_id, assets in assets_by_brief_id.items() if not assets]
     if missing_asset_briefs:
@@ -786,6 +877,14 @@ def setup_campaign_meta_review(
 
     for brief_id in selected_brief_ids:
         brief = brief_map[brief_id]
+        ad_copy_pack_tuple = ad_copy_pack_map.get(brief_id)
+        if ad_copy_pack_tuple is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Asset brief '{brief_id}' is missing an ad copy pack artifact. Regenerate creatives first.",
+            )
+        ad_copy_pack_artifact, ad_copy_pack = ad_copy_pack_tuple
+        copy_pack_by_id = {item.id: item for item in ad_copy_pack.copy_packs}
         experiment_id = brief.get("experimentId")
         if not isinstance(experiment_id, str) or not experiment_id.strip():
             raise HTTPException(
@@ -856,6 +955,58 @@ def setup_campaign_meta_review(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"Asset brief '{brief_id}' requirement at index {requirement_index} must be an object.",
                 )
+            ad_copy_pack_id = metadata.get("adCopyPackId")
+            if not isinstance(ad_copy_pack_id, str) or not ad_copy_pack_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Generated asset '{asset.id}' is missing ai_metadata.adCopyPackId.",
+                )
+            ad_copy_pack_id = ad_copy_pack_id.strip()
+            copy_pack = copy_pack_by_id.get(ad_copy_pack_id)
+            if copy_pack is None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Generated asset '{asset.id}' references unknown adCopyPackId='{ad_copy_pack_id}' "
+                        f"for asset brief '{brief_id}'."
+                    ),
+                )
+            generation_batch_id = metadata.get("creativeGenerationBatchId")
+            if not isinstance(generation_batch_id, str) or not generation_batch_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Generated asset '{asset.id}' is missing ai_metadata.creativeGenerationBatchId.",
+                )
+            generation_batch_id = generation_batch_id.strip()
+            swipe_source_label = metadata.get("swipeSourceLabel")
+            if not isinstance(swipe_source_label, str) or not swipe_source_label.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Generated asset '{asset.id}' is missing ai_metadata.swipeSourceLabel.",
+                )
+            swipe_source_label = swipe_source_label.strip()
+            swipe_source_media_url = metadata.get("swipeSourceUrl")
+            if not isinstance(swipe_source_media_url, str) or not swipe_source_media_url.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Generated asset '{asset.id}' is missing ai_metadata.swipeSourceUrl.",
+                )
+            swipe_source_media_url = swipe_source_media_url.strip()
+            ad_copy_pack_artifact_id = metadata.get("adCopyPackArtifactId")
+            if not isinstance(ad_copy_pack_artifact_id, str) or not ad_copy_pack_artifact_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=f"Generated asset '{asset.id}' is missing ai_metadata.adCopyPackArtifactId.",
+                )
+            ad_copy_pack_artifact_id = ad_copy_pack_artifact_id.strip()
+            if ad_copy_pack_artifact_id != str(ad_copy_pack_artifact.id):
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        f"Generated asset '{asset.id}' adCopyPackArtifactId does not match the latest ad copy pack "
+                        f"artifact for asset brief '{brief_id}'."
+                    ),
+                )
 
             new_creative_spec = meta_repo.create_creative_spec(
                 org_id=auth.org_id,
@@ -868,9 +1019,9 @@ def setup_campaign_meta_review(
                         str(requirement.get("funnelStage") or requirement.get("channel") or "creative").strip(),
                     ]
                 ),
-                primary_text=brief.get("creativeConcept"),
-                headline=requirement.get("hook"),
-                description=requirement.get("angle"),
+                primary_text=copy_pack.meta_primary_text,
+                headline=copy_pack.meta_headline,
+                description=copy_pack.meta_description,
                 page_id=settings.META_PAGE_ID,
                 instagram_actor_id=settings.META_INSTAGRAM_ACTOR_ID,
                 status="draft",
@@ -879,8 +1030,14 @@ def setup_campaign_meta_review(
                     "experimentSpecId": experiment_id,
                     "experimentName": brief.get("variantName") or experiment_id,
                     "assetBriefId": brief_id,
+                    "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
+                    "adCopyPackId": copy_pack.id,
+                    "generationBatchId": generation_batch_id,
+                    "swipeSourceLabel": swipe_source_label,
+                    "swipeSourceMediaUrl": swipe_source_media_url,
                     "requirementIndex": requirement_index,
                     "requirement": requirement,
+                    "copyPack": copy_pack.model_dump(mode="json", by_alias=True),
                     "reviewPaths": review_paths,
                     "variantId": brief.get("variantId"),
                     "variantName": brief.get("variantName"),

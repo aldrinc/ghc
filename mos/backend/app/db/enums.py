@@ -88,6 +88,8 @@ class ArtifactTypeEnum(str, Enum):
     strategy_sheet = "strategy_sheet"
     experiment_spec = "experiment_spec"
     asset_brief = "asset_brief"
+    ad_copy_pack = "ad_copy_pack"
+    creative_generation_plan = "creative_generation_plan"
     qa_report = "qa_report"
     experiment_report = "experiment_report"
     playbook = "playbook"

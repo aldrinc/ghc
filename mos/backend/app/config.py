@@ -12,7 +12,9 @@ _project_root = _backend_root.parent.parent
 load_dotenv(_project_root / ".env", override=False)
 # Optional consolidated env (gitignored) used in local dev to store secrets outside repo-tracked env examples.
 load_dotenv(_project_root / ".env.local.consolidated", override=False)
-load_dotenv(_backend_root / ".env", override=True)
+# Keep process-level env vars authoritative so ad-hoc overrides (for tests/replays/deploy)
+# are not silently replaced by repo-local defaults.
+load_dotenv(_backend_root / ".env", override=False)
 
 
 def _coerce_json(value: str):
@@ -20,6 +22,14 @@ def _coerce_json(value: str):
         return json.loads(value)
     except json.JSONDecodeError:
         return value
+
+
+_LOCAL_DEV_CORS_ORIGINS = {
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5275",
+    "http://127.0.0.1:5275",
+}
 
 
 class Settings(BaseSettings):
@@ -66,7 +76,9 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[str]
 
     OPENAI_API_KEY: str | None = None
+    BASETEN_API_KEY: str | None = None
     OPENAI_WEBHOOK_SECRET: str | None = None
+    BASETEN_BASE_URL: str = "https://inference.baseten.co/v1"
     GEMINI_FILE_SEARCH_ENABLED: bool = False
     GEMINI_FILE_SEARCH_MODEL: str = "gemini-2.5-flash"
     GEMINI_FILE_SEARCH_STORE_PREFIX: str = "mos"
@@ -173,9 +185,14 @@ class Settings(BaseSettings):
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def split_origins(cls, value: str | list[str]) -> list[str]:
+        origins: list[str]
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
-        return value
+            origins = [origin.strip() for origin in value.split(",") if origin.strip()]
+        else:
+            origins = list(value)
+        if "http://localhost:5275" not in origins and "http://127.0.0.1:5275" not in origins:
+            origins.extend(sorted(_LOCAL_DEV_CORS_ORIGINS))
+        return sorted(set(origins))
 
     @field_validator("CLERK_AUDIENCE", mode="before")
     @classmethod

@@ -43,6 +43,14 @@ function getErrorMessage(err: unknown) {
   return "Request failed";
 }
 
+function readString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function readNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsPanelProps) {
   const queryClient = useQueryClient();
   const { post } = useApiClient();
@@ -64,6 +72,7 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
   const [lastWorkflowRunId, setLastWorkflowRunId] = useState<string | null>(null);
   const [lastPreparedAt, setLastPreparedAt] = useState<string | null>(null);
   const [autoRefreshUntil, setAutoRefreshUntil] = useState<number | null>(null);
+  const [latestBatchOnly, setLatestBatchOnly] = useState(true);
 
   const assetBriefIds = useMemo(
     () => assetBriefs.map((brief) => brief.id).filter((briefId): briefId is string => Boolean(briefId)),
@@ -153,13 +162,20 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
 
   const handlePrepareMetaReview = async () => {
     setPrepareError(null);
-    if (!assetBriefIds.length) {
-      setPrepareError("No asset briefs exist for this campaign yet.");
+    if (!prepareAssetBriefIds.length) {
+      setPrepareError(
+        latestBatchOnly && latestBatchId
+          ? "No generated assets exist in the visible batch yet."
+          : "No asset briefs exist for this campaign yet.",
+      );
       return;
     }
     setPreparePending(true);
     try {
-      await post(`/campaigns/${campaign.id}/meta/review-setup`, { assetBriefIds });
+      await post(`/campaigns/${campaign.id}/meta/review-setup`, {
+        assetBriefIds: prepareAssetBriefIds,
+        generationBatchId: latestBatchOnly ? latestBatchId : undefined,
+      });
       setLastPreparedAt(new Date().toISOString());
       await refreshPipeline();
     } catch (err) {
@@ -187,6 +203,92 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
     [pipeline],
   );
   const hasGeneratedAssets = pipeline.length > 0;
+  const batchSummaries = useMemo(() => {
+    const byBatch = new Map<string, { batchId: string; latestCreatedAt: number; count: number }>();
+    pipeline.forEach((item) => {
+      const batchId = readString(item.asset.ai_metadata?.creativeGenerationBatchId);
+      if (!batchId) return;
+      const createdAt = item.asset.created_at ? new Date(item.asset.created_at).getTime() : 0;
+      const existing = byBatch.get(batchId);
+      if (!existing) {
+        byBatch.set(batchId, { batchId, latestCreatedAt: createdAt, count: 1 });
+        return;
+      }
+      existing.latestCreatedAt = Math.max(existing.latestCreatedAt, createdAt);
+      existing.count += 1;
+    });
+    return Array.from(byBatch.values()).sort((a, b) => b.latestCreatedAt - a.latestCreatedAt);
+  }, [pipeline]);
+  const latestBatchId = batchSummaries[0]?.batchId ?? null;
+  const visiblePipeline = useMemo(() => {
+    if (!latestBatchOnly || !latestBatchId) return pipeline;
+    return pipeline.filter((item) => readString(item.asset.ai_metadata?.creativeGenerationBatchId) === latestBatchId);
+  }, [latestBatchId, latestBatchOnly, pipeline]);
+  const hiddenLegacyCount = useMemo(() => {
+    if (!latestBatchOnly || !latestBatchId) return 0;
+    return pipeline.length - visiblePipeline.length;
+  }, [latestBatchId, latestBatchOnly, pipeline.length, visiblePipeline.length]);
+  const visibleAssetBriefIds = useMemo(() => {
+    const ids = new Set<string>();
+    visiblePipeline.forEach((item) => {
+      const briefId = readString(item.asset.ai_metadata?.assetBriefId);
+      if (briefId) ids.add(briefId);
+    });
+    return Array.from(ids);
+  }, [visiblePipeline]);
+  const prepareAssetBriefIds = useMemo(() => {
+    if (latestBatchOnly && latestBatchId) return visibleAssetBriefIds;
+    return assetBriefIds;
+  }, [assetBriefIds, latestBatchId, latestBatchOnly, visibleAssetBriefIds]);
+  const groupedPipeline = useMemo(() => {
+    const groups = new Map<
+      number,
+      {
+        requirementIndex: number;
+        title: string;
+        funnelStage: string | null;
+        items: MetaPipelineAsset[];
+      }
+    >();
+    visiblePipeline.forEach((item) => {
+      const requirementIndex = readNumber(item.asset.ai_metadata?.requirementIndex);
+      const creativeMetadata = (item.creative_spec?.metadata_json || {}) as Record<string, unknown>;
+      const requirement = (creativeMetadata.requirement || {}) as Record<string, unknown>;
+      const title =
+        readString(requirement.hook) ||
+        readString(item.creative_spec?.headline) ||
+        readString(item.creative_spec?.name) ||
+        item.asset.public_id;
+      const funnelStage = readString(requirement.funnelStage);
+      const key = requirementIndex ?? -1;
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, {
+          requirementIndex: key,
+          title,
+          funnelStage,
+          items: [item],
+        });
+        return;
+      }
+      existing.items.push(item);
+    });
+    return Array.from(groups.values())
+      .sort((a, b) => a.requirementIndex - b.requirementIndex)
+      .map((group) => ({
+        ...group,
+        items: group.items.sort((left, right) => {
+          const leftLabel = readString(left.asset.ai_metadata?.swipeSourceLabel) || left.asset.public_id;
+          const rightLabel = readString(right.asset.ai_metadata?.swipeSourceLabel) || right.asset.public_id;
+          return leftLabel.localeCompare(rightLabel);
+        }),
+      }));
+  }, [visiblePipeline]);
+
+  useEffect(() => {
+    if (!latestBatchId) return;
+    setLatestBatchOnly(true);
+  }, [latestBatchId]);
 
   return (
     <div className="space-y-4">
@@ -240,22 +342,29 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
             variant="secondary"
             size="sm"
             onClick={handlePrepareMetaReview}
-            disabled={preparePending || !assetBriefIds.length || !hasGeneratedAssets}
+            disabled={preparePending || !prepareAssetBriefIds.length || !hasGeneratedAssets}
           >
             {preparePending ? "Preparing…" : "Prepare Meta review"}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => void refreshPipeline()} disabled={pipelineLoading}>
             {pipelineLoading ? "Refreshing…" : "Refresh"}
           </Button>
+          {latestBatchId ? (
+            <Button variant="secondary" size="sm" onClick={() => setLatestBatchOnly((current) => !current)}>
+              {latestBatchOnly ? "Show all batches" : "Show latest batch only"}
+            </Button>
+          ) : null}
         </div>
 
         <div className="mt-2 space-y-1 text-sm text-content-muted">
-          <div>Generate creatives runs the campaign creative-service flow for all current briefs.</div>
-          <div>Prepare Meta review creates internal draft creative/ad set objects from the generated assets.</div>
+          <div>Generate creatives runs the swipe-first image remix flow plus the explicit ad copy pack step for all current briefs.</div>
+          <div>Prepare Meta review creates internal draft creative/ad set objects from the generated remix assets and their copy packs.</div>
           {lastWorkflowRunId ? <div>Latest creative workflow: <span className="font-mono">{lastWorkflowRunId}</span></div> : null}
           {lastPreparedAt ? <div>Latest Meta review prep: {formatDate(lastPreparedAt)}</div> : null}
           {autoRefreshUntil ? <div>Auto-refreshing this panel while creative generation completes.</div> : null}
           {!hasGeneratedAssets ? <div>Generate creatives first. Meta review stays disabled until campaign assets exist.</div> : null}
+          {latestBatchId ? <div>Latest creative batch: <span className="font-mono">{shortId(latestBatchId, 8)}</span></div> : null}
+          {hiddenLegacyCount ? <div>{hiddenLegacyCount} legacy or non-latest assets are currently hidden.</div> : null}
           {missingCreativeSpecCount ? <div className="text-warning">{missingCreativeSpecCount} generated assets still need internal Meta specs.</div> : null}
           {generateError ? <div className="text-danger">{generateError}</div> : null}
           {prepareError ? <div className="text-danger">{prepareError}</div> : null}
@@ -273,117 +382,156 @@ export function CampaignMetaAdsPanel({ campaign, assetBriefs }: CampaignMetaAdsP
 
         {pipelineLoading ? (
           <div className="px-4 py-3 text-sm text-content-muted">Loading Meta campaign assets…</div>
-        ) : !pipeline.length ? (
+        ) : !visiblePipeline.length ? (
           <div className="px-4 py-3 text-sm text-content-muted">
             No campaign creative assets found yet. Generate creatives first.
           </div>
         ) : (
           <div className="divide-y divide-border">
-            {pipeline.map((item) => {
-              const assetUrl = resolveAssetUrl(item.asset.public_url);
-              const creativeMetadata = (item.creative_spec?.metadata_json || {}) as Record<string, unknown>;
-              const reviewPaths = (creativeMetadata.reviewPaths || {}) as Record<string, string>;
-              const preSalesUrl = resolveReviewUrl(reviewPaths["pre-sales"]);
-              const salesUrl = resolveReviewUrl(reviewPaths["sales"]);
-              return (
-                <div key={item.asset.id} className="grid gap-4 px-4 py-4 xl:grid-cols-[220px_minmax(0,1fr)]">
-                  <div className="overflow-hidden rounded-lg border border-border bg-surface-2">
-                    {assetUrl ? (
-                      <img
-                        src={assetUrl}
-                        alt={item.asset.asset_kind || "Creative asset"}
-                        className="h-[220px] w-full object-contain"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div className="flex h-[220px] items-center justify-center text-sm text-content-muted">
-                        No preview
-                      </div>
-                    )}
+            {groupedPipeline.map((group) => (
+              <div key={`requirement-${group.requirementIndex}`} className="space-y-4 px-4 py-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-sm font-semibold text-content">
+                    Requirement {group.requirementIndex >= 0 ? group.requirementIndex + 1 : "—"}: {group.title}
                   </div>
-
-                  <div className="min-w-0 space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="text-sm font-semibold text-content">{item.creative_spec?.name || item.asset.public_id}</div>
-                      <Badge tone={item.creative_spec?.id ? "success" : "accent"}>
-                        {item.creative_spec?.id ? "Creative spec ready" : "Spec missing"}
-                      </Badge>
-                      <Badge tone="neutral">{item.asset.status || "draft"}</Badge>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="rounded-lg border border-border bg-surface p-3">
-                        <div className="text-xs uppercase tracking-wide text-content-muted">Asset</div>
-                        <div className="mt-2 space-y-1 text-sm text-content">
-                          <div><span className="text-content-muted">Asset ID:</span> <span className="font-mono">{item.asset.id}</span></div>
-                          <div><span className="text-content-muted">Created:</span> {formatDate(item.asset.created_at)}</div>
-                          <div><span className="text-content-muted">Angle:</span> {item.experiment?.name || item.experiment?.id || "—"}</div>
-                        </div>
-                      </div>
-
-                      <div className="rounded-lg border border-border bg-surface p-3">
-                        <div className="text-xs uppercase tracking-wide text-content-muted">Creative spec</div>
-                        {item.creative_spec ? (
-                          <div className="mt-2 space-y-2 text-sm text-content">
-                            <div>
-                              <div className="text-xs uppercase tracking-wide text-content-muted">Primary text</div>
-                              <div>{item.creative_spec.primary_text || "—"}</div>
-                            </div>
-                            <div>
-                              <div className="text-xs uppercase tracking-wide text-content-muted">Headline</div>
-                              <div>{item.creative_spec.headline || "—"}</div>
-                            </div>
-                            <div>
-                              <div className="text-xs uppercase tracking-wide text-content-muted">Description</div>
-                              <div>{item.creative_spec.description || "—"}</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="mt-2 text-sm text-content-muted">No internal Meta creative spec yet.</div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div className="rounded-lg border border-border bg-surface p-3">
-                        <div className="text-xs uppercase tracking-wide text-content-muted">Ad set specs</div>
-                        {(item.adset_specs || []).length ? (
-                          <div className="mt-2 space-y-2">
-                            {item.adset_specs.map((spec) => (
-                              <div key={spec.id} className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
-                                <div className="font-semibold text-content">{spec.name || spec.id}</div>
-                                <div className="text-content-muted">Status: {spec.status || "draft"}</div>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="mt-2 text-sm text-content-muted">No internal Meta ad set spec yet.</div>
-                        )}
-                      </div>
-
-                      <div className="rounded-lg border border-border bg-surface p-3">
-                        <div className="text-xs uppercase tracking-wide text-content-muted">Funnel review</div>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {preSalesUrl ? (
-                            <a href={preSalesUrl} target="_blank" rel="noreferrer">
-                              <Button variant="secondary" size="xs">Open pre-sales</Button>
-                            </a>
-                          ) : null}
-                          {salesUrl ? (
-                            <a href={salesUrl} target="_blank" rel="noreferrer">
-                              <Button variant="secondary" size="xs">Open sales</Button>
-                            </a>
-                          ) : null}
-                          {!preSalesUrl && !salesUrl ? (
-                            <div className="text-sm text-content-muted">No funnel review links on this creative spec yet.</div>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  {group.funnelStage ? <Badge tone="neutral">{group.funnelStage}</Badge> : null}
+                  <Badge tone="neutral">{group.items.length} swipe remixes</Badge>
                 </div>
-              );
-            })}
+
+                <div className="space-y-4">
+                  {group.items.map((item) => {
+                    const assetUrl = resolveAssetUrl(item.asset.public_url);
+                    const creativeMetadata = (item.creative_spec?.metadata_json || {}) as Record<string, unknown>;
+                    const reviewPaths = (creativeMetadata.reviewPaths || {}) as Record<string, string>;
+                    const preSalesUrl = resolveReviewUrl(reviewPaths["pre-sales"]);
+                    const salesUrl = resolveReviewUrl(reviewPaths["sales"]);
+                    const sourceUrl = resolveAssetUrl(readString(item.asset.ai_metadata?.swipeSourceUrl));
+                    const sourceLabel = readString(item.asset.ai_metadata?.swipeSourceLabel) || "Source swipe";
+                    const batchId = readString(item.asset.ai_metadata?.creativeGenerationBatchId);
+                    const copyPackId = readString(item.asset.ai_metadata?.adCopyPackId);
+                    return (
+                      <div
+                        key={item.asset.id}
+                        className="grid gap-4 rounded-lg border border-border bg-surface p-4 xl:grid-cols-[minmax(0,240px)_minmax(0,240px)_minmax(0,1fr)]"
+                      >
+                        <div className="space-y-2">
+                          <div className="text-xs uppercase tracking-wide text-content-muted">Source swipe</div>
+                          <div className="overflow-hidden rounded-lg border border-border bg-surface-2">
+                            {sourceUrl ? (
+                              <img src={sourceUrl} alt={sourceLabel} className="h-[220px] w-full object-contain" loading="lazy" />
+                            ) : (
+                              <div className="flex h-[220px] items-center justify-center text-sm text-content-muted">No source preview</div>
+                            )}
+                          </div>
+                          <div className="text-sm text-content">{sourceLabel}</div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <div className="text-xs uppercase tracking-wide text-content-muted">Generated remix</div>
+                          <div className="overflow-hidden rounded-lg border border-border bg-surface-2">
+                            {assetUrl ? (
+                              <img
+                                src={assetUrl}
+                                alt={item.asset.asset_kind || "Creative asset"}
+                                className="h-[220px] w-full object-contain"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div className="flex h-[220px] items-center justify-center text-sm text-content-muted">No preview</div>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge tone={item.creative_spec?.id ? "success" : "accent"}>
+                              {item.creative_spec?.id ? "Creative spec ready" : "Spec missing"}
+                            </Badge>
+                            <Badge tone="neutral">{item.asset.status || "draft"}</Badge>
+                            {batchId ? <Badge tone="neutral">Batch {shortId(batchId, 5)}</Badge> : null}
+                          </div>
+                        </div>
+
+                        <div className="min-w-0 space-y-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm font-semibold text-content">{item.creative_spec?.name || item.asset.public_id}</div>
+                            <Badge tone="neutral">Req {readNumber(item.asset.ai_metadata?.requirementIndex) ?? "—"}</Badge>
+                            {copyPackId ? <Badge tone="neutral">Copy {shortId(copyPackId, 4)}</Badge> : null}
+                          </div>
+
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="rounded-lg border border-border bg-surface p-3">
+                              <div className="text-xs uppercase tracking-wide text-content-muted">Asset provenance</div>
+                              <div className="mt-2 space-y-1 text-sm text-content">
+                                <div><span className="text-content-muted">Asset ID:</span> <span className="font-mono">{item.asset.id}</span></div>
+                                <div><span className="text-content-muted">Created:</span> {formatDate(item.asset.created_at)}</div>
+                                <div><span className="text-content-muted">Angle:</span> {item.experiment?.name || item.experiment?.id || "—"}</div>
+                              </div>
+                            </div>
+
+                            <div className="rounded-lg border border-border bg-surface p-3">
+                              <div className="text-xs uppercase tracking-wide text-content-muted">Meta copy pack</div>
+                              {item.creative_spec ? (
+                                <div className="mt-2 space-y-2 text-sm text-content">
+                                  <div>
+                                    <div className="text-xs uppercase tracking-wide text-content-muted">Primary text</div>
+                                    <div>{item.creative_spec.primary_text || "—"}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-xs uppercase tracking-wide text-content-muted">Headline</div>
+                                    <div>{item.creative_spec.headline || "—"}</div>
+                                  </div>
+                                  <div>
+                                    <div className="text-xs uppercase tracking-wide text-content-muted">Description</div>
+                                    <div>{item.creative_spec.description || "—"}</div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="mt-2 text-sm text-content-muted">No internal Meta creative spec yet.</div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="rounded-lg border border-border bg-surface p-3">
+                              <div className="text-xs uppercase tracking-wide text-content-muted">Ad set specs</div>
+                              {(item.adset_specs || []).length ? (
+                                <div className="mt-2 space-y-2">
+                                  {item.adset_specs.map((spec) => (
+                                    <div key={spec.id} className="rounded-md border border-border bg-surface-2 px-3 py-2 text-sm">
+                                      <div className="font-semibold text-content">{spec.name || spec.id}</div>
+                                      <div className="text-content-muted">Status: {spec.status || "draft"}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="mt-2 text-sm text-content-muted">No internal Meta ad set spec yet.</div>
+                              )}
+                            </div>
+
+                            <div className="rounded-lg border border-border bg-surface p-3">
+                              <div className="text-xs uppercase tracking-wide text-content-muted">Funnel review</div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {preSalesUrl ? (
+                                  <a href={preSalesUrl} target="_blank" rel="noreferrer">
+                                    <Button variant="secondary" size="xs">Open pre-sales</Button>
+                                  </a>
+                                ) : null}
+                                {salesUrl ? (
+                                  <a href={salesUrl} target="_blank" rel="noreferrer">
+                                    <Button variant="secondary" size="xs">Open sales</Button>
+                                  </a>
+                                ) : null}
+                                {!preSalesUrl && !salesUrl ? (
+                                  <div className="text-sm text-content-muted">No funnel review links on this creative spec yet.</div>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

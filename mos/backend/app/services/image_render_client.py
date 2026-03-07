@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 import mimetypes
+import os
 from typing import Any, Protocol
 from urllib.parse import urlparse
 
@@ -48,7 +49,27 @@ class ImageRenderClient(Protocol):
         ...
 
 
-def get_image_render_provider() -> str:
+def _infer_image_render_provider_from_model(model_id: str | None) -> str | None:
+    candidate = str(model_id or "").strip().lower().lstrip("/")
+    if not candidate:
+        return None
+    if candidate.startswith("models/"):
+        candidate = candidate[len("models/") :]
+    if candidate.startswith("gemini-"):
+        return _PROVIDER_CREATIVE_SERVICE
+    if candidate.startswith(_HIGGS_NANO_BANANA_MODEL_PREFIX):
+        return _PROVIDER_HIGGSFIELD
+    return None
+
+
+def get_image_render_provider(*, model_id: str | None = None) -> str:
+    inferred = _infer_image_render_provider_from_model(model_id)
+    if inferred is None and model_id is None:
+        inferred = _infer_image_render_provider_from_model(
+            os.getenv("SWIPE_IMAGE_RENDER_MODEL") or os.getenv("IMAGE_RENDER_MODEL")
+        )
+    if inferred is not None:
+        return inferred
     provider = str(settings.IMAGE_RENDER_PROVIDER or "").strip().lower()
     if provider not in {_PROVIDER_CREATIVE_SERVICE, _PROVIDER_HIGGSFIELD}:
         raise ValueError(
@@ -59,8 +80,8 @@ def get_image_render_provider() -> str:
     return provider
 
 
-def build_image_render_client() -> ImageRenderClient:
-    provider = get_image_render_provider()
+def build_image_render_client(*, model_id: str | None = None) -> ImageRenderClient:
+    provider = get_image_render_provider(model_id=model_id)
     if provider == _PROVIDER_CREATIVE_SERVICE:
         return CreativeServiceClient()
     if provider == _PROVIDER_HIGGSFIELD:

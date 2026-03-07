@@ -93,6 +93,7 @@ export type MetaPipelineAsset = {
     height?: number | null;
     created_at?: string;
     public_url?: string | null;
+    ai_metadata?: Record<string, unknown> | null;
   };
   campaign?: { id: string; name: string } | null;
   experiment?: { id: string; name: string } | null;

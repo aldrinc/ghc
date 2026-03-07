@@ -116,6 +116,7 @@ class MetaAdSetSpecCreateRequest(BaseModel):
 
 class CampaignMetaReviewSetupRequest(BaseModel):
     assetBriefIds: list[str] = Field(default_factory=list)
+    generationBatchId: str | None = None
 
     @field_validator("assetBriefIds")
     @classmethod
@@ -133,3 +134,12 @@ class CampaignMetaReviewSetupRequest(BaseModel):
             seen.add(normalized)
             cleaned.append(normalized)
         return cleaned
+
+    @field_validator("generationBatchId")
+    @classmethod
+    def _validate_generation_batch_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("generationBatchId must be a non-empty string when provided.")
+        return value.strip()

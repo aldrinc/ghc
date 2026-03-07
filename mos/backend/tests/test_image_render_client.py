@@ -8,9 +8,24 @@ from app.services import image_render_client as image_render
 
 def test_get_image_render_provider_rejects_unknown_value(monkeypatch) -> None:
     monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "invalid_provider")
+    monkeypatch.delenv("SWIPE_IMAGE_RENDER_MODEL", raising=False)
+    monkeypatch.delenv("IMAGE_RENDER_MODEL", raising=False)
 
     with pytest.raises(ValueError, match="Unsupported IMAGE_RENDER_PROVIDER"):
         image_render.get_image_render_provider()
+
+
+def test_get_image_render_provider_uses_creative_service_for_gemini_models(monkeypatch) -> None:
+    monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "higgsfield")
+
+    assert image_render.get_image_render_provider(model_id="gemini-3.1-flash-image-preview") == "creative_service"
+    assert image_render.get_image_render_provider(model_id="models/gemini-3-pro-image-preview") == "creative_service"
+
+
+def test_get_image_render_provider_uses_higgsfield_for_nano_banana_models(monkeypatch) -> None:
+    monkeypatch.setattr(image_render.settings, "IMAGE_RENDER_PROVIDER", "creative_service")
+
+    assert image_render.get_image_render_provider(model_id="nano-banana-pro") == "higgsfield"
 
 
 def test_higgsfield_create_image_ads_uses_model_defaults(monkeypatch) -> None:
