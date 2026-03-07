@@ -225,8 +225,8 @@ export function SalesPdpReviews({
 
   const page = query.page ?? 1;
   const pageSize = query.pageSize ?? 10;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const visibleReviews = filtered.slice(0, page * pageSize);
+  const hasMoreReviews = visibleReviews.length < filtered.length;
 
   const activeSortLabel =
     data.filters.sorts.find((s) => s.value === (query.sort ?? "most_recent"))?.label ?? "Most recent";
@@ -328,11 +328,14 @@ export function SalesPdpReviews({
 
           {/* Reviews list */}
           <div className="mt-6 border-t border-divider">
-            {paged.map((r) => (
+            {visibleReviews.map((r) => (
               <ReviewRow key={r.id} review={r} />
             ))}
 
-            <Pagination page={page} totalPages={totalPages} onPageChange={(next) => setQuery((q) => ({ ...q, page: next }))} />
+            <ShowMoreButton
+              visible={hasMoreReviews}
+              onClick={() => setQuery((q) => ({ ...q, page: (q.page ?? 1) + 1 }))}
+            />
           </div>
         </div>
       </div>
@@ -609,41 +612,23 @@ function ReviewRow({ review }: { review: Review }) {
   );
 }
 
-function Pagination({
-  page,
-  totalPages,
-  onPageChange,
+function ShowMoreButton({
+  visible,
+  onClick,
 }: {
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
+  visible: boolean;
+  onClick: () => void;
 }) {
-  if (totalPages <= 1) return null;
+  if (!visible) return null;
 
   return (
-    <div className="flex items-center justify-between border-t border-divider py-6">
+    <div className="flex justify-center border-t border-divider py-6">
       <button
         type="button"
-        disabled={page <= 1}
-        onClick={() => onPageChange(Math.max(1, page - 1))}
+        onClick={onClick}
         className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-hover active:bg-active disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
-        Prev
-      </button>
-
-      <div className="text-sm text-content-muted">
-        Page <span className="font-semibold text-content">{page}</span> of{" "}
-        <span className="font-semibold text-content">{totalPages}</span>
-      </div>
-
-      <button
-        type="button"
-        disabled={page >= totalPages}
-        onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-        className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-hover active:bg-active disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        Next
+        Show more
         <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
       </button>
     </div>

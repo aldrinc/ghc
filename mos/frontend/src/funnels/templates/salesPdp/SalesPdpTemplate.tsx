@@ -29,6 +29,7 @@ import baseStyles from "./salesPdpTemplate.module.css";
 import { useDesignSystemTokens } from "@/components/design-system/DesignSystemProvider";
 import { useFunnelRuntime } from "@/funnels/puckConfig";
 import { resolvePublicApiBaseUrl } from "@/funnels/runtimeRouting";
+import { withDesignSystemBrandLogo } from "@/funnels/templates/shared/designSystemBrandLogo";
 import { useTemplateFonts } from "@/funnels/templates/templateFonts";
 import { PaymentIconStrip } from "@/funnels/templates/shared/PaymentIconStrip";
 
@@ -118,6 +119,8 @@ const LOCKED_TEMPLATE_CSS_VARS = new Set([
   "--footer-pad-y",
   "--footer-logo-height",
   "--footer-gap",
+  "--listicle-title-font",
+  "--listicle-title-color",
 ]);
 
 function toCssVarName(key: string): string {
@@ -468,12 +471,18 @@ function HeaderBar({
     target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "center" })
   }
 
+  const designSystemTokens = useDesignSystemTokens()
+  const resolvedLogo = useMemo(
+    () => withDesignSystemBrandLogo(designSystemTokens, config.logo),
+    [config.logo, designSystemTokens]
+  )
+
   return (
     <div className={styles.header} aria-hidden={!visible}>
       <Container className={styles.headerContainer}>
         <div className={`${styles.headerInner} ${visible ? styles.headerVisible : styles.headerHidden}`}>
-          <a className={styles.logo} href={config.logo.href ?? '#top'}>
-            <img className={styles.logoImg} src={resolveImageSrc(config.logo)} alt={config.logo.alt} />
+          <a className={styles.logo} href={resolvedLogo.href ?? '#top'}>
+            <img className={styles.logoImg} src={resolveImageSrc(resolvedLogo)} alt={resolvedLogo.alt} />
           </a>
 
           <nav className={styles.nav} aria-label="Primary">
@@ -1970,13 +1979,18 @@ type SalesPdpFooterProps = {
 }
 
 export function SalesPdpFooter({ config, configJson }: SalesPdpFooterProps) {
+  const designSystemTokens = useDesignSystemTokens()
   const resolvedConfig = parseJson<FooterConfig>(configJson) ?? config ?? salesPdpDefaults.config.footer
+  const resolvedLogo = useMemo(
+    () => withDesignSystemBrandLogo(designSystemTokens, resolvedConfig.logo),
+    [designSystemTokens, resolvedConfig.logo]
+  )
   const links = Array.isArray(resolvedConfig.links) ? resolvedConfig.links : []
   const paymentIcons = Array.isArray(resolvedConfig.paymentIcons) ? resolvedConfig.paymentIcons : []
   return (
     <footer className={`${styles.sectionPeach} ${styles.footer}`}>
       <Container>
-        <img className={styles.footerLogo} src={resolveImageSrc(resolvedConfig.logo)} alt={resolvedConfig.logo.alt} />
+        <img className={styles.footerLogo} src={resolveImageSrc(resolvedLogo)} alt={resolvedLogo.alt} />
         <div className={styles.footerText}>{resolvedConfig.copyright}</div>
         {links.length > 0 ? (
           <nav className={styles.footerLinks} aria-label="Policy links">

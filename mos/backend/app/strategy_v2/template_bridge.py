@@ -24,6 +24,7 @@ _MARKDOWN_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 _FAQ_QUESTION_RE = re.compile(r"^\s*\**\s*Q[:\s]+\s*(?P<value>.+?)\s*\**\s*$", re.IGNORECASE)
 _FAQ_ANSWER_RE = re.compile(r"^\s*\**\s*A[:\s]+\s*(?P<value>.+?)\s*\**\s*$", re.IGNORECASE)
 _SENTENCE_RE = re.compile(r"[.!?]+")
+_SENTENCE_CHUNK_RE = re.compile(r"[^.!?]+(?:[.!?]+|$)")
 _WORD_RE = re.compile(r"\b[^\s]+\b")
 _LITERAL_PRICE_RE = re.compile(r"\$\s*\d")
 _HERO_BENEFIT_COUNT = 4
@@ -639,18 +640,40 @@ def _coerce_non_empty_text(value: Any) -> str:
 
 
 def _clip_text(value: str, *, max_len: int) -> str:
-    # TemplateBridge must not mutate authored copy length. It only normalizes shape.
-    return value.strip()
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned or max_len <= 0:
+        return ""
+    if len(cleaned) <= max_len:
+        return cleaned
+    clipped = cleaned[:max_len].rstrip()
+    last_space = clipped.rfind(" ")
+    if last_space >= max_len // 2:
+        clipped = clipped[:last_space].rstrip()
+    return clipped.rstrip(" ,;:-")
 
 
 def _clip_sentences(value: str, *, max_sentences: int, max_len: int) -> str:
-    # TemplateBridge must not mutate authored sentence count or length.
-    return value.strip()
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned:
+        return ""
+    if max_sentences > 0:
+        sentence_chunks = [
+            match.group(0).strip()
+            for match in _SENTENCE_CHUNK_RE.finditer(cleaned)
+            if match.group(0).strip()
+        ]
+        if sentence_chunks:
+            cleaned = " ".join(sentence_chunks[:max_sentences])
+    return _clip_text(cleaned, max_len=max_len)
 
 
 def _compact_phrase(value: str, *, max_words: int, max_len: int) -> str:
-    # Preserve authored phrase text; downstream validation enforces constraints.
-    return value.strip()
+    cleaned = re.sub(r"\s+", " ", value.strip())
+    if not cleaned:
+        return ""
+    if max_words > 0:
+        cleaned = " ".join(cleaned.split()[:max_words])
+    return _clip_text(cleaned, max_len=max_len)
 
 
 def _coerce_non_empty_text_list(

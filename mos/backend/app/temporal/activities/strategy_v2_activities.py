@@ -65,6 +65,7 @@ from app.strategy_v2 import (
     require_copy_page_quality,
     require_copy_page_semantic_quality,
     require_prompt_chain_provenance,
+    headline_qa_required_api_key_env,
     extract_competitor_analysis,
     extract_saturated_angles,
     hormozi_scorer,
@@ -18198,7 +18199,6 @@ def _is_non_retryable_sales_payload_failure(error_message: str) -> bool:
     return (
         "sales template payload json parse failed" in lowered
         or "invalid template_payload object" in lowered
-        or "template_payload_validation" in lowered
         or "legacy sales payload upgrade failed" in lowered
     )
 
@@ -18596,11 +18596,13 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
     qa_attempts: list[dict[str, Any]] = []
 
     if True:
-        api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+        qa_api_key_env = headline_qa_required_api_key_env(settings.STRATEGY_V2_COPY_QA_MODEL)
+        api_key = os.getenv(qa_api_key_env, "").strip()
         if not api_key:
             raise StrategyV2MissingContextError(
-                "ANTHROPIC_API_KEY is required for copy headline QA loop and is not set. "
-                "Remediation: configure ANTHROPIC_API_KEY before running Strategy V2 copy stage."
+                f"{qa_api_key_env} is required for copy headline QA loop model "
+                f"'{settings.STRATEGY_V2_COPY_QA_MODEL}' and is not set. "
+                f"Remediation: configure {qa_api_key_env} before running Strategy V2 copy stage."
             )
 
         headline_asset = resolve_prompt_asset(

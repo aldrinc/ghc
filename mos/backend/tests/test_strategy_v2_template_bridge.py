@@ -569,7 +569,7 @@ def test_upgrade_sales_payload_handles_two_column_rows_and_strips_known_drift_ke
     assert "cta_url" not in upgraded["guarantee"]
 
 
-def test_upgrade_sales_payload_does_not_clip_overlong_mechanism_bullet_body() -> None:
+def test_upgrade_sales_payload_clamps_overlong_mechanism_bullet_body() -> None:
     long_body = "A" * 400
     legacy_payload = {
         "hero": {
@@ -627,14 +627,16 @@ def test_upgrade_sales_payload_does_not_clip_overlong_mechanism_bullet_body() ->
         template_id="sales-pdp",
         payload_fields=legacy_payload,
     )
-    with pytest.raises(StrategyV2DecisionError, match="mechanism.bullets.0.body"):
-        validate_strategy_v2_template_payload_fields(
-            template_id="sales-pdp",
-            payload_fields=upgraded,
-        )
+    validated = validate_strategy_v2_template_payload_fields(
+        template_id="sales-pdp",
+        payload_fields=upgraded,
+    )
+
+    assert len(validated["mechanism"]["bullets"][0]["body"]) <= 160
+    assert validated["mechanism"]["bullets"][0]["body"] == "A" * 160
 
 
-def test_upgrade_presales_payload_does_not_clip_legacy_fields_to_contract_caps() -> None:
+def test_upgrade_presales_payload_clamps_legacy_fields_to_contract_caps() -> None:
     legacy_payload = {
         "hero": {
             "title": "Safety-first herbal screening process " * 4,
@@ -688,11 +690,19 @@ def test_upgrade_presales_payload_does_not_clip_legacy_fields_to_contract_caps()
         template_id="pre-sales-listicle",
         payload_fields=legacy_payload,
     )
-    with pytest.raises(StrategyV2DecisionError, match="hero.title"):
-        validate_strategy_v2_template_payload_fields(
-            template_id="pre-sales-listicle",
-            payload_fields=upgraded,
-        )
+    validated = validate_strategy_v2_template_payload_fields(
+        template_id="pre-sales-listicle",
+        payload_fields=upgraded,
+    )
+
+    assert len(validated["hero"]["title"]) <= 90
+    assert len(validated["hero"]["subtitle"]) <= 140
+    assert validated["hero"]["subtitle"].count(".") <= 2
+    assert len(validated["reasons"][0]["title"]) <= 72
+    assert validated["reasons"][0]["body"].count(".") <= 3
+    assert all(len(item) <= 24 for item in validated["marquee"])
+    assert len(validated["pitch"]["title"]) <= 78
+    assert len(validated["pitch"]["bullets"]) == 4
 
 
 def test_template_bridge_builds_and_patches_sales_template() -> None:

@@ -1,4 +1,6 @@
 import type { Footer as FooterType } from '../../types'
+import { useDesignSystemTokens } from '@/components/design-system/DesignSystemProvider'
+import { withDesignSystemBrandLogo } from '@/funnels/templates/shared/designSystemBrandLogo'
 import { resolveImageSrc } from '../../utils/assetUtils'
 import { Container } from '../Container/Container'
 import { PaymentIconStrip } from '@/funnels/templates/shared/PaymentIconStrip'
@@ -9,6 +11,8 @@ type Props = {
 }
 
 export function Footer({ footer }: Props) {
+  const designSystemTokens = useDesignSystemTokens()
+  const resolvedLogo = withDesignSystemBrandLogo(designSystemTokens, footer.logo)
   const links = Array.isArray(footer.links) ? footer.links : []
   const paymentIcons = Array.isArray(footer.paymentIcons) ? footer.paymentIcons : []
 
@@ -18,8 +22,8 @@ export function Footer({ footer }: Props) {
         <div className={styles.inner}>
           <img
             className={styles.logo}
-            src={resolveImageSrc(footer.logo)}
-            alt={footer.logo.alt}
+            src={resolveImageSrc(resolvedLogo)}
+            alt={resolvedLogo.alt}
             loading="lazy"
             decoding="async"
           />
