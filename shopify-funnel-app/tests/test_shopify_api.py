@@ -680,6 +680,41 @@ def test_stabilize_product_card_inventory_language_english_labels():
     assert "Presque épuisé" not in updated
 
 
+def test_stabilize_shoppable_video_cart_count_updates_publishes_cart_update_event():
+    content = (
+        'const res{{ forloop.index }} = await fetch("/cart.json");\n'
+        "const cart{{ forloop.index }} = await res{{ forloop.index }}.json();\n"
+        "const headerCartCount{{ forloop.index }} = document.querySelector('.cart-count-bubble span');\n"
+        'const res{{ forloop.index }} = await fetch("/cart.json");\n'
+        "const cart{{ forloop.index }} = await res{{ forloop.index }}.json();\n"
+        "const headerCartCount{{ forloop.index }} = document.querySelector('.cart-count-bubble span');\n"
+    )
+
+    updated = ShopifyApiClient._stabilize_shoppable_video_cart_count_updates(
+        filename="sections/ss-shoppable-video.liquid",
+        content=content,
+    )
+
+    publish_line = (
+        "theme.pubsub.publish(theme.pubsub.PUB_SUB_EVENTS.cartUpdate, "
+        "{ cart: cart{{ forloop.index }} });\n"
+    )
+    expected_segment = (
+        "const cart{{ forloop.index }} = await res{{ forloop.index }}.json();\n"
+        + publish_line
+    )
+    assert updated.count(expected_segment) == 2
+
+    # Re-running normalization should not duplicate cartUpdate publishes.
+    assert (
+        ShopifyApiClient._stabilize_shoppable_video_cart_count_updates(
+            filename="sections/ss-shoppable-video.liquid",
+            content=updated,
+        )
+        == updated
+    )
+
+
 def test_sync_theme_template_component_image_settings_creates_optional_leaf_paths():
     template_filename = "templates/collection.json"
     setting_path = (
@@ -3225,6 +3260,7 @@ def test_sync_theme_brand_updates_layout_and_css():
                 '.button, .btn, input[type="button"], input[type="submit"], input[type="reset"] {'
                 in css_content
             )
+            assert "border: none !important;" in css_content
             assert "border-radius: 999px !important;" in css_content
             assert "box-shadow: 8px 8px 0 var(--color-muted) !important;" in css_content
             assert (
@@ -3280,6 +3316,9 @@ def test_sync_theme_brand_updates_layout_and_css():
             assert (
                 "border-color: var(--footer-text-color) !important;" in css_content
             )
+            assert '[class*="footer-newsletter-input-"]::placeholder' in css_content
+            assert '[class*="footer-copy-text-"] *' in css_content
+            assert '[class*="footer-tab-text-"] *' in css_content
             assert (
                 ".announcement-bar, [id*=\"announcement\"], [class*=\"announcement\"] {"
                 in css_content
@@ -5371,6 +5410,24 @@ def test_render_theme_brand_css_includes_theme_scope_selectors():
     )
     assert 'html[data-theme="light"] [class*="footer"] {' in css
     assert "--footer-bg: #f4ede6 !important;" in css
+
+
+def test_render_theme_brand_css_includes_white_popup_background_overrides():
+    css = ShopifyApiClient._render_theme_brand_css(
+        theme_name="futrgroup2-0theme",
+        workspace_name="Acme Workspace",
+        brand_name="Acme",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+        data_theme="light",
+        css_vars={"--footer-bg": "#f4ede6"},
+        font_urls=[],
+    )
+
+    assert (
+        ".drawer .modal__container, .quick-view .drawer__inner, .x-modal .drawer__inner, .newsletter-modal .drawer__inner {"
+        in css
+    )
+    assert "background-color: #ffffff !important;" in css
 
 
 def test_resolve_theme_brand_profile_supports_canonicalized_theme_aliases():

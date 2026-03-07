@@ -13,6 +13,7 @@ import re
 import threading
 import time
 from typing import Any
+from urllib.parse import urlparse
 from uuid import UUID, uuid4
 import zipfile
 
@@ -176,6 +177,10 @@ _THEME_RICHTEXT_MARKUP_RE = re.compile(
     r"<(?:p|ul|ol|h[1-6]|li|br)\b",
     re.IGNORECASE,
 )
+_HTTP_URL_CANDIDATE_RE = re.compile(
+    r"https?://[^\s\"')>]+",
+    re.IGNORECASE,
+)
 _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
     r"^templates/index\.json\.sections\.ss_feature_1_pro_[^.]+\.blocks\.slide_[^.]+\.settings\.image$",
     re.IGNORECASE,
@@ -215,10 +220,29 @@ _THEME_FOOTER_GROUP_FILENAME = "sections/footer-group.json"
 _THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
 _THEME_INDEX_TEMPLATE_FILENAME = "templates/index.json"
 _THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
+_THEME_SHOPPABLE_VIDEO_SECTION_FILENAME = "sections/ss-shoppable-video.liquid"
+_THEME_FOOTER_TABS_SECTION_FILENAMES: frozenset[str] = frozenset(
+    {"sections/ss-footer-4.liquid", "sections/a-ss-footer-4.liquid"}
+)
 _THEME_MAIN_PAGE_BUTTON_LINK_KEYS: frozenset[str] = frozenset({"button_link", "button_url"})
 _THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE = re.compile(
     r'href="\{\{\s*product_url\s*\}\}"',
     re.IGNORECASE,
+)
+_THEME_SHOPPABLE_VIDEO_CART_JSON_LINE_RE = re.compile(
+    (
+        r"^(?P<indent>\s*)"
+        r"const\s+cart\{\{\s*forloop\.index\s*\}\}\s*="
+        r"\s*await\s+res\{\{\s*forloop\.index\s*\}\}\.json\(\);\s*$"
+    )
+)
+_THEME_SHOPPABLE_VIDEO_CART_UPDATE_PUBLISH_RE = re.compile(
+    (
+        r"theme\.pubsub\.publish\(\s*"
+        r"theme\.pubsub\.PUB_SUB_EVENTS\.cartUpdate\s*,\s*"
+        r"\{\s*cart:\s*cart\{\{\s*forloop\.index\s*\}\}\s*\}\s*"
+        r"\)\s*;"
+    )
 )
 _THEME_TRACK_ORDER_TITLE_RE = re.compile(
     r"^\s*track\s+(?:your|my)\s+order\s*$",
@@ -227,6 +251,30 @@ _THEME_TRACK_ORDER_TITLE_RE = re.compile(
 _THEME_TRACK_ORDER_LINK_HREF_RE = re.compile(
     r'href\s*=\s*["\']/pages/(?:track-order|track-your-order)["\']',
     re.IGNORECASE,
+)
+_THEME_FOOTER_CONTACT_PAGE_PATH = "/pages/contact"
+_THEME_FOOTER_CONTACT_SUPPORT_LINK_HTML = (
+    f'<a href="{_THEME_FOOTER_CONTACT_PAGE_PATH}"><strong><u>Contact our support team</u></strong></a>'
+)
+_THEME_FOOTER_CONTACT_US_LINK_HTML = (
+    f'<a href="{_THEME_FOOTER_CONTACT_PAGE_PATH}"><strong><u>Contact us</u></strong></a>'
+)
+_THEME_FOOTER_REFUND_CONTACT_TEXT_RE = re.compile(
+    r"Contact\s+our\s+support\s+team",
+    re.IGNORECASE,
+)
+_THEME_FOOTER_QUESTIONS_HELP_SENTENCE_RE = re.compile(
+    r"Our\s+team\s+is\s+here\s+to\s+help\.?",
+    re.IGNORECASE,
+)
+_THEME_FOOTER_TAB_LINK_STYLE_SNIPPET = (
+    "  .footer-tab-text-{{ section.id }} a,\n"
+    "  .footer-tab-height-cal-{{ section.id }} a {\n"
+    "    text-decoration: underline !important;\n"
+    "    text-underline-offset: 2px;\n"
+    "    font-weight: 700;\n"
+    "    cursor: pointer;\n"
+    "  }\n\n"
 )
 _THEME_EXPORT_REQUIRED_TEMPLATE_FILES: tuple[str, ...] = (
     "templates/collection.json",
@@ -796,6 +844,41 @@ def _normalize_theme_export_track_order_links(
             if not isinstance(settings, dict):
                 continue
             title = settings.get("title")
+            text = settings.get("text")
+            if isinstance(text, str) and text.strip():
+                if (
+                    "Need a refund?" in text
+                    and "Contact our support team" in text
+                    and _THEME_FOOTER_CONTACT_PAGE_PATH not in text
+                ):
+                    updated_text = _THEME_FOOTER_REFUND_CONTACT_TEXT_RE.sub(
+                        _THEME_FOOTER_CONTACT_SUPPORT_LINK_HTML,
+                        text,
+                        count=1,
+                    )
+                    if updated_text != text:
+                        settings["text"] = updated_text
+                        changed = True
+
+                text_after_refund_update = settings.get("text")
+                if (
+                    isinstance(text_after_refund_update, str)
+                    and "Our team is here to help" in text_after_refund_update
+                    and "Contact us" not in text_after_refund_update
+                    and _THEME_FOOTER_CONTACT_PAGE_PATH not in text_after_refund_update
+                ):
+                    updated_text = _THEME_FOOTER_QUESTIONS_HELP_SENTENCE_RE.sub(
+                        (
+                            "Our team is here to help. "
+                            f"{_THEME_FOOTER_CONTACT_US_LINK_HTML}."
+                        ),
+                        text_after_refund_update,
+                        count=1,
+                    )
+                    if updated_text != text_after_refund_update:
+                        settings["text"] = updated_text
+                        changed = True
+
             if not isinstance(title, str) or not _THEME_TRACK_ORDER_TITLE_RE.match(
                 title.strip()
             ):
@@ -808,6 +891,75 @@ def _normalize_theme_export_track_order_links(
     if not changed:
         return normalized
     return json.dumps(template_data, separators=(",", ":"))
+
+
+def _normalize_theme_export_shoppable_video_cart_counter_updates(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    if filename != _THEME_SHOPPABLE_VIDEO_SECTION_FILENAME:
+        return content
+
+    lines = content.splitlines(keepends=True)
+    if not lines:
+        return content
+
+    changed = False
+    normalized_lines: list[str] = []
+    line_count = len(lines)
+    for index, line in enumerate(lines):
+        normalized_lines.append(line)
+        cart_line_match = _THEME_SHOPPABLE_VIDEO_CART_JSON_LINE_RE.match(
+            line.rstrip("\r\n")
+        )
+        if cart_line_match is None:
+            continue
+
+        next_line = lines[index + 1].strip() if index + 1 < line_count else ""
+        if _THEME_SHOPPABLE_VIDEO_CART_UPDATE_PUBLISH_RE.search(next_line):
+            continue
+
+        indent = cart_line_match.group("indent")
+        if line.endswith("\r\n"):
+            line_ending = "\r\n"
+        elif line.endswith("\n"):
+            line_ending = "\n"
+        elif line.endswith("\r"):
+            line_ending = "\r"
+        else:
+            line_ending = ""
+        normalized_lines.append(
+            indent
+            + "theme.pubsub.publish(theme.pubsub.PUB_SUB_EVENTS.cartUpdate, { cart: cart{{ forloop.index }} });"
+            + line_ending
+        )
+        changed = True
+
+    if not changed:
+        return content
+    return "".join(normalized_lines)
+
+
+def _normalize_theme_export_footer_tab_link_styling(
+    *,
+    filename: str,
+    content: str,
+) -> str:
+    if filename not in _THEME_FOOTER_TABS_SECTION_FILENAMES:
+        return content
+    if ".footer-tab-text-{{ section.id }} a," in content:
+        return content
+
+    media_query_marker = "  @media(min-width: 1024px) {"
+    if media_query_marker in content:
+        return content.replace(
+            media_query_marker,
+            f"{_THEME_FOOTER_TAB_LINK_STYLE_SNIPPET}{media_query_marker}",
+            1,
+        )
+
+    return f"{content.rstrip()}\n\n{_THEME_FOOTER_TAB_LINK_STYLE_SNIPPET}"
 
 
 def _normalize_local_theme_shop_domain(*, shop_domain: str | None) -> str:
@@ -1963,6 +2115,14 @@ def _normalize_theme_export_text_file_content(
         filename=filename,
         content=normalized,
     )
+    normalized = _normalize_theme_export_shoppable_video_cart_counter_updates(
+        filename=filename,
+        content=normalized,
+    )
+    normalized = _normalize_theme_export_footer_tab_link_styling(
+        filename=filename,
+        content=normalized,
+    )
     return normalized
 
 
@@ -2518,6 +2678,87 @@ def _require_public_asset_base_url() -> str:
             ),
         )
     return base_url.rstrip("/")
+
+
+def _is_localhost_http_url(*, value: str) -> bool:
+    cleaned_value = value.strip()
+    if not cleaned_value:
+        return False
+    try:
+        parsed = urlparse(cleaned_value)
+    except ValueError:
+        return False
+    if parsed.scheme not in {"http", "https"}:
+        return False
+    hostname = (parsed.hostname or "").strip().lower()
+    return hostname in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
+
+
+def _assert_non_localhost_http_url(*, value: str, field_label: str) -> None:
+    if _is_localhost_http_url(value=value):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"{field_label} must not use localhost/loopback URLs for Shopify export. "
+                f"Received {value!r}."
+            ),
+        )
+
+
+def _assert_draft_shop_matches_active_connection(
+    *,
+    status_payload: dict[str, Any],
+    draft_shop_domain: str,
+    action_label: str,
+) -> None:
+    normalized_draft_shop = normalize_shop_domain(draft_shop_domain)
+    resolved_shop_domain = status_payload.get("shopDomain")
+    if not isinstance(resolved_shop_domain, str) or not resolved_shop_domain.strip():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Shopify connection is ready for {action_label}, "
+                "but no active shopDomain was resolved."
+            ),
+        )
+    normalized_resolved_shop = normalize_shop_domain(resolved_shop_domain)
+    if normalized_resolved_shop != normalized_draft_shop:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f"Shopify template draft targets {normalized_draft_shop}, "
+                f"but active Shopify connection is {normalized_resolved_shop}. "
+                f"Rebuild the draft for the active store before {action_label}."
+            ),
+        )
+
+
+def _assert_component_image_urls_exclude_localhost(
+    *,
+    component_image_urls: dict[str, str],
+) -> None:
+    offenders: list[str] = []
+    for setting_path, image_url in component_image_urls.items():
+        if not isinstance(setting_path, str) or not setting_path.strip():
+            continue
+        if not isinstance(image_url, str) or not image_url.strip():
+            continue
+        for candidate_url in _HTTP_URL_CANDIDATE_RE.findall(image_url):
+            if not _is_localhost_http_url(value=candidate_url):
+                continue
+            offenders.append(f"{setting_path.strip()}: {candidate_url}")
+            break
+        if len(offenders) >= 5:
+            break
+    if offenders:
+        joined_offenders = "; ".join(offenders)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Template ZIP export cannot include localhost/loopback component image URLs. "
+                f"Offending references: {joined_offenders}."
+            ),
+        )
 
 
 def _get_client_user_pref(
@@ -6268,6 +6509,11 @@ def _publish_shopify_theme_template_draft(
                 f"{status_payload['message']}"
             ),
         )
+    _assert_draft_shop_matches_active_connection(
+        status_payload=status_payload,
+        draft_shop_domain=draft_data.shopDomain,
+        action_label="template publish",
+    )
     _require_internal_install_for_advanced_shopify(
         status_payload=status_payload,
         action_label="template publish",
@@ -6297,6 +6543,10 @@ def _publish_shopify_theme_template_draft(
         org_id=auth.org_id,
         client_id=client_id,
         design_system_id=draft_data.designSystemId,
+    )
+    _assert_non_localhost_http_url(
+        value=latest_logo_url,
+        field_label="Template publish logoUrl",
     )
 
     _emit_theme_sync_progress(
@@ -6633,6 +6883,24 @@ def _build_shopify_theme_template_export_zip_response(
     serialized_version = _serialize_shopify_theme_template_draft_version(version=version)
     draft_data = serialized_version.data
 
+    status_payload = get_client_shopify_connection_status(
+        client_id=client_id,
+        selected_shop_domain=draft_data.shopDomain,
+    )
+    if status_payload["state"] != "ready":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Shopify connection is not ready for template export: "
+                f"{status_payload['message']}"
+            ),
+        )
+    _assert_draft_shop_matches_active_connection(
+        status_payload=status_payload,
+        draft_shop_domain=draft_data.shopDomain,
+        action_label="template export",
+    )
+
     policy_sync_payload = _sync_compliance_policy_pages_for_template_export(
         client_id=client_id,
         shop_domain=draft_data.shopDomain,
@@ -6655,6 +6923,9 @@ def _build_shopify_theme_template_export_zip_response(
         for setting_path in component_image_asset_map
         if setting_path in stored_component_image_urls
     }
+    _assert_component_image_urls_exclude_localhost(
+        component_image_urls=component_image_urls,
+    )
     missing_component_image_url_paths = sorted(
         set(component_image_asset_map.keys()) - set(component_image_urls.keys())
     )
@@ -6688,6 +6959,10 @@ def _build_shopify_theme_template_export_zip_response(
         org_id=auth.org_id,
         client_id=client_id,
         design_system_id=draft_data.designSystemId,
+    )
+    _assert_non_localhost_http_url(
+        value=latest_logo_url,
+        field_label="Template export logoUrl",
     )
     resolved_theme_id, resolved_theme_name, default_theme_role = (
         _resolve_local_theme_selector(

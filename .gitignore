@@ -75,3 +75,4 @@ mos/backend/app/*.zip
 mos/backend/app/**/Archive.zip
 exports/
 testimonial-renderer/samples/output
+*.pid

@@ -47,6 +47,24 @@ def _set_theme_export_sales_page_path(
     return path
 
 
+def _mock_ready_shopify_status(monkeypatch, *, shop_domain: str = "example.myshopify.com") -> None:
+    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
+        _ = client_id
+        resolved_shop_domain = selected_shop_domain or shop_domain
+        return {
+            "state": "ready",
+            "message": "Shopify connection is ready.",
+            "shopDomain": resolved_shop_domain,
+            "shopDomains": [resolved_shop_domain],
+            "selectedShopDomain": selected_shop_domain,
+            "hasStorefrontAccessToken": True,
+            "missingScopes": [],
+            "installationState": "installed",
+        }
+
+    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
+
+
 def _seed_sales_page_for_product(
     db_session,
     *,
@@ -228,6 +246,35 @@ def test_normalize_theme_export_text_file_content_updates_header_track_order_lin
     assert "/pages/track-order" not in normalized_content
 
 
+def test_assert_draft_shop_matches_active_connection_raises_for_shop_mismatch():
+    try:
+        clients_router._assert_draft_shop_matches_active_connection(
+            status_payload={"shopDomain": "active.myshopify.com"},
+            draft_shop_domain="stale.myshopify.com",
+            action_label="template export",
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert "targets stale.myshopify.com" in str(exc.detail)
+        assert "active.myshopify.com" in str(exc.detail)
+    else:
+        raise AssertionError("Expected draft/active shop mismatch to raise HTTPException")
+
+
+def test_assert_component_image_urls_exclude_localhost_raises():
+    try:
+        clients_router._assert_component_image_urls_exclude_localhost(
+            component_image_urls={
+                "templates/index.json.sections.hero.settings.image": "http://localhost:8008/public/assets/example"
+            }
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert "localhost/loopback" in str(exc.detail)
+    else:
+        raise AssertionError("Expected localhost URL guard to raise HTTPException")
+
+
 def test_normalize_theme_export_text_file_content_removes_footer_track_order_tab():
     normalized_content = clients_router._normalize_theme_export_text_file_content(
         filename="sections/footer-group.json",
@@ -254,6 +301,116 @@ def test_normalize_theme_export_text_file_content_removes_footer_track_order_tab
     parsed_content = json.loads(normalized_content)
     footer_blocks = parsed_content["sections"]["ss_footer_4_9rJacA"]["blocks"]
     assert "tab_track" not in footer_blocks
+
+
+def test_normalize_theme_export_text_file_content_updates_footer_contact_support_links():
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="sections/footer-group.json",
+        content=json.dumps(
+            {
+                "sections": {
+                    "ss_footer_4_9rJacA": {
+                        "type": "a-ss-footer-4",
+                        "blocks": {
+                            "tab_refund": {
+                                "type": "tab",
+                                "settings": {
+                                    "title": "Refund Request",
+                                    "text": (
+                                        "<p>Need a refund? Contact our support team and we'll process your "
+                                        "request promptly.</p>"
+                                    ),
+                                },
+                            },
+                            "tab_questions": {
+                                "type": "tab",
+                                "settings": {
+                                    "title": "Questions?",
+                                    "text": (
+                                        "<p>Questions about natural remedies or your handbook? "
+                                        "Our team is here to help.</p>"
+                                    ),
+                                },
+                            },
+                        },
+                    }
+                }
+            }
+        ),
+        sales_page_path="/f/11111111/sales-funnel/sales",
+    )
+    parsed_content = json.loads(normalized_content)
+    footer_blocks = parsed_content["sections"]["ss_footer_4_9rJacA"]["blocks"]
+    refund_text = footer_blocks["tab_refund"]["settings"]["text"]
+    questions_text = footer_blocks["tab_questions"]["settings"]["text"]
+
+    assert (
+        '<a href="/pages/contact"><strong><u>Contact our support team</u></strong></a>'
+        in refund_text
+    )
+    assert (
+        'Our team is here to help. <a href="/pages/contact"><strong><u>Contact us</u></strong></a>.'
+        in questions_text
+    )
+
+
+def test_normalize_theme_export_text_file_content_adds_footer_tab_link_styling():
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="sections/ss-footer-4.liquid",
+        content=(
+            ".footer-tab-text-{{ section.id }} * {\n"
+            "  text-decoration: none;\n"
+            "}\n\n"
+            "  @media(min-width: 1024px) {\n"
+            "    .section-{{ section.id }} {\n"
+            "      padding-top: {{ padding_top }}px;\n"
+            "    }\n"
+            "  }\n"
+        ),
+        sales_page_path="/f/11111111/sales-funnel/sales",
+    )
+
+    assert ".footer-tab-text-{{ section.id }} a," in normalized_content
+    assert ".footer-tab-height-cal-{{ section.id }} a {" in normalized_content
+    assert "text-decoration: underline !important;" in normalized_content
+
+
+def test_normalize_theme_export_text_file_content_publishes_shoppable_video_cart_updates():
+    sales_page_path = "/f/11111111/sales-funnel/sales"
+    content = (
+        'const res{{ forloop.index }} = await fetch("/cart.json");\n'
+        "const cart{{ forloop.index }} = await res{{ forloop.index }}.json();\n"
+        "const headerCartCount{{ forloop.index }} = document.querySelector('.cart-count-bubble span');\n"
+        'const res{{ forloop.index }} = await fetch("/cart.json");\n'
+        "const cart{{ forloop.index }} = await res{{ forloop.index }}.json();\n"
+        "const headerCartCount{{ forloop.index }} = document.querySelector('.cart-count-bubble span');\n"
+    )
+
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="sections/ss-shoppable-video.liquid",
+        content=content,
+        sales_page_path=sales_page_path,
+    )
+
+    publish_line = (
+        "theme.pubsub.publish(theme.pubsub.PUB_SUB_EVENTS.cartUpdate, "
+        "{ cart: cart{{ forloop.index }} });\n"
+    )
+    expected_segment = (
+        "const cart{{ forloop.index }} = await res{{ forloop.index }}.json();\n"
+        + publish_line
+    )
+    assert normalized_content.count(expected_segment) == 2
+
+    # Re-running normalization should not duplicate cartUpdate publishes.
+    assert (
+        clients_router._normalize_theme_export_text_file_content(
+            filename="sections/ss-shoppable-video.liquid",
+            content=normalized_content,
+            sales_page_path=sales_page_path,
+        )
+        == normalized_content
+    )
 
 
 def test_resolve_theme_export_sales_page_path_uses_first_workspace_product(db_session, api_client):
@@ -2006,6 +2163,7 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _mock_ready_shopify_status(monkeypatch)
     sales_page_path = _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -2307,6 +2465,7 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _mock_ready_shopify_status(monkeypatch)
     _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -2480,6 +2639,7 @@ def test_export_shopify_theme_template_zip_requires_stored_component_image_urls(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _mock_ready_shopify_status(monkeypatch)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -2691,6 +2851,7 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _mock_ready_shopify_status(monkeypatch)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -2820,6 +2981,7 @@ def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_pa
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _mock_ready_shopify_status(monkeypatch)
 
     db_session.add(
         Product(
@@ -2953,6 +3115,7 @@ def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
+    _mock_ready_shopify_status(monkeypatch)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(

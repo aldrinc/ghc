@@ -129,6 +129,46 @@ def test_status_multiple_installations_uses_selected_shop(monkeypatch):
     assert status["selectedShopDomain"] == "two.myshopify.com"
 
 
+def test_status_selected_shop_must_match_active_installation(monkeypatch):
+    monkeypatch.setattr(
+        shopify_connection,
+        "list_shopify_installations",
+        lambda: [
+            ShopifyInstallation(
+                shop_domain="active.myshopify.com",
+                client_id="client_1",
+                has_storefront_access_token=True,
+                scopes=sorted(
+                    {
+                        "read_orders",
+                        "write_orders",
+                        "unauthenticated_read_product_listings",
+                        "read_products",
+                        "write_products",
+                        "read_discounts",
+                        "write_discounts",
+                    }
+                ),
+                uninstalled_at=None,
+            )
+        ],
+    )
+
+    status = shopify_connection.get_client_shopify_connection_status(
+        client_id="client_1",
+        selected_shop_domain="stale.myshopify.com",
+    )
+
+    assert status["state"] == "multiple_installations_conflict"
+    assert (
+        status["message"]
+        == "Selected default Shopify store (stale.myshopify.com) is not active for this workspace. "
+        "Choose one store explicitly."
+    )
+    assert status["shopDomain"] is None
+    assert status["selectedShopDomain"] == "stale.myshopify.com"
+
+
 def test_status_missing_scopes_returns_error(monkeypatch):
     monkeypatch.setattr(
         shopify_connection,
