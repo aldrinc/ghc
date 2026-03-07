@@ -186,6 +186,15 @@ def test_enforce_strict_openai_json_schema_preserves_explicit_object_constraints
     assert normalized["required"] == ["dimensions"]
 
 
+def test_template_payload_validation_errors_remain_retryable() -> None:
+    assert (
+        strategy_v2_activities._is_non_retryable_sales_payload_failure(
+            "TEMPLATE_PAYLOAD_VALIDATION: template_id=sales-pdp; errors=problem.title: String should have at least 1 character"
+        )
+        is False
+    )
+
+
 def test_offer_step05_response_schema_enforces_bounded_compact_contract() -> None:
     schema = strategy_v2_activities._offer_step05_response_schema()
     revision_notes = schema["properties"]["revision_notes"]

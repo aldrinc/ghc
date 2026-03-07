@@ -2151,6 +2151,12 @@ class DraftPersistVersionTool(BaseTool[DraftPersistVersionArgs]):
         if args.userId != ctx.user_id:
             raise ValueError("userId mismatch")
 
+        funnel = ctx.session.scalars(
+            select(Funnel).where(Funnel.org_id == ctx.org_id, Funnel.id == args.funnelId)
+        ).first()
+        if not funnel:
+            raise ValueError("Funnel not found")
+
         # Ensure page exists and belongs to funnel.
         page = ctx.session.scalars(
             select(FunnelPage).where(FunnelPage.funnel_id == args.funnelId, FunnelPage.id == args.pageId)

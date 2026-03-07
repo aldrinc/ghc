@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional
 
@@ -63,6 +64,16 @@ _BOOK_CTA_DISALLOWED_PHRASES: tuple[str, ...] = (
     "download now",
     "instant digital access",
 )
+_BOOK_HELPER_SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+")
+_BOOK_HELPER_CLAUSE_SPLIT_RE = re.compile(r"\s*[,;]\s*")
+_BOOK_TEXT_WHITESPACE_RE = re.compile(r"\s+")
+_BOOK_CTA_LABELS: tuple[tuple[str, str], ...] = (
+    ("field guide", "Field Guide"),
+    ("handbook", "Handbook"),
+    ("guide", "Guide"),
+    ("manual", "Manual"),
+    ("book", "Book"),
+)
 
 
 def _collect_image_generation_errors(
@@ -106,6 +117,93 @@ def _find_disallowed_phrase(text: str | None, disallowed_phrases: tuple[str, ...
         if phrase in normalized:
             return phrase
     return None
+
+
+def _normalize_book_text_whitespace(text: str) -> str:
+    return _BOOK_TEXT_WHITESPACE_RE.sub(" ", text).strip()
+
+
+def _normalize_book_offer_helper_text(text: str) -> str:
+    cleaned = _normalize_book_text_whitespace(text)
+    if not cleaned:
+        return ""
+    if _find_disallowed_phrase(cleaned, _BOOK_HELPER_TEXT_DISALLOWED_PHRASES) is None:
+        return cleaned
+
+    sentences = [part.strip() for part in _BOOK_HELPER_SENTENCE_SPLIT_RE.split(cleaned) if part.strip()]
+    if not sentences:
+        sentences = [cleaned]
+
+    normalized_sentences: list[str] = []
+    for sentence in sentences:
+        ending = sentence[-1] if sentence[-1] in ".!?" else ""
+        sentence_core = sentence[:-1] if ending else sentence
+        clauses = [
+            clause.strip(" ,;")
+            for clause in _BOOK_HELPER_CLAUSE_SPLIT_RE.split(sentence_core)
+            if clause.strip(" ,;")
+        ]
+        filtered_clauses = [
+            clause
+            for clause in clauses
+            if _find_disallowed_phrase(clause, _BOOK_HELPER_TEXT_DISALLOWED_PHRASES) is None
+        ]
+        if not filtered_clauses:
+            continue
+        rebuilt = _normalize_book_text_whitespace(", ".join(filtered_clauses))
+        if rebuilt and rebuilt[0].islower():
+            rebuilt = rebuilt[0].upper() + rebuilt[1:]
+        if ending and rebuilt[-1] not in ".!?":
+            rebuilt = f"{rebuilt}{ending}"
+        normalized_sentences.append(rebuilt)
+
+    normalized = " ".join(normalized_sentences).strip()
+    if normalized:
+        return normalized
+    raise ValueError(
+        "Sales template payload uses only digital-only delivery language for a book product. "
+        "field=whats_inside.offer_helper_text. Remediation: describe the physical book offer."
+    )
+
+
+def _normalize_book_cta_label(text: str) -> str:
+    cleaned = _normalize_book_text_whitespace(text)
+    if not cleaned:
+        return ""
+    if _find_disallowed_phrase(cleaned, _BOOK_CTA_DISALLOWED_PHRASES) is None:
+        return cleaned
+    noun_label = "Book"
+    lowered = cleaned.lower()
+    for needle, label in _BOOK_CTA_LABELS:
+        if needle in lowered:
+            noun_label = label
+            break
+    price_suffix = " - {price}" if "{price}" in cleaned else ""
+    return f"Get the {noun_label}{price_suffix}"
+
+
+def _normalize_sales_payload_for_product_type(
+    *,
+    template_id: str,
+    payload_fields: dict[str, Any],
+    product_type: str | None,
+) -> dict[str, Any]:
+    if template_id != "sales-pdp" or not is_book_product_type(product_type):
+        return payload_fields
+
+    hero = payload_fields.get("hero")
+    if isinstance(hero, dict):
+        cta_label = str(hero.get("primary_cta_label") or "").strip()
+        if cta_label:
+            hero["primary_cta_label"] = _normalize_book_cta_label(cta_label)
+
+    whats_inside = payload_fields.get("whats_inside")
+    if isinstance(whats_inside, dict):
+        helper_text = str(whats_inside.get("offer_helper_text") or "").strip()
+        if helper_text:
+            whats_inside["offer_helper_text"] = _normalize_book_offer_helper_text(helper_text)
+
+    return payload_fields
 
 
 def _assert_strategy_v2_offer_product_type_matches_product(
@@ -818,6 +916,15 @@ def create_funnel_drafts_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                 validated_fields = validate_strategy_v2_template_payload_fields(
                     template_id=template_id,
                     payload_fields=upgraded_fields,
+                )
+                validated_fields = _normalize_sales_payload_for_product_type(
+                    template_id=template_id,
+                    payload_fields=validated_fields,
+                    product_type=product_type,
+                )
+                validated_fields = validate_strategy_v2_template_payload_fields(
+                    template_id=template_id,
+                    payload_fields=validated_fields,
                 )
                 _assert_sales_payload_matches_product_type(
                     template_id=template_id,

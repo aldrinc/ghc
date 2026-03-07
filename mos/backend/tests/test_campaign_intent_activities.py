@@ -227,6 +227,51 @@ def test_assert_sales_payload_matches_product_type_rejects_digital_cta_for_book(
         )
 
 
+def test_normalize_sales_payload_for_product_type_rewrites_book_helper_text():
+    payload = {
+        "hero": {"primary_cta_label": "Buy the handbook"},
+        "whats_inside": {
+            "offer_helper_text": "Everything ships in one handbook. No apps to download, no subscriptions to manage."
+        },
+    }
+
+    normalized = cia._normalize_sales_payload_for_product_type(
+        template_id="sales-pdp",
+        product_type="book",
+        payload_fields=payload,
+    )
+
+    assert (
+        normalized["whats_inside"]["offer_helper_text"]
+        == "Everything ships in one handbook. No subscriptions to manage."
+    )
+    cia._assert_sales_payload_matches_product_type(
+        template_id="sales-pdp",
+        product_type="book",
+        payload_fields=normalized,
+    )
+
+
+def test_normalize_sales_payload_for_product_type_rewrites_book_cta():
+    payload = {
+        "hero": {"primary_cta_label": "Get Instant Access - {price}"},
+        "whats_inside": {"offer_helper_text": "Printed handbook with quick-reference pages."},
+    }
+
+    normalized = cia._normalize_sales_payload_for_product_type(
+        template_id="sales-pdp",
+        product_type="book",
+        payload_fields=payload,
+    )
+
+    assert normalized["hero"]["primary_cta_label"] == "Get the Book - {price}"
+    cia._assert_sales_payload_matches_product_type(
+        template_id="sales-pdp",
+        product_type="book",
+        payload_fields=normalized,
+    )
+
+
 def test_assert_strategy_v2_offer_product_type_matches_product_rejects_mismatch():
     with pytest.raises(ValueError, match="product_type does not match"):
         cia._assert_strategy_v2_offer_product_type_matches_product(
