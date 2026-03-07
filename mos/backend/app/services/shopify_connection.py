@@ -444,19 +444,25 @@ def get_client_shopify_connection_status(
                 None,
             )
 
-        if len(active_for_client) > 1 and selected_installation is None:
-            detail = (
-                "Multiple active Shopify stores are linked to this workspace. "
-                "Choose one store explicitly."
-            )
-            if normalized_selected_shop is not None:
-                detail = (
-                    f"Selected default Shopify store ({normalized_selected_shop}) is not active "
-                    "for this workspace. Choose one store explicitly."
-                )
+        if normalized_selected_shop is not None and selected_installation is None:
             return {
                 "state": "conflict",
-                "message": detail,
+                "message": (
+                    f"Selected default Shopify store ({normalized_selected_shop}) is not active "
+                    "for this workspace. Choose one store explicitly."
+                ),
+                "installation": None,
+                "shopDomains": active_shop_domains,
+                "missingScopes": [],
+            }
+
+        if len(active_for_client) > 1 and selected_installation is None:
+            return {
+                "state": "conflict",
+                "message": (
+                    "Multiple active Shopify stores are linked to this workspace. "
+                    "Choose one store explicitly."
+                ),
                 "installation": None,
                 "shopDomains": active_shop_domains,
                 "missingScopes": [],
