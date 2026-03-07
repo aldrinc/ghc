@@ -54,8 +54,8 @@ class Settings(BaseSettings):
     STRATEGY_V2_DEFAULT_ENABLED: bool = False
     STRATEGY_V2_VOC_MODEL: str = "gpt-5.2-2025-12-11"
     STRATEGY_V2_OFFER_MODEL: str = "gpt-5.2-2025-12-11"
-    STRATEGY_V2_COPY_MODEL: str = "gpt-5.2-2025-12-11"
-    STRATEGY_V2_COPY_QA_MODEL: str = "claude-sonnet-4-20250514"
+    STRATEGY_V2_COPY_MODEL: str = "claude-sonnet-4-6"
+    STRATEGY_V2_COPY_QA_MODEL: str = "claude-sonnet-4-6"
     STRATEGY_V2_APIFY_ENABLED: bool = False
     STRATEGY_V2_APIFY_MAX_WAIT_SECONDS: int = 900
     STRATEGY_V2_APIFY_MAX_ITEMS_PER_DATASET: int = 500

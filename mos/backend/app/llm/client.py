@@ -29,8 +29,8 @@ from app.observability import (
 _backend_root = Path(__file__).resolve().parents[2]
 _repo_root = _backend_root.parent.parent
 load_dotenv(_repo_root / ".env", override=False)
-# Backend-local env should win for backend processes (matches app.config behavior).
-load_dotenv(_backend_root / ".env", override=True)
+# Keep process-level env authoritative so explicit runtime overrides are not silently replaced.
+load_dotenv(_backend_root / ".env", override=False)
 
 
 class LLMClientConfigError(Exception):
@@ -76,7 +76,7 @@ class OpenAIResponseFailedError(RuntimeError):
 
 
 logger = logging.getLogger(__name__)
-_DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL") or "gpt-5.2-2025-12-11"
+_DEFAULT_MODEL = os.getenv("LLM_DEFAULT_MODEL") or os.getenv("CLAUDE_DEFAULT_MODEL") or "claude-sonnet-4-6"
 _DEFAULT_TIMEOUT = int(os.getenv("LLM_REQUEST_TIMEOUT", "120"))
 _MAX_RETRIES = int(os.getenv("LLM_REQUEST_RETRIES", "2"))
 _O3_MAX_OUTPUT_TOKENS = int(os.getenv("O3_DEEP_RESEARCH_MAX_OUTPUT_TOKENS", "64000"))
@@ -85,6 +85,17 @@ _POLL_INTERVAL_SECONDS = int(os.getenv("LLM_POLL_INTERVAL_SECONDS", "15"))
 _POLL_TIMEOUT_SECONDS = int(os.getenv("LLM_POLL_TIMEOUT_SECONDS", "3600"))
 _ANTHROPIC_DEFAULT_BASE_URL = "https://api.anthropic.com"
 _OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
+_BASETEN_DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
+
+
+@dataclass(frozen=True)
+class _ResolvedModelTarget:
+    provider: str
+    model_name: str
+    client_family: str
+    base_url: str | None = None
+    api_key_env: str | None = None
+    supports_responses_api: bool = False
 
 
 @dataclass
@@ -113,6 +124,7 @@ class LLMClient:
         self._gemini_configured = False
         self._anthropic_client: Optional[Anthropic] = None
         self._openai_client: Optional[Any] = None
+        self._openai_compatible_clients: dict[str, Any] = {}
         self._openai_client_class = get_openai_client_class()
 
     def _ensure_openai_client(self) -> None:
@@ -131,6 +143,36 @@ class LLMClient:
             "base_url": self._openai_base_url(),
         }
         self._openai_client = self._openai_client_class(**client_kwargs)
+
+    def _ensure_openai_compatible_client(self, *, target: _ResolvedModelTarget) -> Any:
+        if target.client_family != "openai_compatible":
+            raise LLMClientConfigError(
+                f"Model provider '{target.provider}' is not OpenAI-compatible."
+            )
+
+        if target.provider == "openai" and self._openai_client is not None:
+            return self._openai_client
+
+        cached = self._openai_compatible_clients.get(target.provider)
+        if cached is not None:
+            return cached
+
+        api_key_env = target.api_key_env or "OPENAI_API_KEY"
+        api_key = os.getenv(api_key_env)
+        if not api_key:
+            raise LLMClientConfigError(f"{api_key_env} not configured")
+
+        client_kwargs = {
+            "api_key": api_key,
+            "timeout": float(_DEFAULT_TIMEOUT),
+            "max_retries": _MAX_RETRIES,
+            "base_url": target.base_url or self._openai_base_url(),
+        }
+        client = self._openai_client_class(**client_kwargs)
+        if target.provider == "openai":
+            self._openai_client = client
+        self._openai_compatible_clients[target.provider] = client
+        return client
 
     def upload_openai_file_bytes(
         self,
@@ -179,19 +221,39 @@ class LLMClient:
             raise RuntimeError(f"OpenAI file delete returned deleted=false for file_id={normalized_file_id}.")
 
     @staticmethod
-    def _openai_base_url() -> str:
-        configured_base_url = os.getenv("OPENAI_BASE_URL")
+    def _validated_http_base_url(
+        *,
+        env_var_name: str,
+        configured_base_url: str | None,
+        default_base_url: str,
+    ) -> str:
         normalized_base_url = configured_base_url.strip() if isinstance(configured_base_url, str) else ""
         if not normalized_base_url:
-            return _OPENAI_DEFAULT_BASE_URL
+            return default_base_url
 
         parsed = urlparse(normalized_base_url)
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise LLMClientConfigError(
-                "OPENAI_BASE_URL must be a fully qualified http(s) URL, e.g. "
-                "'https://api.openai.com/v1'."
+                f"{env_var_name} must be a fully qualified http(s) URL, e.g. "
+                f"'{default_base_url}'."
             )
         return normalized_base_url
+
+    @staticmethod
+    def _openai_base_url() -> str:
+        return LLMClient._validated_http_base_url(
+            env_var_name="OPENAI_BASE_URL",
+            configured_base_url=os.getenv("OPENAI_BASE_URL"),
+            default_base_url=_OPENAI_DEFAULT_BASE_URL,
+        )
+
+    @staticmethod
+    def _baseten_base_url() -> str:
+        return LLMClient._validated_http_base_url(
+            env_var_name="BASETEN_BASE_URL",
+            configured_base_url=os.getenv("BASETEN_BASE_URL"),
+            default_base_url=_BASETEN_DEFAULT_BASE_URL,
+        )
 
     @staticmethod
     def _anthropic_base_url() -> str:
@@ -200,6 +262,81 @@ class LLMClient:
             configured_base_url = os.getenv("ANTHROPIC_BASE_URL")
         normalized_base_url = configured_base_url.strip() if isinstance(configured_base_url, str) else ""
         return normalized_base_url or _ANTHROPIC_DEFAULT_BASE_URL
+
+    def _resolve_model_target(self, model: str) -> _ResolvedModelTarget:
+        normalized_model = (model or "").strip()
+        if not normalized_model:
+            raise LLMClientConfigError("Model must be a non-empty string.")
+
+        explicit_provider: str | None = None
+        provider_model = normalized_model
+        if ":" in normalized_model:
+            provider_prefix, _, explicit_model = normalized_model.partition(":")
+            if provider_prefix in {"openai", "anthropic", "gemini", "baseten"}:
+                explicit_provider = provider_prefix
+                provider_model = explicit_model.strip()
+                if not provider_model:
+                    raise LLMClientConfigError(
+                        f"Explicit provider model '{normalized_model}' is missing the model name after '{provider_prefix}:'."
+                    )
+
+        if explicit_provider == "openai":
+            return _ResolvedModelTarget(
+                provider="openai",
+                model_name=provider_model,
+                client_family="openai_compatible",
+                base_url=self._openai_base_url(),
+                api_key_env="OPENAI_API_KEY",
+                supports_responses_api=True,
+            )
+        if explicit_provider == "baseten":
+            return _ResolvedModelTarget(
+                provider="baseten",
+                model_name=provider_model,
+                client_family="openai_compatible",
+                base_url=self._baseten_base_url(),
+                api_key_env="BASETEN_API_KEY",
+                supports_responses_api=False,
+            )
+        if explicit_provider == "anthropic":
+            return _ResolvedModelTarget(
+                provider="anthropic",
+                model_name=provider_model,
+                client_family="anthropic",
+            )
+        if explicit_provider == "gemini":
+            return _ResolvedModelTarget(
+                provider="gemini",
+                model_name=provider_model,
+                client_family="gemini",
+            )
+
+        if self._is_openai_model(provider_model):
+            return _ResolvedModelTarget(
+                provider="openai",
+                model_name=provider_model,
+                client_family="openai_compatible",
+                base_url=self._openai_base_url(),
+                api_key_env="OPENAI_API_KEY",
+                supports_responses_api=True,
+            )
+        if provider_model.startswith("claude"):
+            return _ResolvedModelTarget(
+                provider="anthropic",
+                model_name=provider_model,
+                client_family="anthropic",
+            )
+        if provider_model.startswith("gemini") or provider_model.startswith("models/gemini"):
+            return _ResolvedModelTarget(
+                provider="gemini",
+                model_name=provider_model,
+                client_family="gemini",
+            )
+        raise LLMClientConfigError(
+            "Unable to resolve an LLM provider for model "
+            f"'{normalized_model}'. Use an explicit provider prefix such as "
+            "'openai:', 'anthropic:', 'gemini:', or 'baseten:'."
+        )
 
     def _ensure_anthropic_client(self) -> None:
         api_key = os.getenv("ANTHROPIC_API_KEY")
@@ -305,48 +442,48 @@ class LLMClient:
     def generate_text(self, prompt: str, params: Optional[LLMGenerationParams] = None) -> str:
         model = params.model if params and params.model else self.default_model
         model = model or _DEFAULT_MODEL
-        provider = "openai" if self._is_openai_model(model) else "anthropic" if model.startswith("claude") else "gemini"
+        target = self._resolve_model_target(model)
         metadata = self._langfuse_metadata(
             operation="generate_text",
             model=model,
             params=params,
-            provider=provider,
+            provider=target.provider,
         )
         with start_langfuse_span(
             name="llm.generate_text",
             input={"prompt_chars": len(prompt)},
             metadata=metadata,
-            tags=["llm", provider],
+            tags=["llm", target.provider],
             trace_name="llm.workflow",
         ):
-            if provider == "openai":
-                return self._generate_with_openai(prompt, model, params)
-            if provider == "anthropic":
-                return self._generate_with_anthropic(prompt, model, params)
-            return self._generate_with_gemini(prompt, model, params)
+            if target.client_family == "openai_compatible":
+                return self._generate_with_openai_compatible(prompt, target, params)
+            if target.client_family == "anthropic":
+                return self._generate_with_anthropic(prompt, target.model_name, params)
+            return self._generate_with_gemini(prompt, target.model_name, params)
 
     def stream_text(self, prompt: str, params: Optional[LLMGenerationParams] = None) -> Iterator[str]:
         model = params.model if params and params.model else self.default_model
         model = model or _DEFAULT_MODEL
-        provider = "openai" if self._is_openai_model(model) else "anthropic" if model.startswith("claude") else "gemini"
+        target = self._resolve_model_target(model)
         metadata = self._langfuse_metadata(
             operation="stream_text",
             model=model,
             params=params,
-            provider=provider,
+            provider=target.provider,
         )
         with start_langfuse_span(
             name="llm.stream_text",
             input={"prompt_chars": len(prompt)},
             metadata=metadata,
-            tags=["llm", provider, "stream"],
+            tags=["llm", target.provider, "stream"],
             trace_name="llm.workflow",
         ):
-            if provider == "openai":
-                yield from self._stream_with_openai(prompt, model, params)
+            if target.client_family == "openai_compatible":
+                yield from self._stream_with_openai_compatible(prompt, target, params)
                 return
-            if provider == "anthropic":
-                yield from self._stream_with_anthropic(prompt, model, params)
+            if target.client_family == "anthropic":
+                yield from self._stream_with_anthropic(prompt, target.model_name, params)
                 return
 
             # Other providers: fallback to a single non-streamed chunk for now.
@@ -667,11 +804,114 @@ class LLMClient:
             poll_timeout_seconds=poll_timeout_seconds,
         )
 
-    def _generate_with_openai(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> str:
-        self._ensure_openai_client()
+    @staticmethod
+    def _extract_chat_completion_text(completion: Any) -> str | None:
+        choices = getattr(completion, "choices", None)
+        if not isinstance(choices, list) or not choices:
+            return None
+        message = getattr(choices[0], "message", None)
+        if message is None and isinstance(choices[0], dict):
+            message = choices[0].get("message")
+        if message is None:
+            return None
+        content = getattr(message, "content", None)
+        if content is None and isinstance(message, dict):
+            content = message.get("content")
+        if isinstance(content, str) and content:
+            return content
+        if isinstance(content, list):
+            text_parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    item_text = item.get("text")
+                    if isinstance(item_text, str) and item_text:
+                        text_parts.append(item_text)
+                else:
+                    item_text = getattr(item, "text", None)
+                    if isinstance(item_text, str) and item_text:
+                        text_parts.append(item_text)
+            if text_parts:
+                return "".join(text_parts)
+        return None
+
+    @staticmethod
+    def _extract_chat_completion_delta_text(chunk: Any) -> str | None:
+        choices = getattr(chunk, "choices", None)
+        if not isinstance(choices, list) or not choices:
+            return None
+        delta = getattr(choices[0], "delta", None)
+        if delta is None and isinstance(choices[0], dict):
+            delta = choices[0].get("delta")
+        if delta is None:
+            return None
+        content = getattr(delta, "content", None)
+        if content is None and isinstance(delta, dict):
+            content = delta.get("content")
+        if isinstance(content, str) and content:
+            return content
+        if isinstance(content, list):
+            text_parts: list[str] = []
+            for item in content:
+                if isinstance(item, dict):
+                    item_text = item.get("text")
+                    if isinstance(item_text, str) and item_text:
+                        text_parts.append(item_text)
+                else:
+                    item_text = getattr(item, "text", None)
+                    if isinstance(item_text, str) and item_text:
+                        text_parts.append(item_text)
+            if text_parts:
+                return "".join(text_parts)
+        return None
+
+    @staticmethod
+    def _extract_chat_completion_request_id(completion: Any) -> str | None:
+        for attr_name in ("_request_id", "request_id"):
+            request_id = getattr(completion, attr_name, None)
+            if isinstance(request_id, str) and request_id.strip():
+                return request_id.strip()
+        if isinstance(completion, dict):
+            request_id = completion.get("request_id") or completion.get("_request_id")
+            if isinstance(request_id, str) and request_id.strip():
+                return request_id.strip()
+        return None
+
+    @staticmethod
+    def _extract_chat_completion_usage(completion: Any) -> dict[str, int] | None:
+        usage = getattr(completion, "usage", None)
+        if usage is None and isinstance(completion, dict):
+            usage = completion.get("usage")
+        if usage is None:
+            return None
+
+        input_tokens = getattr(usage, "prompt_tokens", None)
+        output_tokens = getattr(usage, "completion_tokens", None)
+        total_tokens = getattr(usage, "total_tokens", None)
+        if isinstance(usage, dict):
+            input_tokens = usage.get("prompt_tokens", input_tokens)
+            output_tokens = usage.get("completion_tokens", output_tokens)
+            total_tokens = usage.get("total_tokens", total_tokens)
+
+        payload: dict[str, int] = {}
+        if isinstance(input_tokens, int):
+            payload["input_tokens"] = input_tokens
+        if isinstance(output_tokens, int):
+            payload["output_tokens"] = output_tokens
+        if isinstance(total_tokens, int):
+            payload["total_tokens"] = total_tokens
+        return payload or None
+
+    def _generate_with_openai_compatible(
+        self,
+        prompt: str,
+        target: _ResolvedModelTarget,
+        params: Optional[LLMGenerationParams],
+    ) -> str:
+        client = self._ensure_openai_compatible_client(target=target)
+        model = target.model_name
 
         # Deep research needs background mode + polling for reliability and a higher token budget.
-        if model.lower().startswith("o3-deep-research"):
+        if target.supports_responses_api and model.lower().startswith("o3-deep-research"):
             return self._generate_openai_deep_research(prompt, model, params)
 
         max_tokens = params.max_tokens if params and params.max_tokens else None
@@ -683,7 +923,13 @@ class LLMClient:
         model_lower = model.lower()
         if use_web_search and "o3-mini" in model_lower:
             raise RuntimeError(f"Model {model} does not support web_search tools; choose a tool-capable model.")
-        should_use_responses = use_reasoning or use_web_search or model.lower().startswith("o")
+        if use_web_search and not target.supports_responses_api:
+            raise RuntimeError(
+                f"Provider {target.provider} does not support web_search tools for model {model}."
+            )
+        should_use_responses = target.supports_responses_api and (
+            use_reasoning or use_web_search or model.lower().startswith("o")
+        )
 
         # Use the Responses API for reasoning/web-search/o-models. Do NOT fall back; surface errors directly.
         if should_use_responses:
@@ -733,7 +979,7 @@ class LLMClient:
 
             max_attempts = max(1, _MAX_RETRIES)
             for attempt in range(1, max_attempts + 1):
-                response = self._openai_client.responses.create(**request_kwargs)
+                response = client.responses.create(**request_kwargs)
                 response_id = getattr(response, "id", None)
                 logger.warning(
                     "OpenAI responses request created "
@@ -798,28 +1044,91 @@ class LLMClient:
             completion_kwargs["max_tokens"] = max_tokens
         if response_format:
             completion_kwargs["response_format"] = response_format
+        if params and params.openai_tools:
+            completion_kwargs["tools"] = params.openai_tools
+        if params and params.openai_tool_choice is not None:
+            completion_kwargs["tool_choice"] = params.openai_tool_choice
+        if params and params.openai_context_management is not None:
+            raise RuntimeError(
+                "openai_context_management is only supported for providers that expose the OpenAI Responses API."
+            )
+        if target.provider == "baseten" and use_reasoning:
+            completion_kwargs["extra_body"] = {
+                "chat_template_args": {
+                    "enable_thinking": True,
+                }
+            }
+
+        if target.provider == "baseten":
+            completion_kwargs["stream"] = True
+            completion_kwargs["stream_options"] = {
+                "include_usage": True,
+                "continuous_usage_stats": True,
+            }
+            try:
+                stream = client.chat.completions.create(**completion_kwargs)
+            except Exception:
+                logger.exception("OpenAI chat completion stream failed", extra={"model": model})
+                raise
+
+            text_parts: list[str] = []
+            request_id: str | None = None
+            usage_payload: dict[str, int] | None = None
+            for chunk in stream:
+                if request_id is None:
+                    request_id = self._extract_chat_completion_request_id(chunk)
+                usage = self._extract_chat_completion_usage(chunk)
+                if usage:
+                    usage_payload = usage
+                delta_text = self._extract_chat_completion_delta_text(chunk)
+                if delta_text:
+                    text_parts.append(delta_text)
+
+            text = "".join(text_parts)
+            if params and params.progress_callback is not None:
+                progress_payload: dict[str, Any] = {"status": "completed"}
+                if request_id:
+                    progress_payload["request_id"] = request_id
+                if usage_payload:
+                    progress_payload.update(usage_payload)
+                params.progress_callback(progress_payload)
+            if text:
+                return text
+            raise RuntimeError(f"OpenAI chat completion stream returned no content for model {model}")
 
         try:
-            completion = self._openai_client.chat.completions.create(**completion_kwargs)
+            completion = client.chat.completions.create(**completion_kwargs)
         except Exception:
             logger.exception("OpenAI chat completion failed", extra={"model": model})
             raise
 
-        if completion and completion.choices:
-            message = completion.choices[0].message
-            text = getattr(message, "content", None)
-        else:
-            text = None
+        if params and params.progress_callback is not None:
+            progress_payload: dict[str, Any] = {"status": "completed"}
+            request_id = self._extract_chat_completion_request_id(completion)
+            if request_id:
+                progress_payload["request_id"] = request_id
+            usage = self._extract_chat_completion_usage(completion)
+            if usage:
+                progress_payload.update(usage)
+            params.progress_callback(progress_payload)
+
+        text = self._extract_chat_completion_text(completion)
 
         if text:
             return text
 
         raise RuntimeError(f"OpenAI chat completion returned no content for model {model}")
 
-    def _stream_with_openai(self, prompt: str, model: str, params: Optional[LLMGenerationParams]) -> Iterator[str]:
-        self._ensure_openai_client()
+    def _stream_with_openai_compatible(
+        self,
+        prompt: str,
+        target: _ResolvedModelTarget,
+        params: Optional[LLMGenerationParams],
+    ) -> Iterator[str]:
+        client = self._ensure_openai_compatible_client(target=target)
+        model = target.model_name
 
-        if model.lower().startswith("o3-deep-research"):
+        if target.supports_responses_api and model.lower().startswith("o3-deep-research"):
             # Deep research is long-running; keep the more reliable polling flow.
             yield self._generate_openai_deep_research(prompt, model, params)
             return
@@ -833,8 +1142,14 @@ class LLMClient:
         model_lower = model.lower()
         if use_web_search and "o3-mini" in model_lower:
             raise RuntimeError(f"Model {model} does not support web_search tools; choose a tool-capable model.")
+        if use_web_search and not target.supports_responses_api:
+            raise RuntimeError(
+                f"Provider {target.provider} does not support web_search tools for model {model}."
+            )
 
-        should_use_responses = use_reasoning or use_web_search or model_lower.startswith("o")
+        should_use_responses = target.supports_responses_api and (
+            use_reasoning or use_web_search or model_lower.startswith("o")
+        )
 
         if should_use_responses:
             include = ["web_search_call.action.sources"] if use_web_search else None
@@ -867,7 +1182,7 @@ class LLMClient:
                 }
 
             saw_delta = False
-            with self._openai_client.responses.stream(**request_kwargs) as stream:
+            with client.responses.stream(**request_kwargs) as stream:
                 for event in stream:
                     event_type = getattr(event, "type", None)
                     if event_type == "response.output_text.delta":
@@ -902,13 +1217,36 @@ class LLMClient:
             completion_kwargs["max_tokens"] = max_tokens
         if response_format:
             completion_kwargs["response_format"] = response_format
-
-        with self._openai_client.chat.completions.stream(**completion_kwargs) as stream:
-            for event in stream:
-                if getattr(event, "type", None) == "content.delta":
-                    delta = getattr(event, "delta", None)
-                    if delta:
-                        yield delta
+        if params and params.openai_tools:
+            completion_kwargs["tools"] = params.openai_tools
+        if params and params.openai_tool_choice is not None:
+            completion_kwargs["tool_choice"] = params.openai_tool_choice
+        if params and params.openai_context_management is not None:
+            raise RuntimeError(
+                "openai_context_management is only supported for providers that expose the OpenAI Responses API."
+            )
+        if target.provider == "baseten" and use_reasoning:
+            completion_kwargs["extra_body"] = {
+                "chat_template_args": {
+                    "enable_thinking": True,
+                }
+            }
+        completion_kwargs["stream"] = True
+        stream = client.chat.completions.create(**completion_kwargs)
+        for chunk in stream:
+            choices = getattr(chunk, "choices", None)
+            if not isinstance(choices, list) or not choices:
+                continue
+            delta = getattr(choices[0], "delta", None)
+            if delta is None and isinstance(choices[0], dict):
+                delta = choices[0].get("delta")
+            if delta is None:
+                continue
+            delta_content = getattr(delta, "content", None)
+            if delta_content is None and isinstance(delta, dict):
+                delta_content = delta.get("content")
+            if isinstance(delta_content, str) and delta_content:
+                yield delta_content
 
     def _generate_openai_deep_research(
         self, prompt: str, model: str, params: Optional[LLMGenerationParams]

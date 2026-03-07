@@ -1,5 +1,8 @@
+import importlib
+
 import pytest
 
+import app.llm.client as llm_client_module
 from app.llm.client import LLMClient, LLMGenerationParams
 
 
@@ -51,3 +54,14 @@ def test_anthropic_generation_surfaces_underlying_exception(monkeypatch) -> None
             "Ping",
             params=LLMGenerationParams(model="claude-sonnet-4-5", temperature=0, max_tokens=16),
         )
+
+
+def test_llm_client_default_model_falls_back_to_claude(monkeypatch) -> None:
+    monkeypatch.delenv("LLM_DEFAULT_MODEL", raising=False)
+    monkeypatch.delenv("CLAUDE_DEFAULT_MODEL", raising=False)
+
+    importlib.reload(llm_client_module)
+    try:
+        assert llm_client_module._DEFAULT_MODEL == "claude-sonnet-4-6"
+    finally:
+        importlib.reload(llm_client_module)

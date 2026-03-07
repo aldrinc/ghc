@@ -261,6 +261,105 @@ def test_upload_openai_file_bytes_returns_uploaded_file_id(monkeypatch) -> None:
     assert llm._openai_client.files.last_purpose == "assistants"  # type: ignore[union-attr]
 
 
+def test_explicit_baseten_provider_stream_collects_chat_completions_and_default_base_url(monkeypatch) -> None:
+    captured_client_kwargs: dict[str, object] = {}
+    created_clients: list[object] = []
+    progress_events: list[dict[str, object]] = []
+
+    class _DummyChatCompletionStream:
+        def __iter__(self):
+            yield SimpleNamespace(
+                choices=[SimpleNamespace(delta=SimpleNamespace(content="baseten "))],
+                usage=None,
+                _request_id="req_baseten_123",
+            )
+            yield SimpleNamespace(
+                choices=[SimpleNamespace(delta=SimpleNamespace(content="hello"))],
+                usage=SimpleNamespace(prompt_tokens=12, completion_tokens=5, total_tokens=17),
+                _request_id="req_baseten_123",
+            )
+
+    class _DummyChatCompletions:
+        def __init__(self) -> None:
+            self.last_create_kwargs: dict[str, object] | None = None
+
+        def create(self, **kwargs):  # noqa: ANN003
+            self.last_create_kwargs = kwargs
+            return _DummyChatCompletionStream()
+
+    class _DummyChat:
+        def __init__(self) -> None:
+            self.completions = _DummyChatCompletions()
+
+    class _DummyOpenAI:
+        def __init__(self, **kwargs):  # noqa: ANN003
+            captured_client_kwargs.update(kwargs)
+            self.chat = _DummyChat()
+            created_clients.append(self)
+
+    monkeypatch.setenv("BASETEN_API_KEY", "test-baseten-key")
+    monkeypatch.setenv("BASETEN_BASE_URL", "")
+    monkeypatch.setattr("app.llm.client.get_openai_client_class", lambda: _DummyOpenAI)
+
+    llm = LLMClient(default_model="baseten:moonshotai/Kimi-K2.5")
+    output = llm.generate_text(
+        "Return a headline",
+        params=LLMGenerationParams(
+            model="baseten:moonshotai/Kimi-K2.5",
+            use_reasoning=True,
+            progress_callback=progress_events.append,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "headline_result",
+                    "schema": {
+                        "type": "object",
+                        "properties": {"headline": {"type": "string"}},
+                        "required": ["headline"],
+                        "additionalProperties": False,
+                    },
+                    "strict": True,
+                },
+            },
+        ),
+    )
+
+    assert output == "baseten hello"
+    assert captured_client_kwargs["base_url"] == "https://inference.baseten.co/v1"
+    assert created_clients
+    request_kwargs = created_clients[0].chat.completions.last_create_kwargs  # type: ignore[attr-defined]
+    assert request_kwargs is not None
+    assert request_kwargs["model"] == "moonshotai/Kimi-K2.5"
+    assert request_kwargs["stream"] is True
+    assert request_kwargs["stream_options"] == {
+        "include_usage": True,
+        "continuous_usage_stats": True,
+    }
+    assert request_kwargs["extra_body"] == {"chat_template_args": {"enable_thinking": True}}
+    assert request_kwargs["response_format"] == {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "headline_result",
+            "schema": {
+                "type": "object",
+                "properties": {"headline": {"type": "string"}},
+                "required": ["headline"],
+                "additionalProperties": False,
+            },
+            "strict": True,
+        },
+    }
+    assert progress_events == [
+        {
+            "status": "completed",
+            "request_id": "req_baseten_123",
+            "input_tokens": 12,
+            "output_tokens": 5,
+            "total_tokens": 17,
+        }
+    ]
+
+
 def test_delete_openai_file_invokes_openai_delete(monkeypatch) -> None:
     class _DummyFiles:
         def __init__(self) -> None:

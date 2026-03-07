@@ -921,3 +921,73 @@ def test_qa_loop_wrapper_retries_transient_timeout(monkeypatch) -> None:
     assert result["json"]["status"] == "PASS"
     assert diagnostics["attempt_count"] == 2
     assert diagnostics["timeout_error_count"] == 1
+
+
+def test_qa_loop_wrapper_supports_baseten_provider_prefix(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    class _DummyChatCompletions:
+        def create(self, **kwargs):  # noqa: ANN003
+            captured["kwargs"] = kwargs
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="Kimi-fixed headline"), finish_reason="stop")],
+                usage=SimpleNamespace(prompt_tokens=9, completion_tokens=4),
+                _request_id="req_kimi_123",
+            )
+
+    class _DummyChat:
+        def __init__(self) -> None:
+            self.completions = _DummyChatCompletions()
+
+    class _DummyOpenAI:
+        def __init__(self, **kwargs):  # noqa: ANN003
+            captured["client_kwargs"] = kwargs
+            self.chat = _DummyChat()
+
+    def _fake_run_qa_loop(*args, **_kwargs):
+        response = fake_module.call_llm(
+            "Rewrite this headline",
+            args[4],
+            args[5],
+            messages=[{"role": "user", "content": "Rewrite this headline"}],
+        )
+        return {
+            "status": "PASS",
+            "best_headline": response["text"],
+            "total_iterations": 2,
+        }
+
+    def _fake_to_json(raw):
+        return {
+            "status": raw["status"],
+            "best_headline": raw["best_headline"],
+            "total_iterations": raw["total_iterations"],
+            "metadata": {"request_ids": ["req_kimi_123"]},
+        }
+
+    fake_module = SimpleNamespace(
+        run_qa_loop=_fake_run_qa_loop,
+        to_json=_fake_to_json,
+    )
+
+    monkeypatch.setattr(scorer_module, "_load_module", lambda *_args, **_kwargs: fake_module)
+    monkeypatch.setattr(scorer_module, "get_openai_client_class", lambda: _DummyOpenAI)
+    monkeypatch.setenv("BASETEN_BASE_URL", "")
+
+    result = run_headline_qa_loop(
+        headline="Most Herb Guides Skip the One Dosing Detail Families Need",
+        page_type="advertorial",
+        max_iterations=2,
+        min_tier="A",
+        api_key="test-baseten-key",
+        model="baseten:moonshotai/Kimi-K2.5",
+    )
+
+    diagnostics = result["diagnostics"]
+    assert result["json"]["status"] == "PASS"
+    assert result["json"]["best_headline"] == "Kimi-fixed headline"
+    assert diagnostics["provider"] == "baseten"
+    assert diagnostics["request_ids"] == ["req_kimi_123"]
+    assert captured["client_kwargs"]["base_url"] == "https://inference.baseten.co/v1"  # type: ignore[index]
+    assert captured["kwargs"]["model"] == "moonshotai/Kimi-K2.5"  # type: ignore[index]
+    assert captured["kwargs"]["extra_body"] == {"chat_template_args": {"enable_thinking": True}}  # type: ignore[index]
