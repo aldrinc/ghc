@@ -82,6 +82,13 @@ def test_validate_tokens_allows_unlocked_template_style_token_change():
     _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
 
 
+def test_base_template_routes_listicle_title_typography_through_brand_heading():
+    tokens = deepcopy(load_base_tokens_template())
+
+    assert tokens["cssVars"]["--listicle-title-font"] == "var(--font-heading)"
+    assert tokens["cssVars"]["--listicle-title-color"] == "var(--color-brand)"
+
+
 def test_validate_tokens_allows_brand_color_change():
     tokens = deepcopy(load_base_tokens_template())
     tokens["cssVars"]["--color-brand"] = "#123456"

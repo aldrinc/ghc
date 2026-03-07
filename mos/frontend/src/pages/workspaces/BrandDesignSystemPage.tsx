@@ -40,7 +40,7 @@ import {
 import { useAssets } from "@/api/assets";
 import { useUploadProductAssets } from "@/api/products";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
@@ -171,11 +171,11 @@ const DESIGN_SYSTEM_TEMPLATE = `{
     "--listicle-content-pad-y": "40px",
     "--listicle-content-pad-x-mobile": "20px",
     "--listicle-content-pad-y-mobile": "30px",
-    "--listicle-title-font": "AwesomeSerif, serif",
+    "--listicle-title-font": "var(--font-heading)",
     "--listicle-title-size": "40px",
     "--listicle-title-size-mobile": "40px",
     "--listicle-title-line": "1.2",
-    "--listicle-title-color": "rgb(0, 27, 116)",
+    "--listicle-title-color": "var(--color-brand)",
     "--listicle-title-margin-bottom": "20px",
     "--listicle-title-letter-spacing": "-0.06em",
     "--listicle-body-size": "clamp(16px, 2.3vw, 20px)",
@@ -3013,14 +3013,29 @@ export function BrandDesignSystemPage() {
                   >
                     {updateDesignSystem.isPending ? "Applying…" : "Set logo"}
                   </Button>
-                  <Input
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-                    onChange={handleLogoUpload}
-                    disabled={uploadDesignSystemLogo.isPending}
-                    className="h-9 max-w-[220px] text-xs file:mr-3 file:cursor-pointer file:text-xs"
-                    aria-label="Upload logo"
-                  />
+                  <div className="relative">
+                    <span
+                      className={buttonClasses({
+                        size: "sm",
+                        variant: "secondary",
+                        className: cn(
+                          "pointer-events-none justify-center",
+                          uploadDesignSystemLogo.isPending && "opacity-60",
+                        ),
+                      })}
+                      aria-hidden="true"
+                    >
+                      {uploadDesignSystemLogo.isPending ? "Uploading..." : "Upload logo"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                      onChange={handleLogoUpload}
+                      disabled={uploadDesignSystemLogo.isPending}
+                      className="absolute inset-0 h-9 w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                      aria-label="Upload logo"
+                    />
+                  </div>
                 </div>
                 <div className="text-[11px] text-content-muted">
                   Selecting or uploading a logo updates this design system token automatically.
