@@ -94,6 +94,20 @@ def test_health_endpoints():
     assert "db" in db_health.json()
 
 
+def test_health_options_allows_loopback_dev_origins():
+    with TestClient(app) as client:
+        resp = client.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:5276",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:5276"
+
+
 def test_auth_creates_org_and_allows_client_create(db_session, monkeypatch):
     app.dependency_overrides.clear()
 

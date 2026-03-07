@@ -43,6 +43,7 @@ from app.routers import (
 )
 
 logger = logging.getLogger(__name__)
+_LOOPBACK_CORS_ORIGIN_REGEX = r"^https?://(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?$"
 
 
 def _is_schema_mismatch_programming_error(exc: ProgrammingError) -> bool:
@@ -83,6 +84,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allow_origins,
+        allow_origin_regex=_LOOPBACK_CORS_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
