@@ -366,6 +366,7 @@ _LOCAL_SHOPIFY_THEME_CSS_IMPORT_URL_RE = re.compile(
     re.IGNORECASE,
 )
 _ASSET_SHOPIFY_FILE_URLS_CACHE_KEY = "shopifyFileUrlsByShopDomain"
+_TEMPLATE_EXPORT_LOGO_RESOLVE_KEY = "brand.logoUrl"
 _LOCAL_SHOPIFY_THEME_TEXT_ENUM_VALUES = {
     "adapt",
     "auto",
@@ -5112,6 +5113,45 @@ def _resolve_template_export_component_image_urls_to_shopify_files(
     return resolved_component_image_urls
 
 
+def _resolve_template_export_logo_url(
+    *,
+    client_id: str,
+    shop_domain: str,
+    logo_url: str,
+) -> str:
+    cleaned_logo_url = logo_url.strip()
+    if not cleaned_logo_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Template export logoUrl was empty after normalization.",
+        )
+    if not _is_localhost_http_url(value=cleaned_logo_url):
+        return cleaned_logo_url
+
+    resolved_logo_payload = _resolve_template_export_component_image_urls_to_shopify_files(
+        client_id=client_id,
+        shop_domain=shop_domain,
+        component_image_urls={_TEMPLATE_EXPORT_LOGO_RESOLVE_KEY: cleaned_logo_url},
+    )
+    resolved_logo_url = resolved_logo_payload.get(_TEMPLATE_EXPORT_LOGO_RESOLVE_KEY)
+    if not isinstance(resolved_logo_url, str) or not resolved_logo_url.strip():
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Shopify image URL resolver returned an invalid logoUrl payload for template ZIP export."
+            ),
+        )
+    normalized_resolved_logo_url = resolved_logo_url.strip()
+    if not normalized_resolved_logo_url.startswith("shopify://"):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Shopify image URL resolver did not return a Shopify file URL for template ZIP export logoUrl."
+            ),
+        )
+    return normalized_resolved_logo_url
+
+
 def _read_asset_cached_shopify_file_url(
     *,
     asset: Any,
@@ -6959,6 +6999,11 @@ def _build_shopify_theme_template_export_zip_response(
         org_id=auth.org_id,
         client_id=client_id,
         design_system_id=draft_data.designSystemId,
+    )
+    latest_logo_url = _resolve_template_export_logo_url(
+        client_id=client_id,
+        shop_domain=draft_data.shopDomain,
+        logo_url=latest_logo_url,
     )
     _assert_non_localhost_http_url(
         value=latest_logo_url,

@@ -275,6 +275,72 @@ def test_assert_component_image_urls_exclude_localhost_raises():
         raise AssertionError("Expected localhost URL guard to raise HTTPException")
 
 
+def test_resolve_template_export_logo_url_returns_non_loopback_unchanged(monkeypatch):
+    observed: dict[str, object] = {}
+
+    def fake_resolve_to_shopify_files(
+        *,
+        client_id: str,
+        shop_domain: str,
+        component_image_urls: dict[str, str],
+    ) -> dict[str, str]:
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain
+        observed["component_image_urls"] = component_image_urls
+        return dict(component_image_urls)
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_template_export_component_image_urls_to_shopify_files",
+        fake_resolve_to_shopify_files,
+    )
+
+    resolved = clients_router._resolve_template_export_logo_url(
+        client_id="client-123",
+        shop_domain="example.myshopify.com",
+        logo_url="https://assets.example.com/public/assets/logo-1",
+    )
+
+    assert resolved == "https://assets.example.com/public/assets/logo-1"
+    assert observed == {}
+
+
+def test_resolve_template_export_logo_url_resolves_loopback_to_shopify_file(monkeypatch):
+    observed: dict[str, object] = {}
+
+    def fake_resolve_to_shopify_files(
+        *,
+        client_id: str,
+        shop_domain: str,
+        component_image_urls: dict[str, str],
+    ) -> dict[str, str]:
+        observed["client_id"] = client_id
+        observed["shop_domain"] = shop_domain
+        observed["component_image_urls"] = component_image_urls
+        return {"brand.logoUrl": "shopify://shop_images/latest-logo.png"}
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_template_export_component_image_urls_to_shopify_files",
+        fake_resolve_to_shopify_files,
+    )
+
+    resolved = clients_router._resolve_template_export_logo_url(
+        client_id="client-123",
+        shop_domain="example.myshopify.com",
+        logo_url="http://localhost:8008/public/assets/latest-logo",
+    )
+
+    assert resolved == "shopify://shop_images/latest-logo.png"
+    assert observed == {
+        "client_id": "client-123",
+        "shop_domain": "example.myshopify.com",
+        "component_image_urls": {
+            "brand.logoUrl": "http://localhost:8008/public/assets/latest-logo"
+        },
+    }
+
+
 def test_normalize_theme_export_text_file_content_removes_footer_track_order_tab():
     normalized_content = clients_router._normalize_theme_export_text_file_content(
         filename="sections/footer-group.json",
@@ -2973,6 +3039,145 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
         entry.startswith("assets/") and entry.endswith("workspace-brand.css")
         for entry in archive.namelist()
     )
+
+
+def test_export_shopify_theme_template_zip_resolves_loopback_logo_url(
+    api_client, db_session, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+    _mock_ready_shopify_status(monkeypatch)
+    _set_theme_export_sales_page_path(monkeypatch)
+
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="futrgroup2-0theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    db_session.add(
+        ShopifyThemeTemplateDraftVersion(
+            draft_id=draft.id,
+            org_id=client.org_id,
+            client_id=client.id,
+            version_number=1,
+            source="build_job",
+            payload={
+                "shopDomain": "example.myshopify.com",
+                "workspaceName": "Acme Workspace",
+                "designSystemId": "design-system-1",
+                "designSystemName": "Acme DS",
+                "brandName": "Draft Snapshot Brand",
+                "logoAssetPublicId": str(uuid4()),
+                "logoUrl": "https://assets.example.com/public/assets/logo-1",
+                "themeId": "gid://shopify/OnlineStoreTheme/123",
+                "themeName": "futrgroup2-0theme",
+                "themeRole": "MAIN",
+                "cssVars": {"--color-brand": "#123456"},
+                "fontUrls": [],
+                "dataTheme": "light",
+                "productId": None,
+                "componentImageAssetMap": {},
+                "componentTextValues": {},
+                "imageSlots": [],
+                "textSlots": [],
+                "metadata": {},
+            },
+            created_by_user_external_id="test-user",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    observed_resolve_payload: dict[str, object] = {}
+
+    def fake_resolve_latest_snapshot(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        design_system_id: str,
+    ):
+        return (
+            "Latest Brand Name",
+            "latest-logo",
+            "http://localhost:8008/public/assets/latest-logo",
+            {
+                "--color-brand": "#654321",
+                "--color-page-bg-secondary": "#f4efe7",
+            },
+            [],
+            "dark",
+        )
+
+    def fake_sync_compliance_for_export(
+        *,
+        client_id: str,
+        shop_domain: str | None,
+        auth,
+        session,
+        sync_to_shopify: bool = True,
+    ):
+        assert sync_to_shopify is False
+        return {
+            "rulesetVersion": "meta_tiktok_compliance_ruleset_v1",
+            "shopDomain": "example.myshopify.com",
+            "pages": [],
+            "updatedProfileUrls": {},
+            "renderedPages": [],
+        }
+
+    def fake_resolve_logo_url_to_shopify_file(
+        *,
+        client_id: str,
+        shop_domain: str,
+        component_image_urls: dict[str, str],
+    ) -> dict[str, str]:
+        observed_resolve_payload["client_id"] = client_id
+        observed_resolve_payload["shop_domain"] = shop_domain
+        observed_resolve_payload["component_image_urls"] = component_image_urls
+        return {"brand.logoUrl": "shopify://shop_images/latest-logo.png"}
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_latest_template_publish_design_system_snapshot",
+        fake_resolve_latest_snapshot,
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "_sync_compliance_policy_pages_for_template_export",
+        fake_sync_compliance_for_export,
+    )
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_template_export_component_image_urls_to_shopify_files",
+        fake_resolve_logo_url_to_shopify_file,
+    )
+
+    response = api_client.post(
+        f"/clients/{client_id}/shopify/theme/brand/template/export-zip",
+        json={"draftId": str(draft.id)},
+    )
+
+    assert response.status_code == 200
+    assert observed_resolve_payload == {
+        "client_id": client_id,
+        "shop_domain": "example.myshopify.com",
+        "component_image_urls": {
+            "brand.logoUrl": "http://localhost:8008/public/assets/latest-logo"
+        },
+    }
 
 
 def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_page(
