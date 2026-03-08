@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from openai import InvalidWebhookSignatureError
 
@@ -8,11 +10,14 @@ from app.services.deep_research import DeepResearchJobService, build_openai_clie
 router = APIRouter(prefix="/api/openai", tags=["openai"])
 
 
-def _build_openai_webhook_client():
-    client = build_openai_client(require_api_key=True)
+def _build_openai_webhook_client(*, webhook_secret: str) -> Any:
+    client = build_openai_client(require_api_key=False)
     if client is not None:
         return client
-    return get_openai_client_class()(api_key="webhook-signature-only")
+
+    openai_client_class = get_openai_client_class()
+    # Webhook signature verification is local and does not require an authenticated API client.
+    return openai_client_class(api_key=lambda: "", webhook_secret=webhook_secret)
 
 
 @router.post("/webhook")
@@ -24,7 +29,7 @@ async def openai_webhook(request: Request, background_tasks: BackgroundTasks):
     raw_body = await request.body()
     headers = dict(request.headers)
 
-    client = _build_openai_webhook_client()
+    client = _build_openai_webhook_client(webhook_secret=webhook_secret)
     try:
         event = client.webhooks.unwrap(raw_body, headers, secret=webhook_secret)
     except InvalidWebhookSignatureError:

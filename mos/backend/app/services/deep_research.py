@@ -38,7 +38,7 @@ _TERMINAL_STATUSES = {
 
 def build_openai_client(require_api_key: bool = True) -> Optional[Any]:
     api_key = settings.OPENAI_API_KEY or os.getenv("OPENAI_API_KEY")
-    if not api_key and require_api_key:
+    if not api_key:
         return None
     client_kwargs: dict[str, Any] = {}
     if api_key:

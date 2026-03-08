@@ -3413,6 +3413,23 @@ def _resolve_theme_sync_product_reference_image(
     }
 
 
+def _resolve_optional_theme_sync_product_reference_image(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    product: Product,
+) -> dict[str, Any] | None:
+    if not _is_gemini_image_references_enabled():
+        return None
+    return _resolve_theme_sync_product_reference_image(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        product=product,
+    )
+
+
 def _is_theme_feature_image_slot_path(slot_path: str) -> bool:
     return bool(_THEME_FEATURE_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
 
@@ -4890,13 +4907,8 @@ def _prepare_shopify_theme_template_build_data(
     quota_exhausted_slot_paths: list[str] = []
     slot_error_by_path: dict[str, str] = {}
     product_reference_image: dict[str, Any] | None = None
-    if (
-        requested_product_id
-        and resolved_product is not None
-        and planner_image_slots
-        and _is_gemini_image_references_enabled()
-    ):
-        product_reference_image = _resolve_theme_sync_product_reference_image(
+    if requested_product_id and resolved_product is not None and planner_image_slots:
+        product_reference_image = _resolve_optional_theme_sync_product_reference_image(
             session=session,
             org_id=auth.org_id,
             client_id=client_id,
@@ -6347,14 +6359,14 @@ def _generate_shopify_theme_template_draft_images(
             )
             effective_general_context = default_general_context
             effective_slot_context_by_path = dict(default_slot_context_by_path)
-            product_reference_image: dict[str, Any] | None = None
-            if _is_gemini_image_references_enabled():
-                product_reference_image = _resolve_theme_sync_product_reference_image(
+            product_reference_image: dict[str, Any] | None = (
+                _resolve_optional_theme_sync_product_reference_image(
                     session=session,
                     org_id=auth.org_id,
                     client_id=client_id,
                     product=resolved_product,
                 )
+            )
 
             _emit_theme_sync_progress(
                 {

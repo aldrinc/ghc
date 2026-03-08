@@ -2978,6 +2978,8 @@ def test_generate_shopify_theme_template_draft_images_backfills_component_image_
 def test_generate_shopify_theme_template_draft_images_routes_review_slots_to_testimonial_renderer(
     api_client, db_session, monkeypatch
 ):
+    monkeypatch.setenv("GEMINI_IMAGE_REFERENCES_ENABLED", "false")
+
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None

@@ -3,6 +3,8 @@ from app.config import settings
 
 def test_openai_webhook_uses_api_prefix(api_client, monkeypatch):
     monkeypatch.setattr(settings, "OPENAI_WEBHOOK_SECRET", "whsec_test")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
+    monkeypatch.setenv("OPENAI_API_KEY", "")
 
     response = api_client.post("/api/openai/webhook", content=b"{}")
 
