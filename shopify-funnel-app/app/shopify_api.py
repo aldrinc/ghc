@@ -25,7 +25,6 @@ _THEME_MAIN_COLLECTION_SECTION_FILENAME = "sections/main-collection.liquid"
 _THEME_HEADER_ICONS_FILENAME = "snippets/header-icons.liquid"
 _THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
 _THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
-_THEME_SHOPPABLE_VIDEO_SECTION_FILENAME = "sections/ss-shoppable-video.liquid"
 _CATALOG_COLLECTION_HANDLE = "all"
 _CATALOG_COLLECTION_TITLE = "Catalog"
 _SHOP_MENU_TITLE = "Shop"
@@ -429,7 +428,7 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             (
                 ("background-color", "var(--color-cta)"),
                 ("color", "var(--color-cta-text)"),
-                ("border", "none"),
+                ("border-color", "var(--color-cta)"),
                 ("border-radius", "999px"),
                 ("box-shadow", "8px 8px 0 var(--color-muted)"),
                 (
@@ -443,6 +442,7 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             (
                 ("background-color", "var(--color-cta-text)"),
                 ("color", "var(--color-cta)"),
+                ("border-color", "var(--color-cta)"),
                 ("transform", "translateY(-2px)"),
             ),
         ),
@@ -484,6 +484,7 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
                 ("background-color", "#ffffff"),
                 ("color", "var(--color-text)"),
                 ("border-color", "var(--color-border)"),
+                ("border-radius", "16px"),
             ),
         ),
         (
@@ -510,22 +511,6 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
                 ("color", "var(--footer-text-color)"),
                 ("border-color", "var(--footer-text-color)"),
             ),
-        ),
-        (
-            'footer [class*="footer-newsletter-text-"] *, footer [class*="footer-text-"] *, #shopify-section-footer [class*="footer-newsletter-text-"] *, #shopify-section-footer [class*="footer-text-"] *, [role="contentinfo"] [class*="footer-newsletter-text-"] *, [role="contentinfo"] [class*="footer-text-"] *, .footer [class*="footer-newsletter-text-"] *, .footer [class*="footer-text-"] *, [id*="footer"] [class*="footer-newsletter-text-"] *, [id*="footer"] [class*="footer-text-"] *, [class*="footer"] [class*="footer-newsletter-text-"] *, [class*="footer"] [class*="footer-text-"] *',
-            (("color", "var(--footer-text-color)"),),
-        ),
-        (
-            'footer [class*="footer-copy-text-"] *, footer [class*="footer-main-title-"], footer [class*="footer-list-title-"], footer [class*="footer-tab-title-"], footer [class*="footer-tab-text-"] *, footer [class*="footer-tab-height-cal-"] *, #shopify-section-footer [class*="footer-copy-text-"] *, #shopify-section-footer [class*="footer-main-title-"], #shopify-section-footer [class*="footer-list-title-"], #shopify-section-footer [class*="footer-tab-title-"], #shopify-section-footer [class*="footer-tab-text-"] *, #shopify-section-footer [class*="footer-tab-height-cal-"] *, [role="contentinfo"] [class*="footer-copy-text-"] *, [role="contentinfo"] [class*="footer-main-title-"], [role="contentinfo"] [class*="footer-list-title-"], [role="contentinfo"] [class*="footer-tab-title-"], [role="contentinfo"] [class*="footer-tab-text-"] *, [role="contentinfo"] [class*="footer-tab-height-cal-"] *, .footer [class*="footer-copy-text-"] *, .footer [class*="footer-main-title-"], .footer [class*="footer-list-title-"], .footer [class*="footer-tab-title-"], .footer [class*="footer-tab-text-"] *, .footer [class*="footer-tab-height-cal-"] *, [id*="footer"] [class*="footer-copy-text-"] *, [id*="footer"] [class*="footer-main-title-"], [id*="footer"] [class*="footer-list-title-"], [id*="footer"] [class*="footer-tab-title-"], [id*="footer"] [class*="footer-tab-text-"] *, [id*="footer"] [class*="footer-tab-height-cal-"] *, [class*="footer"] [class*="footer-copy-text-"] *, [class*="footer"] [class*="footer-main-title-"], [class*="footer"] [class*="footer-list-title-"], [class*="footer"] [class*="footer-tab-title-"], [class*="footer"] [class*="footer-tab-text-"] *, [class*="footer"] [class*="footer-tab-height-cal-"] *',
-            (("color", "var(--footer-text-color)"),),
-        ),
-        (
-            'footer [class*="footer-newsletter-input-"], #shopify-section-footer [class*="footer-newsletter-input-"], [role="contentinfo"] [class*="footer-newsletter-input-"], .footer [class*="footer-newsletter-input-"], [id*="footer"] [class*="footer-newsletter-input-"], [class*="footer"] [class*="footer-newsletter-input-"]',
-            (("color", "var(--footer-text-color)"),),
-        ),
-        (
-            'footer [class*="footer-newsletter-input-"]::placeholder, #shopify-section-footer [class*="footer-newsletter-input-"]::placeholder, [role="contentinfo"] [class*="footer-newsletter-input-"]::placeholder, .footer [class*="footer-newsletter-input-"]::placeholder, [id*="footer"] [class*="footer-newsletter-input-"]::placeholder, [class*="footer"] [class*="footer-newsletter-input-"]::placeholder',
-            (("color", "var(--footer-text-color)"),),
         ),
         (
             'footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), #shopify-section-footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [role="contentinfo"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), .footer a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [id*="footer"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"]), [class*="footer"] a:not(.button):not(.btn):not([class*="button"]):not([class*="btn"])',
@@ -8184,70 +8169,6 @@ class ShopifyApiClient:
         return updated_content
 
     @classmethod
-    def _stabilize_shoppable_video_cart_count_updates(
-        cls,
-        *,
-        filename: str,
-        content: str,
-    ) -> str:
-        if filename != _THEME_SHOPPABLE_VIDEO_SECTION_FILENAME:
-            return content
-
-        cart_json_line_re = re.compile(
-            (
-                r"^(?P<indent>\s*)"
-                r"const\s+cart\{\{\s*forloop\.index\s*\}\}\s*="
-                r"\s*await\s+res\{\{\s*forloop\.index\s*\}\}\.json\(\);\s*$"
-            )
-        )
-        cart_update_publish_re = re.compile(
-            (
-                r"theme\.pubsub\.publish\(\s*"
-                r"theme\.pubsub\.PUB_SUB_EVENTS\.cartUpdate\s*,\s*"
-                r"\{\s*cart:\s*cart\{\{\s*forloop\.index\s*\}\}\s*\}\s*"
-                r"\)\s*;"
-            )
-        )
-
-        lines = content.splitlines(keepends=True)
-        if not lines:
-            return content
-
-        changed = False
-        normalized_lines: list[str] = []
-        line_count = len(lines)
-        for index, line in enumerate(lines):
-            normalized_lines.append(line)
-            cart_line_match = cart_json_line_re.match(line.rstrip("\r\n"))
-            if cart_line_match is None:
-                continue
-
-            next_line = lines[index + 1].strip() if index + 1 < line_count else ""
-            if cart_update_publish_re.search(next_line):
-                continue
-
-            indent = cart_line_match.group("indent")
-            if line.endswith("\r\n"):
-                line_ending = "\r\n"
-            elif line.endswith("\n"):
-                line_ending = "\n"
-            elif line.endswith("\r"):
-                line_ending = "\r"
-            else:
-                line_ending = ""
-
-            normalized_lines.append(
-                indent
-                + "theme.pubsub.publish(theme.pubsub.PUB_SUB_EVENTS.cartUpdate, { cart: cart{{ forloop.index }} });"
-                + line_ending
-            )
-            changed = True
-
-        if not changed:
-            return content
-        return "".join(normalized_lines)
-
-    @classmethod
     def _strip_catalog_navigation_from_header_drawer(
         cls,
         *,
@@ -11168,12 +11089,6 @@ class ShopifyApiClient:
                     )
                     normalized_content = (
                         self._stabilize_product_card_inventory_language(
-                            filename=filename,
-                            content=normalized_content,
-                        )
-                    )
-                    normalized_content = (
-                        self._stabilize_shoppable_video_cart_count_updates(
                             filename=filename,
                             content=normalized_content,
                         )
