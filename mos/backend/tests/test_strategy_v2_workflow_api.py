@@ -2334,7 +2334,9 @@ def test_strategy_v2_state_includes_h2_candidates_from_ingestion_artifact(api_cl
                 ],
                 "candidate_summary": {
                     "selected_candidate_count": 1,
-                    "selection_limits": {"max_candidates": 40},
+                    "selection_limits": {
+                        "max_candidates": strategy_v2_activities._H2_MAX_CANDIDATE_ASSETS
+                    },
                 },
             }
         },

@@ -479,6 +479,14 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             ),
         ),
         (
+            ".menu-drawer .drawer__inner, .menu-drawer .drawer__header, .menu-drawer .drawer__content, .menu-drawer .drawer__scrollable, .menu-drawer .drawer__footer, .menu-drawer .drawer__footer-bottom, menu-drawer .drawer__inner, menu-drawer .drawer__header, menu-drawer .drawer__content, menu-drawer .drawer__scrollable, menu-drawer .drawer__footer, menu-drawer .drawer__footer-bottom, #MenuDrawer .drawer__inner, #MenuDrawer .drawer__header, #MenuDrawer .drawer__content, #MenuDrawer .drawer__scrollable, #MenuDrawer .drawer__footer, #MenuDrawer .drawer__footer-bottom",
+            (
+                ("background-color", "#ffffff"),
+                ("color", "var(--color-text)"),
+                ("border-color", "var(--color-border)"),
+            ),
+        ),
+        (
             ".drawer .modal__container, .quick-view .drawer__inner, .x-modal .drawer__inner, .newsletter-modal .drawer__inner",
             (
                 ("background-color", "#ffffff"),

@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException
+import pytest
 from app.auth.dependencies import AuthContext
 from app.routers import clients as clients_router
 from app.db.enums import AssetSourceEnum, FunnelStatusEnum
@@ -25,6 +26,7 @@ from app.schemas.shopify_connection import (
     ShopifyThemeTemplateGenerateImagesRequest,
 )
 from app.services.shopify_connection import ShopifyInstallation
+from app.testimonial_renderer.validate import TestimonialRenderError as RendererError
 from sqlalchemy import select
 
 
@@ -2971,6 +2973,305 @@ def test_generate_shopify_theme_template_draft_images_backfills_component_image_
             mapped_slot_path: response.version.data.componentImageAssetMap[mapped_slot_path]
         },
     }
+
+
+def test_generate_shopify_theme_template_draft_images_routes_review_slots_to_testimonial_renderer(
+    api_client, db_session, monkeypatch
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    product = Product(
+        org_id=client.org_id,
+        client_id=client.id,
+        title="Acme Recovery Wrap",
+        description="A compression recovery wrap for daily pain relief support.",
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(product)
+    db_session.flush()
+
+    review_slot_path = (
+        "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image"
+    )
+    generic_slot_path = "templates/collection.json.sections.main-collection-banner.settings.image"
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=product.id,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="review-routing-theme",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+    db_session.add(
+        ShopifyThemeTemplateDraftVersion(
+            draft_id=draft.id,
+            org_id=client.org_id,
+            client_id=client.id,
+            version_number=1,
+            source="build_job",
+            payload={
+                "shopDomain": "example.myshopify.com",
+                "workspaceName": "Acme Workspace",
+                "designSystemId": "design-system-1",
+                "designSystemName": "Acme DS",
+                "brandName": "Acme",
+                "logoAssetPublicId": str(uuid4()),
+                "logoUrl": "https://assets.example.com/public/assets/logo-1",
+                "themeId": "gid://shopify/OnlineStoreTheme/123",
+                "themeName": "review-routing-theme",
+                "themeRole": "MAIN",
+                "cssVars": {"--color-brand": "#123456"},
+                "fontUrls": [],
+                "dataTheme": "light",
+                "productId": str(product.id),
+                "componentImageAssetMap": {},
+                "componentImageUrls": {},
+                "componentTextValues": {},
+                "imageSlots": [
+                    {
+                        "path": review_slot_path,
+                        "key": "image",
+                        "role": "supporting",
+                        "recommendedAspect": "square",
+                        "currentValue": None,
+                    },
+                    {
+                        "path": generic_slot_path,
+                        "key": "image",
+                        "role": "hero",
+                        "recommendedAspect": "landscape",
+                        "currentValue": None,
+                    },
+                ],
+                "textSlots": [],
+                "metadata": {},
+            },
+            created_by_user_external_id="test-user",
+            created_at=datetime.now(timezone.utc),
+        )
+    )
+    db_session.commit()
+
+    observed: dict[str, object] = {
+        "standard_slots": [],
+        "testimonial_slots": [],
+    }
+
+    renderer_sentinel = object()
+
+    class FakeThreadedTestimonialRenderer:
+        def __enter__(self):
+            return renderer_sentinel
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr(
+        clients_router,
+        "ThreadedTestimonialRenderer",
+        FakeThreadedTestimonialRenderer,
+    )
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_theme_sync_product_reference_image",
+        lambda **kwargs: {
+            "imageBytes": b"product-reference",
+            "mimeType": "image/png",
+            "assetPublicId": str(uuid4()),
+            "assetId": str(uuid4()),
+        },
+    )
+
+    def fake_generate_review_card_payloads(
+        *,
+        product,
+        slot_paths,
+        general_prompt_context=None,
+        slot_prompt_context_by_path=None,
+        model=None,
+        temperature=0.3,
+        max_tokens=None,
+        max_duration_seconds=None,
+    ):
+        observed["review_payload_product_id"] = str(product.id)
+        observed["review_payload_slot_paths"] = list(slot_paths)
+        return (
+            {
+                review_slot_path: {
+                    "template": "review_card",
+                    "name": "Taylor",
+                    "verified": True,
+                    "rating": 5,
+                    "review": "It feels supportive and easy to wear after long workdays.",
+                    "avatarPrompt": "Candid portrait of a satisfied customer indoors.",
+                    "heroImagePrompt": "Lifestyle product-use photo at home.",
+                    "imageModel": "gemini-2.5-flash-image",
+                }
+            },
+            "claude-sonnet-4-5",
+        )
+
+    monkeypatch.setattr(
+        clients_router,
+        "generate_shopify_theme_review_card_payloads",
+        fake_generate_review_card_payloads,
+    )
+
+    def fake_create_funnel_image_asset(**kwargs):
+        usage_context = kwargs["usage_context"]
+        observed["standard_slots"].append(usage_context["slotPath"])
+        return SimpleNamespace(
+            public_id=str(uuid4()),
+            ai_metadata={
+                "model": "gemini-2.5-flash-image",
+                "source": "ai",
+                "promptTokenCount": 17,
+            },
+            file_source="ai",
+            width=1600,
+            height=900,
+        )
+
+    monkeypatch.setattr(
+        clients_router,
+        "create_funnel_image_asset",
+        fake_create_funnel_image_asset,
+    )
+
+    def fake_generate_shopify_theme_testimonial_image_asset(
+        *,
+        session,
+        org_id,
+        client_id,
+        slot_path,
+        payload,
+        product_id=None,
+        tags=None,
+        renderer=None,
+    ):
+        observed["testimonial_slots"].append(slot_path)
+        observed["testimonial_payload_template"] = payload["template"]
+        observed["testimonial_renderer"] = renderer
+        return SimpleNamespace(
+            public_id=str(uuid4()),
+            ai_metadata={
+                "model": "gemini-2.5-flash-image",
+                "source": "testimonial_renderer",
+            },
+            file_source="upload",
+            width=1600,
+            height=1600,
+        )
+
+    monkeypatch.setattr(
+        clients_router,
+        "generate_shopify_theme_testimonial_image_asset",
+        fake_generate_shopify_theme_testimonial_image_asset,
+    )
+
+    monkeypatch.setattr(
+        clients_router,
+        "_resolve_template_export_component_image_urls_from_asset_map_with_cache",
+        lambda **kwargs: {
+            path: f"shopify://{asset_public_id}.png"
+            for path, asset_public_id in kwargs["component_image_asset_map"].items()
+        },
+    )
+
+    response = clients_router._generate_shopify_theme_template_draft_images(
+        client_id=client_id,
+        payload=ShopifyThemeTemplateGenerateImagesRequest(draftId=str(draft.id)),
+        auth=AuthContext(user_id="test-user", org_id=str(client.org_id)),
+        session=db_session,
+        image_generation_max_concurrency=1,
+        generate_text=False,
+    )
+
+    assert response.generatedImageCount == 2
+    assert sorted(response.generatedSlotPaths) == sorted([review_slot_path, generic_slot_path])
+    assert observed["review_payload_product_id"] == str(product.id)
+    assert observed["review_payload_slot_paths"] == [review_slot_path]
+    assert observed["standard_slots"] == [generic_slot_path]
+    assert observed["testimonial_slots"] == [review_slot_path]
+    assert observed["testimonial_payload_template"] == "review_card"
+    assert observed["testimonial_renderer"] is renderer_sentinel
+    assert response.imageSourceBySlotPath[review_slot_path] == "testimonial_renderer"
+    assert response.imageSourceBySlotPath[generic_slot_path] == "ai"
+    assert response.imageModelBySlotPath[review_slot_path] == "gemini-2.5-flash-image"
+    assert response.imageModelBySlotPath[generic_slot_path] == "gemini-2.5-flash-image"
+
+
+def test_generate_theme_sync_ai_image_assets_raises_for_inprocess_testimonial_renderer_errors(
+    monkeypatch,
+):
+    review_slot_path = (
+        "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image"
+    )
+
+    monkeypatch.setattr(
+        clients_router,
+        "generate_shopify_theme_review_card_payloads",
+        lambda **kwargs: (
+            {
+                review_slot_path: {
+                    "template": "review_card",
+                    "name": "Taylor",
+                    "verified": True,
+                    "rating": 5,
+                    "review": "It feels supportive and easy to wear after long workdays.",
+                    "avatarPrompt": "Candid portrait of a satisfied customer indoors.",
+                    "heroImagePrompt": "Lifestyle product-use photo at home.",
+                    "imageModel": "gemini-2.5-flash-image",
+                }
+            },
+            "claude-sonnet-4-5",
+        ),
+    )
+
+    class FailingThreadedTestimonialRenderer:
+        def __enter__(self):
+            raise RendererError("Failed to launch chromium for testimonial rendering.")
+
+        def __exit__(self, exc_type, exc, tb):
+            return None
+
+    monkeypatch.setattr(
+        clients_router,
+        "ThreadedTestimonialRenderer",
+        FailingThreadedTestimonialRenderer,
+    )
+
+    with pytest.raises(
+        RendererError,
+        match="Failed to launch chromium",
+    ):
+        clients_router._generate_theme_sync_ai_image_assets(
+            session=None,
+            org_id="org-1",
+            client_id="client-1",
+            product_id="product-1",
+            product=SimpleNamespace(id="product-1", title="Acme Wrap"),
+            image_slots=[
+                {
+                    "path": review_slot_path,
+                    "key": "image",
+                    "role": "supporting",
+                    "recommendedAspect": "square",
+                }
+            ],
+            max_concurrency=1,
+        )
 
 
 def test_export_shopify_theme_template_zip_writes_base64_file_payloads(

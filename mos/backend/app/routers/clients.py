@@ -1,6 +1,7 @@
 import base64
 import binascii
 import concurrent.futures
+from contextlib import nullcontext
 from contextvars import ContextVar
 from datetime import datetime, timezone
 from html import escape
@@ -141,10 +142,8 @@ from app.services.shopify_theme_copy_agent import (
 from app.services.shopify_theme_content_planner import (
     plan_shopify_theme_component_content,
 )
-from app.services.testimonial_renderer_client import (
-    TestimonialRendererConfigError,
-    TestimonialRendererRequestError,
-)
+from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
+from app.testimonial_renderer.validate import TestimonialRenderError
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
 from app.temporal.client import get_temporal_client
@@ -4081,6 +4080,7 @@ def _generate_theme_sync_ai_image_assets(
         aspect_ratio: str,
         prompt: str | None = None,
         render_payload: dict[str, Any] | None = None,
+        testimonial_renderer: ThreadedTestimonialRenderer | None = None,
     ) -> dict[str, Any]:
         with SessionLocal() as slot_session:
             try:
@@ -4100,6 +4100,7 @@ def _generate_theme_sync_ai_image_assets(
                         payload=render_payload,
                         product_id=product_id,
                         tags=["shopify_theme_sync", "component_image"],
+                        renderer=testimonial_renderer,
                     )
                     return {
                         "slotPath": slot_path,
@@ -4142,10 +4143,7 @@ def _generate_theme_sync_ai_image_assets(
                     "error": None,
                     "exception": None,
                 }
-            except (
-                TestimonialRendererConfigError,
-                TestimonialRendererRequestError,
-            ) as exc:
+            except TestimonialRenderError as exc:
                 return {
                     "slotPath": slot_path,
                     "asset": None,
@@ -4298,88 +4296,28 @@ def _generate_theme_sync_ai_image_assets(
     completed_count = 0
     generated_count = 0
     skipped_count = 0
-    if max_workers == 1:
-        hard_quota_exhausted = False
-        hard_quota_slot_path: str | None = None
-        for slot in prepared_slots:
-            slot_path = slot["slotPath"]
-            try:
-                outcome = _generate_single_slot_asset(
-                    slot_path=slot_path,
-                    slot_role=slot["slotRole"],
-                    slot_recommended_aspect=slot["recommendedAspect"],
-                    generation_strategy=slot["generationStrategy"],
-                    aspect_ratio=slot["aspectRatio"],
-                    prompt=slot.get("prompt"),
-                    render_payload=slot.get("renderPayload"),
-                )
-            except Exception as exc:  # noqa: BLE001
-                outcome = {
-                    "slotPath": slot_path,
-                    "asset": None,
-                    "source": None,
-                    "rateLimited": False,
-                    "quotaExhausted": False,
-                    "error": str(exc),
-                    "exception": None,
-                }
-            outcomes_by_path[slot_path] = outcome
-            completed_count += 1
-            if outcome.get("asset") is not None:
-                if outcome.get("source") != "unsplash":
-                    generated_count += 1
-            elif outcome.get("rateLimited"):
-                skipped_count += 1
-            _emit_theme_sync_progress(
-                {
-                    "stage": "image_generation",
-                    "message": "Generating component images for Shopify theme sync.",
-                    "totalImageSlots": total_slots,
-                    "completedImageSlots": completed_count,
-                    "generatedImageCount": generated_count,
-                    "skippedImageCount": skipped_count,
-                }
-            )
-            if stop_on_quota_exhausted and outcome.get("quotaExhausted"):
-                hard_quota_exhausted = True
-                hard_quota_slot_path = slot_path
-                break
-
-        if hard_quota_exhausted and hard_quota_slot_path:
+    testimonial_renderer_context = (
+        ThreadedTestimonialRenderer()
+        if testimonial_review_slot_paths
+        else nullcontext(None)
+    )
+    with testimonial_renderer_context as testimonial_renderer:
+        if max_workers == 1:
+            hard_quota_exhausted = False
+            hard_quota_slot_path: str | None = None
             for slot in prepared_slots:
                 slot_path = slot["slotPath"]
-                if slot_path in outcomes_by_path:
-                    continue
-                outcomes_by_path[slot_path] = {
-                    "slotPath": slot_path,
-                    "asset": None,
-                    "source": None,
-                    "rateLimited": True,
-                    "quotaExhausted": False,
-                    "error": (
-                        "Skipped because hard Gemini quota exhaustion was detected "
-                        f"at slotPath={hard_quota_slot_path}."
-                    ),
-                }
-    else:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures: dict[concurrent.futures.Future[dict[str, Any]], str] = {}
-            for slot in prepared_slots:
-                future = pool.submit(
-                    _generate_single_slot_asset,
-                    slot_path=slot["slotPath"],
-                    slot_role=slot["slotRole"],
-                    slot_recommended_aspect=slot["recommendedAspect"],
-                    generation_strategy=slot["generationStrategy"],
-                    aspect_ratio=slot["aspectRatio"],
-                    prompt=slot.get("prompt"),
-                    render_payload=slot.get("renderPayload"),
-                )
-                futures[future] = slot["slotPath"]
-            for future in concurrent.futures.as_completed(futures):
-                slot_path = futures[future]
                 try:
-                    outcome = future.result()
+                    outcome = _generate_single_slot_asset(
+                        slot_path=slot_path,
+                        slot_role=slot["slotRole"],
+                        slot_recommended_aspect=slot["recommendedAspect"],
+                        generation_strategy=slot["generationStrategy"],
+                        aspect_ratio=slot["aspectRatio"],
+                        prompt=slot.get("prompt"),
+                        render_payload=slot.get("renderPayload"),
+                        testimonial_renderer=testimonial_renderer,
+                    )
                 except Exception as exc:  # noqa: BLE001
                     outcome = {
                         "slotPath": slot_path,
@@ -4407,6 +4345,74 @@ def _generate_theme_sync_ai_image_assets(
                         "skippedImageCount": skipped_count,
                     }
                 )
+                if stop_on_quota_exhausted and outcome.get("quotaExhausted"):
+                    hard_quota_exhausted = True
+                    hard_quota_slot_path = slot_path
+                    break
+
+            if hard_quota_exhausted and hard_quota_slot_path:
+                for slot in prepared_slots:
+                    slot_path = slot["slotPath"]
+                    if slot_path in outcomes_by_path:
+                        continue
+                    outcomes_by_path[slot_path] = {
+                        "slotPath": slot_path,
+                        "asset": None,
+                        "source": None,
+                        "rateLimited": True,
+                        "quotaExhausted": False,
+                        "error": (
+                            "Skipped because hard Gemini quota exhaustion was detected "
+                            f"at slotPath={hard_quota_slot_path}."
+                        ),
+                    }
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures: dict[concurrent.futures.Future[dict[str, Any]], str] = {}
+                for slot in prepared_slots:
+                    future = pool.submit(
+                        _generate_single_slot_asset,
+                        slot_path=slot["slotPath"],
+                        slot_role=slot["slotRole"],
+                        slot_recommended_aspect=slot["recommendedAspect"],
+                        generation_strategy=slot["generationStrategy"],
+                        aspect_ratio=slot["aspectRatio"],
+                        prompt=slot.get("prompt"),
+                        render_payload=slot.get("renderPayload"),
+                        testimonial_renderer=testimonial_renderer,
+                    )
+                    futures[future] = slot["slotPath"]
+                for future in concurrent.futures.as_completed(futures):
+                    slot_path = futures[future]
+                    try:
+                        outcome = future.result()
+                    except Exception as exc:  # noqa: BLE001
+                        outcome = {
+                            "slotPath": slot_path,
+                            "asset": None,
+                            "source": None,
+                            "rateLimited": False,
+                            "quotaExhausted": False,
+                            "error": str(exc),
+                            "exception": None,
+                        }
+                    outcomes_by_path[slot_path] = outcome
+                    completed_count += 1
+                    if outcome.get("asset") is not None:
+                        if outcome.get("source") != "unsplash":
+                            generated_count += 1
+                    elif outcome.get("rateLimited"):
+                        skipped_count += 1
+                    _emit_theme_sync_progress(
+                        {
+                            "stage": "image_generation",
+                            "message": "Generating component images for Shopify theme sync.",
+                            "totalImageSlots": total_slots,
+                            "completedImageSlots": completed_count,
+                            "generatedImageCount": generated_count,
+                            "skippedImageCount": skipped_count,
+                        }
+                    )
 
     for slot in prepared_slots:
         slot_path = slot["slotPath"]
@@ -4414,10 +4420,7 @@ def _generate_theme_sync_ai_image_assets(
         generated_asset = outcome.get("asset")
         if generated_asset is None:
             special_exception = outcome.get("exception")
-            if isinstance(
-                special_exception,
-                (TestimonialRendererConfigError, TestimonialRendererRequestError),
-            ):
+            if isinstance(special_exception, TestimonialRenderError):
                 raise special_exception
             raw_slot_error = outcome.get("error")
             if isinstance(raw_slot_error, str) and raw_slot_error.strip():
@@ -6400,10 +6403,7 @@ def _generate_shopify_theme_template_draft_images(
                     if isinstance(slot_path, str) and slot_path.strip()
                 }
             )
-        except (
-            TestimonialRendererConfigError,
-            TestimonialRendererRequestError,
-        ):
+        except TestimonialRenderError:
             raise
         except Exception as exc:  # noqa: BLE001
             image_generation_error = _format_non_fatal_generation_error(

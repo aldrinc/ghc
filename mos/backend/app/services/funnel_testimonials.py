@@ -8,6 +8,7 @@ import os
 import random
 import re
 import time
+from contextlib import nullcontext
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -27,10 +28,6 @@ from app.services.funnel_ai import _load_product_context
 from app.services.claude_files import call_claude_structured_message
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
-from app.services.testimonial_renderer_client import (
-    TestimonialRendererClient,
-    TestimonialRendererConfigError,
-)
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 
@@ -964,7 +961,7 @@ def generate_shopify_theme_testimonial_image_asset(
     payload: dict[str, Any],
     product_id: Optional[str] = None,
     tags: Optional[list[str]] = None,
-    renderer_client: TestimonialRendererClient | None = None,
+    renderer: ThreadedTestimonialRenderer | None = None,
 ) -> Asset:
     normalized_slot_path = _clean_single_line(slot_path or "")
     if not normalized_slot_path:
@@ -983,7 +980,7 @@ def generate_shopify_theme_testimonial_image_asset(
 
     configured_image_model = str(settings.TESTIMONIAL_RENDERER_IMAGE_MODEL or "").strip()
     if not configured_image_model:
-        raise TestimonialRendererConfigError(
+        raise TestimonialRenderError(
             "TESTIMONIAL_RENDERER_IMAGE_MODEL is required for Shopify testimonial image generation."
         )
 
@@ -1009,8 +1006,13 @@ def generate_shopify_theme_testimonial_image_asset(
             if not normalized_tag or normalized_tag in resolved_tags:
                 continue
             resolved_tags.append(normalized_tag)
-    client = renderer_client or TestimonialRendererClient()
-    render_bytes = client.render_png(payload=payload)
+    renderer_context = nullcontext(renderer) if renderer is not None else ThreadedTestimonialRenderer()
+    with renderer_context as active_renderer:
+        if active_renderer is None:
+            raise TestimonialRenderError(
+                "ThreadedTestimonialRenderer did not start for Shopify testimonial image generation."
+            )
+        render_bytes = active_renderer.render_png(payload)
     reviewer_name = _clean_single_line(str(payload.get("name") or "Customer"))
     alt_text = f"Review from {reviewer_name}" if reviewer_name else "Customer review"
     return create_funnel_upload_asset(
@@ -2213,7 +2215,7 @@ def generate_shopify_theme_review_card_payloads(
 
     configured_image_model = str(settings.TESTIMONIAL_RENDERER_IMAGE_MODEL or "").strip()
     if not configured_image_model:
-        raise TestimonialRendererConfigError(
+        raise TestimonialRenderError(
             "TESTIMONIAL_RENDERER_IMAGE_MODEL is required for Shopify testimonial image generation."
         )
 
@@ -2368,8 +2370,6 @@ def generate_funnel_page_testimonials(
 
     model_id: str
 
-    today = datetime.now(timezone.utc).date().isoformat()
-    batch_size = 6
     sales_review_wall_social_index = 0
     social_card_variant_index = 0
     review_card_scene_index = 0

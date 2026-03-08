@@ -3251,6 +3251,10 @@ def test_sync_theme_brand_updates_layout_and_css():
                 in css_content
             )
             assert "background-color: #ffffff !important;" in css_content
+            assert (
+                ".menu-drawer .drawer__inner, .menu-drawer .drawer__header, .menu-drawer .drawer__content, .menu-drawer .drawer__scrollable,"
+                in css_content
+            )
             assert '[class*="cart-drawer"]' not in css_content
             assert (
                 "header .header__buttons .cart-drawer-button, #shopify-section-header .header__buttons .cart-drawer-button,"
@@ -5386,6 +5390,10 @@ def test_render_theme_brand_css_includes_rounded_white_popup_background_override
 
     assert (
         ".drawer .modal__container, .quick-view .drawer__inner, .x-modal .drawer__inner, .newsletter-modal .drawer__inner {"
+        in css
+    )
+    assert (
+        ".menu-drawer .drawer__inner, .menu-drawer .drawer__header, .menu-drawer .drawer__content, .menu-drawer .drawer__scrollable,"
         in css
     )
     assert "background-color: #ffffff !important;" in css

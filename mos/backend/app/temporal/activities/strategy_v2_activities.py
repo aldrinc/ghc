@@ -334,20 +334,6 @@ _VOC_AGENT00_APIFY_CONFIG_SCHEMA: dict[str, Any] = {
     },
     "required": ["config_id", "actor_id", "input", "metadata"],
 }
-_VOC_AGENT00B_CONFIG_METADATA_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "target_id": {"type": "string", "minLength": 1},
-        "platform": {"type": "string", "minLength": 1},
-        "mode": {"type": "string", "minLength": 1},
-        "habitat_name": {"type": "string", "minLength": 1},
-        "habitat_type": {"type": "string", "minLength": 1},
-        "url_pattern": {"type": "string", "minLength": 1},
-        "tier": {"type": "string", "minLength": 1},
-        "source_stage": {"type": "string", "minLength": 1},
-    },
-}
 _VOC_AGENT00B_CONFIG_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -357,7 +343,6 @@ _VOC_AGENT00B_CONFIG_SCHEMA: dict[str, Any] = {
         "mode": {"type": "string", "minLength": 1},
         "actor_id": {"type": "string", "minLength": 1},
         "input": _APIFY_EXEC_INPUT_SCHEMA,
-        "metadata": _VOC_AGENT00B_CONFIG_METADATA_SCHEMA,
     },
     "required": ["config_id", "platform", "mode", "actor_id", "input"],
 }
@@ -1355,7 +1340,7 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                             "label": {"type": "string", "minLength": 1},
                             "value": {"type": "string", "minLength": 1},
                         },
-                        "required": ["label"],
+                        "required": ["label", "value"],
                     },
                 },
             },
@@ -1406,7 +1391,7 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                     "rating": {"type": "integer", "minimum": 1, "maximum": 5},
                     "verified": {"type": "boolean"},
                 },
-                "required": ["text", "author"],
+                "required": ["text", "author", "rating", "verified"],
             },
         },
         "review_wall": {
@@ -6009,7 +5994,7 @@ def _voc_agent00b_response_schema() -> dict[str, Any]:
             },
             "handoff_block": {"type": "string"},
         },
-        "required": ["platform_priorities", "configurations"],
+        "required": ["platform_priorities", "configurations", "handoff_block"],
     }
 
 

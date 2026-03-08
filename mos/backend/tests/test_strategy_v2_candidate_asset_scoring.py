@@ -209,10 +209,18 @@ def test_prepare_competitor_asset_candidates_success(monkeypatch: pytest.MonkeyP
     assert isinstance(summary.get("selected_candidate_ids"), list)
     selection_limits = summary.get("selection_limits")
     assert isinstance(selection_limits, dict)
-    assert selection_limits.get("max_candidates") == 40
+    assert selection_limits == {
+        "max_candidates": strategy_v2_activities._H2_MAX_CANDIDATE_ASSETS,
+        "max_per_competitor": strategy_v2_activities._H2_MAX_CANDIDATES_PER_COMPETITOR,
+        "max_per_platform": strategy_v2_activities._H2_MAX_CANDIDATES_PER_PLATFORM,
+    }
     operator_confirmation_policy = summary.get("operator_confirmation_policy")
     assert isinstance(operator_confirmation_policy, dict)
-    assert operator_confirmation_policy.get("target_confirmed_assets") == 12
+    assert operator_confirmation_policy == {
+        "min_confirmed_assets": strategy_v2_activities._MIN_STAGE1_COMPETITORS,
+        "target_confirmed_assets": strategy_v2_activities._H2_TARGET_CONFIRMED_ASSETS,
+        "max_confirmed_assets": strategy_v2_activities._H2_MAX_CONFIRMED_ASSETS,
+    }
 
 
 def test_competitor_asset_confirmation_decision_caps_confirmed_assets() -> None:
