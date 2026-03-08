@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from html import escape
+from pathlib import Path
 import re
 from typing import Any
 
@@ -41,6 +42,16 @@ _PAGE_ORDER = [
     "company_information",
     "subscription_terms_and_cancellation",
 ]
+
+_POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY = {
+    "privacy_policy": "privacy_policy.md",
+    "terms_of_service": "terms_of_service.md",
+    "returns_refunds_policy": "returns_refunds_policy.md",
+    "shipping_policy": "shipping_policy.md",
+    "contact_support": "contact_support.md",
+    "company_information": "company_information.md",
+    "subscription_terms_and_cancellation": "subscription_terms_and_cancellation.md",
+}
 
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
 _STRONG_RE = re.compile(r"\*\*(.+?)\*\*")
@@ -916,6 +927,52 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
     },
 }
 
+_template_keys = set(_POLICY_TEMPLATES)
+_file_map_keys = set(_POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY)
+if _template_keys != _file_map_keys:
+    missing_file_mappings = sorted(_template_keys - _file_map_keys)
+    extra_file_mappings = sorted(_file_map_keys - _template_keys)
+    raise RuntimeError(
+        "Compliance policy template/file mapping mismatch. "
+        f"missing={missing_file_mappings} extra={extra_file_mappings}"
+    )
+
+
+def _resolve_policy_templates_directory() -> Path:
+    service_file = Path(__file__).resolve()
+    for parent in service_file.parents:
+        candidate = parent / "docs" / "compliance" / "policy-templates"
+        if candidate.is_dir():
+            return candidate
+    raise RuntimeError(
+        "Unable to locate compliance policy template directory. "
+        "Expected 'docs/compliance/policy-templates' in this repository."
+    )
+
+
+_POLICY_TEMPLATES_DIRECTORY = _resolve_policy_templates_directory()
+
+
+def _load_policy_template_markdown(*, page_key: str) -> str:
+    filename = _POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY.get(page_key)
+    if not filename:
+        raise KeyError(f"Unknown policy template key: {page_key}")
+
+    template_path = _POLICY_TEMPLATES_DIRECTORY / filename
+    try:
+        markdown = template_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(
+            f"Failed to read compliance policy template markdown for page '{page_key}' "
+            f"from '{template_path}'."
+        ) from exc
+
+    if not markdown.strip():
+        raise RuntimeError(
+            f"Compliance policy template markdown is empty for page '{page_key}' at '{template_path}'."
+        )
+    return markdown
+
 
 def list_rulesets() -> list[dict[str, Any]]:
     return [
@@ -956,15 +1013,16 @@ def normalize_business_models(values: list[str]) -> list[str]:
 def list_policy_templates() -> list[dict[str, Any]]:
     ordered: list[dict[str, Any]] = []
     for page_key in _PAGE_ORDER:
-        template = _POLICY_TEMPLATES[page_key]
-        ordered.append(deepcopy(template))
+        ordered.append(get_policy_template(page_key=page_key))
     return ordered
 
 
 def get_policy_template(*, page_key: str) -> dict[str, Any]:
     if page_key not in _POLICY_TEMPLATES:
         raise KeyError(f"Unknown policy template key: {page_key}")
-    return deepcopy(_POLICY_TEMPLATES[page_key])
+    template = deepcopy(_POLICY_TEMPLATES[page_key])
+    template["templateMarkdown"] = _load_policy_template_markdown(page_key=page_key)
+    return template
 
 
 def list_policy_page_keys() -> list[str]:

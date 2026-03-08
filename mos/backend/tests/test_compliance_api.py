@@ -1,3 +1,4 @@
+from app.services import compliance as compliance_service
 from app.services.compliance import RULESET_VERSION
 from app.routers import compliance as compliance_router
 
@@ -204,6 +205,15 @@ def test_list_policy_templates(api_client):
     assert privacy is not None
     assert len(privacy["requiredSections"]) >= 1
     assert "templateMarkdown" in privacy
+
+
+def test_get_policy_template_reads_markdown_from_disk(tmp_path, monkeypatch):
+    custom_markdown = "# Custom Privacy Policy\n\nCustom body.\n"
+    (tmp_path / "privacy_policy.md").write_text(custom_markdown, encoding="utf-8")
+    monkeypatch.setattr(compliance_service, "_POLICY_TEMPLATES_DIRECTORY", tmp_path)
+
+    template = compliance_service.get_policy_template(page_key="privacy_policy")
+    assert template["templateMarkdown"] == custom_markdown
 
 
 def test_sync_compliance_policy_pages_to_shopify_updates_profile_urls(api_client, monkeypatch):
