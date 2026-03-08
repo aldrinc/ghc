@@ -27,6 +27,10 @@ from app.services.funnel_ai import _load_product_context
 from app.services.claude_files import call_claude_structured_message
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
+from app.services.testimonial_renderer_client import (
+    TestimonialRendererClient,
+    TestimonialRendererConfigError,
+)
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 
@@ -953,84 +957,49 @@ def _generate_testimonial_image_asset(
 
 def generate_shopify_theme_testimonial_image_asset(
     *,
+    session: Session,
     org_id: str,
     client_id: str,
     slot_path: str,
-    direction_prompt: str,
-    aspect_ratio: str,
-    usage_context: Optional[dict[str, Any]] = None,
-    reference_image_bytes: Optional[bytes] = None,
-    reference_image_mime_type: Optional[str] = None,
-    reference_asset_public_id: Optional[str] = None,
-    reference_asset_id: Optional[str] = None,
+    payload: dict[str, Any],
     product_id: Optional[str] = None,
     tags: Optional[list[str]] = None,
+    renderer_client: TestimonialRendererClient | None = None,
 ) -> Asset:
     normalized_slot_path = _clean_single_line(slot_path or "")
     if not normalized_slot_path:
         raise TestimonialGenerationError(
             "slot_path is required to generate a Shopify testimonial image asset."
         )
-    normalized_direction = _clean_single_line(direction_prompt or "")
-    if not normalized_direction:
+    if not isinstance(payload, dict) or not payload:
         raise TestimonialGenerationError(
-            "direction_prompt is required to generate a Shopify testimonial image asset."
+            "payload is required to generate a Shopify testimonial image asset."
         )
-    normalized_aspect_ratio = _clean_single_line(aspect_ratio or "")
-    if not normalized_aspect_ratio:
+    template = payload.get("template")
+    if not isinstance(template, str) or template.strip() != "review_card":
         raise TestimonialGenerationError(
-            "aspect_ratio is required to generate a Shopify testimonial image asset."
+            "Shopify testimonial image generation currently supports review_card payloads only."
         )
 
-    if normalized_aspect_ratio == "1:1":
-        prompt = _build_distinct_avatar_prompt(
-            render_label=normalized_slot_path,
-            display_name="Customer",
-            persona="satisfied customer sharing a real product experience",
-            direction=_truncate(normalized_direction, limit=220),
-            variant_label="shopify-theme-testimonial",
+    configured_image_model = str(settings.TESTIMONIAL_RENDERER_IMAGE_MODEL or "").strip()
+    if not configured_image_model:
+        raise TestimonialRendererConfigError(
+            "TESTIMONIAL_RENDERER_IMAGE_MODEL is required for Shopify testimonial image generation."
         )
-    else:
-        scene_seed = _seed_value(
-            normalized_slot_path,
-            normalized_direction,
-            normalized_aspect_ratio,
-        )
-        scene_mode = _select_single_scene_mode(scene_seed)
-        prompt = _build_testimonial_scene_prompt(
-            scene_mode=scene_mode,
-            render_label=normalized_slot_path,
-            persona="satisfied customer sharing a real product experience",
-            setting=(
-                "an authentic everyday environment with natural clutter and believable "
-                "smartphone lighting"
-            ),
-            action=(
-                "capturing a candid in-the-moment product-use scene that feels naturally "
-                "user-generated"
-            ),
-            direction=_truncate(normalized_direction, limit=260),
-            prohibit_visible_text=True,
-        )
-        if normalized_aspect_ratio != "9:16":
-            prompt = (
-                f"{prompt}\n\n"
-                "COMPOSITION REQUIREMENT: Keep the subject crop-safe for aspect ratio "
-                f"{normalized_aspect_ratio} and avoid clipping key facial/product details."
-            )
 
     resolved_usage_context = {
-        "kind": "shopify_theme_testimonial_image",
+        "kind": "shopify_theme_testimonial_render",
         "slotPath": normalized_slot_path,
+        "source": "testimonial_renderer",
+        "model": configured_image_model,
+        "modelSource": "TESTIMONIAL_RENDERER_IMAGE_MODEL",
+        "template": "review_card",
     }
-    if isinstance(usage_context, dict):
-        resolved_usage_context.update(usage_context)
-
     resolved_tags = [
         "shopify_theme_sync",
         "component_image",
         "testimonial",
-        "ai_generated",
+        "testimonial_renderer",
     ]
     if isinstance(tags, list):
         for raw_tag in tags:
@@ -1040,22 +1009,22 @@ def generate_shopify_theme_testimonial_image_asset(
             if not normalized_tag or normalized_tag in resolved_tags:
                 continue
             resolved_tags.append(normalized_tag)
-
-    with SessionLocal() as thread_session:
-        return create_funnel_image_asset(
-            session=thread_session,
-            org_id=org_id,
-            client_id=client_id,
-            prompt=prompt,
-            aspect_ratio=normalized_aspect_ratio,
-            usage_context=resolved_usage_context,
-            reference_image_bytes=reference_image_bytes,
-            reference_image_mime_type=reference_image_mime_type,
-            reference_asset_public_id=reference_asset_public_id,
-            reference_asset_id=reference_asset_id,
-            product_id=product_id,
-            tags=resolved_tags,
-        )
+    client = renderer_client or TestimonialRendererClient()
+    render_bytes = client.render_png(payload=payload)
+    reviewer_name = _clean_single_line(str(payload.get("name") or "Customer"))
+    alt_text = f"Review from {reviewer_name}" if reviewer_name else "Customer review"
+    return create_funnel_upload_asset(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        content_bytes=render_bytes,
+        filename=f"shopify-theme-testimonial-{uuid4().hex}.png",
+        content_type="image/png",
+        alt=alt_text,
+        usage_context=resolved_usage_context,
+        product_id=product_id,
+        tags=resolved_tags,
+    )
 
 
 def _resolve_testimonial_template(image: dict[str, Any]) -> str:
@@ -2021,6 +1990,281 @@ def _parse_testimonials_response(raw: str, *, model_id: str) -> dict[str, Any]:
     )
 
 
+def _generate_validated_synthetic_testimonials(
+    *,
+    count: int,
+    copy_text: str,
+    product_context: str,
+    model: str | None = None,
+    temperature: float = 0.3,
+    max_tokens: int | None = None,
+    max_duration_seconds: int | None = None,
+    uniqueness_scope: str,
+) -> tuple[list[dict[str, Any]], str]:
+    if count < 0:
+        raise TestimonialGenerationError("count must be non-negative.")
+    if count == 0:
+        llm = LLMClient()
+        return [], (model or llm.default_model)
+
+    llm = LLMClient()
+    model_id = model or llm.default_model
+    if max_duration_seconds is not None and max_duration_seconds <= 0:
+        raise TestimonialGenerationError("maxDurationSeconds must be > 0 when provided.")
+    deadline_ts = (
+        time.monotonic() + float(max_duration_seconds)
+        if max_duration_seconds is not None
+        else None
+    )
+
+    def ensure_within_budget(step: str) -> None:
+        if deadline_ts is not None and time.monotonic() >= deadline_ts:
+            raise TestimonialGenerationError(
+                f"Testimonials step exceeded configured time budget while {step}."
+            )
+
+    if _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS <= 0:
+        raise TestimonialGenerationError(
+            "FUNNEL_TESTIMONIAL_IDENTITY_ATTEMPTS must be greater than zero."
+        )
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    batch_size = 6
+    validated_testimonials: list[dict[str, Any]] = []
+    for identity_attempt in range(1, _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS + 1):
+        ensure_within_budget("generating testimonial identities")
+        candidate_validated: list[dict[str, Any]] = []
+        reserved_names: list[str] = []
+        reserved_name_keys: set[str] = set()
+        attempt_temperature = min(
+            max(float(temperature), 0.0) + 0.1 * (identity_attempt - 1),
+            0.9,
+        )
+        attempt_nonce = (
+            f"{uniqueness_scope}:{identity_attempt}:{uuid4().hex[:8]}"
+        )
+
+        for batch_idx, start in enumerate(range(0, count, batch_size)):
+            ensure_within_budget("requesting testimonial LLM batches")
+            batch_count = min(batch_size, count - start)
+            prompt = _build_testimonial_prompt(
+                count=batch_count,
+                copy=copy_text,
+                product_context=product_context,
+                today=today,
+                uniqueness_nonce=f"{attempt_nonce}:batch:{batch_idx}",
+                reserved_names=reserved_names,
+            )
+
+            parsed: dict[str, Any]
+            if isinstance(model_id, str) and model_id.lower().startswith("claude"):
+                resp = call_claude_structured_message(
+                    model=model_id,
+                    system=None,
+                    user_content=[{"type": "text", "text": prompt}],
+                    output_schema=_testimonial_output_schema(batch_count),
+                    max_tokens=int(max_tokens) if max_tokens else 16_000,
+                    temperature=attempt_temperature,
+                )
+                parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
+                if not isinstance(parsed_value, dict):
+                    raise TestimonialGenerationError(
+                        "Claude structured testimonials response was not a JSON object."
+                    )
+                parsed = parsed_value
+            else:
+                params = LLMGenerationParams(
+                    model=model_id,
+                    max_tokens=max_tokens,
+                    temperature=attempt_temperature,
+                    use_reasoning=True,
+                    use_web_search=False,
+                    response_format={
+                        "type": "json_schema",
+                        "json_schema": {
+                            "name": "Testimonials",
+                            "strict": True,
+                            "schema": _testimonial_output_schema(batch_count),
+                        },
+                    },
+                )
+                raw = llm.generate_text(prompt, params=params)
+                parsed = _parse_testimonials_response(raw, model_id=model_id)
+            batch_items = parsed.get("testimonials")
+            if not isinstance(batch_items, list):
+                raise TestimonialGenerationError(
+                    "Testimonials response must include a testimonials array."
+                )
+            if len(batch_items) != batch_count:
+                raise TestimonialGenerationError(
+                    f"Expected {batch_count} testimonials, received {len(batch_items)}."
+                )
+
+            batch_validated: list[dict[str, Any]] = []
+            for idx, raw in enumerate(batch_items):
+                global_pos = len(candidate_validated) + idx + 1
+                try:
+                    batch_validated.append(_validate_testimonial_payload(raw or {}))
+                except TestimonialGenerationError as exc:
+                    raise TestimonialGenerationError(
+                        f"Invalid testimonial payload at position {global_pos}: {exc}"
+                    ) from exc
+            candidate_validated.extend(batch_validated)
+
+            for item in batch_validated:
+                primary = item.get("name")
+                if isinstance(primary, str) and primary.strip():
+                    key = _normalize_identity_key(primary)
+                    if key and key not in reserved_name_keys:
+                        reserved_name_keys.add(key)
+                        reserved_names.append(primary.strip())
+                reply = item.get("reply")
+                if isinstance(reply, dict):
+                    reply_name = reply.get("name")
+                    if isinstance(reply_name, str) and reply_name.strip():
+                        key = _normalize_identity_key(reply_name)
+                        if key and key not in reserved_name_keys:
+                            reserved_name_keys.add(key)
+                            reserved_names.append(reply_name.strip())
+
+        try:
+            _assert_distinct_testimonial_identities(candidate_validated)
+        except TestimonialGenerationError as exc:
+            is_duplicate_identity_error = "duplicate testimonial" in str(exc).lower()
+            if not is_duplicate_identity_error:
+                raise
+
+            repaired_identities = _repair_distinct_testimonial_identities(
+                candidate_validated
+            )
+            if repaired_identities is not None:
+                _assert_distinct_testimonial_identities(repaired_identities)
+                candidate_validated = repaired_identities
+            elif identity_attempt >= _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS:
+                raise
+            else:
+                continue
+
+        validated_testimonials = candidate_validated
+        break
+
+    if not validated_testimonials:
+        raise TestimonialGenerationError(
+            "Unable to generate distinct testimonial identities after configured retries."
+        )
+    return validated_testimonials, model_id
+
+
+def _build_shopify_theme_testimonial_product_context(*, product: Product) -> str:
+    payload = {
+        "product": {
+            "id": str(product.id),
+            "title": str(product.title or "").strip(),
+            "description": str(product.description or "").strip(),
+            "productType": str(product.product_type or "").strip(),
+            "primaryBenefits": [
+                item.strip()
+                for item in (product.primary_benefits or [])
+                if isinstance(item, str) and item.strip()
+            ],
+            "featureBullets": [
+                item.strip()
+                for item in (product.feature_bullets or [])
+                if isinstance(item, str) and item.strip()
+            ],
+            "guaranteeText": str(product.guarantee_text or "").strip(),
+            "disclaimers": [
+                item.strip()
+                for item in (product.disclaimers or [])
+                if isinstance(item, str) and item.strip()
+            ],
+        }
+    }
+    return (
+        "Product context (source of truth; do not invent missing details):\n"
+        f"{json.dumps(payload, ensure_ascii=False)}\n\n"
+    )
+
+
+def generate_shopify_theme_review_card_payloads(
+    *,
+    product: Product,
+    slot_paths: list[str],
+    general_prompt_context: str | None = None,
+    slot_prompt_context_by_path: dict[str, str] | None = None,
+    model: str | None = None,
+    temperature: float = 0.3,
+    max_tokens: int | None = None,
+    max_duration_seconds: int | None = None,
+) -> tuple[dict[str, dict[str, Any]], str]:
+    normalized_slot_paths: list[str] = []
+    seen_slot_paths: set[str] = set()
+    for raw_slot_path in slot_paths:
+        if not isinstance(raw_slot_path, str) or not raw_slot_path.strip():
+            continue
+        normalized_slot_path = raw_slot_path.strip()
+        if normalized_slot_path in seen_slot_paths:
+            continue
+        seen_slot_paths.add(normalized_slot_path)
+        normalized_slot_paths.append(normalized_slot_path)
+
+    if not normalized_slot_paths:
+        return {}, (model or LLMClient().default_model)
+
+    configured_image_model = str(settings.TESTIMONIAL_RENDERER_IMAGE_MODEL or "").strip()
+    if not configured_image_model:
+        raise TestimonialRendererConfigError(
+            "TESTIMONIAL_RENDERER_IMAGE_MODEL is required for Shopify testimonial image generation."
+        )
+
+    copy_segments: list[str] = []
+    normalized_general_prompt_context = _clean_single_line(general_prompt_context or "")
+    if normalized_general_prompt_context:
+        copy_segments.append(normalized_general_prompt_context)
+    for slot_path in normalized_slot_paths:
+        slot_prompt_context = _clean_single_line(
+            (slot_prompt_context_by_path or {}).get(slot_path, "")
+        )
+        if not slot_prompt_context:
+            continue
+        copy_segments.append(
+            f"Review image objective for {slot_path}: {slot_prompt_context}"
+        )
+    copy_text = "\n".join(copy_segments).strip()
+    if len(copy_text) > 5000:
+        copy_text = copy_text[:5000].rstrip()
+
+    validated_testimonials, model_id = _generate_validated_synthetic_testimonials(
+        count=len(normalized_slot_paths),
+        copy_text=copy_text,
+        product_context=_build_shopify_theme_testimonial_product_context(product=product),
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        max_duration_seconds=max_duration_seconds,
+        uniqueness_scope=f"shopify-theme:{product.id}",
+    )
+    payload_by_slot_path: dict[str, dict[str, Any]] = {}
+    for slot_path, testimonial in zip(
+        normalized_slot_paths, validated_testimonials, strict=True
+    ):
+        payload: dict[str, Any] = {
+            "template": "review_card",
+            "name": testimonial["name"],
+            "verified": testimonial["verified"],
+            "rating": testimonial["rating"],
+            "review": testimonial["review"],
+            "avatarPrompt": testimonial["avatarPrompt"],
+            "heroImagePrompt": testimonial["heroImagePrompt"],
+            "imageModel": configured_image_model,
+        }
+        meta = testimonial.get("meta")
+        if isinstance(meta, dict):
+            payload["meta"] = meta
+        payload_by_slot_path[slot_path] = payload
+    return payload_by_slot_path, model_id
+
+
 def generate_funnel_page_testimonials(
     *,
     session: Session,
@@ -2108,8 +2352,6 @@ def generate_funnel_page_testimonials(
     if not copy_text.strip():
         raise TestimonialGenerationError("Unable to extract page copy for testimonial generation.")
 
-    llm = LLMClient()
-    model_id = model or llm.default_model
     if max_duration_seconds is not None and max_duration_seconds <= 0:
         raise TestimonialGenerationError("maxDurationSeconds must be > 0 when provided.")
     deadline_ts = (
@@ -2123,6 +2365,8 @@ def generate_funnel_page_testimonials(
             raise TestimonialGenerationError(
                 f"Testimonials step exceeded configured time budget while {step}."
             )
+
+    model_id: str
 
     today = datetime.now(timezone.utc).date().isoformat()
     batch_size = 6
@@ -2146,127 +2390,22 @@ def generate_funnel_page_testimonials(
     social_comment_index = 0
     review_card_index = 0
 
-    if _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS <= 0:
-        raise TestimonialGenerationError(
-            "FUNNEL_TESTIMONIAL_IDENTITY_ATTEMPTS must be greater than zero."
+    remaining_duration_seconds: int | None = None
+    if deadline_ts is not None:
+        remaining_duration_seconds = max(
+            1,
+            int(deadline_ts - time.monotonic()),
         )
-
-    validated_testimonials: list[dict[str, Any]] = []
-    for identity_attempt in range(1, _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS + 1):
-        ensure_within_budget("generating testimonial identities")
-        candidate_validated: list[dict[str, Any]] = []
-        reserved_names: list[str] = []
-        reserved_name_keys: set[str] = set()
-        attempt_temperature = min(max(float(temperature), 0.0) + 0.1 * (identity_attempt - 1), 0.9)
-        attempt_nonce = f"{funnel_id}:{page_id}:{resolved_template_id}:{identity_attempt}:{uuid4().hex[:8]}"
-
-        for batch_idx, start in enumerate(range(0, len(groups), batch_size)):
-            ensure_within_budget("requesting testimonial LLM batches")
-            batch = groups[start : start + batch_size]
-            prompt = _build_testimonial_prompt(
-                count=len(batch),
-                copy=copy_text,
-                product_context=product_context,
-                today=today,
-                uniqueness_nonce=f"{attempt_nonce}:batch:{batch_idx}",
-                reserved_names=reserved_names,
-            )
-
-            parsed: dict[str, Any]
-            if isinstance(model_id, str) and model_id.lower().startswith("claude"):
-                # LLMClient's Anthropic path currently ignores response_format/json_schema.
-                # Use Anthropic structured outputs directly so we never accept partial/invalid JSON.
-                claude_max_tokens = int(max_tokens) if max_tokens else 16_000
-                resp = call_claude_structured_message(
-                    model=model_id,
-                    system=None,
-                    user_content=[{"type": "text", "text": prompt}],
-                    output_schema=_testimonial_output_schema(len(batch)),
-                    max_tokens=claude_max_tokens,
-                    temperature=attempt_temperature,
-                )
-                parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
-                if not isinstance(parsed_value, dict):
-                    raise TestimonialGenerationError("Claude structured testimonials response was not a JSON object.")
-                parsed = parsed_value
-            else:
-                params = LLMGenerationParams(
-                    model=model_id,
-                    max_tokens=max_tokens,
-                    temperature=attempt_temperature,
-                    use_reasoning=True,
-                    use_web_search=False,
-                    response_format={
-                        "type": "json_schema",
-                        "json_schema": {
-                            "name": "Testimonials",
-                            "strict": True,
-                            "schema": _testimonial_output_schema(len(batch)),
-                        },
-                    },
-                )
-                raw = llm.generate_text(prompt, params=params)
-                parsed = _parse_testimonials_response(raw, model_id=model_id)
-            batch_items = parsed.get("testimonials")
-            if not isinstance(batch_items, list):
-                raise TestimonialGenerationError("Testimonials response must include a testimonials array.")
-            if len(batch_items) != len(batch):
-                raise TestimonialGenerationError(
-                    f"Expected {len(batch)} testimonials, received {len(batch_items)}."
-                )
-
-            batch_validated: list[dict[str, Any]] = []
-            for idx, raw in enumerate(batch_items):
-                global_pos = len(candidate_validated) + idx + 1
-                try:
-                    batch_validated.append(_validate_testimonial_payload(raw or {}))
-                except TestimonialGenerationError as exc:
-                    raise TestimonialGenerationError(
-                        f"Invalid testimonial payload at position {global_pos}: {exc}"
-                    ) from exc
-            candidate_validated.extend(batch_validated)
-
-            # Feed identities from earlier batches back into later batches so we don't
-            # fail validation due to cross-batch repeats (reviewers or replies).
-            for item in batch_validated:
-                primary = item.get("name")
-                if isinstance(primary, str) and primary.strip():
-                    key = _normalize_identity_key(primary)
-                    if key and key not in reserved_name_keys:
-                        reserved_name_keys.add(key)
-                        reserved_names.append(primary.strip())
-                reply = item.get("reply")
-                if isinstance(reply, dict):
-                    reply_name = reply.get("name")
-                    if isinstance(reply_name, str) and reply_name.strip():
-                        key = _normalize_identity_key(reply_name)
-                        if key and key not in reserved_name_keys:
-                            reserved_name_keys.add(key)
-                            reserved_names.append(reply_name.strip())
-
-        try:
-            _assert_distinct_testimonial_identities(candidate_validated)
-        except TestimonialGenerationError as exc:
-            is_duplicate_identity_error = "duplicate testimonial" in str(exc).lower()
-            if not is_duplicate_identity_error:
-                raise
-
-            repaired_identities = _repair_distinct_testimonial_identities(candidate_validated)
-            if repaired_identities is not None:
-                _assert_distinct_testimonial_identities(repaired_identities)
-                candidate_validated = repaired_identities
-            elif identity_attempt >= _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS:
-                raise
-            else:
-                continue
-
-        validated_testimonials = candidate_validated
-        break
-
-    if not validated_testimonials:
-        raise TestimonialGenerationError(
-            "Unable to generate distinct testimonial identities after configured retries."
-        )
+    validated_testimonials, model_id = _generate_validated_synthetic_testimonials(
+        count=len(groups),
+        copy_text=copy_text,
+        product_context=product_context,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        max_duration_seconds=remaining_duration_seconds,
+        uniqueness_scope=f"{funnel_id}:{page_id}:{resolved_template_id}",
+    )
 
     generated: list[dict[str, Any]] = []
     try:

@@ -48,9 +48,15 @@ _POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY = {
     "terms_of_service": "terms_of_service.md",
     "returns_refunds_policy": "returns_refunds_policy.md",
     "shipping_policy": "shipping_policy.md",
-    "contact_support": "contact_support.md",
     "company_information": "company_information.md",
     "subscription_terms_and_cancellation": "subscription_terms_and_cancellation.md",
+}
+
+_THEME_MANAGED_POLICY_TEMPLATE_MARKDOWN_BY_PAGE_KEY = {
+    "contact_support": (
+        "# Contact and Support\n\n"
+        "This page is theme-managed and should use the storefront contact-form template.\n"
+    )
 }
 
 _PLACEHOLDER_RE = re.compile(r"\{\{\s*([a-z0-9_]+)\s*\}\}")
@@ -929,12 +935,14 @@ _POLICY_TEMPLATES: dict[str, dict[str, Any]] = {
 
 _template_keys = set(_POLICY_TEMPLATES)
 _file_map_keys = set(_POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY)
-if _template_keys != _file_map_keys:
-    missing_file_mappings = sorted(_template_keys - _file_map_keys)
-    extra_file_mappings = sorted(_file_map_keys - _template_keys)
+_theme_managed_markdown_keys = set(_THEME_MANAGED_POLICY_TEMPLATE_MARKDOWN_BY_PAGE_KEY)
+_covered_keys = _file_map_keys | _theme_managed_markdown_keys
+if _template_keys != _covered_keys:
+    missing_template_coverage = sorted(_template_keys - _covered_keys)
+    extra_template_coverage = sorted(_covered_keys - _template_keys)
     raise RuntimeError(
-        "Compliance policy template/file mapping mismatch. "
-        f"missing={missing_file_mappings} extra={extra_file_mappings}"
+        "Compliance policy template coverage mismatch. "
+        f"missing={missing_template_coverage} extra={extra_template_coverage}"
     )
 
 
@@ -954,6 +962,10 @@ _POLICY_TEMPLATES_DIRECTORY = _resolve_policy_templates_directory()
 
 
 def _load_policy_template_markdown(*, page_key: str) -> str:
+    theme_managed_template_markdown = _THEME_MANAGED_POLICY_TEMPLATE_MARKDOWN_BY_PAGE_KEY.get(page_key)
+    if theme_managed_template_markdown is not None:
+        return theme_managed_template_markdown
+
     filename = _POLICY_TEMPLATE_FILENAME_BY_PAGE_KEY.get(page_key)
     if not filename:
         raise KeyError(f"Unknown policy template key: {page_key}")
@@ -1038,6 +1050,8 @@ def get_profile_url_field_for_page_key(*, page_key: str) -> str:
 def get_policy_page_handle(*, page_key: str) -> str:
     if page_key not in _POLICY_TEMPLATES:
         raise KeyError(f"Unknown policy template key: {page_key}")
+    if page_key == "contact_support":
+        return "contact"
     return page_key.replace("_", "-")
 
 
@@ -1169,6 +1183,59 @@ def render_policy_template_markdown(
             f"Unresolved placeholders remain for page '{page_key}': {unresolved_str}."
         )
     return rendered
+
+
+def resolve_theme_contact_page_values(
+    *,
+    placeholder_values: dict[str, str],
+) -> dict[str, str]:
+    mapping = {
+        "supportEmail": "support_email",
+        "supportPhone": "support_phone",
+        "supportHours": "support_hours_text",
+        "businessAddress": "company_address_text",
+    }
+    missing_placeholders: list[str] = []
+    resolved_values: dict[str, str] = {}
+
+    for response_key, placeholder_key in mapping.items():
+        raw_value = placeholder_values.get(placeholder_key)
+        if raw_value is None or not raw_value.strip():
+            raw_value = _DEFAULT_POLICY_PLACEHOLDER_VALUES.get(placeholder_key)
+        if raw_value is None or not raw_value.strip():
+            missing_placeholders.append(placeholder_key)
+            continue
+        resolved_values[response_key] = raw_value.strip()
+
+    if missing_placeholders:
+        missing = ", ".join(sorted(missing_placeholders))
+        raise ValueError(
+            "Missing placeholder values for theme-managed contact page: "
+            f"{missing}."
+        )
+
+    return resolved_values
+
+
+def render_theme_contact_page_body_html(
+    *,
+    placeholder_values: dict[str, str],
+) -> str:
+    contact_values = resolve_theme_contact_page_values(
+        placeholder_values=placeholder_values
+    )
+    escaped_email = escape(contact_values["supportEmail"])
+    escaped_phone = escape(contact_values["supportPhone"])
+    escaped_hours = escape(contact_values["supportHours"]).replace("\n", "<br/>")
+    escaped_address = escape(contact_values["businessAddress"]).replace("\n", "<br/>")
+
+    return (
+        "<h1>Contact and Support</h1>\n"
+        "<p>Use the contact form on this page to reach our support team.</p>\n"
+        f"<p><strong>Email:</strong> <a href=\"mailto:{escaped_email}\">{escaped_email}</a></p>\n"
+        f"<p><strong>Phone:</strong> {escaped_phone}<br/>{escaped_hours}</p>\n"
+        f"<p><strong>Business address:</strong><br/>{escaped_address}</p>"
+    )
 
 
 def _max_classification(current: str, candidate: str) -> str:

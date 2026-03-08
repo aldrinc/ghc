@@ -213,6 +213,27 @@ def test_offer_step05_response_schema_enforces_bounded_compact_contract() -> Non
         ]
 
 
+def test_voc_agent00b_response_schema_closes_configuration_objects() -> None:
+    schema = strategy_v2_activities._voc_agent00b_response_schema()
+    configuration_item = schema["properties"]["configurations"]["items"]
+    metadata = configuration_item["properties"]["metadata"]
+
+    assert configuration_item["additionalProperties"] is False
+    assert configuration_item["required"] == ["config_id", "platform", "mode", "actor_id", "input"]
+    assert metadata["additionalProperties"] is False
+    assert set(metadata["properties"]) == {
+        "target_id",
+        "platform",
+        "mode",
+        "habitat_name",
+        "habitat_type",
+        "url_pattern",
+        "tier",
+        "source_stage",
+    }
+    assert "required" not in metadata
+
+
 def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.MonkeyPatch) -> None:
     agent02_asset = resolve_prompt_asset(
         pattern="VOC + Angle Engine (2-21-26)/prompts/agent-02b-voc-extractor.md",

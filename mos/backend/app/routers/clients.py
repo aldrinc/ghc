@@ -102,12 +102,17 @@ from app.services.compliance import (
     get_policy_template,
     get_profile_url_field_for_page_key,
     markdown_to_shopify_html,
+    resolve_theme_contact_page_values,
     render_policy_template_markdown,
 )
 from app.services.funnels import (
     create_funnel_image_asset,
     create_funnel_unsplash_asset,
     resolve_funnel_image_model_config,
+)
+from app.services.funnel_testimonials import (
+    generate_shopify_theme_review_card_payloads,
+    generate_shopify_theme_testimonial_image_asset,
 )
 from app.services.media_storage import MediaStorage
 from app.services.public_routing import require_product_route_slug
@@ -135,6 +140,10 @@ from app.services.shopify_theme_copy_agent import (
 )
 from app.services.shopify_theme_content_planner import (
     plan_shopify_theme_component_content,
+)
+from app.services.testimonial_renderer_client import (
+    TestimonialRendererConfigError,
+    TestimonialRendererRequestError,
 )
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
 from app.strategy_v2.feature_flags import is_strategy_v2_enabled
@@ -431,9 +440,17 @@ _THEME_SYNC_AI_IMAGE_MIN_SIZE_BY_ASPECT_RATIO = {
 _THEME_IMAGE_SLOT_CONFIG_PATH = (
     Path(__file__).resolve().parents[4] / "theme_image_slot_config.json"
 )
+_THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT = "default"
+_THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER = "testimonial_renderer"
+_THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_REVIEW_CARD = "review_card"
 
 
-def _load_theme_sync_slot_prompt_overrides() -> tuple[dict[str, str], dict[str, str]]:
+def _load_theme_sync_slot_prompt_overrides() -> tuple[
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+    dict[str, str],
+]:
     try:
         parsed = json.loads(_THEME_IMAGE_SLOT_CONFIG_PATH.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
@@ -463,6 +480,8 @@ def _load_theme_sync_slot_prompt_overrides() -> tuple[dict[str, str], dict[str, 
 
     aspect_ratio_overrides: dict[str, str] = {}
     render_hint_overrides: dict[str, str] = {}
+    generation_strategy_by_path: dict[str, str] = {}
+    testimonial_template_by_path: dict[str, str] = {}
     for raw_theme_name, raw_slots in raw_theme_map.items():
         if not isinstance(raw_theme_name, str) or not raw_theme_name.strip():
             raise RuntimeError(
@@ -537,12 +556,96 @@ def _load_theme_sync_slot_prompt_overrides() -> tuple[dict[str, str], dict[str, 
                     )
                 render_hint_overrides[slot_path] = normalized_render_hint
 
-    return aspect_ratio_overrides, render_hint_overrides
+            raw_generation_strategy = raw_slot.get("generationStrategy")
+            normalized_generation_strategy = _THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT
+            if raw_generation_strategy is not None:
+                if (
+                    not isinstance(raw_generation_strategy, str)
+                    or not raw_generation_strategy.strip()
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an invalid "
+                        "generationStrategy value. "
+                        f"theme={raw_theme_name}, index={index}."
+                    )
+                normalized_generation_strategy = raw_generation_strategy.strip().lower()
+                if normalized_generation_strategy not in {
+                    _THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT,
+                    _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER,
+                }:
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an unsupported "
+                        "generationStrategy value. "
+                        f"path={slot_path}, generationStrategy={normalized_generation_strategy}."
+                    )
+                existing_generation_strategy = generation_strategy_by_path.get(slot_path)
+                if (
+                    existing_generation_strategy is not None
+                    and existing_generation_strategy != normalized_generation_strategy
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains conflicting "
+                        "generationStrategy values. "
+                        f"path={slot_path}."
+                    )
+                if normalized_generation_strategy != _THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT:
+                    generation_strategy_by_path[slot_path] = normalized_generation_strategy
+
+            raw_testimonial_template = raw_slot.get("testimonialTemplate")
+            if raw_testimonial_template is not None:
+                if (
+                    not isinstance(raw_testimonial_template, str)
+                    or not raw_testimonial_template.strip()
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an invalid "
+                        "testimonialTemplate value. "
+                        f"theme={raw_theme_name}, index={index}."
+                    )
+                normalized_testimonial_template = raw_testimonial_template.strip()
+                if (
+                    normalized_testimonial_template
+                    != _THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_REVIEW_CARD
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains an unsupported "
+                        "testimonialTemplate value. "
+                        f"path={slot_path}, testimonialTemplate={normalized_testimonial_template}."
+                    )
+                if (
+                    normalized_generation_strategy
+                    != _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config can only use testimonialTemplate "
+                        "when generationStrategy=testimonial_renderer. "
+                        f"path={slot_path}."
+                    )
+                existing_testimonial_template = testimonial_template_by_path.get(slot_path)
+                if (
+                    existing_testimonial_template is not None
+                    and existing_testimonial_template != normalized_testimonial_template
+                ):
+                    raise RuntimeError(
+                        "Shared theme image slot config contains conflicting "
+                        "testimonialTemplate values. "
+                        f"path={slot_path}."
+                    )
+                testimonial_template_by_path[slot_path] = normalized_testimonial_template
+
+    return (
+        aspect_ratio_overrides,
+        render_hint_overrides,
+        generation_strategy_by_path,
+        testimonial_template_by_path,
+    )
 
 
 (
     _THEME_SYNC_SLOT_ASPECT_RATIO_OVERRIDE_BY_PATH,
     _THEME_SYNC_SLOT_IMAGE_RENDER_HINT_BY_PATH,
+    _THEME_SYNC_SLOT_GENERATION_STRATEGY_BY_PATH,
+    _THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_BY_PATH,
 ) = _load_theme_sync_slot_prompt_overrides()
 _GEMINI_IMAGE_REFERENCES_ENABLED_TRUE_VALUES = {"1", "true", "yes", "on"}
 _THEME_SYNC_IMAGE_GENERATION_MAX_CONCURRENCY = max(
@@ -3721,6 +3824,20 @@ def _build_theme_sync_default_slot_prompt_context_by_path(
     return context_by_path
 
 
+def _resolve_theme_sync_slot_generation_metadata(
+    slot_path: str,
+) -> tuple[str, str | None]:
+    normalized_slot_path = slot_path.strip()
+    generation_strategy = _THEME_SYNC_SLOT_GENERATION_STRATEGY_BY_PATH.get(
+        normalized_slot_path,
+        _THEME_SYNC_SLOT_GENERATION_STRATEGY_DEFAULT,
+    )
+    testimonial_template = _THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_BY_PATH.get(
+        normalized_slot_path
+    )
+    return generation_strategy, testimonial_template
+
+
 def _normalize_theme_slot_role(raw_role: Any) -> str:
     if not isinstance(raw_role, str):
         return "generic"
@@ -3868,6 +3985,7 @@ def _generate_theme_sync_ai_image_assets(
     org_id: str,
     client_id: str,
     product_id: str | None,
+    product: Product | None = None,
     image_slots: list[dict[str, Any]],
     text_slots: list[dict[str, Any]] | None = None,
     general_prompt_context: str | None = None,
@@ -3896,6 +4014,38 @@ def _generate_theme_sync_ai_image_assets(
         ):
             continue
         normalized_slot_prompt_context_by_path[raw_path.strip()] = raw_context.strip()
+    testimonial_review_slot_paths: list[str] = []
+    for raw_slot in selected_slots:
+        if not isinstance(raw_slot, dict):
+            continue
+        raw_slot_path = raw_slot.get("path")
+        if not isinstance(raw_slot_path, str) or not raw_slot_path.strip():
+            continue
+        slot_path = raw_slot_path.strip()
+        generation_strategy, _ = _resolve_theme_sync_slot_generation_metadata(slot_path)
+        if (
+            generation_strategy
+            == _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER
+        ):
+            testimonial_review_slot_paths.append(slot_path)
+    testimonial_render_payload_by_slot_path: dict[str, dict[str, Any]] = {}
+    if testimonial_review_slot_paths:
+        if product is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Shopify testimonial image generation requires a product for "
+                    "review-card slots."
+                ),
+            )
+        testimonial_render_payload_by_slot_path, _ = (
+            generate_shopify_theme_review_card_payloads(
+                product=product,
+                slot_paths=testimonial_review_slot_paths,
+                general_prompt_context=general_prompt_context,
+                slot_prompt_context_by_path=normalized_slot_prompt_context_by_path,
+            )
+        )
     if reference_image_bytes is not None:
         if not reference_image_bytes:
             raise HTTPException(
@@ -3927,11 +4077,43 @@ def _generate_theme_sync_ai_image_assets(
         slot_path: str,
         slot_role: str,
         slot_recommended_aspect: str,
+        generation_strategy: str,
         aspect_ratio: str,
-        prompt: str,
+        prompt: str | None = None,
+        render_payload: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with SessionLocal() as slot_session:
             try:
+                if (
+                    generation_strategy
+                    == _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER
+                ):
+                    if not isinstance(render_payload, dict) or not render_payload:
+                        raise RuntimeError(
+                            "Testimonial render payload is required for routed review slots."
+                        )
+                    generated_asset = generate_shopify_theme_testimonial_image_asset(
+                        session=slot_session,
+                        org_id=org_id,
+                        client_id=client_id,
+                        slot_path=slot_path,
+                        payload=render_payload,
+                        product_id=product_id,
+                        tags=["shopify_theme_sync", "component_image"],
+                    )
+                    return {
+                        "slotPath": slot_path,
+                        "asset": generated_asset,
+                        "source": _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER,
+                        "rateLimited": False,
+                        "quotaExhausted": False,
+                        "error": None,
+                        "exception": None,
+                    }
+                if not isinstance(prompt, str) or not prompt.strip():
+                    raise RuntimeError(
+                        "AI image prompt is required for non-testimonial Shopify theme slots."
+                    )
                 generated_asset = create_funnel_image_asset(
                     session=slot_session,
                     org_id=org_id,
@@ -3958,6 +4140,20 @@ def _generate_theme_sync_ai_image_assets(
                     "rateLimited": False,
                     "quotaExhausted": False,
                     "error": None,
+                    "exception": None,
+                }
+            except (
+                TestimonialRendererConfigError,
+                TestimonialRendererRequestError,
+            ) as exc:
+                return {
+                    "slotPath": slot_path,
+                    "asset": None,
+                    "source": None,
+                    "rateLimited": False,
+                    "quotaExhausted": False,
+                    "error": str(exc),
+                    "exception": exc,
                 }
             except Exception as exc:  # noqa: BLE001
                 if _is_gemini_hard_quota_exhaustion_error(exc):
@@ -3968,6 +4164,7 @@ def _generate_theme_sync_ai_image_assets(
                         "rateLimited": True,
                         "quotaExhausted": True,
                         "error": str(exc),
+                        "exception": None,
                     }
                 if _is_gemini_quota_or_rate_limit_error(exc):
                     return {
@@ -3977,6 +4174,7 @@ def _generate_theme_sync_ai_image_assets(
                         "rateLimited": True,
                         "quotaExhausted": False,
                         "error": str(exc),
+                        "exception": None,
                     }
                 return {
                     "slotPath": slot_path,
@@ -3985,6 +4183,7 @@ def _generate_theme_sync_ai_image_assets(
                     "rateLimited": False,
                     "quotaExhausted": False,
                     "error": str(exc),
+                    "exception": None,
                 }
 
     prepared_slots: list[dict[str, Any]] = []
@@ -4010,9 +4209,48 @@ def _generate_theme_sync_ai_image_assets(
             slot_recommended_aspect,
             slot_path=slot_path,
         )
+        generation_strategy, testimonial_template = (
+            _resolve_theme_sync_slot_generation_metadata(slot_path)
+        )
         role_aspect = (slot_role, slot_recommended_aspect)
         variant_count = variant_count_by_role_aspect.get(role_aspect, 0) + 1
         variant_count_by_role_aspect[role_aspect] = variant_count
+        prepared_slot = {
+            "slotPath": slot_path,
+            "slotKey": slot_key,
+            "slotRole": slot_role,
+            "recommendedAspect": slot_recommended_aspect,
+            "aspectRatio": aspect_ratio,
+            "generationStrategy": generation_strategy,
+        }
+        if (
+            generation_strategy
+            == _THEME_SYNC_SLOT_GENERATION_STRATEGY_TESTIMONIAL_RENDERER
+        ):
+            if (
+                testimonial_template
+                != _THEME_SYNC_SLOT_TESTIMONIAL_TEMPLATE_REVIEW_CARD
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Routed testimonial review slots must declare "
+                        "testimonialTemplate=review_card. "
+                        f"slotPath={slot_path}."
+                    ),
+                )
+            render_payload = testimonial_render_payload_by_slot_path.get(slot_path)
+            if not isinstance(render_payload, dict) or not render_payload:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=(
+                        "Shopify testimonial review payload generation did not return a "
+                        f"payload for slotPath={slot_path}."
+                    ),
+                )
+            prepared_slot["renderPayload"] = render_payload
+            prepared_slots.append(prepared_slot)
+            continue
         prompt = _build_theme_sync_slot_image_prompt(
             slot_role=slot_role,
             slot_key=slot_key,
@@ -4023,16 +4261,8 @@ def _generate_theme_sync_ai_image_assets(
             general_prompt_context=general_prompt_context,
             slot_prompt_context=normalized_slot_prompt_context_by_path.get(slot_path),
         )
-        prepared_slots.append(
-            {
-                "slotPath": slot_path,
-                "slotKey": slot_key,
-                "slotRole": slot_role,
-                "recommendedAspect": slot_recommended_aspect,
-                "aspectRatio": aspect_ratio,
-                "prompt": prompt,
-            }
-        )
+        prepared_slot["prompt"] = prompt
+        prepared_slots.append(prepared_slot)
 
     total_slots = len(prepared_slots)
     _emit_theme_sync_progress(
@@ -4078,8 +4308,10 @@ def _generate_theme_sync_ai_image_assets(
                     slot_path=slot_path,
                     slot_role=slot["slotRole"],
                     slot_recommended_aspect=slot["recommendedAspect"],
+                    generation_strategy=slot["generationStrategy"],
                     aspect_ratio=slot["aspectRatio"],
-                    prompt=slot["prompt"],
+                    prompt=slot.get("prompt"),
+                    render_payload=slot.get("renderPayload"),
                 )
             except Exception as exc:  # noqa: BLE001
                 outcome = {
@@ -4089,6 +4321,7 @@ def _generate_theme_sync_ai_image_assets(
                     "rateLimited": False,
                     "quotaExhausted": False,
                     "error": str(exc),
+                    "exception": None,
                 }
             outcomes_by_path[slot_path] = outcome
             completed_count += 1
@@ -4137,8 +4370,10 @@ def _generate_theme_sync_ai_image_assets(
                     slot_path=slot["slotPath"],
                     slot_role=slot["slotRole"],
                     slot_recommended_aspect=slot["recommendedAspect"],
+                    generation_strategy=slot["generationStrategy"],
                     aspect_ratio=slot["aspectRatio"],
-                    prompt=slot["prompt"],
+                    prompt=slot.get("prompt"),
+                    render_payload=slot.get("renderPayload"),
                 )
                 futures[future] = slot["slotPath"]
             for future in concurrent.futures.as_completed(futures):
@@ -4153,6 +4388,7 @@ def _generate_theme_sync_ai_image_assets(
                         "rateLimited": False,
                         "quotaExhausted": False,
                         "error": str(exc),
+                        "exception": None,
                     }
                 outcomes_by_path[slot_path] = outcome
                 completed_count += 1
@@ -4177,6 +4413,12 @@ def _generate_theme_sync_ai_image_assets(
         outcome = outcomes_by_path.get(slot_path) or {}
         generated_asset = outcome.get("asset")
         if generated_asset is None:
+            special_exception = outcome.get("exception")
+            if isinstance(
+                special_exception,
+                (TestimonialRendererConfigError, TestimonialRendererRequestError),
+            ):
+                raise special_exception
             raw_slot_error = outcome.get("error")
             if isinstance(raw_slot_error, str) and raw_slot_error.strip():
                 slot_error_by_path[slot_path] = raw_slot_error.strip()
@@ -4663,6 +4905,7 @@ def _prepare_shopify_theme_template_build_data(
             org_id=auth.org_id,
             client_id=client_id,
             product_id=resolved_product_storage_id,
+            product=resolved_product,
             image_slots=planner_image_slots,
             text_slots=text_slots,
             reference_image_bytes=(
@@ -6131,6 +6374,7 @@ def _generate_shopify_theme_template_draft_images(
                 org_id=auth.org_id,
                 client_id=client_id,
                 product_id=resolved_product_id,
+                product=resolved_product,
                 image_slots=image_slots_pending_generation,
                 text_slots=text_slots,
                 general_prompt_context=effective_general_context,
@@ -6156,6 +6400,11 @@ def _generate_shopify_theme_template_draft_images(
                     if isinstance(slot_path, str) and slot_path.strip()
                 }
             )
+        except (
+            TestimonialRendererConfigError,
+            TestimonialRendererRequestError,
+        ):
+            raise
         except Exception as exc:  # noqa: BLE001
             image_generation_error = _format_non_fatal_generation_error(
                 stage="Image generation",
@@ -6926,12 +7175,8 @@ def _sync_compliance_policy_pages_for_template_export(
         placeholders["website_url"] = website_url
 
     try:
-        contact_support_markdown = render_policy_template_markdown(
-            page_key="contact_support",
+        contact_support_values = resolve_theme_contact_page_values(
             placeholder_values=placeholders,
-        )
-        contact_support_values = _extract_contact_support_template_values_from_markdown(
-            markdown=contact_support_markdown,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc

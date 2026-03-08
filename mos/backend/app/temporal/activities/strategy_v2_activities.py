@@ -334,6 +334,33 @@ _VOC_AGENT00_APIFY_CONFIG_SCHEMA: dict[str, Any] = {
     },
     "required": ["config_id", "actor_id", "input", "metadata"],
 }
+_VOC_AGENT00B_CONFIG_METADATA_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "target_id": {"type": "string", "minLength": 1},
+        "platform": {"type": "string", "minLength": 1},
+        "mode": {"type": "string", "minLength": 1},
+        "habitat_name": {"type": "string", "minLength": 1},
+        "habitat_type": {"type": "string", "minLength": 1},
+        "url_pattern": {"type": "string", "minLength": 1},
+        "tier": {"type": "string", "minLength": 1},
+        "source_stage": {"type": "string", "minLength": 1},
+    },
+}
+_VOC_AGENT00B_CONFIG_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "config_id": {"type": "string", "minLength": 1},
+        "platform": {"type": "string", "minLength": 1},
+        "mode": {"type": "string", "minLength": 1},
+        "actor_id": {"type": "string", "minLength": 1},
+        "input": _APIFY_EXEC_INPUT_SCHEMA,
+        "metadata": _VOC_AGENT00B_CONFIG_METADATA_SCHEMA,
+    },
+    "required": ["config_id", "platform", "mode", "actor_id", "input"],
+}
 _VOC_AGENT00_HANDOFF_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -5965,6 +5992,27 @@ def _merge_voc_corpus_for_agent2(
     }
 
 
+def _voc_agent00b_response_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "platform_priorities": {
+                "type": "array",
+                "minItems": 1,
+                "items": {"type": "string", "minLength": 1},
+            },
+            "configurations": {
+                "type": "array",
+                "minItems": 1,
+                "items": deepcopy(_VOC_AGENT00B_CONFIG_SCHEMA),
+            },
+            "handoff_block": {"type": "string"},
+        },
+        "required": ["platform_priorities", "configurations"],
+    }
+
+
 def _build_proof_candidates_from_voc(
     *,
     voc_rows: list[dict[str, Any]],
@@ -9196,36 +9244,7 @@ def run_strategy_v2_voc_agent0b_social_video_strategy_activity(params: dict[str,
                 f"KNOWN_COMPETITOR_SOCIAL_ACCOUNTS:\n{_dump_prompt_json(stage1.competitor_urls, max_chars=6000)}\n"
             ),
             schema_name="strategy_v2_voc_agent00b",
-            schema={
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "platform_priorities": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {"type": "string", "minLength": 1},
-                    },
-                    "configurations": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": True,
-                            "properties": {
-                                "config_id": {"type": "string", "minLength": 1},
-                                "platform": {"type": "string", "minLength": 1},
-                                "mode": {"type": "string", "minLength": 1},
-                                "actor_id": {"type": "string", "minLength": 1},
-                                "input": _APIFY_EXEC_INPUT_SCHEMA,
-                                "metadata": {"type": "object", "additionalProperties": True},
-                            },
-                            "required": ["config_id", "platform", "mode", "actor_id", "input"],
-                        },
-                    },
-                    "handoff_block": {"type": "string"},
-                },
-                "required": ["platform_priorities", "configurations"],
-            },
+            schema=_voc_agent00b_response_schema(),
             use_reasoning=True,
             reasoning_effort="xhigh",
             use_web_search=True,
@@ -11213,36 +11232,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         f"KNOWN_COMPETITOR_SOCIAL_ACCOUNTS:\n{_dump_prompt_json(stage1.competitor_urls, max_chars=6000)}\n"
                     ),
                     schema_name="strategy_v2_voc_agent00b",
-                    schema={
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "platform_priorities": {
-                                "type": "array",
-                                "minItems": 1,
-                                "items": {"type": "string", "minLength": 1},
-                            },
-                            "configurations": {
-                                "type": "array",
-                                "minItems": 1,
-                                "items": {
-                                    "type": "object",
-                                    "additionalProperties": True,
-                                    "properties": {
-                                        "config_id": {"type": "string", "minLength": 1},
-                                        "platform": {"type": "string", "minLength": 1},
-                                        "mode": {"type": "string", "minLength": 1},
-                                        "actor_id": {"type": "string", "minLength": 1},
-                                        "input": _APIFY_EXEC_INPUT_SCHEMA,
-                                        "metadata": {"type": "object", "additionalProperties": True},
-                                    },
-                                    "required": ["config_id", "platform", "mode", "actor_id", "input"],
-                                },
-                            },
-                            "handoff_block": {"type": "string"},
-                        },
-                        "required": ["platform_priorities", "configurations"],
-                    },
+                    schema=_voc_agent00b_response_schema(),
                     use_reasoning=True,
                     reasoning_effort="xhigh",
                     use_web_search=True,

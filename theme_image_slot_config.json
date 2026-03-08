@@ -31,7 +31,7 @@
         "role": "gallery",
         "recommendedAspect": "square",
         "promptAspectRatio": "1:1",
-        "promptRenderHint": "Render target: 500x500 desktop-equivalent frame and 300x300 mobile-equivalent frame. Fill the full frame edge-to-edge with no borders, empty margins, or embedded frames. After placement, the left outer corners stay rounded and the right side remains sharp where the image meets the text column."
+        "promptRenderHint": "Render target: square master image that must work in a 500x500 desktop-equivalent frame and a full-width mobile crop with a fixed 300px visible height (roughly 390x300 on a typical phone). Fill the full source edge-to-edge with no borders, empty margins, or embedded frames. Keep the focal subject centered with safe padding on all sides so the shorter mobile crop still preserves the key detail. After placement, the left outer corners stay rounded and the right side remains sharp where the image meets the text column."
       },
       {
         "path": "templates/index.json.sections.image_with_text_aQPm77.settings.image",
@@ -39,7 +39,7 @@
         "role": "gallery",
         "recommendedAspect": "square",
         "promptAspectRatio": "1:1",
-        "promptRenderHint": "Render target: 450x450 desktop-equivalent frame. Fill the full frame edge-to-edge with no borders, empty margins, or embedded frames. After placement, the right outer corners stay rounded and the left side remains sharp where the image meets the text column."
+        "promptRenderHint": "Render target: square master image that must work in a 450x450 desktop-equivalent frame and a full-width mobile square frame (roughly 390x390 on a typical phone). Fill the full source edge-to-edge with no borders, empty margins, or embedded frames. Keep the focal subject centered with safe margins so the composition holds together when scaled to the full mobile width. After placement, the right outer corners stay rounded and the left side remains sharp where the image meets the text column."
       },
       {
         "path": "templates/index.json.sections.image_with_text_overlay_7fYM3f.settings.image",
@@ -125,55 +125,73 @@
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_CieJRi.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_DTL7F7.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_EA4mWi.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_LUTUBp.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_MkDhxG.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_bCk3JY.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_dnta3i.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_mq6JiQ.settings.image",
         "key": "image",
         "role": "supporting",
-        "recommendedAspect": "square"
+        "recommendedAspect": "square",
+        "generationStrategy": "testimonial_renderer",
+        "testimonialTemplate": "review_card"
       },
       {
         "path": "templates/collection.json.sections.main-collection-banner.settings.image",
