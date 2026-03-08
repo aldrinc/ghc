@@ -3,18 +3,19 @@ from __future__ import annotations
 import base64
 import concurrent.futures
 import copy
+import io
 import json
 import os
 import random
 import re
 import time
-from contextlib import nullcontext
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Iterator, Optional, cast
 from uuid import uuid4
 
+from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -26,6 +27,7 @@ from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.funnels import create_funnel_image_asset, create_funnel_upload_asset
 from app.services.funnel_ai import _load_product_context
 from app.services.claude_files import call_claude_structured_message
+from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.funnels import _walk_json as walk_json
 from app.services.media_storage import MediaStorage
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
@@ -64,6 +66,14 @@ class _TestimonialGroup:
     context: _ConfigContext | None = None
 
 
+@dataclass
+class _SalesPdpCarouselTarget:
+    image: dict[str, Any]
+    label: str
+    slot_index: int
+    context: _ConfigContext | None = None
+
+
 _DATE_FORMAT = "%Y-%m-%d"
 _TESTIMONIAL_TEMPLATES = {"review_card", "social_comment", "testimonial_media"}
 _REVIEW_WALL_SOCIAL_RATIO = 0.60
@@ -80,6 +90,51 @@ _MEDIA_SCENE_MODE_CYCLE = (
 _SINGLE_SCENE_MODE_CYCLE = (_SCENE_MODE_WITH_PEOPLE, _SCENE_MODE_NO_PEOPLE)
 _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS = int(os.getenv("FUNNEL_TESTIMONIAL_IDENTITY_ATTEMPTS", "1"))
 _TESTIMONIAL_ASSET_MAX_CONCURRENCY = max(1, settings.FUNNEL_IMAGE_GENERATION_MAX_CONCURRENCY)
+_TESTIMONIAL_RENDER_WORKERS = max(1, int(os.getenv("FUNNEL_TESTIMONIAL_RENDER_WORKERS", "2")))
+_TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS = max(
+    30_000, int(os.getenv("FUNNEL_TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS", "90000"))
+)
+_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS = max(
+    30, int(os.getenv("FUNNEL_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS", "240"))
+)
+_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS = max(
+    1, int(os.getenv("FUNNEL_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS", "2"))
+)
+_SALES_PDP_CAROUSEL_CORE_SLOT_INDEX = 0
+_SALES_PDP_CAROUSEL_VARIANTS: tuple[dict[str, str], ...] = (
+    {
+        "variantId": "standard_ugc",
+        "template": "pdp_ugc_standard",
+        "sampleInput": "testimonial-renderer/samples/inputs/pdp_example1_standard_ugc_nano.json",
+        "archetype": "candid customer selfie with product clearly visible and believable everyday context.",
+    },
+    {
+        "variantId": "qa_ugc",
+        "template": "pdp_qa_ugc",
+        "sampleInput": "testimonial-renderer/samples/inputs/pdp_example2_qa_nano.json",
+        "archetype": "question-answer vibe where customer points to the product while reacting to a concern/objection.",
+    },
+    {
+        "variantId": "bold_claim",
+        "template": "pdp_bold_claim",
+        "sampleInput": "testimonial-renderer/samples/inputs/pdp_example3_bold_claim_nano.json",
+        "archetype": "product-forward frame with strong but compliant social-proof style comment.",
+    },
+    {
+        "variantId": "personal_highlight",
+        "template": "pdp_personal_highlight",
+        "sampleInput": "testimonial-renderer/samples/inputs/pdp_example4_personal_highlight_nano.json",
+        "archetype": "personal highlight moment showing the customer and product together.",
+    },
+    {
+        "variantId": "dorm_selfie",
+        "template": "pdp_ugc_standard",
+        "sampleInput": "testimonial-renderer/samples/inputs/pdp_example5_dorm_selfie_nano.json",
+        "archetype": "younger smartphone selfie vibe in a lived-in room, messy and authentic (not polished).",
+    },
+)
+_SALES_PDP_CAROUSEL_TOTAL_SLOTS = 1 + len(_SALES_PDP_CAROUSEL_VARIANTS)
+_SALES_PDP_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
 
 def _clean_single_line(text: str) -> str:
@@ -795,6 +850,68 @@ def _load_reference_asset_bytes(asset: Asset) -> tuple[bytes, str]:
     return image_bytes, resolved_mime.split(";")[0].strip()
 
 
+def _square_center_crop_png(image_bytes: bytes) -> bytes:
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as img:
+            rgba = img.convert("RGBA")
+            width, height = rgba.size
+            if width <= 0 or height <= 0:
+                raise TestimonialGenerationError("Source image has invalid dimensions.")
+            side = min(width, height)
+            left = (width - side) // 2
+            top = (height - side) // 2
+            square = rgba.crop((left, top, left + side, top + side))
+            if square.size != (1080, 1080):
+                resampling = getattr(Image, "Resampling", Image)
+                square = square.resize((1080, 1080), resampling.LANCZOS)
+            output = io.BytesIO()
+            square.save(output, format="PNG", optimize=True)
+            result = output.getvalue()
+            if not result:
+                raise TestimonialGenerationError("Square product image transform produced empty bytes.")
+            return result
+    except TestimonialGenerationError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise TestimonialGenerationError(
+            "Unable to convert product primary image into square carousel format."
+        ) from exc
+
+
+def _create_sales_pdp_square_core_asset(
+    *,
+    session: Session,
+    org_id: str,
+    client_id: str,
+    funnel_id: str,
+    page_id: str,
+    source_asset: Asset,
+    source_alt: str,
+    product_id: str | None,
+) -> Asset:
+    source_bytes, _ = _load_reference_asset_bytes(source_asset)
+    square_png = _square_center_crop_png(source_bytes)
+    return create_funnel_upload_asset(
+        session=session,
+        org_id=org_id,
+        client_id=client_id,
+        content_bytes=square_png,
+        filename=f"sales-pdp-carousel-{page_id}-core-square.png",
+        content_type="image/png",
+        alt=source_alt,
+        usage_context={
+            "kind": "sales_pdp_carousel_core_square",
+            "funnelId": funnel_id,
+            "pageId": page_id,
+            "sourceAssetId": str(source_asset.id),
+            "sourcePublicId": str(source_asset.public_id),
+        },
+        funnel_id=funnel_id,
+        product_id=product_id,
+        tags=["funnel", "testimonial", "sales_pdp_carousel", "core_product_image", "square_core"],
+    )
+
+
 def _should_soft_fail_gemini_missing_inline_data(exc: BaseException) -> bool:
     """Treat Gemini 'no inline image data' responses as non-fatal in rendering flows.
 
@@ -1006,13 +1123,13 @@ def generate_shopify_theme_testimonial_image_asset(
             if not normalized_tag or normalized_tag in resolved_tags:
                 continue
             resolved_tags.append(normalized_tag)
-    renderer_context = nullcontext(renderer) if renderer is not None else ThreadedTestimonialRenderer()
-    with renderer_context as active_renderer:
-        if active_renderer is None:
-            raise TestimonialRenderError(
-                "ThreadedTestimonialRenderer did not start for Shopify testimonial image generation."
-            )
-        render_bytes = active_renderer.render_png(payload)
+
+    if renderer is None:
+        with ThreadedTestimonialRenderer() as active_renderer:
+            render_bytes = active_renderer.render_png(payload)
+    else:
+        render_bytes = renderer.render_png(payload)
+
     reviewer_name = _clean_single_line(str(payload.get("name") or "Customer"))
     alt_text = f"Review from {reviewer_name}" if reviewer_name else "Customer review"
     return create_funnel_upload_asset(
@@ -1137,6 +1254,48 @@ def _collect_sales_pdp_targets(
             )
             groups.append(_TestimonialGroup(label=label, renders=[render], context=context))
     return groups
+
+
+def _collect_sales_pdp_carousel_targets(
+    config: dict[str, Any],
+    *,
+    context: _ConfigContext | None,
+    expected_count: int,
+) -> list[list[_SalesPdpCarouselTarget]]:
+    hero = config.get("hero") if "hero" in config else config
+    if not isinstance(hero, dict):
+        raise TestimonialGenerationError("Sales PDP hero config must be an object.")
+    gallery = hero.get("gallery")
+    if not isinstance(gallery, dict):
+        raise TestimonialGenerationError("Sales PDP hero.gallery must be an object.")
+    slides = gallery.get("slides")
+    if not isinstance(slides, list):
+        raise TestimonialGenerationError("Sales PDP hero.gallery.slides must be a list.")
+    if len(slides) < expected_count:
+        for idx in range(len(slides), expected_count):
+            slides.append({"alt": f"Sales PDP carousel image {idx + 1}"})
+        if context:
+            context.dirty = True
+    if len(slides) > expected_count:
+        del slides[expected_count:]
+        if context:
+            context.dirty = True
+
+    slot_targets: list[list[_SalesPdpCarouselTarget]] = [[] for _ in range(expected_count)]
+    for idx in range(expected_count):
+        slide = slides[idx]
+        if not isinstance(slide, dict):
+            raise TestimonialGenerationError(f"Sales PDP hero.gallery.slides[{idx}] must be an object.")
+        label = f"sales_pdp.hero.gallery.slides[{idx}]"
+        slot_targets[idx].append(
+            _SalesPdpCarouselTarget(
+                image=slide,
+                label=label,
+                slot_index=idx,
+                context=context,
+            )
+        )
+    return slot_targets
 
 
 def _collect_pre_sales_targets(
@@ -1294,6 +1453,60 @@ def _collect_testimonial_targets(
                 )
             seen_images.add(image_id)
     return groups, contexts
+
+
+def _collect_sales_pdp_carousel_slots(
+    puck_data: dict[str, Any],
+    *,
+    expected_count: int,
+) -> tuple[list[list[_SalesPdpCarouselTarget]], list[_ConfigContext]]:
+    if expected_count <= 0:
+        raise TestimonialGenerationError("Sales PDP carousel expected_count must be greater than zero.")
+
+    slot_targets: list[list[_SalesPdpCarouselTarget]] = [[] for _ in range(expected_count)]
+    contexts: list[_ConfigContext] = []
+    seen_image_ids: set[int] = set()
+    found_component = False
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        if comp_type not in {"SalesPdpHero", "SalesPdpTemplate"}:
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        found_component = True
+        config, ctx = _parse_config_context(props)
+        if not isinstance(config, dict):
+            raise TestimonialGenerationError(f"{comp_type} is missing config/configJson.")
+        if ctx:
+            contexts.append(ctx)
+        component_slots = _collect_sales_pdp_carousel_targets(
+            config=config,
+            context=ctx,
+            expected_count=expected_count,
+        )
+        for idx, targets in enumerate(component_slots):
+            for target in targets:
+                image_id = id(target.image)
+                if image_id in seen_image_ids:
+                    continue
+                seen_image_ids.add(image_id)
+                slot_targets[idx].append(target)
+
+    if not found_component:
+        raise TestimonialGenerationError(
+            "No Sales PDP hero component found for carousel generation. "
+            "Expected SalesPdpHero or SalesPdpTemplate."
+        )
+    for idx, targets in enumerate(slot_targets):
+        if not targets:
+            raise TestimonialGenerationError(
+                f"Sales PDP carousel slot {idx} does not map to any hero.gallery slide targets."
+            )
+    return slot_targets, contexts
 
 
 def _force_pre_sales_review_media_templates(puck_data: dict[str, Any]) -> None:
@@ -1658,28 +1871,28 @@ def _testimonial_output_schema(count: int) -> dict[str, Any]:
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "name": {"type": "string"},
+                        "name": {"type": "string", "minLength": 1, "maxLength": 80},
                         "verified": {"type": "boolean"},
                         "rating": {"type": "integer", "minimum": 1, "maximum": 5},
-                        "review": {"type": "string"},
-                        "persona": {"type": "string"},
-                        "avatarPrompt": {"type": "string"},
-                        "heroImagePrompt": {"type": "string"},
+                        "review": {"type": "string", "minLength": 1, "maxLength": 800},
+                        "persona": {"type": "string", "minLength": 1, "maxLength": 240},
+                        "avatarPrompt": {"type": "string", "minLength": 1, "maxLength": 500},
+                        "heroImagePrompt": {"type": "string", "minLength": 1, "maxLength": 600},
                         "mediaPrompts": {
                             "type": "array",
                             "minItems": 3,
                             "maxItems": 3,
-                            "items": {"type": "string"},
+                            "items": {"type": "string", "minLength": 1, "maxLength": 300},
                         },
                         "reply": {
                             "type": "object",
                             "additionalProperties": False,
                             "properties": {
-                                "name": {"type": "string"},
-                                "persona": {"type": "string"},
-                                "text": {"type": "string"},
-                                "avatarPrompt": {"type": "string"},
-                                "time": {"type": "string"},
+                                "name": {"type": "string", "minLength": 1, "maxLength": 80},
+                                "persona": {"type": "string", "minLength": 1, "maxLength": 240},
+                                "text": {"type": "string", "minLength": 1, "maxLength": 600},
+                                "avatarPrompt": {"type": "string", "minLength": 1, "maxLength": 500},
+                                "time": {"type": "string", "minLength": 1, "maxLength": 24},
                                 "reactionCount": {"type": "integer", "minimum": 0},
                             },
                             "required": [
@@ -1695,7 +1908,7 @@ def _testimonial_output_schema(count: int) -> dict[str, Any]:
                             "type": "object",
                             "additionalProperties": False,
                             "properties": {
-                                "location": {"type": "string"},
+                                "location": {"type": "string", "minLength": 1, "maxLength": 120},
                                 "date": {"type": "string"},
                             },
                             "required": ["location", "date"],
@@ -1736,8 +1949,11 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
     persona = payload.get("persona")
     if not isinstance(persona, str) or not persona.strip():
         raise TestimonialGenerationError("Testimonial persona must be a non-empty string.")
-    if len(persona.strip()) > 240:
-        raise TestimonialGenerationError("Testimonial persona must be 240 characters or fewer.")
+    persona_cleaned = persona.strip()
+    if len(persona_cleaned) > 240:
+        persona_cleaned = persona_cleaned[:240].rstrip()
+        if not persona_cleaned:
+            raise TestimonialGenerationError("Testimonial persona must be 240 characters or fewer.")
     avatar_prompt = payload.get("avatarPrompt")
     if not isinstance(avatar_prompt, str) or not avatar_prompt.strip():
         raise TestimonialGenerationError("Testimonial avatarPrompt must be a non-empty string.")
@@ -1778,8 +1994,11 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
     reply_persona = reply.get("persona")
     if not isinstance(reply_persona, str) or not reply_persona.strip():
         raise TestimonialGenerationError("Testimonial reply.persona must be a non-empty string.")
-    if len(reply_persona.strip()) > 240:
-        raise TestimonialGenerationError("Testimonial reply.persona must be 240 characters or fewer.")
+    reply_persona_cleaned = reply_persona.strip()
+    if len(reply_persona_cleaned) > 240:
+        reply_persona_cleaned = reply_persona_cleaned[:240].rstrip()
+        if not reply_persona_cleaned:
+            raise TestimonialGenerationError("Testimonial reply.persona must be 240 characters or fewer.")
     reply_text = reply.get("text")
     if not isinstance(reply_text, str) or not reply_text.strip():
         raise TestimonialGenerationError("Testimonial reply.text must be a non-empty string.")
@@ -1810,7 +2029,7 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
         raise TestimonialGenerationError(
             "Testimonial reply.name must be different from the primary testimonial name."
         )
-    if _normalize_identity_key(reply_persona) == _normalize_identity_key(persona):
+    if _normalize_identity_key(reply_persona_cleaned) == _normalize_identity_key(persona_cleaned):
         raise TestimonialGenerationError(
             "Testimonial reply.persona must be different from the primary testimonial persona."
         )
@@ -1843,13 +2062,13 @@ def _validate_testimonial_payload(payload: dict[str, Any]) -> dict[str, Any]:
         "verified": verified,
         "rating": rating,
         "review": review.strip(),
-        "persona": persona.strip(),
+        "persona": persona_cleaned,
         "avatarPrompt": avatar_prompt.strip(),
         "heroImagePrompt": hero_prompt.strip(),
         "mediaPrompts": cleaned_media_prompts,
         "reply": {
             "name": cleaned_reply_name,
-            "persona": reply_persona.strip(),
+            "persona": reply_persona_cleaned,
             "text": reply_text.strip(),
             "avatarPrompt": reply_avatar_prompt.strip(),
             "time": reply_time.strip(),
@@ -1939,16 +2158,12 @@ def _build_testimonial_prompt(
     )
 
 
-def _parse_testimonials_response(raw: str, *, model_id: str) -> dict[str, Any]:
+def _parse_json_object_response(raw: str | None, *, model_id: str, label: str) -> dict[str, Any]:
     if raw is None:
-        raise TestimonialGenerationError(
-            f"Testimonials response was empty (model={model_id})."
-        )
+        raise TestimonialGenerationError(f"{label} response was empty (model={model_id}).")
     text = raw.strip()
     if not text:
-        raise TestimonialGenerationError(
-            f"Testimonials response was empty (model={model_id})."
-        )
+        raise TestimonialGenerationError(f"{label} response was empty (model={model_id}).")
 
     def _try_parse(candidate: str) -> Optional[dict[str, Any]]:
         if not candidate:
@@ -1988,8 +2203,756 @@ def _parse_testimonials_response(raw: str, *, model_id: str) -> dict[str, Any]:
 
     snippet = text[:300].replace("\n", "\\n")
     raise TestimonialGenerationError(
-        f"Testimonials response was not valid JSON (model={model_id}). Snippet: {snippet}"
+        f"{label} response was not valid JSON (model={model_id}). Snippet: {snippet}"
     )
+
+
+def _parse_testimonials_response(raw: str, *, model_id: str) -> dict[str, Any]:
+    return _parse_json_object_response(raw, model_id=model_id, label="Testimonials")
+
+
+def _sales_pdp_carousel_output_schema() -> dict[str, Any]:
+    variant_ids = [spec["variantId"] for spec in _SALES_PDP_CAROUSEL_VARIANTS]
+    templates = sorted({spec["template"] for spec in _SALES_PDP_CAROUSEL_VARIANTS})
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "slides": {
+                "type": "array",
+                "minItems": len(_SALES_PDP_CAROUSEL_VARIANTS),
+                "maxItems": len(_SALES_PDP_CAROUSEL_VARIANTS),
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "variantId": {"type": "string", "enum": variant_ids},
+                        "template": {"type": "string", "enum": templates},
+                        "logoText": {"type": "string"},
+                        "stripBgColor": {"type": "string"},
+                        "stripTextColor": {"type": "string"},
+                        "ratingValueText": {"type": "string"},
+                        "ratingDetailText": {"type": "string"},
+                        "ctaText": {"type": "string"},
+                        "qaQuestionText": {"type": "string"},
+                        "commentHandle": {"type": "string"},
+                        "commentText": {"type": "string"},
+                        "commentVerified": {"type": "boolean"},
+                        "backgroundPromptVars": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "product": {"type": "string"},
+                                "subject": {"type": "string"},
+                                "scene": {"type": "string"},
+                                "extra": {"type": "string"},
+                                "avoid": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {"type": "string"},
+                                },
+                            },
+                            "required": ["product", "scene", "extra", "avoid"],
+                        },
+                    },
+                    "required": [
+                        "variantId",
+                        "template",
+                        "logoText",
+                        "stripBgColor",
+                        "stripTextColor",
+                        "ratingValueText",
+                        "ratingDetailText",
+                        "ctaText",
+                        "commentHandle",
+                        "commentText",
+                        "commentVerified",
+                        "backgroundPromptVars",
+                    ],
+                },
+            }
+        },
+        "required": ["slides"],
+    }
+
+
+def _build_sales_pdp_carousel_prompt(
+    *,
+    product_context: str,
+    copy: str,
+    today: str,
+    brand_name: str | None,
+) -> str:
+    variant_lines = "\n".join(
+        (
+            f"- {spec['variantId']} ({spec['template']}): {spec.get('archetype', 'product-focused user-generated style scene.')} "
+            f"Sample family: {spec.get('sampleInput', 'n/a')}."
+        )
+        for spec in _SALES_PDP_CAROUSEL_VARIANTS
+    )
+    required_variant_ids = ", ".join(spec["variantId"] for spec in _SALES_PDP_CAROUSEL_VARIANTS)
+    brand_hint = f"Brand hint: {brand_name}.\n" if isinstance(brand_name, str) and brand_name.strip() else ""
+
+    return (
+        "You are generating Sales PDP carousel card specs for one product.\n"
+        "Output JSON only. No markdown.\n"
+        "Return one slide spec for each required variant listed below.\n\n"
+        "Required variants (exactly one each):\n"
+        f"{variant_lines}\n\n"
+        "Rules:\n"
+        f"- You MUST return exactly these variantIds once each: {required_variant_ids}.\n"
+        "- Each variant must clearly match its sample family archetype listed above.\n"
+        "- Keep all copy and prompts brand/product specific using Product context and Page copy below.\n"
+        "- Never use generic placeholder product descriptions (for example 'hair skin nails gummy').\n"
+        "- Keep claims compliant and realistic; avoid medical guarantees or impossible outcomes.\n"
+        "- commentText must be <= 220 characters, natural, and specific.\n"
+        "- commentHandle must be <= 40 characters and look like a plausible social handle.\n"
+        "- ratingValueText must be <= 16 characters (for example: '4.8/5').\n"
+        "- ratingDetailText must be <= 60 characters.\n"
+        "- ctaText must be <= 60 characters.\n"
+        "- logoText must be <= 24 characters.\n"
+        "- For variantId=qa_ugc, qaQuestionText is REQUIRED (<= 120 chars) and should read like a real customer objection/question.\n"
+        "- stripBgColor and stripTextColor must be valid hex colors (e.g. #0f3b2e, #ffffff).\n"
+        "- backgroundPromptVars.product/scene/extra must be concrete, not generic.\n"
+        "- For non-bold-claim templates, backgroundPromptVars.subject is required and must match the intended persona.\n"
+        "- avoid must be a non-empty list of concise constraints (e.g. no text overlays/watermarks/distorted hands).\n"
+        "- Make all 5 slides distinct in persona, scene, and copy.\n"
+        f"- today is {today}.\n\n"
+        f"{brand_hint}"
+        "Product context:\n"
+        f"{product_context}\n\n"
+        "Page copy:\n"
+        f"{copy}\n\n"
+        "Return JSON with this exact top-level shape:\n"
+        '{ "slides": [ { "variantId": "...", "template": "...", "logoText": "...", "stripBgColor": "#...", "stripTextColor": "#...", "ratingValueText": "...", "ratingDetailText": "...", "ctaText": "...", "commentHandle": "...", "commentText": "...", "commentVerified": true, "backgroundPromptVars": { "product": "...", "subject": "...", "scene": "...", "extra": "...", "avoid": ["...", "..."] } } ] }\n'
+    )
+
+
+def _require_trimmed_string(value: Any, field: str, max_length: int) -> str:
+    if not isinstance(value, str):
+        raise TestimonialGenerationError(f"{field} must be a string.")
+    cleaned = value.strip()
+    if not cleaned:
+        raise TestimonialGenerationError(f"{field} must be a non-empty string.")
+    if len(cleaned) > max_length:
+        raise TestimonialGenerationError(f"{field} must be <= {max_length} characters.")
+    return cleaned
+
+
+def _validate_sales_pdp_hex_color(value: Any, field: str) -> str:
+    color = _require_trimmed_string(value, field, 24)
+    if not _SALES_PDP_COLOR_RE.match(color):
+        raise TestimonialGenerationError(f"{field} must be a hex color value (#rgb or #rrggbb).")
+    return color
+
+
+def _validate_sales_pdp_background_prompt_vars(payload: Any, field_prefix: str) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        raise TestimonialGenerationError(f"{field_prefix} must be an object.")
+    allowed_keys = {"product", "subject", "scene", "extra", "avoid"}
+    for key in payload.keys():
+        if key not in allowed_keys:
+            raise TestimonialGenerationError(f"{field_prefix} contains unsupported key: {key}")
+
+    product = _require_trimmed_string(payload.get("product"), f"{field_prefix}.product", 220)
+    subject = payload.get("subject")
+    if subject is not None and not isinstance(subject, str):
+        raise TestimonialGenerationError(f"{field_prefix}.subject must be a string when provided.")
+    subject_clean = subject.strip() if isinstance(subject, str) and subject.strip() else None
+    if subject_clean is not None and len(subject_clean) > 220:
+        raise TestimonialGenerationError(f"{field_prefix}.subject must be <= 220 characters.")
+    scene = _require_trimmed_string(payload.get("scene"), f"{field_prefix}.scene", 220)
+    extra = _require_trimmed_string(payload.get("extra"), f"{field_prefix}.extra", 600)
+    avoid_raw = payload.get("avoid")
+    if not isinstance(avoid_raw, list) or not avoid_raw:
+        raise TestimonialGenerationError(f"{field_prefix}.avoid must be a non-empty array of strings.")
+    avoid = [_require_trimmed_string(item, f"{field_prefix}.avoid[{idx}]", 160) for idx, item in enumerate(avoid_raw)]
+    return {
+        "product": product,
+        "subject": subject_clean,
+        "scene": scene,
+        "extra": extra,
+        "avoid": avoid,
+    }
+
+
+def _validate_sales_pdp_carousel_plan(payload: Any) -> list[dict[str, Any]]:
+    if not isinstance(payload, dict):
+        raise TestimonialGenerationError("Sales PDP carousel plan must be a JSON object.")
+    raw_slides = payload.get("slides")
+    if not isinstance(raw_slides, list):
+        raise TestimonialGenerationError("Sales PDP carousel plan must include a slides array.")
+    if len(raw_slides) != len(_SALES_PDP_CAROUSEL_VARIANTS):
+        raise TestimonialGenerationError(
+            f"Sales PDP carousel plan must include exactly {len(_SALES_PDP_CAROUSEL_VARIANTS)} slides."
+        )
+
+    expected_templates = {
+        spec["variantId"]: spec["template"] for spec in _SALES_PDP_CAROUSEL_VARIANTS
+    }
+    by_variant: dict[str, dict[str, Any]] = {}
+    for idx, raw in enumerate(raw_slides):
+        if not isinstance(raw, dict):
+            raise TestimonialGenerationError(f"slides[{idx}] must be an object.")
+        variant_id = _require_trimmed_string(raw.get("variantId"), f"slides[{idx}].variantId", 80)
+        if variant_id not in expected_templates:
+            raise TestimonialGenerationError(
+                f"slides[{idx}].variantId is unsupported: {variant_id!r}."
+            )
+        if variant_id in by_variant:
+            raise TestimonialGenerationError(f"Duplicate variantId in carousel plan: {variant_id}.")
+        template = _require_trimmed_string(raw.get("template"), f"slides[{idx}].template", 80)
+        expected_template = expected_templates[variant_id]
+        if template != expected_template:
+            raise TestimonialGenerationError(
+                f"slides[{idx}].template for variant {variant_id!r} must be {expected_template!r}."
+            )
+        prompt_vars = _validate_sales_pdp_background_prompt_vars(
+            raw.get("backgroundPromptVars"),
+            field_prefix=f"slides[{idx}].backgroundPromptVars",
+        )
+        if template != "pdp_bold_claim" and not prompt_vars.get("subject"):
+            raise TestimonialGenerationError(
+                f"slides[{idx}].backgroundPromptVars.subject is required for template {template}."
+            )
+
+        verified_raw = raw.get("commentVerified")
+        if not isinstance(verified_raw, bool):
+            raise TestimonialGenerationError(f"slides[{idx}].commentVerified must be a boolean.")
+        qa_question = raw.get("qaQuestionText")
+        qa_question_clean: str | None = None
+        if variant_id == "qa_ugc":
+            qa_question_clean = _require_trimmed_string(
+                qa_question,
+                f"slides[{idx}].qaQuestionText",
+                120,
+            )
+        elif qa_question is not None:
+            raise TestimonialGenerationError(
+                f"slides[{idx}].qaQuestionText is only allowed for variantId='qa_ugc'."
+            )
+
+        by_variant[variant_id] = {
+            "variantId": variant_id,
+            "template": template,
+            "logoText": _require_trimmed_string(raw.get("logoText"), f"slides[{idx}].logoText", 24),
+            "stripBgColor": _validate_sales_pdp_hex_color(raw.get("stripBgColor"), f"slides[{idx}].stripBgColor"),
+            "stripTextColor": _validate_sales_pdp_hex_color(
+                raw.get("stripTextColor"), f"slides[{idx}].stripTextColor"
+            ),
+            "ratingValueText": _require_trimmed_string(
+                raw.get("ratingValueText"), f"slides[{idx}].ratingValueText", 16
+            ),
+            "ratingDetailText": _require_trimmed_string(
+                raw.get("ratingDetailText"), f"slides[{idx}].ratingDetailText", 60
+            ),
+            "ctaText": _require_trimmed_string(raw.get("ctaText"), f"slides[{idx}].ctaText", 60),
+            "commentHandle": _require_trimmed_string(raw.get("commentHandle"), f"slides[{idx}].commentHandle", 40),
+            "commentText": _require_trimmed_string(raw.get("commentText"), f"slides[{idx}].commentText", 220),
+            "commentVerified": verified_raw,
+            "qaQuestionText": qa_question_clean,
+            "backgroundPromptVars": prompt_vars,
+        }
+
+    ordered: list[dict[str, Any]] = []
+    for spec in _SALES_PDP_CAROUSEL_VARIANTS:
+        variant_id = spec["variantId"]
+        if variant_id not in by_variant:
+            raise TestimonialGenerationError(f"Sales PDP carousel plan is missing variantId: {variant_id}.")
+        ordered.append(by_variant[variant_id])
+    return ordered
+
+
+def _extract_sales_pdp_brand_name(puck_data: dict[str, Any]) -> str | None:
+    def normalize_brand_name(raw: str) -> str | None:
+        cleaned = _clean_single_line(raw)
+        if not cleaned:
+            return None
+        for sep in ("—", "-", "|"):
+            if sep in cleaned:
+                candidate = cleaned.split(sep, 1)[0].strip()
+                if candidate:
+                    cleaned = candidate
+                    break
+        if len(cleaned) > 80:
+            cleaned = cleaned[:80].rstrip()
+        return cleaned or None
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        props = obj.get("props")
+        if comp_type not in {"SalesPdpHeader", "SalesPdpHero"} or not isinstance(props, dict):
+            continue
+        config, _ = _parse_config_context(props)
+        if not isinstance(config, dict):
+            continue
+        header = config
+        if comp_type == "SalesPdpHero":
+            header = config.get("header") if isinstance(config.get("header"), dict) else {}
+        logo = header.get("logo") if isinstance(header.get("logo"), dict) else {}
+        alt = logo.get("alt")
+        if isinstance(alt, str):
+            normalized = normalize_brand_name(alt)
+            if normalized:
+                return normalized
+        purchase = config.get("purchase") if isinstance(config.get("purchase"), dict) else {}
+        title = purchase.get("title")
+        if isinstance(title, str):
+            normalized = normalize_brand_name(title)
+            if normalized:
+                return normalized
+    return None
+
+
+def _find_sales_pdp_logo_asset_public_id(puck_data: dict[str, Any]) -> str | None:
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        props = obj.get("props")
+        if comp_type not in {"SalesPdpHeader", "SalesPdpHero"} or not isinstance(props, dict):
+            continue
+        config, _ = _parse_config_context(props)
+        if not isinstance(config, dict):
+            continue
+        header = config
+        if comp_type == "SalesPdpHero":
+            header = config.get("header") if isinstance(config.get("header"), dict) else {}
+        logo = header.get("logo") if isinstance(header.get("logo"), dict) else {}
+        raw_public_id = logo.get("assetPublicId")
+        if isinstance(raw_public_id, str) and raw_public_id.strip():
+            return raw_public_id.strip()
+    return None
+
+
+def _apply_sales_pdp_carousel_slot_asset(
+    *,
+    targets: list[_SalesPdpCarouselTarget],
+    asset_public_id: str,
+    default_alt: str,
+) -> None:
+    for target in targets:
+        target.image["assetPublicId"] = asset_public_id
+        target.image["thumbAssetPublicId"] = asset_public_id
+        target.image.pop("src", None)
+        target.image.pop("thumbSrc", None)
+        existing_alt = target.image.get("alt")
+        if not isinstance(existing_alt, str) or not existing_alt.strip():
+            target.image["alt"] = default_alt
+        if target.context:
+            target.context.dirty = True
+
+
+def generate_sales_pdp_carousel_images(
+    *,
+    session: Session,
+    org_id: str,
+    user_id: str,
+    funnel_id: str,
+    page_id: str,
+    draft_version_id: Optional[str] = None,
+    current_puck_data: Optional[dict[str, Any]] = None,
+    template_id: Optional[str] = None,
+    idea_workspace_id: Optional[str] = None,
+    model: Optional[str] = None,
+    temperature: float = 0.3,
+    max_tokens: Optional[int] = None,
+    max_duration_seconds: Optional[int] = None,
+) -> tuple[FunnelPageVersion, dict[str, Any], list[dict[str, Any]]]:
+    if max_duration_seconds is not None and max_duration_seconds <= 0:
+        raise TestimonialGenerationError("maxDurationSeconds must be > 0 when provided.")
+    deadline_ts = (
+        time.monotonic() + float(max_duration_seconds)
+        if max_duration_seconds is not None
+        else None
+    )
+
+    def ensure_within_budget(step: str) -> None:
+        if deadline_ts is not None and time.monotonic() >= deadline_ts:
+            raise TestimonialGenerationError(
+                f"Sales PDP carousel step exceeded configured time budget while {step}."
+            )
+
+    funnel = session.scalars(select(Funnel).where(Funnel.org_id == org_id, Funnel.id == funnel_id)).first()
+    if not funnel:
+        raise TestimonialGenerationNotFoundError("Funnel not found")
+
+    page = session.scalars(
+        select(FunnelPage).where(FunnelPage.funnel_id == funnel_id, FunnelPage.id == page_id)
+    ).first()
+    if not page:
+        raise TestimonialGenerationNotFoundError("Page not found")
+
+    base_puck = current_puck_data
+    if base_puck is None and draft_version_id:
+        draft = session.scalars(
+            select(FunnelPageVersion).where(
+                FunnelPageVersion.page_id == page_id,
+                FunnelPageVersion.id == draft_version_id,
+            )
+        ).first()
+        if not draft:
+            raise TestimonialGenerationNotFoundError("Draft version not found")
+        base_puck = draft.puck_data
+    if base_puck is None:
+        raise TestimonialGenerationError(
+            "currentPuckData or draftVersionId is required to generate Sales PDP carousel images."
+        )
+    if not isinstance(base_puck, dict):
+        raise TestimonialGenerationError("puckData must be a JSON object.")
+
+    resolved_template_id = template_id or page.template_id
+    if resolved_template_id != "sales-pdp":
+        raise TestimonialGenerationError(
+            f"Sales PDP carousel generation only supports templateId='sales-pdp'. Received: {resolved_template_id!r}."
+        )
+
+    expected_count = _SALES_PDP_CAROUSEL_TOTAL_SLOTS
+
+    slot_targets, contexts = _collect_sales_pdp_carousel_slots(
+        base_puck,
+        expected_count=expected_count,
+    )
+
+    product, _, product_context = _load_product_context(
+        session=session,
+        org_id=org_id,
+        client_id=str(funnel.client_id),
+        funnel=funnel,
+    )
+    if not product:
+        raise TestimonialGenerationError("Product context is required to generate Sales PDP carousel images.")
+    product_primary_asset = _resolve_product_primary_image(
+        session=session,
+        org_id=org_id,
+        client_id=str(funnel.client_id),
+        product=product,
+    )
+    copy_text = _extract_copy_lines(base_puck)
+    if not copy_text.strip():
+        raise TestimonialGenerationError("Unable to extract page copy for Sales PDP carousel generation.")
+
+    brand_name = _extract_sales_pdp_brand_name(base_puck)
+    logo_public_id = _find_sales_pdp_logo_asset_public_id(base_puck)
+    logo_data_url: str | None = None
+    if isinstance(logo_public_id, str) and logo_public_id:
+        logo_asset = session.scalars(
+            select(Asset).where(
+                Asset.org_id == org_id,
+                Asset.client_id == str(funnel.client_id),
+                Asset.public_id == logo_public_id,
+            )
+        ).first()
+        if not logo_asset:
+            raise TestimonialGenerationError(
+                f"Sales PDP header logo asset not found (assetPublicId={logo_public_id})."
+            )
+        if logo_asset.asset_kind != "image":
+            raise TestimonialGenerationError(
+                f"Sales PDP header logo asset must be an image (assetPublicId={logo_public_id})."
+            )
+        if logo_asset.file_status and logo_asset.file_status != "ready":
+            raise TestimonialGenerationError(
+                f"Sales PDP header logo asset is not ready (assetPublicId={logo_public_id})."
+            )
+        logo_data_url = _asset_data_url(logo_asset)
+
+    llm = LLMClient()
+    model_id = model or llm.default_model
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    ensure_within_budget("requesting Sales PDP carousel plan")
+    prompt = _build_sales_pdp_carousel_prompt(
+        product_context=product_context,
+        copy=copy_text,
+        today=today,
+        brand_name=brand_name,
+    )
+
+    if isinstance(model_id, str) and model_id.lower().startswith("claude"):
+        claude_max_tokens = int(max_tokens) if max_tokens else 8_000
+        resp = call_claude_structured_message(
+            model=model_id,
+            system=None,
+            user_content=[{"type": "text", "text": prompt}],
+            output_schema=_sales_pdp_carousel_output_schema(),
+            max_tokens=claude_max_tokens,
+            temperature=temperature,
+            http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
+            max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+        )
+        parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
+        if not isinstance(parsed_value, dict):
+            raise TestimonialGenerationError("Claude structured Sales PDP carousel response was not a JSON object.")
+        raw_plan = parsed_value
+    else:
+        params = LLMGenerationParams(
+            model=model_id,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            use_reasoning=True,
+            use_web_search=False,
+            response_format={
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "SalesPdpCarouselPlan",
+                    "strict": True,
+                    "schema": _sales_pdp_carousel_output_schema(),
+                },
+            },
+        )
+        raw = llm.generate_text(prompt, params=params)
+        raw_plan = _parse_json_object_response(raw, model_id=model_id, label="Sales PDP carousel")
+
+    validated_plan = _validate_sales_pdp_carousel_plan(raw_plan)
+    variant_spec_by_id = {spec["variantId"]: spec for spec in _SALES_PDP_CAROUSEL_VARIANTS}
+
+    core_product_asset = product_primary_asset
+    product_primary_is_square = (
+        isinstance(product_primary_asset.width, int)
+        and isinstance(product_primary_asset.height, int)
+        and product_primary_asset.width == product_primary_asset.height
+    )
+    if not product_primary_is_square:
+        ensure_within_budget("normalizing core product image to square")
+        core_product_asset = _create_sales_pdp_square_core_asset(
+            session=session,
+            org_id=org_id,
+            client_id=str(funnel.client_id),
+            funnel_id=funnel_id,
+            page_id=page_id,
+            source_asset=product_primary_asset,
+            source_alt=(f"{product.title} product image" if isinstance(product.title, str) else "Product image"),
+            product_id=str(funnel.product_id) if funnel.product_id else None,
+        )
+
+    product_primary_public_id = str(core_product_asset.public_id)
+    product_reference_data_url = _asset_data_url(product_primary_asset)
+    generated: list[dict[str, Any]] = []
+
+    core_slot_targets = slot_targets[_SALES_PDP_CAROUSEL_CORE_SLOT_INDEX]
+    core_label = f"sales_pdp.hero.gallery.slides[{_SALES_PDP_CAROUSEL_CORE_SLOT_INDEX}]"
+    _apply_sales_pdp_carousel_slot_asset(
+        targets=core_slot_targets,
+        asset_public_id=product_primary_public_id,
+        default_alt=(f"{product.title} product image" if isinstance(product.title, str) else "Product image"),
+    )
+    generated.append(
+        {
+            "target": core_label,
+            "targets": [target.label for target in core_slot_targets],
+            "kind": "core_product_image",
+            "publicId": product_primary_public_id,
+            "assetId": str(core_product_asset.id),
+            "template": (
+                "core_product_image_square"
+                if str(core_product_asset.id) != str(product_primary_asset.id)
+                else "core_product_image"
+            ),
+            **(
+                {
+                    "sourcePublicId": str(product_primary_asset.public_id),
+                    "sourceAssetId": str(product_primary_asset.id),
+                }
+                if str(core_product_asset.id) != str(product_primary_asset.id)
+                else {}
+            ),
+        }
+    )
+
+    render_jobs: list[dict[str, Any]] = []
+    for idx, slide_plan in enumerate(validated_plan):
+        slot_index = idx + 1
+        slot_label = f"sales_pdp.hero.gallery.slides[{slot_index}]"
+        render_jobs.append(
+            {
+                "slot_index": slot_index,
+                "slot_label": slot_label,
+                "target_labels": [target.label for target in slot_targets[slot_index]],
+                "slide_plan": slide_plan,
+                "render_payload": {
+                    "template": slide_plan["template"],
+                    "output": {"preset": "square"},
+                    "brand": {
+                        "logoText": slide_plan["logoText"],
+                        "stripBgColor": slide_plan["stripBgColor"],
+                        "stripTextColor": slide_plan["stripTextColor"],
+                        **({"name": brand_name} if brand_name else {}),
+                        **({"logoUrl": logo_data_url} if logo_data_url else {}),
+                    },
+                    "rating": {
+                        "valueText": slide_plan["ratingValueText"],
+                        "detailText": slide_plan["ratingDetailText"],
+                    },
+                    "cta": {"text": slide_plan["ctaText"]},
+                    "background": {
+                        "promptVars": slide_plan["backgroundPromptVars"],
+                        "referenceImages": [product_reference_data_url],
+                        "referenceFirst": True,
+                        "imageConfig": {"aspectRatio": "1:1"},
+                    },
+                    "comment": {
+                        "handle": slide_plan["commentHandle"],
+                        "text": slide_plan["commentText"],
+                        **(
+                            {"questionText": slide_plan["qaQuestionText"]}
+                            if isinstance(slide_plan.get("qaQuestionText"), str)
+                            else {}
+                        ),
+                        "verified": slide_plan["commentVerified"],
+                    },
+                },
+            }
+        )
+
+    try:
+        render_workers = min(_TESTIMONIAL_RENDER_WORKERS, len(render_jobs)) if render_jobs else 1
+        rendered_bytes_by_slot: dict[int, bytes] = {}
+        with ThreadedTestimonialRenderer(
+            worker_count=render_workers,
+            response_timeout_ms=_TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS,
+        ) as renderer:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=render_workers) as pool:
+                render_futures: dict[int, concurrent.futures.Future[bytes]] = {}
+                for job in render_jobs:
+                    slot_index = cast(int, job["slot_index"])
+                    render_payload = cast(dict[str, Any], job["render_payload"])
+                    ensure_within_budget(f"queuing carousel slot render {slot_index + 1}")
+                    render_futures[slot_index] = pool.submit(renderer.render_png, render_payload)
+
+                for job in render_jobs:
+                    slot_index = cast(int, job["slot_index"])
+                    ensure_within_budget(f"waiting for carousel slot render {slot_index + 1}")
+                    future = render_futures[slot_index]
+                    try:
+                        if deadline_ts is None:
+                            rendered_bytes_by_slot[slot_index] = future.result()
+                        else:
+                            remaining = deadline_ts - time.monotonic()
+                            if remaining <= 0:
+                                raise TestimonialGenerationError(
+                                    "Sales PDP carousel step exceeded configured time budget while waiting for render "
+                                    f"slot {slot_index + 1}."
+                                )
+                            rendered_bytes_by_slot[slot_index] = future.result(timeout=remaining)
+                    except concurrent.futures.TimeoutError as exc:
+                        raise TestimonialGenerationError(
+                            f"Sales PDP carousel step exceeded configured time budget while rendering slot {slot_index + 1}."
+                        ) from exc
+
+        for job in render_jobs:
+            slot_index = cast(int, job["slot_index"])
+            slot_label = cast(str, job["slot_label"])
+            target_labels = cast(list[str], job["target_labels"])
+            slide_plan = cast(dict[str, Any], job["slide_plan"])
+            render_payload = cast(dict[str, Any], job["render_payload"])
+            image_bytes = rendered_bytes_by_slot[slot_index]
+            asset = create_funnel_upload_asset(
+                session=session,
+                org_id=org_id,
+                client_id=str(funnel.client_id),
+                content_bytes=image_bytes,
+                filename=f"sales-pdp-carousel-{page_id}-{slot_index + 1}.png",
+                content_type="image/png",
+                alt=f"Sales PDP carousel image {slot_index + 1}",
+                usage_context={
+                    "kind": "sales_pdp_carousel_render",
+                    "funnelId": funnel_id,
+                    "pageId": page_id,
+                    "target": slot_label,
+                    "variantId": slide_plan["variantId"],
+                },
+                funnel_id=funnel_id,
+                product_id=str(funnel.product_id) if funnel.product_id else None,
+                tags=[
+                    "funnel",
+                    "testimonial",
+                    "sales_pdp_carousel",
+                    str(render_payload.get("template") or ""),
+                    str(slide_plan["variantId"]),
+                ],
+            )
+
+            _apply_sales_pdp_carousel_slot_asset(
+                targets=slot_targets[slot_index],
+                asset_public_id=str(asset.public_id),
+                default_alt=f"Sales PDP carousel image {slot_index + 1}",
+            )
+
+            generated.append(
+                {
+                    "target": slot_label,
+                    "targets": target_labels,
+                    "kind": "generated_pdp_carousel",
+                    "variantId": slide_plan["variantId"],
+                    "sampleInput": variant_spec_by_id.get(slide_plan["variantId"], {}).get("sampleInput"),
+                    "template": str(render_payload.get("template")),
+                    "publicId": str(asset.public_id),
+                    "assetId": str(asset.id),
+                    "renderPayload": {
+                        "template": render_payload["template"],
+                        "outputPreset": "square",
+                        "sampleInput": variant_spec_by_id.get(slide_plan["variantId"], {}).get("sampleInput"),
+                        "brand": {
+                            "logoText": slide_plan["logoText"],
+                            "stripBgColor": slide_plan["stripBgColor"],
+                            "stripTextColor": slide_plan["stripTextColor"],
+                            **({"name": brand_name} if brand_name else {}),
+                        },
+                        "rating": render_payload["rating"],
+                        "cta": render_payload["cta"],
+                        "comment": render_payload["comment"],
+                        **(
+                            {"qaQuestionText": slide_plan["qaQuestionText"]}
+                            if isinstance(slide_plan.get("qaQuestionText"), str)
+                            else {}
+                        ),
+                        "backgroundPromptVars": slide_plan["backgroundPromptVars"],
+                    },
+                }
+            )
+    except TestimonialRenderError as exc:
+        raise TestimonialGenerationError(str(exc)) from exc
+
+    for ctx in contexts:
+        if ctx.dirty:
+            ctx.props[ctx.key] = json.dumps(ctx.parsed, ensure_ascii=False)
+
+    ai_metadata = {
+        "kind": "sales_pdp_carousel_generation",
+        "model": model_id,
+        "temperature": temperature,
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "generatedCarouselImages": generated,
+        "carouselPlan": validated_plan,
+        "actorUserId": user_id,
+        "ideaWorkspaceId": idea_workspace_id,
+        "templateId": resolved_template_id,
+    }
+
+    normalize_public_page_metadata_for_context(
+        session=session,
+        org_id=org_id,
+        funnel=funnel,
+        page=page,
+        puck_data=base_puck,
+    )
+
+    version = FunnelPageVersion(
+        page_id=page.id,
+        status=FunnelPageVersionStatusEnum.draft,
+        puck_data=base_puck,
+        source=FunnelPageVersionSourceEnum.ai,
+        created_at=datetime.now(timezone.utc),
+        ai_metadata=ai_metadata,
+    )
+    session.add(version)
+    session.commit()
+    session.refresh(version)
+
+    return version, base_puck, generated
 
 
 def _generate_validated_synthetic_testimonials(
@@ -2008,11 +2971,11 @@ def _generate_validated_synthetic_testimonials(
     if count == 0:
         llm = LLMClient()
         return [], (model or llm.default_model)
+    if max_duration_seconds is not None and max_duration_seconds <= 0:
+        raise TestimonialGenerationError("maxDurationSeconds must be > 0 when provided.")
 
     llm = LLMClient()
     model_id = model or llm.default_model
-    if max_duration_seconds is not None and max_duration_seconds <= 0:
-        raise TestimonialGenerationError("maxDurationSeconds must be > 0 when provided.")
     deadline_ts = (
         time.monotonic() + float(max_duration_seconds)
         if max_duration_seconds is not None
@@ -2038,13 +3001,9 @@ def _generate_validated_synthetic_testimonials(
         candidate_validated: list[dict[str, Any]] = []
         reserved_names: list[str] = []
         reserved_name_keys: set[str] = set()
-        attempt_temperature = min(
-            max(float(temperature), 0.0) + 0.1 * (identity_attempt - 1),
-            0.9,
-        )
-        attempt_nonce = (
-            f"{uniqueness_scope}:{identity_attempt}:{uuid4().hex[:8]}"
-        )
+        batch_validation_error: TestimonialGenerationError | None = None
+        attempt_temperature = min(max(float(temperature), 0.0) + 0.1 * (identity_attempt - 1), 0.9)
+        attempt_nonce = f"{uniqueness_scope}:{identity_attempt}:{uuid4().hex[:8]}"
 
         for batch_idx, start in enumerate(range(0, count, batch_size)):
             ensure_within_budget("requesting testimonial LLM batches")
@@ -2067,6 +3026,8 @@ def _generate_validated_synthetic_testimonials(
                     output_schema=_testimonial_output_schema(batch_count),
                     max_tokens=int(max_tokens) if max_tokens else 16_000,
                     temperature=attempt_temperature,
+                    http_timeout_seconds=_TESTIMONIAL_CLAUDE_STRUCTURED_TIMEOUT_SECONDS,
+                    max_attempts=_TESTIMONIAL_CLAUDE_STRUCTURED_MAX_ATTEMPTS,
                 )
                 parsed_value = resp.get("parsed") if isinstance(resp, dict) else None
                 if not isinstance(parsed_value, dict):
@@ -2108,9 +3069,12 @@ def _generate_validated_synthetic_testimonials(
                 try:
                     batch_validated.append(_validate_testimonial_payload(raw or {}))
                 except TestimonialGenerationError as exc:
-                    raise TestimonialGenerationError(
+                    batch_validation_error = TestimonialGenerationError(
                         f"Invalid testimonial payload at position {global_pos}: {exc}"
-                    ) from exc
+                    )
+                    break
+            if batch_validation_error is not None:
+                break
             candidate_validated.extend(batch_validated)
 
             for item in batch_validated:
@@ -2128,6 +3092,11 @@ def _generate_validated_synthetic_testimonials(
                         if key and key not in reserved_name_keys:
                             reserved_name_keys.add(key)
                             reserved_names.append(reply_name.strip())
+
+        if batch_validation_error is not None:
+            if identity_attempt >= _MAX_TESTIMONIAL_IDENTITY_ATTEMPTS:
+                raise batch_validation_error
+            continue
 
         try:
             _assert_distinct_testimonial_identities(candidate_validated)
@@ -2369,7 +3338,7 @@ def generate_funnel_page_testimonials(
             )
 
     model_id: str
-
+    today = datetime.now(timezone.utc).date().isoformat()
     sales_review_wall_social_index = 0
     social_card_variant_index = 0
     review_card_scene_index = 0
@@ -2409,7 +3378,22 @@ def generate_funnel_page_testimonials(
 
     generated: list[dict[str, Any]] = []
     try:
-        with ThreadedTestimonialRenderer() as renderer:
+        with ThreadedTestimonialRenderer(
+            worker_count=1,
+            response_timeout_ms=_TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS,
+        ) as renderer:
+            def render_with_budget(render_payload: dict[str, Any], *, label: str) -> bytes:
+                ensure_within_budget(f"rendering {label}")
+                timeout_ms = _TESTIMONIAL_RENDER_RESPONSE_TIMEOUT_MS
+                if deadline_ts is not None:
+                    remaining_seconds = deadline_ts - time.monotonic()
+                    if remaining_seconds <= 0:
+                        raise TestimonialGenerationError(
+                            f"Testimonials step exceeded configured time budget while rendering {label}."
+                        )
+                    timeout_ms = max(1_000, min(int(remaining_seconds * 1000), timeout_ms))
+                return renderer.render_png(render_payload, timeout_ms=timeout_ms)
+
             for idx, group in enumerate(groups):
                 ensure_within_budget("rendering testimonial groups")
                 validated = validated_testimonials[idx]
@@ -2503,7 +3487,7 @@ def generate_funnel_page_testimonials(
                         }
                         render_payload = dict(payload)
                         render_payload["imageUrl"] = _asset_data_url_from_generated(media_asset)
-                        image_bytes = renderer.render_png(render_payload)
+                        image_bytes = render_with_budget(render_payload, label=render.label)
                         asset = create_funnel_upload_asset(
                             session=session,
                             org_id=org_id,
@@ -2664,7 +3648,7 @@ def generate_funnel_page_testimonials(
                         if hero_asset is not None:
                             render_payload["heroImageUrl"] = _asset_data_url_from_generated(hero_asset)
 
-                        image_bytes = renderer.render_png(render_payload)
+                        image_bytes = render_with_budget(render_payload, label=render.label)
                         asset = create_funnel_upload_asset(
                             session=session,
                             org_id=org_id,
@@ -2970,7 +3954,7 @@ def generate_funnel_page_testimonials(
                             "header": {"title": "All comments", "showSortIcon": variant != 2},
                             "comments": [primary_comment_render],
                         }
-                    image_bytes = renderer.render_png(render_payload)
+                    image_bytes = render_with_budget(render_payload, label=render.label)
                     asset = create_funnel_upload_asset(
                         session=session,
                         org_id=org_id,
@@ -3072,6 +4056,14 @@ def generate_funnel_page_testimonials(
         "ideaWorkspaceId": idea_workspace_id,
         "templateId": resolved_template_id,
     }
+
+    normalize_public_page_metadata_for_context(
+        session=session,
+        org_id=org_id,
+        funnel=funnel,
+        page=page,
+        puck_data=base_puck,
+    )
 
     version = FunnelPageVersion(
         page_id=page.id,

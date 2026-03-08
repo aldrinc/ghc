@@ -1,4 +1,11 @@
-import { useMemo, type ReactNode } from "react";
+import {
+  Children,
+  createContext,
+  isValidElement,
+  useContext,
+  useMemo,
+  type ReactNode,
+} from "react";
 import { useDesignSystemTokens } from "@/components/design-system/DesignSystemProvider";
 import { BadgeRow } from "./components/BadgeRow/BadgeRow";
 import { Container } from "./components/Container/Container";
@@ -23,6 +30,137 @@ export const preSalesDefaults = defaults as {
   theme?: ThemeConfig;
 };
 
+const PRE_SALES_REVIEW_COUNT_MIN = 12;
+const PRE_SALES_REVIEW_COUNT_MAX = 15000;
+
+type PreSalesSocialProof = {
+  reviewCount: number;
+  reviewTitle: string;
+};
+
+const PreSalesSocialProofContext = createContext<PreSalesSocialProof | null>(null);
+
+function parsePreSalesReviewCount(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const normalized = Math.round(value);
+    if (normalized >= PRE_SALES_REVIEW_COUNT_MIN && normalized <= PRE_SALES_REVIEW_COUNT_MAX) {
+      return normalized;
+    }
+  }
+  if (typeof value !== "string") return null;
+  const match = value.match(/\b([\d,]{2,})\b/);
+  if (!match) return null;
+  const normalized = Number.parseInt(match[1].replace(/,/g, ""), 10);
+  if (!Number.isFinite(normalized)) return null;
+  if (normalized < PRE_SALES_REVIEW_COUNT_MIN || normalized > PRE_SALES_REVIEW_COUNT_MAX) return null;
+  return normalized;
+}
+
+function formatPreSalesReviewTitle(count: number): string {
+  return `Over ${count.toLocaleString()} — 5 Star Reviews`;
+}
+
+function derivePreSalesReviewCount(seedSource: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < seedSource.length; i += 1) {
+    hash ^= seedSource.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const span = PRE_SALES_REVIEW_COUNT_MAX - PRE_SALES_REVIEW_COUNT_MIN + 1;
+  return PRE_SALES_REVIEW_COUNT_MIN + ((hash >>> 0) % span);
+}
+
+function buildPreSalesReviewSeed(anchorId: string): string {
+  const seedParts: string[] = [];
+  if (typeof window !== "undefined" && window.location.pathname) seedParts.push(window.location.pathname);
+  if (typeof document !== "undefined" && document.title) seedParts.push(document.title);
+  if (anchorId) seedParts.push(anchorId);
+  return seedParts.join("::") || "pre-sales-listicle";
+}
+
+function extractPreSalesReviewCountFromNode(node: ReactNode): number | null {
+  let resolved: number | null = null;
+
+  function visit(current: ReactNode): void {
+    if (resolved !== null) return;
+    Children.forEach(current, (child) => {
+      if (resolved !== null || !isValidElement(child)) return;
+      const props = child.props as Record<string, unknown>;
+      const config = props.config;
+      if (config && typeof config === "object" && !Array.isArray(config)) {
+        const configRecord = config as Record<string, unknown>;
+        const titleCount = parsePreSalesReviewCount(configRecord.title);
+        if (titleCount !== null) {
+          resolved = titleCount;
+          return;
+        }
+        const badges = configRecord.badges;
+        if (Array.isArray(badges) && badges.length > 0) {
+          const firstBadge = badges[0];
+          if (firstBadge && typeof firstBadge === "object" && !Array.isArray(firstBadge)) {
+            const badgeCount = parsePreSalesReviewCount((firstBadge as Record<string, unknown>).value);
+            if (badgeCount !== null) {
+              resolved = badgeCount;
+              return;
+            }
+          }
+        }
+      }
+      if (props.children !== undefined) visit(props.children as ReactNode);
+    });
+  }
+
+  visit(node);
+  return resolved;
+}
+
+function useResolvedPreSalesSocialProof(): PreSalesSocialProof {
+  const contextValue = useContext(PreSalesSocialProofContext);
+  if (contextValue) return contextValue;
+  const reviewCount = derivePreSalesReviewCount(buildPreSalesReviewSeed("top"));
+  return {
+    reviewCount,
+    reviewTitle: formatPreSalesReviewTitle(reviewCount),
+  };
+}
+
+function normalizePreSalesBadges(
+  badges: ListicleConfig["badges"],
+  reviewCount: number,
+): ListicleConfig["badges"] {
+  const standards = [
+    {
+      value: reviewCount.toLocaleString(),
+      label: "5-Star Reviews",
+      iconAlt: "5 star reviews",
+    },
+    {
+      value: "24/7",
+      label: "Customer Support",
+      iconAlt: "24/7 customer support",
+    },
+    {
+      value: undefined,
+      label: "Risk Free Trial",
+      iconAlt: "Risk free trial",
+    },
+  ] as const;
+
+  return badges.slice(0, standards.length).map((badge, index) => {
+    const standard = standards[index];
+    const normalized = {
+      ...badge,
+      label: standard.label,
+      iconAlt: standard.iconAlt,
+    };
+    if (standard.value) {
+      return { ...normalized, value: standard.value };
+    }
+    const { value: _unusedValue, ...rest } = normalized;
+    return rest;
+  });
+}
+
 type Props = {
   id?: string;
   config?: ListicleConfig;
@@ -36,16 +174,97 @@ type Props = {
 // Keep layout geometry consistent with the base template.
 // Brand design systems can still change colors and font families.
 const LOCKED_TEMPLATE_CSS_VARS = new Set([
+  "--radius-sm",
+  "--radius-md",
+  "--radius-lg",
   "--container-max",
   "--container-pad",
-  "--listicle-title-letter-spacing",
+  "--section-pad-y",
+  "--section-pad-y-mobile",
+  "--heading-size",
+  "--heading-size-mobile",
+  "--hero-min-height",
+  "--hero-min-height-mobile",
+  "--hero-pad-x",
+  "--hero-pad-y",
+  "--hero-copy-pad-right",
+  "--hero-title-max",
+  "--hero-title-line",
+  "--hero-subtitle-max",
+  "--hero-media-frame-size",
+  "--hero-media-frame-size-mobile",
+  "--hero-title-size",
+  "--hero-subtitle-size",
+  "--hero-subtitle-line",
+  "--hero-subtitle-gap",
+  "--badge-strip-pad-y",
+  "--badge-strip-gap",
+  "--badge-icon-size",
+  "--badge-value-size",
+  "--badge-label-size",
+  "--badge-text-size",
+  "--listicle-card-gap",
+  "--listicle-card-radius",
+  "--listicle-card-border",
+  "--listicle-media-width",
+  "--listicle-media-min-height",
+  "--listicle-media-min-height-mobile",
+  "--listicle-media-frame-height",
+  "--listicle-media-frame-height-mobile",
+  "--listicle-media-max-width",
+  "--listicle-media-max-height",
+  "--listicle-content-pad-x",
+  "--listicle-content-pad-y",
+  "--listicle-content-pad-x-mobile",
+  "--listicle-content-pad-y-mobile",
+  "--listicle-number-size",
+  "--listicle-number-offset",
+  "--listicle-number-font-size",
+  "--listicle-title-font",
+  "--listicle-title-size",
+  "--listicle-title-size-mobile",
+  "--listicle-title-color",
+  "--listicle-title-margin-bottom",
+  "--listicle-body-size",
+  "--listicle-body-line",
+  "--listicle-body-gap",
+  "--reviews-height",
+  "--reviews-card-width",
+  "--reviews-card-pad",
+  "--reviews-card-radius",
   "--marquee-border",
   "--marquee-font-size",
   "--marquee-font-weight",
   "--marquee-gap",
   "--marquee-height",
   "--marquee-letter-spacing",
+  "--marquee-pad-y",
   "--marquee-pad-x",
+  "--pitch-pad-y",
+  "--pitch-gap",
+  "--pitch-content-max",
+  "--pitch-title-size",
+  "--pitch-bullets-top",
+  "--pitch-bullets-bottom",
+  "--pitch-bullet-gap",
+  "--pitch-bullet-size",
+  "--pitch-bullet-line",
+  "--pitch-check-size",
+  "--pitch-check-gap",
+  "--pitch-media-max",
+  "--pitch-media-frame-height",
+  "--pitch-media-frame-height-mobile",
+  "--pitch-media-image-max-width",
+  "--pitch-media-image-max-height",
+  "--wall-pad-y",
+  "--wall-pad-top",
+  "--wall-height",
+  "--wall-gap",
+  "--wall-pad-x",
+  "--wall-fade-height",
+  "--footer-pad-y",
+  "--footer-logo-height",
+  "--footer-gap",
 ]);
 
 function toCssVarName(key: string): string {
@@ -175,16 +394,26 @@ export function PreSalesPage({ anchorId, theme, themeJson, content, children }: 
 
   const resolvedAnchorId = anchorId && anchorId.trim() ? anchorId : "top";
   const body = content ? content({}) : children;
+  const socialProof = useMemo<PreSalesSocialProof>(() => {
+    const explicitCount = extractPreSalesReviewCountFromNode(body);
+    const reviewCount = explicitCount ?? derivePreSalesReviewCount(buildPreSalesReviewSeed(resolvedAnchorId));
+    return {
+      reviewCount,
+      reviewTitle: formatPreSalesReviewTitle(reviewCount),
+    };
+  }, [body, resolvedAnchorId]);
 
   return (
-    <div
-      className={baseStyles.root}
-      id={resolvedAnchorId}
-      data-theme={explicitTheme?.dataTheme ?? designSystemTokens?.dataTheme ?? resolvedTheme?.dataTheme}
-      style={themeStyle}
-    >
-      {body}
-    </div>
+    <PreSalesSocialProofContext.Provider value={socialProof}>
+      <div
+        className={baseStyles.root}
+        id={resolvedAnchorId}
+        data-theme={explicitTheme?.dataTheme ?? designSystemTokens?.dataTheme ?? resolvedTheme?.dataTheme}
+        style={themeStyle}
+      >
+        {body}
+      </div>
+    </PreSalesSocialProofContext.Provider>
   );
 }
 
@@ -213,13 +442,18 @@ export function PreSalesHero({ config, configJson }: PreSalesHeroProps) {
     isHeroSectionConfig(resolvedConfig),
     `PreSalesHero.config must be an object like { hero: { title, subtitle, media? }, badges: [] }. Received ${describeValue(resolvedConfig)}.`
   );
+  const socialProof = useResolvedPreSalesSocialProof();
+  const normalizedBadges = useMemo(
+    () => normalizePreSalesBadges(resolvedConfig.badges, socialProof.reviewCount),
+    [resolvedConfig.badges, socialProof.reviewCount]
+  );
 
   return (
     <Hero
       title={resolvedConfig.hero.title}
       subtitle={resolvedConfig.hero.subtitle}
       media={resolvedConfig.hero.media}
-      badges={resolvedConfig.badges}
+      badges={normalizedBadges}
     />
   );
 }
@@ -360,8 +594,13 @@ export function PreSalesReviewWall({ config, configJson, copy, copyJson }: PreSa
     isRecord(resolvedConfig) && typeof resolvedConfig.title === "string" && Array.isArray(resolvedConfig.columns),
     `PreSalesReviewWall.config must be an object like { title: string, columns: [...] }. Received ${describeValue(resolvedConfig)}.`
   );
+  const socialProof = useResolvedPreSalesSocialProof();
   const resolvedCopy = resolveCopy(copy, copyJson);
-  return <ReviewWall wall={resolvedConfig} modalCopy={resolvedCopy.modal} />;
+  const normalizedWall = useMemo(
+    () => ({ ...resolvedConfig, title: socialProof.reviewTitle }),
+    [resolvedConfig, socialProof.reviewTitle]
+  );
+  return <ReviewWall wall={normalizedWall} modalCopy={resolvedCopy.modal} />;
 }
 
 type PreSalesFooterProps = {
@@ -425,7 +664,6 @@ export function PreSalesTemplate(props: Props) {
         Array.isArray(parsed.reasons) &&
         Array.isArray(parsed.marquee) &&
         isRecord(parsed.pitch) &&
-        isRecord(parsed.reviews) &&
         isRecord(parsed.reviewsWall) &&
         isRecord(parsed.footer) &&
         isRecord(parsed.floatingCta),
@@ -443,7 +681,6 @@ export function PreSalesTemplate(props: Props) {
       Array.isArray(resolvedConfig.reasons) &&
       Array.isArray(resolvedConfig.marquee) &&
       isRecord(resolvedConfig.pitch) &&
-      isRecord(resolvedConfig.reviews) &&
       isRecord(resolvedConfig.reviewsWall) &&
       isRecord(resolvedConfig.footer) &&
       isRecord(resolvedConfig.floatingCta),
@@ -458,7 +695,6 @@ export function PreSalesTemplate(props: Props) {
         <PreSalesHero config={{ hero: resolvedConfig.hero, badges: resolvedConfig.badges }} />
         <main>
           <PreSalesReasons config={resolvedConfig.reasons} />
-          <PreSalesReviews config={resolvedConfig.reviews} copy={resolvedCopy} />
           <PreSalesMarquee config={resolvedConfig.marquee} />
           <PreSalesPitch config={resolvedConfig.pitch} />
           <PreSalesReviewWall config={resolvedConfig.reviewsWall} copy={resolvedCopy} />

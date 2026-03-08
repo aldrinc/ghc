@@ -1344,3 +1344,142 @@ def test_extract_embedded_asset_public_ids_errors_on_invalid_uuid():
             design_system_tokens=None,
             context_label="test-page",
         )
+
+
+def test_materialize_design_system_brand_logo_in_puck_data_rewrites_sales_and_presales_logo_slots():
+    stale_logo_id = "11111111-1111-1111-1111-111111111111"
+    current_logo_id = "22222222-2222-2222-2222-222222222222"
+    gallery_asset_id = "33333333-3333-3333-3333-333333333333"
+    brand_alt = "Current Honest Herbalist Logo"
+
+    sales_template_config = {
+        "hero": {"header": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}}},
+        "footer": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}},
+    }
+    presales_template_config = {
+        "footer": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}},
+    }
+
+    puck_data = {
+        "root": {"props": {}},
+        "content": [
+            {
+                "type": "SalesPdpPage",
+                "props": {
+                    "content": [
+                        {
+                            "type": "SalesPdpHeader",
+                            "props": {
+                                "config": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo", "href": "#top"}},
+                                "configJson": json.dumps(
+                                    {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo", "href": "#top"}}
+                                ),
+                            },
+                        },
+                        {
+                            "type": "SalesPdpHero",
+                            "props": {
+                                "config": {
+                                    "header": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo", "href": "#top"}},
+                                    "gallery": {"slides": [{"assetPublicId": gallery_asset_id}]},
+                                },
+                                "configJson": json.dumps(
+                                    {
+                                        "header": {
+                                            "logo": {
+                                                "assetPublicId": stale_logo_id,
+                                                "alt": "Old Logo",
+                                                "href": "#top",
+                                            }
+                                        },
+                                        "gallery": {"slides": [{"assetPublicId": gallery_asset_id}]},
+                                    }
+                                ),
+                            },
+                        },
+                        {
+                            "type": "SalesPdpFooter",
+                            "props": {
+                                "config": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}},
+                                "configJson": json.dumps({"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}}),
+                            },
+                        },
+                    ]
+                },
+            },
+            {
+                "type": "SalesPdpTemplate",
+                "props": {
+                    "config": sales_template_config,
+                    "configJson": json.dumps(sales_template_config),
+                },
+            },
+            {
+                "type": "PreSalesFooter",
+                "props": {
+                    "config": {"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}},
+                    "configJson": json.dumps({"logo": {"assetPublicId": stale_logo_id, "alt": "Old Logo"}}),
+                },
+            },
+            {
+                "type": "PreSalesTemplate",
+                "props": {
+                    "config": presales_template_config,
+                    "configJson": json.dumps(presales_template_config),
+                },
+            },
+        ],
+        "zones": {},
+    }
+
+    materialized = deploy_service._materialize_design_system_brand_logo_in_puck_data(
+        puck_data=puck_data,
+        design_system_tokens={"brand": {"logoAssetPublicId": current_logo_id, "logoAlt": brand_alt}},
+    )
+
+    sales_page_blocks = materialized["content"][0]["props"]["content"]
+    sales_header = sales_page_blocks[0]["props"]["config"]["logo"]
+    sales_hero_header = sales_page_blocks[1]["props"]["config"]["header"]["logo"]
+    sales_footer = sales_page_blocks[2]["props"]["config"]["logo"]
+    legacy_sales = materialized["content"][1]["props"]["config"]
+    presales_footer = materialized["content"][2]["props"]["config"]["logo"]
+    legacy_presales = materialized["content"][3]["props"]["config"]["footer"]["logo"]
+
+    assert sales_header["assetPublicId"] == current_logo_id
+    assert sales_hero_header["assetPublicId"] == current_logo_id
+    assert sales_footer["assetPublicId"] == current_logo_id
+    assert legacy_sales["hero"]["header"]["logo"]["assetPublicId"] == current_logo_id
+    assert legacy_sales["footer"]["logo"]["assetPublicId"] == current_logo_id
+    assert presales_footer["assetPublicId"] == current_logo_id
+    assert legacy_presales["assetPublicId"] == current_logo_id
+
+    assert sales_header["alt"] == brand_alt
+    assert sales_hero_header["alt"] == brand_alt
+    assert sales_footer["alt"] == brand_alt
+    assert legacy_sales["hero"]["header"]["logo"]["alt"] == brand_alt
+    assert legacy_sales["footer"]["logo"]["alt"] == brand_alt
+    assert presales_footer["alt"] == brand_alt
+    assert legacy_presales["alt"] == brand_alt
+
+    sales_header_json = json.loads(sales_page_blocks[0]["props"]["configJson"])
+    sales_hero_json = json.loads(sales_page_blocks[1]["props"]["configJson"])
+    sales_footer_json = json.loads(sales_page_blocks[2]["props"]["configJson"])
+    legacy_sales_json = json.loads(materialized["content"][1]["props"]["configJson"])
+    presales_footer_json = json.loads(materialized["content"][2]["props"]["configJson"])
+    legacy_presales_json = json.loads(materialized["content"][3]["props"]["configJson"])
+
+    assert sales_header_json["logo"]["assetPublicId"] == current_logo_id
+    assert sales_hero_json["header"]["logo"]["assetPublicId"] == current_logo_id
+    assert sales_footer_json["logo"]["assetPublicId"] == current_logo_id
+    assert legacy_sales_json["hero"]["header"]["logo"]["assetPublicId"] == current_logo_id
+    assert legacy_sales_json["footer"]["logo"]["assetPublicId"] == current_logo_id
+    assert presales_footer_json["logo"]["assetPublicId"] == current_logo_id
+    assert legacy_presales_json["footer"]["logo"]["assetPublicId"] == current_logo_id
+
+    extracted = deploy_service._extract_embedded_asset_public_ids(
+        puck_data=materialized,
+        design_system_tokens={"brand": {"logoAssetPublicId": current_logo_id, "logoAlt": brand_alt}},
+        context_label="artifact-page",
+    )
+
+    assert extracted == {current_logo_id, gallery_asset_id}

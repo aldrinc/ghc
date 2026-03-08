@@ -1,0 +1,1260 @@
+[
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/practicaltools_apify-reddit-api_nWwQyuH4exNlbvyAs.json::item[0]"
+    ],
+    "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "habitat_type": "Reddit",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/practicaltools_apify-reddit-api_nWwQyuH4exNlbvyAs.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 470
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "N",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "N",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "N",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "N",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "N",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "NONE",
+      "purchasing_comparing": "N",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "N",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "N",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 20,
+    "source_file": "practicaltools_apify-reddit-api_nWwQyuH4exNlbvyAs.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 14,
+    "evidence_refs": [
+      "/apify_output/apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json::item[0]"
+    ],
+    "habitat_name": "apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json",
+    "habitat_type": "Social_Video",
+    "items_in_file": 200,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json::item[0]",
+        "has_failed_solution": "Y",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "Y",
+        "sample_id": "S1",
+        "word_count": 367
+      },
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json::item[100]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S2",
+        "word_count": 194
+      },
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json::item[199]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S3",
+        "word_count": 262
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "Y",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "Y",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "Y",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "Y",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "Y",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "Y",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "SOME",
+      "purchasing_comparing": "Y",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "Y",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "Y",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "Y",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "Y"
+    },
+    "rank_score": 35,
+    "source_file": "apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "/apify_output/apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json",
+    "video_extension": {
+      "comment_avg_length": "SHORT",
+      "comment_sections_active": "Y",
+      "contains_objection_language": "N",
+      "contains_purchase_intent": "N",
+      "contains_testimonial_language": "N",
+      "creator_diversity": "MANY",
+      "hook_formats_identifiable": "Y",
+      "median_view_count": 91435,
+      "video_count_scraped": 133,
+      "viral_video_count": 0,
+      "viral_videos_found": "N"
+    }
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/practicaltools_apify-reddit-api_AvKZfPsjxgVcxhJFW.json::item[0]"
+    ],
+    "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "habitat_type": "Reddit",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/practicaltools_apify-reddit-api_AvKZfPsjxgVcxhJFW.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 470
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "N",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "N",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "N",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "N",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "N",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "NONE",
+      "purchasing_comparing": "N",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "N",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "N",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 20,
+    "source_file": "practicaltools_apify-reddit-api_AvKZfPsjxgVcxhJFW.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/practicaltools_apify-reddit-api_GJsergT7tTRhcbSJR.json::item[0]"
+    ],
+    "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "habitat_type": "Reddit",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/practicaltools_apify-reddit-api_GJsergT7tTRhcbSJR.json::item[0]",
+        "has_failed_solution": "Y",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "Y",
+        "sample_id": "S1",
+        "word_count": 470
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "Y",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "Y",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "Y",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "Y",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "Y",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "SOME",
+      "purchasing_comparing": "Y",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "Y",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "Y",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "Y"
+    },
+    "rank_score": 30,
+    "source_file": "practicaltools_apify-reddit-api_GJsergT7tTRhcbSJR.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/practicaltools_apify-reddit-api_EMOi8FRYLhOFBA0Be.json::item[0]"
+    ],
+    "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "habitat_type": "Reddit",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/practicaltools_apify-reddit-api_EMOi8FRYLhOFBA0Be.json::item[0]",
+        "has_failed_solution": "Y",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 470
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "Y",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "Y",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "Y",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "Y",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "Y",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "SOME",
+      "purchasing_comparing": "Y",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "Y",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "Y",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 27,
+    "source_file": "practicaltools_apify-reddit-api_EMOi8FRYLhOFBA0Be.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/practicaltools_apify-reddit-api_TUWalDky9OZ412Xgl.json::item[0]"
+    ],
+    "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "habitat_type": "Reddit",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/practicaltools_apify-reddit-api_TUWalDky9OZ412Xgl.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 470
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "N",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "N",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "N",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "N",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "N",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "NONE",
+      "purchasing_comparing": "N",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "N",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "N",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 20,
+    "source_file": "practicaltools_apify-reddit-api_TUWalDky9OZ412Xgl.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/practicaltools_apify-reddit-api_BlhkTtaiplVdvgdqX.json::item[0]"
+    ],
+    "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "habitat_type": "Reddit",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/practicaltools_apify-reddit-api_BlhkTtaiplVdvgdqX.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 470
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "N",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "N",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "N",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "N",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "N",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "NONE",
+      "purchasing_comparing": "N",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "N",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "N",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 20,
+    "source_file": "practicaltools_apify-reddit-api_BlhkTtaiplVdvgdqX.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/practicaltools_apify-reddit-api_tpbUIzqjjUMcOaBbG.json::item[0]"
+    ],
+    "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "habitat_type": "Reddit",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/practicaltools_apify-reddit-api_tpbUIzqjjUMcOaBbG.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 470
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "N",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "N",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "N",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "N",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "N",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "NONE",
+      "purchasing_comparing": "N",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "N",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "N",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 20,
+    "source_file": "practicaltools_apify-reddit-api_tpbUIzqjjUMcOaBbG.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/practicaltools_apify-reddit-api_nn639TnPhCX8Ygora.json::item[0]"
+    ],
+    "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "habitat_type": "Reddit",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/practicaltools_apify-reddit-api_nn639TnPhCX8Ygora.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 470
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "N",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "N",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "N",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "N",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "N",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "NONE",
+      "purchasing_comparing": "N",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "N",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "N",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 20,
+    "source_file": "practicaltools_apify-reddit-api_nn639TnPhCX8Ygora.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "MAJOR_ISSUES",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/clockworks_tiktok-scraper_Zfgak0CiSsqanx8pl.json::item[0]"
+    ],
+    "habitat_name": "clockworks_tiktok-scraper_Zfgak0CiSsqanx8pl.json",
+    "habitat_type": "Social_Video",
+    "items_in_file": 1,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/clockworks_tiktok-scraper_Zfgak0CiSsqanx8pl.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 24
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "N",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "N",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "N",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "N",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "N",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "N",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "NONE",
+      "purchasing_comparing": "N",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "N",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "N",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 12,
+    "source_file": "clockworks_tiktok-scraper_Zfgak0CiSsqanx8pl.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "/apify_output/clockworks_tiktok-scraper_Zfgak0CiSsqanx8pl.json",
+    "video_extension": {
+      "comment_avg_length": "SHORT",
+      "comment_sections_active": "Y",
+      "contains_objection_language": "N",
+      "contains_purchase_intent": "N",
+      "contains_testimonial_language": "N",
+      "creator_diversity": "FEW",
+      "hook_formats_identifiable": "Y",
+      "median_view_count": 1220,
+      "video_count_scraped": 2,
+      "viral_video_count": 0,
+      "viral_videos_found": "N"
+    }
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 14,
+    "evidence_refs": [
+      "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json::item[0]"
+    ],
+    "habitat_name": "apify_instagram-scraper_VqEmoxp38D3Au5qk3.json",
+    "habitat_type": "Social_Video",
+    "items_in_file": 200,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 287
+      },
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json::item[100]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S2",
+        "word_count": 175
+      },
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json::item[199]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "Y",
+        "sample_id": "S3",
+        "word_count": 212
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "Y",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "Y",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "Y",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "Y",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "Y",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "Y",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "SOME",
+      "purchasing_comparing": "Y",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "Y",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "Y",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "Y",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "Y"
+    },
+    "rank_score": 35,
+    "source_file": "apify_instagram-scraper_VqEmoxp38D3Au5qk3.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json",
+    "video_extension": {
+      "comment_avg_length": "SHORT",
+      "comment_sections_active": "Y",
+      "contains_objection_language": "N",
+      "contains_purchase_intent": "N",
+      "contains_testimonial_language": "N",
+      "creator_diversity": "MANY",
+      "hook_formats_identifiable": "Y",
+      "median_view_count": 91435,
+      "video_count_scraped": 133,
+      "viral_video_count": 0,
+      "viral_videos_found": "N"
+    }
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 0,
+    "evidence_refs": [
+      "/apify_output/apify_instagram-scraper_9nnE3i6vUfvWhodB5.json::item[0]"
+    ],
+    "habitat_name": "apify_instagram-scraper_9nnE3i6vUfvWhodB5.json",
+    "habitat_type": "Social_Video",
+    "items_in_file": 19,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_9nnE3i6vUfvWhodB5.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "Y",
+        "sample_id": "S1",
+        "word_count": 258
+      },
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_9nnE3i6vUfvWhodB5.json::item[9]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S2",
+        "word_count": 191
+      },
+      {
+        "evidence_ref": "/apify_output/apify_instagram-scraper_9nnE3i6vUfvWhodB5.json::item[18]",
+        "has_failed_solution": "Y",
+        "has_identity_language": "N",
+        "has_specific_outcome": "Y",
+        "has_trigger_event": "N",
+        "sample_id": "S3",
+        "word_count": 226
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "Y",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "Y",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "Y",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "Y",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "Y",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "Y",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "SOME",
+      "purchasing_comparing": "Y",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "Y",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "Y",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "N",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "Y"
+    },
+    "rank_score": 34,
+    "source_file": "apify_instagram-scraper_9nnE3i6vUfvWhodB5.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "/apify_output/apify_instagram-scraper_9nnE3i6vUfvWhodB5.json",
+    "video_extension": {
+      "comment_avg_length": "SHORT",
+      "comment_sections_active": "Y",
+      "contains_objection_language": "N",
+      "contains_purchase_intent": "N",
+      "contains_testimonial_language": "N",
+      "creator_diversity": "MANY",
+      "hook_formats_identifiable": "Y",
+      "median_view_count": 91435,
+      "video_count_scraped": 133,
+      "viral_video_count": 0,
+      "viral_videos_found": "N"
+    }
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [],
+      "overlap_level": "NONE",
+      "whitespace_opportunity": "Y"
+    },
+    "data_quality": "MAJOR_ISSUES",
+    "estimated_yield": 7,
+    "evidence_refs": [
+      "/apify_output/streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json::item[0]"
+    ],
+    "habitat_name": "streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json",
+    "habitat_type": "YouTube",
+    "items_in_file": 992,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 0
+      },
+      {
+        "evidence_ref": "/apify_output/streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json::item[496]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S2",
+        "word_count": 0
+      },
+      {
+        "evidence_ref": "/apify_output/streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json::item[991]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S3",
+        "word_count": 0
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "Y",
+      "comparison_discussions": "N",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "0",
+      "competitor_brands_mentioned": "N",
+      "discusses_spending": "N",
+      "dominated_by_offtopic": "Y",
+      "exact_category": "N",
+      "fear_frustration_shame": "N",
+      "first_person_narratives": "N",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "N",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "N",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "N",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "FEW",
+      "purchasing_comparing": "Y",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "N",
+      "relevance_pct": "UNDER_10_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "N",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "Y",
+      "threads_50_plus": "Y",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "N"
+    },
+    "rank_score": 14,
+    "source_file": "streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "/apify_output/streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json",
+    "video_extension": null
+  },
+  {
+    "competitive_overlap": {
+      "competitors_in_data": [
+        "thelostremedies"
+      ],
+      "overlap_level": "LOW",
+      "whitespace_opportunity": "N"
+    },
+    "data_quality": "CLEAN",
+    "estimated_yield": 14,
+    "evidence_refs": [
+      "/apify_output/streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json::item[0]"
+    ],
+    "habitat_name": "streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json",
+    "habitat_type": "Social_Video",
+    "items_in_file": 81,
+    "language_samples": [
+      {
+        "evidence_ref": "/apify_output/streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json::item[0]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S1",
+        "word_count": 12
+      },
+      {
+        "evidence_ref": "/apify_output/streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json::item[40]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S2",
+        "word_count": 14
+      },
+      {
+        "evidence_ref": "/apify_output/streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json::item[80]",
+        "has_failed_solution": "N",
+        "has_identity_language": "N",
+        "has_specific_outcome": "N",
+        "has_trigger_event": "N",
+        "sample_id": "S3",
+        "word_count": 18
+      }
+    ],
+    "mining_gate": {
+      "failed_fields": [],
+      "reason": "All hard-gate fields are Y in scraped run metadata and extractable text present.",
+      "status": "PASS"
+    },
+    "observation_sheet": {
+      "adjacent_only": "N",
+      "comparison_discussions": "Y",
+      "competitor_ads_present": "N",
+      "competitor_brand_count": "1-3",
+      "competitor_brands_mentioned": "Y",
+      "discusses_spending": "Y",
+      "dominated_by_offtopic": "N",
+      "exact_category": "Y",
+      "fear_frustration_shame": "Y",
+      "first_person_narratives": "Y",
+      "habitat_age": "UNDER_1YR",
+      "long_detailed_posts": "Y",
+      "membership_trend": "CANNOT_DETERMINE",
+      "no_rate_limiting": "Y",
+      "personal_usage": "Y",
+      "post_frequency_trend": "CANNOT_DETERMINE",
+      "post_purchase_experience": "Y",
+      "posts_last_12mo": "Y",
+      "posts_last_3mo": "Y",
+      "posts_last_6mo": "Y",
+      "price_value_mentions": "Y",
+      "publicly_accessible": "Y",
+      "purchase_intent_density": "SOME",
+      "purchasing_comparing": "Y",
+      "recency_ratio": "MAJORITY_RECENT",
+      "recommendation_threads": "Y",
+      "relevance_pct": "OVER_50_PCT",
+      "reusability": "PATTERN_REUSABLE",
+      "seasonal_description": "N/A",
+      "seasonal_patterns": "CANNOT_DETERMINE",
+      "specific_dollar_or_time": "Y",
+      "target_language": "Y",
+      "text_based_content": "Y",
+      "threads_1000_plus": "N",
+      "threads_200_plus": "N",
+      "threads_50_plus": "Y",
+      "trend_direction": "CANNOT_DETERMINE",
+      "trigger_events": "Y"
+    },
+    "rank_score": 35,
+    "source_file": "streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json",
+    "trend_lifecycle": {
+      "lifecycle_stage": "CANNOT_DETERMINE",
+      "trend_direction": "CANNOT_DETERMINE"
+    },
+    "url_pattern": "/apify_output/streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json",
+    "video_extension": {
+      "comment_avg_length": "SHORT",
+      "comment_sections_active": "Y",
+      "contains_objection_language": "N",
+      "contains_purchase_intent": "N",
+      "contains_testimonial_language": "N",
+      "creator_diversity": "MANY",
+      "hook_formats_identifiable": "Y",
+      "median_view_count": 12604,
+      "video_count_scraped": 59,
+      "viral_video_count": 0,
+      "viral_videos_found": "N"
+    }
+  }
+]

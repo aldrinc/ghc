@@ -238,7 +238,7 @@
                     "offer": {
                       "title": "3. Select Your Offer:",
                       "helperText": "Most customers go for the Buy 3 Get 3 Free offer.",
-                      "seeWhyLabel": "Click to see why.",
+                      "seeWhyLabel": "",
                       "options": [
                         {
                           "id": "1",
@@ -1026,7 +1026,9 @@
                     "src": "/assets/puppypad-logo.svg",
                     "alt": "Brand logo"
                   },
-                  "copyright": "© All rights reserved."
+                  "copyright": "© 2025 PuppyPad",
+                  "links": [],
+                  "paymentIcons": []
                 },
                 "id": "sales-pdp-footer"
               }

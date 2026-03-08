@@ -499,6 +499,8 @@ def call_claude_structured_message(
     output_schema: Dict[str, Any],
     max_tokens: int = 32000,
     temperature: float = 0.0,
+    http_timeout_seconds: Optional[float] = None,
+    max_attempts: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
     Call Claude Messages API with structured outputs enabled and return parsed JSON + raw response.
@@ -516,6 +518,12 @@ def call_claude_structured_message(
     candidate_model = model or CLAUDE_DEFAULT_MODEL
     if not candidate_model:
         raise RuntimeError("Claude model is required for structured message call")
+    structured_timeout = float(http_timeout_seconds) if http_timeout_seconds is not None else float(
+        CLAUDE_STRUCTURED_HTTP_TIMEOUT
+    )
+    if structured_timeout <= 0:
+        raise RuntimeError("Claude structured message timeout must be > 0 seconds.")
+    structured_max_attempts = max(1, int(max_attempts)) if max_attempts is not None else CLAUDE_STRUCTURED_MAX_ATTEMPTS
 
     if (user_content is None) == (messages is None):
         raise RuntimeError(
@@ -558,6 +566,8 @@ def call_claude_structured_message(
             "outputSchemaSha256": schema_sha256,
             "outputSchemaChars": len(schema_json),
             "structuredOutput": True,
+            "timeoutSeconds": structured_timeout,
+            "maxAttempts": structured_max_attempts,
         },
         model_parameters={"max_tokens": max_tokens, "temperature": temperature},
         tags=["llm", "anthropic", "structured"],
@@ -567,9 +577,9 @@ def call_claude_structured_message(
         payload: Dict[str, Any] | None = None
         last_retryable_error: Exception | None = None
 
-        for attempt in range(1, CLAUDE_STRUCTURED_MAX_ATTEMPTS + 1):
+        for attempt in range(1, structured_max_attempts + 1):
             try:
-                with httpx.Client(timeout=CLAUDE_STRUCTURED_HTTP_TIMEOUT) as client:
+                with httpx.Client(timeout=structured_timeout) as client:
                     response = client.post(url, headers=headers, json=body)
                     response.raise_for_status()
                     payload = response.json()
@@ -587,14 +597,14 @@ def call_claude_structured_message(
                     ) from exc
 
                 status_code = exc.response.status_code if exc.response else None
-                if status_code in CLAUDE_STRUCTURED_RETRYABLE_STATUS_CODES and attempt < CLAUDE_STRUCTURED_MAX_ATTEMPTS:
+                if status_code in CLAUDE_STRUCTURED_RETRYABLE_STATUS_CODES and attempt < structured_max_attempts:
                     last_retryable_error = exc
                     logger.warning(
                         "claude_structured_message_retry_status",
                         extra={
                             "status_code": status_code,
                             "attempt": attempt,
-                            "max_attempts": CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+                            "max_attempts": structured_max_attempts,
                             "request_id": request_id,
                             "model": candidate_model,
                         },
@@ -608,13 +618,13 @@ def call_claude_structured_message(
                     f"Claude structured message failed (status={status}{request_id_suffix}): {body_text}"
                 ) from exc
             except Exception as exc:  # noqa: BLE001
-                if _is_retryable_structured_transport_error(exc) and attempt < CLAUDE_STRUCTURED_MAX_ATTEMPTS:
+                if _is_retryable_structured_transport_error(exc) and attempt < structured_max_attempts:
                     last_retryable_error = exc
                     logger.warning(
                         "claude_structured_message_retry_transport",
                         extra={
                             "attempt": attempt,
-                            "max_attempts": CLAUDE_STRUCTURED_MAX_ATTEMPTS,
+                            "max_attempts": structured_max_attempts,
                             "model": candidate_model,
                             "error": str(exc),
                         },
@@ -627,7 +637,7 @@ def call_claude_structured_message(
             terminal_error = last_retryable_error or RuntimeError("unknown Claude structured message error")
             raise RuntimeError(
                 "Claude structured message failed after retry budget exhausted. "
-                f"attempts={CLAUDE_STRUCTURED_MAX_ATTEMPTS} error={terminal_error}"
+                f"attempts={structured_max_attempts} error={terminal_error}"
             ) from terminal_error
 
         parsed = None

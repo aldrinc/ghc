@@ -17,6 +17,7 @@ from app.agent.funnel_tools import (
     DraftValidateTool,
     ImagesGenerateTool,
     ImagesPlanTool,
+    SalesPdpCarouselGenerateAndApplyTool,
     TestimonialsGenerateAndApplyTool,
     PublishValidateReadyTool,
     PublishExecuteTool,
@@ -383,11 +384,46 @@ def run_generate_page_draft_stream(
                 draft_version_id = testimonials_res.ui_details.get("draftVersionId") or draft_version_id
                 break
 
+        # 12) Generate + apply Sales PDP carousel images from scoped PDP samples.
+        # Run this after testimonials so a long carousel run cannot leave sales pages
+        # without required synthetic testimonial content.
+        generated_carousel_images: list[dict[str, Any]] = []
+        if (
+            generate_images
+            and funnel_ctx.get("templateMode")
+            and funnel_ctx.get("templateKind") == "sales-pdp"
+        ):
+            carousel_res = yield from runtime.invoke_tool_stream(
+                handle=handle,
+                tool=SalesPdpCarouselGenerateAndApplyTool(),
+                raw_args={
+                    "orgId": org_id,
+                    "userId": user_id,
+                    "funnelId": funnel_id,
+                    "pageId": page_id,
+                    "draftVersionId": draft_version_id,
+                    "templateId": funnel_ctx.get("templateId"),
+                    "ideaWorkspaceId": docs_ctx.get("ideaWorkspaceId"),
+                    "model": model,
+                    "temperature": temperature,
+                    "maxTokens": max_tokens,
+                    "agentRunId": handle.run_id,
+                    "maxDurationSeconds": DEFAULT_IMAGES_STEP_BUDGET_SECONDS,
+                },
+                client_id=client_id,
+                funnel_id=funnel_id,
+                page_id=page_id,
+            )
+            puck_data = carousel_res.ui_details.get("puckData") or puck_data
+            draft_version_id = carousel_res.ui_details.get("draftVersionId") or draft_version_id
+            generated_carousel_images = carousel_res.ui_details.get("generatedCarouselImages") or []
+
         final = {
             "assistantMessage": assistant_message,
             "puckData": puck_data,
             "draftVersionId": draft_version_id,
             "generatedImages": generated_images,
+            "generatedCarouselImages": generated_carousel_images,
             "imagePlans": image_plans,
             "runId": handle.run_id,
         }

@@ -61,7 +61,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
         return {
             "variants": [
                 {
-                    "variant_id": "base",
+                    "variant_id": "single_device",
                     "dimensions": {
                         "value_equation": {"raw_score": 8.0, "evidence_quality": "INFERRED"},
                         "objection_coverage": {"raw_score": 8.0, "evidence_quality": "OBSERVED"},
@@ -71,10 +71,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "clarity_simplicity": {"raw_score": 8.0, "evidence_quality": "INFERRED"},
                         "bottleneck_resilience": {"raw_score": 7.5, "evidence_quality": "INFERRED"},
                         "momentum_continuity": {"raw_score": 7.8, "evidence_quality": "INFERRED"},
+                        "pricing_fidelity": {"raw_score": 8.0, "evidence_quality": "OBSERVED"},
+                        "savings_fidelity": {"raw_score": 7.8, "evidence_quality": "OBSERVED"},
+                        "best_value_fidelity": {"raw_score": 7.5, "evidence_quality": "INFERRED"},
                     },
                 },
                 {
-                    "variant_id": "variant_a",
+                    "variant_id": "share_and_save",
                     "dimensions": {
                         "value_equation": {"raw_score": 8.2, "evidence_quality": "INFERRED"},
                         "objection_coverage": {"raw_score": 8.1, "evidence_quality": "OBSERVED"},
@@ -84,10 +87,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "clarity_simplicity": {"raw_score": 8.0, "evidence_quality": "INFERRED"},
                         "bottleneck_resilience": {"raw_score": 7.6, "evidence_quality": "INFERRED"},
                         "momentum_continuity": {"raw_score": 8.0, "evidence_quality": "INFERRED"},
+                        "pricing_fidelity": {"raw_score": 8.4, "evidence_quality": "OBSERVED"},
+                        "savings_fidelity": {"raw_score": 8.3, "evidence_quality": "OBSERVED"},
+                        "best_value_fidelity": {"raw_score": 8.1, "evidence_quality": "INFERRED"},
                     },
                 },
                 {
-                    "variant_id": "variant_b",
+                    "variant_id": "family_bundle",
                     "dimensions": {
                         "value_equation": {"raw_score": 7.8, "evidence_quality": "INFERRED"},
                         "objection_coverage": {"raw_score": 7.7, "evidence_quality": "OBSERVED"},
@@ -97,6 +103,9 @@ def _stub_prompt_chain_runtime(monkeypatch):
                         "clarity_simplicity": {"raw_score": 7.7, "evidence_quality": "INFERRED"},
                         "bottleneck_resilience": {"raw_score": 7.4, "evidence_quality": "INFERRED"},
                         "momentum_continuity": {"raw_score": 7.6, "evidence_quality": "INFERRED"},
+                        "pricing_fidelity": {"raw_score": 8.7, "evidence_quality": "OBSERVED"},
+                        "savings_fidelity": {"raw_score": 8.8, "evidence_quality": "OBSERVED"},
+                        "best_value_fidelity": {"raw_score": 8.9, "evidence_quality": "INFERRED"},
                     },
                 },
             ]
@@ -105,7 +114,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
     def _offer_variants_payload() -> list[dict[str, Any]]:
         return [
             {
-                "variant_id": "base",
+                "variant_id": "single_device",
                 "core_promise": "Overwhelm -> calm routine",
                 "value_stack": [
                     {
@@ -135,6 +144,22 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 ],
                 "guarantee": "30-day clarity guarantee",
                 "pricing_rationale": "Single payment for recurring use",
+                "pricing_metadata": {"list_price_cents": 9900, "offer_price_cents": 6900},
+                "savings_metadata": {
+                    "savings_amount_cents": 3000,
+                    "savings_percent": 30.3,
+                    "savings_basis": "vs_list_price",
+                },
+                "best_value_metadata": {
+                    "is_best_value": False,
+                    "rationale": "Lowest commitment option for first-time buyers.",
+                    "compared_variant_ids": ["share_and_save", "family_bundle"],
+                },
+                "bonus_modules": [
+                    {"bonus_id": "bonus-1", "copy": "Nightly startup checklist for first use."},
+                    {"bonus_id": "bonus-2", "copy": "Troubleshooting map for routine disruptions."},
+                    {"bonus_id": "bonus-3", "copy": "Quick reference card for daily consistency."},
+                ],
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 8},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 8},
@@ -147,10 +172,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "clarity_simplicity": 8,
                     "bottleneck_resilience": 7,
                     "momentum_continuity": 8,
+                    "pricing_fidelity": 8,
+                    "savings_fidelity": 8,
+                    "best_value_fidelity": 7,
                 },
             },
             {
-                "variant_id": "variant_a",
+                "variant_id": "share_and_save",
                 "core_promise": "Overwhelm -> calm routine",
                 "value_stack": [
                     {
@@ -180,6 +208,22 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 ],
                 "guarantee": "60-day confidence guarantee",
                 "pricing_rationale": "Action-oriented bundle value",
+                "pricing_metadata": {"list_price_cents": 19800, "offer_price_cents": 11900},
+                "savings_metadata": {
+                    "savings_amount_cents": 7900,
+                    "savings_percent": 39.9,
+                    "savings_basis": "vs_list_price",
+                },
+                "best_value_metadata": {
+                    "is_best_value": False,
+                    "rationale": "Best for two-device households balancing value and flexibility.",
+                    "compared_variant_ids": ["single_device", "family_bundle"],
+                },
+                "bonus_modules": [
+                    {"bonus_id": "bonus-1", "copy": "Shared setup workflow for two users."},
+                    {"bonus_id": "bonus-2", "copy": "Sync checklist to keep routines aligned."},
+                    {"bonus_id": "bonus-3", "copy": "Partner accountability prompts for follow-through."},
+                ],
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 8},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 8},
@@ -192,10 +236,13 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "clarity_simplicity": 8,
                     "bottleneck_resilience": 8,
                     "momentum_continuity": 8,
+                    "pricing_fidelity": 8,
+                    "savings_fidelity": 8,
+                    "best_value_fidelity": 8,
                 },
             },
             {
-                "variant_id": "variant_b",
+                "variant_id": "family_bundle",
                 "core_promise": "Overwhelm -> calm routine",
                 "value_stack": [
                     {
@@ -225,6 +272,22 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 ],
                 "guarantee": "30-day clarity guarantee",
                 "pricing_rationale": "Anchored bundle value",
+                "pricing_metadata": {"list_price_cents": 29700, "offer_price_cents": 15900},
+                "savings_metadata": {
+                    "savings_amount_cents": 13800,
+                    "savings_percent": 46.46,
+                    "savings_basis": "vs_list_price",
+                },
+                "best_value_metadata": {
+                    "is_best_value": True,
+                    "rationale": "Highest total savings for family usage with the same core system.",
+                    "compared_variant_ids": ["single_device", "share_and_save"],
+                },
+                "bonus_modules": [
+                    {"bonus_id": "bonus-1", "copy": "Family onboarding plan for multiple caregivers."},
+                    {"bonus_id": "bonus-2", "copy": "Shared escalation guide for off-pattern nights."},
+                    {"bonus_id": "bonus-3", "copy": "Printable family tracker for weekly review."},
+                ],
                 "objection_map": [
                     {"objection": "Will this fit my routine?", "source": "voc", "covered": True, "coverage_strength": 7},
                     {"objection": "Will this actually work?", "source": "voc", "covered": True, "coverage_strength": 7},
@@ -237,11 +300,187 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "clarity_simplicity": 7,
                     "bottleneck_resilience": 7,
                     "momentum_continuity": 7,
+                    "pricing_fidelity": 9,
+                    "savings_fidelity": 9,
+                    "best_value_fidelity": 9,
                 },
             },
         ]
 
     def _fake_run_prompt_json_object(*, context: str, **_kwargs):
+        advertorial_template_payload = {
+            "hero": {
+                "title": "Approved Headline",
+                "subtitle": "Predictable evenings are possible with a mechanism-first approach.",
+                "badges": [
+                    {
+                        "label": "Mechanism-first",
+                        "icon": {"alt": "Mechanism icon", "prompt": "icon of mechanism-first process"},
+                    },
+                    {
+                        "label": "Evidence-backed",
+                        "icon": {"alt": "Evidence icon", "prompt": "icon of evidence-backed guidance"},
+                    },
+                    {
+                        "label": "Practical nightly use",
+                        "icon": {"alt": "Checklist icon", "prompt": "icon of nightly routine checklist"},
+                    },
+                ],
+            },
+            "reasons": [
+                {
+                    "number": 1,
+                    "title": "Random fixes miss the real bottleneck",
+                    "body": "Mechanism mismatch keeps restarting the same nightly stress loop.",
+                    "image": {
+                        "alt": "Caregiver reviewing a nightly routine checklist",
+                    },
+                }
+            ],
+            "marquee": [
+                "Mechanism-first",
+                "Evidence-backed",
+                "Practical steps",
+            ],
+            "pitch": {
+                "title": "See the full implementation offer",
+                "bullets": [
+                    "Checklist for nightly execution",
+                    "Decision support for common setbacks",
+                    "Mechanism-first guidance for routine resets",
+                    "Clear next steps for tonight's implementation",
+                ],
+                "cta_label": "Continue to the offer",
+                "image": {"alt": "Printed guide and checklist pages"},
+            },
+            "reviews": [
+                {
+                    "text": "We stopped guessing and the evening rhythm is finally stable.",
+                    "author": "K. Parent",
+                    "rating": 5,
+                },
+                {
+                    "text": "The step-by-step flow made execution much easier for our routine.",
+                    "author": "D. Caregiver",
+                    "rating": 5,
+                },
+                {
+                    "text": "Clear boundaries and practical guidance reduced our nightly stress fast.",
+                    "author": "M. Family",
+                    "rating": 5,
+                },
+            ],
+            "review_wall": {
+                "title": "What readers report after switching approach",
+                "button_label": "Open full review examples",
+            },
+            "floating_cta": {
+                "label": "Continue to offer",
+            },
+        }
+        sales_template_payload = {
+            "hero": {
+                "purchase_title": "Start the mechanism-first evening system",
+                "primary_cta_label": "Claim the system",
+                "primary_cta_subbullets": [
+                    "Fast implementation path",
+                    "30-day confidence guarantee",
+                ],
+            },
+            "problem": {
+                "title": "Nightly friction keeps repeating",
+                "paragraphs": [
+                    "Most routines fail because they optimize effort instead of sequence.",
+                ],
+                "emphasis_line": "When sequence is wrong, consistency collapses.",
+            },
+            "mechanism": {
+                "title": "Fix the sequence, then the outcomes follow",
+                "paragraphs": [
+                    "The system targets trigger timing and removes guesswork.",
+                ],
+                "bullets": [
+                    {"title": "Trigger map", "body": "Identify sequence breakpoints before they cascade."},
+                    {"title": "Execution order", "body": "Apply steps in a repeatable nightly progression."},
+                    {"title": "Recovery branch", "body": "Handle misses without resetting the full routine."},
+                    {"title": "Progress markers", "body": "Track wins and frictions with simple checkpoints."},
+                    {"title": "Confidence anchor", "body": "Use evidence-backed cues to stay consistent under stress."},
+                ],
+                "callout": {
+                    "left_title": "Why old routines fail",
+                    "left_body": "They describe tasks but ignore trigger order.",
+                    "right_title": "What this changes",
+                    "right_body": "It aligns actions to sequence so consistency compounds.",
+                },
+                "comparison": {
+                    "badge": "Side-by-side",
+                    "title": "Mechanism-first system vs generic routines",
+                    "swipe_hint": "Swipe to compare",
+                    "columns": {
+                        "pup": "Mechanism-first",
+                        "disposable": "Generic routine",
+                    },
+                    "rows": [
+                        {
+                            "label": "Predictability",
+                            "pup": "High once sequence is set",
+                            "disposable": "Inconsistent",
+                        }
+                    ],
+                },
+            },
+            "social_proof": {
+                "badge": "Verified",
+                "title": "Customer-backed clarity",
+                "rating_label": "4.9 average confidence",
+                "summary": "Families report fewer resets and calmer evenings.",
+            },
+            "whats_inside": {
+                "benefits": [
+                    "Start Faster",
+                    "Stay On Track",
+                    "Ask Better Questions",
+                    "Feel More Certain",
+                ],
+                "offer_helper_text": "Everything needed to execute without guesswork.",
+            },
+            "bonus": {
+                "free_gifts_title": "Included bonus assets",
+                "free_gifts_body": "Rapid-start templates and scenario walkthroughs.",
+            },
+            "guarantee": {
+                "title": "30-day confidence guarantee",
+                "paragraphs": [
+                    "Run the system and evaluate fit using measurable checkpoints.",
+                ],
+                "why_title": "Why this guarantee exists",
+                "why_body": "The process is practical, testable, and low-friction.",
+                "closing_line": "You can adopt this with clear downside protection.",
+            },
+            "faq": {
+                "title": "Frequently asked questions",
+                "items": [
+                    {
+                        "question": "How quickly can we start?",
+                        "answer": "Most families can run the first sequence tonight.",
+                    }
+                ],
+            },
+            "faq_pills": [
+                {
+                    "label": "How quickly can we start?",
+                    "answer": "Most families can run the first sequence tonight.",
+                }
+            ],
+            "marquee_items": [
+                "Mechanism-first",
+                "Practical nightly use",
+                "Evidence-backed",
+                "Confidence guarantee",
+            ],
+            "urgency_message": "Selling out faster than expected. Claim your access before this launch closes.",
+            "cta_close": "Start now and lock in consistent evenings.",
+        }
         if context == "strategy_v2.agent0_output":
             payload = {
                 "category_classification": {"primary": "sleep-support"},
@@ -482,6 +721,10 @@ def _stub_prompt_chain_runtime(monkeypatch):
                 "delivery_test": "Show mechanism mismatch, practical correction path, and evidence language.",
                 "minimum_delivery": "Deliver by midpoint with clear implementation detail.",
             }
+        elif context == "strategy_v2.copy.advertorial_template_payload":
+            payload = {
+                "template_payload": advertorial_template_payload,
+            }
         elif context == "strategy_v2.copy.advertorial":
             payload = {
                 "markdown": (
@@ -500,61 +743,49 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "See the full offer and next-step system details now.\n"
                     "[Continue to the offer](/sales-page)."
                 ),
-                "template_payload": {
-                    "hero": {
-                        "title": "Approved Headline",
-                        "subtitle": "Predictable evenings are possible with a mechanism-first approach.",
-                        "badges": [
-                            {"label": "Mechanism-first"},
-                            {"label": "Evidence-backed"},
-                            {"label": "Practical nightly use"},
-                        ],
-                    },
-                    "reasons": [
-                        {
-                            "number": 1,
-                            "title": "Random fixes miss the real bottleneck",
-                            "body": "Mechanism mismatch keeps restarting the same nightly stress loop.",
-                        }
-                    ],
-                    "marquee": [
-                        "Mechanism-first",
-                        "Evidence-backed",
-                        "Practical steps",
-                    ],
-                    "pitch": {
-                        "title": "See the full implementation offer",
-                        "bullets": [
-                            "Checklist for nightly execution",
-                            "Decision support for common setbacks",
-                        ],
-                        "cta_label": "Continue to the offer",
-                    },
-                    "reviews": [
-                        {
-                            "text": "We stopped guessing and the evening rhythm is finally stable.",
-                            "author": "K. Parent",
-                            "rating": 5,
-                        },
-                        {
-                            "text": "The step-by-step flow made execution much easier for our routine.",
-                            "author": "D. Caregiver",
-                            "rating": 5,
-                        },
-                        {
-                            "text": "Clear boundaries and practical guidance reduced our nightly stress fast.",
-                            "author": "M. Family",
-                            "rating": 5,
-                        },
-                    ],
-                    "review_wall": {
-                        "title": "What readers report after switching approach",
-                        "button_label": "Open full review examples",
-                    },
-                    "floating_cta": {
-                        "label": "Continue to offer",
-                    },
-                },
+                "template_payload": advertorial_template_payload,
+            }
+        elif context == "strategy_v2.copy.sales_template_payload_direct":
+            payload = {
+                "template_payload_json": json.dumps(sales_template_payload),
+            }
+        elif context == "strategy_v2.copy.sales_page_markdown":
+            payload = {
+                "markdown": (
+                    "# Approved Headline — Sales Page\n\n"
+                    "## Hero Stack\n"
+                    "Offer summary: predictable evenings with a practical implementation system.\n"
+                    "[Start the offer](/checkout).\n\n"
+                    "## Problem Recap\n"
+                    "The main struggle is repeated nighttime friction and stress from an unresolved bottleneck.\n\n"
+                    "## Mechanism + Comparison\n"
+                    "This mechanism-first method differs from generic routines and explains why older approaches fail.\n\n"
+                    "## Identity Bridge\n"
+                    "You are not inconsistent; the pain came from advice that ignored your real constraint.\n\n"
+                    "## Social Proof\n"
+                    "Proof includes direct buyer language, practical results, and evidence from lived routines.\n\n"
+                    "## CTA #1\n"
+                    "Get the full offer now with clear onboarding steps.\n"
+                    "[Claim the system](/checkout).\n\n"
+                    "## What's Inside\n"
+                    "Inside the value stack: implementation checklist, timeline map, and decision support docs.\n\n"
+                    "## Bonus Stack + Value\n"
+                    "Bonus value stack includes rapid-start templates and scenario examples.\n\n"
+                    "## Guarantee\n"
+                    "Guarantee: 30-day confidence guarantee with compliance-safe expectations and safety guidance.\n\n"
+                    "## CTA #2\n"
+                    "Move forward with the offer while momentum is high.\n"
+                    "[Start now](/checkout).\n\n"
+                    "## FAQ\n"
+                    "Proof and compliance notes: what this includes, what it does not claim, and safe usage boundaries.\n\n"
+                    "## CTA #3 + P.S.\n"
+                    "Final offer step: start today. Price: $49 one-time.\n"
+                    "[Complete checkout](/checkout)."
+                ),
+            }
+        elif context == "strategy_v2.copy.sales_template_payload":
+            payload = {
+                "template_payload_json": json.dumps(sales_template_payload),
             }
         elif context == "strategy_v2.copy.sales_page":
             payload = {
@@ -589,94 +820,7 @@ def _stub_prompt_chain_runtime(monkeypatch):
                     "Final offer step: start today. Price: $49 one-time.\n"
                     "[Complete checkout](/checkout)."
                 ),
-                "template_payload": {
-                    "hero": {
-                        "purchase_title": "Start the mechanism-first evening system",
-                        "primary_cta_label": "Claim the system",
-                        "primary_cta_subbullets": [
-                            "Fast implementation path",
-                            "30-day confidence guarantee",
-                        ],
-                    },
-                    "problem": {
-                        "title": "Nightly friction keeps repeating",
-                        "paragraphs": [
-                            "Most routines fail because they optimize effort instead of sequence.",
-                        ],
-                        "emphasis_line": "When sequence is wrong, consistency collapses.",
-                    },
-                    "mechanism": {
-                        "title": "Fix the sequence, then the outcomes follow",
-                        "paragraphs": [
-                            "The system targets trigger timing and removes guesswork.",
-                        ],
-                        "bullets": [
-                            {"title": "Trigger map", "body": "Identify sequence breakpoints before they cascade."},
-                            {"title": "Execution order", "body": "Apply steps in a repeatable nightly progression."},
-                            {"title": "Recovery branch", "body": "Handle misses without resetting the full routine."},
-                            {"title": "Progress markers", "body": "Track wins and frictions with simple checkpoints."},
-                        ],
-                        "callout": {
-                            "left_title": "Why old routines fail",
-                            "left_body": "They describe tasks but ignore trigger order.",
-                            "right_title": "What this changes",
-                            "right_body": "It aligns actions to sequence so consistency compounds.",
-                        },
-                        "comparison": {
-                            "badge": "Side-by-side",
-                            "title": "Mechanism-first system vs generic routines",
-                            "swipe_hint": "Swipe to compare",
-                            "columns": {
-                                "pup": "Mechanism-first",
-                                "disposable": "Generic routine",
-                            },
-                            "rows": [
-                                {
-                                    "label": "Predictability",
-                                    "pup": "High once sequence is set",
-                                    "disposable": "Inconsistent",
-                                }
-                            ],
-                        },
-                    },
-                    "social_proof": {
-                        "badge": "Verified",
-                        "title": "Customer-backed clarity",
-                        "rating_label": "4.9 average confidence",
-                        "summary": "Families report fewer resets and calmer evenings.",
-                    },
-                    "whats_inside": {
-                        "benefits": [
-                            "Implementation checklist",
-                            "Timeline map",
-                            "Decision support prompts",
-                        ],
-                        "offer_helper_text": "Everything needed to execute without guesswork.",
-                    },
-                    "bonus": {
-                        "free_gifts_title": "Included bonus assets",
-                        "free_gifts_body": "Rapid-start templates and scenario walkthroughs.",
-                    },
-                    "guarantee": {
-                        "title": "30-day confidence guarantee",
-                        "paragraphs": [
-                            "Run the system and evaluate fit using measurable checkpoints.",
-                        ],
-                        "why_title": "Why this guarantee exists",
-                        "why_body": "The process is practical, testable, and low-friction.",
-                        "closing_line": "You can adopt this with clear downside protection.",
-                    },
-                    "faq": {
-                        "title": "Frequently asked questions",
-                        "items": [
-                            {
-                                "question": "How quickly can we start?",
-                                "answer": "Most families can run the first sequence tonight.",
-                            }
-                        ],
-                    },
-                    "cta_close": "Start now and lock in consistent evenings.",
-                },
+                "template_payload": sales_template_payload,
             }
         else:
             raise AssertionError(f"Unexpected prompt context in test stub: {context}")
@@ -877,6 +1021,7 @@ def _agent2_voc_observations_payload() -> list[dict[str, Any]]:
         rows.append(
             {
                 "voc_id": f"V{index + 1:03d}",
+                "evidence_id": f"E{index + 1:016X}",
                 "source": "https://www.reddit.com/r/sleep" if index % 2 == 0 else "https://forum.sleephelp.com/thread",
                 "source_type": "REDDIT" if index % 2 == 0 else "FORUM",
                 "source_url": "https://www.reddit.com/r/sleep" if index % 2 == 0 else "https://forum.sleephelp.com/thread",
@@ -1388,9 +1533,9 @@ def test_start_strategy_v2_and_send_all_hitl_signals(api_client, fake_temporal):
     offer_winner = api_client.post(
         f"/workflows/{run_id}/signals/strategy-v2/select-offer-winner",
         json={
-            "variant_id": "variant_a",
-            "rejected_variant_ids": ["variant_b"],
-            "reviewed_candidate_ids": ["variant_a", "variant_b"],
+            "variant_id": "share_and_save",
+            "rejected_variant_ids": ["family_bundle"],
+            "reviewed_candidate_ids": ["share_and_save", "family_bundle"],
             **_manual_hitl_fields(
                 operator_note="Variant A wins on composite score and decision confidence.",
             ),
@@ -1600,7 +1745,8 @@ def test_strategy_v2_state_from_research_artifacts(api_client, db_session, auth_
         ("v2-03", "v2-03b", None),
         ("v2-03b", "v2-03c", None),
         ("v2-03c", "v2-04", None),
-        ("v2-04", "v2-05", None),
+        ("v2-04", "v2-05a", None),
+        ("v2-05a", "v2-05", None),
         ("v2-05", "v2-06", None),
     ],
 )
@@ -2204,11 +2350,25 @@ def test_strategy_v2_checkpoint_c4_requires_agent1_handoff(monkeypatch):
         )
 
 
-def test_strategy_v2_checkpoint_c5_requires_voc_scored(monkeypatch):
+def test_strategy_v2_checkpoint_c5_scores_voc_observations_when_voc_scored_missing(monkeypatch):
     monkeypatch.setattr(strategy_v2_activities, "_require_stage2b_shared_context", lambda **_kwargs: _stage2b_shared_context_stub())
     monkeypatch.setattr(strategy_v2_activities, "_validate_step_payload_lineage_prerequisites", lambda **_kwargs: None)
+    monkeypatch.setattr(strategy_v2_activities, "_normalize_voc_observations", lambda rows: rows)
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "score_voc_items",
+        lambda rows: {
+            "items": [{"adjusted_score": 1.0, "zero_evidence_gate": False} for _ in rows] or [{"adjusted_score": 1.0, "zero_evidence_gate": False}],
+            "summary": {"count": len(rows)},
+        },
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_run_prompt_json_object",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("_run_prompt_json_object reached")),
+    )
 
-    with pytest.raises(StrategyV2SchemaValidationError, match="voc_scored"):
+    with pytest.raises(AssertionError, match="_run_prompt_json_object reached"):
         strategy_v2_activities.run_strategy_v2_voc_agent3_synthesis_activity(
             {
                 "org_id": "org-1",
@@ -2228,10 +2388,17 @@ def test_strategy_v2_checkpoint_c5_requires_voc_scored(monkeypatch):
                 ],
                 "existing_step_payload_artifact_ids": {
                     **_stage2b_foundational_artifact_ids(),
-                    "v2-05": "artifact-v2-05",
+                    "v2-04": "artifact-v2-04",
                 },
                 "competitor_analysis": {"asset_observation_sheets": [], "compliance_landscape": {"red_pct": 0.0, "yellow_pct": 0.0}},
-                "voc_observations": [{"voc_id": "V001", "quote": "Quote", "source_url": "https://source.example"}],
+                "voc_observations": [
+                    {
+                        "voc_id": "V001",
+                        "evidence_id": "E1111111111111111",
+                        "quote": "Quote",
+                        "source_url": "https://source.example",
+                    }
+                ],
                 "voc_scored": None,
             }
         )
@@ -2605,7 +2772,7 @@ def test_campaign_intent_allows_strategy_v2_enabled_client_without_canon_metric(
                 "ums": "UMS core",
                 "core_promise": "Promise",
                 "value_stack_summary": ["Stack item"],
-                "variant_selected": "variant_a",
+                "variant_selected": "share_and_save",
             },
         )
     )
@@ -2616,7 +2783,7 @@ def test_campaign_intent_allows_strategy_v2_enabled_client_without_canon_metric(
             product_id=product_uuid,
             campaign_id=None,
             type=ArtifactTypeEnum.strategy_v2_offer,
-            data={"selected_offer": {"variant_id": "variant_a"}},
+            data={"selected_offer": {"variant_id": "share_and_save"}},
         )
     )
     db_session.add(
@@ -2693,7 +2860,14 @@ def test_strategy_v2_voc_pipeline_accepts_precanon_research_without_client_canon
         "_run_agent2_extractor",
         lambda **_kwargs: {
             "mode": "DUAL",
-            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "voc_observations": [
+                {
+                    "voc_id": "V1",
+                    "evidence_id": "E1111111111111111",
+                    "source": "https://example.com",
+                    "quote": "Sample VOC",
+                }
+            ],
             "rejected_items": [],
             "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
             "prompt_provenance": {},
@@ -2883,7 +3057,14 @@ def test_strategy_v2_voc_pipeline_builds_foundational_research_from_onboarding_p
         "_run_agent2_extractor",
         lambda **_kwargs: {
             "mode": "DUAL",
-            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "voc_observations": [
+                {
+                    "voc_id": "V1",
+                    "evidence_id": "E1111111111111111",
+                    "source": "https://example.com",
+                    "quote": "Sample VOC",
+                }
+            ],
             "rejected_items": [],
             "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
             "prompt_provenance": {},
@@ -3208,6 +3389,58 @@ def test_build_offer_variants_requires_nonempty_revision_notes(
                 "workflow_run_id": workflow_run_id,
                 "stage2": stage2_payload,
                 "offer_pipeline_output": offer_pipeline_output,
+                "offer_data_readiness": {
+                    "status": "ready",
+                    "missing_fields": [],
+                    "inconsistent_fields": [],
+                    "context": {
+                        "offer_format": "DISCOUNT_PLUS_3_BONUSES_V1",
+                        "product_type": "digital",
+                        "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
+                        "offer_id": "offer-1",
+                        "offer_name": "Offer Variant Bundle",
+                        "bonus_items": [
+                            {
+                                "bonus_id": "bonus-1",
+                                "linked_product_id": "bonus-prod-1",
+                                "title": "Bonus 1",
+                                "product_type": "digital",
+                                "position": 1,
+                            },
+                            {
+                                "bonus_id": "bonus-2",
+                                "linked_product_id": "bonus-prod-2",
+                                "title": "Bonus 2",
+                                "product_type": "digital",
+                                "position": 2,
+                            },
+                            {
+                                "bonus_id": "bonus-3",
+                                "linked_product_id": "bonus-prod-3",
+                                "title": "Bonus 3",
+                                "product_type": "digital",
+                                "position": 3,
+                            },
+                        ],
+                        "pricing_metadata": {"list_price_cents": 9900, "offer_price_cents": 6900},
+                        "savings_metadata": {
+                            "savings_amount_cents": 3000,
+                            "savings_percent": 30.3,
+                            "savings_basis": "vs_list_price",
+                        },
+                        "bundle_contents": {
+                            "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
+                            "offer_id": "offer-1",
+                            "offer_name": "Offer Variant Bundle",
+                            "bonuses": [
+                                {"bonus_id": "bonus-1", "linked_product_id": "bonus-prod-1", "title": "Bonus 1"},
+                                {"bonus_id": "bonus-2", "linked_product_id": "bonus-prod-2", "title": "Bonus 2"},
+                                {"bonus_id": "bonus-3", "linked_product_id": "bonus-prod-3", "title": "Bonus 3"},
+                            ],
+                            "bonus_count": 3,
+                        },
+                    },
+                },
                 "ump_ums_selection_decision": {
                     "operator_user_id": "operator-1",
                     "pair_id": "pair-a",
@@ -3256,6 +3489,17 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
         strategy_v2_activities,
         "build_page_data_from_body_text",
         lambda body_text, page_type=None: {"sections": [{"text": body_text[:200], "page_type": page_type}]},
+    )
+    monkeypatch.setattr(
+        strategy_v2_activities,
+        "_build_policy_footer_links",
+        lambda **_kwargs: (
+            [
+                {"title": "Privacy Policy", "url": "https://example.com/privacy"},
+                {"title": "Terms of Service", "url": "https://example.com/terms"},
+            ],
+            "Example Brand",
+        ),
     )
     monkeypatch.setattr(
         strategy_v2_activities,
@@ -3328,7 +3572,14 @@ def test_strategy_v2_activity_integration_stage0_to_final_copy(
         "_run_agent2_extractor",
         lambda **_kwargs: {
             "mode": "DUAL",
-            "voc_observations": [{"voc_id": "V1", "source": "https://example.com", "quote": "Sample VOC"}],
+            "voc_observations": [
+                {
+                    "voc_id": "V1",
+                    "evidence_id": "E1111111111111111",
+                    "source": "https://example.com",
+                    "quote": "Sample VOC",
+                }
+            ],
             "rejected_items": [],
             "extraction_summary": {"input_count": 1, "output_count": 1, "rejected_count": 0},
             "prompt_provenance": {},
@@ -3518,8 +3769,6 @@ SEGMENT_HINT: parents
             "workflow_run_id": workflow_run_id,
             "stage2": stage2_result["stage2"],
             "competitor_analysis": voc_angle_result["competitor_analysis"],
-            "voc_observations": voc_angle_result["voc_observations"],
-            "voc_scored": voc_angle_result["voc_scored"],
             "angle_synthesis": {"ranked_candidates": voc_angle_result["ranked_angle_candidates"]},
             "business_model": "one-time",
             "funnel_position": "cold_traffic",
@@ -3541,6 +3790,58 @@ SEGMENT_HINT: parents
             "workflow_run_id": workflow_run_id,
             "stage2": stage2_result["stage2"],
             "offer_pipeline_output": offer_pipeline_output,
+            "offer_data_readiness": {
+                "status": "ready",
+                "missing_fields": [],
+                "inconsistent_fields": [],
+                "context": {
+                    "offer_format": "DISCOUNT_PLUS_3_BONUSES_V1",
+                    "product_type": "digital",
+                    "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
+                    "offer_id": "offer-1",
+                    "offer_name": "Offer Variant Bundle",
+                    "bonus_items": [
+                        {
+                            "bonus_id": "bonus-1",
+                            "linked_product_id": "bonus-prod-1",
+                            "title": "Bonus 1",
+                            "product_type": "digital",
+                            "position": 1,
+                        },
+                        {
+                            "bonus_id": "bonus-2",
+                            "linked_product_id": "bonus-prod-2",
+                            "title": "Bonus 2",
+                            "product_type": "digital",
+                            "position": 2,
+                        },
+                        {
+                            "bonus_id": "bonus-3",
+                            "linked_product_id": "bonus-prod-3",
+                            "title": "Bonus 3",
+                            "product_type": "digital",
+                            "position": 3,
+                        },
+                    ],
+                    "pricing_metadata": {"list_price_cents": 9900, "offer_price_cents": 6900},
+                    "savings_metadata": {
+                        "savings_amount_cents": 3000,
+                        "savings_percent": 30.3,
+                        "savings_basis": "vs_list_price",
+                    },
+                    "bundle_contents": {
+                        "core_product": {"product_id": product_id, "title": "Offer Variant Product"},
+                        "offer_id": "offer-1",
+                        "offer_name": "Offer Variant Bundle",
+                        "bonuses": [
+                            {"bonus_id": "bonus-1", "linked_product_id": "bonus-prod-1", "title": "Bonus 1"},
+                            {"bonus_id": "bonus-2", "linked_product_id": "bonus-prod-2", "title": "Bonus 2"},
+                            {"bonus_id": "bonus-3", "linked_product_id": "bonus-prod-3", "title": "Bonus 3"},
+                        ],
+                        "bonus_count": 3,
+                    },
+                },
+            },
             "ump_ums_selection_decision": {
                 "operator_user_id": "operator-1",
                 "pair_id": pair_id,
@@ -3604,8 +3905,9 @@ SEGMENT_HINT: parents
         }
     )
     assert copy_result.get("step_payload_artifact_id")
-    assert copy_result["copy_payload"].get("presell_markdown")
-    assert copy_result["copy_payload"].get("sales_page_markdown")
+    assert copy_result["copy_payload"]["copy_generation_mode"] == "template_payload_only"
+    assert copy_result["copy_payload"]["template_payloads"]["pre-sales-listicle"]["fields"]
+    assert copy_result["copy_payload"]["template_payloads"]["sales-pdp"]["fields"]
     assert copy_result["copy_payload"]["copy_contract_profile"]["profile_id"] == "strategy_v2_warm_presell_v1"
     assert copy_result["copy_payload"]["copy_input_packet"]["profile_id"] == "strategy_v2_warm_presell_v1"
     assert copy_result["copy_payload"]["semantic_gates"]["presell"]["passed"] is True

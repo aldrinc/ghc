@@ -1,7 +1,10 @@
+import type { FooterLink, PaymentIconKey } from "../shared/footerTypes"
+
 export type ImageAsset = {
   src: string
   alt: string
   assetPublicId?: string
+  referenceAssetPublicId?: string
 }
 
 export type NavItem = {
@@ -266,7 +269,8 @@ export type ReviewWallConfig = {
 export type FooterConfig = {
   logo: ImageAsset
   copyright: string
-  company?: string
+  links?: FooterLink[]
+  paymentIcons?: PaymentIconKey[]
 }
 
 export type ModalsConfig = {

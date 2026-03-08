@@ -71,6 +71,57 @@ def _required_css_var_keys() -> list[str]:
     return sorted(str(k) for k in css_vars.keys())
 
 
+def materialize_design_system_tokens(tokens: Any) -> dict[str, Any]:
+    """
+    Expand legacy persisted token payloads to the current base template shape while preserving
+    explicitly stored values. This keeps writes compatible with older sparse design systems.
+    """
+    if not isinstance(tokens, dict):
+        raise DesignSystemGenerationError("Design system generation output must be a JSON object.")
+
+    base = deepcopy(load_base_tokens_template())
+    out = deepcopy(tokens)
+
+    css_vars = tokens.get("cssVars")
+    if css_vars is None:
+        css_vars = {}
+    if not isinstance(css_vars, dict):
+        raise DesignSystemGenerationError("Design system tokens.cssVars must be a JSON object.")
+    base_css_vars = base.get("cssVars")
+    if not isinstance(base_css_vars, dict):
+        raise DesignSystemGenerationError("Design system base template cssVars must be a JSON object.")
+    out["cssVars"] = {**deepcopy(base_css_vars), **css_vars}
+
+    funnel_defaults = tokens.get("funnelDefaults")
+    if funnel_defaults is None:
+        funnel_defaults = {}
+    if not isinstance(funnel_defaults, dict):
+        raise DesignSystemGenerationError("Design system tokens.funnelDefaults must be a JSON object.")
+    base_funnel_defaults = base.get("funnelDefaults")
+    if not isinstance(base_funnel_defaults, dict):
+        raise DesignSystemGenerationError("Design system base template funnelDefaults must be a JSON object.")
+    out["funnelDefaults"] = {**deepcopy(base_funnel_defaults), **funnel_defaults}
+
+    brand = tokens.get("brand")
+    if brand is None:
+        brand = {}
+    if not isinstance(brand, dict):
+        raise DesignSystemGenerationError("Design system tokens.brand must be a JSON object.")
+    base_brand = base.get("brand")
+    if not isinstance(base_brand, dict):
+        raise DesignSystemGenerationError("Design system base template brand must be a JSON object.")
+    out["brand"] = {**deepcopy(base_brand), **brand}
+
+    if "dataTheme" not in out:
+        out["dataTheme"] = base.get("dataTheme")
+    if "fontUrls" not in out:
+        out["fontUrls"] = deepcopy(base.get("fontUrls"))
+    if "fontCss" not in out and "fontCss" in base:
+        out["fontCss"] = base.get("fontCss")
+
+    return out
+
+
 def _build_full_prompt(
     *,
     ctx: DesignSystemGenerationContext,
@@ -498,7 +549,7 @@ def validate_design_system_tokens(tokens: Any) -> dict[str, Any]:
     """
     Shared strict validator for generated and persisted design system tokens.
     """
-    return _validate_tokens(tokens, required_css_vars=_required_css_var_keys())
+    return _validate_tokens(materialize_design_system_tokens(tokens), required_css_vars=_required_css_var_keys())
 
 
 def _parse_hex_channel(hex_part: str) -> int:

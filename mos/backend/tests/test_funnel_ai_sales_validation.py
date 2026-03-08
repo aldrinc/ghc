@@ -112,6 +112,7 @@ def test_sales_pdp_urgency_rows_restore_monthly_sold_out_format():
     funnel_ai._enforce_sales_pdp_urgency_month_rows(
         puck_data=generated_puck_data,
         reference_puck_data=reference_puck_data,
+        product_title="Honest Herbalist Handbook",
         now=datetime(2026, 2, 16, tzinfo=timezone.utc),
     )
 
@@ -134,6 +135,7 @@ def test_sales_pdp_urgency_rows_use_previous_month_in_january():
     funnel_ai._enforce_sales_pdp_urgency_month_rows(
         puck_data=generated_puck_data,
         reference_puck_data=reference_puck_data,
+        product_title="Honest Herbalist Handbook",
         now=datetime(2026, 1, 5, tzinfo=timezone.utc),
     )
 
@@ -160,8 +162,33 @@ def test_sales_pdp_urgency_rows_require_sold_metrics():
         funnel_ai._enforce_sales_pdp_urgency_month_rows(
             puck_data=generated_puck_data,
             reference_puck_data=reference_puck_data,
+            product_title="Honest Herbalist Handbook",
             now=datetime(2026, 2, 16, tzinfo=timezone.utc),
         )
+
+
+def test_sales_pdp_urgency_rows_replace_legacy_template_product_name():
+    reference_puck_data = _sales_template_puck_data()
+    generated_puck_data = _sales_template_puck_data()
+    generated_urgency = _find_sales_hero_urgency(generated_puck_data)
+    generated_urgency["message"] = "We are selling out more than expected. Order now before we run out again."
+    generated_urgency["rows"] = [
+        {"label": "FEBRUARY", "value": "Sold Out (4,780 PuppyPads Were Sold)", "tone": "muted"},
+        {"label": "MARCH", "value": "99% Sold (5,346 out of 5,400 PuppyPads)", "tone": "highlight"},
+    ]
+
+    funnel_ai._enforce_sales_pdp_urgency_month_rows(
+        puck_data=generated_puck_data,
+        reference_puck_data=reference_puck_data,
+        product_title="Honest Herbalist Handbook",
+        now=datetime(2026, 3, 1, tzinfo=timezone.utc),
+    )
+
+    rows = _find_sales_hero_urgency(generated_puck_data)["rows"]
+    assert "PuppyPad" not in rows[0]["value"]
+    assert "PuppyPad" not in rows[1]["value"]
+    assert "Honest Herbalist Handbook" in rows[0]["value"]
+    assert "Honest Herbalist Handbook" in rows[1]["value"]
 
 
 def test_pre_sales_floating_cta_trigger_repairs_invalid_show_after_id():
@@ -254,8 +281,22 @@ def test_align_sales_checkout_option_ids_noop_when_ids_already_match():
         "color": {"options": [{"id": "white", "label": "White"}]},
         "offer": {
             "options": [
-                {"id": "single", "title": "Single Device", "image": {"alt": "Single"}, "price": 299.0},
-                {"id": "double", "title": "Share & Save Duo", "image": {"alt": "Duo"}, "price": 499.0},
+                {
+                    "id": "single",
+                    "title": "Single Device",
+                    "image": {"alt": "Single"},
+                    "price": 299.0,
+                    "compareAt": 0,
+                    "saveLabel": "",
+                },
+                {
+                    "id": "double",
+                    "title": "Share & Save Duo",
+                    "image": {"alt": "Duo"},
+                    "price": 499.0,
+                    "compareAt": 0,
+                    "saveLabel": "",
+                },
             ]
         },
     }
@@ -267,6 +308,57 @@ def test_align_sales_checkout_option_ids_noop_when_ids_already_match():
     changed = funnel_ai._align_sales_pdp_purchase_options_to_variants(purchase=purchase, variants=variants)
 
     assert changed is False
+
+
+def test_align_sales_checkout_option_ids_recomputes_compare_at_and_save_label():
+    purchase = {
+        "size": {"options": [{"id": "onesize", "label": "One Size", "sizeIn": "", "sizeCm": ""}]},
+        "color": {"options": [{"id": "white", "label": "White"}]},
+        "offer": {
+            "options": [
+                {
+                    "id": "share_and_save",
+                    "title": "Share & Save",
+                    "image": {"alt": "Share & Save"},
+                    "price": 149.0,
+                    "compareAt": 300.0,
+                    "saveLabel": "SAVE $151",
+                },
+                {
+                    "id": "family_bundle",
+                    "title": "Family Bundle",
+                    "image": {"alt": "Family Bundle"},
+                    "price": 99.0,
+                    "compareAt": 150.0,
+                    "saveLabel": "SAVE $51",
+                },
+            ]
+        },
+    }
+    variants = [
+        {
+            "title": "Share & Save",
+            "amount_cents": 7900,
+            "compare_at_cents": 9800,
+            "option_values": {"offerId": "share_and_save"},
+        },
+        {
+            "title": "Family Bundle",
+            "amount_cents": 9900,
+            "compare_at_cents": 14700,
+            "option_values": {"offerId": "family_bundle"},
+        },
+    ]
+
+    changed = funnel_ai._align_sales_pdp_purchase_options_to_variants(purchase=purchase, variants=variants)
+
+    assert changed is True
+    assert purchase["offer"]["options"][0]["price"] == 79.0
+    assert purchase["offer"]["options"][0]["compareAt"] == 98.0
+    assert purchase["offer"]["options"][0]["saveLabel"] == "SAVE $19"
+    assert purchase["offer"]["options"][1]["price"] == 99.0
+    assert purchase["offer"]["options"][1]["compareAt"] == 147.0
+    assert purchase["offer"]["options"][1]["saveLabel"] == "SAVE $48"
 
 
 def test_align_sales_checkout_option_ids_requires_variant_option_values():

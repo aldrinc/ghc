@@ -22,7 +22,11 @@ from app.temporal.activities.strategy_v2_activities import (
     _CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS,
     _build_headline_candidate_pool,
     _build_copy_repair_directives,
+    _is_non_retryable_sales_payload_failure,
     _llm_generate_text,
+    _normalize_copy_generation_mode,
+    _parse_sales_template_payload_json,
+    _parse_json_response_strict,
     _headline_numeric_promise_is_compatible,
     _normalize_sales_cta_section_titles,
     _repair_markdown_cta_label_for_congruency,
@@ -33,6 +37,17 @@ from app.temporal.activities.strategy_v2_activities import (
     _repair_sales_markdown_for_semantic_structure,
     _build_stage3_risk_headline_templates,
 )
+
+
+def test_normalize_copy_generation_mode_accepts_supported_values() -> None:
+    assert _normalize_copy_generation_mode("full_markdown") == "full_markdown"
+    assert _normalize_copy_generation_mode("template_payload_only") == "template_payload_only"
+    assert _normalize_copy_generation_mode("template_only") == "template_payload_only"
+
+
+def test_normalize_copy_generation_mode_rejects_invalid_value() -> None:
+    with pytest.raises(StrategyV2DecisionError, match="Invalid copy_generation_mode"):
+        _normalize_copy_generation_mode("markdown_only")
 
 
 def _stage3_payload() -> dict[str, object]:
@@ -268,6 +283,10 @@ def test_copy_input_packet_and_runtime_blocks_build_successfully() -> None:
         page_contract=get_page_contract(profile=profile, page_type="sales_page_warm"),
     )
     assert "Place the first CTA before" not in sales_page_runtime
+    assert "`template_payload_json`" in sales_page_runtime
+    assert "problem_recap" in sales_page_runtime
+    assert "cta_primary" in sales_page_runtime
+    assert "`whats_inside.benefits` must be exactly 4 short, outcome-led purchase-module bullets." in sales_page_runtime
 
 
 def test_copy_repair_directives_add_cta_budget_fix_when_cta_count_fails() -> None:
@@ -884,3 +903,86 @@ def test_llm_generate_text_uses_explicit_claude_messages_when_provided(monkeypat
     assert captured["temperature"] == 0.0
     assert captured["max_tokens"] == _CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS
     assert json.loads(output) == {"headline": "Rewritten headline"}
+
+
+def test_parse_json_response_strict_parses_object_and_strips_fence() -> None:
+    parsed = _parse_json_response_strict(
+        raw_text="```json\n{\"hello\":\"world\"}\n```",
+        field_name="sample",
+    )
+    assert parsed == {"hello": "world"}
+
+
+def test_parse_json_response_strict_rejects_malformed_trailing_content() -> None:
+    with pytest.raises(StrategyV2SchemaValidationError, match="Failed to parse JSON object"):
+        _parse_json_response_strict(
+            raw_text='{"hero":{"headline":"x"}} trailing',
+            field_name="sales_template_payload",
+        )
+
+
+def test_parse_sales_template_payload_json_recovers_best_candidate() -> None:
+    broken = (
+        '{"hero":{"headline":"Wrong only"}} trailing '
+        '{"hero":{"purchase_title":"Good title","primary_cta_label":"Buy now","primary_cta_subbullets":["Fast","Simple"]},'
+        '"problem":{"title":"Problem","paragraphs":["p1"],"emphasis_line":"e1"},'
+        '"mechanism":{"title":"Mechanism","paragraphs":["m1"],"bullets":[{"title":"b1","body":"c1"},{"title":"b2","body":"c2"},{"title":"b3","body":"c3"},{"title":"b4","body":"c4"}],'
+        '"callout":{"left_title":"L","left_body":"LB","right_title":"R","right_body":"RB"},'
+        '"comparison":{"badge":"B","title":"T","swipe_hint":"S","columns":{"pup":"P","disposable":"D"},'
+        '"rows":[{"label":"r1","pup":"p1","disposable":"d1"}]}},'
+        '"social_proof":{"badge":"B","title":"T","rating_label":"R","summary":"S"},'
+        '"whats_inside":{"benefits":["x"],"offer_helper_text":"h"},'
+        '"bonus":{"free_gifts_title":"g","free_gifts_body":"b"},'
+        '"guarantee":{"title":"g","paragraphs":["p"],"why_title":"w","why_body":"wb","closing_line":"c"},'
+        '"faq":{"title":"f","items":[{"question":"q","answer":"a"}]},'
+        '"faq_pills":[{"label":"q","answer":"a"}],'
+        '"marquee_items":["m1","m2","m3","m4"],'
+        '"urgency_message":"Selling out faster than expected. now.",'
+        '"cta_close":"Close"}'
+    )
+
+    parsed, recovery = _parse_sales_template_payload_json(raw_text=broken)
+
+    assert isinstance(parsed, dict)
+    assert parsed["hero"]["purchase_title"] == "Good title"
+    assert isinstance(recovery, dict)
+    assert recovery["mode"] == "candidate_recovery"
+    assert recovery["candidate_count"] >= 2
+
+
+def test_parse_sales_template_payload_json_recovers_fragmented_top_level_object() -> None:
+    broken = (
+        '{"hero":{"headline":"Safety headline","primary_cta_label":"Buy now","primary_cta_subbullets":["Fast","Simple"]},'
+        '"problem":{"headline":"Problem headline","body":"Problem body"}}'
+        ',"mechanism":{"headline":"Mechanism headline","subheadline":"Mechanism summary"},'
+        '"faq":{"title":"FAQ","items":[{"question":"Q1","answer":"A1"}]}}'
+    )
+
+    parsed, recovery = _parse_sales_template_payload_json(raw_text=broken)
+
+    assert isinstance(parsed, dict)
+    assert set(parsed.keys()) == {"hero", "problem", "mechanism", "faq"}
+    assert isinstance(recovery, dict)
+    assert recovery["mode"] == "fragmented_top_level_object_recovery"
+    assert recovery["merged_key_count"] == 4
+
+
+def test_parse_sales_template_payload_json_rejects_incomplete_object() -> None:
+    broken = '{"hero":{"headline":"Cut off"},"problem":{"headline":"Missing close"}'
+    with pytest.raises(StrategyV2SchemaValidationError, match="incomplete JSON"):
+        _parse_sales_template_payload_json(raw_text=broken)
+
+
+def test_is_non_retryable_sales_payload_failure_detects_parser_and_validation_errors() -> None:
+    assert _is_non_retryable_sales_payload_failure(
+        "Sales template payload JSON parse failed. Details: Failed to parse JSON object."
+    )
+    assert _is_non_retryable_sales_payload_failure(
+        "TEMPLATE_PAYLOAD_VALIDATION: template_id=sales-pdp; errors=hero.purchase_title: Field required"
+    )
+    assert _is_non_retryable_sales_payload_failure(
+        "Legacy sales payload upgrade failed: faq_pills is missing and faq.items is unavailable."
+    )
+    assert not _is_non_retryable_sales_payload_failure(
+        "Sales page failed copy depth/structure gates. SALES_PROOF_DEPTH: proof_words=10, required>=220"
+    )

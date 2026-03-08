@@ -1,0 +1,564 @@
+from datetime import datetime, timedelta, timezone
+
+from app.db.enums import ArtifactTypeEnum, AssetSourceEnum, AssetStatusEnum
+from app.db.models import Artifact, Asset, Campaign, Funnel, FunnelPage
+
+
+def _create_campaign_with_product(api_client, *, suffix: str) -> tuple[str, str, str]:
+    client_resp = api_client.post("/clients", json={"name": f"Client {suffix}", "industry": "SaaS"})
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    product_resp = api_client.post(
+        "/products",
+        json={"clientId": client_id, "title": f"Product {suffix}"},
+    )
+    assert product_resp.status_code == 201
+    product_id = product_resp.json()["id"]
+
+    campaign_resp = api_client.post(
+        "/campaigns",
+        json={
+            "client_id": client_id,
+            "product_id": product_id,
+            "name": f"Campaign {suffix}",
+            "channels": ["facebook"],
+            "asset_brief_types": ["image_ad"],
+        },
+    )
+    assert campaign_resp.status_code == 201
+    return client_id, product_id, campaign_resp.json()["id"]
+
+
+def test_campaign_meta_review_setup_creates_internal_specs_and_pipeline_payload(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review")
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Meta Review Funnel",
+        route_slug="meta-review-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    pre_sales_page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Pre-sales",
+        slug="pre-sales",
+        template_id="pre_sales_listicle",
+    )
+    sales_page = FunnelPage(
+        funnel_id=funnel.id,
+        name="Sales",
+        slug="sales",
+        template_id="sales_pdp",
+    )
+    db_session.add_all([pre_sales_page, sales_page])
+    db_session.commit()
+
+    brief_id = "brief-exp-a02-001"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(funnel.id),
+                    "experimentId": "exp-A02-Interaction Triage Workflow",
+                    "variantId": "variant_a",
+                    "variantName": "Interaction Triage Workflow",
+                    "creativeConcept": "Explain the workflow and reduce confusion.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "A clearer way to check interactions before you start.",
+                            "angle": "Structure over guesswork.",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    ad_copy_pack_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        type=ArtifactTypeEnum.ad_copy_pack,
+        data={
+            "schemaVersion": 2,
+            "assetBriefId": brief_id,
+            "sourceBriefArtifactId": str(brief_artifact.id),
+            "sourceBriefSha256": "brief-sha-123",
+            "sourceFunnelId": str(funnel.id),
+            "copyPacks": [
+                {
+                    "id": "copy-pack-001",
+                    "requirementIndex": 0,
+                    "channel": "facebook",
+                    "format": "image_ad",
+                    "funnelStage": "top-of-funnel",
+                    "angle": "Structure over guesswork.",
+                    "hook": "A clearer way to check interactions before you start.",
+                    "creativeConcept": "Use a structured workflow instead of guessing.",
+                    "metaPrimaryText": "Parents need a repeatable herb-drug interaction workflow before they try anything.",
+                    "metaHeadline": "A safer way to screen interactions",
+                    "metaDescription": "Built from the Honest Herbalist workflow.",
+                    "claimsGuardrails": ["Do not promise medical outcomes."],
+                }
+            ],
+        },
+    )
+    db_session.add(ad_copy_pack_artifact)
+    db_session.commit()
+    db_session.refresh(ad_copy_pack_artifact)
+
+    asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/test-meta-review.jpg",
+        content_type="image/jpeg",
+        size_bytes=1234,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
+            "adCopyPackId": "copy-pack-001",
+            "creativeGenerationBatchId": "batch-xyz",
+            "swipeSourceLabel": "10.png",
+            "swipeSourceUrl": "https://example.com/swipes/10.png",
+        },
+    )
+    db_session.add(asset)
+    db_session.commit()
+    db_session.refresh(asset)
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id]},
+    )
+    assert setup_resp.status_code == 200
+    setup_payload = setup_resp.json()
+    assert setup_payload["assetCount"] == 1
+    assert len(setup_payload["createdCreativeSpecIds"]) == 1
+    assert len(setup_payload["createdAdSetSpecIds"]) == 1
+
+    pipeline_resp = api_client.get(
+        f"/meta/pipeline/assets?clientId={client_id}&productId={product_id}&campaignId={campaign_id}&statuses=draft"
+    )
+    assert pipeline_resp.status_code == 200
+    pipeline = pipeline_resp.json()
+    assert len(pipeline) == 1
+    row = pipeline[0]
+    assert row["asset"]["ai_metadata"]["creativeGenerationBatchId"] == "batch-xyz"
+    assert row["creative_spec"]["primary_text"] == (
+        "Parents need a repeatable herb-drug interaction workflow before they try anything."
+    )
+    assert row["creative_spec"]["headline"] == "A safer way to screen interactions"
+    assert row["creative_spec"]["description"] == "Built from the Honest Herbalist workflow."
+    assert row["creative_spec"]["metadata_json"]["assetBriefId"] == brief_id
+    assert row["creative_spec"]["metadata_json"]["adCopyPackArtifactId"] == str(ad_copy_pack_artifact.id)
+    assert row["creative_spec"]["metadata_json"]["adCopyPackId"] == "copy-pack-001"
+    assert row["creative_spec"]["metadata_json"]["generationBatchId"] == "batch-xyz"
+    assert row["creative_spec"]["metadata_json"]["swipeSourceLabel"] == "10.png"
+    assert row["creative_spec"]["metadata_json"]["swipeSourceMediaUrl"] == "https://example.com/swipes/10.png"
+    assert row["creative_spec"]["metadata_json"]["copyPack"]["metaPrimaryText"] == (
+        "Parents need a repeatable herb-drug interaction workflow before they try anything."
+    )
+    assert row["creative_spec"]["metadata_json"]["reviewPaths"]["pre-sales"].endswith("/pre-sales")
+    assert row["creative_spec"]["metadata_json"]["reviewPaths"]["sales"].endswith("/sales")
+    assert row["experiment"]["id"] == "exp-A02-Interaction Triage Workflow"
+    assert row["adset_specs"][0]["metadata_json"]["experimentSpecId"] == "exp-A02-Interaction Triage Workflow"
+
+
+def test_campaign_meta_review_setup_ignores_legacy_assets_when_latest_batch_exists(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review-latest-batch")
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Meta Review Funnel",
+        route_slug="meta-review-latest-batch-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    db_session.add_all(
+        [
+            FunnelPage(funnel_id=funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+            FunnelPage(funnel_id=funnel.id, name="Sales", slug="sales", template_id="sales_pdp"),
+        ]
+    )
+    db_session.commit()
+
+    brief_id = "brief-exp-a02-latest-batch"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(funnel.id),
+                    "experimentId": "exp-A02-Latest-Batch",
+                    "variantId": "variant_a",
+                    "variantName": "Latest Batch Variant",
+                    "creativeConcept": "Use latest batch only.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Use the latest assets only.",
+                            "angle": "Batch-aware review setup.",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    ad_copy_pack_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        type=ArtifactTypeEnum.ad_copy_pack,
+        data={
+            "schemaVersion": 2,
+            "assetBriefId": brief_id,
+            "sourceBriefArtifactId": str(brief_artifact.id),
+            "sourceBriefSha256": "brief-sha-latest",
+            "sourceFunnelId": str(funnel.id),
+            "copyPacks": [
+                {
+                    "id": "copy-pack-latest",
+                    "requirementIndex": 0,
+                    "channel": "facebook",
+                    "format": "image_ad",
+                    "funnelStage": "top-of-funnel",
+                    "angle": "Batch-aware review setup.",
+                    "hook": "Use the latest assets only.",
+                    "creativeConcept": "Latest batch creative",
+                    "metaPrimaryText": "Primary text from the latest batch.",
+                    "metaHeadline": "Latest batch headline",
+                    "metaDescription": "Latest batch description",
+                    "claimsGuardrails": ["Do not invent unsupported claims."],
+                }
+            ],
+        },
+    )
+    db_session.add(ad_copy_pack_artifact)
+    db_session.commit()
+    db_session.refresh(ad_copy_pack_artifact)
+
+    legacy_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/legacy-meta-review.jpg",
+        content_type="image/jpeg",
+        size_bytes=1111,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+        },
+        created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+    )
+    latest_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/latest-meta-review.jpg",
+        content_type="image/jpeg",
+        size_bytes=2222,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
+            "adCopyPackId": "copy-pack-latest",
+            "creativeGenerationBatchId": "batch-latest",
+            "swipeSourceLabel": "10.png",
+            "swipeSourceUrl": "https://example.com/swipes/10.png",
+        },
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([legacy_asset, latest_asset])
+    db_session.commit()
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id]},
+    )
+    assert setup_resp.status_code == 200
+    setup_payload = setup_resp.json()
+    assert setup_payload["assetCount"] == 1
+
+    pipeline_resp = api_client.get(
+        f"/meta/pipeline/assets?clientId={client_id}&productId={product_id}&campaignId={campaign_id}&statuses=draft"
+    )
+    assert pipeline_resp.status_code == 200
+    pipeline = pipeline_resp.json()
+    latest_row = next(row for row in pipeline if row["asset"]["id"] == str(latest_asset.id))
+    legacy_row = next(row for row in pipeline if row["asset"]["id"] == str(legacy_asset.id))
+    assert latest_row["creative_spec"] is not None
+    assert legacy_row["creative_spec"] is None
+
+
+def test_campaign_meta_review_setup_can_scope_to_explicit_generation_batch(
+    api_client,
+    db_session,
+) -> None:
+    client_id, product_id, campaign_id = _create_campaign_with_product(api_client, suffix="meta-review-batch-scope")
+
+    campaign = db_session.get(Campaign, campaign_id)
+    assert campaign is not None
+
+    funnel = Funnel(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        name="Meta Review Batch Scope Funnel",
+        route_slug="meta-review-batch-scope-funnel",
+    )
+    db_session.add(funnel)
+    db_session.commit()
+    db_session.refresh(funnel)
+
+    db_session.add_all(
+        [
+            FunnelPage(funnel_id=funnel.id, name="Pre-sales", slug="pre-sales", template_id="pre_sales_listicle"),
+            FunnelPage(funnel_id=funnel.id, name="Sales", slug="sales", template_id="sales_pdp"),
+        ]
+    )
+    db_session.commit()
+
+    brief_id = "brief-exp-a02-batch-scope"
+    brief_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        type=ArtifactTypeEnum.asset_brief,
+        data={
+            "asset_briefs": [
+                {
+                    "id": brief_id,
+                    "campaignId": campaign_id,
+                    "clientId": client_id,
+                    "funnelId": str(funnel.id),
+                    "experimentId": "exp-A02-Batch-Scope",
+                    "variantId": "variant_a",
+                    "variantName": "Batch Scope Variant",
+                    "creativeConcept": "Use only the requested batch.",
+                    "requirements": [
+                        {
+                            "channel": "facebook",
+                            "format": "image_ad",
+                            "funnelStage": "top-of-funnel",
+                            "hook": "Respect the selected creative batch.",
+                            "angle": "Batch-scoped review setup.",
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+    db_session.add(brief_artifact)
+    db_session.commit()
+    db_session.refresh(brief_artifact)
+
+    ad_copy_pack_artifact = Artifact(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        type=ArtifactTypeEnum.ad_copy_pack,
+        data={
+            "schemaVersion": 2,
+            "assetBriefId": brief_id,
+            "sourceBriefArtifactId": str(brief_artifact.id),
+            "sourceBriefSha256": "brief-sha-batch-scope",
+            "sourceFunnelId": str(funnel.id),
+            "copyPacks": [
+                {
+                    "id": "copy-pack-batch-scope",
+                    "requirementIndex": 0,
+                    "channel": "facebook",
+                    "format": "image_ad",
+                    "funnelStage": "top-of-funnel",
+                    "angle": "Batch-scoped review setup.",
+                    "hook": "Respect the selected creative batch.",
+                    "creativeConcept": "Scoped creative concept.",
+                    "metaPrimaryText": "Primary text from the selected batch.",
+                    "metaHeadline": "Selected batch headline",
+                    "metaDescription": "Selected batch description",
+                    "claimsGuardrails": ["Do not invent unsupported claims."],
+                }
+            ],
+        },
+    )
+    db_session.add(ad_copy_pack_artifact)
+    db_session.commit()
+    db_session.refresh(ad_copy_pack_artifact)
+
+    older_batch_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/batch-scope-older.jpg",
+        content_type="image/jpeg",
+        size_bytes=1111,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
+            "adCopyPackId": "copy-pack-batch-scope",
+            "creativeGenerationBatchId": "batch-older",
+            "swipeSourceLabel": "10.png",
+            "swipeSourceUrl": "https://example.com/swipes/10.png",
+        },
+        created_at=datetime.now(timezone.utc) - timedelta(hours=1),
+    )
+    selected_batch_asset = Asset(
+        org_id=campaign.org_id,
+        client_id=client_id,
+        campaign_id=campaign_id,
+        product_id=product_id,
+        funnel_id=funnel.id,
+        asset_brief_artifact_id=brief_artifact.id,
+        source_type=AssetSourceEnum.ai,
+        status=AssetStatusEnum.draft,
+        asset_kind="image",
+        channel_id="facebook",
+        format="image_ad",
+        content={"assetBriefId": brief_id},
+        storage_key="creative/batch-scope-selected.jpg",
+        content_type="image/jpeg",
+        size_bytes=2222,
+        width=1080,
+        height=1080,
+        file_source="ai",
+        file_status="ready",
+        ai_metadata={
+            "assetBriefId": brief_id,
+            "requirementIndex": 0,
+            "adCopyPackArtifactId": str(ad_copy_pack_artifact.id),
+            "adCopyPackId": "copy-pack-batch-scope",
+            "creativeGenerationBatchId": "batch-selected",
+            "swipeSourceLabel": "11.png",
+            "swipeSourceUrl": "https://example.com/swipes/11.png",
+        },
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add_all([older_batch_asset, selected_batch_asset])
+    db_session.commit()
+
+    setup_resp = api_client.post(
+        f"/campaigns/{campaign_id}/meta/review-setup",
+        json={"assetBriefIds": [brief_id], "generationBatchId": "batch-selected"},
+    )
+    assert setup_resp.status_code == 200
+    setup_payload = setup_resp.json()
+    assert setup_payload["assetCount"] == 1
+
+    pipeline_resp = api_client.get(
+        f"/meta/pipeline/assets?clientId={client_id}&productId={product_id}&campaignId={campaign_id}&statuses=draft"
+    )
+    assert pipeline_resp.status_code == 200
+    pipeline = pipeline_resp.json()
+    selected_row = next(row for row in pipeline if row["asset"]["id"] == str(selected_batch_asset.id))
+    older_row = next(row for row in pipeline if row["asset"]["id"] == str(older_batch_asset.id))
+    assert selected_row["creative_spec"] is not None
+    assert selected_row["creative_spec"]["metadata_json"]["generationBatchId"] == "batch-selected"
+    assert older_row["creative_spec"] is None

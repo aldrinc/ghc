@@ -342,6 +342,7 @@ def test_get_client_shopify_product_parses_response(monkeypatch):
             "title": "Sleep Drops",
             "handle": "sleep-drops",
             "status": "ACTIVE",
+            "productType": "Book",
             "variants": [
                 {
                     "variantGid": "gid://shopify/ProductVariant/1",
@@ -370,6 +371,7 @@ def test_get_client_shopify_product_parses_response(monkeypatch):
 
     assert response["shopDomain"] == "example.myshopify.com"
     assert response["productGid"] == "gid://shopify/Product/123"
+    assert response["productType"] == "Book"
     assert response["variants"][0]["variantGid"] == "gid://shopify/ProductVariant/1"
     assert response["variants"][0]["inventoryPolicy"] == "continue"
     assert response["variants"][0]["optionValues"] == {"Size": "L"}

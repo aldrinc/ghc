@@ -129,9 +129,6 @@ type SalesPdpReviewsProps = {
    * If not provided, the demo filters locally.
    */
   onQueryChange?: (q: ReviewsQuery) => void;
-
-  onWriteReview?: () => void;
-  onReadSummaryByTopics?: () => void;
 };
 
 function describeValue(value: unknown): string {
@@ -149,8 +146,6 @@ export function SalesPdpReviews({
   config,
   configJson,
   onQueryChange,
-  onWriteReview,
-  onReadSummaryByTopics,
 }: SalesPdpReviewsProps) {
   let parsed: SalesPdpReviewsConfig | null = null;
   if (typeof configJson === "string" && configJson.trim()) {
@@ -230,8 +225,8 @@ export function SalesPdpReviews({
 
   const page = query.page ?? 1;
   const pageSize = query.pageSize ?? 10;
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paged = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const visibleReviews = filtered.slice(0, page * pageSize);
+  const hasMoreReviews = visibleReviews.length < filtered.length;
 
   const activeSortLabel =
     data.filters.sorts.find((s) => s.value === (query.sort ?? "most_recent"))?.label ?? "Most recent";
@@ -240,55 +235,6 @@ export function SalesPdpReviews({
     <section id={resolved.id} className="w-full bg-background">
       <div className="mx-auto max-w-6xl px-4 py-14 md:px-6">
         <h2 className="text-center font-serif text-5xl tracking-tight text-content">Reviews</h2>
-
-        {/* Summary row */}
-        <div className="mx-auto mt-10 max-w-5xl">
-          <div className="flex flex-col items-center justify-between gap-10 md:flex-row md:gap-0">
-            <div className="flex items-center gap-5">
-              <div className="text-6xl font-medium tracking-tight text-content">
-                {data.summary.averageRating.toFixed(1)}
-              </div>
-              <div className="flex flex-col">
-                <StarRating value={data.summary.averageRating} size="md" />
-                <div className="mt-1 text-sm text-content-muted">
-                  Based on {formatNumber(data.summary.totalReviews)} reviews
-                </div>
-              </div>
-            </div>
-
-            <div className="hidden h-16 w-px bg-divider md:block" />
-
-            <div className="w-full max-w-sm md:w-[420px] md:px-8">
-              <RatingBreakdown breakdown={normalizeBreakdown(data.summary.breakdown)} total={data.summary.totalReviews} />
-            </div>
-
-            <div className="hidden h-16 w-px bg-divider md:block" />
-
-            <button
-              type="button"
-              onClick={onWriteReview}
-              className="inline-flex h-11 items-center justify-center rounded-full bg-primary px-7 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-accent-hover active:bg-accent-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              Write A Review
-            </button>
-          </div>
-        </div>
-
-        {/* Customers say */}
-        <div className="mx-auto mt-14 max-w-5xl">
-          <h3 className="text-xl font-semibold text-content">Customers say</h3>
-          <p className="mt-4 max-w-4xl text-sm leading-6 text-content-muted">{data.summary.customersSay}</p>
-
-          <button
-            type="button"
-            onClick={onReadSummaryByTopics}
-            className="mt-6 inline-flex h-10 items-center justify-center rounded-full border border-border bg-transparent px-6 text-sm font-semibold text-content transition-colors hover:bg-hover active:bg-active focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-          >
-            Read summary by topics
-          </button>
-
-          <div className="mt-10 h-px w-full bg-divider" />
-        </div>
 
         {/* Reviews with images */}
         <div className="mx-auto mt-10 max-w-5xl">
@@ -382,11 +328,14 @@ export function SalesPdpReviews({
 
           {/* Reviews list */}
           <div className="mt-6 border-t border-divider">
-            {paged.map((r) => (
+            {visibleReviews.map((r) => (
               <ReviewRow key={r.id} review={r} />
             ))}
 
-            <Pagination page={page} totalPages={totalPages} onPageChange={(next) => setQuery((q) => ({ ...q, page: next }))} />
+            <ShowMoreButton
+              visible={hasMoreReviews}
+              onClick={() => setQuery((q) => ({ ...q, page: (q.page ?? 1) + 1 }))}
+            />
           </div>
         </div>
       </div>
@@ -399,39 +348,6 @@ export function SalesPdpReviews({
  * Subcomponents
  * -----------------------------
  */
-
-function RatingBreakdown({
-  breakdown,
-  total,
-}: {
-  breakdown: { rating: ReviewRating; count: number }[];
-  total: number;
-}) {
-  return (
-    <div className="space-y-2">
-      {breakdown
-        .slice()
-        .sort((a, b) => b.rating - a.rating)
-        .map((row) => {
-          const pct = total > 0 ? (row.count / total) * 100 : 0;
-          return (
-            <div key={row.rating} className="flex items-center gap-3">
-              <div className="flex w-12 items-center gap-1 text-sm text-content">
-                <span className="tabular-nums">{row.rating}</span>
-                <StarGlyph className="h-4 w-4 text-accent" filled />
-              </div>
-
-              <div className="h-2 flex-1 rounded-full bg-muted">
-                <div className="h-2 rounded-full bg-accent" style={{ width: `${pct}%` }} />
-              </div>
-
-              <div className="w-14 text-right text-sm tabular-nums text-accent">{formatNumber(row.count)}</div>
-            </div>
-          );
-        })}
-    </div>
-  );
-}
 
 function MediaGallery({ items }: { items: MediaAsset[] }) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
@@ -696,41 +612,23 @@ function ReviewRow({ review }: { review: Review }) {
   );
 }
 
-function Pagination({
-  page,
-  totalPages,
-  onPageChange,
+function ShowMoreButton({
+  visible,
+  onClick,
 }: {
-  page: number;
-  totalPages: number;
-  onPageChange: (page: number) => void;
+  visible: boolean;
+  onClick: () => void;
 }) {
-  if (totalPages <= 1) return null;
+  if (!visible) return null;
 
   return (
-    <div className="flex items-center justify-between border-t border-divider py-6">
+    <div className="flex justify-center border-t border-divider py-6">
       <button
         type="button"
-        disabled={page <= 1}
-        onClick={() => onPageChange(Math.max(1, page - 1))}
+        onClick={onClick}
         className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-hover active:bg-active disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
-        Prev
-      </button>
-
-      <div className="text-sm text-content-muted">
-        Page <span className="font-semibold text-content">{page}</span> of{" "}
-        <span className="font-semibold text-content">{totalPages}</span>
-      </div>
-
-      <button
-        type="button"
-        disabled={page >= totalPages}
-        onClick={() => onPageChange(Math.min(totalPages, page + 1))}
-        className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm font-semibold text-content shadow-sm transition-colors hover:bg-hover active:bg-active disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        Next
+        Show more
         <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
       </button>
     </div>
@@ -808,10 +706,4 @@ function formatDateMMDDYY(iso: ISODateString) {
   const dd = String(d.getDate()).padStart(2, "0");
   const yy = String(d.getFullYear()).slice(-2);
   return `${mm}/${dd}/${yy}`;
-}
-
-function normalizeBreakdown(items: RatingBreakdownItem[]) {
-  const map = new Map(items.map((i) => [i.rating, i.count]));
-  const all: ReviewRating[] = [5, 4, 3, 2, 1];
-  return all.map((r) => ({ rating: r, count: map.get(r) ?? 0 }));
 }

@@ -411,7 +411,6 @@ function migratePreSalesTemplate(content: unknown[]): unknown[] {
             },
           },
           { type: "PreSalesReasons", props: { id: makeBlockId(), config: config.reasons } },
-          { type: "PreSalesReviews", props: { id: makeBlockId(), config: config.reviews, copy } },
           { type: "PreSalesMarquee", props: { id: makeBlockId(), config: config.marquee } },
           { type: "PreSalesPitch", props: { id: makeBlockId(), config: config.pitch } },
           { type: "PreSalesReviewWall", props: { id: makeBlockId(), config: config.reviewsWall, copy } },

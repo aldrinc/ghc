@@ -7,6 +7,7 @@ from app.temporal.activities.strategy_v2_activities import _normalize_voc_observ
 def _base_voc_row() -> dict[str, object]:
     return {
         "voc_id": "V001",
+        "evidence_id": "E1111111111111111",
         "source": "https://www.reddit.com/r/herbalism/comments/example",
         "source_type": "REDDIT",
         "source_url": "https://www.reddit.com/r/herbalism/comments/example",

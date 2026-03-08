@@ -12,6 +12,7 @@ export type MetaCreativeSpec = {
   page_id?: string | null;
   instagram_actor_id?: string | null;
   status?: string | null;
+  metadata_json?: Record<string, unknown> | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -33,6 +34,7 @@ export type MetaAdSetSpec = {
   end_time?: string | null;
   promoted_object?: Record<string, unknown> | null;
   conversion_domain?: string | null;
+  metadata_json?: Record<string, unknown> | null;
   created_at?: string;
   updated_at?: string;
 };
@@ -91,6 +93,7 @@ export type MetaPipelineAsset = {
     height?: number | null;
     created_at?: string;
     public_url?: string | null;
+    ai_metadata?: Record<string, unknown> | null;
   };
   campaign?: { id: string; name: string } | null;
   experiment?: { id: string; name: string } | null;

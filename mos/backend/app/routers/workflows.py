@@ -260,8 +260,10 @@ def _strategy_v2_state_from_research_artifacts(
         pending_signal_type = "strategy_v2_select_angle"
     elif "v2-05" in step_payloads:
         current_stage = "v2-06"
-    elif "v2-04" in step_payloads:
+    elif "v2-05a" in step_payloads:
         current_stage = "v2-05"
+    elif "v2-04" in step_payloads:
+        current_stage = "v2-05a"
     elif "v2-03c" in step_payloads:
         current_stage = "v2-04"
     elif "v2-03b" in step_payloads:
@@ -560,14 +562,26 @@ def _launch_index_for_angle(
 def _idempotent_launch_response_from_rows(rows: list[Any]) -> dict[str, Any]:
     if not rows:
         raise RuntimeError("No launch rows were provided for idempotent response.")
-    first = rows[0]
-    launch_workflow_run_id = str(getattr(first, "launch_workflow_run_id", "") or "").strip()
-    launch_temporal_workflow_id = str(getattr(first, "launch_temporal_workflow_id", "") or "").strip()
-    if not launch_workflow_run_id or not launch_temporal_workflow_id:
+
+    rows_by_workflow: dict[tuple[str, str], list[Any]] = {}
+    for row in rows:
+        launch_workflow_run_id = str(getattr(row, "launch_workflow_run_id", "") or "").strip()
+        launch_temporal_workflow_id = str(getattr(row, "launch_temporal_workflow_id", "") or "").strip()
+        if not launch_workflow_run_id or not launch_temporal_workflow_id:
+            raise RuntimeError(
+                "Existing launch record is missing launch workflow metadata and cannot satisfy idempotent response."
+            )
+        key = (launch_workflow_run_id, launch_temporal_workflow_id)
+        rows_by_workflow.setdefault(key, []).append(row)
+
+    if len(rows_by_workflow) != 1:
         raise RuntimeError(
-            "Existing launch record is missing launch workflow metadata and cannot satisfy idempotent response."
+            "Existing launch records span multiple launch workflows and cannot satisfy a single idempotent response. "
+            "Remediation: request one launch key set per workflow run or use launch history."
         )
-    payload_rows = [_strategy_v2_launch_record_to_payload(row) for row in rows]
+
+    (launch_workflow_run_id, launch_temporal_workflow_id), workflow_rows = next(iter(rows_by_workflow.items()))
+    payload_rows = [_strategy_v2_launch_record_to_payload(row) for row in workflow_rows]
     return _compose_launch_action_response(
         run_id=launch_workflow_run_id,
         temporal_workflow_id=launch_temporal_workflow_id,
@@ -740,6 +754,15 @@ async def start_strategy_v2_workflow(
     compliance_notes = body.get("compliance_notes")
     if compliance_notes is not None and not isinstance(compliance_notes, str):
         raise HTTPException(status_code=400, detail="compliance_notes must be a string when provided.")
+    copy_generation_mode_raw = body.get("copy_generation_mode")
+    if copy_generation_mode_raw is not None and not isinstance(copy_generation_mode_raw, str):
+        raise HTTPException(status_code=400, detail="copy_generation_mode must be a string when provided.")
+    copy_generation_mode = copy_generation_mode_raw.strip().lower() if isinstance(copy_generation_mode_raw, str) else None
+    if copy_generation_mode and copy_generation_mode not in {"full_markdown", "template_payload_only"}:
+        raise HTTPException(
+            status_code=400,
+            detail="copy_generation_mode must be either 'full_markdown' or 'template_payload_only'.",
+        )
 
     temporal = await get_temporal_client()
     handle = await temporal.start_workflow(
@@ -759,6 +782,7 @@ async def start_strategy_v2_workflow(
             existing_proof_assets=existing_proof_assets,
             brand_voice_notes=brand_voice_notes,
             compliance_notes=compliance_notes.strip() if isinstance(compliance_notes, str) else None,
+            copy_generation_mode=copy_generation_mode,
         ),
         id=f"strategy-v2-{auth.org_id}-{client_id}-{product_id}-{uuid4()}",
         task_queue=settings.TEMPORAL_TASK_QUEUE,
@@ -786,6 +810,7 @@ async def start_strategy_v2_workflow(
             "target_platforms": target_platforms,
             "target_regions": target_regions,
             "existing_proof_assets": existing_proof_assets,
+            "copy_generation_mode": copy_generation_mode,
         },
     )
     return {"workflow_run_id": str(run.id), "temporal_workflow_id": handle.id}
@@ -1469,7 +1494,10 @@ async def strategy_v2_launch_angle_campaign(
     )
     existing = launches_repo.get_by_launch_key(org_id=auth.org_id, launch_key=launch_key)
     if existing:
-        return _idempotent_launch_response_from_rows([existing])
+        try:
+            return _idempotent_launch_response_from_rows([existing])
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     temporal = await get_temporal_client()
     temporal_workflow_id = _build_deterministic_launch_temporal_workflow_id(
@@ -1673,7 +1701,10 @@ async def strategy_v2_launch_additional_ums(
         )
 
     if launch_rows_by_key and not launch_items:
-        return _idempotent_launch_response_from_rows(launch_rows_by_key)
+        try:
+            return _idempotent_launch_response_from_rows(launch_rows_by_key)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     temporal = await get_temporal_client()
     launch_keys = [str(item.get("launch_key", "")).strip() for item in launch_items if str(item.get("launch_key", "")).strip()]
@@ -1801,7 +1832,8 @@ async def strategy_v2_launch_additional_angle(
         raise HTTPException(
             status_code=409,
             detail=(
-                "Source run is missing v2-05 VOC payload required for additional-angle launch replay."
+                "Source run is missing VOC payload required for additional-angle launch replay "
+                "(expected from v2-05 or v2-06 fallback payload)."
             ),
         )
 
@@ -1834,7 +1866,10 @@ async def strategy_v2_launch_additional_angle(
                 status_code=409,
                 detail=f"Missing angle payload for selected angle_id '{angle_id}'.",
             )
-        angle_name = _require_nonempty_string(angle_payload.get("angle_name"), field_name="selected_angle.angle_name")
+        angle_name = _require_nonempty_string(
+            value=angle_payload.get("angle_name"),
+            field_name="selected_angle.angle_name",
+        )
         launch_index = _launch_index_for_angle(
             launches_repo=launches_repo,
             org_id=auth.org_id,
@@ -1873,7 +1908,10 @@ async def strategy_v2_launch_additional_angle(
         )
 
     if launch_rows_by_key and not launch_items:
-        return _idempotent_launch_response_from_rows(launch_rows_by_key)
+        try:
+            return _idempotent_launch_response_from_rows(launch_rows_by_key)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     temporal = await get_temporal_client()
     launch_keys = [str(item.get("launch_key", "")).strip() for item in launch_items if str(item.get("launch_key", "")).strip()]

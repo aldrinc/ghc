@@ -16,6 +16,7 @@ Process all rows in one pass. Do not do corpus-wide scoring.
 
 2. Source traceability is mandatory.
 - Every accepted row must include: `source_type`, `source_url`, `source_author`, `source_date`, `evidence_ref`.
+- Every accepted row must include `evidence_id`, copied exactly from input.
 - Set `source` to a concise attribution string compatible with legacy consumers.
 
 3. Extraction only.
@@ -37,6 +38,10 @@ Process all rows in one pass. Do not do corpus-wide scoring.
 - Copy `mode` exactly from runtime context.
 - Set `input_count` to the exact number of rows in `EVIDENCE_ROWS_JSON`.
 - Set `output_count` to the exact length of `voc_observations`.
+- Decision partition must be exact:
+  - Every input `evidence_id` must appear exactly once across `voc_observations` or `rejected_items`.
+  - Do not invent `evidence_id` values.
+  - Do not omit decisions for any input row.
 - `validation_errors` must be an empty array unless a schema-hard violation is present.
 
 ## Extraction Guidance
@@ -76,6 +81,7 @@ Runtime provides `OPENAI_CODE_INTERPRETER_FILE_IDS_JSON` (a key-to-file_id map) 
 
 Required logical keys in that map:
 - `EVIDENCE_ROWS_JSON`
+- `AGENT2_INPUT_MANIFEST_JSON`
 - `AGENT1_MINING_PLAN_JSON`
 - `HABITAT_SCORED_JSON`
 - `PRODUCT_BRIEF_JSON`
@@ -85,6 +91,7 @@ Required logical keys in that map:
 - `FOUNDATIONAL_RESEARCH_DOCS_JSON`
 
 Treat `EVIDENCE_ROWS_JSON` from the uploaded file as the source of truth.
+Treat `AGENT2_INPUT_MANIFEST_JSON` as the canonical evidence_id registry for output mapping.
 
 MANDATORY PRE-READ RULE
 - If `FOUNDATIONAL_RESEARCH_DOCS_JSON` is present, review it before extracting VOC rows.

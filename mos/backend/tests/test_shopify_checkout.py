@@ -147,6 +147,17 @@ def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, d
         option_values={"offerId": "other"},
     )
     db_session.add(secondary_variant)
+    duplicate_unconfigured_variant = ProductVariant(
+        product_id=seeded["product"].id,
+        offer_id=seeded["offer"].id,
+        title="Duplicate Unconfigured Variant",
+        price=2999,
+        currency="USD",
+        provider=None,
+        external_price_id=None,
+        option_values=None,
+    )
+    db_session.add(duplicate_unconfigured_variant)
     db_session.commit()
 
     product_slug = str(seeded["product"].id).split("-", 1)[0]
@@ -155,6 +166,61 @@ def test_public_funnel_commerce_filters_to_selected_offer_variants(api_client, d
     payload = response.json()
     assert payload["product"]["variants_count"] == 1
     assert payload["product"]["variants"][0]["id"] == str(seeded["variant"].id)
+
+
+def test_public_checkout_selection_prefers_checkout_ready_variant(api_client, db_session, auth_context, monkeypatch):
+    seeded = _seed_shopify_funnel(
+        db_session=db_session,
+        org_id=UUID(auth_context.org_id),
+        with_selected_offer=True,
+    )
+    seeded["variant"].option_values = {"offerId": "variant_a"}
+    db_session.add(seeded["variant"])
+    db_session.commit()
+
+    duplicate_unconfigured_variant = ProductVariant(
+        product_id=seeded["product"].id,
+        offer_id=seeded["offer"].id,
+        title="Duplicate Unconfigured Variant",
+        price=2999,
+        currency="USD",
+        provider=None,
+        external_price_id=None,
+        option_values={"offerId": "variant_a"},
+    )
+    db_session.add(duplicate_unconfigured_variant)
+    db_session.commit()
+
+    observed: dict[str, object] = {}
+
+    def fake_create_shopify_checkout(**kwargs):
+        observed.update(kwargs)
+        return {
+            "checkoutUrl": "https://example-shop.myshopify.com/cart/c/example-token",
+            "cartId": "gid://shopify/Cart/example",
+        }
+
+    monkeypatch.setattr(public_funnels, "create_shopify_checkout", fake_create_shopify_checkout)
+
+    response = api_client.post(
+        "/public/checkout",
+        json={
+            "funnelSlug": seeded["funnel"].route_slug,
+            "selection": {"offerId": "variant_a"},
+            "quantity": 1,
+            "successUrl": "https://funnel.example/success",
+            "cancelUrl": "https://funnel.example/cancel",
+            "pageId": None,
+            "visitorId": "visitor_123",
+            "sessionId": "session_123",
+            "utm": {"source": "test"},
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["checkoutUrl"] == "https://example-shop.myshopify.com/cart/c/example-token"
+    assert observed["variant_gid"] == "gid://shopify/ProductVariant/123456789"
 
 
 def test_shopify_orders_webhook_persists_funnel_order(api_client, db_session, auth_context, monkeypatch):

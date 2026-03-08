@@ -102,109 +102,6 @@
               }
             },
             {
-              "type": "PreSalesReviews",
-              "props": {
-                "config": {
-                  "autoAdvanceMs": 6500,
-                  "slides": [
-                    {
-                      "rating": 5,
-                      "text": "My puppy took to the pads like a duck to a pond, washing them is a breeze and my puppy just loves her pads",
-                      "author": "Charles",
-                      "verified": true,
-                      "images": [
-                        {
-                          "src": "/assets/Attraction.webp",
-                          "alt": "Dog on PuppyPad",
-                          "testimonialTemplate": "testimonial_media"
-                        },
-                        {
-                          "src": "/assets/Product-IMG-3-Gray.webp",
-                          "alt": "PuppyPad close up",
-                          "testimonialTemplate": "testimonial_media"
-                        },
-                        {
-                          "src": "/assets/reason5.webp",
-                          "alt": "PuppyPad guarantee",
-                          "testimonialTemplate": "testimonial_media"
-                        }
-                      ]
-                    },
-                    {
-                      "rating": 5,
-                      "text": "No smell, no leaks, and it stays put. Our dog figured it out almost immediately.",
-                      "author": "Morgan",
-                      "verified": true,
-                      "images": [
-                        {
-                          "src": "/assets/Product-IMG-3-Gray.webp",
-                          "alt": "PuppyPad on floor",
-                          "testimonialTemplate": "testimonial_media"
-                        },
-                        {
-                          "src": "/assets/Attraction.webp",
-                          "alt": "Dog using the pad",
-                          "testimonialTemplate": "testimonial_media"
-                        },
-                        {
-                          "src": "/assets/reason5.webp",
-                          "alt": "Risk-free trial",
-                          "testimonialTemplate": "testimonial_media"
-                        }
-                      ]
-                    },
-                    {
-                      "rating": 5,
-                      "text": "We replaced disposable pads completely. Washing is easy and the pad still looks brand new.",
-                      "author": "Jamie",
-                      "verified": true,
-                      "images": [
-                        {
-                          "src": "/assets/reason5.webp",
-                          "alt": "PuppyPad product badge",
-                          "testimonialTemplate": "testimonial_media"
-                        },
-                        {
-                          "src": "/assets/Product-IMG-3-Gray.webp",
-                          "alt": "Reusable PuppyPad",
-                          "testimonialTemplate": "testimonial_media"
-                        },
-                        {
-                          "src": "/assets/Attraction.webp",
-                          "alt": "Dog near pad",
-                          "testimonialTemplate": "testimonial_media"
-                        }
-                      ]
-                    },
-                    {
-                      "rating": 5,
-                      "text": "Perfect for apartments. It grips the floor and absorbs fast — total game changer.",
-                      "author": "Taylor",
-                      "verified": true,
-                      "images": [
-                        {
-                          "src": "/assets/Attraction.webp",
-                          "alt": "Dog on pad",
-                          "testimonialTemplate": "testimonial_media"
-                        },
-                        {
-                          "src": "/assets/reason5.webp",
-                          "alt": "Limited time offer",
-                          "testimonialTemplate": "testimonial_media"
-                        },
-                        {
-                          "src": "/assets/Product-IMG-3-Gray.webp",
-                          "alt": "PuppyPad details",
-                          "testimonialTemplate": "testimonial_media"
-                        }
-                      ]
-                    }
-                  ]
-                },
-                "id": "pre-sales-reviews"
-              }
-            },
-            {
               "type": "PreSalesMarquee",
               "props": {
                 "config": [
@@ -228,9 +125,14 @@
                     "**Replaces Over 1,000 Disposable Pads** - Just wash & reuse (saves $2000/year)",
                     "**Absorbs In Less Than 5 Seconds** & Holds Up To 4 Pees With No Smell"
                   ],
+                  "cta": {
+                    "label": "Learn more",
+                    "linkType": "nextPage"
+                  },
                   "image": {
                     "src": "/assets/reviews-preview.webp",
-                    "alt": "PuppyPad layers diagram"
+                    "alt": "PuppyPad layers diagram",
+                    "prompt": ""
                   }
                 },
                 "id": "pre-sales-pitch"
@@ -303,7 +205,10 @@
                   "logo": {
                     "src": "/assets/puppypad-logo.svg",
                     "alt": "PuppyPad"
-                  }
+                  },
+                  "copyright": "© 2025 PuppyPad",
+                  "links": [],
+                  "paymentIcons": []
                 },
                 "id": "pre-sales-footer"
               }
@@ -312,7 +217,7 @@
               "type": "PreSalesFloatingCta",
               "props": {
                 "config": {
-                  "label": "SHOP NOW",
+                  "label": "Learn more",
                   "linkType": "nextPage",
                   "showAfterId": "listicle-end"
                 },

@@ -120,34 +120,142 @@ _CODE_FENCE_RE = re.compile(
     r"```(?P<lang>[^\n`]*)\n(?P<code>.*?)(?:\n)?```",
     re.DOTALL,
 )
+_ALLOWED_PROMPT_FENCE_LANGS = {"text", "markdown", ""}
+_RENDER_PLACEHOLDER_TOKEN_RE = re.compile(r"\[([A-Z0-9_]{2,})\]")
+_PLACEHOLDER_HEADING_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*\*)?\s*placeholders?(?:\s+key)?\s*:?\s*(?:\*\*)?\s*$",
+    re.IGNORECASE,
+)
+_PLACEHOLDER_MAPPING_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*\*)?\[(?P<key>[A-Z0-9_]{2,})\](?:\*\*)?\s*(?:[:=]\s*|\-\s*)(?P<value>.+?)\s*$"
+)
+_PLACEHOLDER_SECTION_MAPPING_RE = re.compile(
+    r"^\s*(?:[-*]\s*)?(?:\*\*)?\[(?P<key>[A-Z0-9_]{2,})\](?:\*\*)?\s+(?P<value>.+?)\s*$"
+)
 
 
 class SwipePromptParseError(RuntimeError):
     pass
 
 
+def _register_placeholder_mapping(
+    mappings: Dict[str, str],
+    *,
+    key: str,
+    value: str,
+) -> None:
+    normalized_key = key.strip().upper()
+    normalized_value = value.strip()
+    if not normalized_key or not normalized_value:
+        raise SwipePromptParseError(
+            f"Invalid placeholder mapping encountered for key [{key}]."
+        )
+    existing = mappings.get(normalized_key)
+    if existing is not None and existing != normalized_value:
+        raise SwipePromptParseError(
+            "Conflicting placeholder mappings detected for "
+            f"[{normalized_key}]: {existing!r} vs {normalized_value!r}."
+        )
+    mappings[normalized_key] = normalized_value
+
+
+def inline_swipe_render_placeholders(prompt: str) -> tuple[str, Dict[str, str]]:
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise SwipePromptParseError("Render prompt is empty; cannot inline placeholder values.")
+
+    lines = prompt.splitlines()
+    mapping_lines: set[int] = set()
+    placeholder_mappings: Dict[str, str] = {}
+    in_placeholder_section = False
+
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if _PLACEHOLDER_HEADING_RE.match(stripped):
+            mapping_lines.add(idx)
+            in_placeholder_section = True
+            continue
+
+        explicit_mapping = _PLACEHOLDER_MAPPING_RE.match(line)
+        if explicit_mapping:
+            _register_placeholder_mapping(
+                placeholder_mappings,
+                key=explicit_mapping.group("key"),
+                value=explicit_mapping.group("value"),
+            )
+            mapping_lines.add(idx)
+            continue
+
+        if not in_placeholder_section:
+            continue
+
+        if not stripped:
+            mapping_lines.add(idx)
+            continue
+
+        section_mapping = _PLACEHOLDER_SECTION_MAPPING_RE.match(line)
+        if section_mapping:
+            _register_placeholder_mapping(
+                placeholder_mappings,
+                key=section_mapping.group("key"),
+                value=section_mapping.group("value"),
+            )
+            mapping_lines.add(idx)
+            continue
+
+        in_placeholder_section = False
+
+    inlined = "\n".join(line for idx, line in enumerate(lines) if idx not in mapping_lines).strip()
+
+    for key, value in placeholder_mappings.items():
+        inlined = re.sub(rf"\[{re.escape(key)}\]", value, inlined)
+
+    unresolved_tokens = sorted({match.group(0) for match in _RENDER_PLACEHOLDER_TOKEN_RE.finditer(inlined)})
+    if unresolved_tokens:
+        raise SwipePromptParseError(
+            "Render prompt contains unresolved bracket placeholders after inlining: "
+            f"{', '.join(unresolved_tokens)}."
+        )
+
+    return inlined, placeholder_mappings
+
+
 def extract_new_image_prompt_from_markdown(markdown: str) -> str:
     if not isinstance(markdown, str) or not markdown.strip():
-        raise SwipePromptParseError("Swipe prompt output is empty; expected markdown with a ```text code fence")
+        raise SwipePromptParseError(
+            "Swipe prompt output is empty; expected markdown with exactly one fenced code block "
+            "(```text``` or ```markdown```) containing the image prompt"
+        )
 
     matches = list(_CODE_FENCE_RE.finditer(markdown))
     if not matches:
-        raise SwipePromptParseError("No markdown code fences found; expected a ```text fenced block for the image prompt")
+        raise SwipePromptParseError(
+            "No markdown code fences found; expected exactly one fenced code block "
+            "(```text``` or ```markdown```) for the image prompt"
+        )
 
-    text_blocks: list[str] = []
-    other_blocks: list[str] = []
+    valid_blocks: list[tuple[str, str]] = []
+    seen_langs: list[str] = []
     for match in matches:
         lang = (match.group("lang") or "").strip().lower()
         code = (match.group("code") or "").strip()
+        if lang not in seen_langs:
+            seen_langs.append(lang)
         if not code:
             continue
-        if lang == "text":
-            text_blocks.append(code)
-        else:
-            other_blocks.append(code)
+        if lang in _ALLOWED_PROMPT_FENCE_LANGS:
+            valid_blocks.append((lang or "(empty)", code))
 
-    if text_blocks:
-        return text_blocks[0]
-    raise SwipePromptParseError(
-        "No ```text code fence found in swipe prompt output; cannot extract the generation-ready image prompt"
-    )
+    if not valid_blocks:
+        lang_display = ", ".join(seen_langs) if seen_langs else "[none]"
+        raise SwipePromptParseError(
+            "No valid prompt code fence found; expected exactly one non-empty fenced block with language "
+            f"`text` or `markdown`. Found fence languages: {lang_display}"
+        )
+    if len(valid_blocks) > 1:
+        langs = ", ".join(lang for lang, _code in valid_blocks)
+        raise SwipePromptParseError(
+            "Ambiguous prompt output; expected exactly one non-empty valid fenced block "
+            f"but found {len(valid_blocks)} (`{langs}`)"
+        )
+
+    return valid_blocks[0][1]

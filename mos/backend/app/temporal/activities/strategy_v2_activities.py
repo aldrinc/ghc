@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from copy import deepcopy
 from datetime import datetime, timezone
 import hashlib
@@ -23,11 +24,19 @@ from app.db.enums import AgentRunStatusEnum, ArtifactTypeEnum, WorkflowStatusEnu
 from app.db.models import Product, WorkflowRun
 from app.db.repositories.agent_runs import AgentRunsRepository
 from app.db.repositories.artifacts import ArtifactsRepository
+from app.db.repositories.client_compliance_profiles import ClientComplianceProfilesRepository
+from app.db.repositories.design_systems import DesignSystemsRepository
 from app.db.repositories.onboarding_payloads import OnboardingPayloadsRepository
-from app.db.repositories.products import ProductOffersRepository, ProductVariantsRepository
+from app.db.repositories.products import (
+    ProductOfferBonusesRepository,
+    ProductOffersRepository,
+    ProductsRepository,
+    ProductVariantsRepository,
+)
 from app.db.repositories.research_artifacts import ResearchArtifactsRepository
 from app.db.repositories.workflows import WorkflowsRepository
 from app.llm import LLMClient, LLMGenerationParams
+from app.services.product_types import canonical_product_type
 from app.strategy_v2 import (
     AngleSelectionDecision,
     AwarenessAngleMatrix,
@@ -56,6 +65,7 @@ from app.strategy_v2 import (
     require_copy_page_quality,
     require_copy_page_semantic_quality,
     require_prompt_chain_provenance,
+    headline_qa_required_api_key_env,
     extract_competitor_analysis,
     extract_saturated_angles,
     hormozi_scorer,
@@ -102,6 +112,8 @@ from app.strategy_v2.prompt_runtime import (
 )
 from app.strategy_v2.template_bridge import (
     build_strategy_v2_template_patch_operations,
+    inspect_strategy_v2_template_payload_validation,
+    upgrade_strategy_v2_template_payload_fields,
     validate_strategy_v2_template_payload_fields,
 )
 from app.services.claude_files import call_claude_structured_message
@@ -118,11 +130,13 @@ from app.strategy_v2.step_keys import (
     V2_STEP_HABITAT_SCORING,
     V2_STEP_HABITAT_STRATEGY,
     V2_STEP_OFFER_PIPELINE,
+    V2_STEP_OFFER_DATA_READINESS,
     V2_STEP_OFFER_VARIANT_SCORING,
     V2_STEP_OFFER_WINNER_HITL,
     V2_STEP_RESEARCH_PROCEED_HITL,
     V2_STEP_SCRAPE_VIRALITY,
     V2_STEP_STAGE0_BUILD,
+    V2_STEP_VOC_EXTRACTION_RAW,
     V2_STEP_VOC_EXTRACTION,
 )
 from app.temporal.precanon.research import parse_step_output
@@ -153,9 +167,14 @@ _FOUNDTN_STEP03_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP03_MODEL", setti
 _FOUNDTN_STEP04_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP04_MODEL", settings.STRATEGY_V2_VOC_MODEL)
 _FOUNDTN_STEP06_MODEL = os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP06_MODEL", settings.STRATEGY_V2_VOC_MODEL)
 _FOUNDTN_STEP04_MAX_TOKENS = int(os.getenv("STRATEGY_V2_FOUNDATIONAL_STEP04_MAX_TOKENS", "64000"))
-_COPY_PIPELINE_MAX_TOKENS = int(os.getenv("STRATEGY_V2_COPY_MAX_TOKENS", "128000"))
-_CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS = int(
-    os.getenv("STRATEGY_V2_CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS", "64000")
+_CLAUDE_MAX_OUTPUT_TOKENS = 64000
+_COPY_PIPELINE_MAX_TOKENS = min(
+    int(os.getenv("STRATEGY_V2_COPY_MAX_TOKENS", "64000")),
+    _CLAUDE_MAX_OUTPUT_TOKENS,
+)
+_CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS = min(
+    int(os.getenv("STRATEGY_V2_CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS", "64000")),
+    _CLAUDE_MAX_OUTPUT_TOKENS,
 )
 
 _VOC_AGENT00_PROMPT_PATTERN = "VOC + Angle Engine (2-21-26)/prompts/agent-00-habitat-strategist.md"
@@ -333,18 +352,6 @@ _VOC_AGENT00_APIFY_CONFIG_SCHEMA: dict[str, Any] = {
         },
     },
     "required": ["config_id", "actor_id", "input", "metadata"],
-}
-_VOC_AGENT00B_CONFIG_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "config_id": {"type": "string", "minLength": 1},
-        "platform": {"type": "string", "minLength": 1},
-        "mode": {"type": "string", "minLength": 1},
-        "actor_id": {"type": "string", "minLength": 1},
-        "input": _APIFY_EXEC_INPUT_SCHEMA,
-    },
-    "required": ["config_id", "platform", "mode", "actor_id", "input"],
 }
 _VOC_AGENT00_HANDOFF_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -1111,11 +1118,13 @@ _VOC_AGENT01_OUTPUT_SCHEMA: dict[str, Any] = {
     ],
 }
 _VOC_AGENT02_YN_SCHEMA: dict[str, Any] = {"type": "string", "enum": ["Y", "N"]}
+_VOC_AGENT02_EVIDENCE_ID_PATTERN = r"^E[0-9A-F]{16}$"
 _VOC_AGENT02_VOC_OBSERVATION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
         "voc_id": {"type": "string", "minLength": 1},
+        "evidence_id": {"type": "string", "pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN},
         "source": {"type": "string", "minLength": 1},
         "source_type": {
             "type": "string",
@@ -1208,6 +1217,7 @@ _VOC_AGENT02_VOC_OBSERVATION_SCHEMA: dict[str, Any] = {
     },
     "required": [
         "voc_id",
+        "evidence_id",
         "source",
         "source_type",
         "source_url",
@@ -1276,7 +1286,7 @@ _VOC_AGENT02_OUTPUT_SCHEMA: dict[str, Any] = {
                 "type": "object",
                 "additionalProperties": False,
                 "properties": {
-                    "evidence_id": {"type": "string", "minLength": 1},
+                    "evidence_id": {"type": "string", "pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN},
                     "reason": {
                         "type": "string",
                         "enum": ["NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"],
@@ -1317,9 +1327,118 @@ _COPY_HEADLINE_QA_MAX_ITERATIONS = int(os.getenv("STRATEGY_V2_COPY_HEADLINE_QA_M
 _COPY_HEADLINE_TRANSIENT_FAIL_FAST_THRESHOLD = int(
     os.getenv("STRATEGY_V2_COPY_HEADLINE_TRANSIENT_FAIL_FAST_THRESHOLD", "6")
 )
+_COPY_USE_CLAUDE_CHAT_CONTEXT = os.getenv("STRATEGY_V2_COPY_USE_CLAUDE_CHAT_CONTEXT", "0").strip() == "1"
 _COPY_DEBUG_CAPTURE_MARKDOWN = os.getenv("STRATEGY_V2_COPY_DEBUG_CAPTURE_MARKDOWN", "0").strip() == "1"
 _COPY_DEBUG_CAPTURE_THREADS = os.getenv("STRATEGY_V2_COPY_DEBUG_CAPTURE_THREADS", "0").strip() == "1"
 _COPY_DEBUG_CAPTURE_FULL_MARKDOWN = os.getenv("STRATEGY_V2_COPY_DEBUG_CAPTURE_FULL_MARKDOWN", "0").strip() == "1"
+_COPY_GENERATION_MODE_FULL_MARKDOWN = "full_markdown"
+_COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY = "template_payload_only"
+_COPY_GENERATION_MODE_DEFAULT = os.getenv(
+    "STRATEGY_V2_COPY_GENERATION_MODE",
+    _COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY,
+).strip()
+
+
+def _normalize_copy_generation_mode(value: object) -> str:
+    raw = str(value or _COPY_GENERATION_MODE_DEFAULT).strip().lower()
+    if raw in {"full_markdown", "full", "full_copy"}:
+        return _COPY_GENERATION_MODE_FULL_MARKDOWN
+    if raw in {"template_payload_only", "template_only", "payload_only"}:
+        return _COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY
+    raise StrategyV2DecisionError(
+        "Invalid copy_generation_mode. Allowed values: 'full_markdown', 'template_payload_only'. "
+        f"Received: '{raw or '<empty>'}'."
+    )
+
+
+_FOOTER_PAYMENT_ICON_KEYS: list[str] = [
+    "american_express",
+    "apple_pay",
+    "google_pay",
+    "maestro",
+    "mastercard",
+    "paypal",
+    "visa",
+]
+
+
+def _clean_url_for_footer(value: object) -> str:
+    if not isinstance(value, str):
+        return ""
+    cleaned = value.strip()
+    if not cleaned:
+        return ""
+    lowered = cleaned.lower()
+    if not (lowered.startswith("http://") or lowered.startswith("https://")):
+        return ""
+    return cleaned
+
+
+def _build_policy_footer_links(*, org_id: str, client_id: str) -> tuple[list[dict[str, str]], str]:
+    with session_scope() as session:
+        profile = ClientComplianceProfilesRepository(session).get(org_id=org_id, client_id=client_id)
+        design_systems = DesignSystemsRepository(session).list(org_id=org_id, client_id=client_id)
+    if profile is None:
+        raise StrategyV2DecisionError(
+            "Missing client compliance profile. "
+            "Remediation: configure and sync policy pages before copy pipeline launch."
+        )
+
+    privacy_url = _clean_url_for_footer(profile.privacy_policy_url)
+    terms_url = _clean_url_for_footer(profile.terms_of_service_url)
+    returns_url = _clean_url_for_footer(profile.returns_refunds_policy_url)
+    shipping_url = _clean_url_for_footer(profile.shipping_policy_url)
+    subscription_url = _clean_url_for_footer(profile.subscription_terms_and_cancellation_url)
+
+    missing_policy_keys: list[str] = []
+    if not privacy_url:
+        missing_policy_keys.append("privacy_policy_url")
+    if not terms_url:
+        missing_policy_keys.append("terms_of_service_url")
+    if not returns_url:
+        missing_policy_keys.append("returns_refunds_policy_url")
+    if not shipping_url:
+        missing_policy_keys.append("shipping_policy_url")
+    if missing_policy_keys:
+        raise StrategyV2DecisionError(
+            "Missing required policy page URLs for footer rendering: "
+            f"{', '.join(missing_policy_keys)}. "
+            "Remediation: sync Shopify policy pages and retry."
+        )
+
+    links: list[dict[str, str]] = [
+        {"label": "Privacy", "href": privacy_url},
+        {"label": "Terms", "href": terms_url},
+        {"label": "Returns", "href": returns_url},
+        {"label": "Shipping", "href": shipping_url},
+    ]
+    if subscription_url:
+        links.append({"label": "Subscription", "href": subscription_url})
+
+    brand_name = ""
+    for design_system in design_systems:
+        tokens = design_system.tokens if isinstance(design_system.tokens, dict) else {}
+        brand = tokens.get("brand")
+        if not isinstance(brand, dict):
+            continue
+        candidate = str(brand.get("name") or "").strip()
+        if candidate:
+            brand_name = candidate
+            break
+    if not brand_name:
+        brand_name = (
+            str(profile.operating_entity_name or "").strip()
+            or str(profile.legal_business_name or "").strip()
+            or str(profile.client_id or "").strip()
+        )
+    if not brand_name:
+        raise StrategyV2DecisionError(
+            "Unable to determine brand name for footer copyright. "
+            "Remediation: set design system brand.name or compliance profile entity fields."
+        )
+    return links, brand_name
+
+
 _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -1328,8 +1447,13 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
             "type": "object",
             "additionalProperties": False,
             "properties": {
-                "title": {"type": "string", "minLength": 1},
-                "subtitle": {"type": "string", "minLength": 1},
+                "title": {"type": "string", "minLength": 1, "maxLength": 90},
+                "subtitle": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 140,
+                    "description": "Maximum 2 sentences.",
+                },
                 "badges": {
                     "type": "array",
                     "minItems": 1,
@@ -1338,9 +1462,18 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                         "additionalProperties": False,
                         "properties": {
                             "label": {"type": "string", "minLength": 1},
-                            "value": {"type": "string", "minLength": 1},
+                            "value": {"type": "string", "minLength": 1, "maxLength": 24},
+                            "icon": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "alt": {"type": "string", "minLength": 1, "maxLength": 240},
+                                    "prompt": {"type": "string", "minLength": 1, "maxLength": 420},
+                                },
+                                "required": ["alt", "prompt"],
+                            },
                         },
-                        "required": ["label", "value"],
+                        "required": ["label", "value", "icon"],
                     },
                 },
             },
@@ -1354,34 +1487,58 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "properties": {
                     "number": {"type": "integer", "minimum": 1},
-                    "title": {"type": "string", "minLength": 1},
-                    "body": {"type": "string", "minLength": 1},
+                    "title": {"type": "string", "minLength": 1, "maxLength": 72},
+                    "body": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 420,
+                        "description": "Maximum 3 sentences.",
+                    },
+                    "image": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "alt": {"type": "string", "minLength": 1, "maxLength": 240},
+                            "prompt": {"type": "string", "minLength": 1, "maxLength": 420},
+                        },
+                        "required": ["alt", "prompt"],
+                    },
                 },
-                "required": ["number", "title", "body"],
+                "required": ["number", "title", "body", "image"],
             },
         },
         "marquee": {
             "type": "array",
             "minItems": 1,
-            "items": {"type": "string", "minLength": 1},
+            "items": {"type": "string", "minLength": 1, "maxLength": 24},
         },
         "pitch": {
             "type": "object",
             "additionalProperties": False,
             "properties": {
-                "title": {"type": "string", "minLength": 1},
+                "title": {"type": "string", "minLength": 1, "maxLength": 78},
                 "bullets": {
                     "type": "array",
-                    "minItems": 1,
-                    "items": {"type": "string", "minLength": 1},
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "items": {"type": "string", "minLength": 1, "maxLength": 90},
                 },
                 "cta_label": {"type": "string", "minLength": 1},
+                "image": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "alt": {"type": "string", "minLength": 1, "maxLength": 240},
+                        "prompt": {"type": "string", "minLength": 1, "maxLength": 420},
+                    },
+                    "required": ["alt", "prompt"],
+                },
             },
-            "required": ["title", "bullets", "cta_label"],
+            "required": ["title", "bullets", "cta_label", "image"],
         },
         "reviews": {
             "type": "array",
-            "minItems": 3,
+            "minItems": 0,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -1590,6 +1747,27 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
             },
             "required": ["title", "items"],
         },
+        "faq_pills": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "label": {"type": "string", "minLength": 1},
+                    "answer": {"type": "string", "minLength": 1},
+                },
+                "required": ["label", "answer"],
+            },
+        },
+        "marquee_items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "items": {"type": "string", "minLength": 1},
+        },
+        "urgency_message": {"type": "string", "minLength": 1, "maxLength": 220},
         "cta_close": {"type": "string", "minLength": 1},
     },
     "required": [
@@ -1601,9 +1779,48 @@ _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
         "bonus",
         "guarantee",
         "faq",
+        "faq_pills",
+        "marquee_items",
+        "urgency_message",
         "cta_close",
     ],
 }
+_PRE_SALES_TEMPLATE_LIMITS_INSTRUCTION = (
+    "Hard limits for pre-sales template payload:\n"
+    "- hero.title <= 90 chars\n"
+    "- hero.subtitle <= 140 chars (max 2 sentences)\n"
+    "- hero.badges must be exactly 3 items: [<review count> 5-Star Reviews, 24/7 Customer Support, Risk Free Trial]\n"
+    "- hero.badges[].value <= 24 chars when present\n"
+    "- reasons[].title <= 72 chars\n"
+    "- reasons[].body <= 420 chars and MUST be 2-3 sentences (never 4+)\n"
+    "- reasons[].image.prompt must stay editorial before the marquee; do not depict the product reference image, packaging, or exact book/product identity\n"
+    "- marquee[] each <= 24 chars, 1-4 words\n"
+    "- pitch.title <= 78 chars\n"
+    "- pitch.bullets must be exactly 4 items; each <= 90 chars\n"
+    "- pitch.image is the first section allowed to introduce the product after the marquee\n"
+    "- pitch.cta_label must be short, non-transactional; use 'Learn more'\n"
+)
+
+_SALES_TEMPLATE_LIMITS_INSTRUCTION = (
+    "Hard limits for sales template payload JSON string:\n"
+    "- hero.purchase_title must be the plain product name only (no tagline)\n"
+    "- hero.purchase_title <= 64 chars\n"
+    "- hero.primary_cta_label must not hardcode a literal dollar amount; if price appears in CTA copy it must use the exact token {price}\n"
+    "- hero.primary_cta_subbullets must be exactly 2 items; each <= 90 chars\n"
+    "- whats_inside.benefits must be exactly 4 items; each <= 38 chars and 2-6 words\n"
+    "- whats_inside.benefits must be outcome-led, not feature inventory; avoid endings like workflow/guide/reference/checklist/pages/notes/prompts/scripts\n"
+    "- whats_inside.benefits must not use parentheses, colons, arrows, commas, or explanatory clauses\n"
+    "- whats_inside.offer_helper_text <= 180 chars and max 2 sentences\n"
+    "- problem.paragraphs: 1-2 items, each <= 320 chars\n"
+    "- mechanism.paragraphs: 1-2 items, each <= 220 chars\n"
+    "- mechanism.bullets: exactly 5 items; title <= 56 chars; body <= 160 chars\n"
+    "- guarantee.paragraphs: exactly 1 item <= 260 chars\n"
+    "- guarantee.why_body <= 220 chars; closing_line <= 140 chars\n"
+    "- faq.items[].question <= 120 chars; answer <= 280 chars (max 3 sentences)\n"
+    "- faq_pills[].label <= 120 chars; answer <= 420 chars (max 3 sentences)\n"
+    "- marquee_items[] each <= 24 chars, 1-3 words\n"
+    "- urgency_message <= 220 chars\n"
+)
 _COPY_WORD_FLOOR_ERROR_RE = re.compile(
     r"(?P<reason>[A-Z_]+_WORD_FLOOR):\s*total_words=(?P<current>\d+),\s*required>=(?P<min>\d+)",
     re.IGNORECASE,
@@ -1638,6 +1855,10 @@ _COPY_REQUIRED_SIGNAL_COVERAGE_ERROR_RE = re.compile(
 )
 _COPY_BELIEF_SEQUENCE_ORDER_ERROR_RE = re.compile(
     r"BELIEF_SEQUENCE_ORDER:\s*(?P<detail>[^;]+)",
+    re.IGNORECASE,
+)
+_COPY_SALES_SEMANTIC_CTA_LINK_ERROR_RE = re.compile(
+    r"Sales semantic repair requires at least one existing markdown CTA link URL",
     re.IGNORECASE,
 )
 _MARKDOWN_LINK_CAPTURE_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -1752,7 +1973,27 @@ _UMP_UMS_DIMENSIONS = (
     "memorability",
 )
 
-_OFFER_VARIANT_IDS = ("base", "variant_a", "variant_b")
+_OFFER_VARIANT_IDS = ("single_device", "share_and_save", "family_bundle")
+_OFFER_VARIANT_DISPLAY_LABELS = {
+    "single_device": "Single Device",
+    "share_and_save": "Share & Save",
+    "family_bundle": "Family Bundle",
+}
+_BOOK_OFFER_VARIANT_DISPLAY_LABELS = {
+    "single_device": "Single Book",
+    "share_and_save": "2-Book Bundle",
+    "family_bundle": "3-Book Bundle",
+}
+_DEFAULT_OFFER_VARIANT_BUNDLE_QUANTITIES = {
+    "single_device": 1,
+    "share_and_save": 2,
+    "family_bundle": 4,
+}
+_BOOK_OFFER_VARIANT_BUNDLE_QUANTITIES = {
+    "single_device": 1,
+    "share_and_save": 2,
+    "family_bundle": 3,
+}
 _OFFER_COMPOSITE_DIMENSIONS = (
     "value_equation",
     "objection_coverage",
@@ -1762,10 +2003,19 @@ _OFFER_COMPOSITE_DIMENSIONS = (
     "clarity_simplicity",
     "bottleneck_resilience",
     "momentum_continuity",
+    "pricing_fidelity",
+    "savings_fidelity",
+    "best_value_fidelity",
 )
 _OFFER_EVIDENCE_QUALITY_LEVELS = ("OBSERVED", "INFERRED", "ASSUMED")
 _STEP05_REVISION_NOTES_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP05_REVISION_NOTES_MAX_CHARS", "4000"))
 _STEP05_KILL_CONDITION_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP05_KILL_CONDITION_MAX_CHARS", "800"))
+_STEP04_CORE_PROMISE_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP04_CORE_PROMISE_MAX_CHARS", "140"))
+_STEP04_BONUS_TITLE_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP04_BONUS_TITLE_MAX_CHARS", "70"))
+_STEP04_BONUS_COPY_MAX_CHARS = int(os.getenv("STRATEGY_V2_OFFER_STEP04_BONUS_COPY_MAX_CHARS", "140"))
+_STEP04_BEST_VALUE_REASON_MAX_CHARS = int(
+    os.getenv("STRATEGY_V2_OFFER_STEP04_BEST_VALUE_REASON_MAX_CHARS", "120")
+)
 _OFFER_ORCHESTRATOR_REQUIRED_STEP_PROMPTS = (
     "step-01-avatar-brief.md",
     "step-02-market-calibration.md",
@@ -1787,6 +2037,7 @@ _AGENT3_MAX_QUOTE_CHARS = 320
 _AGENT1_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT1_MAX_TOKENS", "128000"))
 _AGENT2_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT2_MAX_TOKENS", "128000"))
 _AGENT3_MAX_TOKENS = int(os.getenv("STRATEGY_V2_AGENT3_MAX_TOKENS", "64000"))
+_AGENT2_PROMPT_MAX_EVIDENCE_ROWS = int(os.getenv("STRATEGY_V2_AGENT2_PROMPT_MAX_EVIDENCE_ROWS", "100"))
 _AGENT2_AGENT1_HANDOFF_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT2_AGENT1_HANDOFF_MAX_CHARS", "20000"))
 _AGENT2_HABITAT_SCORED_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT2_HABITAT_SCORED_MAX_CHARS", "20000"))
 _AGENT2_PRODUCT_BRIEF_MAX_CHARS = int(os.getenv("STRATEGY_V2_AGENT2_PRODUCT_BRIEF_MAX_CHARS", "9000"))
@@ -2457,11 +2708,29 @@ def _extract_reddit_subreddit_from_value(value: Any) -> str:
     return ""
 
 
-def _validate_reddit_target_alignment(*, run_rows: Sequence[Mapping[str, Any]]) -> None:
+def _validate_reddit_target_alignment(
+    *,
+    run_rows: Sequence[Mapping[str, Any]],
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> None:
     mismatches: list[str] = []
     missing_evidence: list[str] = []
+    total_rows = len(run_rows)
+    last_progress_heartbeat = time.monotonic()
 
-    for row in run_rows:
+    for idx, row in enumerate(run_rows, start=1):
+        if progress_callback is not None:
+            now = time.monotonic()
+            if idx == 1 or idx == total_rows or (now - last_progress_heartbeat) >= 15:
+                progress_callback(
+                    {
+                        "progress_event": "reddit_alignment_scan",
+                        "processed_run_rows": idx,
+                        "total_run_rows": total_rows,
+                    }
+                )
+                last_progress_heartbeat = now
+
         actor_id = str(row.get("actor_id") or "").strip().lower()
         if "reddit" not in actor_id:
             continue
@@ -2565,6 +2834,7 @@ def _build_scraped_data_manifest(
     *,
     apify_context: Mapping[str, Any],
     competitor_analysis: Mapping[str, Any],
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     raw_runs = apify_context.get("raw_runs")
     run_rows = [row for row in raw_runs if isinstance(row, dict)] if isinstance(raw_runs, list) else []
@@ -2596,7 +2866,20 @@ def _build_scraped_data_manifest(
     missing_target_id_before_backfill = 0
     backfilled_target_id_count = 0
     missing_target_id_after_backfill = 0
+    total_runs = len(run_rows)
+    last_progress_heartbeat = time.monotonic()
     for idx, row in enumerate(run_rows):
+        if progress_callback is not None:
+            now = time.monotonic()
+            if idx == 0 or idx + 1 == total_runs or (now - last_progress_heartbeat) >= 15:
+                progress_callback(
+                    {
+                        "progress_event": "manifest_build",
+                        "processed_runs": idx + 1,
+                        "total_runs": total_runs,
+                    }
+                )
+                last_progress_heartbeat = now
         input_payload = row.get("input_payload")
         requested_refs: list[str] = []
         if isinstance(input_payload, dict):
@@ -3420,11 +3703,15 @@ def _llm_generate_text(
         if progress_callback is not None:
             progress_callback({"status": "submitted", "llm_phase": "structured_json"})
 
+        claude_structured_max_tokens = max_tokens or _CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS
+        if claude_structured_max_tokens > _CLAUDE_MAX_OUTPUT_TOKENS:
+            claude_structured_max_tokens = _CLAUDE_MAX_OUTPUT_TOKENS
+
         structured_kwargs: dict[str, Any] = {
             "model": model,
             "system": None,
             "output_schema": schema,
-            "max_tokens": max_tokens or _CLAUDE_STRUCTURED_FALLBACK_MAX_TOKENS,
+            "max_tokens": claude_structured_max_tokens,
             "temperature": 0.0,
         }
         if claude_messages is not None:
@@ -3506,6 +3793,266 @@ def _parse_json_response(*, raw_text: str, field_name: str) -> dict[str, Any]:
             f"Expected JSON object for '{field_name}', received '{type(parsed).__name__}'."
         )
     return parsed
+
+
+def _parse_json_response_strict(*, raw_text: str, field_name: str) -> dict[str, Any]:
+    cleaned = raw_text.strip()
+    if not cleaned:
+        raise StrategyV2MissingContextError(
+            f"Expected JSON object for '{field_name}', received empty text."
+        )
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^\s*```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```\s*$", "", cleaned)
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError as exc:
+        raise StrategyV2SchemaValidationError(
+            f"Failed to parse JSON object for '{field_name}': {exc}"
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise StrategyV2SchemaValidationError(
+            f"Expected JSON object for '{field_name}', received '{type(parsed).__name__}'."
+        )
+    return parsed
+
+
+_SALES_TEMPLATE_TOP_LEVEL_KEYS: set[str] = {
+    "hero",
+    "problem",
+    "mechanism",
+    "social_proof",
+    "whats_inside",
+    "bonus",
+    "guarantee",
+    "faq",
+    "faq_pills",
+    "marquee_items",
+    "urgency_message",
+    "cta_close",
+}
+
+
+def _recover_fragmented_sales_template_payload_json(*, raw_text: str) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    cleaned = raw_text.strip()
+    if not cleaned:
+        return None
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^\s*```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```\s*$", "", cleaned)
+
+    try:
+        first_object, first_end_index = json.JSONDecoder().raw_decode(cleaned)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(first_object, dict):
+        return None
+
+    tail = cleaned[first_end_index:].strip()
+    if not tail.startswith(","):
+        return None
+    tail_without_delimiter = tail.lstrip(",").strip()
+    if not tail_without_delimiter.startswith('"'):
+        return None
+
+    try:
+        tail_object = json.loads("{" + tail_without_delimiter)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(tail_object, dict):
+        return None
+
+    overlapping_keys = [key for key in tail_object.keys() if key in first_object]
+    if overlapping_keys:
+        return None
+
+    merged = dict(first_object)
+    merged.update(tail_object)
+    recovery = {
+        "mode": "fragmented_top_level_object_recovery",
+        "first_object_key_count": len(first_object),
+        "tail_object_key_count": len(tail_object),
+        "merged_key_count": len(merged),
+        "first_expected_top_level_key_hits": len(_SALES_TEMPLATE_TOP_LEVEL_KEYS.intersection(first_object.keys())),
+        "tail_expected_top_level_key_hits": len(_SALES_TEMPLATE_TOP_LEVEL_KEYS.intersection(tail_object.keys())),
+        "merged_expected_top_level_key_hits": len(_SALES_TEMPLATE_TOP_LEVEL_KEYS.intersection(merged.keys())),
+    }
+    return merged, recovery
+
+
+def _looks_like_incomplete_json_object(*, raw_text: str) -> bool:
+    cleaned = raw_text.strip()
+    if not cleaned:
+        return False
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^\s*```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```\s*$", "", cleaned)
+    if "{" not in cleaned:
+        return False
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for char in cleaned:
+        if in_string:
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+            continue
+        if char == "{":
+            depth += 1
+            continue
+        if char == "}":
+            depth = max(0, depth - 1)
+            continue
+    return in_string or depth > 0
+
+
+def _extract_json_object_candidates(*, raw_text: str, max_candidates: int = 12) -> list[dict[str, Any]]:
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^\s*```(?:json)?\s*", "", cleaned, flags=re.IGNORECASE)
+        cleaned = re.sub(r"\s*```\s*$", "", cleaned)
+
+    start_index: int | None = None
+    depth = 0
+    in_string = False
+    escaped = False
+    candidates: list[dict[str, Any]] = []
+    for index, char in enumerate(cleaned):
+        if start_index is None:
+            if char == "{":
+                start_index = index
+                depth = 1
+            continue
+
+        if in_string:
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+            continue
+        if char == "{":
+            depth += 1
+            continue
+        if char == "}":
+            depth -= 1
+            if depth == 0:
+                snippet = cleaned[start_index : index + 1]
+                start_index = None
+                try:
+                    parsed = json.loads(snippet)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict):
+                    candidates.append(parsed)
+                    if len(candidates) >= max_candidates:
+                        break
+    return candidates
+
+
+def _parse_sales_template_payload_json(*, raw_text: str) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    try:
+        strict = _parse_json_response_strict(raw_text=raw_text, field_name="sales_template_payload")
+        return strict, None
+    except (StrategyV2MissingContextError, StrategyV2SchemaValidationError) as strict_exc:
+        if _looks_like_incomplete_json_object(raw_text=raw_text):
+            raise StrategyV2SchemaValidationError(
+                "Sales template payload appears to be incomplete JSON (truncated before the top-level object closed). "
+                "Remediation: increase completion budget or return a shorter payload."
+            ) from strict_exc
+
+        fragmented_recovery = _recover_fragmented_sales_template_payload_json(raw_text=raw_text)
+        if fragmented_recovery is not None:
+            return fragmented_recovery
+
+        candidate_rows = _extract_json_object_candidates(raw_text=raw_text, max_candidates=12)
+        if not candidate_rows:
+            raise StrategyV2SchemaValidationError(str(strict_exc)) from strict_exc
+
+        unique_candidates: list[dict[str, Any]] = []
+        seen_signatures: set[str] = set()
+        for row in candidate_rows:
+            signature = json.dumps(row, sort_keys=True, ensure_ascii=True)
+            if signature in seen_signatures:
+                continue
+            seen_signatures.add(signature)
+            unique_candidates.append(row)
+        if not unique_candidates:
+            raise StrategyV2SchemaValidationError(str(strict_exc)) from strict_exc
+
+        scored: list[tuple[int, int, int, int, dict[str, Any]]] = []
+        for index, candidate in enumerate(unique_candidates):
+            candidate_for_validation = candidate
+            try:
+                candidate_for_validation = upgrade_strategy_v2_template_payload_fields(
+                    template_id="sales-pdp",
+                    payload_fields=candidate,
+                )
+            except StrategyV2DecisionError:
+                candidate_for_validation = candidate
+            report = inspect_strategy_v2_template_payload_validation(
+                template_id="sales-pdp",
+                payload_fields=candidate_for_validation,
+                max_items=1,
+            )
+            error_count = int(report.get("error_count") or 0)
+            expected_top_level_key_hits = len(_SALES_TEMPLATE_TOP_LEVEL_KEYS.intersection(candidate.keys()))
+            top_level_key_count = len(candidate.keys())
+            scored.append(
+                (
+                    -expected_top_level_key_hits,
+                    error_count,
+                    -top_level_key_count,
+                    index,
+                    candidate,
+                )
+            )
+
+        scored.sort(key=lambda row: (row[0], row[1], row[2], row[3]))
+        best_row = scored[0]
+        best_rows = [
+            row
+            for row in scored
+            if row[0] == best_row[0]
+            and row[1] == best_row[1]
+            and row[2] == best_row[2]
+        ]
+        if len(best_rows) != 1:
+            raise StrategyV2SchemaValidationError(
+                "Sales template payload parser found multiple JSON object candidates with equivalent validation scores. "
+                "Remediation: return exactly one JSON object in template_payload_json."
+            ) from strict_exc
+
+        selected_row = best_rows[0]
+        selected_index = selected_row[3]
+        selected = selected_row[4]
+        recovery = {
+            "mode": "candidate_recovery",
+            "strict_parse_error": str(strict_exc),
+            "candidate_count": len(unique_candidates),
+            "selected_candidate_index": selected_index,
+            "selected_error_count": selected_row[1],
+            "selected_expected_top_level_key_hits": -selected_row[0],
+            "selected_top_level_key_count": -selected_row[2],
+        }
+        return selected, recovery
 
 
 def _enforce_strict_openai_json_schema(node: Any) -> Any:
@@ -3636,6 +4183,242 @@ def _offer_step05_response_schema() -> dict[str, Any]:
     }
 
 
+def _offer_step04_response_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "variants": {
+                "type": "array",
+                "minItems": len(_OFFER_VARIANT_IDS),
+                "maxItems": len(_OFFER_VARIANT_IDS),
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "variant_id": {
+                            "type": "string",
+                            "enum": list(_OFFER_VARIANT_IDS),
+                        },
+                        "core_promise": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": _STEP04_CORE_PROMISE_MAX_CHARS,
+                            "pattern": ".*\\S.*",
+                        },
+                        "value_stack": {
+                            "type": "array",
+                            "minItems": 3,
+                            "maxItems": 7,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "dream_outcome": {
+                                        "type": "number",
+                                        "minimum": 0.0,
+                                        "maximum": 10.0,
+                                    },
+                                    "perceived_likelihood": {
+                                        "type": "number",
+                                        "minimum": 0.0,
+                                        "maximum": 10.0,
+                                    },
+                                    "time_delay": {
+                                        "type": "number",
+                                        "minimum": 0.0,
+                                        "maximum": 10.0,
+                                    },
+                                    "effort_sacrifice": {
+                                        "type": "number",
+                                        "minimum": 0.0,
+                                        "maximum": 10.0,
+                                    },
+                                    "novelty_classification": {"type": "string"},
+                                },
+                                "required": [
+                                    "name",
+                                    "dream_outcome",
+                                    "perceived_likelihood",
+                                    "time_delay",
+                                    "effort_sacrifice",
+                                    "novelty_classification",
+                                ],
+                            },
+                        },
+                        "guarantee": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 320,
+                            "pattern": ".*\\S.*",
+                        },
+                        "pricing_rationale": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 320,
+                            "pattern": ".*\\S.*",
+                        },
+                        "pricing_metadata": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "list_price_cents": {"type": "integer", "minimum": 1},
+                                "offer_price_cents": {"type": "integer", "minimum": 1},
+                            },
+                            "required": ["list_price_cents", "offer_price_cents"],
+                        },
+                        "savings_metadata": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "savings_amount_cents": {"type": "integer", "minimum": 0},
+                                "savings_percent": {"type": "number", "minimum": 0.0},
+                                "savings_basis": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+                            },
+                            "required": ["savings_amount_cents", "savings_percent", "savings_basis"],
+                        },
+                        "best_value_metadata": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "is_best_value": {"type": "boolean"},
+                                "rationale": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": _STEP04_BEST_VALUE_REASON_MAX_CHARS,
+                                    "pattern": ".*\\S.*",
+                                },
+                                "compared_variant_ids": {
+                                    "type": "array",
+                                    "minItems": len(_OFFER_VARIANT_IDS) - 1,
+                                    "maxItems": len(_OFFER_VARIANT_IDS) - 1,
+                                    "items": {"type": "string", "enum": list(_OFFER_VARIANT_IDS)},
+                                },
+                            },
+                            "required": ["is_best_value", "rationale", "compared_variant_ids"],
+                        },
+                        "bonus_modules": {
+                            "type": "array",
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "bonus_id": {"type": "string", "minLength": 1, "pattern": ".*\\S.*"},
+                                    "copy": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "maxLength": _STEP04_BONUS_COPY_MAX_CHARS,
+                                        "pattern": ".*\\S.*",
+                                    },
+                                },
+                                "required": ["bonus_id", "copy"],
+                            },
+                        },
+                        "objection_map": {
+                            "type": "array",
+                            "minItems": 3,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "objection": {"type": "string"},
+                                    "source": {"type": "string"},
+                                    "covered": {"type": "boolean"},
+                                    "coverage_strength": {
+                                        "type": "number",
+                                        "minimum": 0.0,
+                                        "maximum": 10.0,
+                                    },
+                                },
+                                "required": ["objection", "source", "covered", "coverage_strength"],
+                            },
+                        },
+                        "dimension_scores": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                "competitive_differentiation": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                                "compliance_safety": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                                "internal_consistency": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                                "clarity_simplicity": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                                "bottleneck_resilience": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                                "momentum_continuity": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                                "pricing_fidelity": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                                "savings_fidelity": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                                "best_value_fidelity": {
+                                    "type": "number",
+                                    "minimum": 0.0,
+                                    "maximum": 10.0,
+                                },
+                            },
+                            "required": [
+                                "competitive_differentiation",
+                                "compliance_safety",
+                                "internal_consistency",
+                                "clarity_simplicity",
+                                "bottleneck_resilience",
+                                "momentum_continuity",
+                                "pricing_fidelity",
+                                "savings_fidelity",
+                                "best_value_fidelity",
+                            ],
+                        },
+                    },
+                    "required": [
+                        "variant_id",
+                        "core_promise",
+                        "value_stack",
+                        "guarantee",
+                        "pricing_rationale",
+                        "pricing_metadata",
+                        "savings_metadata",
+                        "best_value_metadata",
+                        "bonus_modules",
+                        "objection_map",
+                        "dimension_scores",
+                    ],
+                },
+            }
+        },
+        "required": ["variants"],
+    }
+
+
 def _render_prompt_asset(
     *,
     asset: PromptAsset,
@@ -3645,6 +4428,40 @@ def _render_prompt_asset(
     if variables is None:
         variables = {}
     return render_prompt_template_strict(template=asset.text, variables=variables, context=context)
+
+
+def _run_with_activity_heartbeats(
+    *,
+    phase: str,
+    operation: str,
+    heartbeat_payload: Mapping[str, Any],
+    fn: Callable[[], Any],
+    interval_seconds: float = 15.0,
+) -> Any:
+    if interval_seconds <= 0:
+        raise ValueError("interval_seconds must be positive.")
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(fn)
+        while True:
+            try:
+                return future.result(timeout=interval_seconds)
+            except FuturesTimeoutError:
+                payload: dict[str, Any] = {
+                    "phase": phase,
+                    "status": "in_progress",
+                    "progress_event": operation,
+                }
+                for key, value in heartbeat_payload.items():
+                    if value is not None:
+                        payload[str(key)] = value
+                activity.heartbeat(payload)
+
+
+def _heartbeat_safe(payload: Mapping[str, Any]) -> None:
+    try:
+        activity.heartbeat(dict(payload))
+    except RuntimeError:
+        return
 
 
 def _run_prompt_json_object(
@@ -4749,6 +5566,272 @@ def _resolve_offer_price_cents_and_currency(
     return price_cents_raw, currency
 
 
+def _normalize_discount_and_savings_metadata(
+    *,
+    list_price_cents: int,
+    offer_price_cents: int,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    if list_price_cents <= 0:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness requires list_price_cents > 0."
+        )
+    if offer_price_cents <= 0:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness requires offer_price_cents > 0."
+        )
+    if offer_price_cents > list_price_cents:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness detected invalid pricing: offer_price_cents exceeds list_price_cents."
+        )
+    savings_amount_cents = list_price_cents - offer_price_cents
+    savings_pct = round((savings_amount_cents / float(list_price_cents)) * 100.0, 2) if list_price_cents else 0.0
+    pricing_metadata = {
+        "list_price_cents": int(list_price_cents),
+        "offer_price_cents": int(offer_price_cents),
+    }
+    savings_metadata = {
+        "savings_amount_cents": int(savings_amount_cents),
+        "savings_percent": float(savings_pct),
+        "savings_basis": "vs_list_price",
+    }
+    return pricing_metadata, savings_metadata
+
+
+def _resolve_offer_bundle_context(
+    *,
+    session,
+    org_id: str,
+    client_id: str,
+    product_id: str,
+    onboarding_payload: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    products_repo = ProductsRepository(session)
+    offers_repo = ProductOffersRepository(session)
+    bonuses_repo = ProductOfferBonusesRepository(session)
+    variants_repo = ProductVariantsRepository(session)
+
+    product = products_repo.get(org_id=org_id, product_id=product_id)
+    if product is None or str(product.client_id) != client_id:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness could not resolve product for this org/client/product."
+        )
+    onboarding_product_type = (
+        canonical_product_type(str(onboarding_payload.get("product_type") or ""))
+        if isinstance(onboarding_payload, Mapping)
+        else None
+    )
+    product_type = canonical_product_type(str(product.product_type or ""))
+    if onboarding_product_type and product_type and onboarding_product_type != product_type:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness found mismatched product_type between onboarding payload and product record. "
+            f"onboarding={onboarding_product_type} product={product_type}. "
+            "Remediation: update products.category/product_type to match onboarding before running Offer Agent."
+        )
+    product_type = onboarding_product_type or product_type
+    if not product_type:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness requires product_type. "
+            "Remediation: set products.category/product_type before running Offer Agent."
+        )
+
+    default_offer_id_raw = onboarding_payload.get("default_offer_id") if isinstance(onboarding_payload, Mapping) else None
+    default_offer_id = str(default_offer_id_raw or "").strip() if default_offer_id_raw is not None else ""
+    product_offers = offers_repo.list_by_product(product_id=product_id)
+    target_offer = None
+    if default_offer_id:
+        target_offer = offers_repo.get(offer_id=default_offer_id)
+        if target_offer is None:
+            raise StrategyV2MissingContextError(
+                "Offer data readiness default_offer_id was provided but not found."
+            )
+        if (
+            str(target_offer.org_id) != org_id
+            or str(target_offer.client_id) != client_id
+            or str(target_offer.product_id or "") != product_id
+        ):
+            raise StrategyV2MissingContextError(
+                "Offer data readiness default_offer_id does not belong to this org/client/product."
+            )
+    elif len(product_offers) == 1:
+        target_offer = product_offers[0]
+    elif len(product_offers) > 1:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness requires onboarding default_offer_id when multiple offers exist."
+        )
+
+    if target_offer is None:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness requires an existing product offer to anchor bundle contents."
+        )
+
+    variant_rows = [
+        row
+        for row in variants_repo.list_by_product(product_id=product_id)
+        if str(row.offer_id or "") == str(target_offer.id)
+    ]
+    if not variant_rows:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness requires at least one price point variant linked to the selected offer."
+        )
+    offer_price_cents = min(int(row.price) for row in variant_rows)
+    compare_at_candidates = [int(row.compare_at_price) for row in variant_rows if isinstance(row.compare_at_price, int)]
+    list_price_cents = max(compare_at_candidates) if compare_at_candidates else max(int(row.price) for row in variant_rows)
+    pricing_metadata, savings_metadata = _normalize_discount_and_savings_metadata(
+        list_price_cents=list_price_cents,
+        offer_price_cents=offer_price_cents,
+    )
+
+    bonus_links = bonuses_repo.list_by_offer(offer_id=str(target_offer.id))
+    bonus_items: list[dict[str, Any]] = []
+    for link in bonus_links:
+        linked_product = products_repo.get(org_id=org_id, product_id=str(link.bonus_product_id))
+        if linked_product is None:
+            raise StrategyV2MissingContextError(
+                "Offer data readiness detected an invalid offer bonus link."
+            )
+        bonus_title = str(linked_product.title or "").strip()
+        if not bonus_title:
+            raise StrategyV2MissingContextError(
+                "Offer data readiness requires non-empty bonus product title."
+            )
+        bonus_items.append(
+            {
+                "bonus_id": str(link.id),
+                "linked_product_id": str(linked_product.id),
+                "title": bonus_title,
+                "product_type": str(linked_product.product_type or "").strip().lower() or "other",
+                "position": int(link.position),
+            }
+        )
+    bonus_items = sorted(bonus_items, key=lambda row: int(row.get("position") or 0))
+    if len(bonus_items) != 3:
+        raise StrategyV2MissingContextError(
+            "Offer data readiness requires exactly 3 linked offer bonuses for V1."
+        )
+
+    core_product_context = {
+        "product_id": str(product.id),
+        "title": str(product.title or "").strip(),
+        "product_type": product_type,
+    }
+    return {
+        "offer_format": "DISCOUNT_PLUS_3_BONUSES_V1",
+        "product_type": product_type,
+        "core_product": core_product_context,
+        "offer_id": str(target_offer.id),
+        "offer_name": str(target_offer.name or "").strip(),
+        "bonus_items": bonus_items,
+        "pricing_metadata": pricing_metadata,
+        "savings_metadata": savings_metadata,
+        "bundle_contents": {
+            "core_product": core_product_context,
+            "offer_id": str(target_offer.id),
+            "offer_name": str(target_offer.name or "").strip(),
+            "bonuses": [
+                {
+                    "bonus_id": str(item.get("bonus_id") or ""),
+                    "linked_product_id": str(item.get("linked_product_id") or ""),
+                    "title": str(item.get("title") or ""),
+                    "product_type": str(item.get("product_type") or ""),
+                    "position": int(item.get("position") or 0),
+                }
+                for item in bonus_items
+            ],
+            "bonus_count": len(bonus_items),
+        },
+    }
+
+
+@activity.defn(name="strategy_v2.validate_offer_data_readiness")
+def validate_strategy_v2_offer_data_readiness_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    onboarding_payload_id = (
+        str(params["onboarding_payload_id"])
+        if isinstance(params.get("onboarding_payload_id"), str)
+        else None
+    )
+    offer_pipeline_output = _require_dict(payload=params["offer_pipeline_output"], field_name="offer_pipeline_output")
+
+    missing_fields: list[str] = []
+    inconsistent_fields: list[str] = []
+    required_operator_inputs: list[str] = []
+    remediation_steps: list[str] = []
+    resolved_context: dict[str, Any] = {}
+
+    with session_scope() as session:
+        onboarding_payload = _load_onboarding_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            onboarding_payload_id=onboarding_payload_id,
+        )
+        try:
+            resolved_context = _resolve_offer_bundle_context(
+                session=session,
+                org_id=org_id,
+                client_id=client_id,
+                product_id=product_id,
+                onboarding_payload=onboarding_payload,
+            )
+        except StrategyV2MissingContextError as exc:
+            inconsistent_fields.append(str(exc))
+            remediation_steps.append(
+                "Provide product_type, a default offer, one price point, and exactly 3 linked bonuses for Offer Agent V1."
+            )
+
+        offer_input = offer_pipeline_output.get("offer_input")
+        if not isinstance(offer_input, dict):
+            missing_fields.append("offer_pipeline_output.offer_input")
+        else:
+            product_brief = offer_input.get("product_brief")
+            if not isinstance(product_brief, dict):
+                missing_fields.append("offer_pipeline_output.offer_input.product_brief")
+            else:
+                if not isinstance(product_brief.get("price_cents"), int):
+                    missing_fields.append("offer_pipeline_output.offer_input.product_brief.price_cents")
+                currency = str(product_brief.get("currency") or "").strip().upper()
+                if len(currency) != 3:
+                    missing_fields.append("offer_pipeline_output.offer_input.product_brief.currency")
+
+    status = "ready" if not missing_fields and not inconsistent_fields else "blocked"
+    payload = {
+        "status": status,
+        "missing_fields": missing_fields,
+        "inconsistent_fields": inconsistent_fields,
+        "required_operator_inputs": required_operator_inputs,
+        "remediation_steps": remediation_steps,
+        "context": resolved_context,
+    }
+
+    with session_scope() as session:
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_OFFER_DATA_READINESS,
+            title="Strategy V2 Offer Data Readiness",
+            summary=(
+                "Offer data readiness checks passed for V1 discount+3-bonus format."
+                if status == "ready"
+                else "Offer data readiness blocked with required remediation."
+            ),
+            payload=payload,
+            model_name="deterministic_validator",
+            prompt_version="strategy_v2.offer_data_readiness.v1",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=None,
+        )
+    payload["step_payload_artifact_id"] = step_payload_artifact_id
+    return payload
+
+
 def _serialize_product_offer_for_strategy(offer: Any) -> dict[str, Any]:
     return {
         "id": str(offer.id),
@@ -4765,6 +5848,124 @@ def _serialize_product_offer_for_strategy(offer: Any) -> dict[str, Any]:
     }
 
 
+def _resolve_offer_variant_bundle_quantity(*, variant_id: str, product_type: str | None) -> int:
+    normalized = str(variant_id or "").strip().lower()
+    if not normalized:
+        raise StrategyV2MissingContextError(
+            "Offer variant_id is required to resolve bundle quantity for product variant sync."
+        )
+    canonical_type = canonical_product_type(product_type)
+    quantity_mapping = (
+        _BOOK_OFFER_VARIANT_BUNDLE_QUANTITIES
+        if canonical_type == "book"
+        else _DEFAULT_OFFER_VARIANT_BUNDLE_QUANTITIES
+    )
+    quantity = quantity_mapping.get(normalized)
+    if quantity is None:
+        raise StrategyV2MissingContextError(
+            f"Offer variant_id '{normalized}' is not recognized for bundle quantity resolution."
+        )
+    return quantity
+
+
+def _resolve_offer_variant_display_label(*, variant_id: str, product_type: str | None = None) -> str:
+    normalized = str(variant_id or "").strip().lower()
+    if not normalized:
+        raise StrategyV2MissingContextError(
+            "Offer variant_id is required to resolve display label for product variant sync."
+        )
+    canonical_type = canonical_product_type(product_type)
+    label_mapping = (
+        _BOOK_OFFER_VARIANT_DISPLAY_LABELS
+        if canonical_type == "book"
+        else _OFFER_VARIANT_DISPLAY_LABELS
+    )
+    mapped_label = label_mapping.get(normalized)
+    if mapped_label:
+        return mapped_label
+    return " ".join(part.capitalize() for part in normalized.replace("-", "_").split("_") if part)
+
+
+def _normalize_scored_variants_for_offer_sync(
+    *,
+    scored_variants: Sequence[Mapping[str, Any]],
+    product_type: str | None,
+) -> list[dict[str, Any]]:
+    if len(scored_variants) != len(_OFFER_VARIANT_IDS):
+        raise StrategyV2MissingContextError(
+            "Offer variant sync requires exactly 3 scored variants "
+            f"({', '.join(_OFFER_VARIANT_IDS)})."
+        )
+    normalized_by_id: dict[str, dict[str, Any]] = {}
+    for index, variant in enumerate(scored_variants, start=1):
+        if not isinstance(variant, Mapping):
+            raise StrategyV2MissingContextError(
+                f"Offer variant sync received non-object variant at index {index}."
+            )
+        variant_id = str(variant.get("variant_id") or "").strip().lower()
+        if variant_id not in _OFFER_VARIANT_IDS:
+            raise StrategyV2MissingContextError(
+                "Offer variant sync received unknown variant_id "
+                f"'{variant_id or '<empty>'}'. Expected: {', '.join(_OFFER_VARIANT_IDS)}."
+            )
+        if variant_id in normalized_by_id:
+            raise StrategyV2MissingContextError(
+                f"Offer variant sync received duplicate variant_id '{variant_id}'."
+            )
+        pricing_metadata = _require_dict(
+            payload=variant.get("pricing_metadata"),
+            field_name=f"offer_sync.{variant_id}.pricing_metadata",
+        )
+        list_price_cents = pricing_metadata.get("list_price_cents")
+        offer_price_cents = pricing_metadata.get("offer_price_cents")
+        if not isinstance(list_price_cents, int) or list_price_cents <= 0:
+            raise StrategyV2MissingContextError(
+                f"Offer variant '{variant_id}' must include positive integer pricing_metadata.list_price_cents."
+            )
+        if not isinstance(offer_price_cents, int) or offer_price_cents <= 0:
+            raise StrategyV2MissingContextError(
+                f"Offer variant '{variant_id}' must include positive integer pricing_metadata.offer_price_cents."
+            )
+        if offer_price_cents > list_price_cents:
+            raise StrategyV2MissingContextError(
+                f"Offer variant '{variant_id}' has offer_price_cents greater than list_price_cents."
+            )
+        normalized_by_id[variant_id] = {
+            "variant_id": variant_id,
+            "display_label": _resolve_offer_variant_display_label(
+                variant_id=variant_id,
+                product_type=product_type,
+            ),
+            "bundle_quantity": _resolve_offer_variant_bundle_quantity(
+                variant_id=variant_id,
+                product_type=product_type,
+            ),
+            "core_promise": str(variant.get("core_promise") or "").strip(),
+            "pricing_metadata": {
+                "list_price_cents": list_price_cents,
+                "offer_price_cents": offer_price_cents,
+            },
+            "savings_metadata": (
+                dict(variant.get("savings_metadata"))
+                if isinstance(variant.get("savings_metadata"), Mapping)
+                else None
+            ),
+            "best_value_metadata": (
+                dict(variant.get("best_value_metadata"))
+                if isinstance(variant.get("best_value_metadata"), Mapping)
+                else None
+            ),
+        }
+    missing_variant_ids = [variant_id for variant_id in _OFFER_VARIANT_IDS if variant_id not in normalized_by_id]
+    if missing_variant_ids:
+        raise StrategyV2MissingContextError(
+            "Offer variant sync is missing required variant_ids: "
+            + ", ".join(missing_variant_ids)
+            + "."
+        )
+    return [normalized_by_id[variant_id] for variant_id in _OFFER_VARIANT_IDS]
+
+
 def _sync_product_offer_from_strategy_output(
     *,
     session,
@@ -4774,6 +5975,7 @@ def _sync_product_offer_from_strategy_output(
     onboarding_payload: Mapping[str, Any] | None,
     offer_pipeline_output: Mapping[str, Any],
     stage3_data: Mapping[str, Any],
+    scored_variants: Sequence[Mapping[str, Any]],
     selected_variant: Mapping[str, Any],
     selected_variant_score: Mapping[str, Any],
     decision_payload: Mapping[str, Any],
@@ -4830,16 +6032,48 @@ def _sync_product_offer_from_strategy_output(
     differentiation_bullets = _coerce_string_list(stage3_data.get("value_stack_summary"))
     guarantee_text = str(stage3_data.get("guarantee_type") or "").strip() or None
 
+    normalized_scored_variants = _normalize_scored_variants_for_offer_sync(
+        scored_variants=scored_variants,
+        product_type=str(stage3_data.get("product_type") or ""),
+    )
     strategy_v2_offer_payload = {
         "source": "strategy_v2",
         "variant_id": str(stage3_data.get("variant_selected") or ""),
+        "offer_format": str(stage3_data.get("offer_format") or "DISCOUNT_PLUS_3_BONUSES_V1"),
+        "product_type": str(stage3_data.get("product_type") or ""),
         "ump": str(stage3_data.get("ump") or ""),
         "ums": str(stage3_data.get("ums") or ""),
         "core_promise": offer_name,
         "value_stack_summary": differentiation_bullets,
         "pricing_rationale": pricing_rationale or None,
+        "pricing_metadata": (
+            dict(stage3_data.get("pricing_metadata"))
+            if isinstance(stage3_data.get("pricing_metadata"), dict)
+            else None
+        ),
+        "savings_metadata": (
+            dict(stage3_data.get("savings_metadata"))
+            if isinstance(stage3_data.get("savings_metadata"), dict)
+            else None
+        ),
+        "best_value_metadata": (
+            dict(stage3_data.get("best_value_metadata"))
+            if isinstance(stage3_data.get("best_value_metadata"), dict)
+            else None
+        ),
+        "bundle_contents": (
+            dict(stage3_data.get("bundle_contents"))
+            if isinstance(stage3_data.get("bundle_contents"), dict)
+            else None
+        ),
+        "bonus_stack": (
+            [row for row in stage3_data.get("bonus_stack") if isinstance(row, dict)]
+            if isinstance(stage3_data.get("bonus_stack"), list)
+            else []
+        ),
         "guarantee_type": guarantee_text,
         "composite_score": stage3_data.get("composite_score"),
+        "variants": normalized_scored_variants,
         "selected_variant": dict(selected_variant),
         "selected_variant_score": dict(selected_variant_score),
         "decision": dict(decision_payload),
@@ -4885,24 +6119,78 @@ def _sync_product_offer_from_strategy_output(
         for row in variants_repo.list_by_product(product_id=product_id)
         if str(row.offer_id or "") == str(target_offer.id)
     ]
-    if not offer_variant_rows:
-        variant_id = str(stage3_data.get("variant_selected") or "").strip()
-        if not variant_id:
-            raise StrategyV2MissingContextError(
-                "Stage3 variant_selected is required to sync product variants. "
-                "Remediation: rerun Offer winner selection and ensure variant_selected is present."
-            )
-        price_cents, currency = _resolve_offer_price_cents_and_currency(
-            offer_pipeline_output=offer_pipeline_output,
+    _, currency = _resolve_offer_price_cents_and_currency(
+        offer_pipeline_output=offer_pipeline_output,
+    )
+    existing_rows_by_offer_id: dict[str, Any] = {}
+    unmatched_rows: list[Any] = []
+    for row in offer_variant_rows:
+        option_values = row.option_values if isinstance(row.option_values, Mapping) else {}
+        offer_id_value = str(option_values.get("offerId") or "").strip().lower()
+        if offer_id_value and offer_id_value not in existing_rows_by_offer_id:
+            existing_rows_by_offer_id[offer_id_value] = row
+        else:
+            unmatched_rows.append(row)
+
+    retained_variant_row_ids: set[str] = set()
+    for variant_payload in normalized_scored_variants:
+        variant_id = str(variant_payload["variant_id"]).strip().lower()
+        pricing_metadata = _require_dict(
+            payload=variant_payload.get("pricing_metadata"),
+            field_name=f"offer_sync.{variant_id}.pricing_metadata",
         )
-        variants_repo.create(
+        offer_price_cents = int(pricing_metadata["offer_price_cents"])
+        list_price_cents = int(pricing_metadata["list_price_cents"])
+        compare_at_price = list_price_cents if list_price_cents > offer_price_cents else None
+        if variant_id in existing_rows_by_offer_id:
+            variant_row = variants_repo.update(
+                variant_id=str(existing_rows_by_offer_id[variant_id].id),
+                offer_id=str(target_offer.id),
+                title=str(variant_payload["display_label"]),
+                price=offer_price_cents,
+                currency=currency,
+                compare_at_price=compare_at_price,
+                option_values={"offerId": variant_id},
+            )
+            if variant_row is None:
+                raise StrategyV2MissingContextError(
+                    f"Failed to update existing product variant for offer variant_id '{variant_id}'."
+                )
+            retained_variant_row_ids.add(str(variant_row.id))
+            continue
+        if unmatched_rows:
+            reused_row = unmatched_rows.pop(0)
+            variant_row = variants_repo.update(
+                variant_id=str(reused_row.id),
+                offer_id=str(target_offer.id),
+                title=str(variant_payload["display_label"]),
+                price=offer_price_cents,
+                currency=currency,
+                compare_at_price=compare_at_price,
+                option_values={"offerId": variant_id},
+            )
+            if variant_row is None:
+                raise StrategyV2MissingContextError(
+                    f"Failed to repurpose existing product variant row for variant_id '{variant_id}'."
+                )
+            retained_variant_row_ids.add(str(variant_row.id))
+            continue
+        created_variant = variants_repo.create(
             product_id=product_id,
             offer_id=str(target_offer.id),
-            title=offer_name,
-            price=price_cents,
+            title=str(variant_payload["display_label"]),
+            price=offer_price_cents,
             currency=currency,
+            compare_at_price=compare_at_price,
             option_values={"offerId": variant_id},
         )
+        retained_variant_row_ids.add(str(created_variant.id))
+
+    for row in offer_variant_rows:
+        row_id = str(row.id)
+        if row_id in retained_variant_row_ids:
+            continue
+        variants_repo.delete(variant_id=row_id)
 
     return _serialize_product_offer_for_strategy(target_offer)
 
@@ -5946,10 +7234,11 @@ def _merge_voc_corpus_for_agent2(
         max_ratio_per_source=_VOC_SOURCE_DIVERSITY_MAX_RATIO,
     )
 
-    artifact_rows = _select_diverse_voc_rows(
+    # Preserve the full deduped corpus for Agent 2 evidence extraction.
+    artifact_rows = sorted(
         normalized_step4 + normalized_external,
-        max_rows=_VOC_MERGED_CORPUS_MAX_ROWS,
-        max_ratio_per_source=1.0,
+        key=_score_voc_row_for_prompt,
+        reverse=True,
     )
     if not prompt_rows:
         raise StrategyV2MissingContextError(
@@ -5970,7 +7259,9 @@ def _merge_voc_corpus_for_agent2(
                 "prompt_rows": _VOC_PROMPT_CORPUS_ROWS,
                 "prompt_step4_rows": _VOC_PROMPT_STEP4_ROWS,
                 "prompt_external_rows": _VOC_PROMPT_EXTERNAL_ROWS,
-                "artifact_rows": _VOC_MERGED_CORPUS_MAX_ROWS,
+                "artifact_rows": len(artifact_rows),
+                "artifact_rows_cap_configured": _VOC_MERGED_CORPUS_MAX_ROWS,
+                "artifact_rows_cap_applied": False,
             },
             "source_diversity_max_ratio": _VOC_SOURCE_DIVERSITY_MAX_RATIO,
         },
@@ -5990,7 +7281,18 @@ def _voc_agent00b_response_schema() -> dict[str, Any]:
             "configurations": {
                 "type": "array",
                 "minItems": 1,
-                "items": deepcopy(_VOC_AGENT00B_CONFIG_SCHEMA),
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "config_id": {"type": "string", "minLength": 1},
+                        "platform": {"type": "string", "minLength": 1},
+                        "mode": {"type": "string", "minLength": 1},
+                        "actor_id": {"type": "string", "minLength": 1},
+                        "input": _APIFY_EXEC_INPUT_SCHEMA,
+                    },
+                    "required": ["config_id", "platform", "mode", "actor_id", "input"],
+                },
             },
             "handoff_block": {"type": "string"},
         },
@@ -6754,6 +8056,7 @@ def _coerce_yes_no(value: object, *, default: str = "N") -> str:
 
 _VOC_REQUIRED_FIELDS = (
     "voc_id",
+    "evidence_id",
     "source",
     "source_type",
     "source_url",
@@ -6828,6 +8131,7 @@ _VOC_CREDIBILITY_FIELDS = (
     "moderated_community",
 )
 
+_VOC_AGENT02_EVIDENCE_ID_REGEX = re.compile(_VOC_AGENT02_EVIDENCE_ID_PATTERN)
 _VOC_FIRST_PERSON_PATTERN = re.compile(r"\b(i|i['’]?m|i['’]?ve|me|my|mine|we|our|us)\b", flags=re.IGNORECASE)
 _VOC_INTENSITY_TOKEN_PATTERN = re.compile(
     r"\b(pain|hurt|anxiety|anxious|fear|frustrat|stress|worry|risk|danger|sick|flu|cold|infection|cough)\b",
@@ -7425,6 +8729,10 @@ def _normalize_voc_observations(raw_rows: list[dict[str, Any]]) -> list[dict[str
         normalized_row = _enrich_voc_observation_signal(
             row={
                 "voc_id": str(row_payload.get("voc_id") or f"V{index + 1:03d}"),
+                "evidence_id": _normalize_agent2_evidence_id(
+                    row_payload.get("evidence_id"),
+                    field_name=f"Agent 2 VOC observation[{index}].evidence_id",
+                ),
                 "source": source,
                 "source_type": source_type,
                 "source_url": str(row_payload.get("source_url") or source).strip(),
@@ -7498,9 +8806,18 @@ def _normalize_agent2_evidence_text(value: object, *, max_chars: int = 900) -> s
     return cleaned[:max_chars]
 
 
-def _build_agent2_evidence_id(*, source_url: str, verbatim: str, evidence_ref: str) -> str:
+def _normalize_agent2_evidence_id(value: object, *, field_name: str) -> str:
+    evidence_id = str(value or "").strip().upper()
+    if not _VOC_AGENT02_EVIDENCE_ID_REGEX.fullmatch(evidence_id):
+        raise StrategyV2SchemaValidationError(
+            f"{field_name} must match pattern {_VOC_AGENT02_EVIDENCE_ID_PATTERN!r}, got {value!r}."
+        )
+    return evidence_id
+
+
+def _build_agent2_evidence_id(*, source_type: str, source_url: str, verbatim: str, evidence_ref: str) -> str:
     digest = hashlib.sha256(
-        f"{source_url}::{verbatim[:280]}::{evidence_ref}".encode("utf-8")
+        f"{source_type}::{source_url}::{verbatim}::{evidence_ref}".encode("utf-8")
     ).hexdigest()
     return f"E{digest[:16].upper()}"
 
@@ -7515,12 +8832,15 @@ def _build_agent2_evidence_rows(
     diagnostics: dict[str, int] = {
         "existing_rows_in": len(existing_corpus),
         "merged_rows_in": len(merged_voc_artifact_rows),
+        "existing_rows_skipped_due_merged_superset": 0,
+        "existing_rows_used": 0,
+        "merged_rows_used": 0,
         "scraped_rows_in": 0,
         "accepted_rows": 0,
-        "dropped_missing_required": 0,
-        "dropped_duplicates": 0,
+        "rows_rejected_missing_source_url_or_verbatim": 0,
+        "base_rows_rejected_missing_source_url_or_verbatim": 0,
+        "scraped_rows_rejected_missing_source_url_or_verbatim": 0,
     }
-    seen_keys: set[str] = set()
 
     def _normalize_agent2_evidence_source_type(raw_value: str) -> str:
         value = str(raw_value or "").strip().upper()
@@ -7576,17 +8896,20 @@ def _build_agent2_evidence_rows(
         habitat_name: str,
         habitat_type: str,
         strategy_target_id: str,
+        allow_missing_source_or_verbatim: bool = False,
     ) -> None:
         normalized_source_url = _canonical_source_url(source_url)
         normalized_verbatim = _normalize_agent2_evidence_text(verbatim, max_chars=900)
         if not normalized_source_url or not normalized_verbatim:
-            diagnostics["dropped_missing_required"] += 1
-            return
-        dedupe_key = f"{normalized_source_url}::{normalized_verbatim[:240]}"
-        if dedupe_key in seen_keys:
-            diagnostics["dropped_duplicates"] += 1
-            return
-        seen_keys.add(dedupe_key)
+            diagnostics["rows_rejected_missing_source_url_or_verbatim"] += 1
+            if allow_missing_source_or_verbatim:
+                diagnostics["scraped_rows_rejected_missing_source_url_or_verbatim"] += 1
+                return
+            diagnostics["base_rows_rejected_missing_source_url_or_verbatim"] += 1
+            raise StrategyV2SchemaValidationError(
+                "Agent 2 evidence row is missing required source_url/verbatim content after normalization. "
+                f"source_type={source_type!r}, source_url={source_url!r}, evidence_ref={evidence_ref!r}"
+            )
         normalized_context = _normalize_agent2_evidence_text(context, max_chars=280)
         normalized_author = _normalize_agent2_evidence_text(author, max_chars=120) or "Anonymous"
         normalized_date = _normalize_agent2_evidence_text(date, max_chars=120) or "Unknown"
@@ -7597,6 +8920,7 @@ def _build_agent2_evidence_rows(
         rows.append(
             {
                 "evidence_id": _build_agent2_evidence_id(
+                    source_type=normalized_source_type,
                     source_url=normalized_source_url,
                     verbatim=normalized_verbatim,
                     evidence_ref=normalized_ref,
@@ -7618,23 +8942,16 @@ def _build_agent2_evidence_rows(
         )
         diagnostics["accepted_rows"] += 1
 
-    for index, row in enumerate(existing_corpus):
-        if not isinstance(row, Mapping):
-            continue
-        _add_row(
-            source_type=str(row.get("platform") or row.get("source_type") or "EXISTING_CORPUS"),
-            source_url=str(row.get("source_url") or row.get("source") or ""),
-            author=str(row.get("author") or "Anonymous"),
-            date=str(row.get("date") or "Unknown"),
-            context=str(row.get("thread_title") or row.get("context") or "Existing corpus item"),
-            verbatim=str(row.get("quote") or row.get("verbatim") or ""),
-            evidence_ref=str(row.get("voc_id") or f"existing_corpus::item[{index}]"),
-            habitat_name=str(row.get("habitat_name") or "Existing corpus"),
-            habitat_type=str(row.get("habitat_type") or row.get("platform") or "Existing_Corpus"),
-            strategy_target_id=str(row.get("strategy_target_id") or "CANNOT_DETERMINE"),
-        )
+    base_rows: Sequence[Mapping[str, Any]]
+    if merged_voc_artifact_rows:
+        base_rows = merged_voc_artifact_rows
+        diagnostics["existing_rows_skipped_due_merged_superset"] = len(existing_corpus)
+        diagnostics["merged_rows_used"] = len(merged_voc_artifact_rows)
+    else:
+        base_rows = existing_corpus
+        diagnostics["existing_rows_used"] = len(existing_corpus)
 
-    for index, row in enumerate(merged_voc_artifact_rows):
+    for index, row in enumerate(base_rows):
         if not isinstance(row, Mapping):
             continue
         _add_row(
@@ -7670,15 +8987,30 @@ def _build_agent2_evidence_rows(
             )
             _add_row(
                 source_type=source_type,
-                source_url=str(item.get("source_url") or item.get("url") or ""),
+                source_url=str(
+                    item.get("source_url")
+                    or item.get("url")
+                    or item.get("permalink")
+                    or item.get("result_url")
+                    or ""
+                ),
                 author=str(item.get("author") or "Anonymous"),
                 date=str(item.get("timestamp") or "Unknown"),
                 context=str(item.get("title") or item.get("permalink") or habitat_name),
-                verbatim=str(item.get("body") or item.get("title") or item.get("raw") or ""),
+                verbatim=str(
+                    item.get("body")
+                    or item.get("title")
+                    or item.get("snippet")
+                    or item.get("description")
+                    or item.get("organic_results_sample")
+                    or item.get("raw")
+                    or ""
+                ),
                 evidence_ref=evidence_ref,
                 habitat_name=habitat_name,
                 habitat_type=habitat_type,
                 strategy_target_id=strategy_target_id,
+                allow_missing_source_or_verbatim=True,
             )
 
     if not rows:
@@ -7690,7 +9022,416 @@ def _build_agent2_evidence_rows(
     return rows, diagnostics
 
 
-def _run_agent2_extractor(
+def _derive_voc_id_from_evidence_id(*, evidence_id: str) -> str:
+    normalized = _normalize_agent2_evidence_id(
+        evidence_id,
+        field_name="raw evidence row.evidence_id",
+    )
+    if normalized.startswith("E"):
+        return f"R{normalized[1:]}"
+    return f"R{normalized}"
+
+
+def _infer_voc_date_bracket(*, source_date: str) -> str:
+    text = str(source_date or "").strip()
+    if not text:
+        return "UNKNOWN"
+    upper = text.upper()
+    for bracket in ("LAST_3MO", "LAST_6MO", "LAST_12MO", "LAST_24MO", "OLDER", "UNKNOWN"):
+        if bracket in upper:
+            return bracket
+    if upper in {"N/A", "NONE", "NULL"}:
+        return "UNKNOWN"
+    normalized = text.replace("Z", "+00:00")
+    parsed_dt: datetime | None = None
+    for parser in (
+        lambda value: datetime.fromisoformat(value),
+        lambda value: datetime.strptime(value, "%Y-%m-%d"),
+        lambda value: datetime.strptime(value, "%Y/%m/%d"),
+        lambda value: datetime.strptime(value, "%b %d, %Y"),
+        lambda value: datetime.strptime(value, "%B %d, %Y"),
+    ):
+        try:
+            parsed_dt = parser(normalized)
+            break
+        except Exception:
+            continue
+    if parsed_dt is None:
+        year_match = re.search(r"\b(20\d{2}|19\d{2})\b", text)
+        if not year_match:
+            return "UNKNOWN"
+        try:
+            parsed_dt = datetime(int(year_match.group(1)), 1, 1)
+        except Exception:
+            return "UNKNOWN"
+    if parsed_dt.tzinfo is None:
+        parsed_dt = parsed_dt.replace(tzinfo=timezone.utc)
+    age_days = max(0, (datetime.now(timezone.utc) - parsed_dt.astimezone(timezone.utc)).days)
+    if age_days <= 93:
+        return "LAST_3MO"
+    if age_days <= 186:
+        return "LAST_6MO"
+    if age_days <= 366:
+        return "LAST_12MO"
+    if age_days <= 730:
+        return "LAST_24MO"
+    return "OLDER"
+
+
+def _derive_voc_observations_from_evidence_rows(
+    *,
+    evidence_rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    raw_rows: list[dict[str, Any]] = []
+    for index, row in enumerate(evidence_rows):
+        if not isinstance(row, Mapping):
+            continue
+        evidence_id = _normalize_agent2_evidence_id(
+            row.get("evidence_id"),
+            field_name=f"raw evidence row[{index}].evidence_id",
+        )
+        quote = _normalize_agent2_evidence_text(row.get("verbatim"), max_chars=900)
+        source_url = _normalize_agent2_evidence_text(row.get("source_url"), max_chars=900)
+        if not quote or not source_url:
+            raise StrategyV2SchemaValidationError(
+                "Raw-evidence Agent 3 fallback requires non-empty source_url and verbatim text for every row. "
+                f"Found invalid row at index={index}, evidence_id={evidence_id}."
+            )
+        source_type = _normalize_voc_source_type(row.get("source_type"))
+        quote_words = re.findall(r"[A-Za-z0-9']+", quote)
+        word_count = max(1, len(quote_words))
+        quote_lower = quote.lower()
+
+        has_first_person = bool(_VOC_FIRST_PERSON_PATTERN.search(quote_lower))
+        has_numeric = bool(re.search(r"\d", quote))
+        has_trigger = bool(re.search(r"\b(when|after|before|since|because|if|once|during)\b", quote_lower))
+        has_before_after = (
+            bool(re.search(r"\bbefore\b", quote_lower))
+            and bool(re.search(r"\bafter\b", quote_lower))
+        ) or bool(re.search(r"\b(vs|versus|instead of)\b", quote_lower))
+        has_crisis = bool(
+            re.search(
+                r"\b(can't|cannot|desperate|urgent|panic|worst|scared|anxious|frustrat|pain|hurt|struggling)\b",
+                quote_lower,
+            )
+        )
+        has_physical_signal = bool(
+            re.search(r"\b(pain|hurt|ache|symptom|sick|fatigue|headache|insomnia)\b", quote_lower)
+        )
+        has_identity_shift = bool(
+            re.search(r"\b(i need to|i want to|i wish i|finally|become)\b", quote_lower)
+        )
+        has_enemy = bool(
+            re.search(
+                r"\b(system|industry|company|brand|doctor|insurance|algorithm|platform|time)\b",
+                quote_lower,
+            )
+        )
+        has_belief_shift = bool(
+            re.search(r"\b(i thought|i used to think|turns out|realized|realised)\b", quote_lower)
+        )
+        has_expectation_gap = bool(
+            re.search(r"\b(expected|supposed to|thought|but|instead)\b", quote_lower)
+        )
+        has_prior_solution_failure = bool(
+            re.search(r"\b(tried|didn't work|did not work|failed|no luck|nothing works?)\b", quote_lower)
+        )
+        is_compare_or_recommend = bool(
+            re.search(r"\b(compare|comparison|recommend|best|which one|vs|versus)\b", quote_lower)
+        )
+        is_purchase_intent = bool(
+            re.search(r"\b(buy|purchase|price|cost|ordered|order)\b", quote_lower)
+        )
+
+        if word_count >= 60:
+            usable_content_pct = "OVER_75_PCT"
+        elif word_count >= 30:
+            usable_content_pct = "50_TO_75_PCT"
+        elif word_count >= 15:
+            usable_content_pct = "25_TO_50_PCT"
+        else:
+            usable_content_pct = "UNDER_25_PCT"
+
+        if has_crisis:
+            emotional_valence = "FRUSTRATION"
+        elif "hope" in quote_lower:
+            emotional_valence = "HOPE"
+        elif "anx" in quote_lower or "worry" in quote_lower:
+            emotional_valence = "ANXIETY"
+        elif "relief" in quote_lower:
+            emotional_valence = "RELIEF"
+        else:
+            emotional_valence = "NEUTRAL"
+
+        if "parent" in quote_lower:
+            identity_role = "PARENT"
+        elif "caregiver" in quote_lower:
+            identity_role = "CAREGIVER"
+        elif "student" in quote_lower:
+            identity_role = "STUDENT"
+        elif "doctor" in quote_lower or "nurse" in quote_lower:
+            identity_role = "PROFESSIONAL"
+        else:
+            identity_role = "NONE"
+
+        if has_prior_solution_failure and "everything" in quote_lower:
+            solution_sophistication = "EXHAUSTED"
+        elif has_prior_solution_failure:
+            solution_sophistication = "EXPERIENCED"
+        else:
+            solution_sophistication = "NOVICE"
+
+        if is_compare_or_recommend:
+            buyer_stage = "SOLUTION_AWARE"
+        elif is_purchase_intent:
+            buyer_stage = "PRODUCT_AWARE"
+        else:
+            buyer_stage = "PROBLEM_AWARE"
+
+        compliance_risk = (
+            "RED"
+            if bool(re.search(r"\b(cure|diagnos|treat|prescription|disease)\b", quote_lower))
+            else "YELLOW"
+        )
+
+        hook_format = "NONE"
+        hook_word_count = 0
+        if source_type == "VIDEO_HOOK":
+            hook_format = "QUESTION" if "?" in quote else "STATEMENT"
+            hook_word_count = min(word_count, 30)
+
+        quote_preview = quote[:240]
+        trigger_event = quote_preview if has_trigger else "NONE"
+        desired_outcome_match = re.search(
+            r"\b(?:want to|need to|hope to|looking to)\s+([^.!?]{4,120})",
+            quote_lower,
+        )
+        desired_outcome = desired_outcome_match.group(1).strip() if desired_outcome_match else "NONE"
+        fear_risk = quote_preview if has_crisis else "NONE"
+        enemy_blame = quote_preview if has_enemy else "NONE"
+        failed_prior_solution = quote_preview if has_prior_solution_failure else "NONE"
+
+        raw_rows.append(
+            {
+                "voc_id": _derive_voc_id_from_evidence_id(evidence_id=evidence_id),
+                "evidence_id": evidence_id,
+                "source": source_url,
+                "source_type": source_type,
+                "source_url": source_url,
+                "source_author": _normalize_agent2_evidence_text(row.get("author"), max_chars=120) or "Anonymous",
+                "source_date": _normalize_agent2_evidence_text(row.get("date"), max_chars=120) or "Unknown",
+                "is_hook": "Y" if source_type == "VIDEO_HOOK" else "N",
+                "hook_format": hook_format,
+                "hook_word_count": hook_word_count,
+                "video_virality_tier": "BASELINE",
+                "video_view_count": 0,
+                "competitor_saturation": [],
+                "in_whitespace": "Y",
+                "evidence_ref": _normalize_agent2_evidence_text(row.get("evidence_ref"), max_chars=240)
+                or f"derived::{evidence_id}",
+                "quote": quote,
+                "specific_number": "Y" if has_numeric else "N",
+                "specific_product_brand": "N",
+                "specific_event_moment": "Y" if has_trigger else "N",
+                "specific_body_symptom": "Y" if has_physical_signal else "N",
+                "before_after_comparison": "Y" if has_before_after else "N",
+                "crisis_language": "Y" if has_crisis else "N",
+                "profanity_extreme_punctuation": "Y" if bool(re.search(r"[!?]{2,}", quote)) else "N",
+                "physical_sensation": "Y" if has_physical_signal else "N",
+                "identity_change_desire": "Y" if has_identity_shift else "N",
+                "word_count": word_count,
+                "clear_trigger_event": "Y" if has_trigger else "N",
+                "named_enemy": "Y" if has_enemy else "N",
+                "shiftable_belief": "Y" if has_belief_shift else "N",
+                "expectation_vs_reality": "Y" if has_expectation_gap else "N",
+                "headline_ready": "Y" if (has_trigger or has_crisis or word_count >= 18) else "N",
+                "usable_content_pct": usable_content_pct,
+                "personal_context": "Y" if has_first_person else "N",
+                "long_narrative": "Y" if word_count >= 80 else "N",
+                "engagement_received": "N",
+                "real_person_signals": "Y" if has_first_person else "N",
+                "moderated_community": "Y" if source_type in {"REDDIT", "FORUM", "QA"} else "N",
+                "trigger_event": trigger_event,
+                "pain_problem": quote_preview,
+                "desired_outcome": desired_outcome,
+                "failed_prior_solution": failed_prior_solution,
+                "enemy_blame": enemy_blame,
+                "identity_role": identity_role,
+                "fear_risk": fear_risk,
+                "emotional_valence": emotional_valence,
+                "durable_psychology": "Y",
+                "market_specific": "Y" if (has_numeric or is_purchase_intent) else "N",
+                "date_bracket": _infer_voc_date_bracket(
+                    source_date=_normalize_agent2_evidence_text(row.get("date"), max_chars=120)
+                ),
+                "buyer_stage": buyer_stage,
+                "solution_sophistication": solution_sophistication,
+                "compliance_risk": compliance_risk,
+            }
+        )
+
+    normalized_rows = _normalize_voc_observations(raw_rows)
+    if not normalized_rows:
+        raise StrategyV2MissingContextError(
+            "Raw-evidence Agent 3 fallback produced zero normalized VOC rows. "
+            "Remediation: verify merged/existing corpus rows include usable source_url + verbatim fields."
+        )
+    return normalized_rows
+
+
+def _agent2_source_type_distribution(rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    distribution: dict[str, int] = {}
+    for row in rows:
+        source_type = str(row.get("source_type") or "UNKNOWN").strip().upper() or "UNKNOWN"
+        distribution[source_type] = distribution.get(source_type, 0) + 1
+    return {key: distribution[key] for key in sorted(distribution)}
+
+
+def _compact_agent2_evidence_rows(
+    *,
+    evidence_rows: Sequence[Mapping[str, Any]],
+    max_rows: int,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+    if max_rows < 1:
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 evidence compaction max_rows must be >= 1."
+        )
+    ordered_rows = [dict(row) for row in evidence_rows if isinstance(row, Mapping)]
+    total_count = len(ordered_rows)
+    if total_count <= max_rows:
+        summary = {
+            "enabled": False,
+            "max_rows": max_rows,
+            "input_count": total_count,
+            "selected_count": total_count,
+            "excluded_count": 0,
+            "source_type_distribution_input": _agent2_source_type_distribution(ordered_rows),
+            "source_type_distribution_selected": _agent2_source_type_distribution(ordered_rows),
+        }
+        return ordered_rows, [], summary
+
+    rows_by_source_type: dict[str, list[dict[str, Any]]] = {}
+    for row in ordered_rows:
+        source_type = str(row.get("source_type") or "UNKNOWN").strip().upper() or "UNKNOWN"
+        rows_by_source_type.setdefault(source_type, []).append(row)
+
+    source_types = sorted(rows_by_source_type)
+    per_type_quota = max(1, max_rows // max(1, len(source_types)))
+    selected: list[dict[str, Any]] = []
+    selected_ids: set[str] = set()
+
+    for source_type in source_types:
+        bucket = rows_by_source_type[source_type]
+        selected_in_bucket = 0
+        for row in bucket:
+            evidence_id = str(row.get("evidence_id") or "").strip().upper()
+            if not evidence_id or evidence_id in selected_ids:
+                continue
+            if len(selected) >= max_rows or selected_in_bucket >= per_type_quota:
+                break
+            selected.append(row)
+            selected_ids.add(evidence_id)
+            selected_in_bucket += 1
+
+    if len(selected) < max_rows:
+        for row in ordered_rows:
+            evidence_id = str(row.get("evidence_id") or "").strip().upper()
+            if not evidence_id or evidence_id in selected_ids:
+                continue
+            selected.append(row)
+            selected_ids.add(evidence_id)
+            if len(selected) >= max_rows:
+                break
+
+    excluded = [
+        row
+        for row in ordered_rows
+        if str(row.get("evidence_id") or "").strip().upper() not in selected_ids
+    ]
+    summary = {
+        "enabled": True,
+        "max_rows": max_rows,
+        "input_count": total_count,
+        "selected_count": len(selected),
+        "excluded_count": len(excluded),
+        "source_type_distribution_input": _agent2_source_type_distribution(ordered_rows),
+        "source_type_distribution_selected": _agent2_source_type_distribution(selected),
+    }
+    return selected, excluded, summary
+
+
+def _index_agent2_input_rows(
+    *,
+    evidence_rows: Sequence[Mapping[str, Any]],
+) -> tuple[list[str], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    ordered_ids: list[str] = []
+    rows_by_id: dict[str, dict[str, Any]] = {}
+    manifest_rows: list[dict[str, Any]] = []
+    for index, row in enumerate(evidence_rows):
+        if not isinstance(row, Mapping):
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 evidence row[{index}] must be an object."
+            )
+        evidence_id = _normalize_agent2_evidence_id(
+            row.get("evidence_id"),
+            field_name=f"Agent 2 evidence row[{index}].evidence_id",
+        )
+        if evidence_id in rows_by_id:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 evidence row[{index}] duplicates evidence_id={evidence_id}."
+            )
+        source_type = _normalize_agent2_evidence_text(row.get("source_type"), max_chars=80)
+        source_url = _normalize_agent2_evidence_text(row.get("source_url"), max_chars=900)
+        source_author = _normalize_agent2_evidence_text(row.get("author"), max_chars=120) or "Anonymous"
+        source_date = _normalize_agent2_evidence_text(row.get("date"), max_chars=120) or "Unknown"
+        context = _normalize_agent2_evidence_text(row.get("context"), max_chars=280) or "Unknown context"
+        verbatim = _normalize_agent2_evidence_text(row.get("verbatim"), max_chars=900)
+        evidence_ref = _normalize_agent2_evidence_text(row.get("evidence_ref"), max_chars=240)
+        if not source_type or not source_url or not verbatim or not evidence_ref:
+            raise StrategyV2SchemaValidationError(
+                "Agent 2 evidence input row is missing required normalized fields "
+                f"(evidence_id={evidence_id}, source_type/source_url/verbatim/evidence_ref required)."
+            )
+        normalized_row = {
+            "input_index": index + 1,
+            "evidence_id": evidence_id,
+            "source_type": source_type,
+            "source_url": source_url,
+            "source_author": source_author,
+            "source_date": source_date,
+            "context": context,
+            "verbatim": verbatim,
+            "evidence_ref": evidence_ref,
+            "habitat_name": _normalize_agent2_evidence_text(row.get("habitat_name"), max_chars=160),
+            "habitat_type": _normalize_agent2_evidence_text(row.get("habitat_type"), max_chars=80),
+            "strategy_target_id": _normalize_agent2_evidence_text(
+                row.get("strategy_target_id"), max_chars=160
+            ),
+        }
+        ordered_ids.append(evidence_id)
+        rows_by_id[evidence_id] = normalized_row
+        manifest_rows.append(
+            {
+                "input_index": index + 1,
+                "evidence_id": evidence_id,
+                "source_type": source_type,
+                "source_url": source_url,
+                "source_author": source_author,
+                "source_date": source_date,
+                "evidence_ref": evidence_ref,
+                "context_preview": context[:180],
+                "verbatim_preview": verbatim[:220],
+                "verbatim_sha256": hashlib.sha256(verbatim.encode("utf-8")).hexdigest(),
+            }
+        )
+    if not ordered_ids:
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 evidence input rows are empty after normalization."
+        )
+    return ordered_ids, rows_by_id, manifest_rows
+
+
+def _run_agent2_extractor_prompt_only(
     *,
     agent02_asset: PromptAsset,
     model: str,
@@ -7707,15 +9448,20 @@ def _run_agent2_extractor(
     foundational_step_summaries: Mapping[str, Any],
     activity_name: str,
 ) -> dict[str, Any]:
-    all_voc_rows: list[dict[str, Any]] = []
-    all_rejected_items: list[dict[str, Any]] = []
-    raw_outputs_preview: list[str] = []
+    input_ordered_ids, input_rows_by_id, input_manifest_rows = _index_agent2_input_rows(
+        evidence_rows=evidence_rows
+    )
     static_file_id_map, static_file_ids = _upload_openai_prompt_json_files(
         model=model,
         workflow_run_id=workflow_run_id,
         stage_label="agent2-extractor",
         logical_payloads={
             "EVIDENCE_ROWS_JSON": [dict(row) for row in evidence_rows if isinstance(row, Mapping)],
+            "AGENT2_INPUT_MANIFEST_JSON": {
+                "input_count": len(input_ordered_ids),
+                "evidence_id_pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN,
+                "rows": input_manifest_rows,
+            },
             "AGENT1_MINING_PLAN_JSON": agent01_output.get("mining_plan", []),
             "HABITAT_SCORED_JSON": habitat_scored,
             "PRODUCT_BRIEF_JSON": stage1_data,
@@ -7755,6 +9501,10 @@ def _run_agent2_extractor(
                 "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
                 "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before extracting VOC evidence rows.\n"
                 "Treat EVIDENCE_ROWS_JSON (from OPENAI_CODE_INTERPRETER_FILE_IDS_JSON) as the primary source of truth.\n"
+                "Use AGENT2_INPUT_MANIFEST_JSON to read the canonical evidence_id list.\n"
+                "For every input evidence_id, return exactly one decision: either accepted in voc_observations "
+                "or rejected in rejected_items.\n"
+                "Do not invent evidence_id values. Only echo evidence_id values from AGENT2_INPUT_MANIFEST_JSON.\n"
                 "Return one extraction object only."
             ),
             schema_name="strategy_v2_voc_agent02_output",
@@ -7778,12 +9528,18 @@ def _run_agent2_extractor(
                 "provide complete evidence rows and Agent 1 mining plan context before rerunning v2-05."
             ),
         )
-        raw_outputs_preview.append(raw_output[:2000])
 
         output_mode = str(output.get("mode") or "").strip().upper()
-        if output_mode != mode:
+        if output_mode and output_mode not in {"DUAL", "FRESH"}:
             raise StrategyV2SchemaValidationError(
-                f"Agent 2 mode mismatch (expected='{mode}', actual='{output_mode}')."
+                f"Agent 2 mode is unsupported (expected one of DUAL/FRESH, actual='{output_mode}')."
+            )
+        if output_mode and output_mode != mode:
+            logging.getLogger(__name__).warning(
+                "Agent 2 mode mismatch; keeping runtime mode and continuing "
+                "(expected=%s, model_reported=%s).",
+                mode,
+                output_mode,
             )
 
         def _coerce_output_int(field_name: str) -> int:
@@ -7830,48 +9586,242 @@ def _run_agent2_extractor(
         if not isinstance(rejected_rows, list):
             raise StrategyV2SchemaValidationError("Agent 2 output must include rejected_items array.")
 
-        all_voc_rows.extend([dict(row) for row in voc_rows if isinstance(row, dict)])
-        all_rejected_items.extend([dict(row) for row in rejected_rows if isinstance(row, dict)])
+        return {
+            "mode": mode,
+            "output": output,
+            "raw_output": raw_output,
+            "prompt_provenance": prompt_provenance,
+            "input_ordered_ids": input_ordered_ids,
+            "input_rows_by_id": input_rows_by_id,
+            "input_manifest_rows": input_manifest_rows,
+            "input_count": len(input_ordered_ids),
+        }
     finally:
         _cleanup_openai_prompt_files(model=model, file_ids=static_file_ids)
 
-    deduped_rows: list[dict[str, Any]] = []
-    seen_keys: set[str] = set()
-    for row in all_voc_rows:
-        source_url = str(row.get("source_url") or row.get("source") or "").strip()
-        quote = str(row.get("quote") or "").strip()
-        evidence_ref = str(row.get("evidence_ref") or "").strip()
-        if not source_url or not quote:
-            continue
-        dedupe_key = f"{source_url}::{quote[:240]}::{evidence_ref}"
-        if dedupe_key in seen_keys:
-            continue
-        seen_keys.add(dedupe_key)
-        normalized_row = dict(row)
-        if not str(normalized_row.get("source") or "").strip():
-            source_type = str(normalized_row.get("source_type") or "UNKNOWN").strip()
-            normalized_row["source"] = f"{source_type} | {source_url}"
-        deduped_rows.append(normalized_row)
 
-    if not deduped_rows:
-        raise StrategyV2DecisionError(
-            "Agent 2 extraction produced zero usable voc_observations after deduplication."
+def _validate_agent2_decision_partition(
+    *,
+    mode: str,
+    output: Mapping[str, Any],
+    input_ordered_ids: Sequence[str],
+    input_rows_by_id: Mapping[str, Mapping[str, Any]],
+) -> dict[str, Any]:
+    input_id_set = set(input_ordered_ids)
+    voc_rows = output.get("voc_observations")
+    if not isinstance(voc_rows, list):
+        raise StrategyV2SchemaValidationError("Agent 2 output must include voc_observations array.")
+    rejected_rows = output.get("rejected_items")
+    if not isinstance(rejected_rows, list):
+        raise StrategyV2SchemaValidationError("Agent 2 output must include rejected_items array.")
+
+    accepted_by_id: dict[str, dict[str, Any]] = {}
+    rejected_by_id: dict[str, dict[str, Any]] = {}
+    unknown_ids: set[str] = set()
+
+    for idx, row in enumerate(voc_rows):
+        if not isinstance(row, dict):
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 voc_observations[{idx}] must be an object."
+            )
+        evidence_id = _normalize_agent2_evidence_id(
+            row.get("evidence_id"),
+            field_name=f"Agent 2 voc_observations[{idx}].evidence_id",
+        )
+        source_row = input_rows_by_id.get(evidence_id)
+        if source_row is None:
+            unknown_ids.add(evidence_id)
+            continue
+        if evidence_id in accepted_by_id:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 voc_observations includes duplicate evidence_id={evidence_id}."
+            )
+        normalized_row = dict(row)
+        normalized_row["evidence_id"] = evidence_id
+        normalized_row["source_type"] = source_row["source_type"]
+        normalized_row["source_url"] = source_row["source_url"]
+        normalized_row["source_author"] = source_row["source_author"]
+        normalized_row["source_date"] = source_row["source_date"]
+        normalized_row["evidence_ref"] = source_row["evidence_ref"]
+        normalized_row["source"] = f"{source_row['source_type']}::{source_row['source_url']}"
+        accepted_by_id[evidence_id] = normalized_row
+
+    for idx, row in enumerate(rejected_rows):
+        if not isinstance(row, dict):
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 rejected_items[{idx}] must be an object."
+            )
+        evidence_id = _normalize_agent2_evidence_id(
+            row.get("evidence_id"),
+            field_name=f"Agent 2 rejected_items[{idx}].evidence_id",
+        )
+        source_row = input_rows_by_id.get(evidence_id)
+        if source_row is None:
+            unknown_ids.add(evidence_id)
+            continue
+        if evidence_id in rejected_by_id:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 rejected_items includes duplicate evidence_id={evidence_id}."
+            )
+        reason = str(row.get("reason") or "").strip().upper()
+        if reason not in {"NOT_VOC", "MISSING_SOURCE", "TOO_VAGUE", "DUPLICATE_EVIDENCE"}:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 rejected_items[{idx}] has invalid reason={reason!r}."
+            )
+        note = str(row.get("note") or "").strip()
+        if not note:
+            raise StrategyV2SchemaValidationError(
+                f"Agent 2 rejected_items[{idx}] requires a non-empty note."
+            )
+        rejected_by_id[evidence_id] = {
+            "evidence_id": evidence_id,
+            "reason": reason,
+            "note": note,
+            "source_type": source_row["source_type"],
+            "source_url": source_row["source_url"],
+            "source_author": source_row["source_author"],
+            "source_date": source_row["source_date"],
+            "evidence_ref": source_row["evidence_ref"],
+            "context": source_row["context"],
+            "verbatim_preview": source_row["verbatim"][:280],
+        }
+
+    if unknown_ids:
+        sample_ids = sorted(unknown_ids)[:8]
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 output contains evidence_id values not present in input evidence rows "
+            f"(unknown_count={len(unknown_ids)}, sample_ids={sample_ids})."
         )
 
-    for index, row in enumerate(deduped_rows, start=1):
+    accepted_id_set = set(accepted_by_id.keys())
+    rejected_id_set = set(rejected_by_id.keys())
+    overlap_ids = accepted_id_set.intersection(rejected_id_set)
+    if overlap_ids:
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 output cannot accept and reject the same evidence_id "
+            f"(overlap_count={len(overlap_ids)}, sample_ids={sorted(overlap_ids)[:8]})."
+        )
+
+    missing_decisions = input_id_set - accepted_id_set - rejected_id_set
+    if missing_decisions:
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 output did not return decisions for all input evidence rows "
+            f"(missing_count={len(missing_decisions)}, sample_ids={sorted(missing_decisions)[:8]})."
+        )
+
+    if len(accepted_id_set) + len(rejected_id_set) != len(input_ordered_ids):
+        raise StrategyV2SchemaValidationError(
+            "Agent 2 decision partition count mismatch after validation "
+            f"(accepted={len(accepted_id_set)}, rejected={len(rejected_id_set)}, input={len(input_ordered_ids)})."
+        )
+
+    all_voc_rows: list[dict[str, Any]] = []
+    all_rejected_items: list[dict[str, Any]] = []
+    for evidence_id in input_ordered_ids:
+        accepted_row = accepted_by_id.get(evidence_id)
+        if accepted_row is not None:
+            all_voc_rows.append(accepted_row)
+            continue
+        rejected_row = rejected_by_id.get(evidence_id)
+        if rejected_row is not None:
+            all_rejected_items.append(rejected_row)
+            continue
+        raise StrategyV2SchemaValidationError(
+            f"Agent 2 decision partition missing evidence_id={evidence_id} after validation."
+        )
+
+    if not all_voc_rows:
+        raise StrategyV2DecisionError(
+            "Agent 2 extraction produced zero usable voc_observations after strict decision partition validation."
+        )
+
+    for index, row in enumerate(all_voc_rows, start=1):
         row["voc_id"] = f"V{index:04d}"
 
     return {
         "mode": mode,
-        "voc_observations": deduped_rows,
+        "voc_observations": all_voc_rows,
         "rejected_items": all_rejected_items,
         "extraction_summary": {
-            "input_count": len(evidence_rows),
-            "output_count": len(deduped_rows),
+            "input_count": len(input_ordered_ids),
+            "output_count": len(all_voc_rows),
             "rejected_count": len(all_rejected_items),
         },
-        "raw_outputs_preview": raw_outputs_preview,
-        "prompt_provenance": prompt_provenance,
+        "id_validation_report": {
+            "input_count": len(input_ordered_ids),
+            "accepted_count": len(all_voc_rows),
+            "rejected_count": len(all_rejected_items),
+            "unknown_id_count": 0,
+            "missing_decision_count": 0,
+            "overlap_count": 0,
+            "evidence_id_pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN,
+        },
+    }
+
+
+def _run_agent2_extractor(
+    *,
+    agent02_asset: PromptAsset,
+    model: str,
+    workflow_run_id: str,
+    mode: str,
+    evidence_rows: Sequence[Mapping[str, Any]],
+    agent01_output: Mapping[str, Any],
+    habitat_scored: Mapping[str, Any],
+    stage1_data: Mapping[str, Any],
+    avatar_brief_payload: Mapping[str, Any],
+    competitor_analysis: Mapping[str, Any],
+    saturated_angles: Sequence[Any],
+    foundational_step_contents: Mapping[str, Any],
+    foundational_step_summaries: Mapping[str, Any],
+    activity_name: str,
+) -> dict[str, Any]:
+    prompt_result = _run_agent2_extractor_prompt_only(
+        agent02_asset=agent02_asset,
+        model=model,
+        workflow_run_id=workflow_run_id,
+        mode=mode,
+        evidence_rows=evidence_rows,
+        agent01_output=agent01_output,
+        habitat_scored=habitat_scored,
+        stage1_data=stage1_data,
+        avatar_brief_payload=avatar_brief_payload,
+        competitor_analysis=competitor_analysis,
+        saturated_angles=saturated_angles,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        activity_name=activity_name,
+    )
+    validated = _validate_agent2_decision_partition(
+        mode=str(prompt_result.get("mode") or mode),
+        output=_require_dict(payload=prompt_result.get("output"), field_name="agent2_output"),
+        input_ordered_ids=[
+            str(item)
+            for item in (prompt_result.get("input_ordered_ids") if isinstance(prompt_result.get("input_ordered_ids"), list) else [])
+            if isinstance(item, str)
+        ],
+        input_rows_by_id={
+            str(key): value
+            for key, value in (
+                prompt_result.get("input_rows_by_id").items()
+                if isinstance(prompt_result.get("input_rows_by_id"), dict)
+                else []
+            )
+            if isinstance(key, str) and isinstance(value, Mapping)
+        },
+    )
+
+    return {
+        **validated,
+        "input_manifest": {
+            "input_count": int(prompt_result.get("input_count") or 0),
+            "evidence_id_pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN,
+            "rows": prompt_result.get("input_manifest_rows") if isinstance(prompt_result.get("input_manifest_rows"), list) else [],
+        },
+        "raw_outputs_preview": [str(prompt_result.get("raw_output") or "")[:2000]],
+        "prompt_provenance": prompt_result.get("prompt_provenance")
+        if isinstance(prompt_result.get("prompt_provenance"), dict)
+        else {},
     }
 
 
@@ -8111,10 +10061,138 @@ def _normalize_angle_observations(
     return observations
 
 
+def _coerce_agent3_top_quote(raw_quote: Any) -> dict[str, Any]:
+    if isinstance(raw_quote, str):
+        quote_text = raw_quote.strip()
+        if not quote_text:
+            raise StrategyV2SchemaValidationError("Agent 3 top quote string cannot be empty.")
+        return {"voc_id": "", "quote": quote_text}
+    if not isinstance(raw_quote, Mapping):
+        raise StrategyV2SchemaValidationError("Agent 3 top quote must be an object or string.")
+    quote_text = str(raw_quote.get("quote") or "").strip()
+    if not quote_text:
+        raise StrategyV2SchemaValidationError("Agent 3 top quote object is missing quote text.")
+    payload: dict[str, Any] = {
+        "voc_id": str(raw_quote.get("voc_id") or "").strip(),
+        "quote": quote_text,
+    }
+    adjusted_score = raw_quote.get("adjusted_score")
+    if isinstance(adjusted_score, (int, float)):
+        payload["adjusted_score"] = float(adjusted_score)
+    return payload
+
+
+def _map_prompt_purple_candidate_to_selected_angle(
+    *,
+    row: Mapping[str, Any],
+    index: int,
+) -> dict[str, Any]:
+    primitive = row.get("primitive")
+    if not isinstance(primitive, Mapping):
+        raise StrategyV2SchemaValidationError(
+            f"Agent 3 purple_ocean_candidates[{index}] is missing primitive object."
+        )
+    evidence = row.get("evidence")
+    if not isinstance(evidence, Mapping):
+        raise StrategyV2SchemaValidationError(
+            f"Agent 3 purple_ocean_candidates[{index}] is missing evidence object."
+        )
+
+    angle_name = str(row.get("name") or row.get("angle_name") or "").strip()
+    if not angle_name:
+        raise StrategyV2SchemaValidationError(
+            f"Agent 3 purple_ocean_candidates[{index}] is missing name."
+        )
+
+    rank_value = row.get("rank")
+    rank_int = int(rank_value) if isinstance(rank_value, (int, float)) and int(rank_value) > 0 else index + 1
+    angle_id = str(row.get("angle_id") or "").strip() or f"A{rank_int:02d}"
+
+    who = str(primitive.get("who") or "").strip()
+    trigger = str(primitive.get("trigger") or "").strip()
+    pain = str(primitive.get("pain") or "").strip()
+    desired_outcome = str(primitive.get("desired_outcome") or "").strip()
+    mechanism = str(primitive.get("mechanism") or "").strip()
+    belief_shift_raw = primitive.get("belief_shift")
+    belief_shift = belief_shift_raw if isinstance(belief_shift_raw, Mapping) else {}
+    belief_before = str(belief_shift.get("before") or "").strip()
+    belief_after = str(belief_shift.get("after") or "").strip()
+
+    pain_desire = ""
+    if pain and desired_outcome:
+        pain_desire = f"{pain} -> {desired_outcome}"
+    elif pain:
+        pain_desire = pain
+    elif desired_outcome:
+        pain_desire = desired_outcome
+
+    top_quotes_raw = evidence.get("top_quotes")
+    if not isinstance(top_quotes_raw, list):
+        raise StrategyV2SchemaValidationError(
+            f"Agent 3 purple_ocean_candidates[{index}] evidence.top_quotes must be an array."
+        )
+    top_quotes = [_coerce_agent3_top_quote(quote_row) for quote_row in top_quotes_raw]
+
+    supporting_raw = evidence.get("supporting_voc_count")
+    supporting_voc_count = int(supporting_raw) if isinstance(supporting_raw, (int, float)) else 0
+    contradiction_raw = evidence.get("contradiction_count")
+    contradiction_count = int(contradiction_raw) if isinstance(contradiction_raw, (int, float)) else 0
+
+    triangulation_status = ""
+    triangulation_raw = str(evidence.get("triangulation_status") or "").strip().upper()
+    if triangulation_raw in {"SINGLE", "DUAL", "MULTI"}:
+        triangulation_status = triangulation_raw
+    elif isinstance(evidence.get("habitat_types"), (int, float)):
+        habitat_types = int(evidence.get("habitat_types") or 0)
+        if habitat_types >= 3:
+            triangulation_status = "MULTI"
+        elif habitat_types == 2:
+            triangulation_status = "DUAL"
+        elif habitat_types == 1:
+            triangulation_status = "SINGLE"
+
+    evidence_payload: dict[str, Any] = {
+        "supporting_voc_count": max(0, supporting_voc_count),
+        "top_quotes": top_quotes,
+        "contradiction_count": max(0, contradiction_count),
+    }
+    if triangulation_status:
+        evidence_payload["triangulation_status"] = triangulation_status
+
+    return {
+        "angle_id": angle_id,
+        "angle_name": angle_name,
+        "definition": {
+            "who": who,
+            "pain_desire": pain_desire,
+            "mechanism_why": mechanism,
+            "belief_shift": {
+                "before": belief_before,
+                "after": belief_after,
+            },
+            "trigger": trigger,
+        },
+        "evidence": evidence_payload,
+    }
+
+
 def _normalize_angle_candidates(raw_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     candidates: list[dict[str, Any]] = []
-    for row in raw_rows:
-        candidate = SelectedAngleContract.model_validate(row)
+    for index, row in enumerate(raw_rows):
+        candidate_payload_raw: dict[str, Any]
+        if isinstance(row.get("definition"), Mapping) and isinstance(row.get("evidence"), Mapping):
+            candidate_payload_raw = dict(row)
+        elif isinstance(row.get("primitive"), Mapping) and isinstance(row.get("evidence"), Mapping):
+            candidate_payload_raw = _map_prompt_purple_candidate_to_selected_angle(
+                row=row,
+                index=index,
+            )
+        else:
+            raise StrategyV2SchemaValidationError(
+                "Agent 3 candidate row must include either definition/evidence or primitive/evidence."
+            )
+
+        candidate = SelectedAngleContract.model_validate(candidate_payload_raw)
         candidate_payload = candidate.model_dump(mode="python")
         evidence_payload = candidate_payload.get("evidence")
         if isinstance(evidence_payload, dict):
@@ -8139,6 +10217,234 @@ def _normalize_angle_candidates(raw_rows: list[dict[str, Any]]) -> list[dict[str
             "Prompt-chain Agent 3 did not return any angle candidates."
         )
     return candidates
+
+
+def _extract_agent3_candidate_rows(agent03_output: Mapping[str, Any]) -> list[dict[str, Any]]:
+    purple_rows = agent03_output.get("purple_ocean_candidates")
+    if isinstance(purple_rows, list):
+        return [row for row in purple_rows if isinstance(row, dict)]
+    legacy_rows = agent03_output.get("angle_candidates")
+    if isinstance(legacy_rows, list):
+        return [row for row in legacy_rows if isinstance(row, dict)]
+    raise StrategyV2SchemaValidationError(
+        "Agent 3 output must contain purple_ocean_candidates array."
+    )
+
+
+def _agent3_prompt_output_schema(*, include_legacy_angle_candidates: bool) -> dict[str, Any]:
+    quote_item_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "voc_id": {"type": "string", "maxLength": 64},
+            "quote": {"type": "string", "maxLength": _AGENT3_MAX_QUOTE_CHARS},
+        },
+        "required": ["voc_id", "quote"],
+    }
+    candidate_schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "rank": {"type": "integer", "minimum": 1},
+            "name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+            "primitive": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "who": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "trigger": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "pain": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "desired_outcome": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "enemy": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "mechanism": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "belief_shift": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "before": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                            "after": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                        },
+                        "required": ["before", "after"],
+                    },
+                    "failed_fixes": {
+                        "type": "array",
+                        "items": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    },
+                },
+                "required": [
+                    "who",
+                    "trigger",
+                    "pain",
+                    "desired_outcome",
+                    "enemy",
+                    "mechanism",
+                    "belief_shift",
+                    "failed_fixes",
+                ],
+            },
+            "evidence": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "supporting_voc_count": {"type": "integer"},
+                    "habitat_types": {"type": "integer"},
+                    "contradiction_count": {"type": "integer"},
+                    "top_quotes": {
+                        "type": "array",
+                        "minItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
+                        "maxItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
+                        "items": quote_item_schema,
+                    },
+                },
+                "required": ["supporting_voc_count", "habitat_types", "contradiction_count", "top_quotes"],
+            },
+            "scores": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "demand_signal": {"type": "number"},
+                    "pain_intensity": {"type": "number"},
+                    "distinctiveness": {"type": "number"},
+                    "plausibility": {"type": "number"},
+                    "proof_density": {"type": "number"},
+                    "compliance_safety": {"type": "number"},
+                    "saturation": {"type": "number"},
+                },
+                "required": [
+                    "demand_signal",
+                    "pain_intensity",
+                    "distinctiveness",
+                    "plausibility",
+                    "proof_density",
+                    "compliance_safety",
+                    "saturation",
+                ],
+            },
+            "compliance_risk": {"type": "string", "maxLength": 64},
+            "evidence_floor": {"type": "string", "maxLength": 64},
+            "source_diversity": {"type": "string", "maxLength": 64},
+            "recommended_stack": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "primary": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "secondary": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "tertiary": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                },
+                "required": ["primary", "secondary", "tertiary"],
+            },
+        },
+        "required": [
+            "rank",
+            "name",
+            "primitive",
+            "evidence",
+            "scores",
+            "compliance_risk",
+            "evidence_floor",
+            "source_diversity",
+            "recommended_stack",
+        ],
+    }
+    schema: dict[str, Any] = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "research_mode": {"type": "string", "maxLength": 64},
+            "product": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+            "saturated_angles": {
+                "type": "array",
+                "items": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+            },
+            "purple_ocean_candidates": {
+                "type": "array",
+                "minItems": _MIN_AGENT3_ANGLE_CANDIDATES,
+                "maxItems": _MIN_AGENT3_ANGLE_CANDIDATES,
+                "items": candidate_schema,
+            },
+            "angle_stacks": {
+                "type": "array",
+                "items": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+            },
+            "orphan_signals": {
+                "type": "array",
+                "items": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+            },
+            "confidence": {"type": "string", "maxLength": 64},
+            "biggest_gap": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+        },
+        "required": [
+            "research_mode",
+            "product",
+            "saturated_angles",
+            "purple_ocean_candidates",
+            "angle_stacks",
+            "orphan_signals",
+            "confidence",
+            "biggest_gap",
+        ],
+    }
+    if include_legacy_angle_candidates:
+        schema["properties"]["angle_candidates"] = {
+            "type": "array",
+            "minItems": _MIN_AGENT3_ANGLE_CANDIDATES,
+            "maxItems": _MIN_AGENT3_ANGLE_CANDIDATES,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "angle_id": {"type": "string", "maxLength": 32},
+                    "angle_name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                    "definition": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "who": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                            "pain_desire": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                            "mechanism_why": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                            "belief_shift": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "before": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                    "after": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                                },
+                                "required": ["before", "after"],
+                            },
+                            "trigger": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
+                        },
+                        "required": ["who", "pain_desire", "mechanism_why", "belief_shift", "trigger"],
+                    },
+                    "evidence": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "supporting_voc_count": {"type": "integer"},
+                            "top_quotes": {
+                                "type": "array",
+                                "minItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
+                                "maxItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
+                                "items": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "voc_id": {"type": "string", "maxLength": 64},
+                                        "quote": {"type": "string", "maxLength": _AGENT3_MAX_QUOTE_CHARS},
+                                        "adjusted_score": {"type": "number"},
+                                    },
+                                    "required": ["quote"],
+                                },
+                            },
+                            "contradiction_count": {"type": "integer"},
+                        },
+                        "required": ["supporting_voc_count", "top_quotes", "contradiction_count"],
+                    },
+                },
+                "required": ["angle_id", "angle_name", "definition", "evidence"],
+            },
+        }
+        schema["anyOf"] = [{"required": ["purple_ocean_candidates"]}, {"required": ["angle_candidates"]}]
+    return schema
 
 
 def _dump_prompt_json(payload: object, *, max_chars: int) -> str:
@@ -8255,33 +10561,28 @@ def _map_offer_pipeline_input_with_price_resolution(
     max_iterations: int,
     score_threshold: float,
 ):
-    def _map_with_stage2(stage2_payload: ProductBriefStage2) -> Any:
-        return map_offer_pipeline_input(
-            stage2=stage2_payload,
-            selected_angle_payload=selected_angle_payload,
-            competitor_teardowns=competitor_teardowns,
-            voc_research=voc_research,
-            purple_ocean_research=purple_ocean_research,
-            business_model=business_model,
-            funnel_position=funnel_position,
-            target_platforms=target_platforms,
-            target_regions=target_regions,
-            existing_proof_assets=existing_proof_assets,
-            brand_voice_notes=brand_voice_notes,
-            compliance_sensitivity=compliance_sensitivity,
-            llm_model=llm_model,
-            max_iterations=max_iterations,
-            score_threshold=score_threshold,
+    if str(stage2.price or "").strip().upper() == "TBD":
+        raise StrategyV2MissingContextError(
+            "Offer pipeline requires an explicit stage2.price value; fallback price scraping is disabled. "
+            "Remediation: populate explicit pricing before running v2-08 Offer pipeline."
         )
-
-    try:
-        return _map_with_stage2(stage2)
-    except StrategyV2MissingContextError:
-        if str(stage2.price or "").strip().upper() != "TBD":
-            raise
-        resolved_price = _resolve_price_from_reference_urls(urls=list(stage2.competitor_urls))
-        resolved_stage2 = stage2.model_copy(update={"price": resolved_price})
-        return _map_with_stage2(resolved_stage2)
+    return map_offer_pipeline_input(
+        stage2=stage2,
+        selected_angle_payload=selected_angle_payload,
+        competitor_teardowns=competitor_teardowns,
+        voc_research=voc_research,
+        purple_ocean_research=purple_ocean_research,
+        business_model=business_model,
+        funnel_position=funnel_position,
+        target_platforms=target_platforms,
+        target_regions=target_regions,
+        existing_proof_assets=existing_proof_assets,
+        brand_voice_notes=brand_voice_notes,
+        compliance_sensitivity=compliance_sensitivity,
+        llm_model=llm_model,
+        max_iterations=max_iterations,
+        score_threshold=score_threshold,
+    )
 
 
 _AWARENESS_LEVEL_KEYS = (
@@ -8805,11 +11106,120 @@ def _require_stage1_artifact_id(*, params: Mapping[str, Any]) -> str:
     return stage1_artifact_id
 
 
+def _load_foundational_step02_content_from_artifact(
+    *,
+    org_id: str,
+    workflow_run_id: str,
+) -> str:
+    with session_scope() as session:
+        research_repo = ResearchArtifactsRepository(session)
+        artifacts_repo = ArtifactsRepository(session)
+        record = research_repo.get_for_step(
+            org_id=org_id,
+            workflow_run_id=workflow_run_id,
+            step_key="v2-02.foundation.02",
+        )
+        if record is None:
+            return ""
+        artifact = artifacts_repo.get(org_id=org_id, artifact_id=str(record.doc_id))
+        if artifact is None or not isinstance(artifact.data, Mapping):
+            return ""
+        payload = artifact.data.get("payload")
+        payload_map = payload if isinstance(payload, Mapping) else artifact.data
+        content = payload_map.get("content") if isinstance(payload_map, Mapping) else None
+        if isinstance(content, str) and content.strip():
+            return content.strip()
+    return ""
+
+
+def _load_step_payload_payload_from_research_artifact(
+    *,
+    checkpoint_label: str,
+    org_id: str,
+    workflow_run_id: str,
+    step_key: str,
+) -> tuple[str, dict[str, Any]]:
+    """Load the persisted step-payload artifact for the given step_key and return (artifact_id, payload).
+
+    Strategy V2 step payloads can be large. Downstream activities should load them from the DB
+    instead of passing the full payload through Temporal activity inputs/outputs.
+    """
+    if not org_id.strip():
+        raise StrategyV2MissingContextError(f"{checkpoint_label} requires org_id to load step payload artifacts.")
+    if not workflow_run_id.strip():
+        raise StrategyV2MissingContextError(
+            f"{checkpoint_label} requires workflow_run_id to load step payload artifacts."
+        )
+    if not step_key.strip():
+        raise StrategyV2MissingContextError(f"{checkpoint_label} requires a non-empty step_key to load step payload.")
+
+    with session_scope() as session:
+        research_repo = ResearchArtifactsRepository(session)
+        artifacts_repo = ArtifactsRepository(session)
+        record = research_repo.get_for_step(
+            org_id=org_id,
+            workflow_run_id=workflow_run_id,
+            step_key=step_key,
+        )
+        if record is None:
+            raise StrategyV2MissingContextError(
+                f"{checkpoint_label} missing step payload artifact for step '{step_key}'. "
+                "Remediation: rerun the missing checkpoint so the handoff artifact is persisted."
+            )
+        artifact_id = str(record.doc_id or "").strip()
+        if not artifact_id:
+            raise StrategyV2MissingContextError(
+                f"{checkpoint_label} has an invalid step payload artifact id for step '{step_key}'. "
+                "Remediation: rerun the missing checkpoint so the handoff artifact is persisted."
+            )
+        artifact = artifacts_repo.get(org_id=org_id, artifact_id=artifact_id)
+        if artifact is None or not isinstance(artifact.data, Mapping):
+            raise StrategyV2MissingContextError(
+                f"{checkpoint_label} missing step payload artifact data for step '{step_key}' "
+                f"(artifact_id={artifact_id})."
+            )
+
+        artifact_data = artifact.data
+        _validate_step_payload_lineage_payload(
+            checkpoint_label=checkpoint_label,
+            required_step_key=step_key,
+            artifact_id=artifact_id,
+            artifact_data=artifact_data,
+        )
+
+        payload_raw = artifact_data.get("payload")
+        if not isinstance(payload_raw, Mapping):
+            raise StrategyV2MissingContextError(
+                f"{checkpoint_label} step payload artifact for step '{step_key}' is missing payload "
+                f"(artifact_id={artifact_id})."
+            )
+        payload = dict(payload_raw)
+        return artifact_id, payload
+
+
 def _require_stage2b_shared_context(*, params: Mapping[str, Any]) -> dict[str, Any]:
+    org_id = str(params.get("org_id") or "").strip()
+    workflow_run_id = str(params.get("workflow_run_id") or "").strip()
+    _heartbeat_safe(
+        {
+            "activity": "strategy_v2.require_stage2b_shared_context",
+            "phase": "context_hydration",
+            "status": "in_progress",
+            "progress_event": "shared_context_started",
+        }
+    )
     stage0 = ProductBriefStage0.model_validate(_require_dict(payload=params["stage0"], field_name="stage0"))
     stage1 = ProductBriefStage1.model_validate(_require_dict(payload=params["stage1"], field_name="stage1"))
     _require_stage1_quality(stage1)
     precanon_research = _require_dict(payload=params["precanon_research"], field_name="precanon_research")
+    _heartbeat_safe(
+        {
+            "activity": "strategy_v2.require_stage2b_shared_context",
+            "phase": "context_hydration",
+            "status": "in_progress",
+            "progress_event": "stage_payloads_validated",
+        }
+    )
 
     confirmed_competitor_assets_raw = params.get("confirmed_competitor_assets")
     if not isinstance(confirmed_competitor_assets_raw, list):
@@ -8838,12 +11248,53 @@ def _require_stage2b_shared_context(*, params: Mapping[str, Any]) -> dict[str, A
     )
     has_step02 = isinstance(step_contents_raw.get("02"), str) and str(step_contents_raw.get("02")).strip() != ""
     if not has_step02:
+        restored_step02 = ""
+        if org_id and workflow_run_id:
+            restored_step02 = _run_with_activity_heartbeats(
+                phase="context_hydration",
+                operation="restore_step02_from_artifact",
+                heartbeat_payload={
+                    "activity": "strategy_v2.require_stage2b_shared_context",
+                },
+                fn=lambda: _load_foundational_step02_content_from_artifact(
+                    org_id=org_id,
+                    workflow_run_id=workflow_run_id,
+                ),
+            )
+        if restored_step02:
+            updated_step_contents = dict(step_contents_raw)
+            updated_step_contents["02"] = restored_step02
+            updated_step_summaries = dict(step_summaries_raw)
+            updated_step_summaries["02"] = "restored_from_step_payload_artifact"
+            precanon_research = dict(precanon_research)
+            precanon_research["step_contents"] = updated_step_contents
+            precanon_research["step_summaries"] = updated_step_summaries
+            step_contents_raw = updated_step_contents
+            step_summaries_raw = updated_step_summaries
+            has_step02 = True
+            _heartbeat_safe(
+                {
+                    "activity": "strategy_v2.require_stage2b_shared_context",
+                    "phase": "context_hydration",
+                    "status": "in_progress",
+                    "progress_event": "step02_restored_from_artifact",
+                }
+            )
+    if not has_step02:
         step1_content_raw = step_contents_raw.get("01")
         if not isinstance(step1_content_raw, str) or not step1_content_raw.strip():
             raise StrategyV2MissingContextError(
                 "Foundational step 01 content is missing; cannot generate competitor analysis for step 02. "
                 "Remediation: rerun foundational stage and persist step 01 output."
             )
+        _heartbeat_safe(
+            {
+                "activity": "strategy_v2.require_stage2b_shared_context",
+                "phase": "context_hydration",
+                "status": "in_progress",
+                "progress_event": "step02_generation_started",
+            }
+        )
         step1_summary = (
             str(step_summaries_raw.get("01")).strip()
             if isinstance(step_summaries_raw.get("01"), str)
@@ -8867,6 +11318,14 @@ def _require_stage2b_shared_context(*, params: Mapping[str, Any]) -> dict[str, A
         precanon_research = dict(precanon_research)
         precanon_research["step_contents"] = updated_step_contents
         precanon_research["step_summaries"] = updated_step_summaries
+        _heartbeat_safe(
+            {
+                "activity": "strategy_v2.require_stage2b_shared_context",
+                "phase": "context_hydration",
+                "status": "in_progress",
+                "progress_event": "step02_generation_completed",
+            }
+        )
 
     foundational_step_contents = _require_foundational_step_contents(precanon_research=precanon_research)
     foundational_step_summaries = _require_dict(
@@ -8877,6 +11336,14 @@ def _require_stage2b_shared_context(*, params: Mapping[str, Any]) -> dict[str, A
     avatar_brief_payload = _build_avatar_brief_runtime_payload(
         step6_content=foundational_step_contents["06"],
         step6_summary=str(foundational_step_summaries.get("06") or ""),
+    )
+    _heartbeat_safe(
+        {
+            "activity": "strategy_v2.require_stage2b_shared_context",
+            "phase": "context_hydration",
+            "status": "completed",
+            "progress_event": "shared_context_ready",
+        }
     )
 
     return {
@@ -9368,6 +11835,30 @@ def _load_apify_collection_payload_for_postprocess(
         return collection_payload
 
 
+def _load_apify_ingestion_payload_for_downstream(
+    *,
+    org_id: str,
+    apify_ingestion_artifact_id: str,
+) -> dict[str, Any]:
+    with session_scope() as session:
+        artifacts_repo = ArtifactsRepository(session)
+        artifact = artifacts_repo.get(org_id=org_id, artifact_id=apify_ingestion_artifact_id)
+        if artifact is None or not isinstance(artifact.data, Mapping):
+            raise StrategyV2MissingContextError(
+                "Missing Strategy V2 Apify ingestion artifact for downstream hydration "
+                f"(artifact_id={apify_ingestion_artifact_id}). "
+                "Remediation: rerun v2-03c before invoking downstream agents."
+            )
+        payload = artifact.data.get("payload")
+        payload_map = payload if isinstance(payload, Mapping) else artifact.data
+        if not isinstance(payload_map, Mapping):
+            raise StrategyV2SchemaValidationError(
+                "Apify ingestion artifact payload is malformed; expected object payload. "
+                f"artifact_id={apify_ingestion_artifact_id}."
+            )
+        return dict(payload_map)
+
+
 @activity.defn(name="strategy_v2.run_voc_agent0b_apify_collection")
 def run_strategy_v2_voc_agent0b_apify_collection_activity(params: dict[str, Any]) -> dict[str, Any]:
     org_id = str(params["org_id"])
@@ -9632,6 +12123,34 @@ def run_strategy_v2_voc_agent0b_apify_ingestion_activity(params: dict[str, Any])
         }
     )
 
+    def _context_hydration_heartbeat(event: dict[str, Any]) -> None:
+        payload: dict[str, Any] = {
+            "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+            "phase": "context_hydration",
+            "status": "in_progress",
+        }
+        for key in ("progress_event", "processed_run_rows", "total_run_rows"):
+            value = event.get(key)
+            if value is not None:
+                payload[key] = value
+        activity.heartbeat(payload)
+
+    def _post_transform_heartbeat(event: dict[str, Any]) -> None:
+        payload: dict[str, Any] = {
+            "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+            "phase": "post_apify_transform",
+            "status": "in_progress",
+        }
+        for key in ("progress_event", "processed_runs", "total_runs"):
+            value = event.get(key)
+            if value is not None:
+                payload[key] = value
+        activity.heartbeat(payload)
+
+    context_heartbeat_payload = {
+        "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
+    }
+
     stage1_artifact_id = _require_stage1_artifact_id(params=params)
     _ = stage1_artifact_id
     shared_context = _require_stage2b_shared_context(params=params)
@@ -9642,27 +12161,37 @@ def run_strategy_v2_voc_agent0b_apify_ingestion_activity(params: dict[str, Any])
     stage1 = shared_context["stage1"]
     foundational_step_contents = shared_context["foundational_step_contents"]
     foundational_step_summaries = shared_context["foundational_step_summaries"]
-    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
-        org_id=org_id,
-        client_id=client_id,
-        product_id=product_id,
-        campaign_id=campaign_id,
-        workflow_run_id=workflow_run_id,
-        foundational_step_contents=foundational_step_contents,
-        foundational_step_summaries=foundational_step_summaries,
-        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    existing_step_payload_artifact_ids = _run_with_activity_heartbeats(
+        phase="context_hydration",
+        operation="ensure_foundational_payload_artifacts",
+        heartbeat_payload=context_heartbeat_payload,
+        fn=lambda: _ensure_foundational_step_payload_artifact_ids(
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            foundational_step_contents=foundational_step_contents,
+            foundational_step_summaries=foundational_step_summaries,
+            existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        ),
     )
-    _require_step_payload_artifact_prerequisites(
-        checkpoint_label="v2-03c Apify postprocess + virality",
-        step_payload_artifact_ids=existing_step_payload_artifact_ids,
-        required_step_keys=[
-            *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
-            V2_STEP_HABITAT_STRATEGY,
-            V2_STEP_SCRAPE_VIRALITY,
-            V2_STEP_APIFY_COLLECTION,
-        ],
-        org_id=org_id,
-        validate_lineage=True,
+    _run_with_activity_heartbeats(
+        phase="context_hydration",
+        operation="validate_step_payload_prerequisites",
+        heartbeat_payload=context_heartbeat_payload,
+        fn=lambda: _require_step_payload_artifact_prerequisites(
+            checkpoint_label="v2-03c Apify postprocess + virality",
+            step_payload_artifact_ids=existing_step_payload_artifact_ids,
+            required_step_keys=[
+                *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+                V2_STEP_HABITAT_STRATEGY,
+                V2_STEP_SCRAPE_VIRALITY,
+                V2_STEP_APIFY_COLLECTION,
+            ],
+            org_id=org_id,
+            validate_lineage=True,
+        ),
     )
     competitor_analysis = _require_dict(
         payload=params.get("competitor_analysis"),
@@ -9687,10 +12216,16 @@ def run_strategy_v2_voc_agent0b_apify_ingestion_activity(params: dict[str, Any])
             "Remediation: run v2-03b apify_collection first and pass its artifact id."
         )
 
-    collection_payload = _load_apify_collection_payload_for_postprocess(
-        org_id=org_id,
-        apify_collection_artifact_id=apify_collection_artifact_id,
+    collection_payload = _run_with_activity_heartbeats(
+        phase="context_hydration",
+        operation="load_apify_collection_payload",
+        heartbeat_payload=context_heartbeat_payload,
+        fn=lambda: _load_apify_collection_payload_for_postprocess(
+            org_id=org_id,
+            apify_collection_artifact_id=apify_collection_artifact_id,
+        ),
     )
+    _context_hydration_heartbeat({"progress_event": "collection_payload_loaded"})
     strategy_apify_configs = collection_payload.get("strategy_apify_configs")
     if not isinstance(strategy_apify_configs, list):
         raise StrategyV2SchemaValidationError(
@@ -9748,7 +12283,10 @@ def run_strategy_v2_voc_agent0b_apify_ingestion_activity(params: dict[str, Any])
             "apify collection payload raw run count mismatch "
             f"(len(raw_runs)={len(raw_run_rows)}, executed_actor_run_count={executed_actor_run_count})."
         )
-    _validate_reddit_target_alignment(run_rows=raw_run_rows)
+    _validate_reddit_target_alignment(
+        run_rows=raw_run_rows,
+        progress_callback=_context_hydration_heartbeat,
+    )
     activity.heartbeat(
         {
             "activity": "strategy_v2.run_voc_agent0b_apify_ingestion",
@@ -9834,6 +12372,7 @@ def run_strategy_v2_voc_agent0b_apify_ingestion_activity(params: dict[str, Any])
     scraped_data_manifest = _build_scraped_data_manifest(
         apify_context=apify_context,
         competitor_analysis=competitor_analysis,
+        progress_callback=_post_transform_heartbeat,
     )
     _validate_agent1_scraped_manifest_integrity(
         scraped_data_manifest=scraped_data_manifest,
@@ -9915,8 +12454,14 @@ def run_strategy_v2_voc_agent0b_apify_ingestion_activity(params: dict[str, Any])
                 "metric_video_observation_count": len(metric_video_rows),
                 "apify_video_observation_count": len(apify_video_rows),
                 "video_filter_diagnostics": video_filter_diagnostics,
+                "scraped_data_manifest": scraped_data_manifest,
                 "video_scored": video_scored,
                 "scoring_audit": scoring_audit,
+                "existing_corpus": existing_corpus,
+                "merged_voc_artifact_rows": merged_voc_artifact_rows,
+                "corpus_selection_summary": merged_voc["summary"],
+                "external_corpus_count": len(external_voc_corpus),
+                "proof_asset_candidates": proof_asset_candidates,
                 "ingestion_summary": {
                     "strategy_config_run_count": strategy_config_run_count,
                     "planned_actor_run_count": planned_actor_run_count,
@@ -9944,17 +12489,15 @@ def run_strategy_v2_voc_agent0b_apify_ingestion_activity(params: dict[str, Any])
         artifact_id=step_payload_artifact_id,
     )
     return {
-        "scraped_data_manifest": scraped_data_manifest,
-        "video_scored": video_scored,
-        "existing_corpus": existing_corpus,
-        "merged_voc_artifact_rows": merged_voc_artifact_rows,
-        "corpus_selection_summary": merged_voc["summary"],
-        "external_corpus_count": len(external_voc_corpus),
+        "scraped_manifest_run_count": int(scraped_data_manifest.get("run_count") or 0),
+        "scraped_manifest_total_run_count": int(scraped_data_manifest.get("total_run_count") or 0),
+        "existing_corpus_count": len(existing_corpus),
+        "merged_voc_artifact_row_count": len(merged_voc_artifact_rows),
+        "proof_asset_candidate_count": len(proof_asset_candidates),
         "strategy_config_run_count": strategy_config_run_count,
         "planned_actor_run_count": planned_actor_run_count,
         "executed_actor_run_count": executed_actor_run_count,
         "failed_actor_run_count": failed_actor_run_count,
-        "proof_asset_candidates": proof_asset_candidates,
         "handoff_audit": handoff_audit,
         "scoring_audit": scoring_audit,
         "step_payload_artifact_id": step_payload_artifact_id,
@@ -10017,8 +12560,18 @@ def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]
         payload=params.get("agent00b_output"),
         field_name="agent00b_output",
     )
+    apify_ingestion_artifact_id = str(params.get("apify_ingestion_artifact_id") or "").strip()
+    apify_ingestion_payload: dict[str, Any] = {}
+    if apify_ingestion_artifact_id:
+        apify_ingestion_payload = _load_apify_ingestion_payload_for_downstream(
+            org_id=org_id,
+            apify_ingestion_artifact_id=apify_ingestion_artifact_id,
+        )
+    scraped_data_manifest_payload = params.get("scraped_data_manifest")
+    if not isinstance(scraped_data_manifest_payload, dict):
+        scraped_data_manifest_payload = apify_ingestion_payload.get("scraped_data_manifest")
     scraped_data_manifest = _require_dict(
-        payload=params.get("scraped_data_manifest"),
+        payload=scraped_data_manifest_payload,
         field_name="scraped_data_manifest",
     )
     scraped_data_files = scraped_data_manifest.get("raw_scraped_data_files")
@@ -10029,8 +12582,12 @@ def run_strategy_v2_voc_agent1_habitat_qualifier_activity(params: dict[str, Any]
         )
     video_scored = params.get("video_scored")
     if not isinstance(video_scored, list):
+        video_scored = apify_ingestion_payload.get("video_scored")
+    if not isinstance(video_scored, list):
         raise StrategyV2SchemaValidationError("video_scored must be an array for v2-04 Agent 1 qualification.")
     scoring_audit = params.get("scoring_audit")
+    if scoring_audit is None and isinstance(apify_ingestion_payload.get("scoring_audit"), dict):
+        scoring_audit = apify_ingestion_payload.get("scoring_audit")
     if scoring_audit is not None and not isinstance(scoring_audit, dict):
         raise StrategyV2SchemaValidationError(
             "scoring_audit must be an object when provided for v2-04 Agent 1 qualification."
@@ -10327,7 +12884,7 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
         existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
     )
     _require_step_payload_artifact_prerequisites(
-        checkpoint_label="v2-05 Agent 2 VOC extraction",
+        checkpoint_label="v2-05a Agent 2 VOC extraction",
         step_payload_artifact_ids=existing_step_payload_artifact_ids,
         required_step_keys=[
             *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
@@ -10347,30 +12904,51 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
     )
     agent01_output = _require_dict(payload=params.get("agent01_output"), field_name="agent01_output")
     habitat_scored = _require_dict(payload=params.get("habitat_scored"), field_name="habitat_scored")
+    apify_ingestion_artifact_id = str(params.get("apify_ingestion_artifact_id") or "").strip()
+    apify_ingestion_payload: dict[str, Any] = {}
+    if apify_ingestion_artifact_id:
+        apify_ingestion_payload = _load_apify_ingestion_payload_for_downstream(
+            org_id=org_id,
+            apify_ingestion_artifact_id=apify_ingestion_artifact_id,
+        )
 
     existing_corpus_raw = params.get("existing_corpus")
     if not isinstance(existing_corpus_raw, list):
-        raise StrategyV2SchemaValidationError("existing_corpus must be an array for v2-05.")
+        existing_corpus_raw = apify_ingestion_payload.get("existing_corpus")
+    if not isinstance(existing_corpus_raw, list):
+        raise StrategyV2SchemaValidationError("existing_corpus must be an array for v2-05a.")
     existing_corpus = [row for row in existing_corpus_raw if isinstance(row, dict)]
     merged_voc_artifact_rows_raw = params.get("merged_voc_artifact_rows")
     if not isinstance(merged_voc_artifact_rows_raw, list):
-        raise StrategyV2SchemaValidationError("merged_voc_artifact_rows must be an array for v2-05.")
+        merged_voc_artifact_rows_raw = apify_ingestion_payload.get("merged_voc_artifact_rows")
+    if not isinstance(merged_voc_artifact_rows_raw, list):
+        raise StrategyV2SchemaValidationError("merged_voc_artifact_rows must be an array for v2-05a.")
     merged_voc_artifact_rows = [row for row in merged_voc_artifact_rows_raw if isinstance(row, dict)]
+    scraped_data_manifest_payload = params.get("scraped_data_manifest")
+    if not isinstance(scraped_data_manifest_payload, dict):
+        scraped_data_manifest_payload = apify_ingestion_payload.get("scraped_data_manifest")
     scraped_data_manifest = _require_dict(
-        payload=params.get("scraped_data_manifest"),
+        payload=scraped_data_manifest_payload,
         field_name="scraped_data_manifest",
     )
     proof_asset_candidates_raw = params.get("proof_asset_candidates")
     if not isinstance(proof_asset_candidates_raw, list):
-        raise StrategyV2SchemaValidationError("proof_asset_candidates must be an array for v2-05.")
+        proof_asset_candidates_raw = apify_ingestion_payload.get("proof_asset_candidates")
+    if not isinstance(proof_asset_candidates_raw, list):
+        raise StrategyV2SchemaValidationError("proof_asset_candidates must be an array for v2-05a.")
     proof_asset_candidates = [row for row in proof_asset_candidates_raw if isinstance(row, dict)]
+    corpus_selection_payload = params.get("corpus_selection_summary")
+    if not isinstance(corpus_selection_payload, dict):
+        corpus_selection_payload = apify_ingestion_payload.get("corpus_selection_summary")
     corpus_selection_summary = _require_dict(
-        payload=params.get("corpus_selection_summary"),
+        payload=corpus_selection_payload,
         field_name="corpus_selection_summary",
     )
     external_corpus_count = params.get("external_corpus_count")
+    if not isinstance(external_corpus_count, int):
+        external_corpus_count = apify_ingestion_payload.get("external_corpus_count")
     if not isinstance(external_corpus_count, int) or external_corpus_count < 0:
-        raise StrategyV2SchemaValidationError("external_corpus_count must be a non-negative integer for v2-05.")
+        raise StrategyV2SchemaValidationError("external_corpus_count must be a non-negative integer for v2-05a.")
 
     saturated_angles = extract_saturated_angles(competitor_analysis, limit=9)
     evidence_rows, evidence_diagnostics = _build_agent2_evidence_rows(
@@ -10378,6 +12956,26 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
         merged_voc_artifact_rows=merged_voc_artifact_rows,
         scraped_data_manifest=scraped_data_manifest,
     )
+    prompt_evidence_rows = evidence_rows
+    excluded_prompt_rows: list[dict[str, Any]] = []
+    compaction_summary: dict[str, Any] = {
+        "enabled": False,
+        "max_rows": _AGENT2_PROMPT_MAX_EVIDENCE_ROWS,
+        "input_count": len(evidence_rows),
+        "selected_count": len(evidence_rows),
+        "excluded_count": 0,
+        "source_type_distribution_input": _agent2_source_type_distribution(evidence_rows),
+        "source_type_distribution_selected": _agent2_source_type_distribution(evidence_rows),
+    }
+    if len(evidence_rows) > _AGENT2_PROMPT_MAX_EVIDENCE_ROWS:
+        prompt_evidence_rows, excluded_prompt_rows, compaction_summary = _compact_agent2_evidence_rows(
+            evidence_rows=evidence_rows,
+            max_rows=_AGENT2_PROMPT_MAX_EVIDENCE_ROWS,
+        )
+    evidence_diagnostics["total_rows_available"] = len(evidence_rows)
+    evidence_diagnostics["rows_selected_for_prompt"] = len(prompt_evidence_rows)
+    evidence_diagnostics["rows_excluded_by_compaction"] = len(excluded_prompt_rows)
+
     agent2_mode = "DUAL" if existing_corpus else "FRESH"
     activity.heartbeat(
         {
@@ -10390,12 +12988,12 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
         pattern=_VOC_AGENT02_PROMPT_PATTERN,
         context="VOC Agent 2 extractor",
     )
-    extraction = _run_agent2_extractor(
+    prompt_extraction = _run_agent2_extractor_prompt_only(
         agent02_asset=agent02_asset,
         model=settings.STRATEGY_V2_VOC_MODEL,
         workflow_run_id=workflow_run_id,
         mode=agent2_mode,
-        evidence_rows=evidence_rows,
+        evidence_rows=prompt_evidence_rows,
         agent01_output=agent01_output,
         habitat_scored=habitat_scored,
         stage1_data=stage1_data,
@@ -10406,13 +13004,249 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
         foundational_step_summaries=foundational_step_summaries,
         activity_name="strategy_v2.run_voc_agent2_extraction",
     )
+    agent02_output_raw = _require_dict(
+        payload=prompt_extraction.get("output"),
+        field_name="agent2_prompt_output",
+    )
+    voc_rows_raw = agent02_output_raw.get("voc_observations")
+    if not isinstance(voc_rows_raw, list):
+        raise StrategyV2SchemaValidationError("Agent 2 extraction output must include voc_observations array.")
+    rejected_rows_raw = agent02_output_raw.get("rejected_items")
+    if not isinstance(rejected_rows_raw, list):
+        raise StrategyV2SchemaValidationError("Agent 2 extraction output must include rejected_items array.")
+    if excluded_prompt_rows:
+        compaction_rejections = [
+            {
+                "evidence_id": str(row.get("evidence_id") or "").strip().upper(),
+                "reason": "TOO_VAGUE",
+                "note": (
+                    "Excluded from prompt extraction by deterministic compaction cap; "
+                    "kept in audit trail."
+                ),
+            }
+            for row in excluded_prompt_rows
+            if str(row.get("evidence_id") or "").strip()
+        ]
+        rejected_rows_raw = [*rejected_rows_raw, *compaction_rejections]
     agent02_output = {
-        "mode": extraction["mode"],
-        "voc_observations": extraction["voc_observations"],
-        "rejected_items": extraction["rejected_items"],
-        "extraction_summary": extraction["extraction_summary"],
-        "validation_errors": [],
+        "mode": str(prompt_extraction.get("mode") or agent2_mode),
+        "input_count": len(evidence_rows),
+        "output_count": len(voc_rows_raw),
+        "voc_observations": voc_rows_raw,
+        "rejected_items": rejected_rows_raw,
+        "validation_errors": (
+            [row for row in agent02_output_raw.get("validation_errors", []) if isinstance(row, str)]
+            if isinstance(agent02_output_raw.get("validation_errors"), list)
+            else []
+        ),
+        "extraction_summary": {
+            "input_count": len(evidence_rows),
+            "prompt_input_count": int(prompt_extraction.get("input_count") or len(prompt_evidence_rows)),
+            "output_count": len(voc_rows_raw),
+            "rejected_count": len(rejected_rows_raw),
+            "compaction_excluded_count": len(excluded_prompt_rows),
+        },
     }
+    agent02_input_manifest = {
+        "input_count": int(prompt_extraction.get("input_count") or len(prompt_evidence_rows)),
+        "total_input_count": len(evidence_rows),
+        "evidence_id_pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN,
+        "rows": (
+            prompt_extraction.get("input_manifest_rows")
+            if isinstance(prompt_extraction.get("input_manifest_rows"), list)
+            else []
+        ),
+    }
+    prompt_provenance = (
+        dict(prompt_extraction.get("prompt_provenance"))
+        if isinstance(prompt_extraction.get("prompt_provenance"), dict)
+        else {}
+    )
+    raw_output = str(prompt_extraction.get("raw_output") or "")
+
+    with session_scope() as session:
+        voc_agent_run_id = _record_agent_run(
+            session=session,
+            org_id=org_id,
+            user_id=operator_user_id,
+            client_id=client_id,
+            objective_type="strategy_v2.agent2_voc_extraction.prompt_only",
+            model=settings.STRATEGY_V2_VOC_MODEL,
+            inputs_json={
+                "input_count": int(prompt_extraction.get("input_count") or len(prompt_evidence_rows)),
+                "total_input_count": len(evidence_rows),
+                "compaction_excluded_count": len(excluded_prompt_rows),
+                "mode": str(prompt_extraction.get("mode") or agent2_mode),
+            },
+            outputs_json={
+                "output_count": len(voc_rows_raw),
+                "rejected_count": len(rejected_rows_raw),
+                "validation_error_count": len(agent02_output["validation_errors"]),
+            },
+        )
+        step_payload_artifact_id = _persist_step_payload(
+            session=session,
+            org_id=org_id,
+            client_id=client_id,
+            product_id=product_id,
+            campaign_id=campaign_id,
+            workflow_run_id=workflow_run_id,
+            step_key=V2_STEP_VOC_EXTRACTION_RAW,
+            title="Strategy V2 VOC Extraction (Raw)",
+            summary="Agent 2 prompt-chain VOC extraction completed; deterministic QA runs in v2-05.",
+            payload={
+                "voc_observation_count": len(voc_rows_raw),
+                "prompt_corpus_count": len(existing_corpus),
+                "merged_corpus_count": len(merged_voc_artifact_rows),
+                "external_corpus_count": external_corpus_count,
+                "corpus_selection_summary": corpus_selection_summary,
+                "mode": str(prompt_extraction.get("mode") or agent2_mode),
+                "agent02_output": agent02_output,
+                "input_manifest": agent02_input_manifest,
+                "rejected_items": rejected_rows_raw,
+                "rejected_item_count": len(
+                    [row for row in rejected_rows_raw if isinstance(row, dict)]
+                ),
+                "evidence_row_count": len(evidence_rows),
+                "evidence_diagnostics": evidence_diagnostics,
+                "compaction_summary": compaction_summary,
+                "proof_asset_candidates": proof_asset_candidates,
+                "prompt_provenance": prompt_provenance,
+                "raw_output": raw_output[:20000],
+            },
+            model_name=settings.STRATEGY_V2_VOC_MODEL,
+            prompt_version="strategy_v2.agent2.prompt_chain.v2",
+            schema_version=SCHEMA_VERSION_V2,
+            agent_run_id=voc_agent_run_id,
+        )
+
+    updated_step_payload_artifact_ids = _updated_step_payload_artifact_ids(
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        step_key=V2_STEP_VOC_EXTRACTION_RAW,
+        artifact_id=step_payload_artifact_id,
+    )
+    return {
+        "agent02_output": agent02_output,
+        "agent02_input_manifest": agent02_input_manifest,
+        "agent02_prompt_provenance": prompt_provenance,
+        "agent02_raw_output": raw_output[:20000],
+        "evidence_rows": evidence_rows,
+        "evidence_diagnostics": evidence_diagnostics,
+        "prompt_corpus_count": len(existing_corpus),
+        "merged_corpus_count": len(merged_voc_artifact_rows),
+        "external_corpus_count": external_corpus_count,
+        "corpus_selection_summary": corpus_selection_summary,
+        "proof_asset_candidates": proof_asset_candidates,
+        "compaction_summary": compaction_summary,
+        "step_payload_artifact_id": step_payload_artifact_id,
+        "step_payload_artifact_ids": updated_step_payload_artifact_ids,
+    }
+
+
+@activity.defn(name="strategy_v2.run_voc_agent2_qa")
+def run_strategy_v2_voc_agent2_qa_activity(params: dict[str, Any]) -> dict[str, Any]:
+    org_id = str(params["org_id"])
+    client_id = str(params["client_id"])
+    product_id = str(params["product_id"])
+    campaign_id = str(params["campaign_id"]) if isinstance(params.get("campaign_id"), str) else None
+    workflow_run_id = str(params["workflow_run_id"])
+    operator_user_id = str(params.get("operator_user_id") or "system")
+
+    _ = _require_stage1_artifact_id(params=params)
+    shared_context = _require_stage2b_shared_context(params=params)
+    existing_step_payload_artifact_ids = _parse_step_payload_artifact_ids(
+        payload=params.get("existing_step_payload_artifact_ids"),
+        field_name="existing_step_payload_artifact_ids",
+    )
+    foundational_step_contents = shared_context["foundational_step_contents"]
+    foundational_step_summaries = shared_context["foundational_step_summaries"]
+    existing_step_payload_artifact_ids = _ensure_foundational_step_payload_artifact_ids(
+        org_id=org_id,
+        client_id=client_id,
+        product_id=product_id,
+        campaign_id=campaign_id,
+        workflow_run_id=workflow_run_id,
+        foundational_step_contents=foundational_step_contents,
+        foundational_step_summaries=foundational_step_summaries,
+        existing_step_payload_artifact_ids=existing_step_payload_artifact_ids,
+    )
+    _require_step_payload_artifact_prerequisites(
+        checkpoint_label="v2-05 Agent 2 QA finalization",
+        step_payload_artifact_ids=existing_step_payload_artifact_ids,
+        required_step_keys=[
+            *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
+            V2_STEP_SCRAPE_VIRALITY,
+            V2_STEP_APIFY_INGESTION,
+            V2_STEP_HABITAT_SCORING,
+            V2_STEP_VOC_EXTRACTION_RAW,
+        ],
+        org_id=org_id,
+        validate_lineage=True,
+    )
+
+    agent02_output = _require_dict(payload=params.get("agent02_output"), field_name="agent02_output")
+    evidence_rows_raw = params.get("evidence_rows")
+    if not isinstance(evidence_rows_raw, list):
+        raise StrategyV2SchemaValidationError("evidence_rows must be an array for v2-05 QA finalization.")
+    evidence_rows = [row for row in evidence_rows_raw if isinstance(row, dict)]
+    if not evidence_rows:
+        raise StrategyV2MissingContextError(
+            "v2-05 QA finalization requires non-empty evidence_rows from v2-05a extraction."
+        )
+    evidence_diagnostics = _require_dict(
+        payload=params.get("evidence_diagnostics") if isinstance(params.get("evidence_diagnostics"), dict) else {},
+        field_name="evidence_diagnostics",
+    )
+    proof_asset_candidates_raw = params.get("proof_asset_candidates")
+    if not isinstance(proof_asset_candidates_raw, list):
+        raise StrategyV2SchemaValidationError("proof_asset_candidates must be an array for v2-05 QA finalization.")
+    proof_asset_candidates = [row for row in proof_asset_candidates_raw if isinstance(row, dict)]
+    corpus_selection_summary = _require_dict(
+        payload=params.get("corpus_selection_summary") if isinstance(params.get("corpus_selection_summary"), dict) else {},
+        field_name="corpus_selection_summary",
+    )
+    external_corpus_count = params.get("external_corpus_count")
+    if not isinstance(external_corpus_count, int) or external_corpus_count < 0:
+        raise StrategyV2SchemaValidationError(
+            "external_corpus_count must be a non-negative integer for v2-05 QA finalization."
+        )
+    prompt_corpus_count = params.get("prompt_corpus_count")
+    if not isinstance(prompt_corpus_count, int) or prompt_corpus_count < 0:
+        raise StrategyV2SchemaValidationError(
+            "prompt_corpus_count must be a non-negative integer for v2-05 QA finalization."
+        )
+    merged_corpus_count = params.get("merged_corpus_count")
+    if not isinstance(merged_corpus_count, int) or merged_corpus_count < 0:
+        raise StrategyV2SchemaValidationError(
+            "merged_corpus_count must be a non-negative integer for v2-05 QA finalization."
+        )
+    agent02_input_manifest = (
+        dict(params.get("agent02_input_manifest"))
+        if isinstance(params.get("agent02_input_manifest"), dict)
+        else {}
+    )
+    agent02_prompt_provenance = (
+        dict(params.get("agent02_prompt_provenance"))
+        if isinstance(params.get("agent02_prompt_provenance"), dict)
+        else {}
+    )
+    agent02_raw_output = str(params.get("agent02_raw_output") or "")
+    agent2_mode = str(agent02_output.get("mode") or "").strip().upper()
+    if agent2_mode not in {"FRESH", "DUAL"}:
+        raise StrategyV2SchemaValidationError(
+            f"agent02_output.mode must be either 'FRESH' or 'DUAL', received {agent02_output.get('mode')!r}."
+        )
+
+    input_ordered_ids, input_rows_by_id, input_manifest_rows = _index_agent2_input_rows(
+        evidence_rows=evidence_rows
+    )
+    extraction = _validate_agent2_decision_partition(
+        mode=agent2_mode,
+        output=agent02_output,
+        input_ordered_ids=input_ordered_ids,
+        input_rows_by_id=input_rows_by_id,
+    )
+
     raw_voc_observations = extraction["voc_observations"]
     voc_observations = _normalize_voc_observations([row for row in raw_voc_observations if isinstance(row, dict)])
     voc_scored = score_voc_items(voc_observations)
@@ -10427,10 +13261,17 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
             org_id=org_id,
             user_id=operator_user_id,
             client_id=client_id,
-            objective_type="strategy_v2.agent2_voc_extraction.prompt_chain",
-            model=settings.STRATEGY_V2_VOC_MODEL,
-            inputs_json={"voc_observation_count": len(voc_observations)},
-            outputs_json=voc_scored,
+            objective_type="strategy_v2.agent2_voc_extraction.qa_finalization",
+            model="deterministic",
+            inputs_json={
+                "input_count": len(input_ordered_ids),
+                "mode": agent2_mode,
+            },
+            outputs_json={
+                "voc_observation_count": len(voc_observations),
+                "rejected_count": len(extraction.get("rejected_items") or []),
+                "score_summary": voc_scored.get("summary") if isinstance(voc_scored, dict) else {},
+            },
         )
         step_payload_artifact_id = _persist_step_payload(
             session=session,
@@ -10441,17 +13282,27 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
             workflow_run_id=workflow_run_id,
             step_key=V2_STEP_VOC_EXTRACTION,
             title="Strategy V2 VOC Extraction",
-            summary="Agent 2 prompt-chain VOC corpus extracted and scored.",
+            summary="Agent 2 extraction QA finalized and VOC corpus scored.",
             payload={
                 "voc_observation_count": len(voc_observations),
-                "prompt_corpus_count": len(existing_corpus),
-                "merged_corpus_count": len(merged_voc_artifact_rows),
+                "prompt_corpus_count": prompt_corpus_count,
+                "merged_corpus_count": merged_corpus_count,
                 "external_corpus_count": external_corpus_count,
                 "corpus_selection_summary": corpus_selection_summary,
                 "voc_observations": voc_observations,
                 "voc_scored": voc_scored,
                 "mode": str(extraction.get("mode") or agent2_mode),
                 "extraction_summary": extraction.get("extraction_summary", {}),
+                "id_validation_report": extraction.get("id_validation_report", {}),
+                "input_manifest": (
+                    agent02_input_manifest
+                    if agent02_input_manifest
+                    else {
+                        "input_count": len(input_ordered_ids),
+                        "evidence_id_pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN,
+                        "rows": input_manifest_rows,
+                    }
+                ),
                 "rejected_items": extraction.get("rejected_items", []),
                 "rejected_item_count": len(
                     [row for row in extraction.get("rejected_items", []) if isinstance(row, dict)]
@@ -10459,15 +13310,11 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
                 "evidence_row_count": len(evidence_rows),
                 "evidence_diagnostics": evidence_diagnostics,
                 "proof_asset_candidates": proof_asset_candidates,
-                "prompt_provenance": extraction.get("prompt_provenance", {}),
-                "raw_output": "\n\n".join(
-                    str(part)
-                    for part in extraction.get("raw_outputs_preview", [])[:8]
-                    if isinstance(part, str)
-                )[:20000],
+                "prompt_provenance": agent02_prompt_provenance,
+                "raw_output": agent02_raw_output[:20000],
             },
-            model_name=settings.STRATEGY_V2_VOC_MODEL,
-            prompt_version="strategy_v2.agent2.prompt_chain.v2",
+            model_name="deterministic",
+            prompt_version="strategy_v2.agent2.qa_finalization.v1",
             schema_version=SCHEMA_VERSION_V2,
             agent_run_id=voc_agent_run_id,
         )
@@ -10478,10 +13325,8 @@ def run_strategy_v2_voc_agent2_extraction_activity(params: dict[str, Any]) -> di
         artifact_id=step_payload_artifact_id,
     )
     return {
-        "agent02_output": agent02_output,
         "voc_observations": voc_observations,
         "voc_scored": voc_scored,
-        "merged_voc_artifact_rows": merged_voc_artifact_rows,
         "proof_asset_candidates": proof_asset_candidates,
         "step_payload_artifact_id": step_payload_artifact_id,
         "step_payload_artifact_ids": updated_step_payload_artifact_ids,
@@ -10520,7 +13365,7 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
         step_payload_artifact_ids=existing_step_payload_artifact_ids,
         required_step_keys=[
             *[f"v2-02.foundation.{step_key}" for step_key in _FOUNDATIONAL_STEP_KEYS],
-            V2_STEP_VOC_EXTRACTION,
+            V2_STEP_HABITAT_SCORING,
         ],
         org_id=org_id,
         validate_lineage=True,
@@ -10531,16 +13376,95 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
         payload=params.get("competitor_analysis"),
         field_name="competitor_analysis",
     )
-    voc_observations_raw = params.get("voc_observations")
-    if not isinstance(voc_observations_raw, list) or not voc_observations_raw:
-        raise StrategyV2MissingContextError(
-            "voc_observations is required for Agent 3 angle synthesis. "
-            "Remediation: ensure v2-05 emits voc_observations before invoking v2-06."
+    apify_ingestion_artifact_id = str(params.get("apify_ingestion_artifact_id") or "").strip()
+    apify_ingestion_payload: dict[str, Any] = {}
+    if apify_ingestion_artifact_id:
+        apify_ingestion_payload = _load_apify_ingestion_payload_for_downstream(
+            org_id=org_id,
+            apify_ingestion_artifact_id=apify_ingestion_artifact_id,
         )
-    voc_observations = [row for row in voc_observations_raw if isinstance(row, dict)]
-    if not voc_observations:
-        raise StrategyV2MissingContextError("voc_observations must include object rows for v2-06.")
-    voc_scored = _require_dict(payload=params.get("voc_scored"), field_name="voc_scored")
+    proof_asset_candidates_raw = params.get("proof_asset_candidates")
+    proof_asset_candidates = (
+        [row for row in proof_asset_candidates_raw if isinstance(row, dict)]
+        if isinstance(proof_asset_candidates_raw, list)
+        else []
+    )
+    if not proof_asset_candidates:
+        proof_asset_candidates_from_apify = apify_ingestion_payload.get("proof_asset_candidates")
+        if isinstance(proof_asset_candidates_from_apify, list):
+            proof_asset_candidates = [
+                row for row in proof_asset_candidates_from_apify if isinstance(row, dict)
+            ]
+    agent01_output_raw = params.get("agent01_output")
+    agent01_output = agent01_output_raw if isinstance(agent01_output_raw, dict) else {}
+    agent1_habitat_observations_raw = agent01_output.get("habitat_observations")
+    agent1_habitat_observations = (
+        [row for row in agent1_habitat_observations_raw if isinstance(row, dict)]
+        if isinstance(agent1_habitat_observations_raw, list)
+        else []
+    )
+    agent1_mining_plan_raw = agent01_output.get("mining_plan")
+    agent1_mining_plan = (
+        [row for row in agent1_mining_plan_raw if isinstance(row, dict)]
+        if isinstance(agent1_mining_plan_raw, list)
+        else []
+    )
+    habitat_scored_raw = params.get("habitat_scored")
+    habitat_scored = habitat_scored_raw if isinstance(habitat_scored_raw, dict) else {}
+
+    voc_input_mode = "agent2_full"
+    evidence_rows_for_prompt: list[dict[str, Any]] = []
+    evidence_manifest_rows: list[dict[str, Any]] = []
+    evidence_diagnostics: dict[str, Any] = {}
+    voc_observations_raw = params.get("voc_observations")
+    if isinstance(voc_observations_raw, list) and voc_observations_raw:
+        voc_input_mode = "agent2_full"
+        voc_observations = _normalize_voc_observations(
+            [row for row in voc_observations_raw if isinstance(row, dict)]
+        )
+        provided_voc_scored = params.get("voc_scored")
+        if isinstance(provided_voc_scored, dict):
+            voc_scored = provided_voc_scored
+        else:
+            voc_input_mode = "agent2_observations_only"
+            voc_scored = score_voc_items(voc_observations)
+    else:
+        voc_input_mode = "raw_evidence_fallback"
+        existing_corpus_raw = params.get("existing_corpus")
+        if not isinstance(existing_corpus_raw, list):
+            existing_corpus_raw = apify_ingestion_payload.get("existing_corpus")
+        merged_voc_artifact_rows_raw = params.get("merged_voc_artifact_rows")
+        if not isinstance(merged_voc_artifact_rows_raw, list):
+            merged_voc_artifact_rows_raw = apify_ingestion_payload.get("merged_voc_artifact_rows")
+        existing_corpus_rows = (
+            [row for row in existing_corpus_raw if isinstance(row, Mapping)]
+            if isinstance(existing_corpus_raw, list)
+            else []
+        )
+        merged_voc_artifact_rows = (
+            [row for row in merged_voc_artifact_rows_raw if isinstance(row, Mapping)]
+            if isinstance(merged_voc_artifact_rows_raw, list)
+            else []
+        )
+        scraped_data_manifest_payload = params.get("scraped_data_manifest")
+        if not isinstance(scraped_data_manifest_payload, dict):
+            scraped_data_manifest_payload = apify_ingestion_payload.get("scraped_data_manifest")
+        scraped_data_manifest = _require_dict(
+            payload=scraped_data_manifest_payload,
+            field_name="scraped_data_manifest",
+        )
+        evidence_rows_for_prompt, evidence_diagnostics = _build_agent2_evidence_rows(
+            existing_corpus=existing_corpus_rows,
+            merged_voc_artifact_rows=merged_voc_artifact_rows,
+            scraped_data_manifest=scraped_data_manifest,
+        )
+        _, _, evidence_manifest_rows = _index_agent2_input_rows(
+            evidence_rows=evidence_rows_for_prompt
+        )
+        voc_observations = _derive_voc_observations_from_evidence_rows(
+            evidence_rows=evidence_rows_for_prompt
+        )
+        voc_scored = score_voc_items(voc_observations)
 
     competitor_angle_map = build_competitor_angle_map(competitor_analysis)
     saturated_angles = extract_saturated_angles(competitor_analysis, limit=9)
@@ -10556,32 +13480,76 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
         pattern=_VOC_AGENT03_PROMPT_PATTERN,
         context="VOC Agent 3 shadow angle clusterer",
     )
+    agent03_logical_payloads: dict[str, Any] = {
+        "COMPETITOR_ANGLE_MAP_JSON": competitor_angle_map,
+        "KNOWN_SATURATED_ANGLES_JSON": saturated_angles,
+        "PRODUCT_BRIEF_JSON": stage1_data,
+        "HABITAT_SCORED_JSON": habitat_scored,
+        "AGENT1_HABITAT_OBSERVATIONS_JSON": agent1_habitat_observations,
+        "AGENT1_MINING_PLAN_JSON": agent1_mining_plan,
+        "AVATAR_BRIEF_SUMMARY_JSON": {
+            "avatar_brief_summary": str(foundational_step_summaries.get("06") or "")[:4000]
+        },
+        "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
+            "step_contents": {
+                step_key: str(foundational_step_contents.get(step_key) or "")
+                for step_key in _FOUNDATIONAL_STEP_KEYS
+            },
+            "step_summaries": {
+                step_key: str(foundational_step_summaries.get(step_key) or "")
+                for step_key in _FOUNDATIONAL_STEP_KEYS
+            },
+        },
+    }
+    if voc_input_mode in {"agent2_full", "agent2_observations_only"}:
+        agent03_logical_payloads["AGENT2_VOC_OBSERVATIONS_JSON"] = voc_observations
+        agent03_logical_payloads["AGENT2_HANDOFF_VOC_SCORED_JSON"] = voc_scored
+    else:
+        agent03_logical_payloads["VOC_EVIDENCE_ROWS_JSON"] = evidence_rows_for_prompt
+        agent03_logical_payloads["AGENT2_INPUT_MANIFEST_JSON"] = {
+            "input_count": len(evidence_manifest_rows),
+            "evidence_id_pattern": _VOC_AGENT02_EVIDENCE_ID_PATTERN,
+            "rows": evidence_manifest_rows,
+        }
+        agent03_logical_payloads["VOC_EVIDENCE_LAYOUT_JSON"] = {
+            "description": (
+                "Rows contain deterministic evidence_id keyed VOC evidence for Agent 3 raw-evidence fallback."
+            ),
+            "required_fields": [
+                "evidence_id",
+                "source_type",
+                "source_url",
+                "author",
+                "date",
+                "context",
+                "verbatim",
+                "evidence_ref",
+            ],
+            "counts": {
+                "evidence_rows": len(evidence_rows_for_prompt),
+                "manifest_rows": len(evidence_manifest_rows),
+            },
+            "evidence_diagnostics": evidence_diagnostics,
+        }
     agent03_file_id_map, agent03_uploaded_file_ids = _upload_openai_prompt_json_files(
         model=settings.STRATEGY_V2_VOC_MODEL,
         workflow_run_id=workflow_run_id,
         stage_label="agent3",
-        logical_payloads={
-            "AGENT2_HANDOFF_VOC_SCORED_JSON": voc_scored,
-            "AGENT2_VOC_OBSERVATIONS_JSON": voc_observations,
-            "COMPETITOR_ANGLE_MAP_JSON": competitor_angle_map,
-            "KNOWN_SATURATED_ANGLES_JSON": saturated_angles,
-            "PRODUCT_BRIEF_JSON": stage1_data,
-            "AVATAR_BRIEF_SUMMARY_JSON": {
-                "avatar_brief_summary": str(foundational_step_summaries.get("06") or "")[:4000]
-            },
-            "FOUNDATIONAL_RESEARCH_DOCS_JSON": {
-                "step_contents": {
-                    step_key: str(foundational_step_contents.get(step_key) or "")
-                    for step_key in _FOUNDATIONAL_STEP_KEYS
-                },
-                "step_summaries": {
-                    step_key: str(foundational_step_summaries.get(step_key) or "")
-                    for step_key in _FOUNDATIONAL_STEP_KEYS
-                },
-            },
-        },
+        logical_payloads=agent03_logical_payloads,
     )
     try:
+        runtime_voc_instruction = ""
+        if voc_input_mode == "raw_evidence_fallback":
+            runtime_voc_instruction = (
+                "Agent 2 VOC outputs were not provided for this run.\n"
+                "Use VOC_EVIDENCE_ROWS_JSON + AGENT2_INPUT_MANIFEST_JSON as the canonical VOC source.\n"
+                "Preserve evidence_id traceability and derive deterministic VOC IDs from evidence_id where needed.\n"
+            )
+        elif voc_input_mode == "agent2_observations_only":
+            runtime_voc_instruction = (
+                "AGENT2_VOC_OBSERVATIONS_JSON was provided without a native Agent 2 score payload.\n"
+                "Use the provided scored handoff JSON generated from deterministic scoring for ranking support.\n"
+            )
         agent03_output, agent03_raw, agent03_provenance = _run_prompt_json_object(
             asset=agent03_asset,
             context="strategy_v2.agent3_output",
@@ -10590,122 +13558,24 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
                 "## Runtime Input Block\n"
                 f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent03_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
                 "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
+                "Review FOUNDATIONAL_RESEARCH_DOCS_JSON before beginning any analysis.\n"
                 "Use OPENAI_CODE_INTERPRETER_FILE_IDS_JSON to load each dataset.\n"
-                "Output both angle_observations and angle_candidates.\n"
-                f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} angle_candidates, "
-                f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate, "
-                f"and exactly {_AGENT3_HOOK_STARTERS_PER_CANDIDATE} hook_starters per candidate.\n"
+                "Operate in artifact-only mode for this run and do not invoke web search.\n"
+                "If HABITAT_SCORED_JSON, AGENT1_HABITAT_OBSERVATIONS_JSON, or AGENT1_MINING_PLAN_JSON are present, "
+                "use them to prioritize habitat weighting, source diversity checks, and contradiction sampling.\n"
+                "If any Agent 1 artifact is missing or empty, continue with available inputs and encode that limitation "
+                "via conservative evidence judgments.\n"
+                f"{runtime_voc_instruction}"
+                "Output the JSON handoff block defined in the Agent 3 prompt.\n"
+                f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} purple_ocean_candidates and "
+                f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate.\n"
+                "Do not generate hook_starters unless explicitly requested by the prompt.\n"
                 f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
             ),
             schema_name="strategy_v2_voc_agent03",
-            schema={
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "angle_observations": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": _MAX_AGENT3_ANGLE_OBSERVATIONS,
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "angle_id": {"type": "string", "maxLength": 32},
-                            "angle_name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                            "competitor_angle_overlap": {"type": "string", "enum": _VOC_YN_CD_ENUM},
-                        },
-                        "required": ["angle_id", "angle_name", "competitor_angle_overlap"],
-                    },
-                },
-                "angle_candidates": {
-                    "type": "array",
-                    "minItems": _MIN_AGENT3_ANGLE_CANDIDATES,
-                    "maxItems": _MIN_AGENT3_ANGLE_CANDIDATES,
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "properties": {
-                            "angle_id": {"type": "string", "maxLength": 32},
-                            "angle_name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                            "definition": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "who": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                    "pain_desire": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                    "mechanism_why": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                    "belief_shift": {
-                                        "type": "object",
-                                        "additionalProperties": False,
-                                        "properties": {
-                                            "before": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                            "after": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                        },
-                                        "required": ["before", "after"],
-                                    },
-                                    "trigger": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                },
-                                "required": ["who", "pain_desire", "mechanism_why", "belief_shift", "trigger"],
-                            },
-                            "evidence": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "supporting_voc_count": {"type": "integer"},
-                                    "top_quotes": {
-                                        "type": "array",
-                                        "minItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
-                                        "maxItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
-                                        "items": {
-                                            "type": "object",
-                                            "additionalProperties": False,
-                                            "properties": {
-                                                "voc_id": {"type": "string", "maxLength": 64},
-                                                "quote": {"type": "string", "maxLength": _AGENT3_MAX_QUOTE_CHARS},
-                                                "adjusted_score": {"type": "number"},
-                                            },
-                                            "required": ["voc_id", "quote", "adjusted_score"],
-                                        },
-                                    },
-                                    "triangulation_status": {"type": "string", "enum": ["SINGLE", "DUAL", "MULTI"]},
-                                    "velocity_status": {
-                                        "type": "string",
-                                        "enum": ["ACCELERATING", "STEADY", "DECELERATING"],
-                                    },
-                                    "contradiction_count": {"type": "integer"},
-                                },
-                                "required": [
-                                    "supporting_voc_count",
-                                    "top_quotes",
-                                    "triangulation_status",
-                                    "velocity_status",
-                                    "contradiction_count",
-                                ],
-                            },
-                            "hook_starters": {
-                                "type": "array",
-                                "minItems": _AGENT3_HOOK_STARTERS_PER_CANDIDATE,
-                                "maxItems": _AGENT3_HOOK_STARTERS_PER_CANDIDATE,
-                                "items": {
-                                    "type": "object",
-                                    "additionalProperties": False,
-                                    "properties": {
-                                        "visual": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                        "opening_line": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                        "lever": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                    },
-                                    "required": ["visual", "opening_line", "lever"],
-                                },
-                            },
-                        },
-                        "required": ["angle_id", "angle_name", "definition", "evidence", "hook_starters"],
-                    },
-                },
-            },
-            "required": ["angle_observations", "angle_candidates"],
-            },
+            schema=_agent3_prompt_output_schema(include_legacy_angle_candidates=False),
             use_reasoning=True,
-            use_web_search=True,
+            use_web_search=False,
             openai_tools=_openai_python_tool_resources(
                 settings.STRATEGY_V2_VOC_MODEL,
                 file_ids=list(agent03_file_id_map.values()),
@@ -10727,14 +13597,15 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
         stage_label="v2-06 Agent 3 angle synthesis",
         parsed_output=agent03_output,
         raw_output=agent03_raw,
-        remediation=("ensure Agent 2 produced complete high-quality VOC observations before rerunning v2-06."),
+        remediation=(
+            "ensure Agent 3 receives canonical Agent 2 outputs or raw VOC evidence files "
+            "(VOC_EVIDENCE_ROWS_JSON + AGENT2_INPUT_MANIFEST_JSON) before rerunning v2-06."
+        ),
     )
     raw_angle_observations = agent03_output.get("angle_observations")
     if not isinstance(raw_angle_observations, list):
-        raise StrategyV2SchemaValidationError("Agent 3 output must contain angle_observations array.")
-    raw_angle_candidates = agent03_output.get("angle_candidates")
-    if not isinstance(raw_angle_candidates, list):
-        raise StrategyV2SchemaValidationError("Agent 3 output must contain angle_candidates array.")
+        raw_angle_observations = []
+    raw_angle_candidates = _extract_agent3_candidate_rows(agent03_output)
     angle_candidates = _normalize_angle_candidates([row for row in raw_angle_candidates if isinstance(row, dict)])
     candidate_lookup = {
         str(candidate.get("angle_id")): candidate
@@ -10784,7 +13655,15 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
             client_id=client_id,
             objective_type="strategy_v2.agent3_angle_synthesis.prompt_chain",
             model=settings.STRATEGY_V2_VOC_MODEL,
-            inputs_json={"angle_observation_count": len(angle_observations)},
+            inputs_json={
+                "angle_observation_count": len(angle_observations),
+                "voc_input_mode": voc_input_mode,
+                "voc_observation_count": len(voc_observations),
+                "voc_scored_item_count": len(voc_scored.get("items"))
+                if isinstance(voc_scored.get("items"), list)
+                else 0,
+                "raw_evidence_row_count": len(evidence_rows_for_prompt),
+            },
             outputs_json={
                 "ranked_candidates": ranked_candidates,
                 "score_summary": scored_angles_payload.get("summary"),
@@ -10805,6 +13684,14 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
                 "scorecard": scored_angles_payload,
                 "stage1_artifact_id": stage1_artifact_id,
                 "angle_observations": angle_observations,
+                "voc_input_mode": voc_input_mode,
+                "voc_observation_count": len(voc_observations),
+                "voc_observations": voc_observations,
+                "voc_scored": voc_scored,
+                "proof_asset_candidates": proof_asset_candidates,
+                "competitor_analysis": competitor_analysis,
+                "voc_scored_summary": voc_scored.get("summary") if isinstance(voc_scored, dict) else {},
+                "evidence_diagnostics": evidence_diagnostics,
                 "prompt_provenance": agent03_provenance,
                 "raw_output": agent03_raw[:30000],
             },
@@ -10821,8 +13708,6 @@ def run_strategy_v2_voc_agent3_synthesis_activity(params: dict[str, Any]) -> dic
     )
     return {
         "ranked_angle_candidates": ranked_candidates,
-        "angle_observations": angle_observations,
-        "scorecard": scored_angles_payload,
         "step_payload_artifact_id": step_payload_artifact_id,
         "step_payload_artifact_ids": updated_step_payload_artifact_ids,
     }
@@ -11643,6 +14528,7 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 [row for row in raw_voc_observations if isinstance(row, dict)]
             )
             voc_scored = score_voc_items(voc_observations)
+            voc_input_mode = "agent2_full"
             _require_voc_transition_quality(
                 voc_observations=voc_observations,
                 voc_scored=voc_scored,
@@ -11677,6 +14563,8 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "voc_scored": voc_scored,
                     "mode": str(extraction.get("mode") or agent2_mode),
                     "extraction_summary": extraction.get("extraction_summary", {}),
+                    "id_validation_report": extraction.get("id_validation_report", {}),
+                    "input_manifest": extraction.get("input_manifest", {}),
                     "rejected_items": extraction.get("rejected_items", []),
                     "rejected_item_count": len(
                         [row for row in extraction.get("rejected_items", []) if isinstance(row, dict)]
@@ -11738,121 +14626,14 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                         f"OPENAI_CODE_INTERPRETER_FILE_IDS_JSON:\n{_dump_prompt_json_required(agent03_file_id_map, max_chars=12000, field_name='OPENAI_CODE_INTERPRETER_FILE_IDS_JSON')}\n\n"
                         "All required runtime JSON inputs are provided as uploaded files in the code interpreter container.\n"
                         "Use OPENAI_CODE_INTERPRETER_FILE_IDS_JSON to load each dataset.\n"
-                        "Output both angle_observations and angle_candidates.\n"
-                        f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} angle_candidates, "
-                        f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate, "
-                        f"and exactly {_AGENT3_HOOK_STARTERS_PER_CANDIDATE} hook_starters per candidate.\n"
+                        "Output the JSON handoff block defined in the Agent 3 prompt.\n"
+                        f"Return exactly {_MIN_AGENT3_ANGLE_CANDIDATES} purple_ocean_candidates and "
+                        f"exactly {_AGENT3_TOP_QUOTES_PER_CANDIDATE} top_quotes per candidate.\n"
+                        "Do not generate hook_starters unless explicitly requested by the prompt.\n"
                         f"Keep every non-quote text field <= {_AGENT3_MAX_TEXT_CHARS} characters and each quote <= {_AGENT3_MAX_QUOTE_CHARS} characters."
                     ),
                     schema_name="strategy_v2_voc_agent03",
-                    schema={
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "angle_observations": {
-                            "type": "array",
-                            "minItems": 1,
-                            "maxItems": _MAX_AGENT3_ANGLE_OBSERVATIONS,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "angle_id": {"type": "string", "maxLength": 32},
-                                    "angle_name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                },
-                                "required": ["angle_id", "angle_name"],
-                            },
-                        },
-                        "angle_candidates": {
-                            "type": "array",
-                            "minItems": _MIN_AGENT3_ANGLE_CANDIDATES,
-                            "maxItems": _MIN_AGENT3_ANGLE_CANDIDATES,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "angle_id": {"type": "string", "maxLength": 32},
-                                    "angle_name": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                    "definition": {
-                                        "type": "object",
-                                        "additionalProperties": False,
-                                        "properties": {
-                                            "who": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                            "pain_desire": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                            "mechanism_why": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                            "belief_shift": {
-                                                "type": "object",
-                                                "additionalProperties": False,
-                                                "properties": {
-                                                    "before": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                                    "after": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                                },
-                                                "required": ["before", "after"],
-                                            },
-                                            "trigger": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                        },
-                                        "required": ["who", "pain_desire", "mechanism_why", "belief_shift", "trigger"],
-                                    },
-                                    "evidence": {
-                                        "type": "object",
-                                        "additionalProperties": False,
-                                        "properties": {
-                                            "supporting_voc_count": {"type": "integer"},
-                                            "top_quotes": {
-                                                "type": "array",
-                                                "minItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
-                                                "maxItems": _AGENT3_TOP_QUOTES_PER_CANDIDATE,
-                                                "items": {
-                                                    "type": "object",
-                                                    "additionalProperties": False,
-                                                    "properties": {
-                                                        "voc_id": {"type": "string", "maxLength": 64},
-                                                        "quote": {"type": "string", "maxLength": _AGENT3_MAX_QUOTE_CHARS},
-                                                        "adjusted_score": {"type": "number"},
-                                                    },
-                                                    "required": ["voc_id", "quote", "adjusted_score"],
-                                                },
-                                            },
-                                            "triangulation_status": {
-                                                "type": "string",
-                                                "enum": ["SINGLE", "DUAL", "MULTI"],
-                                            },
-                                            "velocity_status": {
-                                                "type": "string",
-                                                "enum": ["ACCELERATING", "STEADY", "DECELERATING"],
-                                            },
-                                            "contradiction_count": {"type": "integer"},
-                                        },
-                                        "required": [
-                                            "supporting_voc_count",
-                                            "top_quotes",
-                                            "triangulation_status",
-                                            "velocity_status",
-                                            "contradiction_count",
-                                        ],
-                                    },
-                                    "hook_starters": {
-                                        "type": "array",
-                                        "minItems": _AGENT3_HOOK_STARTERS_PER_CANDIDATE,
-                                        "maxItems": _AGENT3_HOOK_STARTERS_PER_CANDIDATE,
-                                        "items": {
-                                            "type": "object",
-                                            "additionalProperties": False,
-                                            "properties": {
-                                                "visual": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                                "opening_line": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                                "lever": {"type": "string", "maxLength": _AGENT3_MAX_TEXT_CHARS},
-                                            },
-                                            "required": ["visual", "opening_line", "lever"],
-                                        },
-                                    },
-                                },
-                                "required": ["angle_id", "angle_name", "definition", "evidence", "hook_starters"],
-                            },
-                        },
-                    },
-                    "required": ["angle_observations", "angle_candidates"],
-                    },
+                    schema=_agent3_prompt_output_schema(include_legacy_angle_candidates=False),
                     use_reasoning=True,
                     use_web_search=True,
                     openai_tools=_openai_python_tool_resources(
@@ -11882,10 +14663,8 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
             )
             raw_angle_observations = agent03_output.get("angle_observations")
             if not isinstance(raw_angle_observations, list):
-                raise StrategyV2SchemaValidationError("Agent 3 output must contain angle_observations array.")
-            raw_angle_candidates = agent03_output.get("angle_candidates")
-            if not isinstance(raw_angle_candidates, list):
-                raise StrategyV2SchemaValidationError("Agent 3 output must contain angle_candidates array.")
+                raw_angle_observations = []
+            raw_angle_candidates = _extract_agent3_candidate_rows(agent03_output)
             angle_candidates = _normalize_angle_candidates(
                 [row for row in raw_angle_candidates if isinstance(row, dict)]
             )
@@ -11939,7 +14718,15 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                 client_id=client_id,
                 objective_type="strategy_v2.agent3_angle_synthesis.prompt_chain",
                 model=settings.STRATEGY_V2_VOC_MODEL,
-                inputs_json={"angle_observation_count": len(angle_observations)},
+                inputs_json={
+                    "angle_observation_count": len(angle_observations),
+                    "voc_input_mode": voc_input_mode,
+                    "voc_observation_count": len(voc_observations),
+                    "voc_scored_item_count": len(voc_scored.get("items"))
+                    if isinstance(voc_scored.get("items"), list)
+                    else 0,
+                    "raw_evidence_row_count": len(evidence_rows),
+                },
                 outputs_json={
                     "ranked_candidates": ranked_candidates,
                     "score_summary": scored_angles_payload.get("summary"),
@@ -11960,6 +14747,14 @@ def run_strategy_v2_voc_angle_pipeline_activity(params: dict[str, Any]) -> dict[
                     "scorecard": scored_angles_payload,
                     "stage1_artifact_id": stage1_artifact_id,
                     "angle_observations": angle_observations,
+                    "voc_input_mode": voc_input_mode,
+                    "voc_observation_count": len(voc_observations),
+                    "voc_observations": voc_observations,
+                    "voc_scored": voc_scored,
+                    "proof_asset_candidates": proof_asset_candidates,
+                    "competitor_analysis": competitor_analysis,
+                    "voc_scored_summary": voc_scored.get("summary") if isinstance(voc_scored, dict) else {},
+                    "evidence_diagnostics": evidence_diagnostics,
                     "prompt_provenance": agent03_provenance,
                     "raw_output": agent03_raw[:30000],
                 },
@@ -12799,18 +15594,36 @@ def run_strategy_v2_offer_pipeline_activity(params: dict[str, Any]) -> dict[str,
     stage2 = ProductBriefStage2.model_validate(_require_dict(payload=params["stage2"], field_name="stage2"))
     _require_selected_angle_evidence_quality(selected_angle=stage2.selected_angle)
     competitor_analysis = _require_dict(payload=params["competitor_analysis"], field_name="competitor_analysis")
-    voc_scored = _require_dict(payload=params["voc_scored"], field_name="voc_scored")
-    voc_observations_raw = params.get("voc_observations")
-    if not isinstance(voc_observations_raw, list):
+    if "voc_scored" in params or "voc_observations" in params:
         raise StrategyV2MissingContextError(
-            "voc_observations is required for selected-angle Offer input mapping. "
-            "Remediation: pass Agent 2 voc_observations into the offer pipeline."
+            "Offer pipeline no longer accepts voc_scored/voc_observations via Temporal payloads "
+            "(can exceed the 4MB gRPC limit). "
+            "Remediation: load VOC inputs from the persisted v2-06 step payload artifact."
+        )
+    _, v2_06_payload = _load_step_payload_payload_from_research_artifact(
+        checkpoint_label="v2-08 Offer pipeline",
+        org_id=org_id,
+        workflow_run_id=workflow_run_id,
+        step_key=V2_STEP_ANGLE_SYNTHESIS,
+    )
+    voc_scored_raw = v2_06_payload.get("voc_scored")
+    if not isinstance(voc_scored_raw, dict):
+        raise StrategyV2MissingContextError(
+            "v2-08 Offer pipeline missing voc_scored in v2-06 step payload artifact. "
+            "Remediation: rerun v2-06 and ensure VOC scoring payload is persisted."
+        )
+    voc_observations_raw = v2_06_payload.get("voc_observations")
+    if not isinstance(voc_observations_raw, list) or not voc_observations_raw:
+        raise StrategyV2MissingContextError(
+            "v2-08 Offer pipeline missing non-empty voc_observations in v2-06 step payload artifact. "
+            "Remediation: rerun v2-06 and ensure VOC observation payload is persisted."
         )
     voc_observations = [row for row in voc_observations_raw if isinstance(row, dict)]
     if not voc_observations:
         raise StrategyV2MissingContextError(
-            "voc_observations is empty; cannot build selected-angle VOC research payload."
+            "v2-08 Offer pipeline voc_observations in v2-06 payload are invalid; expected dict rows."
         )
+    voc_scored = voc_scored_raw
     angle_synthesis = _require_dict(payload=params["angle_synthesis"], field_name="angle_synthesis")
     proof_asset_candidates_raw = params.get("proof_asset_candidates")
     proof_asset_candidates = (
@@ -12818,6 +15631,10 @@ def run_strategy_v2_offer_pipeline_activity(params: dict[str, Any]) -> dict[str,
         if isinstance(proof_asset_candidates_raw, list)
         else []
     )
+    if not proof_asset_candidates:
+        proof_asset_candidates_v2_06_raw = v2_06_payload.get("proof_asset_candidates")
+        if isinstance(proof_asset_candidates_v2_06_raw, list):
+            proof_asset_candidates = [row for row in proof_asset_candidates_v2_06_raw if isinstance(row, dict)]
     operator_inputs = _require_offer_operator_inputs(params)
 
     compliance_sensitivity = derive_compliance_sensitivity(competitor_analysis)
@@ -13393,6 +16210,90 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
     workflow_run_id = str(params["workflow_run_id"])
     stage2 = ProductBriefStage2.model_validate(_require_dict(payload=params["stage2"], field_name="stage2"))
     offer_pipeline_output = _require_dict(payload=params["offer_pipeline_output"], field_name="offer_pipeline_output")
+    offer_data_readiness = _require_dict(payload=params["offer_data_readiness"], field_name="offer_data_readiness")
+    readiness_status = str(offer_data_readiness.get("status") or "").strip().lower()
+    if readiness_status != "ready":
+        missing_fields = offer_data_readiness.get("missing_fields")
+        inconsistent_fields = offer_data_readiness.get("inconsistent_fields")
+        raise StrategyV2MissingContextError(
+            "Offer data readiness is blocked and cannot continue to variant generation. "
+            f"missing_fields={missing_fields}; inconsistent_fields={inconsistent_fields}"
+        )
+    readiness_context = _require_dict(
+        payload=offer_data_readiness.get("context"),
+        field_name="offer_data_readiness.context",
+    )
+    offer_format = str(readiness_context.get("offer_format") or "").strip() or "DISCOUNT_PLUS_3_BONUSES_V1"
+    if offer_format != "DISCOUNT_PLUS_3_BONUSES_V1":
+        raise StrategyV2SchemaValidationError(
+            f"Unsupported offer_format '{offer_format}'. Only DISCOUNT_PLUS_3_BONUSES_V1 is allowed."
+        )
+    product_type = str(readiness_context.get("product_type") or "").strip().lower()
+    if not product_type:
+        raise StrategyV2SchemaValidationError("offer_data_readiness.context.product_type is required.")
+    core_product_context = _require_dict(
+        payload=readiness_context.get("core_product"),
+        field_name="offer_data_readiness.context.core_product",
+    )
+    core_product_id = str(core_product_context.get("product_id") or "").strip()
+    core_product_title = str(core_product_context.get("title") or "").strip()
+    if not core_product_id or not core_product_title:
+        raise StrategyV2SchemaValidationError(
+            "offer_data_readiness.context.core_product requires product_id and title."
+        )
+    bundle_contents_seed = _require_dict(
+        payload=readiness_context.get("bundle_contents"),
+        field_name="offer_data_readiness.context.bundle_contents",
+    )
+    pricing_metadata_seed = _require_dict(
+        payload=readiness_context.get("pricing_metadata"),
+        field_name="offer_data_readiness.context.pricing_metadata",
+    )
+    savings_metadata_seed = _require_dict(
+        payload=readiness_context.get("savings_metadata"),
+        field_name="offer_data_readiness.context.savings_metadata",
+    )
+    bonus_items_raw = readiness_context.get("bonus_items")
+    if not isinstance(bonus_items_raw, list) or len(bonus_items_raw) != 3:
+        raise StrategyV2SchemaValidationError(
+            "offer_data_readiness.context.bonus_items must contain exactly 3 bonus definitions."
+        )
+    bonus_items: list[dict[str, Any]] = []
+    for bonus_idx, raw_bonus in enumerate(bonus_items_raw):
+        bonus_item = _require_dict(
+            payload=raw_bonus,
+            field_name=f"offer_data_readiness.context.bonus_items[{bonus_idx}]",
+        )
+        bonus_id = str(bonus_item.get("bonus_id") or "").strip()
+        linked_product_id = str(bonus_item.get("linked_product_id") or "").strip()
+        title = str(bonus_item.get("title") or "").strip()
+        if not bonus_id or not linked_product_id or not title:
+            raise StrategyV2SchemaValidationError(
+                "offer_data_readiness.context.bonus_items requires bonus_id, linked_product_id, and title."
+            )
+        bonus_items.append(
+            {
+                "bonus_id": bonus_id,
+                "linked_product_id": linked_product_id,
+                "title": title,
+                "product_type": str(bonus_item.get("product_type") or "").strip().lower() or "other",
+                "position": int(bonus_item.get("position") or 0),
+            }
+        )
+    bonus_items = sorted(bonus_items, key=lambda row: int(row.get("position") or 0))
+    expected_bonus_ids = {str(row["bonus_id"]) for row in bonus_items}
+    if len(expected_bonus_ids) != 3:
+        raise StrategyV2SchemaValidationError(
+            "offer_data_readiness.context.bonus_items must include 3 unique bonus_id values."
+        )
+    bonus_by_id = {str(row["bonus_id"]): row for row in bonus_items}
+    product_type_offer_instruction = ""
+    if canonical_product_type(product_type) == "book":
+        product_type_offer_instruction = (
+            "For this run, the core product is a physical book. "
+            "The three offer variants must map to 1 book, 2 books, and 3 books respectively. "
+            "Do not use device, seat, license, PDF, downloadable, or instant-digital-access language for the core product."
+        )
     decision = UmpUmsSelectionDecision.model_validate(
         _require_dict(payload=params["ump_ums_selection_decision"], field_name="ump_ums_selection_decision")
     )
@@ -13522,6 +16423,12 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 "revision_notes": (revision_guidance or "First run — no revision notes"),
                 "product_name": stage2.product_name,
                 "angle_name": stage2.selected_angle.angle_name,
+                "offer_format": offer_format,
+                "product_type": product_type,
+                "offer_data_readiness_context": _dump_prompt_json(readiness_context, max_chars=12000),
+                "bundle_contents_seed": _dump_prompt_json(bundle_contents_seed, max_chars=8000),
+                "pricing_metadata_seed": _dump_prompt_json(pricing_metadata_seed, max_chars=2000),
+                "savings_metadata_seed": _dump_prompt_json(savings_metadata_seed, max_chars=2000),
             }
             step04_parsed, step04_raw, step04_provenance = _run_prompt_json_object(
                 asset=step04_asset,
@@ -13532,103 +16439,17 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                     "## Runtime Input Block\n"
                     f"STEP_01_OUTPUT:\n{step_01_output[:12000]}\n\n"
                     f"STEP_02_OUTPUT:\n{step_02_output[:12000]}\n\n"
+                    f"OFFER_DATA_READINESS_CONTEXT:\n{_dump_prompt_json(readiness_context, max_chars=12000)}\n\n"
                     "## Runtime Output Contract\n"
-                    "Return JSON with `variants` array for ids base, variant_a, variant_b.\n"
-                    "Each variant must include core_promise, value_stack (with scoring levers), "
-                    "guarantee, pricing_rationale, objection_map, and dimension_scores."
+                    f"Return JSON with `variants` array for ids {', '.join(_OFFER_VARIANT_IDS)}.\n"
+                    "Use the V1 structure: product + discount + exactly 3 bonus modules.\n"
+                    "Bonus modules must reuse the exact bonus_id values from OFFER_DATA_READINESS_CONTEXT and keep copy short.\n"
+                    "Each variant must include structured pricing_metadata, savings_metadata, best_value_metadata, "
+                    "objection_map, and dimension_scores.\n"
+                    f"{product_type_offer_instruction}"
                 ),
                 schema_name="strategy_v2_offer_step04",
-                schema={
-                    "type": "object",
-                    "additionalProperties": False,
-                    "properties": {
-                        "variants": {
-                            "type": "array",
-                            "minItems": 3,
-                            "maxItems": 3,
-                            "items": {
-                                "type": "object",
-                                "additionalProperties": False,
-                                "properties": {
-                                    "variant_id": {"type": "string"},
-                                    "core_promise": {"type": "string"},
-                                    "value_stack": {
-                                        "type": "array",
-                                        "minItems": 3,
-                                        "maxItems": 7,
-                                        "items": {
-                                            "type": "object",
-                                            "additionalProperties": False,
-                                            "properties": {
-                                                "name": {"type": "string"},
-                                                "dream_outcome": {"type": "number"},
-                                                "perceived_likelihood": {"type": "number"},
-                                                "time_delay": {"type": "number"},
-                                                "effort_sacrifice": {"type": "number"},
-                                                "novelty_classification": {"type": "string"},
-                                            },
-                                            "required": [
-                                                "name",
-                                                "dream_outcome",
-                                                "perceived_likelihood",
-                                                "time_delay",
-                                                "effort_sacrifice",
-                                                "novelty_classification",
-                                            ],
-                                        },
-                                    },
-                                    "guarantee": {"type": "string"},
-                                    "pricing_rationale": {"type": "string"},
-                                    "objection_map": {
-                                        "type": "array",
-                                        "minItems": 3,
-                                        "items": {
-                                            "type": "object",
-                                            "additionalProperties": False,
-                                            "properties": {
-                                                "objection": {"type": "string"},
-                                                "source": {"type": "string"},
-                                                "covered": {"type": "boolean"},
-                                                "coverage_strength": {"type": "number"},
-                                            },
-                                            "required": ["objection", "source", "covered", "coverage_strength"],
-                                        },
-                                    },
-                                    "dimension_scores": {
-                                        "type": "object",
-                                        "additionalProperties": False,
-                                        "properties": {
-                                            "competitive_differentiation": {"type": "number"},
-                                            "compliance_safety": {"type": "number"},
-                                            "internal_consistency": {"type": "number"},
-                                            "clarity_simplicity": {"type": "number"},
-                                            "bottleneck_resilience": {"type": "number"},
-                                            "momentum_continuity": {"type": "number"},
-                                        },
-                                        "required": [
-                                            "competitive_differentiation",
-                                            "compliance_safety",
-                                            "internal_consistency",
-                                            "clarity_simplicity",
-                                            "bottleneck_resilience",
-                                            "momentum_continuity",
-                                        ],
-                                    },
-                                },
-                                "required": [
-                                    "variant_id",
-                                    "core_promise",
-                                    "value_stack",
-                                    "guarantee",
-                                    "pricing_rationale",
-                                    "objection_map",
-                                    "dimension_scores",
-                                ],
-                            },
-                        }
-                    },
-                    "required": ["variants"],
-                },
+                schema=_offer_step04_response_schema(),
                 use_reasoning=True,
                 use_web_search=False,
                 heartbeat_context={
@@ -13649,6 +16470,13 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 if variant_id not in _OFFER_VARIANT_IDS:
                     raise StrategyV2SchemaValidationError(
                         f"Invalid variant_id '{variant_id}'. Expected exactly: {', '.join(_OFFER_VARIANT_IDS)}."
+                    )
+                core_promise = str(variant.get("core_promise") or "").strip()
+                if not core_promise:
+                    raise StrategyV2SchemaValidationError(f"Variant '{variant_id}' core_promise is required.")
+                if len(core_promise) > _STEP04_CORE_PROMISE_MAX_CHARS:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' core_promise exceeds {_STEP04_CORE_PROMISE_MAX_CHARS} chars."
                     )
                 value_stack_raw = variant.get("value_stack")
                 if not isinstance(value_stack_raw, list) or not value_stack_raw:
@@ -13695,6 +16523,152 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                         }
                     )
                     novelty_rows.append({"element_name": element_name, "classification": novelty_class})
+
+                bonus_modules_raw = variant.get("bonus_modules")
+                if not isinstance(bonus_modules_raw, list) or len(bonus_modules_raw) != len(bonus_items):
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' must include exactly {len(bonus_items)} bonus_modules."
+                    )
+                bonus_copy_by_id: dict[str, str] = {}
+                for bonus_module_idx, bonus_module_raw in enumerate(bonus_modules_raw):
+                    bonus_module = _require_dict(
+                        payload=bonus_module_raw,
+                        field_name=f"variants[{idx}].bonus_modules[{bonus_module_idx}]",
+                    )
+                    bonus_id = str(bonus_module.get("bonus_id") or "").strip()
+                    if bonus_id not in bonus_by_id:
+                        raise StrategyV2SchemaValidationError(
+                            f"Variant '{variant_id}' bonus_modules contains unknown bonus_id '{bonus_id}'."
+                        )
+                    if bonus_id in bonus_copy_by_id:
+                        raise StrategyV2SchemaValidationError(
+                            f"Variant '{variant_id}' bonus_modules contains duplicate bonus_id '{bonus_id}'."
+                        )
+                    bonus_copy = str(bonus_module.get("copy") or "").strip()
+                    if not bonus_copy:
+                        raise StrategyV2SchemaValidationError(
+                            f"Variant '{variant_id}' bonus_modules bonus_id '{bonus_id}' copy is required."
+                        )
+                    if len(bonus_copy) > _STEP04_BONUS_COPY_MAX_CHARS:
+                        raise StrategyV2SchemaValidationError(
+                            f"Variant '{variant_id}' bonus copy for bonus_id '{bonus_id}' exceeds "
+                            f"{_STEP04_BONUS_COPY_MAX_CHARS} chars."
+                        )
+                    bonus_copy_by_id[bonus_id] = bonus_copy
+                if set(bonus_copy_by_id.keys()) != expected_bonus_ids:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' bonus_modules must include exactly readiness bonus ids: "
+                        f"{sorted(expected_bonus_ids)}."
+                    )
+
+                pricing_metadata_raw = _require_dict(
+                    payload=variant.get("pricing_metadata"),
+                    field_name=f"variants[{idx}].pricing_metadata",
+                )
+                list_price_cents = pricing_metadata_raw.get("list_price_cents")
+                offer_price_cents = pricing_metadata_raw.get("offer_price_cents")
+                if not isinstance(list_price_cents, int) or list_price_cents <= 0:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' pricing_metadata.list_price_cents must be a positive integer."
+                    )
+                if not isinstance(offer_price_cents, int) or offer_price_cents <= 0:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' pricing_metadata.offer_price_cents must be a positive integer."
+                    )
+                if offer_price_cents > list_price_cents:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' pricing_metadata.offer_price_cents cannot exceed list_price_cents."
+                    )
+                pricing_metadata = {
+                    "list_price_cents": list_price_cents,
+                    "offer_price_cents": offer_price_cents,
+                }
+
+                savings_metadata_raw = _require_dict(
+                    payload=variant.get("savings_metadata"),
+                    field_name=f"variants[{idx}].savings_metadata",
+                )
+                savings_amount_cents = savings_metadata_raw.get("savings_amount_cents")
+                savings_percent_raw = savings_metadata_raw.get("savings_percent")
+                savings_basis = str(savings_metadata_raw.get("savings_basis") or "").strip()
+                if not isinstance(savings_amount_cents, int) or savings_amount_cents < 0:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' savings_metadata.savings_amount_cents must be a non-negative integer."
+                    )
+                if not isinstance(savings_percent_raw, (int, float)) or float(savings_percent_raw) < 0.0:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' savings_metadata.savings_percent must be non-negative."
+                    )
+                if not savings_basis:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' savings_metadata.savings_basis is required."
+                    )
+                expected_savings_amount = int(list_price_cents) - int(offer_price_cents)
+                if savings_amount_cents != expected_savings_amount:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' savings_metadata.savings_amount_cents must equal "
+                        "list_price_cents - offer_price_cents."
+                    )
+                expected_savings_percent = round((expected_savings_amount / float(list_price_cents)) * 100.0, 2)
+                savings_percent = round(float(savings_percent_raw), 2)
+                if abs(savings_percent - expected_savings_percent) > 0.5:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' savings_metadata.savings_percent must match computed savings percent "
+                        f"within tolerance (expected {expected_savings_percent})."
+                    )
+                savings_metadata = {
+                    "savings_amount_cents": int(savings_amount_cents),
+                    "savings_percent": float(savings_percent),
+                    "savings_basis": savings_basis,
+                }
+
+                best_value_raw = _require_dict(
+                    payload=variant.get("best_value_metadata"),
+                    field_name=f"variants[{idx}].best_value_metadata",
+                )
+                best_value_reason = str(best_value_raw.get("rationale") or "").strip()
+                if not best_value_reason:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' best_value_metadata.rationale is required."
+                    )
+                if len(best_value_reason) > _STEP04_BEST_VALUE_REASON_MAX_CHARS:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' best_value_metadata.rationale exceeds "
+                        f"{_STEP04_BEST_VALUE_REASON_MAX_CHARS} chars."
+                    )
+                compared_variant_ids_raw = best_value_raw.get("compared_variant_ids")
+                if not isinstance(compared_variant_ids_raw, list):
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' best_value_metadata.compared_variant_ids must be an array."
+                    )
+                compared_variant_ids = [
+                    str(item).strip().lower()
+                    for item in compared_variant_ids_raw
+                    if isinstance(item, str) and str(item).strip()
+                ]
+                if len(compared_variant_ids) != len(_OFFER_VARIANT_IDS) - 1:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' best_value_metadata.compared_variant_ids must include exactly "
+                        f"{len(_OFFER_VARIANT_IDS) - 1} ids."
+                    )
+                if len(set(compared_variant_ids)) != len(compared_variant_ids):
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' best_value_metadata.compared_variant_ids must be unique."
+                    )
+                if variant_id in compared_variant_ids:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' best_value_metadata.compared_variant_ids cannot include itself."
+                    )
+                unknown_compared_ids = [item for item in compared_variant_ids if item not in _OFFER_VARIANT_IDS]
+                if unknown_compared_ids:
+                    raise StrategyV2SchemaValidationError(
+                        f"Variant '{variant_id}' compared_variant_ids contains unknown ids: {unknown_compared_ids}."
+                    )
+                best_value_metadata = {
+                    "is_best_value": bool(best_value_raw.get("is_best_value")),
+                    "rationale": best_value_reason,
+                    "compared_variant_ids": compared_variant_ids,
+                }
 
                 objection_map_raw = variant.get("objection_map")
                 if not isinstance(objection_map_raw, list) or not objection_map_raw:
@@ -13755,6 +16729,53 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                             dimension_scores.get("momentum_continuity"),
                             field_name=f"{variant_id}.momentum_continuity",
                         ),
+                        "pricing_fidelity": _normalize_score_1_10(
+                            dimension_scores.get("pricing_fidelity"),
+                            field_name=f"{variant_id}.pricing_fidelity",
+                        ),
+                        "savings_fidelity": _normalize_score_1_10(
+                            dimension_scores.get("savings_fidelity"),
+                            field_name=f"{variant_id}.savings_fidelity",
+                        ),
+                        "best_value_fidelity": _normalize_score_1_10(
+                            dimension_scores.get("best_value_fidelity"),
+                            field_name=f"{variant_id}.best_value_fidelity",
+                        ),
+                    },
+                    "offer_format": offer_format,
+                    "product_type": product_type,
+                    "pricing_metadata": pricing_metadata,
+                    "savings_metadata": savings_metadata,
+                    "best_value_metadata": best_value_metadata,
+                    "bonus_stack": [
+                        {
+                            "bonus_id": str(bonus_row.get("bonus_id") or ""),
+                            "linked_product_id": str(bonus_row.get("linked_product_id") or ""),
+                            "title": str(bonus_row.get("title") or ""),
+                            "product_type": str(bonus_row.get("product_type") or ""),
+                            "copy": str(bonus_copy_by_id.get(str(bonus_row.get("bonus_id") or "")) or ""),
+                        }
+                        for bonus_row in bonus_items
+                    ],
+                    "bundle_contents": {
+                        "core_product": {
+                            "product_id": core_product_id,
+                            "title": core_product_title,
+                            "product_type": product_type,
+                        },
+                        "offer_id": str(readiness_context.get("offer_id") or ""),
+                        "offer_name": str(readiness_context.get("offer_name") or ""),
+                        "bonuses": [
+                            {
+                                "bonus_id": str(bonus_row.get("bonus_id") or ""),
+                                "linked_product_id": str(bonus_row.get("linked_product_id") or ""),
+                                "title": str(bonus_row.get("title") or ""),
+                                "product_type": str(bonus_row.get("product_type") or ""),
+                                "copy": str(bonus_copy_by_id.get(str(bonus_row.get("bonus_id") or "")) or ""),
+                            }
+                            for bonus_row in bonus_items
+                        ],
+                        "bonus_count": len(bonus_items),
                     },
                 }
             missing_ids = [variant_id for variant_id in _OFFER_VARIANT_IDS if variant_id not in by_id]
@@ -13762,7 +16783,17 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 raise StrategyV2SchemaValidationError(
                     f"Offer Step 04 did not return required variant ids: {missing_ids}."
                 )
-            generated_variant_inputs = [by_id["base"], by_id["variant_a"], by_id["variant_b"]]
+            best_value_variant_ids = [
+                variant_id
+                for variant_id, payload in by_id.items()
+                if bool(_require_dict(payload=payload.get("best_value_metadata"), field_name="best_value_metadata").get("is_best_value"))
+            ]
+            if len(best_value_variant_ids) != 1:
+                raise StrategyV2SchemaValidationError(
+                    "Offer Step 04 must mark exactly one variant as best value "
+                    f"(found {len(best_value_variant_ids)}: {best_value_variant_ids})."
+                )
+            generated_variant_inputs = [by_id[variant_id] for variant_id in _OFFER_VARIANT_IDS]
 
             scored_variants = []
             evaluation_variants: list[dict[str, Any]] = []
@@ -13774,10 +16805,17 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 scored_variants.append(
                     {
                         "variant_id": variant["variant_id"],
+                        "offer_format": variant["offer_format"],
+                        "product_type": variant["product_type"],
                         "core_promise": variant["core_promise"],
                         "value_stack": variant["value_stack"],
                         "guarantee": variant["guarantee"],
                         "pricing_rationale": variant["pricing_rationale"],
+                        "pricing_metadata": variant["pricing_metadata"],
+                        "savings_metadata": variant["savings_metadata"],
+                        "best_value_metadata": variant["best_value_metadata"],
+                        "bundle_contents": variant["bundle_contents"],
+                        "bonus_stack": variant["bonus_stack"],
                         "value_score": value_score,
                         "objection_score": objection_score,
                         "novelty_score": novelty_score,
@@ -13820,6 +16858,18 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                                 "raw_score": float(dimensions["momentum_continuity"]),
                                 "evidence_quality": "INFERRED",
                             },
+                            "pricing_fidelity": {
+                                "raw_score": float(dimensions["pricing_fidelity"]),
+                                "evidence_quality": "OBSERVED",
+                            },
+                            "savings_fidelity": {
+                                "raw_score": float(dimensions["savings_fidelity"]),
+                                "evidence_quality": "OBSERVED",
+                            },
+                            "best_value_fidelity": {
+                                "raw_score": float(dimensions["best_value_fidelity"]),
+                                "evidence_quality": "INFERRED",
+                            },
                         },
                     }
                 )
@@ -13830,6 +16880,7 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 "step_02_output": step_02_output[:20000],
                 "selected_ump_ums": _dump_prompt_json(selected_pair, max_chars=6000),
                 "step_04_output": _dump_prompt_json({"variants": generated_variant_inputs}, max_chars=30000),
+                "offer_data_readiness_context": _dump_prompt_json(readiness_context, max_chars=12000),
                 "product_name": stage2.product_name,
                 "angle_name": stage2.selected_angle.angle_name,
             }
@@ -13845,7 +16896,7 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                     f"STEP_04_OUTPUT_JSON:\n{_dump_prompt_json({'variants': generated_variant_inputs}, max_chars=30000)}\n\n"
                     "## Runtime Output Contract\n"
                     "Return JSON ONLY (no markdown, no prose outside JSON).\n"
-                    "For each variant, provide exactly the 8 required dimensions and required fields only.\n"
+                    f"For each variant, provide exactly {len(_OFFER_COMPOSITE_DIMENSIONS)} required dimensions and required fields only.\n"
                     "Do not emit large narratives, placeholder whitespace, or extra keys.\n"
                     f"`revision_notes` MUST be non-empty plain text and <= {_STEP05_REVISION_NOTES_MAX_CHARS} chars."
                 ),
@@ -13904,7 +16955,10 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 client_id=client_id,
                 objective_type="strategy_v2.offer_variant_generation_scoring.prompt_chain",
                 model=settings.STRATEGY_V2_OFFER_MODEL,
-                inputs_json={"selected_pair": selected_pair},
+                inputs_json={
+                    "selected_pair": selected_pair,
+                    "offer_data_readiness": offer_data_readiness,
+                },
                 outputs_json={
                     "iteration_count": iteration,
                     "composite": composite_results,
@@ -13920,6 +16974,7 @@ def build_strategy_v2_offer_variants_activity(params: dict[str, Any]) -> dict[st
                 "iteration_count": iteration,
                 "max_iterations": max_iterations,
                 "score_threshold": score_threshold,
+                "offer_data_readiness": offer_data_readiness,
                 "generated_variant_inputs": generated_variant_inputs,
                 "variants": scored_variants,
                 "composite_results": composite_results,
@@ -14041,6 +17096,33 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
             "value_stack_summary": list(selected_variant.get("value_stack") or []),
             "guarantee_type": str(selected_variant.get("guarantee") or ""),
             "pricing_rationale": str(selected_variant.get("pricing_rationale") or ""),
+            "offer_format": str(selected_variant.get("offer_format") or "DISCOUNT_PLUS_3_BONUSES_V1"),
+            "product_type": str(selected_variant.get("product_type") or ""),
+            "pricing_metadata": (
+                dict(selected_variant.get("pricing_metadata"))
+                if isinstance(selected_variant.get("pricing_metadata"), dict)
+                else None
+            ),
+            "savings_metadata": (
+                dict(selected_variant.get("savings_metadata"))
+                if isinstance(selected_variant.get("savings_metadata"), dict)
+                else None
+            ),
+            "best_value_metadata": (
+                dict(selected_variant.get("best_value_metadata"))
+                if isinstance(selected_variant.get("best_value_metadata"), dict)
+                else None
+            ),
+            "bundle_contents": (
+                dict(selected_variant.get("bundle_contents"))
+                if isinstance(selected_variant.get("bundle_contents"), dict)
+                else None
+            ),
+            "bonus_stack": (
+                [row for row in selected_variant.get("bonus_stack") if isinstance(row, dict)]
+                if isinstance(selected_variant.get("bonus_stack"), list)
+                else []
+            ),
             "awareness_level_primary": awareness_level_primary,
             "sophistication_level": sophistication_level,
             "composite_score": float(selected_variant_score.get("composite_safety_adjusted") or 0.0),
@@ -14106,6 +17188,7 @@ def finalize_strategy_v2_offer_winner_activity(params: dict[str, Any]) -> dict[s
             onboarding_payload=onboarding_payload,
             offer_pipeline_output=offer_pipeline_output,
             stage3_data=stage3_data,
+            scored_variants=[variant for variant in variants_raw if isinstance(variant, Mapping)],
             selected_variant=selected_variant,
             selected_variant_score=selected_variant_score,
             decision_payload=decision_payload,
@@ -15071,6 +18154,32 @@ def _extract_copy_reason_codes(error_message: str, *, limit: int = 20) -> list[s
     return collected
 
 
+def _is_non_retryable_sales_payload_failure(error_message: str) -> bool:
+    lowered = error_message.lower()
+    if "template_payload_validation" in lowered:
+        return any(
+            signal in lowered
+            for signal in (
+                "field required",
+                "extra inputs are not permitted",
+                "input should be a valid",
+                "input should be an object",
+                "input should be a valid array",
+                "input should be a valid boolean",
+                "input should be a valid dictionary",
+                "input should be a valid integer",
+                "input should be a valid list",
+                "input should be a valid object",
+                "input should be a valid string",
+            )
+        )
+    return (
+        "sales template payload json parse failed" in lowered
+        or "invalid template_payload object" in lowered
+        or "legacy sales payload upgrade failed" in lowered
+    )
+
+
 def _coerce_int(value: object) -> int:
     if isinstance(value, bool):
         return int(value)
@@ -15168,6 +18277,7 @@ def _build_copy_repair_directives(
     word_floor_repair_lines: list[str] = []
     word_ceiling_repair_lines: list[str] = []
     cta_repair_lines: list[str] = []
+    cta_link_repair_lines: list[str] = []
     proof_repair_lines: list[str] = []
     section_coverage_repair_lines: list[str] = []
     belief_sequence_repair_lines: list[str] = []
@@ -15221,6 +18331,15 @@ def _build_copy_repair_directives(
                     "- Canonical CTA sections are headings that contain `CTA` or `Continue to Offer`.",
                     "- URL path tokens alone do not count as CTA intent.",
                     "- Keep explicit purchase directives (buy/order/checkout/add-to-cart/complete-purchase) inside canonical CTA sections.",
+                ]
+
+        if not cta_link_repair_lines:
+            cta_link_match = _COPY_SALES_SEMANTIC_CTA_LINK_ERROR_RE.search(message)
+            if cta_link_match is not None:
+                cta_link_repair_lines = [
+                    "- CTA link integrity hard-fix: previous sales draft had zero markdown CTA link URLs.",
+                    "- Add at least one markdown link in each canonical CTA section using `[anchor](https://...)`.",
+                    "- Keep the purchase destination URL consistent across CTA #1, CTA #2, and CTA #3 + P.S.",
                 ]
 
         if not proof_repair_lines:
@@ -15300,6 +18419,7 @@ def _build_copy_repair_directives(
 
         if (
             cta_repair_lines
+            and cta_link_repair_lines
             and proof_repair_lines
             and section_coverage_repair_lines
             and belief_sequence_repair_lines
@@ -15316,6 +18436,7 @@ def _build_copy_repair_directives(
     lines.extend(word_floor_repair_lines)
     lines.extend(word_ceiling_repair_lines)
     lines.extend(cta_repair_lines)
+    lines.extend(cta_link_repair_lines)
     lines.extend(proof_repair_lines)
     lines.extend(section_coverage_repair_lines)
     lines.extend(belief_sequence_repair_lines)
@@ -15399,12 +18520,45 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
     _require_selected_angle_evidence_quality(selected_angle=stage3.selected_angle)
     copy_context = _require_dict(payload=params["copy_context"], field_name="copy_context")
     operator_user_id = str(params.get("operator_user_id") or "system")
+    headline_evaluation_limit = _COPY_HEADLINE_EVALUATION_LIMIT
+    if params.get("headline_evaluation_limit") is not None:
+        headline_evaluation_limit = _coerce_int(params.get("headline_evaluation_limit"))
+    headline_evaluation_offset = _COPY_HEADLINE_EVALUATION_OFFSET
+    if params.get("headline_evaluation_offset") is not None:
+        headline_evaluation_offset = _coerce_int(params.get("headline_evaluation_offset"))
+    allow_no_bundle_result = str(params.get("allow_no_bundle_result") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    rapid_mode = str(params.get("rapid_mode") or "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }
+    copy_generation_mode = _normalize_copy_generation_mode(params.get("copy_generation_mode"))
+    template_payload_only_mode = copy_generation_mode == _COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY
+    qa_max_iterations = _COPY_HEADLINE_QA_MAX_ITERATIONS
+    page_repair_max_attempts = _COPY_PAGE_REPAIR_MAX_ATTEMPTS
+    if rapid_mode:
+        if template_payload_only_mode:
+            page_repair_max_attempts = min(page_repair_max_attempts, 5)
+        else:
+            page_repair_max_attempts = min(page_repair_max_attempts, 3)
 
     hook_lines = [hook.opening_line.strip() for hook in stage3.selected_angle.hook_starters if hook.opening_line.strip()]
     if not hook_lines:
+        # Agent 3 may omit hook starters (angles are VOC-first). In that case, fall back to
+        # using the selected angle's top VOC quotes as headline seeds.
+        hook_lines = [
+            quote.quote.strip()
+            for quote in stage3.selected_angle.evidence.top_quotes
+            if isinstance(quote.quote, str) and quote.quote.strip()
+        ][:12]
+    if not hook_lines:
         raise StrategyV2MissingContextError(
-            "Selected angle does not contain hook starters for copy generation. "
-            "Remediation: select an angle with hook_starters populated."
+            "Selected angle does not contain any usable hook starters or VOC quotes for copy generation. "
+            "Remediation: select an angle with non-empty evidence.top_quotes (preferred) or hook_starters."
         )
     copy_contract_profile = default_copy_contract_profile()
     copy_input_packet = build_copy_stage4_input_packet(
@@ -15419,11 +18573,13 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
     qa_attempts: list[dict[str, Any]] = []
 
     if True:
-        api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+        qa_api_key_env = headline_qa_required_api_key_env(settings.STRATEGY_V2_COPY_QA_MODEL)
+        api_key = os.getenv(qa_api_key_env, "").strip()
         if not api_key:
             raise StrategyV2MissingContextError(
-                "ANTHROPIC_API_KEY is required for copy headline QA loop and is not set. "
-                "Remediation: configure ANTHROPIC_API_KEY before running Strategy V2 copy stage."
+                f"{qa_api_key_env} is required for copy headline QA loop model "
+                f"'{settings.STRATEGY_V2_COPY_QA_MODEL}' and is not set. "
+                f"Remediation: configure {qa_api_key_env} before running Strategy V2 copy stage."
             )
 
         headline_asset = resolve_prompt_asset(
@@ -15532,23 +18688,23 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                 f"(expected_items={expected_presell_items}). "
                 "Remediation: generate non-numeric headlines or align promised list count with page sections."
             )
-        if _COPY_HEADLINE_EVALUATION_LIMIT < 1:
+        if headline_evaluation_limit < 1:
             raise StrategyV2DecisionError(
                 "Headline evaluation limit must be >= 1. "
                 "Remediation: set STRATEGY_V2_COPY_HEADLINE_EVALUATION_LIMIT to a positive integer."
             )
-        if _COPY_HEADLINE_EVALUATION_OFFSET < 0:
+        if headline_evaluation_offset < 0:
             raise StrategyV2DecisionError(
                 "Headline evaluation offset must be >= 0. "
                 "Remediation: set STRATEGY_V2_COPY_HEADLINE_EVALUATION_OFFSET to a non-negative integer."
             )
-        if _COPY_HEADLINE_EVALUATION_OFFSET >= len(ranked_headlines):
+        if headline_evaluation_offset >= len(ranked_headlines):
             raise StrategyV2DecisionError(
                 "Headline evaluation offset exceeds available ranked headlines. "
                 "Remediation: lower STRATEGY_V2_COPY_HEADLINE_EVALUATION_OFFSET or increase candidate generation."
             )
         headlines_for_evaluation = ranked_headlines[
-            _COPY_HEADLINE_EVALUATION_OFFSET : _COPY_HEADLINE_EVALUATION_OFFSET + _COPY_HEADLINE_EVALUATION_LIMIT
+            headline_evaluation_offset : headline_evaluation_offset + headline_evaluation_limit
         ]
         if not headlines_for_evaluation:
             raise StrategyV2DecisionError(
@@ -15583,7 +18739,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             qa_result = run_headline_qa_loop(
                 headline=source_headline,
                 page_type="advertorial",
-                max_iterations=_COPY_HEADLINE_QA_MAX_ITERATIONS,
+                max_iterations=qa_max_iterations,
                 min_tier="A",
                 api_key=api_key,
                 model=settings.STRATEGY_V2_COPY_QA_MODEL,
@@ -15631,6 +18787,10 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                 "qa_overloaded_error_count": qa_overloaded_error_count,
                 "qa_timeout_error_count": qa_timeout_error_count,
                 "qa_transient_attempt_count": qa_transient_attempt_count,
+                "rapid_mode": rapid_mode,
+                "copy_generation_mode": copy_generation_mode,
+                "qa_max_iterations": qa_max_iterations,
+                "page_repair_max_attempts": page_repair_max_attempts,
             }
             if qa_last_failing_tests:
                 attempt_row["qa_last_failing_tests"] = qa_last_failing_tests
@@ -15730,24 +18890,41 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                 continue
 
             page_generation_errors: list[str] = []
-            use_claude_chat_context = settings.STRATEGY_V2_COPY_MODEL.lower().startswith("claude")
+            # Claude repair loops can explode input-token size when full chat history is
+            # carried across attempts. Keep this opt-in via env; default to stateless turns.
+            use_claude_chat_context = (
+                settings.STRATEGY_V2_COPY_MODEL.lower().startswith("claude")
+                and _COPY_USE_CLAUDE_CHAT_CONTEXT
+            )
             advertorial_conversation: list[dict[str, Any]] = []
-            sales_conversation: list[dict[str, Any]] = []
+            sales_markdown_conversation: list[dict[str, Any]] = []
+            sales_payload_conversation: list[dict[str, Any]] = []
             presell_thread_id = f"presell_page:{headline_index}"
-            sales_thread_id = f"sales_page:{headline_index}"
+            sales_markdown_thread_id = f"sales_markdown:{headline_index}"
+            sales_payload_thread_id = f"sales_payload:{headline_index}"
             page_attempt_observability: list[dict[str, Any]] = []
             attempt_row["page_thread_ids"] = {
                 "presell": presell_thread_id,
-                "sales_page": sales_thread_id,
+                "sales_page": sales_markdown_thread_id,
+                "sales_markdown": sales_markdown_thread_id,
+                "sales_payload": sales_payload_thread_id,
             }
-            for page_attempt in range(1, _COPY_PAGE_REPAIR_MAX_ATTEMPTS + 1):
+            for page_attempt in range(1, page_repair_max_attempts + 1):
                 page_prompt_start_index = len(prompt_call_logs)
                 page_observability_row: dict[str, Any] = {
                     "page_attempt": page_attempt,
                     "presell_thread_id": presell_thread_id,
-                    "sales_page_thread_id": sales_thread_id,
+                    "sales_page_thread_id": sales_markdown_thread_id,
+                    "sales_markdown_thread_id": sales_markdown_thread_id,
+                    "sales_payload_thread_id": sales_payload_thread_id,
                     "thread_turn": page_attempt,
+                    "rapid_mode": rapid_mode,
+                    "copy_generation_mode": copy_generation_mode,
+                    "page_repair_max_attempts": page_repair_max_attempts,
                 }
+                presell_markdown_for_observability = ""
+                sales_markdown_for_observability = ""
+                sales_template_payload_json_for_observability = ""
                 presell_repair_directives = _build_copy_repair_directives(
                     previous_errors=page_generation_errors,
                     page_scope="presell_advertorial",
@@ -15774,18 +18951,296 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                     page_observability_row["sales_prompt_runtime_instruction"] = sales_runtime_instruction
                     page_observability_row["presell_prompt_runtime_instruction"] = presell_runtime_instruction
                     if use_claude_chat_context:
-                        page_observability_row["sales_thread_before_call"] = _serialize_claude_conversation(
-                            sales_conversation
+                        page_observability_row["sales_markdown_thread_before_call"] = _serialize_claude_conversation(
+                            sales_markdown_conversation
+                        )
+                        page_observability_row["sales_payload_thread_before_call"] = _serialize_claude_conversation(
+                            sales_payload_conversation
                         )
                         page_observability_row["presell_thread_before_call"] = _serialize_claude_conversation(
                             advertorial_conversation
                         )
                 try:
+                    if template_payload_only_mode:
+                        presell_payload_runtime_instruction = (
+                            f"{presell_runtime_instruction}\n\n"
+                            "## Execution Mode Override\n"
+                            "This call generates template payload only.\n"
+                            "Return JSON with key `template_payload` only.\n"
+                            "- Do not return markdown.\n\n"
+                            f"{_PRE_SALES_TEMPLATE_LIMITS_INSTRUCTION}\n"
+                            "If any field would exceed limits, rewrite it to fit before returning."
+                        )
+                        advertorial_payload_parsed, advertorial_raw, advertorial_provenance = _run_prompt_json_object(
+                            asset=advertorial_asset,
+                            context="strategy_v2.copy.advertorial_template_payload",
+                            model=settings.STRATEGY_V2_COPY_MODEL,
+                            runtime_instruction=presell_payload_runtime_instruction,
+                            schema_name="strategy_v2_copy_advertorial_template_payload",
+                            schema={
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "template_payload": _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA,
+                                },
+                                "required": ["template_payload"],
+                            },
+                            use_reasoning=True,
+                            use_web_search=False,
+                            max_tokens=_COPY_PIPELINE_MAX_TOKENS,
+                            heartbeat_context={
+                                "activity": "strategy_v2.run_copy_pipeline",
+                                "phase": "advertorial_template_payload_prompt",
+                                "model": settings.STRATEGY_V2_COPY_MODEL,
+                                "headline_index": headline_index,
+                                "headline": winning_headline[:160],
+                                "thread_id": presell_thread_id,
+                                "page_attempt": page_attempt,
+                            },
+                            conversation_messages=advertorial_conversation if use_claude_chat_context else None,
+                            log_metadata={
+                                "thread_id": presell_thread_id,
+                                "thread_turn": page_attempt,
+                                "headline_index": headline_index,
+                                "page_attempt": page_attempt,
+                            },
+                            llm_call_log=prompt_call_logs,
+                            llm_call_label="advertorial_template_payload_prompt",
+                        )
+                        presell_template_payload = _require_dict(
+                            payload=advertorial_payload_parsed.get("template_payload"),
+                            field_name="presell_template_payload",
+                        )
+                        presell_markdown = ""
+                        presell_markdown_for_observability = ""
+
+                        sales_payload_runtime_instruction = (
+                            f"{sales_runtime_instruction}\n\n"
+                            "## Execution Mode Override\n"
+                            "This call generates template payload only.\n"
+                            "Return JSON with key `template_payload_json` only.\n"
+                            "- Do not return markdown.\n\n"
+                            f"{_SALES_TEMPLATE_LIMITS_INSTRUCTION}\n"
+                            "If any field would exceed limits, rewrite it to fit before returning."
+                        )
+                        sales_payload_parsed, sales_payload_raw, sales_payload_provenance = _run_prompt_json_object(
+                            asset=sales_asset,
+                            context="strategy_v2.copy.sales_template_payload_direct",
+                            model=settings.STRATEGY_V2_COPY_MODEL,
+                            runtime_instruction=sales_payload_runtime_instruction,
+                            schema_name="strategy_v2_copy_sales_template_payload_direct",
+                            schema={
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "template_payload_json": {"type": "string"},
+                                },
+                                "required": ["template_payload_json"],
+                            },
+                            use_reasoning=True,
+                            use_web_search=False,
+                            max_tokens=_COPY_PIPELINE_MAX_TOKENS,
+                            heartbeat_context={
+                                "activity": "strategy_v2.run_copy_pipeline",
+                                "phase": "sales_template_payload_prompt",
+                                "model": settings.STRATEGY_V2_COPY_MODEL,
+                                "headline_index": headline_index,
+                                "headline": winning_headline[:160],
+                                "thread_id": sales_payload_thread_id,
+                                "page_attempt": page_attempt,
+                            },
+                            conversation_messages=sales_payload_conversation if use_claude_chat_context else None,
+                            log_metadata={
+                                "thread_id": sales_payload_thread_id,
+                                "thread_turn": page_attempt,
+                                "headline_index": headline_index,
+                                "page_attempt": page_attempt,
+                            },
+                            llm_call_log=prompt_call_logs,
+                            llm_call_label="sales_template_payload_prompt",
+                        )
+                        sales_template_payload_json = str(
+                            sales_payload_parsed.get("template_payload_json") or ""
+                        ).strip()
+                        sales_template_payload_json_for_observability = sales_template_payload_json
+                        if not sales_template_payload_json:
+                            raise StrategyV2DecisionError(
+                                "Sales payload prompt returned empty template_payload_json. "
+                                "Remediation: return a JSON-serialized sales template payload in template_payload_json."
+                            )
+                        try:
+                            sales_template_payload, sales_payload_parse_meta = _parse_sales_template_payload_json(
+                                raw_text=sales_template_payload_json,
+                            )
+                        except (StrategyV2MissingContextError, StrategyV2SchemaValidationError) as exc:
+                            page_observability_row["sales_template_payload_json_parse_error"] = str(exc)
+                            raise StrategyV2DecisionError(
+                                "Sales template payload JSON parse failed. "
+                                f"Details: {exc}"
+                            ) from exc
+                        if isinstance(sales_payload_parse_meta, dict):
+                            page_observability_row["sales_template_payload_parse_recovery"] = sales_payload_parse_meta
+                        presell_template_payload = upgrade_strategy_v2_template_payload_fields(
+                            template_id="pre-sales-listicle",
+                            payload_fields=presell_template_payload,
+                        )
+                        sales_template_payload = upgrade_strategy_v2_template_payload_fields(
+                            template_id="sales-pdp",
+                            payload_fields=sales_template_payload,
+                        )
+                        presell_template_fields = validate_strategy_v2_template_payload_fields(
+                            template_id="pre-sales-listicle",
+                            payload_fields=presell_template_payload,
+                        )
+                        try:
+                            sales_template_fields = validate_strategy_v2_template_payload_fields(
+                                template_id="sales-pdp",
+                                payload_fields=sales_template_payload,
+                            )
+                        except StrategyV2DecisionError:
+                            sales_validation_report = inspect_strategy_v2_template_payload_validation(
+                                template_id="sales-pdp",
+                                payload_fields=sales_template_payload,
+                                max_items=160,
+                            )
+                            page_observability_row["template_payload_validation"] = "fail"
+                            page_observability_row["sales_template_validation_report"] = sales_validation_report
+                            page_observability_row["sales_template_payload_upgraded_failed"] = json.dumps(
+                                sales_template_payload,
+                                ensure_ascii=True,
+                            )[:16000]
+                            raise
+                        presell_template_patch = build_strategy_v2_template_patch_operations(
+                            template_id="pre-sales-listicle",
+                            payload_fields=presell_template_fields,
+                        )
+                        sales_template_patch = build_strategy_v2_template_patch_operations(
+                            template_id="sales-pdp",
+                            payload_fields=sales_template_fields,
+                        )
+                        page_observability_row["template_payload_validation"] = "pass"
+
+                        sales_page_markdown = ""
+                        sales_markdown_for_observability = ""
+                        body_markdown = ""
+                        congruency = {
+                            "mode": _COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY,
+                            "skipped": True,
+                            "skip_reason": "template_payload_only_mode",
+                            "presell": {"passed": True, "hard_gate_pass": True},
+                            "sales_page": {"passed": True, "hard_gate_pass": True},
+                            "composite": {
+                                "presell_passed": True,
+                                "sales_page_passed": True,
+                                "hard_gate_pass": True,
+                                "passed": True,
+                            },
+                        }
+                        presell_semantic_report = {
+                            "mode": _COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY,
+                            "page_type": "presell_advertorial",
+                            "passed": True,
+                            "skipped": True,
+                            "skip_reason": "template_payload_only_mode",
+                        }
+                        sales_semantic_report = {
+                            "mode": _COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY,
+                            "page_type": "sales_page_warm",
+                            "passed": True,
+                            "skipped": True,
+                            "skip_reason": "template_payload_only_mode",
+                        }
+                        presell_quality_report = {
+                            "mode": _COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY,
+                            "page_type": "presell_advertorial",
+                            "passed": True,
+                            "skipped": True,
+                            "skip_reason": "template_payload_only_mode",
+                        }
+                        sales_quality_report = {
+                            "mode": _COPY_GENERATION_MODE_TEMPLATE_PAYLOAD_ONLY,
+                            "page_type": "sales_page_warm",
+                            "passed": True,
+                            "skipped": True,
+                            "skip_reason": "template_payload_only_mode",
+                        }
+
+                        selected_bundle = {
+                            "headline_row": scored,
+                            "qa_json": qa_json,
+                            "winning_headline": winning_headline,
+                            "body_markdown": body_markdown,
+                            "presell_markdown": presell_markdown,
+                            "sales_page_markdown": sales_page_markdown,
+                            "presell_template_payload": presell_template_payload,
+                            "sales_template_payload": sales_template_payload,
+                            "presell_template_fields": presell_template_fields,
+                            "sales_template_fields": sales_template_fields,
+                            "presell_template_patch": presell_template_patch,
+                            "sales_template_patch": sales_template_patch,
+                            "congruency": congruency,
+                            "promise_contract": promise_contract,
+                            "semantic_gates": {
+                                "presell": presell_semantic_report,
+                                "sales_page": sales_semantic_report,
+                            },
+                            "quality_gate_report": {
+                                "presell": presell_quality_report,
+                                "sales_page": sales_quality_report,
+                            },
+                            "page_generation_attempts": page_attempt,
+                            "page_generation_failures": list(page_generation_errors),
+                            "page_thread_ids": {
+                                "presell": presell_thread_id,
+                                "sales_page": sales_markdown_thread_id,
+                                "sales_markdown": sales_markdown_thread_id,
+                                "sales_payload": sales_payload_thread_id,
+                            },
+                            "page_attempt_observability": list(page_attempt_observability),
+                            "prompt_chain": {
+                                "headline_prompt_provenance": headline_provenance,
+                                "headline_prompt_raw_output": headline_raw[:16000],
+                                "promise_prompt_provenance": promise_provenance,
+                                "promise_prompt_raw_output": promise_raw[:8000],
+                                "advertorial_prompt_provenance": advertorial_provenance,
+                                "advertorial_prompt_raw_output": advertorial_raw[:16000],
+                                "sales_prompt_provenance": sales_payload_provenance,
+                                "sales_prompt_raw_output": sales_payload_raw[:16000],
+                                "sales_markdown_prompt_provenance": sales_payload_provenance,
+                                "sales_markdown_prompt_raw_output": sales_payload_raw[:16000],
+                                "sales_template_payload_prompt_provenance": sales_payload_provenance,
+                                "sales_template_payload_prompt_raw_output": sales_payload_raw[:16000],
+                            },
+                        }
+                        page_prompt_request_ids = _coerce_string_list(
+                            [row.get("request_id") for row in prompt_call_logs[page_prompt_start_index:]],
+                            limit=12,
+                        )
+                        if page_prompt_request_ids:
+                            attempt_row["page_prompt_request_ids"] = page_prompt_request_ids
+                            page_observability_row["request_ids"] = page_prompt_request_ids
+                        page_observability_row["status"] = "pass"
+                        page_attempt_observability.append(page_observability_row)
+                        attempt_row["page_attempt_observability"] = list(page_attempt_observability)
+                        attempt_row["presell_thread_turn_count"] = page_attempt
+                        attempt_row["sales_markdown_thread_turn_count"] = page_attempt
+                        attempt_row["sales_payload_thread_turn_count"] = page_attempt
+                        attempt_row["page_generation_attempts"] = page_attempt
+                        attempt_row["page_generation_failures"] = list(page_generation_errors)
+                        attempt_row["result"] = "selected_bundle_passed"
+                        qa_attempts.append(attempt_row)
+                        break
+
+                    presell_full_runtime_instruction = (
+                        f"{presell_runtime_instruction}\n\n"
+                        f"{_PRE_SALES_TEMPLATE_LIMITS_INSTRUCTION}\n"
+                        "If any field would exceed limits, rewrite it to fit before returning."
+                    )
                     advertorial_parsed, advertorial_raw, advertorial_provenance = _run_prompt_json_object(
                         asset=advertorial_asset,
                         context="strategy_v2.copy.advertorial",
                         model=settings.STRATEGY_V2_COPY_MODEL,
-                        runtime_instruction=presell_runtime_instruction,
+                        runtime_instruction=presell_full_runtime_instruction,
                         schema_name="strategy_v2_copy_advertorial",
                         schema={
                             "type": "object",
@@ -15823,6 +19278,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         payload=advertorial_parsed.get("template_payload"),
                         field_name="presell_template_payload",
                     )
+                    presell_markdown_for_observability = presell_markdown
                     if _COPY_DEBUG_CAPTURE_FULL_MARKDOWN:
                         page_observability_row["presell_markdown_generated"] = presell_markdown
                     if _COPY_DEBUG_CAPTURE_THREADS and use_claude_chat_context:
@@ -15834,6 +19290,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         headline=winning_headline,
                         promise_contract=promise_contract,
                     )
+                    presell_markdown_for_observability = presell_markdown
                     presell_quality_report = require_copy_page_quality(
                         markdown=presell_markdown,
                         page_contract=presell_page_contract,
@@ -15846,70 +19303,58 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         page_name="Presell advertorial",
                     )
 
-                    sales_parsed, sales_raw, sales_provenance = _run_prompt_json_object(
+                    sales_markdown_runtime_instruction = (
+                        f"{sales_runtime_instruction}\n\n"
+                        "## Execution Mode Override\n"
+                        "This call generates sales markdown only.\n"
+                        "Return JSON with key `markdown` only.\n"
+                        "- Do not return teaser fragments or partial sections.\n"
+                        "- Deliver full long-form sales copy that satisfies all hard constraints above.\n"
+                        "- Include at least one markdown link `[anchor](https://...)` in each canonical CTA section."
+                    )
+                    sales_markdown_parsed, sales_markdown_raw, sales_markdown_provenance = _run_prompt_json_object(
                         asset=sales_asset,
-                        context="strategy_v2.copy.sales_page",
+                        context="strategy_v2.copy.sales_page_markdown",
                         model=settings.STRATEGY_V2_COPY_MODEL,
-                        runtime_instruction=sales_runtime_instruction,
-                        schema_name="strategy_v2_copy_sales_page",
+                        runtime_instruction=sales_markdown_runtime_instruction,
+                        schema_name="strategy_v2_copy_sales_page_markdown",
                         schema={
                             "type": "object",
                             "additionalProperties": False,
                             "properties": {
                                 "markdown": {"type": "string"},
-                                "template_payload": _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA,
                             },
-                            "required": ["markdown", "template_payload"],
+                            "required": ["markdown"],
                         },
                         use_reasoning=True,
                         use_web_search=False,
                         max_tokens=_COPY_PIPELINE_MAX_TOKENS,
                         heartbeat_context={
                             "activity": "strategy_v2.run_copy_pipeline",
-                            "phase": "sales_page_prompt",
+                            "phase": "sales_page_markdown_prompt",
                             "model": settings.STRATEGY_V2_COPY_MODEL,
                             "headline_index": headline_index,
                             "headline": winning_headline[:160],
-                            "thread_id": sales_thread_id,
+                            "thread_id": sales_markdown_thread_id,
                             "page_attempt": page_attempt,
                         },
-                        conversation_messages=sales_conversation if use_claude_chat_context else None,
+                        conversation_messages=sales_markdown_conversation if use_claude_chat_context else None,
                         log_metadata={
-                            "thread_id": sales_thread_id,
+                            "thread_id": sales_markdown_thread_id,
                             "thread_turn": page_attempt,
                             "headline_index": headline_index,
                             "page_attempt": page_attempt,
                         },
                         llm_call_log=prompt_call_logs,
-                        llm_call_label="sales_page_prompt",
+                        llm_call_label="sales_page_markdown_prompt",
                     )
-                    sales_page_markdown = str(sales_parsed.get("markdown") or "").strip()
-                    sales_template_payload = _require_dict(
-                        payload=sales_parsed.get("template_payload"),
-                        field_name="sales_template_payload",
-                    )
-                    presell_template_fields = validate_strategy_v2_template_payload_fields(
-                        template_id="pre-sales-listicle",
-                        payload_fields=presell_template_payload,
-                    )
-                    sales_template_fields = validate_strategy_v2_template_payload_fields(
-                        template_id="sales-pdp",
-                        payload_fields=sales_template_payload,
-                    )
-                    presell_template_patch = build_strategy_v2_template_patch_operations(
-                        template_id="pre-sales-listicle",
-                        payload_fields=presell_template_fields,
-                    )
-                    sales_template_patch = build_strategy_v2_template_patch_operations(
-                        template_id="sales-pdp",
-                        payload_fields=sales_template_fields,
-                    )
-                    page_observability_row["template_payload_validation"] = "pass"
+                    sales_page_markdown = str(sales_markdown_parsed.get("markdown") or "").strip()
+                    sales_markdown_for_observability = sales_page_markdown
                     if _COPY_DEBUG_CAPTURE_FULL_MARKDOWN:
                         page_observability_row["sales_markdown_generated"] = sales_page_markdown
                     if _COPY_DEBUG_CAPTURE_THREADS and use_claude_chat_context:
-                        page_observability_row["sales_thread_after_call"] = _serialize_claude_conversation(
-                            sales_conversation
+                        page_observability_row["sales_markdown_thread_after_call"] = _serialize_claude_conversation(
+                            sales_markdown_conversation
                         )
                     sales_page_markdown = _repair_sales_markdown_for_quality(
                         markdown=sales_page_markdown,
@@ -15930,6 +19375,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                     sales_page_markdown = _normalize_sales_cta_section_titles(
                         markdown=sales_page_markdown,
                     )
+                    sales_markdown_for_observability = sales_page_markdown
                     if _COPY_DEBUG_CAPTURE_FULL_MARKDOWN:
                         page_observability_row["sales_markdown_final"] = sales_page_markdown
                         page_observability_row["presell_markdown_final"] = presell_markdown
@@ -15963,6 +19409,117 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         promise_contract=promise_contract,
                         page_name="Sales page",
                     )
+                    sales_payload_runtime_instruction = (
+                        f"{sales_runtime_instruction}\n\n"
+                        "## Execution Mode Override\n"
+                        "This call generates template payload only.\n"
+                        "Use FINAL_SALES_PAGE_MARKDOWN as source of truth and return JSON with key "
+                        "`template_payload_json` only.\n\n"
+                        f"{_SALES_TEMPLATE_LIMITS_INSTRUCTION}\n"
+                        "If any field would exceed limits, rewrite it to fit before returning.\n\n"
+                        f"FINAL_SALES_PAGE_MARKDOWN:\n{sales_page_markdown}"
+                    )
+                    sales_payload_parsed, sales_payload_raw, sales_payload_provenance = _run_prompt_json_object(
+                        asset=sales_asset,
+                        context="strategy_v2.copy.sales_template_payload",
+                        model=settings.STRATEGY_V2_COPY_MODEL,
+                        runtime_instruction=sales_payload_runtime_instruction,
+                        schema_name="strategy_v2_copy_sales_template_payload",
+                        schema={
+                            "type": "object",
+                            "additionalProperties": False,
+                            "properties": {
+                                # NOTE: Anthropic Claude rejects the full sales template schema with:
+                                # "compiled grammar is too large". Keep this field as a JSON string and
+                                # enforce the real contract via validate_strategy_v2_template_payload_fields().
+                                "template_payload_json": {"type": "string"},
+                            },
+                            "required": ["template_payload_json"],
+                        },
+                        use_reasoning=True,
+                        use_web_search=False,
+                        max_tokens=_COPY_PIPELINE_MAX_TOKENS,
+                        heartbeat_context={
+                            "activity": "strategy_v2.run_copy_pipeline",
+                            "phase": "sales_template_payload_prompt",
+                            "model": settings.STRATEGY_V2_COPY_MODEL,
+                            "headline_index": headline_index,
+                            "headline": winning_headline[:160],
+                            "thread_id": sales_payload_thread_id,
+                            "page_attempt": page_attempt,
+                        },
+                        conversation_messages=sales_payload_conversation if use_claude_chat_context else None,
+                        log_metadata={
+                            "thread_id": sales_payload_thread_id,
+                            "thread_turn": page_attempt,
+                            "headline_index": headline_index,
+                            "page_attempt": page_attempt,
+                        },
+                        llm_call_log=prompt_call_logs,
+                        llm_call_label="sales_template_payload_prompt",
+                    )
+                    sales_template_payload_json = str(sales_payload_parsed.get("template_payload_json") or "").strip()
+                    sales_template_payload_json_for_observability = sales_template_payload_json
+                    if _COPY_DEBUG_CAPTURE_THREADS and use_claude_chat_context:
+                        page_observability_row["sales_payload_thread_after_call"] = _serialize_claude_conversation(
+                            sales_payload_conversation
+                        )
+                    if not sales_template_payload_json:
+                        raise StrategyV2DecisionError(
+                            "Sales payload prompt returned empty template_payload_json. "
+                            "Remediation: return a JSON-serialized sales template payload in template_payload_json."
+                        )
+                    try:
+                        sales_template_payload, sales_payload_parse_meta = _parse_sales_template_payload_json(
+                            raw_text=sales_template_payload_json,
+                        )
+                    except (StrategyV2MissingContextError, StrategyV2SchemaValidationError) as exc:
+                        page_observability_row["sales_template_payload_json_parse_error"] = str(exc)
+                        raise StrategyV2DecisionError(
+                            "Sales template payload JSON parse failed. "
+                            f"Details: {exc}"
+                        ) from exc
+                    if isinstance(sales_payload_parse_meta, dict):
+                        page_observability_row["sales_template_payload_parse_recovery"] = sales_payload_parse_meta
+                    presell_template_payload = upgrade_strategy_v2_template_payload_fields(
+                        template_id="pre-sales-listicle",
+                        payload_fields=presell_template_payload,
+                    )
+                    sales_template_payload = upgrade_strategy_v2_template_payload_fields(
+                        template_id="sales-pdp",
+                        payload_fields=sales_template_payload,
+                    )
+                    presell_template_fields = validate_strategy_v2_template_payload_fields(
+                        template_id="pre-sales-listicle",
+                        payload_fields=presell_template_payload,
+                    )
+                    try:
+                        sales_template_fields = validate_strategy_v2_template_payload_fields(
+                            template_id="sales-pdp",
+                            payload_fields=sales_template_payload,
+                        )
+                    except StrategyV2DecisionError:
+                        sales_validation_report = inspect_strategy_v2_template_payload_validation(
+                            template_id="sales-pdp",
+                            payload_fields=sales_template_payload,
+                            max_items=160,
+                        )
+                        page_observability_row["template_payload_validation"] = "fail"
+                        page_observability_row["sales_template_validation_report"] = sales_validation_report
+                        page_observability_row["sales_template_payload_upgraded_failed"] = json.dumps(
+                            sales_template_payload,
+                            ensure_ascii=True,
+                        )[:16000]
+                        raise
+                    presell_template_patch = build_strategy_v2_template_patch_operations(
+                        template_id="pre-sales-listicle",
+                        payload_fields=presell_template_fields,
+                    )
+                    sales_template_patch = build_strategy_v2_template_patch_operations(
+                        template_id="sales-pdp",
+                        payload_fields=sales_template_fields,
+                    )
+                    page_observability_row["template_payload_validation"] = "pass"
 
                     body_markdown = f"{presell_markdown}\n\n---\n\n{sales_page_markdown}"
                     presell_page_data = build_page_data_from_body_text(presell_markdown, page_type="advertorial")
@@ -16028,7 +19585,9 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         "page_generation_failures": list(page_generation_errors),
                         "page_thread_ids": {
                             "presell": presell_thread_id,
-                            "sales_page": sales_thread_id,
+                            "sales_page": sales_markdown_thread_id,
+                            "sales_markdown": sales_markdown_thread_id,
+                            "sales_payload": sales_payload_thread_id,
                         },
                         "page_attempt_observability": list(page_attempt_observability),
                         "prompt_chain": {
@@ -16038,8 +19597,12 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                             "promise_prompt_raw_output": promise_raw[:8000],
                             "advertorial_prompt_provenance": advertorial_provenance,
                             "advertorial_prompt_raw_output": advertorial_raw[:16000],
-                            "sales_prompt_provenance": sales_provenance,
-                            "sales_prompt_raw_output": sales_raw[:16000],
+                            "sales_prompt_provenance": sales_markdown_provenance,
+                            "sales_prompt_raw_output": sales_markdown_raw[:16000],
+                            "sales_markdown_prompt_provenance": sales_markdown_provenance,
+                            "sales_markdown_prompt_raw_output": sales_markdown_raw[:16000],
+                            "sales_template_payload_prompt_provenance": sales_payload_provenance,
+                            "sales_template_payload_prompt_raw_output": sales_payload_raw[:16000],
                         },
                     }
                     page_prompt_request_ids = _coerce_string_list(
@@ -16053,13 +19616,25 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                     page_attempt_observability.append(page_observability_row)
                     attempt_row["page_attempt_observability"] = list(page_attempt_observability)
                     attempt_row["presell_thread_turn_count"] = page_attempt
-                    attempt_row["sales_page_thread_turn_count"] = page_attempt
+                    attempt_row["sales_markdown_thread_turn_count"] = page_attempt
+                    attempt_row["sales_payload_thread_turn_count"] = page_attempt
                     attempt_row["page_generation_attempts"] = page_attempt
                     attempt_row["page_generation_failures"] = list(page_generation_errors)
                     attempt_row["result"] = "selected_bundle_passed"
                     qa_attempts.append(attempt_row)
                     break
-                except StrategyV2DecisionError as exc:
+                except (
+                    StrategyV2DecisionError,
+                    StrategyV2MissingContextError,
+                    StrategyV2SchemaValidationError,
+                    RuntimeError,
+                ) as exc:
+                    # StrategyV2* exceptions inherit RuntimeError; only treat bare RuntimeError
+                    # as a pass-through for non-Claude structured-call failures.
+                    if type(exc) is RuntimeError:
+                        runtime_message = str(exc)
+                        if not runtime_message.startswith("Claude structured message"):
+                            raise
                     failure_message = str(exc)
                     page_generation_errors.append(failure_message)
                     reason_class = _classify_copy_attempt_error(failure_message)
@@ -16073,11 +19648,21 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                         page_observability_row["request_ids"] = page_prompt_request_ids
                     page_observability_row["status"] = "fail"
                     page_observability_row["failure_reason_class"] = reason_class
+                    page_observability_row["failure_message"] = failure_message
                     if reason_codes:
                         page_observability_row["failure_reason_codes"] = reason_codes
+                    if presell_markdown_for_observability:
+                        page_observability_row["presell_markdown_failed"] = presell_markdown_for_observability[:16000]
+                    if sales_markdown_for_observability:
+                        page_observability_row["sales_markdown_failed"] = sales_markdown_for_observability[:16000]
+                    if sales_template_payload_json_for_observability:
+                        page_observability_row["sales_template_payload_json_failed"] = (
+                            sales_template_payload_json_for_observability[:16000]
+                        )
                     page_attempt_observability.append(page_observability_row)
                     attempt_row["page_attempt_observability"] = list(page_attempt_observability)
                     attempt_row["last_failure_reason_class"] = reason_class
+                    attempt_row["last_failure_message"] = failure_message
                     if reason_codes:
                         attempt_row["last_failure_reason_codes"] = reason_codes
                     if use_claude_chat_context:
@@ -16099,7 +19684,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                                     "content": [{"type": "text", "text": presell_feedback_turn}],
                                 }
                             )
-                        if sales_conversation and targets_sales:
+                        if (sales_markdown_conversation or sales_payload_conversation) and targets_sales:
                             sales_feedback_turn = _build_copy_retry_feedback_turn(
                                 page_attempt=page_attempt,
                                 latest_error=failure_message,
@@ -16108,13 +19693,22 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                                     page_scope="sales_page_warm",
                                 ),
                             )
-                            sales_conversation.append(
-                                {
-                                    "role": "user",
-                                    "content": [{"type": "text", "text": sales_feedback_turn}],
-                                }
-                            )
-                    if page_attempt >= _COPY_PAGE_REPAIR_MAX_ATTEMPTS:
+                            sales_feedback_message = {
+                                "role": "user",
+                                "content": [{"type": "text", "text": sales_feedback_turn}],
+                            }
+                            if sales_markdown_conversation:
+                                sales_markdown_conversation.append(dict(sales_feedback_message))
+                            if sales_payload_conversation:
+                                sales_payload_conversation.append(dict(sales_feedback_message))
+                    if _is_non_retryable_sales_payload_failure(failure_message):
+                        attempt_row["page_generation_attempts"] = page_attempt
+                        attempt_row["page_generation_failures"] = list(page_generation_errors)
+                        attempt_row["error"] = failure_message
+                        qa_attempt_error_buckets[reason_class] += 1
+                        qa_attempts.append(attempt_row)
+                        break
+                    if page_attempt >= page_repair_max_attempts:
                         attempt_row["page_generation_attempts"] = page_attempt
                         attempt_row["page_generation_failures"] = list(page_generation_errors)
                         attempt_row["error"] = failure_message
@@ -16142,10 +19736,13 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
         copy_loop_report = {
             "started_at": copy_loop_started_at,
             "finished_at": _now_iso(),
+            "rapid_mode": rapid_mode,
+            "copy_generation_mode": copy_generation_mode,
             "headline_candidate_count": len(headline_candidates),
             "headline_ranked_count": len(ranked_headlines),
             "headline_evaluated_count": len(headlines_for_evaluation),
-            "headline_evaluation_offset": _COPY_HEADLINE_EVALUATION_OFFSET,
+            "headline_evaluation_offset": headline_evaluation_offset,
+            "headline_evaluation_limit": headline_evaluation_limit,
             "qa_attempt_count": len(qa_attempts),
             "qa_pass_count": sum(1 for row in qa_attempts if str(row.get("qa_status") or "").upper() == "PASS"),
             "qa_fail_count": sum(1 for row in qa_attempts if row.get("error")),
@@ -16156,8 +19753,10 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             "qa_timeout_error_count": qa_timeout_error_count_total,
             "qa_transient_attempt_count": qa_transient_attempt_count_total,
             "qa_model": qa_model_effective,
+            "qa_max_iterations": qa_max_iterations,
             "qa_call_timeout_seconds": qa_timeout_seconds_effective,
             "qa_call_max_retries": qa_call_max_retries_effective,
+            "page_repair_max_attempts": page_repair_max_attempts,
             "qa_request_ids": qa_request_ids,
             "qa_request_id_missing_count": qa_request_id_missing_count,
             "qa_transient_fail_fast_triggered": headline_qa_transient_fail_fast_triggered,
@@ -16202,10 +19801,21 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
                     f"qa_attempts={len(qa_attempts)}). "
                     "Retry the activity after model capacity recovers."
                 )
-            raise StrategyV2DecisionError(
-                "Copy prompt-chain pipeline could not produce a headline + page bundle that passed QA and congruency gates. "
+            decision_error_message = (
+                "Copy prompt-chain pipeline could not produce a headline + page bundle that passed configured gates. "
+                f"(copy_generation_mode={copy_generation_mode}). "
                 f"Attempts: {attempts_summary or 'none'}"
             )
+            if allow_no_bundle_result:
+                return {
+                    "copy_artifact_id": None,
+                    "copy_payload": None,
+                    "step_payload_artifact_id": None,
+                    "selected_bundle_found": False,
+                    "copy_loop_failure_summary": decision_error_message,
+                    "copy_loop_report": copy_loop_report,
+                }
+            raise StrategyV2DecisionError(decision_error_message)
 
         top = _require_dict(payload=selected_bundle.get("headline_row"), field_name="selected_headline_row")
         qa_json = _require_dict(payload=selected_bundle.get("qa_json"), field_name="selected_qa_json")
@@ -16238,6 +19848,16 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             payload=selected_bundle.get("sales_template_fields"),
             field_name="selected_sales_template_fields",
         )
+        # Phase-1 rules: pre-sales CTA language is non-transactional and sales title is product-name only.
+        presell_pitch = presell_template_fields.get("pitch")
+        if isinstance(presell_pitch, dict):
+            presell_pitch["cta_label"] = "Learn more"
+        presell_floating_cta = presell_template_fields.get("floating_cta")
+        if isinstance(presell_floating_cta, dict):
+            presell_floating_cta["label"] = "Learn more"
+        sales_hero = sales_template_fields.get("hero")
+        if isinstance(sales_hero, dict):
+            sales_hero["purchase_title"] = str(stage3.product_name).strip()
         presell_template_patch_raw = selected_bundle.get("presell_template_patch")
         if not isinstance(presell_template_patch_raw, list) or not presell_template_patch_raw:
             raise StrategyV2DecisionError(
@@ -16258,6 +19878,55 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
             )
         presell_template_patch = [dict(item) for item in presell_template_patch_raw]
         sales_template_patch = [dict(item) for item in sales_template_patch_raw]
+        product_name_title = str(stage3.product_name).strip()
+        if product_name_title:
+            for op in sales_template_patch:
+                if (
+                    str(op.get("component_type") or "") == "SalesPdpHero"
+                    and str(op.get("field_path") or "") == "props.config.purchase.title"
+                ):
+                    op["value"] = product_name_title
+        policy_links, brand_name = _build_policy_footer_links(org_id=org_id, client_id=client_id)
+        current_year = datetime.now(timezone.utc).year
+        copyright_text = f"© {current_year} {brand_name}"
+        presell_template_patch.extend(
+            [
+                {
+                    "component_type": "PreSalesFooter",
+                    "field_path": "props.config.links",
+                    "value": policy_links,
+                },
+                {
+                    "component_type": "PreSalesFooter",
+                    "field_path": "props.config.paymentIcons",
+                    "value": _FOOTER_PAYMENT_ICON_KEYS,
+                },
+                {
+                    "component_type": "PreSalesFooter",
+                    "field_path": "props.config.copyright",
+                    "value": copyright_text,
+                },
+            ]
+        )
+        sales_template_patch.extend(
+            [
+                {
+                    "component_type": "SalesPdpFooter",
+                    "field_path": "props.config.links",
+                    "value": policy_links,
+                },
+                {
+                    "component_type": "SalesPdpFooter",
+                    "field_path": "props.config.paymentIcons",
+                    "value": _FOOTER_PAYMENT_ICON_KEYS,
+                },
+                {
+                    "component_type": "SalesPdpFooter",
+                    "field_path": "props.config.copyright",
+                    "value": copyright_text,
+                },
+            ]
+        )
         provenance_report = require_prompt_chain_provenance(prompt_chain=prompt_chain)
         angle_id = stage3.selected_angle.angle_id
         angle_run_id = f"{workflow_run_id}:{angle_id}"
@@ -16292,6 +19961,7 @@ def run_strategy_v2_copy_pipeline_activity(params: dict[str, Any]) -> dict[str, 
 
         copy_payload = {
             "headline": winning_headline,
+            "copy_generation_mode": copy_generation_mode,
             "body_markdown": body_markdown,
             "presell_markdown": presell_markdown,
             "sales_page_markdown": sales_page_markdown,

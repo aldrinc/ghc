@@ -1,0 +1,38 @@
+{
+  "template": "pdp_ugc_standard",
+  "output": {
+    "preset": "tiktok"
+  },
+  "brand": {
+    "name": "SampleLogo",
+    "logoText": "SampleLogo",
+    "stripBgColor": "#be3b7a",
+    "stripTextColor": "#ffffff",
+    "assets": {
+      "palette": {
+        "primary": "#be3b7a",
+        "accent": "#111827"
+      },
+      "notes": "Beauty-focused, social-first UGC aesthetic with natural skin texture."
+    }
+  },
+  "rating": {
+    "valueText": "4.9/5",
+    "detailText": "Rated by 10,000+ Women"
+  },
+  "cta": {
+    "text": "BUY ONE, GET ONE FREE TODAY!"
+  },
+  "background": {
+    "imageModel": "gemini-2.5-flash-image",
+    "imageConfig": {
+      "aspectRatio": "9:16"
+    },
+    "prompt": "Photorealistic 9:16 vertical iPhone front-camera selfie still frame with accidental TikTok UGC vibe (not influencer). Scene: small messy dorm bedroom at night with warm lamp light plus dim overhead light, slight red-orange light cast on the wall, cluttered desk chair, random wall decor like a flag or poster, unstyled lived-in feel, and a messy bed with wrinkled sheets visible behind her. Camera: iPhone resting on a desk or laptop (no tripod), slight upward angle (mildly unflattering), off-center framing, shoulder partially cropped, a bit of arm entering the edge of frame, tiny natural motion blur as if the phone shook while she shifted, native iPhone HDR look with mild shadow noise. Subject: woman early to mid 20s, sharp defined jawline, hollow cheeks, defined cheekbones, slim nose, natural glam makeup with visible pores and skin texture (no beauty filter), hair loosely tied back (not styled), medium hoop earrings, simple tank top, casually confident. Prop: small stainless-steel mini microphone held near her mouth with a black cord clearly visible running toward the camera. Expression: mid-sentence, calm and slightly amused, looking at herself on the screen more than directly into the lens, subtle smirk forming. Product: a supplement bottle with a bright pink label that reads HAIR, SKIN AND NAILS GUMMY, white cap, brand name covered by a black rectangle, visible on the desk near the lower-right side of frame. Leave clean negative space in the lower-left area for a small comment bubble overlay. Negative constraints: no captions, no on-screen text, no watermark, no logos, no polished studio lighting, no cinematic color grade, no gimbal smoothness, no perfect centered framing, no beauty smoothing, no exaggerated influencer posing."
+  },
+  "comment": {
+    "handle": "DormGlow24",
+    "text": "Recorded this quick in my dorm and i swear this is the glow-up combo that actually worked for me.",
+    "avatarUrl": "../assets/avatar-harper.svg"
+  }
+}

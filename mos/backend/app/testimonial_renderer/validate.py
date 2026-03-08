@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 
 class TestimonialRenderError(RuntimeError):
@@ -15,6 +16,10 @@ _TEMPLATE_TYPES = {
     "social_comment_no_header",
     "social_comment_instagram",
     "testimonial_media",
+    "pdp_ugc_standard",
+    "pdp_qa_ugc",
+    "pdp_bold_claim",
+    "pdp_personal_highlight",
 }
 _MAX_NAME_LENGTH = 80
 _MAX_REVIEW_LENGTH = 800
@@ -24,6 +29,25 @@ _MAX_META_LABEL = 24
 _MAX_VIEW_REPLIES = 40
 _MAX_INSTAGRAM_USERNAME = 40
 _DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_PDP_OUTPUT_PRESETS = {"tiktok", "feed", "square"}
+_PDP_DEFAULT_OUTPUT_PRESET = "tiktok"
+_PDP_COLOR_PATTERN = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
+_MAX_PDP_HANDLE = 40
+_MAX_PDP_COMMENT = 220
+_MAX_PDP_CTA = 60
+_MAX_PDP_LOGO_TEXT = 24
+_MAX_PDP_RATING_VALUE = 16
+_MAX_PDP_RATING_DETAIL = 60
+_MAX_PDP_BRAND_NAME = 80
+_MAX_PDP_BRAND_NOTES = 260
+_NANO_REFERENCE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp"}
+_NANO_REFERENCE_DATA_MIME_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+    "image/webp",
+}
+_PDP_DEFAULT_AVATAR_PATH = Path(__file__).resolve().parent / "templates" / "assets" / "pdp-default-avatar.svg"
 
 
 def _is_plain_object(value: Any) -> bool:
@@ -41,6 +65,12 @@ def _assert_string(value: Any, field: str, max_length: int | None = None) -> str
     return trimmed
 
 
+def _assert_optional_string(value: Any, field: str, max_length: int | None = None) -> str | None:
+    if value is None:
+        return None
+    return _assert_string(value, field, max_length)
+
+
 def _assert_boolean(value: Any, field: str) -> bool:
     if not isinstance(value, bool):
         raise TestimonialRenderError(f"{field} must be a boolean.")
@@ -53,6 +83,13 @@ def _assert_rating(value: Any, field: str) -> int:
     if value < 1 or value > 5:
         raise TestimonialRenderError(f"{field} must be an integer between 1 and 5.")
     return value
+
+
+def _assert_color(value: Any, field: str) -> str:
+    color = _assert_string(value, field, 24)
+    if not _PDP_COLOR_PATTERN.match(color):
+        raise TestimonialRenderError(f"{field} must be a hex color like #fff or #ffffff.")
+    return color
 
 
 def _resolve_image_url(value: Any, base_dir: Optional[Path], field: str) -> str:
@@ -74,6 +111,31 @@ def _resolve_image_url(value: Any, base_dir: Optional[Path], field: str) -> str:
     if not resolved_path.exists():
         raise TestimonialRenderError(f"{field} file does not exist: {resolved_path}")
     return resolved_path.as_uri()
+
+
+def _assert_nano_reference_image_url(resolved_url: str, field: str) -> None:
+    trimmed = _assert_string(resolved_url, field)
+    if trimmed.startswith("data:"):
+        match = re.match(r"^data:([^;]+);", trimmed, flags=re.IGNORECASE)
+        mime_type = match.group(1).strip().lower() if match else ""
+        if mime_type not in _NANO_REFERENCE_DATA_MIME_TYPES:
+            raise TestimonialRenderError(f"{field} must use png/jpg/jpeg/webp when using data URLs.")
+        return
+
+    path_like = trimmed
+    if trimmed.startswith("http://") or trimmed.startswith("https://") or trimmed.startswith("file://"):
+        parsed = urlparse(trimmed)
+        path_like = parsed.path or trimmed
+
+    ext = Path(path_like).suffix.lower()
+    if ext not in _NANO_REFERENCE_EXTENSIONS:
+        raise TestimonialRenderError(f"{field} must reference a png/jpg/jpeg/webp image.")
+
+
+def _resolve_pdp_default_avatar_url() -> str:
+    if not _PDP_DEFAULT_AVATAR_PATH.exists():
+        raise TestimonialRenderError(f"Default PDP avatar file does not exist: {_PDP_DEFAULT_AVATAR_PATH}")
+    return _PDP_DEFAULT_AVATAR_PATH.resolve().as_uri()
 
 
 def _validate_meta(
@@ -186,7 +248,9 @@ def _validate_thread_comment(comment: Any, *, base_dir: Optional[Path], prefix: 
 
     view_replies_text: str | None = None
     if comment.get("viewRepliesText") is not None:
-        view_replies_text = _assert_string(comment.get("viewRepliesText"), f"{prefix}.viewRepliesText", _MAX_VIEW_REPLIES)
+        view_replies_text = _assert_string(
+            comment.get("viewRepliesText"), f"{prefix}.viewRepliesText", _MAX_VIEW_REPLIES
+        )
 
     replies: list[dict[str, Any]] | None = None
     if comment.get("replies") is not None:
@@ -232,6 +296,287 @@ def _validate_instagram_post(post: Any, *, base_dir: Optional[Path]) -> dict[str
         "location": location,
         "likeCount": like_count,
         "dateLabel": date_label,
+    }
+
+
+def _validate_pdp_output(output: Any) -> dict[str, str]:
+    if output is None:
+        return {"preset": _PDP_DEFAULT_OUTPUT_PRESET}
+    if not _is_plain_object(output):
+        raise TestimonialRenderError("output must be an object when provided.")
+    allowed_keys = {"preset"}
+    for key in output.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"output contains unsupported key: {key}")
+
+    preset = _assert_string(output.get("preset"), "output.preset", 24).lower()
+    if preset not in _PDP_OUTPUT_PRESETS:
+        allowed = ", ".join(sorted(_PDP_OUTPUT_PRESETS))
+        raise TestimonialRenderError(f"output.preset must be one of: {allowed}")
+    return {"preset": preset}
+
+
+def _validate_pdp_brand_palette(palette: Any) -> dict[str, str]:
+    if not _is_plain_object(palette):
+        raise TestimonialRenderError("brand.assets.palette must be an object when provided.")
+    allowed_keys = {"primary", "secondary", "accent"}
+    for key in palette.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"brand.assets.palette contains unsupported key: {key}")
+
+    output: dict[str, str] = {}
+    if palette.get("primary") is not None:
+        output["primary"] = _assert_color(palette.get("primary"), "brand.assets.palette.primary")
+    if palette.get("secondary") is not None:
+        output["secondary"] = _assert_color(palette.get("secondary"), "brand.assets.palette.secondary")
+    if palette.get("accent") is not None:
+        output["accent"] = _assert_color(palette.get("accent"), "brand.assets.palette.accent")
+    if not output:
+        raise TestimonialRenderError("brand.assets.palette must include at least one color token.")
+    return output
+
+
+def _validate_pdp_brand_assets(assets: Any, base_dir: Optional[Path]) -> dict[str, Any] | None:
+    if assets is None:
+        return None
+    if not _is_plain_object(assets):
+        raise TestimonialRenderError("brand.assets must be an object when provided.")
+    allowed_keys = {"logoUrl", "referenceImages", "palette", "notes"}
+    for key in assets.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"brand.assets contains unsupported key: {key}")
+
+    logo_url: str | None = None
+    if assets.get("logoUrl") is not None:
+        logo_url = _resolve_image_url(assets.get("logoUrl"), base_dir, "brand.assets.logoUrl")
+        _assert_nano_reference_image_url(logo_url, "brand.assets.logoUrl")
+
+    reference_images: list[str] | None = None
+    if assets.get("referenceImages") is not None:
+        raw_images = assets.get("referenceImages")
+        if not isinstance(raw_images, list) or len(raw_images) == 0:
+            raise TestimonialRenderError("brand.assets.referenceImages must be a non-empty array when provided.")
+        reference_images = [
+            _resolve_image_url(entry, base_dir, f"brand.assets.referenceImages[{idx}]")
+            for idx, entry in enumerate(raw_images)
+        ]
+        for idx, image_url in enumerate(reference_images):
+            _assert_nano_reference_image_url(image_url, f"brand.assets.referenceImages[{idx}]")
+
+    palette: dict[str, str] | None = None
+    if assets.get("palette") is not None:
+        palette = _validate_pdp_brand_palette(assets.get("palette"))
+
+    notes = _assert_optional_string(assets.get("notes"), "brand.assets.notes", _MAX_PDP_BRAND_NOTES)
+    if not logo_url and not reference_images and not palette and not notes:
+        raise TestimonialRenderError(
+            "brand.assets must include at least one of logoUrl, referenceImages, palette, or notes."
+        )
+
+    return {
+        "logoUrl": logo_url,
+        "referenceImages": reference_images,
+        "palette": palette,
+        "notes": notes,
+    }
+
+
+def _validate_pdp_brand(brand: Any, base_dir: Optional[Path]) -> dict[str, Any]:
+    if not _is_plain_object(brand):
+        raise TestimonialRenderError("brand must be an object.")
+    allowed_keys = {
+        "logoUrl",
+        "logoText",
+        "stripBgColor",
+        "stripTextColor",
+        "name",
+        "assets",
+    }
+    for key in brand.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"brand contains unsupported key: {key}")
+
+    strip_bg_color = _assert_color(brand.get("stripBgColor"), "brand.stripBgColor")
+    strip_text_color = _assert_color(brand.get("stripTextColor"), "brand.stripTextColor")
+
+    logo_url: str | None = None
+    if brand.get("logoUrl") is not None:
+        logo_url = _resolve_image_url(brand.get("logoUrl"), base_dir, "brand.logoUrl")
+    logo_text = _assert_optional_string(brand.get("logoText"), "brand.logoText", _MAX_PDP_LOGO_TEXT)
+    if not logo_url and not logo_text:
+        raise TestimonialRenderError("brand.logoUrl or brand.logoText is required.")
+
+    name = _assert_optional_string(brand.get("name"), "brand.name", _MAX_PDP_BRAND_NAME)
+    assets = _validate_pdp_brand_assets(brand.get("assets"), base_dir)
+    return {
+        "stripBgColor": strip_bg_color,
+        "stripTextColor": strip_text_color,
+        "logoUrl": logo_url,
+        "logoText": logo_text,
+        "name": name,
+        "assets": assets,
+    }
+
+
+def _validate_pdp_rating(rating: Any) -> dict[str, str]:
+    if not _is_plain_object(rating):
+        raise TestimonialRenderError("rating must be an object.")
+    allowed_keys = {"valueText", "detailText"}
+    for key in rating.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"rating contains unsupported key: {key}")
+    return {
+        "valueText": _assert_string(rating.get("valueText"), "rating.valueText", _MAX_PDP_RATING_VALUE),
+        "detailText": _assert_string(rating.get("detailText"), "rating.detailText", _MAX_PDP_RATING_DETAIL),
+    }
+
+
+def _validate_pdp_cta(cta: Any) -> dict[str, str]:
+    if not _is_plain_object(cta):
+        raise TestimonialRenderError("cta must be an object.")
+    allowed_keys = {"text"}
+    for key in cta.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"cta contains unsupported key: {key}")
+    return {"text": _assert_string(cta.get("text"), "cta.text", _MAX_PDP_CTA)}
+
+
+def _validate_pdp_prompt_vars(vars_payload: Any) -> dict[str, Any]:
+    if not _is_plain_object(vars_payload):
+        raise TestimonialRenderError("background.promptVars must be an object.")
+    allowed_keys = {"product", "scene", "subject", "extra", "avoid"}
+    for key in vars_payload.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"background.promptVars contains unsupported key: {key}")
+
+    output: dict[str, Any] = {
+        "product": _assert_string(vars_payload.get("product"), "background.promptVars.product", 220),
+        "scene": _assert_optional_string(vars_payload.get("scene"), "background.promptVars.scene", 220),
+        "subject": _assert_optional_string(vars_payload.get("subject"), "background.promptVars.subject", 220),
+        "extra": _assert_optional_string(vars_payload.get("extra"), "background.promptVars.extra", 600),
+    }
+    if vars_payload.get("avoid") is not None:
+        raw_avoid = vars_payload.get("avoid")
+        if not isinstance(raw_avoid, list) or len(raw_avoid) == 0:
+            raise TestimonialRenderError("background.promptVars.avoid must be a non-empty array when provided.")
+        output["avoid"] = [
+            _assert_string(entry, f"background.promptVars.avoid[{idx}]", 160)
+            for idx, entry in enumerate(raw_avoid)
+        ]
+    else:
+        output["avoid"] = None
+    return output
+
+
+def _validate_pdp_background(background: Any, base_dir: Optional[Path]) -> dict[str, Any]:
+    if not _is_plain_object(background):
+        raise TestimonialRenderError("background must be an object.")
+    allowed_keys = {
+        "imageUrl",
+        "alt",
+        "prompt",
+        "promptVars",
+        "referenceImages",
+        "referenceFirst",
+        "imageModel",
+        "imageConfig",
+    }
+    for key in background.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"background contains unsupported key: {key}")
+
+    image_url: str | None = None
+    if background.get("imageUrl") is not None:
+        image_url = _resolve_image_url(background.get("imageUrl"), base_dir, "background.imageUrl")
+    alt = _assert_optional_string(background.get("alt"), "background.alt", 200)
+    prompt = _assert_optional_string(background.get("prompt"), "background.prompt", 6000)
+    prompt_vars = (
+        _validate_pdp_prompt_vars(background.get("promptVars"))
+        if background.get("promptVars") is not None
+        else None
+    )
+    if prompt and prompt_vars:
+        raise TestimonialRenderError("Provide either background.prompt or background.promptVars, not both.")
+    if image_url and (prompt or prompt_vars):
+        raise TestimonialRenderError(
+            "Provide either background.imageUrl or background.prompt/background.promptVars, not both."
+        )
+    if not image_url and not prompt and not prompt_vars:
+        raise TestimonialRenderError(
+            "background.imageUrl is required unless background.prompt or background.promptVars is provided."
+        )
+
+    reference_images: list[str] | None = None
+    if background.get("referenceImages") is not None:
+        raw_reference_images = background.get("referenceImages")
+        if not isinstance(raw_reference_images, list) or len(raw_reference_images) == 0:
+            raise TestimonialRenderError("background.referenceImages must be a non-empty array when provided.")
+        reference_images = [
+            _resolve_image_url(entry, base_dir, f"background.referenceImages[{idx}]")
+            for idx, entry in enumerate(raw_reference_images)
+        ]
+
+    reference_first: bool | None = None
+    if background.get("referenceFirst") is not None:
+        reference_first = _assert_boolean(background.get("referenceFirst"), "background.referenceFirst")
+
+    image_model = _assert_optional_string(background.get("imageModel"), "background.imageModel", 120)
+    image_config: dict[str, Any] | None = None
+    if background.get("imageConfig") is not None:
+        if not _is_plain_object(background.get("imageConfig")):
+            raise TestimonialRenderError("background.imageConfig must be an object when provided.")
+        image_config = dict(background.get("imageConfig"))
+
+    if image_url and (
+        reference_images is not None
+        or reference_first is not None
+        or image_model is not None
+        or image_config is not None
+    ):
+        raise TestimonialRenderError(
+            "background.referenceImages/referenceFirst/imageModel/imageConfig are only allowed when "
+            "generating a background (omit background.imageUrl)."
+        )
+
+    return {
+        "imageUrl": image_url,
+        "alt": alt,
+        "prompt": prompt,
+        "promptVars": prompt_vars,
+        "referenceImages": reference_images,
+        "referenceFirst": reference_first,
+        "imageModel": image_model,
+        "imageConfig": image_config,
+    }
+
+
+def _validate_pdp_comment(comment: Any, *, base_dir: Optional[Path], prefix: str) -> dict[str, Any]:
+    if not _is_plain_object(comment):
+        raise TestimonialRenderError(f"{prefix} must be an object.")
+    allowed_keys = {"handle", "text", "questionText", "avatarUrl", "verified"}
+    for key in comment.keys():
+        if key not in allowed_keys:
+            raise TestimonialRenderError(f"{prefix} contains unsupported key: {key}")
+
+    handle = _assert_string(comment.get("handle"), f"{prefix}.handle", _MAX_PDP_HANDLE)
+    text = _assert_string(comment.get("text"), f"{prefix}.text", _MAX_PDP_COMMENT)
+    question_text = _assert_optional_string(comment.get("questionText"), f"{prefix}.questionText", 140)
+    avatar_url = _resolve_pdp_default_avatar_url()
+    if comment.get("avatarUrl") is not None:
+        if not isinstance(comment.get("avatarUrl"), str):
+            raise TestimonialRenderError(f"{prefix}.avatarUrl must be a string.")
+        candidate = str(comment.get("avatarUrl")).strip()
+        if candidate:
+            avatar_url = _resolve_image_url(candidate, base_dir, f"{prefix}.avatarUrl")
+    verified: bool | None = None
+    if comment.get("verified") is not None:
+        verified = _assert_boolean(comment.get("verified"), f"{prefix}.verified")
+    return {
+        "handle": handle,
+        "text": text,
+        "questionText": question_text,
+        "avatarUrl": avatar_url,
+        "verified": verified,
     }
 
 
@@ -321,6 +666,19 @@ def validate_payload(payload: Any, *, base_dir: Optional[Path] = None) -> dict[s
         output["template"] = template
         output["imageUrl"] = image_url
         output["alt"] = alt
+        return output
+
+    if template in {"pdp_ugc_standard", "pdp_qa_ugc", "pdp_bold_claim", "pdp_personal_highlight"}:
+        output = dict(payload)
+        output["template"] = template
+        output["output"] = _validate_pdp_output(payload.get("output"))
+        output["brand"] = _validate_pdp_brand(payload.get("brand"), base_dir)
+        output["rating"] = _validate_pdp_rating(payload.get("rating"))
+        output["cta"] = _validate_pdp_cta(payload.get("cta"))
+        output["background"] = _validate_pdp_background(payload.get("background"), base_dir)
+        output["comment"] = _validate_pdp_comment(payload.get("comment"), base_dir=base_dir, prefix="comment")
+        if template == "pdp_qa_ugc" and not output["comment"].get("questionText"):
+            raise TestimonialRenderError("comment.questionText is required for template pdp_qa_ugc.")
         return output
 
     raise TestimonialRenderError("Unsupported template.")

@@ -1,6 +1,7 @@
 .footer {
   background: var(--footer-bg);
   border-top: var(--footer-border);
+  color: var(--footer-text);
   padding: var(--footer-pad-y) 0;
   /* Extra bottom space so the fixed CTA doesn't cover the logo. */
   padding-bottom: calc(
@@ -11,8 +12,10 @@
 
 .inner {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: var(--footer-gap);
 }
 
 .logo {
@@ -20,4 +23,43 @@
   width: auto;
   max-width: 100%;
   display: block;
+}
+
+.copyright {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  color: var(--footer-text);
+  font-weight: 600;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 16px;
+}
+
+.link {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--footer-link);
+  text-decoration: none;
+}
+
+.link:hover {
+  color: var(--footer-link-hover);
+  text-decoration: underline;
+}
+
+.paymentIcons {
+  margin-top: 16px;
+}
+
+@media (max-width: 700px) {
+  .links {
+    flex-direction: column;
+    gap: 8px;
+  }
 }

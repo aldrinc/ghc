@@ -1,0 +1,60 @@
+{
+  "bottleneck": ": Medication-Matrix Midlifers (HRT/Polypharmacy)** (S3 has highest computed score: **1024**)",
+  "category_niche": "Health & Wellness",
+  "competitor_count_validated": 23,
+  "competitor_urls": [
+    "https://offer.ancientremediesrevived.com/c3-nb",
+    "https://chestnutherbs.com/online-herbal-classes/online-herbal-immersion-program/?utm_source=openai",
+    "https://www.similarweb.com/top-websites/united-kingdom/health/alternative-and-natural-medicine/trending/?utm_source=openai",
+    "https://www.thelostremedies.com/my-store/?utm_source=openai",
+    "https://ancientremedies.com/?utm_source=openai",
+    "https://shop.ancientremedies.com/g/m52-nbb/unique-offer?utm_source=openai",
+    "https://www.thelostremedies.com/?utm_source=openai",
+    "https://theherbalacademy.com/product/online-advanced-herbal-course/?utm_source=openai",
+    "https://www.evolutionaryherbalism.com/?utm_source=openai",
+    "https://www.iwillaremedy.com/everydayherbalism?utm_source=openai",
+    "https://herbalmedics.academy/on-demand-course-library/?utm_source=openai",
+    "https://www.similarweb.com/top-websites/united-states/health/alternative-and-natural-medicine/trending/?utm_source=openai",
+    "https://www.semrush.com/website/ancientremedies.com/overview/",
+    "https://www.trustpilot.com/review/ancientremedies.com?utm_source=openai",
+    "https://www.semrush.com/website/theherbalacademy.com/overview/?utm_source=openai",
+    "https://gripsintelligence.com/insights/retailers/theherbalacademy.com?utm_source=openai",
+    "https://www.evolutionaryherbalism.com/home/contact-us/?utm_source=openai",
+    "https://hypestat.com/info/iwillaremedy.com?utm_source=openai",
+    "https://www.scam-detector.com/validator/chestnutherbs-com-review/?utm_source=openai",
+    "https://www.iwillaremedy.com/?utm_source=openai",
+    "https://ancientremedies.com/products/sp-ancient-remedies-revived?utm_source=openai",
+    "https://theherbalacademy.com/contact-us/?utm_source=openai",
+    "https://www.evolutionaryherbalism.com/vitalist-herbalism-mini-course/program-details/?utm_source=openai",
+    "https://herbalmedics.academy/course/the-apothecarist-herbal-medicine-making-course-2025/?utm_source=openai"
+  ],
+  "description": "We sell a natural remedies handbook for $49.",
+  "market_maturity_stage": "Maturity",
+  "positioning_gaps": [
+    "Strong safety/compliance framing: contraindications, drug\u2013herb interaction checklists, \u201cwhen to seek care\u201d (gap suggested by heavy \u201cremedies that outperform modern medicines\u201d style claims elsewhere). ([ancientremedies.com](https://ancientremedies.com/?utm_source=openai))",
+    "**Mid-price ($49) handbook** positioned as: *personalizable + compliance-forward + \u201cevidence-graded\u201d* instead of urgency/survivalist framing. (Gap inferred from dominant captured funnels emphasizing urgency/discount and broad claims.) ([shop.ancientremedies.com](https://shop.ancientremedies.com/g/m52-nbb/unique-offer?utm_source=openai))"
+  ],
+  "price": "TBD",
+  "primary_icps": [
+    "\u201cAfter a few hours of him crying... I reach for the Tylenol and he\u2019s fine for like 3-5 hrs.\u201d (Reddit r/NewParents)",
+    "\u201cAny magic tricks or do we just wait it out and expire from exhaustion?\u201d (Reddit r/workingmoms)",
+    "\u201cI have this fear of giving him any nurofen and he doesn\u2019t need it\u201d (Reddit r/NewParents)"
+  ],
+  "primary_segment": {
+    "key_differentiator": "\u201cI have this fear of giving him any nurofen and he doesn\u2019t need it\u201d (Reddit r/NewParents)",
+    "name": "\u201cAfter a few hours of him crying... I reach for the Tylenol and he\u2019s fine for like 3-5 hrs.\u201d (Reddit r/NewParents)",
+    "size_estimate": "\u201cAny magic tricks or do we just wait it out and expire from exhaustion?\u201d (Reddit r/workingmoms)"
+  },
+  "product_category_keywords": [
+    "health & wellness",
+    "health",
+    "wellness",
+    "health wellness",
+    "honest",
+    "herbalist"
+  ],
+  "product_customizable": true,
+  "product_name": "The Honest Herbalist Handbook",
+  "schema_version": "2.0.0",
+  "stage": 1
+}

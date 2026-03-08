@@ -40,7 +40,7 @@ import {
 import { useAssets } from "@/api/assets";
 import { useUploadProductAssets } from "@/api/products";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { DialogContent, DialogDescription, DialogRoot, DialogTitle } from "@/components/ui/dialog";
@@ -171,11 +171,11 @@ const DESIGN_SYSTEM_TEMPLATE = `{
     "--listicle-content-pad-y": "40px",
     "--listicle-content-pad-x-mobile": "20px",
     "--listicle-content-pad-y-mobile": "30px",
-    "--listicle-title-font": "AwesomeSerif, serif",
+    "--listicle-title-font": "var(--font-heading)",
     "--listicle-title-size": "40px",
     "--listicle-title-size-mobile": "40px",
     "--listicle-title-line": "1.2",
-    "--listicle-title-color": "rgb(0, 27, 116)",
+    "--listicle-title-color": "var(--color-brand)",
     "--listicle-title-margin-bottom": "20px",
     "--listicle-title-letter-spacing": "-0.06em",
     "--listicle-body-size": "clamp(16px, 2.3vw, 20px)",
@@ -876,7 +876,6 @@ export function BrandDesignSystemPage() {
   const [complianceProfileForm, setComplianceProfileForm] = useState<ComplianceProfileFormState>(() =>
     buildComplianceProfileFormState(null, workspace?.name)
   );
-  const logoUploadInputRef = useRef<HTMLInputElement | null>(null);
   const templateAssetUploadInputRef = useRef<HTMLInputElement | null>(null);
   const autoCreateBaseTemplateDraftAttemptKeyRef = useRef("");
   const complianceProfileFormSeedRef = useRef("");
@@ -2985,6 +2984,63 @@ export function BrandDesignSystemPage() {
             </TabsList>
 
             <TabsContent value="preview" flush>
+              <div className="mb-4 space-y-2 rounded-md border border-border bg-surface p-3 shadow-sm">
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
+                  <select
+                    className="w-full rounded-md border border-input-border bg-input px-2 py-2 text-xs text-content shadow-sm"
+                    value={selectedLogoPublicId}
+                    onChange={(e) => setSelectedLogoPublicId(e.target.value)}
+                    disabled={isLoadingLogoAssets || !logoAssetOptions.length}
+                  >
+                    <option value="">
+                      {isLoadingLogoAssets
+                        ? "Loading image assets…"
+                        : logoAssetOptions.length
+                          ? "Select existing image asset"
+                          : "No image assets available"}
+                    </option>
+                    {logoAssetOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    type="button"
+                    onClick={applySelectedLogoAsset}
+                    disabled={!selectedLogoPublicId || updateDesignSystem.isPending}
+                  >
+                    {updateDesignSystem.isPending ? "Applying…" : "Set logo"}
+                  </Button>
+                  <div className="relative">
+                    <span
+                      className={buttonClasses({
+                        size: "sm",
+                        variant: "secondary",
+                        className: cn(
+                          "pointer-events-none justify-center",
+                          uploadDesignSystemLogo.isPending && "opacity-60",
+                        ),
+                      })}
+                      aria-hidden="true"
+                    >
+                      {uploadDesignSystemLogo.isPending ? "Uploading..." : "Upload logo"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                      onChange={handleLogoUpload}
+                      disabled={uploadDesignSystemLogo.isPending}
+                      className="absolute inset-0 h-9 w-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+                      aria-label="Upload logo"
+                    />
+                  </div>
+                </div>
+                <div className="text-[11px] text-content-muted">
+                  Selecting or uploading a logo updates this design system token automatically.
+                </div>
+              </div>
               <DesignSystemProvider tokens={previewTokens}>
                 <div
                   className="rounded-md overflow-hidden"
@@ -3043,54 +3099,6 @@ export function BrandDesignSystemPage() {
                                 Unable to load logo from <span className="font-mono">{previewLogoSrc}</span>
                               </div>
                             ) : null}
-                          </div>
-                          <div className="mt-3 space-y-2">
-                            <input
-                              ref={logoUploadInputRef}
-                              className="hidden"
-                              type="file"
-                              accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-                              onChange={handleLogoUpload}
-                            />
-                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
-                              <select
-                                className="w-full rounded-md border border-input-border bg-input px-2 py-2 text-xs text-content shadow-sm"
-                                value={selectedLogoPublicId}
-                                onChange={(e) => setSelectedLogoPublicId(e.target.value)}
-                                disabled={isLoadingLogoAssets || !logoAssetOptions.length}
-                              >
-                                <option value="">
-                                  {isLoadingLogoAssets
-                                    ? "Loading image assets…"
-                                    : logoAssetOptions.length
-                                      ? "Select existing image asset"
-                                      : "No image assets available"}
-                                </option>
-                                {logoAssetOptions.map((option) => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                              <Button
-                                size="sm"
-                                onClick={applySelectedLogoAsset}
-                                disabled={!selectedLogoPublicId || updateDesignSystem.isPending}
-                              >
-                                {updateDesignSystem.isPending ? "Applying…" : "Set logo"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="secondary"
-                                onClick={() => logoUploadInputRef.current?.click()}
-                                disabled={uploadDesignSystemLogo.isPending}
-                              >
-                                {uploadDesignSystemLogo.isPending ? "Uploading…" : "Upload logo"}
-                              </Button>
-                            </div>
-                            <div className="text-[11px]" style={{ color: "var(--color-muted)" }}>
-                              Selecting or uploading a logo updates this design system token automatically.
-                            </div>
                           </div>
                         </div>
                       </div>

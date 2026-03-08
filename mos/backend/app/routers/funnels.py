@@ -55,6 +55,7 @@ from app.agent.funnel_objectives import (
 )
 from app.services.design_systems import resolve_design_system_tokens
 from app.services.funnel_ai import AiAttachmentError
+from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.funnel_templates import apply_template_assets, get_funnel_template, list_funnel_templates
 from app.services.funnel_testimonials import (
     TestimonialGenerationError,
@@ -616,10 +617,19 @@ def create_page(
         next_page_id=next_page_id,
     )
 
+    initial_puck_data = template_puck_data or default_puck_data()
+    normalize_public_page_metadata_for_context(
+        session=session,
+        org_id=auth.org_id,
+        funnel=funnel,
+        page=page,
+        puck_data=initial_puck_data,
+    )
+
     version = FunnelPageVersion(
         page_id=page.id,
         status=FunnelPageVersionStatusEnum.draft,
-        puck_data=template_puck_data or default_puck_data(),
+        puck_data=initial_puck_data,
         source=FunnelPageVersionSourceEnum.human,
         created_at=datetime.now(timezone.utc),
     )
@@ -686,10 +696,19 @@ def save_draft(
     if not page:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page not found")
 
+    puck_data = payload.puckData
+    normalize_public_page_metadata_for_context(
+        session=session,
+        org_id=auth.org_id,
+        funnel=funnel,
+        page=page,
+        puck_data=puck_data,
+    )
+
     version = FunnelPageVersion(
         page_id=page.id,
         status=FunnelPageVersionStatusEnum.draft,
-        puck_data=payload.puckData,
+        puck_data=puck_data,
         source=FunnelPageVersionSourceEnum.human,
         created_at=datetime.now(timezone.utc),
     )
@@ -1033,6 +1052,7 @@ def ai_generate_page_draft(
         "puckData": result.get("puckData") or {},
         "draftVersionId": result.get("draftVersionId") or "",
         "generatedImages": result.get("generatedImages") or [],
+        "generatedCarouselImages": result.get("generatedCarouselImages") or [],
         "imagePlans": result.get("imagePlans") or [],
         **({"runId": result.get("runId")} if result.get("runId") else {}),
     }

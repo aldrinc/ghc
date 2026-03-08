@@ -1,0 +1,1527 @@
+{
+  "id": "resp_05ffb0b9f3865c0d0069a761483ab08195810dd70620e23bd3",
+  "object": "response",
+  "created_at": 1772577096,
+  "status": "completed",
+  "background": true,
+  "billing": {
+    "payer": "developer"
+  },
+  "completed_at": 1772578192,
+  "error": null,
+  "frequency_penalty": 0.0,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": 64000,
+  "max_tool_calls": null,
+  "model": "gpt-5.2-2025-12-11",
+  "output": [
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7615bdf688195a642413ad6fced4e",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7615d5a88819580debfd99a7fbac0",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "import json, pandas as pd, os, textwrap, re, math, numpy as np\npaths = {\n\"COMPETITOR_ANGLE_MAP_JSON\":\"/mnt/data/file-PfdMw3WPLwSV2RUGdJyL79-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-competitor_angle_map_json.json\",\n\"KNOWN_SATURATED_ANGLES_JSON\":\"/mnt/data/file-Geog7Hf2yAb1frW29PDTzZ-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-known_saturated_angles_json.json\",\n\"PRODUCT_BRIEF_JSON\":\"/mnt/data/file-MGPjBw3JvJorgDNnQGqYvj-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-product_brief_json.json\",\n\"HABITAT_SCORED_JSON\":\"/mnt/data/file-Ci56CMQUC6WanYNGoudMRx-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-habitat_scored_json.json\",\n\"AGENT1_HABITAT_OBSERVATIONS_JSON\":\"/mnt/data/file-M5MEecJGkbLnhsVrBZXesd-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent1_habitat_observations_json.json\",\n\"AGENT1_MINING_PLAN_JSON\":\"/mnt/data/file-BGqHiPvqEF3V1f7ZhZwxdG-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent1_mining_plan_json.json\",\n\"AVATAR_BRIEF_SUMMARY_JSON\":\"/mnt/data/file-YXjghwpcS4C2Y16vQ4i47B-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-avatar_brief_summary_json.json\",\n\"FOUNDATIONAL_RESEARCH_DOCS_JSON\":\"/mnt/data/file-EqdciZv7W5mbbndQENiXFH-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-foundational_research_docs_json.json\",\n\"VOC_EVIDENCE_ROWS_JSON\":\"/mnt/data/file-SNBXfzgZKweSmBsRQujifT-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-voc_evidence_rows_json.json\",\n\"AGENT2_INPUT_MANIFEST_JSON\":\"/mnt/data/file-8kLMTE8kmc7nUvrLCXicqw-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent2_input_manifest_json.json\",\n\"VOC_EVIDENCE_LAYOUT_JSON\":\"/mnt/data/file-X1qFen75pZJCAG6HEiKmPc-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-voc_evidence_layout_json.json\"\n}\ndef load(p):\n    with open(p,'r') as f:\n        return json.load(f)\ndata = {k: load(v) for k,v in paths.items()}\n{ k: type(v) for k,v in data.items() }\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7616910e48195bdfe6b2478958ac9",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761694bb08195bdc444d4f37104c8",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "prod = data[\"PRODUCT_BRIEF_JSON\"]\nprod.keys(), prod.get(\"product_name\"), prod.get(\"category\")\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7616da7908195b2e548ec6bd5410d",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "prod\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7617016048195a26b7d3578ce035c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7617168848195b610101aacb6f79d",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "comp = data[\"COMPETITOR_ANGLE_MAP_JSON\"]\nlen(comp), comp[0].keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76173896c8195bee0ba963484e651",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "comp[0][\"competitor_name\"], len(comp[0][\"assets\"]), comp[0][\"assets\"][0].keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761767e0881958f81009b46548462",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "comp[0][\"assets\"][:2]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761790f6081958f5d846f1c544807",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76179b43c8195a67843ea4af21b9a",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "sat = data[\"KNOWN_SATURATED_ANGLES_JSON\"]\nlen(sat), sat[0].keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7617bb5cc8195bab678920de77d22",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7617ec0d0819583bdd670409337cd",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "voc_rows = data[\"VOC_EVIDENCE_ROWS_JSON\"]\nlen(voc_rows), voc_rows[0].keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76181bc8481959415da1baa2f7555",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761829ba48195ae74b7ed7020ce86",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "hab = data[\"HABITAT_SCORED_JSON\"]\nhab.keys(), list(hab[\"habitat_scores\"].keys())[:5]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7618537948195b3a28bf87921d874",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "hab\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76188b0488195900faef8872db9eb",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7618950cc819586c9bf44423db2a1",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "a1_obs = data[\"AGENT1_HABITAT_OBSERVATIONS_JSON\"]\nlen(a1_obs), a1_obs[0].keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7618cc4f88195a42996063ae2be5c",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "a1_obs[0]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7618f6f0c8195824430d6b37ed266",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7618feb4081958504a11333f660a9",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "a1_plan = data[\"AGENT1_MINING_PLAN_JSON\"]\nlen(a1_plan), a1_plan[0].keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761980290819597182945926df31b",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "a1_plan[0][\"sampling_strategy\"], a1_plan[0][\"target_voc_types\"][:5]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7619b50008195baf8a4d6cf4db5e6",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7619b7cb88195b883106eb29c0963",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "avatar = data[\"AVATAR_BRIEF_SUMMARY_JSON\"]\navatar.keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7619f18d88195aa9bda799d081142",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "avatar[\"avatar_brief_summary\"][:500]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761a1af948195b3dccbe1d7e7ccbd",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761a1d340819594d6ca4acfed6d99",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "avatar[\"avatar_brief_summary\"]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761a43ccc81958aab577fa9f8deec",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761a462408195ab9367761ac3a7cd",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "found = data[\"FOUNDATIONAL_RESEARCH_DOCS_JSON\"]\nfound.keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761a8b890819580ae3bc2eb92b4e9",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "found[\"step_summaries\"]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761acc5d0819598d0bf0336e3a4b2",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761ad29d08195ba41ee837eb69fae",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "layout = data[\"VOC_EVIDENCE_LAYOUT_JSON\"]\nlayout.keys(), layout.get(\"fields\",{}) if \"fields\" in layout else None\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761b4f81c8195b1279251c41ce8fa",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "layout\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761bbee6481958886065227bf7a7e",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761bcb95c8195b3c0446ba5ce365c",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "manifest = data[\"AGENT2_INPUT_MANIFEST_JSON\"]\nmanifest.keys()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761bf9bc08195b629dfdec76233d2",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "manifest[\"rows\"][0].keys(), manifest[\"input_count\"]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761c2037081958cbda09a1e4eac10",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761cf5fe48195a1da60c97396b1d5",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df = pd.DataFrame(voc_rows)\ndf['date'].head(), df['date'].isna().mean(), df['date'].unique()[:5]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761d2848481958ad4a9836c1c66e2",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761d2f56c819586007a27d25aa4ff",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "from datetime import datetime, timezone, date\ntoday = datetime(2026,3,3,tzinfo=timezone.utc)\ndef parse_date(s):\n    if not isinstance(s,str) or s.lower()==\"unknown\" or s.strip()==\"\":\n        return None\n    try:\n        return datetime.fromisoformat(s.replace(\"Z\",\"+00:00\"))\n    except Exception:\n        try:\n            return datetime.strptime(s,\"%Y-%m-%d\")\n        except:\n            return None\ndf['dt'] = df['date'].apply(parse_date)\ndf['dt'].notna().mean(), df['dt'].min(), df['dt'].max()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761d87df4819585dfae6cf43ed17d",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761d8f23081958afff05ebe10a527",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['habitat_type'].value_counts().head()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761dbd9d081959581b86afed8bd12",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761dd85148195a49d702133e47864",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df[['habitat_name','habitat_type']].drop_duplicates().head(20)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761e040d48195b356f6c994581182",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761e2a2fc81958979566c4f48e35d",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def norm_hab(row):\n    hn = str(row['habitat_name']).lower()\n    ht = str(row['habitat_type']).lower()\n    su = str(row['source_url']).lower()\n    if 'reddit.com' in hn or 'reddit.com' in su:\n        return 'Reddit'\n    if 'instagram' in ht or 'instagram' in hn:\n        return 'Instagram'\n    if 'youtube' in ht or 'youtu' in hn or 'youtu' in su:\n        return 'YouTube'\n    if 'tiktok' in ht or 'tiktok' in hn or 'tiktok' in su:\n        return 'TikTok'\n    if 'merged' in ht or 'merged' in hn:\n        return 'Merged'\n    return 'Other'\ndf['hab_norm'] = df.apply(norm_hab, axis=1)\ndf['hab_norm'].value_counts()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a761eaa5e8819590cb933ec172e02c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a761fdd50c819588d5e642c922548e",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "import re\ndef count_kw(pattern):\n    return df['verbatim'].str.contains(pattern, case=False, na=False, regex=True).sum()\npatterns = {\n\"meds\": r\"\\b(medication|meds|prescription|rx|ssri|statin|blood pressure|beta blocker|metformin|warfarin|eliquis|xarelto|hormone|hrt)\\b\",\n\"kids\": r\"\\b(baby|toddler|kid|child|teething|newborn|my son|my daughter|little one)\\b\",\n\"preg\": r\"\\b(pregnan|breastfeed|nursing|postpartum|trimester)\\b\",\n\"menopause\": r\"\\b(menopause|perimenopause|hot flash|hrt|progesterone|estrogen)\\b\",\n\"prep\": r\"\\b(prep|preparedness|emergency|power outage|hurricane|storm|grid|bug out)\\b\",\n\"scam\": r\"\\b(scamm|counterfeit|fake|mlm|snake oil|woo|tiktok|influencer)\\b\",\n\"allergy\": r\"\\b(allerg|histamine|sensitive|reaction|side effect|itch|hives)\\b\",\n\"aging\": r\"\\b(aging|elderly|grandma|grandpa|my mom|my dad|caregiver)\\b\",\n\"apothecary\": r\"\\b(apothecary|stock|kit|pantry|cabinet|herb shelf|remedy chest)\\b\",\n\"skin\": r\"\\b(eczema|rash|acne|psoriasis|skin)\\b\",\n\"gut\": r\"\\b(ibs|gerd|bloat|constipat|diarrhea|nausea|stomach)\\b\",\n\"price\": r\"\\b(afford|expensive|cost|copay|insurance|urgent care|er)\\b\",\n}\n{ k: count_kw(v) for k,v in patterns.items() }\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76215dcb48195a7695c6da8a100f1",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7621e14e881958add9a2817f9778f",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['len'] = df['verbatim'].astype(str).str.len()\ndf['len'].describe()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762239f4081959eb6728c7dff2b2f",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76229a7bc8195b5e37637316e220a",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def sel(pattern):\n    return df[df['verbatim'].str.contains(pattern, case=False, na=False, regex=True)]\nclusters = {}\nclusters['A01'] = sel(r\"\\b(medication|meds|prescription|rx|ssri|statin|warfarin|eliquis|xarelto|blood pressure|beta blocker)\\b.*\\b(interaction|contraindicat|mix|combine|safe|together)\\b|\\b(interaction|contraindicat)\\b.*\\b(medication|meds|prescription|rx)\\b\")\nclusters['A02'] = sel(r\"\\b(baby|toddler|kid|child|teething|newborn)\\b.*\\b(fever|cough|congest|sick|ear infection|teeth|sleep)\\b\")\nclusters['A03'] = sel(r\"\\b(pregnan|breastfeed|nursing|postpartum|trimester)\\b.*\\b(herb|tea|tincture|supplement|natural|remed)\\b\")\nclusters['A04'] = sel(r\"\\b(menopause|perimenopause|hot flash|night sweats)\\b.*\\b(herb|supplement|natural|remed|tea)\\b|\\b(hrt|estrogen|progesterone)\\b.*\\b(herb|supplement|natural|remed)\\b\")\nclusters['A05'] = sel(r\"\\b(tiktok|influencer|google|youtube|instagram|mlm|snake oil|woo|counterfeit|fake)\\b.*\\b(trust|evidence|science|research|skeptic|bs|bullshit)\\b|\\b(trust|evidence|science)\\b.*\\b(tiktok|influencer|mlm|woo|counterfeit|fake)\\b\")\nclusters['A06'] = sel(r\"\\b(apothecary|kit|stock|pantry|cabinet|medicine cabinet|remedy cabinet|herb shelf)\\b\")\nclusters['A07'] = sel(r\"\\b(allerg|sensitive|reaction|side effect|hives|histamine|itch)\\b.*\\b(herb|supplement|tea|tincture|natural)\\b\")\nclusters['A08'] = sel(r\"\\b(my mom|my dad|grandma|grandpa|elderly|caregiving|caregiver)\\b.*\\b(med|prescription|blood pressure|diabetes|heart|warfarin|eliquis|statin)\\b|\\b(elderly|grandma|grandpa)\\b.*\\b(herb|tea|tincture|supplement)\\b\")\nclusters['A09'] = sel(r\"\\b(prep|preparedness|emergency|power outage|hurricane|storm|grid|bug out)\\b.*\\b(herb|remed|first aid|kit|stock)\\b|\\b(herbal)\\b.*\\b(prep|preparedness|emergency)\\b\")\nclusters['A10'] = sel(r\"\\b(eczema|rash|acne|psoriasis|skin|gerd|ibs|bloat|nausea|stomach)\\b.*\\b(salve|topical|cream|oil|tea|soak)\\b\")\n{ k: len(v) for k,v in clusters.items() }\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76236f0288195ab85e35264529c39",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76237968c81959ea9d4b319d29500",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "for term in [\"my mom\",\"my dad\",\"grandma\",\"grandpa\",\"elderly\",\"caregiver\",\"caregiving\"]:\n    print(term, df['verbatim'].str.contains(term, case=False, na=False).sum())\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762409e008195bb3ef479c82c0fb8",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762418cc08195b96ac262fd54de10",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A08'] = sel(r\"\\b(caregiver|caregiving|elderly|grandma|grandpa|my mom)\\b.*\\b(herb|tea|tincture|supplement|natural|remed)\\b|\\b(herb|tea|tincture|supplement)\\b.*\\b(elderly|caregiver|grandma|my mom)\\b\")\nlen(clusters['A08'])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762471798819588f200fb250303cd",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762491cd08195a25e0e4804eb43d8",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "theme_terms = [\"anxiety\",\"sleep\",\"insomnia\",\"stress\",\"cough\",\"cold\",\"flu\",\"immune\",\"pain\",\"headache\",\"migraine\",\"adhd\",\"depression\",\"focus\",\"weight\",\"thyroid\",\"candida\",\"detox\",\"lyme\",\"uti\",\"yeast\",\"period\",\"cramp\"]\nfor t in theme_terms:\n    print(t, df['verbatim'].str.contains(rf\"\\b{re.escape(t)}\\b\", case=False, na=False).sum())\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7624f8d8881959d269ce70481d8dc",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762504e0881958f73a26594ece963",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "for t in [\"melatonin\",\"valerian\",\"magnesium\",\"ashwagandha\",\"chamomile\",\"lavender\",\"passionflower\",\"l-theanine\"]:\n    print(t, df['verbatim'].str.contains(t, case=False, na=False).sum())\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762547760819582602a8872b05fe9",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76255b4448195aa093a1596e85a8b",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['verbatim'].str.contains(r\"\\bdoctor|dr\\.|pediatrician|obgyn|gp|primary care|pharmacist\\b\", case=False, na=False, regex=True).sum()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7625a662c8195ab6e8fedc4c5bf95",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7625b6d5081959e0f2288236019fd",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A08'] = sel(r\"\\b(doctor|dr\\.|pediatrician|obgyn|pharmacist)\\b.*\\b(doesn'?t know|won'?t|dismiss|shrug|no idea|can'?t help|told me to stop|said no)\\b.*\\b(herb|supplement|tea|natural)\\b|\\b(herb|supplement|tea)\\b.*\\b(pharmacist|doctor)\\b.*\\b(doesn'?t|won'?t|dismiss|no idea|can'?t)\\b\")\nlen(clusters['A08'])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76261f7e48195b60a11d606a82bc6",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7626379c481959f1b508a7e508dc3",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A08'] = sel(r\"\\b(doctor|pediatrician|obgyn|pharmacist)\\b.*\\b(herb|supplement|tea|tincture)\\b.*\\b(safe|ok|interaction|mix|together|contraindicat|should i)\\b|\\b(should i|safe)\\b.*\\b(herb|supplement)\\b.*\\b(pharmacist|doctor)\\b\")\nlen(clusters['A08']), clusters['A08']['hab_norm'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7626d393481958aaec150b2f96723",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7626e70cc81959859d878f0c728e4",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "for t in [\"grow\",\"growing\",\"garden\",\"forage\",\"foraging\",\"wildcraft\",\"wildcrafting\"]:\n    print(t, df['verbatim'].str.contains(rf\"\\b{t}\\b\", case=False, na=False).sum())\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76276ae68819591659d4c60116a21",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76277dec88195b419734c6ef3f965",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['verbatim'].str.contains(r\"essential oil|doterra|young living\", case=False, na=False, regex=True).sum()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762815d888195be8133408872507e",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762821e148195b809764530d52197",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "for t in [\"homestead\",\"homesteading\",\"crunchy\",\"granola\",\"natural living\"]:\n    print(t, df['verbatim'].str.contains(t, case=False, na=False).sum())\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76289684c819596430021d4c24b1c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7628a3f388195900f75bd7426c742",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['verbatim'].str.contains(r\"tincture|tea|capsule|dose|dosage|mg|drops|decoction|infusion|glycerite\", case=False, na=False, regex=True).sum()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7629339ec819587f1dbe73aa89c11",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76295706c8195b53cd3110f1f6fc1",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A08'] = sel(r\"\\b(tincture|glycerite|tea|decoction|infusion|capsule|extract)\\b.*\\b(dose|dosage|how much|how many|drops|mg|teaspoon|tablespoon|too much|overdose|frequency)\\b|\\b(dose|dosage|how much|how many drops)\\b.*\\b(tincture|tea|extract)\\b\")\nlen(clusters['A08'])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7629c5ca48195846d1a01165c57e5",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7629e5b988195accc24a677facc10",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A08'] = sel(r\"\\b(tincture|glycerite|extract|capsule|tea|decoction|infusion)\\b.*\\b(how do i|how much|how many|can i take|take it|dosing|dose|dosage|drops|mg|teaspoon|tablespoon|times a day|per day)\\b|\\b(dosing|dosage)\\b\")\nlen(clusters['A08'])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762a787d48195a0d6289e17b46379",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762af82cc81958fbf3980d6cc8a06",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['evidence_id'].head(10).tolist()[:10]\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762b768ac8195988ca443d37e292f",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762be13288195b4b71dbbd027020d",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def get_short_quotes(dfsub):\n    d = dfsub[dfsub['len']<=320].copy()\n    return len(d), d['len'].describe()\n{ k: get_short_quotes(v)[0] for k,v in clusters.items() }\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762c62e64819580c3cedcaa0663a9",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762cc2a648195b3f80888cf560385",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def sample_text(dfsub, n=5):\n    return dfsub[['evidence_id','verbatim','source_url','hab_norm']].head(n).to_dict('records')\nsample_text(clusters['A02'],3)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762d5a50c8195ad54f0b4fa75f3af",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762d8ee9c819589ba719aa5663f15",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['strategy_target_id'].value_counts().head(20)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762e2574c8195bb227b02a1612954",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762e330c881958fe32106b0ff0cbf",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df[['context','verbatim']].head(3)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a762e81f748195ae661d0890a525f1",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a762e9d9a481959c7a8afe1bbd19ae",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df[df['habitat_name'].str.contains('NewParents', na=False)][['evidence_id','verbatim']].head(3).to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76302ed5881958d2194dc40eeaeb6",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76303cbfc8195a9256c8bdf80cff6",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "import json, pandas as pd, re, numpy as np\nfrom datetime import datetime, timezone\npaths = {\n\"COMPETITOR_ANGLE_MAP_JSON\":\"/mnt/data/file-PfdMw3WPLwSV2RUGdJyL79-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-competitor_angle_map_json.json\",\n\"KNOWN_SATURATED_ANGLES_JSON\":\"/mnt/data/file-Geog7Hf2yAb1frW29PDTzZ-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-known_saturated_angles_json.json\",\n\"PRODUCT_BRIEF_JSON\":\"/mnt/data/file-MGPjBw3JvJorgDNnQGqYvj-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-product_brief_json.json\",\n\"HABITAT_SCORED_JSON\":\"/mnt/data/file-Ci56CMQUC6WanYNGoudMRx-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-habitat_scored_json.json\",\n\"AGENT1_HABITAT_OBSERVATIONS_JSON\":\"/mnt/data/file-M5MEecJGkbLnhsVrBZXesd-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent1_habitat_observations_json.json\",\n\"AGENT1_MINING_PLAN_JSON\":\"/mnt/data/file-BGqHiPvqEF3V1f7ZhZwxdG-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent1_mining_plan_json.json\",\n\"AVATAR_BRIEF_SUMMARY_JSON\":\"/mnt/data/file-YXjghwpcS4C2Y16vQ4i47B-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-avatar_brief_summary_json.json\",\n\"FOUNDATIONAL_RESEARCH_DOCS_JSON\":\"/mnt/data/file-EqdciZv7W5mbbndQENiXFH-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-foundational_research_docs_json.json\",\n\"VOC_EVIDENCE_ROWS_JSON\":\"/mnt/data/file-SNBXfzgZKweSmBsRQujifT-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-voc_evidence_rows_json.json\",\n\"AGENT2_INPUT_MANIFEST_JSON\":\"/mnt/data/file-8kLMTE8kmc7nUvrLCXicqw-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent2_input_manifest_json.json\",\n\"VOC_EVIDENCE_LAYOUT_JSON\":\"/mnt/data/file-X1qFen75pZJCAG6HEiKmPc-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-voc_evidence_layout_json.json\"\n}\ndef load(p):\n    with open(p,'r') as f:\n        return json.load(f)\ndata = {k: load(v) for k,v in paths.items()}\ndf = pd.DataFrame(data[\"VOC_EVIDENCE_ROWS_JSON\"])\ndef norm_hab(row):\n    hn = str(row['habitat_name']).lower()\n    ht = str(row['habitat_type']).lower()\n    su = str(row['source_url']).lower()\n    if 'reddit.com' in hn or 'reddit.com' in su:\n        return 'Reddit'\n    if 'instagram' in ht or 'instagram' in hn:\n        return 'Instagram'\n    if 'youtube' in ht or 'youtu' in hn or 'youtu' in su:\n        return 'YouTube'\n    if 'tiktok' in ht or 'tiktok' in hn or 'tiktok' in su:\n        return 'TikTok'\n    if 'merged' in ht or 'merged' in hn:\n        return 'Merged'\n    return 'Other'\ndf['hab_norm']=df.apply(norm_hab,axis=1)\ndf['len']=df['verbatim'].astype(str).str.len()\ntoday = datetime(2026,3,3,tzinfo=timezone.utc)\ndef parse_date(s):\n    if not isinstance(s,str) or s.lower()==\"unknown\" or s.strip()==\"\":\n        return None\n    try:\n        return datetime.fromisoformat(s.replace(\"Z\",\"+00:00\"))\n    except Exception:\n        return None\ndf['dt']=df['date'].apply(parse_date)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76316da048195b4b4af4aa1ccb11f",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7631748248195855bac119c3e5d6d",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df[df['habitat_name'].astype(str).str.contains('r/NewParents', na=False)][['evidence_id','verbatim']].head(5).to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7631c985c81958b30f264bd582d21",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7632125388195a982978bb6c32078",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def sel(pattern):\n    return df[df['verbatim'].str.contains(pattern, case=False, na=False, regex=True)].copy()\n\nclusters = {}\nclusters['A01'] = sel(r\"\\b(medication|meds|prescription|rx|ssri|statin|warfarin|eliquis|xarelto|blood pressure|beta blocker|metformin)\\b.*\\b(herb|herbal|tea|tincture|supplement)\\b.*\\b(interaction|contraindicat|mix|combine|safe|together)\\b|\\b(interaction|contraindicat)\\b.*\\b(medication|meds|prescription|rx)\\b\")\nclusters['A02'] = sel(r\"\\b(baby|toddler|kid|child|teething|newborn)\\b.*\\b(natural|herb|herbal|remed|home remedy|alternative)\\b|\\b(tylenol|nurofen|ibuprofen|motrin)\\b.*\\b(baby|toddler|kid|teething)\\b\")\nclusters['A03'] = sel(r\"\\b(pregnan|breastfeed|nursing|postpartum|trimester)\\b.*\\b(herb|herbal|tea|tincture|supplement|natural|remed)\\b\")\nclusters['A04'] = sel(r\"\\b(menopause|perimenopause|hot flash|night sweats)\\b.*\\b(herb|herbal|supplement|natural|remed|tea)\\b|\\b(hrt|estrogen|progesterone)\\b.*\\b(herb|supplement|natural)\\b\")\nclusters['A05'] = sel(r\"\\b(woo|snake oil|mlm|doterra|young living|influencer|tiktok|counterfeit|fake)\\b.*\\b(trust|evidence|science|research|skeptic|bs|bullshit)\\b|\\b(trust|evidence|science|research)\\b.*\\b(woo|mlm|tiktok|counterfeit|fake)\\b\")\nclusters['A06'] = sel(r\"\\b(apothecary|herbal apothecary|home apothecary|herb cabinet|remedy cabinet|medicine cabinet|pantry|stocking|stock up|kit)\\b\")\nclusters['A07'] = sel(r\"\\b(allerg|sensitive|reaction|side effect|hives|histamine|itch)\\b.*\\b(herb|herbal|supplement|tea|tincture|natural)\\b\")\nclusters['A08'] = sel(r\"\\b(tincture|glycerite|extract|capsule|tea|decoction|infusion)\\b.*\\b(how do i|how much|how many|can i take|dosing|dose|dosage|drops|mg|teaspoon|tablespoon|times a day|per day)\\b|\\b(dosing|dosage)\\b.*\\b(herb|tincture|tea|supplement)\\b\")\nclusters['A09'] = sel(r\"\\b(prep|preparedness|emergency|power outage|hurricane|storm|grid|bug out)\\b.*\\b(herb|herbal|remed|first aid|kit|apothecary|stock)\\b\")\nclusters['A10'] = sel(r\"\\b(eczema|rash|acne|psoriasis|skin|dermatitis)\\b.*\\b(natural|herb|herbal|remed|salve|cream|oil|soak|tea)\\b|\\b(gerd|ibs|bloat|nausea|stomach)\\b.*\\b(tea|ginger|peppermint|chamomile|fennel|herb)\\b\")\n{k:len(v) for k,v in clusters.items()}\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7632f0680819592794494eae931f7",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763350d3c8195b34a11a0e2076bb6",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A09'] = sel(r\"\\b(prep|preparedness|emergency|power outage|hurricane|storm|grid|bug out)\\b.*\\b(natural|remed|herb|herbal|first aid|kit|apothecary|stock)\\b|\\b(first aid kit)\\b.*\\b(herb|herbal|natural)\\b\")\nlen(clusters['A09'])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7633a95cc81958e2180a5c57aa5f9",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7633cf9fc8195b83f84f823f99209",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "emotion_words = [\"scared\",\"afraid\",\"fear\",\"terrified\",\"worried\",\"anxious\",\"exhausted\",\"guilt\",\"panic\",\"overwhelmed\",\"desperate\",\"helpless\"]\ntrigger_words = [\"2am\",\"3am\",\"middle of the night\",\"tonight\",\"right now\",\"urgent\",\"appointment\",\"pharmacy\",\"started\",\"switching\",\"pregnant\",\"postpartum\",\"teething\",\"hot flashes\",\"night sweats\",\"power outage\",\"storm\"]\ndetail_words = [\"mg\",\"drops\",\"teaspoon\",\"tablespoon\",\"days\",\"weeks\",\"hours\",\"months\",\"years\"]\nneg_words = [\"didn't work\",\"doesn't work\",\"no effect\",\"made it worse\",\"worse\",\"avoid\",\"danger\",\"unsafe\",\"contraindicated\",\"scam\",\"bs\",\"bullshit\"]\ndef quote_score(text):\n    t = text.lower()\n    s = 0\n    if any(w in t for w in emotion_words): s += 2\n    if any(w in t for w in trigger_words): s += 2\n    if any(w in t for w in detail_words): s += 1.5\n    if \"?\" in t: s += 0.5\n    if re.search(r\"\\b(i|my|we|our)\\b\", t): s += 1\n    if re.search(r\"\\b(only thing|nothing works|so tired|can't)\\b\", t): s += 1\n    # penalize extremely short or generic\n    if len(text) < 60: s -= 0.5\n    if len(text) > 700: s -= 0.3\n    return s\n\ndef get_top_quotes(dfsub, k=5):\n    d = dfsub.copy()\n    d['score'] = d['verbatim'].astype(str).apply(quote_score)\n    d = d.sort_values(['score','len'], ascending=[False, True])\n    top = d.head(k)\n    quotes=[]\n    for _,r in top.iterrows():\n        voc_id=\"R\"+r['evidence_id']\n        q=str(r['verbatim'])\n        if len(q)>320:\n            q=q[:320]\n        quotes.append({\"voc_id\":voc_id,\"quote\":q,\"adjusted_score\":float(round(r['score'],3))})\n    return quotes, top\n\ndef contradiction_count(dfsub):\n    t = dfsub['verbatim'].astype(str).str.lower()\n    pattern = \"|\".join(re.escape(w) for w in neg_words)\n    return int(t.str.contains(pattern, regex=True).sum())\n\ndef triangulation(dfsub):\n    types = dfsub['hab_norm'].nunique()\n    if types<=1: return \"SINGLE\"\n    if types==2: return \"DUAL\"\n    return \"MULTI\"\n\ndef velocity(dfsub):\n    d = dfsub[dfsub['dt'].notna()].copy()\n    if len(d)<5:\n        return \"STEADY\"\n    recent6 = (today - d['dt'] <= pd.Timedelta(days=183)).mean()\n    recent12 = (today - d['dt'] <= pd.Timedelta(days=365)).mean()\n    # if recent6 high -> accelerating; else if recent12 moderate -> steady; else decel\n    if recent6 >= 0.35:\n        return \"ACCELERATING\"\n    if recent12 >= 0.35:\n        return \"STEADY\"\n    return \"DECELERATING\"\n\nfor k,v in clusters.items():\n    print(k,len(v),triangulation(v),velocity(v),contradiction_count(v))\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76349a6248195a885593e1384ae22",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7634c57208195b8f5c0c4f865a1f4",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "for k in clusters:\n    quotes, top = get_top_quotes(clusters[k],5)\n    print(k, [q['voc_id'] for q in quotes])\n    print(quotes[0]['quote'][:200].replace(\"\\n\",\" \"))\n    print(\"----\")\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76351a8d4819590eef7bd4abe1e5a",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7635458f08195a49339eb3955e4fa",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['source_type'].value_counts().head(20)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7635e7c308195a16167949abd503d",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76363f86481959c20beb64a4cc09c",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "marketing_terms = [\"webinar\",\"sold out\",\"spaces left\",\"comment\",\"dm me\",\"link in bio\",\"use code\",\"shop\",\"sale\",\"subscribe\",\"follow\",\"must have\",\"call it\",\"\u2728\",\"#\"]\ndef quote_score(text, source_type=None):\n    t=text.lower()\n    s=0\n    if any(w in t for w in emotion_words): s+=2\n    if any(w in t for w in trigger_words): s+=2\n    if any(w in t for w in detail_words): s+=1.5\n    if \"?\" in t: s+=0.7\n    if re.search(r\"\\b(i|my|we|our)\\b\", t): s+=1\n    if re.search(r\"\\b(help|advice|anyone|what do i|should i)\\b\", t): s+=1.2\n    # source type bonus\n    if source_type in [\"REDDIT\",\"FORUM\",\"IG_COMMENT\",\"YT_COMMENT\"]:\n        s+=1.0\n    if source_type == \"VIDEO_HOOK\":\n        s-=0.8\n    # marketing penalty\n    if any(mt in t for mt in marketing_terms):\n        s-=1.2\n    if len(text)<60: s-=0.5\n    return s\n\ndef get_top_quotes(dfsub, k=5):\n    d=dfsub.copy()\n    d['score']=d.apply(lambda r: quote_score(str(r['verbatim']), r['source_type']), axis=1)\n    d=d.sort_values(['score','len'], ascending=[False, True])\n    top=d.head(k)\n    quotes=[]\n    for _,r in top.iterrows():\n        voc_id=\"R\"+r['evidence_id']\n        q=str(r['verbatim'])\n        if len(q)>320: q=q[:320]\n        quotes.append({\"voc_id\":voc_id,\"quote\":q,\"adjusted_score\":float(round(r['score'],3))})\n    return quotes, top\n\nfor k in clusters:\n    quotes,_ = get_top_quotes(clusters[k],5)\n    print(k, quotes[0]['voc_id'], quotes[0]['adjusted_score'])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7636c1958819592a93e4079ffb182",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7636c6fc0819599a75bbd9b26b6e4",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes, top = get_top_quotes(clusters['A03'],5)\ntop[['evidence_id','source_type','verbatim']].head(5).to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7637056888195b64444a2c19afbed",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7637344988195a55d07eb5a2a5657",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "d=clusters['A03'].copy()\nd['score']=d.apply(lambda r: quote_score(str(r['verbatim']), r['source_type']), axis=1)\nd.sort_values('score',ascending=False).head(10)[['evidence_id','source_type','score','len']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76376346c81959c1a8437b3e0e3ff",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76379a2988195855a954ae0528ca9",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def quote_score(text, source_type=None):\n    t=text.lower()\n    s=0\n    if any(w in t for w in emotion_words): s+=2\n    if any(w in t for w in trigger_words): s+=2\n    if any(w in t for w in detail_words): s+=1.5\n    if \"?\" in t: s+=1.0\n    if re.search(r\"\\b(i|my|we|our)\\b\", t): s+=1\n    if re.search(r\"\\b(help|advice|anyone|what do i|should i|is it safe|safe)\\b\", t): s+=1.2\n    # source type bonus\n    if source_type in [\"REDDIT\",\"FORUM\",\"IG_COMMENT\",\"YT_COMMENT\"]:\n        s+=1.0\n    if source_type == \"VIDEO_HOOK\":\n        s-=1.2\n    # marketing penalty\n    if any(mt in t for mt in marketing_terms):\n        s-=1.5\n    if t.count(\"#\")>=3:\n        s-=1\n    if len(text)>500:\n        s-=1.0\n    if len(text)<60:\n        s-=0.5\n    return s\n\ndef get_top_quotes(dfsub, k=5):\n    d=dfsub.copy()\n    d['score']=d.apply(lambda r: quote_score(str(r['verbatim']), r['source_type']), axis=1)\n    d=d.sort_values(['score','len'], ascending=[False, True])\n    selected=[]\n    used_sha=set()\n    used_hab=set()\n    used_source=set()\n    for _,r in d.iterrows():\n        # dedupe by verbatim hash\n        h=hash(r['verbatim'])\n        if h in used_sha: \n            continue\n        # diversify: avoid more than 2 same hab_norm if possible\n        if len(selected)<k:\n            # allow\n            pass\n        selected.append(r)\n        used_sha.add(h)\n        used_hab.add(r['hab_norm'])\n        used_source.add(r['source_type'])\n        if len(selected)>=k:\n            break\n    quotes=[]\n    for r in selected:\n        voc_id=\"R\"+r['evidence_id']\n        q=str(r['verbatim'])\n        if len(q)>320: q=q[:320]\n        quotes.append({\"voc_id\":voc_id,\"quote\":q,\"adjusted_score\":float(round(r['score'],3))})\n    return quotes, pd.DataFrame(selected)\n\n# check A03 top now\nquotes, top = get_top_quotes(clusters['A03'],5)\ntop[['evidence_id','source_type','score','len']].to_dict('records'), quotes[0]['quote']\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76383acec8195827c3def4feacc6b",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763845be881959e723e469cdc6551",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "for k in clusters:\n    quotes,_=get_top_quotes(clusters[k],5)\n    print(k, [q['voc_id'] for q in quotes], [q['adjusted_score'] for q in quotes])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7638760bc8195a8844294d4264874",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76387f8bc81958ed313904c76c479",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "top = get_top_quotes(clusters['A05'],5)[1]\ntop[['evidence_id','source_type','verbatim']].head(2).to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7638ad8c88195a96ea875a213637b",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7638ea6188195bb0e85e02164aed2",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "for k,v in clusters.items():\n    print(k, v['source_type'].value_counts().to_dict())\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7639176388195a249db4b473d5044",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76393863081958464dac08bcbe38a",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "spam_patterns = [\nr\"\\bASIN\\b\", r\"buy.*\\.com\", r\"\\bLLC\\b\", r\"verified .* marketplace\", r\"secure checkout\", \nr\"link in bio\", r\"use code\", r\"subscribe\", r\"follow me\", r\"DM me\", r\"join (our|my) facebook\", \nr\"spaces left\", r\"sold out\", r\"webinar\", r\"course\", r\"enroll\", r\"shop now\", r\"\\bhttp\", r\"www\\.\", \nr\"\ud83d\udc49\", r\"\u2705\", r\"\ud83d\uded2\", r\"\ud83d\udd25 welcome\", r\"free apothe\", r\"practitioner only\"\n]\nspam_re = re.compile(\"|\".join(spam_patterns), re.IGNORECASE)\ndef is_spam(text):\n    if not isinstance(text,str): return False\n    if spam_re.search(text):\n        return True\n    # many hashtags\n    if text.count(\"#\")>=6:\n        return True\n    return False\n\ndf['is_spam']=df['verbatim'].astype(str).apply(is_spam)\ndf['is_spam'].mean(), df[df['is_spam']].shape\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7639900f08195ab1e503109af1c38",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7639978d48195912bb87baa26dfa8",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df_clean = df[~df['is_spam']].copy()\ndef sel_clean(pattern):\n    return df_clean[df_clean['verbatim'].str.contains(pattern, case=False, na=False, regex=True)].copy()\n\nclusters = {}\nclusters['A01'] = sel_clean(r\"\\b(medication|meds|prescription|rx|ssri|statin|warfarin|eliquis|xarelto|blood pressure|beta blocker|metformin)\\b.*\\b(herb|herbal|tea|tincture|supplement)\\b.*\\b(interaction|contraindicat|mix|combine|safe|together)\\b|\\b(interaction|contraindicat)\\b.*\\b(medication|meds|prescription|rx)\\b\")\nclusters['A02'] = sel_clean(r\"\\b(baby|toddler|kid|child|teething|newborn)\\b.*\\b(natural|herb|herbal|remed|home remedy|alternative)\\b|\\b(tylenol|nurofen|ibuprofen|motrin)\\b.*\\b(baby|toddler|kid|teething)\\b\")\nclusters['A03'] = sel_clean(r\"\\b(pregnan|breastfeed|nursing|postpartum|trimester)\\b.*\\b(herb|herbal|tea|tincture|supplement|natural|remed)\\b\")\nclusters['A04'] = sel_clean(r\"\\b(menopause|perimenopause|hot flash|night sweats)\\b.*\\b(herb|herbal|supplement|natural|remed|tea)\\b|\\b(hrt|estrogen|progesterone)\\b.*\\b(herb|supplement|natural)\\b\")\nclusters['A05'] = sel_clean(r\"\\b(woo|snake oil|mlm|doterra|young living|influencer|tiktok|counterfeit|fake)\\b.*\\b(trust|evidence|science|research|skeptic|bs|bullshit)\\b|\\b(trust|evidence|science|research)\\b.*\\b(woo|mlm|tiktok|counterfeit|fake)\\b\")\nclusters['A06'] = sel_clean(r\"\\b(apothecary|herbal apothecary|home apothecary|herb cabinet|remedy cabinet|medicine cabinet|pantry|stocking|stock up|kit)\\b\")\nclusters['A07'] = sel_clean(r\"\\b(allerg|sensitive|reaction|side effect|hives|histamine|itch)\\b.*\\b(herb|herbal|supplement|tea|tincture|natural)\\b\")\nclusters['A08'] = sel_clean(r\"\\b(tincture|glycerite|extract|capsule|tea|decoction|infusion)\\b.*\\b(how do i|how much|how many|can i take|dosing|dose|dosage|drops|mg|teaspoon|tablespoon|times a day|per day)\\b|\\b(dosing|dosage)\\b.*\\b(herb|tincture|tea|supplement)\\b\")\nclusters['A09'] = sel_clean(r\"\\b(prep|preparedness|emergency|power outage|hurricane|storm|grid|bug out)\\b.*\\b(natural|remed|herb|herbal|first aid|kit|apothecary|stock)\\b|\\b(first aid kit)\\b.*\\b(herb|herbal|natural)\\b\")\nclusters['A10'] = sel_clean(r\"\\b(eczema|rash|acne|psoriasis|skin|dermatitis)\\b.*\\b(natural|herb|herbal|remed|salve|cream|oil|soak|tea)\\b|\\b(gerd|ibs|bloat|nausea|stomach)\\b.*\\b(tea|ginger|peppermint|chamomile|fennel|herb)\\b\")\n{k:len(v) for k,v in clusters.items()}\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763a67c80819585bfa0858424ed33",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763aa5f088195a912e697e2bec428",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "spam_patterns_light = [\nr\"\\bASIN\\b\", r\"\\bLLC\\b\", r\"buyfatburners\", r\"verified .* marketplace\", r\"secure checkout\",\nr\"link in bio\", r\"use code\", r\"\\bpromo\\b\", r\"affiliate\", r\"shop now\", r\"sold out\", r\"webinar\", r\"enroll\", r\"course\"\n]\nspam_re_light = re.compile(\"|\".join(spam_patterns_light), re.IGNORECASE)\ndef is_spam_light(text):\n    if not isinstance(text,str): return False\n    if spam_re_light.search(text):\n        return True\n    if text.count(\"#\")>=10:\n        return True\n    return False\n\ndf['is_spam_light']=df['verbatim'].astype(str).apply(is_spam_light)\ndf_light = df[~df['is_spam_light']].copy()\ndf['is_spam_light'].mean()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763b4d7448195925657fa9dd3cb34",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763b51fb88195892d30d64f38ea18",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def sel_light(pattern):\n    return df_light[df_light['verbatim'].str.contains(pattern, case=False, na=False, regex=True)].copy()\n\nclusters = {}\nclusters['A01'] = sel_light(r\"\\b(medication|meds|prescription|rx|ssri|statin|warfarin|eliquis|xarelto|blood pressure|beta blocker|metformin)\\b.*\\b(herb|herbal|tea|tincture|supplement)\\b.*\\b(interaction|contraindicat|mix|combine|safe|together)\\b|\\b(interaction|contraindicat)\\b.*\\b(medication|meds|prescription|rx)\\b\")\nclusters['A02'] = sel_light(r\"\\b(baby|toddler|kid|child|teething|newborn)\\b.*\\b(natural|herb|herbal|remed|home remedy|alternative)\\b|\\b(tylenol|nurofen|ibuprofen|motrin)\\b.*\\b(baby|toddler|kid|teething)\\b\")\nclusters['A03'] = sel_light(r\"\\b(pregnan|breastfeed|nursing|postpartum|trimester)\\b.*\\b(herb|herbal|tea|tincture|supplement|natural|remed)\\b\")\nclusters['A04'] = sel_light(r\"\\b(menopause|perimenopause|hot flash|night sweats)\\b.*\\b(herb|herbal|supplement|natural|remed|tea)\\b|\\b(hrt|estrogen|progesterone)\\b.*\\b(herb|supplement|natural)\\b\")\nclusters['A05'] = sel_light(r\"\\b(woo|snake oil|mlm|doterra|young living|influencer|tiktok|counterfeit|fake)\\b.*\\b(trust|evidence|science|research|skeptic|bs|bullshit)\\b|\\b(trust|evidence|science|research)\\b.*\\b(woo|mlm|tiktok|counterfeit|fake)\\b\")\nclusters['A06'] = sel_light(r\"\\b(apothecary|herbal apothecary|home apothecary|herb cabinet|remedy cabinet|medicine cabinet|pantry|stocking|stock up|kit)\\b\")\nclusters['A07'] = sel_light(r\"\\b(allerg|sensitive|reaction|side effect|hives|histamine|itch)\\b.*\\b(herb|herbal|supplement|tea|tincture|natural)\\b\")\nclusters['A08'] = sel_light(r\"\\b(tincture|glycerite|extract|capsule|tea|decoction|infusion)\\b.*\\b(how do i|how much|how many|can i take|dosing|dose|dosage|drops|mg|teaspoon|tablespoon|times a day|per day)\\b|\\b(dosing|dosage)\\b.*\\b(herb|tincture|tea|supplement)\\b\")\nclusters['A09'] = sel_light(r\"\\b(prep|preparedness|emergency|power outage|hurricane|storm|grid|bug out)\\b.*\\b(natural|remed|herb|herbal|first aid|kit|apothecary|stock)\\b|\\b(first aid kit)\\b.*\\b(herb|herbal|natural)\\b\")\nclusters['A10'] = sel_light(r\"\\b(eczema|rash|acne|psoriasis|skin|dermatitis)\\b.*\\b(natural|herb|herbal|remed|salve|cream|oil|soak|tea)\\b|\\b(gerd|ibs|bloat|nausea|stomach)\\b.*\\b(tea|ginger|peppermint|chamomile|fennel|herb)\\b\")\n{k:len(v) for k,v in clusters.items()}\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763c2869481958cf52c4615c5bb9f",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763c411b481959053e2bd8cdf852b",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A05'] = sel_light(r\"\\b(woo|snake oil|mlm|doterra|young living|influencer|tiktok|counterfeit|fake|misinformation)\\b.*\\b(trust|evidence|science|research|skeptic|bs|bullshit|confus|mixed|contradict)\\b|\\b(trust|evidence|science|research|skeptic|confus|mixed)\\b.*\\b(woo|mlm|tiktok|counterfeit|fake|misinformation|influencer)\\b|\\bgoogle\\b.*\\b(mixed|confus|contradict|can't trust)\\b\")\nlen(clusters['A05']), clusters['A05']['source_type'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763c93d848195b08461de62a07192",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763c9e2708195a74c299dbc63d641",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "from datetime import timedelta\ndef contradiction_count(dfsub):\n    t=dfsub['verbatim'].astype(str).str.lower()\n    pattern=\"|\".join([re.escape(w) for w in neg_words])\n    return int(t.str.contains(pattern, regex=True).sum())\n\ndef triangulation(dfsub):\n    types=dfsub['hab_norm'].nunique()\n    return \"SINGLE\" if types<=1 else \"DUAL\" if types==2 else \"MULTI\"\n\ndef velocity(dfsub):\n    d=dfsub[dfsub['dt'].notna()]\n    if len(d)<5:\n        return \"STEADY\"\n    recent6=(today - d['dt']<=timedelta(days=183)).mean()\n    recent12=(today - d['dt']<=timedelta(days=365)).mean()\n    if recent6>=0.35: return \"ACCELERATING\"\n    if recent12>=0.35: return \"STEADY\"\n    return \"DECELERATING\"\n\n{k:(len(v),triangulation(v),velocity(v),contradiction_count(v)) for k,v in clusters.items()}\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763cf2e1c8195b156277ca44d8c3f",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763d43cc88195bb85b4c29d37ab61",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes, top = get_top_quotes(clusters['A02'],5)\ntop[['evidence_id','source_type','hab_norm','verbatim']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763d6d4ac81958d0840b3337b6d2c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763d9a1c8819581643749a1c58fd5",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A02'] = sel_light(r\"\\b(baby|toddler|kid|child|newborn)\\b.*\\b(teething|fever|cough|congest|sick|ear|pain)\\b.*\\b(natural|herb|herbal|remed|home remedy|alternative)\\b|\\b(tylenol|nurofen|ibuprofen|motrin)\\b.*\\b(baby|toddler|kid|teething)\\b\")\nlen(clusters['A02']), clusters['A02']['source_type'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763e03cec8195b8ae5cd0c63cbd0a",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763e0c7f08195a341d82006f4c8bb",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes, top = get_top_quotes(clusters['A02'],5)\ntop[['evidence_id','source_type','verbatim']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763e3535c819582a714fe44c9afa4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763e423288195aa1ea31c71fdb914",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes, top = get_top_quotes(clusters['A01'],5)\ntop[['evidence_id','source_type','verbatim']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763e67ae8819588c7df681ee9bfa6",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763e794908195a9f32775229b84e7",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A01']['source_type'].value_counts()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763eac64481959210630d0b47a070",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763ebf030819599bb5bf017f69281",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "a01=clusters['A01']\na01[a01['verbatim'].str.contains(r\"\\bI('| a)m on\\b|\\bmy meds\\b|\\bmy medication\\b\", case=False, na=False, regex=True)][['evidence_id','source_type','verbatim']].head(10).to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763f490c4819580fedb828562bbbd",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763f6050881958c2d2cc0269b5763",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "mask = df_light['verbatim'].str.contains(r\"on (a )?(prescription|medication|blood thinner|antidepressant|ssri|warfarin|eliquis|xarelto)\", case=False, na=False, regex=True) & \\\n       df_light['verbatim'].str.contains(r\"herb|supplement|tea|tincture\", case=False, na=False, regex=True)\ntmp=df_light[mask]\nlen(tmp), tmp['source_type'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a763ff1c6881958e70e3e17e138988",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a763ffb04c819597066ad20dad3a12",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "tmp[tmp['source_type'].isin(['REDDIT','FORUM'])][['evidence_id','source_type','verbatim']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a764037240819595a2da31dcfa1846",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7640634ac819599048e1e1da46c20",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "mask = df_light['verbatim'].str.contains(r\"can i take|safe to take|okay to take|interaction|contraindicat\", case=False, na=False, regex=True) & \\\n       df_light['verbatim'].str.contains(r\"medication|prescription|blood thinner|antidepressant|ssri|statin|blood pressure|diabetes|warfarin|eliquis|xarelto\", case=False, na=False, regex=True)\ncand = df_light[mask]\nlen(cand), cand['source_type'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7640af4e481959e0c829ee8898ffd",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7640bb26481958de7268cbce27565",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "mask = df_light['verbatim'].str.contains(r\"can i take|safe to take|okay to take|interaction|contraindicat|mix|combine\", case=False, na=False, regex=True) & \\\n       df_light['verbatim'].str.contains(r\"medication|prescription|blood thinner|antidepressant|ssri|statin|blood pressure|diabetes|warfarin|eliquis|xarelto\", case=False, na=False, regex=True) & \\\n       df_light['verbatim'].str.contains(r\"herb|herbal|supplement|tea|tincture|st\\. john|ginkgo|garlic|ashwagandha\", case=False, na=False, regex=True)\na01 = df_light[mask].copy()\nlen(a01), a01['source_type'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76411454c81958f16ce01fd3b5d40",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7641231048195b6a0d295ebc52f51",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A01']=a01\nquotes, top = get_top_quotes(clusters['A01'],5)\ntop[['evidence_id','source_type','verbatim','score','len']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a764151bd88195ad8932aa96876ce4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7642be5588195b11f403995a8b85d",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "top_quotes_map={}\nfor k,v in clusters.items():\n    quotes, top = get_top_quotes(v,5)\n    top_quotes_map[k]=quotes\n    # print first quote id\n    print(k, [q['voc_id'] for q in quotes])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7642f2ff48195847c230f7f14cb13",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a764313bf48195861b3e93319fc71b",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "get_top_quotes(clusters['A04'],5)[1][['evidence_id','verbatim']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76434a5908195bcffe4b6dc3308e2",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76435d420819597cef52ee98abdc0",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "a04=clusters['A04']\na04[a04['source_type']==\"REDDIT\"][['evidence_id','verbatim']].head(10).to_dict('records'), len(a04[a04['source_type']==\"REDDIT\"])\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a764398a7c8195bcf1f11fbf963dd2",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7643a3f948195a93d9ff7fe15532f",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "top = get_top_quotes(clusters['A05'],5)[1]\ntop[['evidence_id','source_type','verbatim']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7643d9a6881959b3fa8a98da72926",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7643f0ab48195b5b3c1fea99c5bf1",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A05'] = sel_light(r\"(?i)(herb|herbal|remed|supplement|natural).*(woo|snake oil|mlm|doterra|young living|influencer|tiktok|counterfeit|fake|misinformation|ai).*(trust|evidence|science|research|skeptic|bs|bullshit|confus|mixed|contradict)|(?i)(trust|evidence|science|research|skeptic|confus|mixed).*(herb|herbal|remed|supplement|natural).*(woo|mlm|tiktok|counterfeit|fake|misinformation|ai)|(?i)google.*(herb|herbal|remed|supplement|natural).*(mixed|confus|contradict|can't trust)\")\nlen(clusters['A05']), clusters['A05']['source_type'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76444114c8195b931a8464a05900e",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76445064c81959f23ff93c01ed40b",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "pattern_a05 = r\"(herb|herbal|remed|supplement|natural).*(woo|snake oil|mlm|doterra|young living|influencer|tiktok|counterfeit|fake|misinformation|ai).*(trust|evidence|science|research|skeptic|bs|bullshit|confus|mixed|contradict)\" \\\n             r\"|(trust|evidence|science|research|skeptic|confus|mixed).*(herb|herbal|remed|supplement|natural).*(woo|mlm|tiktok|counterfeit|fake|misinformation|ai)\" \\\n             r\"|google.*(herb|herbal|remed|supplement|natural).*(mixed|confus|contradict|can't trust)\"\nclusters['A05'] = sel_light(pattern_a05)\nlen(clusters['A05']), clusters['A05']['source_type'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7644a70348195914e5d1eaf41c205",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7644b90848195a9e29014a528defb",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes, top = get_top_quotes(clusters['A05'],5)\ntop[['evidence_id','source_type','verbatim','score']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7644e79f48195975094e2aca6ae9f",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7645232f481958c5eab7462bc5711",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "top = get_top_quotes(clusters['A09'],5)[1]\ntop[['evidence_id','source_type','verbatim','score']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76455127881959b7ae8050cee96d5",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7645a39908195adfb48e1e10fb7cd",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A09'] = sel_light(r\"\\b(preparedness|emergency|power outage|hurricane|storm|grid|bug out|wilderness|first aid|first responder|wfr|stop the bleed|survival)\\b.*\\b(herb|herbal|apothecary|remed|yarrow|plantain|neem|comfrey|arnica)\\b|\\b(herbal)\\b.*\\b(first aid|wilderness|emergency|preparedness)\\b\")\nlen(clusters['A09']), clusters['A09']['source_type'].value_counts().to_dict()\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7645def148195baf70b88ba41611d",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7645e20948195b558a23001d37a72",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes, top = get_top_quotes(clusters['A09'],5)\ntop[['evidence_id','source_type','verbatim','score']].to_dict('records')\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a76463b1f8819594666cc4980b954f",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a76466402881958e79e2c78cffab90",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "# Build angle definitions with IDs\ndef ids_for(k, n=3):\n    return [q['voc_id'] for q in top_quotes_map[k][:n]]\n# refresh top_quotes_map after modifications to clusters A02 A05 A09 etc\ntop_quotes_map={}\nfor k,v in clusters.items():\n    top_quotes_map[k]=get_top_quotes(v,5)[0]\n\nids = {k: ids_for(k,3) for k in clusters}\nids\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7646a78f88195ab79662d3fe6aeaf",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7646b1aa48195ae4da010dca31b86",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "angle_specs = [\n(\"POA01\",\"Interaction-Safe Add\u2011Ons\",\"A01\",\n {\"who\":\"Adults on prescriptions/HRT adding herbs or supplements but fear interactions ({ids})\",\n  \"trigger\":\"New Rx/HRT + want to keep/start herbs; ask \u201cis this safe together?\u201d ({ids2})\",\n  \"pain\":\"Conflicting advice + unregulated bottles; fear making symptoms/anxiety worse; wants a clear avoid/caution/OK list + timing + when to ask clinician. Failed: guessing, Googling. ({ids3})\",\n  \"belief_before\":\"OTC/natural means it\u2019s safe to combine. ({ids})\",\n  \"belief_after\":\"Natural still needs interaction guardrails + a go/no\u2011go check. ({ids2})\",\n  \"mech\":\"Handbook cross-checks meds\u2194herbs with contraindication flags, timing tips, and \u201cwhen to seek care\u201d prompts; customizable to your med list.\"\n }),\n(\"POA02\",\"2am Kid Remedy Triage\",\"A02\",\n {\"who\":\"Exhausted parents of teething/sick babies trying to stay \u201cnatural\u201d without harming their kid ({ids})\",\n  \"trigger\":\"3am pain/fever + guilt about Tylenol/Nurofen + \u201cwhat else can I try tonight?\u201d ({ids2})\",\n  \"pain\":\"Tried drops/gels/frozen tricks\u2014nothing lasts; fear unsafe teething products + fear meds. Outcome: safe comfort steps + when OTC is reasonable + red flags. Enemy: internet guilt wars. ({ids3})\",\n  \"belief_before\":\"If it\u2019s \u2018natural\u2019 it must be safer for babies. ({ids})\",\n  \"belief_after\":\"Baby-safe = specific guardrails + escalation cues, not vibes. ({ids2})\",\n  \"mech\":\"Symptom-first kid pages: age/weight notes, comfort options, what to avoid, when to use OTC, and \u201ccall/seek care\u201d cutoffs\u2014fast lookup.\"\n }),\n(\"POA03\",\"Pregnancy Tea Panic Filter\",\"A03\",\n {\"who\":\"Pregnant/nursing people who want natural relief but worry every herb/tea is risky ({ids})\",\n  \"trigger\":\"Realize a favorite tea/herb may be unsafe; panic + confusion from mixed lists ({ids2})\",\n  \"pain\":\"\u201cMost herbal teas aren\u2019t considered safe\u201d + conflicting sources; wants trimester/breastfeeding-safe lists + clear \u2018avoid\u2019 reasons + when to ask provider. Failed: Google roulette. ({ids3})\",\n  \"belief_before\":\"If it\u2019s sold as tea, it\u2019s automatically pregnancy-safe. ({ids})\",\n  \"belief_after\":\"Pregnancy-safe depends on herb + dose + stage; use a vetted list. ({ids2})\",\n  \"mech\":\"Pregnancy/breastfeeding filter + evidence-graded entries, common ingredients cross-check, and conservative \u2018stop/ask\u2019 flags.\"\n }),\n(\"POA04\",\"Menopause/HRT Supplement Cross\u2011Check\",\"A04\",\n {\"who\":\"Peri/menopause buyers starting HRT or symptom stacks who still want botanicals\u2014but safely ({ids})\",\n  \"trigger\":\"Start HRT + can\u2019t get clear answers on supplements/herbs; doesn\u2019t want to \u201cmess it up\u201d ({ids2})\",\n  \"pain\":\"Doctor can\u2019t confirm safety; overwhelmed by hot-flash/sleep/mood stacks. Outcome: what to pause, what\u2019s low-risk, what to monitor, and when to escalate. ({ids3})\",\n  \"belief_before\":\"I can just keep all my usual supplements when I start HRT. ({ids})\",\n  \"belief_after\":\"HRT + herbs = plan + monitoring + interaction screen. ({ids2})\",\n  \"mech\":\"HRT-aware checklists: interaction red/yellow/green, symptom-support options, and a \u201cquestions to bring to clinician\u201d page.\"\n }),\n(\"POA05\",\"Stop Buying \u2018Bottles of Hope\u2019\",\"A05\",\n {\"who\":\"Natural-curious shoppers burned by influencer trends & sketchy supplement claims ({ids})\",\n  \"trigger\":\"Standing in the \u2018detox/energy\u2019 aisle or doomscrolling\u2014realizing you\u2019re overspending + still unsure what\u2019s real ({ids2})\",\n  \"pain\":\"Can\u2019t trust labels/AI-ish books; hates woo but wants options. Outcome: a simple evidence-graded shortlist + how to vet quality. Failed: impulse buys. Enemy: hype economy. ({ids3})\",\n  \"belief_before\":\"More supplements = more progress. ({ids})\",\n  \"belief_after\":\"Fewer, higher-confidence basics + clear \u2018not worth it\u2019 calls. ({ids2})\",\n  \"mech\":\"Evidence-graded remedy entries + \u201cquality / third-party test / red-flag claims\u201d checklists; customizable \u2018keep/skip\u2019 list.\"\n }),\n(\"POA06\",\"Home Apothecary (No Clutter)\",\"A06\",\n {\"who\":\"DIY wellness learners building a home apothecary/medicine cabinet but overwhelmed by what to stock ({ids})\",\n  \"trigger\":\"New home/baby/season change + \u201cwhat do I actually need on hand?\u201d ({ids2})\",\n  \"pain\":\"Random purchases turn into cabinet graveyard; wants a minimal kit with multipurpose items, storage/shelf-life notes, and quick lookup for common issues. ({ids3})\",\n  \"belief_before\":\"I need a separate product for every symptom. ({ids})\",\n  \"belief_after\":\"A small, multipurpose kit + a lookup system beats chaos. ({ids2})\",\n  \"mech\":\"Customizable apothecary builder: shopping list, prep methods (tea/tincture/salve), labeling, rotation dates, and safety flags.\"\n }),\n(\"POA07\",\"Sensitive-Reactor Guardrails\",\"A07\",\n {\"who\":\"People who get side effects or allergic reactions from \u2018normal\u2019 herbs/supplements ({ids})\",\n  \"trigger\":\"A bad reaction (itch/hives/flare) makes them afraid to try anything again ({ids2})\",\n  \"pain\":\"Wants natural support but can\u2019t risk another reaction; needs \u2018start low\u2019 steps, what to avoid, and when symptoms mean stop/seek care. Failed: self-experimenting. ({ids3})\",\n  \"belief_before\":\"If it\u2019s a common herb, it can\u2019t cause a real reaction. ({ids})\",\n  \"belief_after\":\"Sensitivity is real\u2014dose/form + contraindications matter. ({ids2})\",\n  \"mech\":\"Sensitivity flags per entry + conservative titration guidance + cross-reactivity notes + clear stop-signs; customizable by known sensitivities.\"\n }),\n(\"POA08\",\"Dose & Form Decoder\",\"A08\",\n {\"who\":\"People with tinctures/teas/capsules asking \u2018how much, how often, how long?\u2019 ({ids})\",\n  \"trigger\":\"Bought a tincture or tea blend but labels + online advice are vague/contradictory ({ids2})\",\n  \"pain\":\"Fear of taking too much or wasting time with too little; wants form-based dosing ranges, timing, and \u201cif no change by X, stop\u201d rules. Failed: guessing. ({ids3})\",\n  \"belief_before\":\"Directions online are universal for everyone. ({ids})\",\n  \"belief_after\":\"Dose depends on form + goal + your context\u2014use a table, not comments. ({ids2})\",\n  \"mech\":\"Form-first dosage tables (tea vs tincture vs capsule), timing windows, and personalization notes; plus \u2018when to pause\u2019 cautions.\"\n }),\n(\"POA09\",\"Herbal First-Aid (Realistic)\",\"A09\",\n {\"who\":\"Hikers/campers/parents who want herbal first-aid options in their kit\u2014not doomsday prepping ({ids})\",\n  \"trigger\":\"Trip/storm season + realizing you might be far from care; want confidence for common cuts/bumps ({ids2})\",\n  \"pain\":\"Not sure what belongs in an herbal kit or what\u2019s unsafe; wants a small \u2018field-tested\u2019 list + clear limits on when to seek medical help. ({ids3})\",\n  \"belief_before\":\"An herbal kit should replace modern first aid. ({ids})\",\n  \"belief_after\":\"Herbal + modern together, with clear escalation rules. ({ids2})\",\n  \"mech\":\"First-aid module: kit checklist, quick recipes, storage, and \u2018do not use / get stitches / urgent care\u2019 thresholds; customizable by trip type.\"\n }),\n(\"POA10\",\"Skin & Gut \u2018Small Fixes\u2019\",\"A10\",\n {\"who\":\"People dealing with recurring rashes/eczema/acne or nausea/GERD who want gentler options ({ids})\",\n  \"trigger\":\"Flare-up hits + they don\u2019t want a 12-supplement protocol or harsh meds ({ids2})\",\n  \"pain\":\"Trial-and-error products waste money; wants simple first steps (topical/tea), patch-test notes, and \u2018stop/seek care\u2019 red flags. Enemy: \u2018stack culture\u2019. ({ids3})\",\n  \"belief_before\":\"Natural care means a long, complicated protocol. ({ids})\",\n  \"belief_after\":\"Start with the simplest safe option + clear stop rules. ({ids2})\",\n  \"mech\":\"Symptom quick pages: simplest topical/tea options, contraindication flags, and step-up ladder; customizable by sensitivity and meds.\"\n })\n]\n# format with ids\ndef fmt(s, ids, ids2, ids3):\n    return s.format(ids=\",\".join(ids[:2]), ids2=\",\".join(ids2[:2]), ids3=\",\".join(ids3[:2]))\n\n# Build and check lengths\nfor aid,name,ck,txt in angle_specs:\n    idlist=[q['voc_id'] for q in top_quotes_map[ck]]\n    who=fmt(txt['who'],idlist,idlist[1:],idlist[2:])\n    trig=fmt(txt['trigger'],idlist,idlist[1:],idlist[2:])\n    pain=fmt(txt['pain'],idlist,idlist[1:],idlist[2:])\n    mech=txt['mech']\n    bb=fmt(txt['belief_before'],idlist,idlist[1:],idlist[2:])\n    ba=fmt(txt['belief_after'],idlist,idlist[1:],idlist[2:])\n    maxlen=max(len(who),len(trig),len(pain),len(mech),len(bb),len(ba))\n    print(aid,maxlen)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7649a49408195a7054320a9512a6c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a7649aced881958de5b5e575bf8266",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "for aid,name,ck,txt in angle_specs:\n    print(aid, len(txt['mech']))\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a7649ebbb88195bf4b31709f991c0c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a764a4103c8195a72f95a9931bf45f",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "hook_templates = {\n\"POA01\":[\n {\"visual\":\"Split-screen: pill organizer + herbal tea jar + \u201cCan these mix?\u201d checklist\",\n  \"opening_line\":\"On prescriptions and still want herbs? Don\u2019t guess\u2014cross-check first.\",\n  \"lever\":\"Interaction \u201cred/yellow/green\u201d page + timing rules.\"},\n {\"visual\":\"Screenshot-style: \u201cMy doctor can\u2019t say\u2026\u201d email excerpt\",\n  \"opening_line\":\"When your clinician won\u2019t (or can\u2019t) confirm supplements with HRT\u2026\",\n  \"lever\":\"Bring-a-list questions + conservative stop/ask flags.\"},\n {\"visual\":\"Calendar + symptom spike arrow after \u201cnew supplement\u201d\",\n  \"opening_line\":\"If a new supplement made you feel worse, it might be the combo.\",\n  \"lever\":\"Go/no-go screening by med class + common culprit herbs.\"}\n],\n\"POA02\":[\n {\"visual\":\"Dark room + 3am clock + teething baby + \u201cWhat now?\u201d flowchart\",\n  \"opening_line\":\"It\u2019s 3am. Baby\u2019s in pain. You want natural\u2014but safe.\",\n  \"lever\":\"Fast comfort menu + what to avoid + when OTC is OK.\"},\n {\"visual\":\"Pile of \u201cteething\u201d products crossed out + one simple checklist\",\n  \"opening_line\":\"Tried every \u2018natural\u2019 teething trick and nothing lasts?\",\n  \"lever\":\"Shortlist of safer options + red flags for unsafe gels/drops.\"},\n {\"visual\":\"\u201cTylenol guilt\u201d word cloud vs \u201crelief + safety\u201d checklist\",\n  \"opening_line\":\"The guilt isn\u2019t a plan. Here\u2019s a plan.\",\n  \"lever\":\"Decision tree: comfort \u2192 monitor \u2192 escalate.\"}\n],\n\"POA03\":[\n {\"visual\":\"Tea box flipped over to ingredient list + \u201cIs this safe?\u201d highlight\",\n  \"opening_line\":\"Pregnant and realizing your \u2018ginger tea\u2019 has extra herbs?\",\n  \"lever\":\"Ingredient cross-check + trimester/breastfeeding filters.\"},\n {\"visual\":\"Two Google tabs: \u201csafe\u201d vs \u201cunsafe\u201d\",\n  \"opening_line\":\"Google says yes. Google says no. Now what?\",\n  \"lever\":\"Conservative safe-list + clear \u2018avoid/ask\u2019 reasons.\"},\n {\"visual\":\"Checklist titled \u201cAsk your provider\u201d with 5 questions\",\n  \"opening_line\":\"Want natural relief without gambling in pregnancy?\",\n  \"lever\":\"Bring-to-appointment script + stop-sign symptoms.\"}\n],\n\"POA04\":[\n {\"visual\":\"HRT patch + supplement bottles + \u201cCan I keep these?\u201d note\",\n  \"opening_line\":\"Starting HRT and your doctor can\u2019t answer supplement questions?\",\n  \"lever\":\"HRT cross-check page: pause/monitor/ask.\"},\n {\"visual\":\"Hot flash icon + sleep icon + \u201cstack\u201d of pills\",\n  \"opening_line\":\"Perimenopause stacks get out of hand fast.\",\n  \"lever\":\"Evidence-graded shortlist + what to track weekly.\"},\n {\"visual\":\"Red/yellow/green traffic light over common herbs\",\n  \"opening_line\":\"Herbs aren\u2019t \u2018no big deal\u2019 when hormones shift.\",\n  \"lever\":\"Interaction screening + conservative escalation rules.\"}\n],\n\"POA05\":[\n {\"visual\":\"Pharmacy aisle + \u201cdetox\u201d shelf + receipt total\",\n  \"opening_line\":\"Stop buying a bottle of hope every month.\",\n  \"lever\":\"Cut-the-noise checklist: what\u2019s worth it vs hype.\"},\n {\"visual\":\"Amazon-style book cover blurred with \u201cAI?\u201d stamp\",\n  \"opening_line\":\"Worried your \u2018herbal\u2019 info is influencer fluff (or AI)?\",\n  \"lever\":\"Trust signals + sourcing/quality red flags.\"},\n {\"visual\":\"Before/after: 12 bottles \u2192 3 basics\",\n  \"opening_line\":\"More supplements isn\u2019t a strategy.\",\n  \"lever\":\"Minimal \u2018keep/skip\u2019 list based on confidence.\"}\n],\n\"POA06\":[\n {\"visual\":\"Messy cabinet labeled \u201cgraveyard\u201d \u2192 labeled apothecary jars\",\n  \"opening_line\":\"If your cabinet is full, but you still don\u2019t know what to use\u2026\",\n  \"lever\":\"Minimal kit + quick lookup by symptom.\"},\n {\"visual\":\"Shopping list with only 12 items + checkboxes\",\n  \"opening_line\":\"Build a home apothecary that actually gets used.\",\n  \"lever\":\"Multipurpose core items + storage/rotation dates.\"},\n {\"visual\":\"Label maker + tincture dropper + \u201csafe use\u201d notes\",\n  \"opening_line\":\"Make it once. Label it. Know when to NOT use it.\",\n  \"lever\":\"Prep methods + contraindication flags.\"}\n],\n\"POA07\":[\n {\"visual\":\"Skin hives icon + \u201cnew herb\u201d arrow + stop sign\",\n  \"opening_line\":\"If \u2018normal\u2019 supplements keep giving you side effects\u2026\",\n  \"lever\":\"Sensitivity guardrails: start-low + stop/seek-care signs.\"},\n {\"visual\":\"Checklist: \u201cIs this a histamine trigger?\u201d\",\n  \"opening_line\":\"Your body isn\u2019t \u2018being dramatic\u2019\u2014reactions happen.\",\n  \"lever\":\"Cross-reactivity notes + conservative alternatives.\"},\n {\"visual\":\"Measuring dropper showing tiny dose + calendar\",\n  \"opening_line\":\"The safest dose is the one you can tolerate.\",\n  \"lever\":\"Titration steps by form (tea vs tincture vs capsule).\"}\n],\n\"POA08\":[\n {\"visual\":\"Tincture bottle label zoom + \u201cHow many drops?\u201d\",\n  \"opening_line\":\"Bought a tincture\u2026 and now you\u2019re stuck on dosing.\",\n  \"lever\":\"Form-first dosage tables + timing windows.\"},\n {\"visual\":\"Three columns: tea / tincture / capsule\",\n  \"opening_line\":\"Same herb. Different form. Different dose.\",\n  \"lever\":\"Convert \u2018folk advice\u2019 into usable ranges.\"},\n {\"visual\":\"Sticky note: \u201cIf no change by day X\u2026\u201d\",\n  \"opening_line\":\"Not sure when to stop or switch?\",\n  \"lever\":\"Simple duration rules + caution flags.\"}\n],\n\"POA09\":[\n {\"visual\":\"Daypack dump: bandages + herbs + checklist\",\n  \"opening_line\":\"Want herbal first-aid\u2014but still be realistic?\",\n  \"lever\":\"Kit checklist + clear limits + when to seek care.\"},\n {\"visual\":\"Trail map + \u201cmiles from clinic\u201d + calm plan\",\n  \"opening_line\":\"When you\u2019re far from help, confidence beats panic.\",\n  \"lever\":\"Modern + herbal together, with escalation rules.\"},\n {\"visual\":\"Small tin labeled \u201cfield kit\u201d with 6 items\",\n  \"opening_line\":\"Skip the doomsday kit. Build the \u2018actually useful\u2019 kit.\",\n  \"lever\":\"Multipurpose herbs + storage + quick recipes.\"}\n],\n\"POA10\":[\n {\"visual\":\"Eczema flare photo blurred + \u201cstart here\u201d ladder\",\n  \"opening_line\":\"For flare-ups, you don\u2019t need a 12-step protocol.\",\n  \"lever\":\"Simplest safe topical/tea first + step-up ladder.\"},\n {\"visual\":\"Price tags on 5 skincare products crossed out\",\n  \"opening_line\":\"Tired of buying products that don\u2019t help?\",\n  \"lever\":\"Evidence-graded options + patch-test notes.\"},\n {\"visual\":\"Stomach icon + mug of tea + \u201cwhat to try first\u201d card\",\n  \"opening_line\":\"When your gut is off, start gentle.\",\n  \"lever\":\"Simple tea options + contraindication flags.\"}\n]\n}\n# check lengths\nfor aid,hooks in hook_templates.items():\n    for h in hooks:\n        assert max(len(h['visual']),len(h['opening_line']),len(h['lever']))<=280\nlen(hook_templates)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a764d2976c81959cd7928b7b5f69e4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a764d566588195a8f7866f36378a91",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def build_candidate(spec):\n    angle_id, angle_name, ck, txt = spec\n    quotes = get_top_quotes(clusters[ck],5)[0]\n    idlist = [q['voc_id'] for q in quotes]\n    who = txt['who'].format(ids=\",\".join(idlist[:2]), ids2=\",\".join(idlist[1:3]), ids3=\",\".join(idlist[2:4]))\n    trigger = txt['trigger'].format(ids=\",\".join(idlist[:2]), ids2=\",\".join(idlist[1:3]), ids3=\",\".join(idlist[2:4]))\n    pain = txt['pain'].format(ids=\",\".join(idlist[:2]), ids2=\",\".join(idlist[1:3]), ids3=\",\".join(idlist[2:4]))\n    mech = txt['mech']\n    bb = txt['belief_before'].format(ids=\",\".join(idlist[:2]), ids2=\",\".join(idlist[1:3]), ids3=\",\".join(idlist[2:4]))\n    ba = txt['belief_after'].format(ids=\",\".join(idlist[:2]), ids2=\",\".join(idlist[1:3]), ids3=\",\".join(idlist[2:4]))\n    cand = {\n        \"angle_id\": angle_id,\n        \"angle_name\": angle_name,\n        \"definition\": {\n            \"who\": who,\n            \"pain_desire\": pain,\n            \"mechanism_why\": mech,\n            \"belief_shift\": {\"before\": bb, \"after\": ba},\n            \"trigger\": trigger\n        },\n        \"evidence\": {\n            \"supporting_voc_count\": int(len(clusters[ck])),\n            \"top_quotes\": quotes,\n            \"triangulation_status\": triangulation(clusters[ck]),\n            \"velocity_status\": velocity(clusters[ck]),\n            \"contradiction_count\": contradiction_count(clusters[ck])\n        },\n        \"hook_starters\": hook_templates[angle_id]\n    }\n    return cand\n\ncandidates = [build_candidate(s) for s in angle_specs]\n\n# validate lengths\ndef check_lengths(obj):\n    # non-quote text fields <=280, quote <=320\n    issues=[]\n    for c in obj:\n        # definition fields\n        for k,v in c['definition'].items():\n            if k=='belief_shift':\n                for kk,vv in v.items():\n                    if len(vv)>280:\n                        issues.append((c['angle_id'],f\"belief_shift.{kk}\",len(vv)))\n            else:\n                if len(v)>280:\n                    issues.append((c['angle_id'],k,len(v)))\n        # hooks\n        for i,h in enumerate(c['hook_starters']):\n            for k,v in h.items():\n                if len(v)>280: issues.append((c['angle_id'],f\"hook{i}.{k}\",len(v)))\n        # quotes\n        for q in c['evidence']['top_quotes']:\n            if len(q['quote'])>320:\n                issues.append((c['angle_id'],q['voc_id'],len(q['quote'])))\n    return issues\n\nissues = check_lengths(candidates)\nissues[:10], len(issues)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a764e19038819582fee803b144a781",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_05ffb0b9f3865c0d0069a764e1ebf08195aef15f10fd3114fb",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "angle_observations=[{\"angle_id\":c[\"angle_id\"],\"angle_name\":c[\"angle_name\"],\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"} for c in candidates]\nout={\"angle_observations\":angle_observations,\"angle_candidates\":candidates}\n# validate JSON serializable and schema keys\njson_str=json.dumps(out,ensure_ascii=False)\nlen(json_str)\n",
+      "container_id": "cntr_69a761561c808193ad259d10f0f512b703fec505a798c0db",
+      "outputs": null
+    },
+    {
+      "id": "rs_05ffb0b9f3865c0d0069a764e5cba48195a4c98327ce16df22",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "msg_05ffb0b9f3865c0d0069a764e803508195988e423b5ba535ea",
+      "type": "message",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "annotations": [],
+          "logprobs": [],
+          "text": "{\n  \"angle_observations\": [\n    {\n      \"angle_id\": \"POA01\",\n      \"angle_name\": \"Interaction-Safe Add\u2011Ons\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA02\",\n      \"angle_name\": \"2am Kid Remedy Triage\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA03\",\n      \"angle_name\": \"Pregnancy Tea Panic Filter\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA04\",\n      \"angle_name\": \"Menopause/HRT Supplement Cross\u2011Check\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA05\",\n      \"angle_name\": \"Stop Buying \u2018Bottles of Hope\u2019\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA06\",\n      \"angle_name\": \"Home Apothecary (No Clutter)\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA07\",\n      \"angle_name\": \"Sensitive-Reactor Guardrails\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA08\",\n      \"angle_name\": \"Dose & Form Decoder\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA09\",\n      \"angle_name\": \"Herbal First-Aid (Realistic)\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    },\n    {\n      \"angle_id\": \"POA10\",\n      \"angle_name\": \"Skin & Gut \u2018Small Fixes\u2019\",\n      \"competitor_angle_overlap\": \"CANNOT_DETERMINE\"\n    }\n  ],\n  \"angle_candidates\": [\n    {\n      \"angle_id\": \"POA01\",\n      \"angle_name\": \"Interaction-Safe Add\u2011Ons\",\n      \"definition\": {\n        \"who\": \"Adults on prescriptions/HRT adding herbs or supplements but fear interactions (REC7C81ACA0320D0B2,REA656374C0620FE74)\",\n        \"pain_desire\": \"Conflicting advice + unregulated bottles; fear making symptoms/anxiety worse; wants a clear avoid/caution/OK list + timing + when to ask clinician. Failed: guessing, Googling. (REC7C81ACA0320D0B2,REA656374C0620FE74)\",\n        \"mechanism_why\": \"Handbook cross-checks meds\u2194herbs with contraindication flags, timing tips, and \u201cwhen to seek care\u201d prompts; customizable to your med list.\",\n        \"belief_shift\": {\n          \"before\": \"OTC/natural means it\u2019s safe to combine. (REC7C81ACA0320D0B2,REA656374C0620FE74)\",\n          \"after\": \"Natural still needs interaction guardrails + a go/no\u2011go check. (REA656374C0620FE74,RED8BF681B3DA667CD)\"\n        },\n        \"trigger\": \"New Rx/HRT + want to keep/start herbs; ask \u201cis this safe together?\u201d (REA656374C0620FE74,RED8BF681B3DA667CD)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 91,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"REC7C81ACA0320D0B2\",\n            \"quote\": \"Everything was stable. Medication working. Supplements consistent. OCD manageable. Then suddenly\u2014everything spiralled. Intrusive thoughts louder. Compulsions harder to resist. She rang panicking: \\\"I'm failing.\\\" We investigated. No reported changes to her diet or lifestyle and blood tests all fine - all fine. I was\",\n            \"adjusted_score\": 7.7\n          },\n          {\n            \"voc_id\": \"REA656374C0620FE74\",\n            \"quote\": \"TL,DR: My doctor can't say what supplements should not be taken while on HRT...? I've only been on HRT two weeks, but as soon as I got my script, I emailed my doctor the list of supplements I take, and asked if I should stop taking any. This was the non-answer response: \\\"It's not possible to say that oth\",\n            \"adjusted_score\": 6.7\n          },\n          {\n            \"voc_id\": \"RED8BF681B3DA667CD\",\n            \"quote\": \"How to go full-time as smoothly as possible before taking ... | In fact, I started taking estrogen supplements without ... How long does it take for the effects of HRT (MTF) to become visible?Read more | Are natural supplements safe for everyone during ... | While natural supplements can be beneficial for some ind\",\n            \"adjusted_score\": 5.2\n          },\n          {\n            \"voc_id\": \"RE46D57BC1B0D7BF52\",\n            \"quote\": \"Have you ever felt anxious about giving herbs to someone who's already taking medications? Many herbalists feel hesitant to help people taking prescribed drugs because of concerns about herb-drug interactions. But how much do we really need to worry about this? Herbs can impact how drugs are absorbed and metaboli\",\n            \"adjusted_score\": 5.2\n          },\n          {\n            \"voc_id\": \"RE78D2D127C65FC427\",\n            \"quote\": \"Read Full Article: https://earthycures.com/why-so-many-people-are-turning-to-natural-remedies-after-conventional-medicine-falls-short/ Have you ever found yourself scrolling at 1 a.m. asking, \\\"Why does my body hate me?\\\" after a doctor\u2019s appointment left you feeling dismissed? You aren't alone. In this video, w\",\n            \"adjusted_score\": 4.0\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"ACCELERATING\",\n        \"contradiction_count\": 39\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Split-screen: pill organizer + herbal tea jar + \u201cCan these mix?\u201d checklist\",\n          \"opening_line\": \"On prescriptions and still want herbs? Don\u2019t guess\u2014cross-check first.\",\n          \"lever\": \"Interaction \u201cred/yellow/green\u201d page + timing rules.\"\n        },\n        {\n          \"visual\": \"Screenshot-style: \u201cMy doctor can\u2019t say\u2026\u201d email excerpt\",\n          \"opening_line\": \"When your clinician won\u2019t (or can\u2019t) confirm supplements with HRT\u2026\",\n          \"lever\": \"Bring-a-list questions + conservative stop/ask flags.\"\n        },\n        {\n          \"visual\": \"Calendar + symptom spike arrow after \u201cnew supplement\u201d\",\n          \"opening_line\": \"If a new supplement made you feel worse, it might be the combo.\",\n          \"lever\": \"Go/no-go screening by med class + common culprit herbs.\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA02\",\n      \"angle_name\": \"2am Kid Remedy Triage\",\n      \"definition\": {\n        \"who\": \"Exhausted parents of teething/sick babies trying to stay \u201cnatural\u201d without harming their kid (REE17F7351E52B1080,RE7BC66D367EA97727)\",\n        \"pain_desire\": \"Tried drops/gels/frozen tricks\u2014nothing lasts; fear unsafe teething products + fear meds. Outcome: safe comfort steps + when OTC is reasonable + red flags. Enemy: internet guilt wars. (REBB41B0CE8D583BF5,RE1E813C24634DA100)\",\n        \"mechanism_why\": \"Symptom-first kid pages: age/weight notes, comfort options, what to avoid, when to use OTC, and \u201ccall/seek care\u201d cutoffs\u2014fast lookup.\",\n        \"belief_shift\": {\n          \"before\": \"If it\u2019s \u2018natural\u2019 it must be safer for babies. (REE17F7351E52B1080,RE7BC66D367EA97727)\",\n          \"after\": \"Baby-safe = specific guardrails + escalation cues, not vibes. (RE7BC66D367EA97727,REBB41B0CE8D583BF5)\"\n        },\n        \"trigger\": \"3am pain/fever + guilt about Tylenol/Nurofen + \u201cwhat else can I try tonight?\u201d (RE7BC66D367EA97727,REBB41B0CE8D583BF5)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 12,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"REE17F7351E52B1080\",\n            \"quote\": \"If it helps at all, we were worried about over using Tylenol and talked to our pediatrician about it at her last well visit. We had been giving it mostly before naps and bedtime because teething really seems to affect her sleep. Our pediatrician gave us her blessing to use Tylenol when we think she needs it. She said i\",\n            \"adjusted_score\": 7.7\n          },\n          {\n            \"voc_id\": \"RE7BC66D367EA97727\",\n            \"quote\": \"This is a rant but also advice needed if it\u2019s different than what\u2019s already out there. My baby boy started teething at 3-4 months. He just turned 5 months and cut his first tooth with the other currently trailing behind. He is often in a lot of pain. I have purchased every single alternative to Tylenol - frozen tethers\",\n            \"adjusted_score\": 7.7\n          },\n          {\n            \"voc_id\": \"REBB41B0CE8D583BF5\",\n            \"quote\": \"There\u2019s nothing world with giving your teething baby Tylenol when he\u2019s in pain\u2026.some of those other options you\u2019ve tried like the gels and numbing pills aren\u2019t recommended anyway. There should be no guilt involved here, but I understand!! I would try and honestly assess where you believe the guilt is coming from. Do yo\",\n            \"adjusted_score\": 7.2\n          },\n          {\n            \"voc_id\": \"RE1E813C24634DA100\",\n            \"quote\": \"Are you in the US? I know you requested natural remedies but unfortunately anything labeled such as teething relief here is pretty unsafe and not FDA tested or approved. You're better off giving infant Tylenol when baby is obviously struggling and uncomfy. I usually can tell with my girl when she's extra extra drooly,\",\n            \"adjusted_score\": 5.5\n          },\n          {\n            \"voc_id\": \"RE8B2D50335B1E1BC5\",\n            \"quote\": \"How Often Can You Give Tylenol For Infants? When caring for infants, knowing how to manage discomfort effectively is essential for parents. In this informative video, we\u2019ll discuss the important considerations for administering Tylenol, a common medication used to alleviate symptoms such as fever and teething pain. We\u2019\",\n            \"adjusted_score\": 0.0\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"DECELERATING\",\n        \"contradiction_count\": 4\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Dark room + 3am clock + teething baby + \u201cWhat now?\u201d flowchart\",\n          \"opening_line\": \"It\u2019s 3am. Baby\u2019s in pain. You want natural\u2014but safe.\",\n          \"lever\": \"Fast comfort menu + what to avoid + when OTC is OK.\"\n        },\n        {\n          \"visual\": \"Pile of \u201cteething\u201d products crossed out + one simple checklist\",\n          \"opening_line\": \"Tried every \u2018natural\u2019 teething trick and nothing lasts?\",\n          \"lever\": \"Shortlist of safer options + red flags for unsafe gels/drops.\"\n        },\n        {\n          \"visual\": \"\u201cTylenol guilt\u201d word cloud vs \u201crelief + safety\u201d checklist\",\n          \"opening_line\": \"The guilt isn\u2019t a plan. Here\u2019s a plan.\",\n          \"lever\": \"Decision tree: comfort \u2192 monitor \u2192 escalate.\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA03\",\n      \"angle_name\": \"Pregnancy Tea Panic Filter\",\n      \"definition\": {\n        \"who\": \"Pregnant/nursing people who want natural relief but worry every herb/tea is risky (REA47DB03D2D9C82D3,REEDB164A4D53E6AB2)\",\n        \"pain_desire\": \"\u201cMost herbal teas aren\u2019t considered safe\u201d + conflicting sources; wants trimester/breastfeeding-safe lists + clear \u2018avoid\u2019 reasons + when to ask provider. Failed: Google roulette. (REDFB127C0A7FEAB5A,RE8FC41C62A0DCEC62)\",\n        \"mechanism_why\": \"Pregnancy/breastfeeding filter + evidence-graded entries, common ingredients cross-check, and conservative \u2018stop/ask\u2019 flags.\",\n        \"belief_shift\": {\n          \"before\": \"If it\u2019s sold as tea, it\u2019s automatically pregnancy-safe. (REA47DB03D2D9C82D3,REEDB164A4D53E6AB2)\",\n          \"after\": \"Pregnancy-safe depends on herb + dose + stage; use a vetted list. (REEDB164A4D53E6AB2,REDFB127C0A7FEAB5A)\"\n        },\n        \"trigger\": \"Realize a favorite tea/herb may be unsafe; panic + confusion from mixed lists (REEDB164A4D53E6AB2,REDFB127C0A7FEAB5A)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 14,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"REA47DB03D2D9C82D3\",\n            \"quote\": \"Hi! I just found that my favorite Lemon &amp; Ginger tea has some lemongrass in it, which may not be safe in pregnancy. I\u2019ve had 1-2 cups of this tea daily during my first trimester. Has anyone else drank tea with lemongrass in their pregnancy? It gets very confusing, as most of herbal teas are not considered safe in p\",\n            \"adjusted_score\": 4.2\n          },\n          {\n            \"voc_id\": \"REEDB164A4D53E6AB2\",\n            \"quote\": \"What is the best natural remedy for toothache during pregnancy? Basic information about toothache during pregnancy. Pregnant women can also experience swollen gums, bleeding from gums and other oral health problems. These conditions are caused by hormonal changes during pregnancy. A toothache can be a sign of a dental\",\n            \"adjusted_score\": 2.7\n          },\n          {\n            \"voc_id\": \"REDFB127C0A7FEAB5A\",\n            \"quote\": \"\ud83c\udf3f Herbal Wisdom Wednesday \ud83c\udf3f Myth-Buster: \\\"Are Herbal Remedies Safe with Medications?\\\" As a Registered Nurse with 40+ years of experience AND a certified clinical herbalist, this is one of the most important questions I get asked. The answer? It depends! Here's what you need to know: \u2705 Some herbs can interact with medic\",\n            \"adjusted_score\": 1.7\n          },\n          {\n            \"voc_id\": \"RE8FC41C62A0DCEC62\",\n            \"quote\": \"\u2728Postpartum Depletion\u2728 . Postpartum depletion often raises its ugly head within the first few months after giving birth, when most women are still recovering as well as finding their feet with the new demands of motherhood. It can affect a woman\u2019s mental, emotional, physical, spiritual and social wellbeing AND can last\",\n            \"adjusted_score\": 1.5\n          },\n          {\n            \"voc_id\": \"REBD91E20327D0FC09\",\n            \"quote\": \"What can pregnant moms drink if they don\u2019t like water? \u2013 The ... | Though its caffeine content may be a bit high for daily use, it is a healthy pregnancy drink. Many women find that herbal teas help ...Read more | What Herbal Teas Are Safe During Pregnancy? - Parents | \u201cGinger and peppermint teas are often recommended\u201d\",\n            \"adjusted_score\": 0.2\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"ACCELERATING\",\n        \"contradiction_count\": 7\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Tea box flipped over to ingredient list + \u201cIs this safe?\u201d highlight\",\n          \"opening_line\": \"Pregnant and realizing your \u2018ginger tea\u2019 has extra herbs?\",\n          \"lever\": \"Ingredient cross-check + trimester/breastfeeding filters.\"\n        },\n        {\n          \"visual\": \"Two Google tabs: \u201csafe\u201d vs \u201cunsafe\u201d\",\n          \"opening_line\": \"Google says yes. Google says no. Now what?\",\n          \"lever\": \"Conservative safe-list + clear \u2018avoid/ask\u2019 reasons.\"\n        },\n        {\n          \"visual\": \"Checklist titled \u201cAsk your provider\u201d with 5 questions\",\n          \"opening_line\": \"Want natural relief without gambling in pregnancy?\",\n          \"lever\": \"Bring-to-appointment script + stop-sign symptoms.\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA04\",\n      \"angle_name\": \"Menopause/HRT Supplement Cross\u2011Check\",\n      \"definition\": {\n        \"who\": \"Peri/menopause buyers starting HRT or symptom stacks who still want botanicals\u2014but safely (REA656374C0620FE74,RED8BF681B3DA667CD)\",\n        \"pain_desire\": \"Doctor can\u2019t confirm safety; overwhelmed by hot-flash/sleep/mood stacks. Outcome: what to pause, what\u2019s low-risk, what to monitor, and when to escalate. (RE4AB03AEEAE4DD178,RE33AD7EFF82413B62)\",\n        \"mechanism_why\": \"HRT-aware checklists: interaction red/yellow/green, symptom-support options, and a \u201cquestions to bring to clinician\u201d page.\",\n        \"belief_shift\": {\n          \"before\": \"I can just keep all my usual supplements when I start HRT. (REA656374C0620FE74,RED8BF681B3DA667CD)\",\n          \"after\": \"HRT + herbs = plan + monitoring + interaction screen. (RED8BF681B3DA667CD,RE4AB03AEEAE4DD178)\"\n        },\n        \"trigger\": \"Start HRT + can\u2019t get clear answers on supplements/herbs; doesn\u2019t want to \u201cmess it up\u201d (RED8BF681B3DA667CD,RE4AB03AEEAE4DD178)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 17,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"REA656374C0620FE74\",\n            \"quote\": \"TL,DR: My doctor can't say what supplements should not be taken while on HRT...? I've only been on HRT two weeks, but as soon as I got my script, I emailed my doctor the list of supplements I take, and asked if I should stop taking any. This was the non-answer response: \\\"It's not possible to say that oth\",\n            \"adjusted_score\": 6.7\n          },\n          {\n            \"voc_id\": \"RED8BF681B3DA667CD\",\n            \"quote\": \"How to go full-time as smoothly as possible before taking ... | In fact, I started taking estrogen supplements without ... How long does it take for the effects of HRT (MTF) to become visible?Read more | Are natural supplements safe for everyone during ... | While natural supplements can be beneficial for some ind\",\n            \"adjusted_score\": 5.2\n          },\n          {\n            \"voc_id\": \"RE4AB03AEEAE4DD178\",\n            \"quote\": \"I've been having so many conversations about perimenopause, privately, in classes, and on stages, that I wanted to offer support to our wider community on how to navigate this time with confidence and grace. If your body, like mine \ud83d\ude35\u200d\ud83d\udcab, has been whispering, or speaking loudly, that something is changing, then welcome\",\n            \"adjusted_score\": 3.5\n          },\n          {\n            \"voc_id\": \"RE33AD7EFF82413B62\",\n            \"quote\": \"Ashwagandha has been a lovely addition to my perimenopause protocol. Everyone talks about the stress relief. Fewer people talk about the emotional flatness some experience. Is it the herb? The dose? Your nervous system? Watch the full video to understand what\u2019s really happening and how to use it wisely. And don\u2019t forge\",\n            \"adjusted_score\": 2.0\n          },\n          {\n            \"voc_id\": \"RE55EF8E6F85E99B71\",\n            \"quote\": \"Finding balance through hormonal changes doesn't have to be overwhelming. \ud83c\udf38Nature provides incredible botanical allies! \u2728 Here is your Women's Health Cheat Sheet for navigating PMS, stress, and menopause: \ud83c\udf3f Ashwagandha Regulates stress hormones (cortisol) & fights fatigue. Add powder to smoothies for long-term calm. \ud83d\udc9c\",\n            \"adjusted_score\": -0.3\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"ACCELERATING\",\n        \"contradiction_count\": 1\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"HRT patch + supplement bottles + \u201cCan I keep these?\u201d note\",\n          \"opening_line\": \"Starting HRT and your doctor can\u2019t answer supplement questions?\",\n          \"lever\": \"HRT cross-check page: pause/monitor/ask.\"\n        },\n        {\n          \"visual\": \"Hot flash icon + sleep icon + \u201cstack\u201d of pills\",\n          \"opening_line\": \"Perimenopause stacks get out of hand fast.\",\n          \"lever\": \"Evidence-graded shortlist + what to track weekly.\"\n        },\n        {\n          \"visual\": \"Red/yellow/green traffic light over common herbs\",\n          \"opening_line\": \"Herbs aren\u2019t \u2018no big deal\u2019 when hormones shift.\",\n          \"lever\": \"Interaction screening + conservative escalation rules.\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA05\",\n      \"angle_name\": \"Stop Buying \u2018Bottles of Hope\u2019\",\n      \"definition\": {\n        \"who\": \"Natural-curious shoppers burned by influencer trends & sketchy supplement claims (REC7C81ACA0320D0B2,REE3C7ABC7A8450730)\",\n        \"pain_desire\": \"Can\u2019t trust labels/AI-ish books; hates woo but wants options. Outcome: a simple evidence-graded shortlist + how to vet quality. Failed: impulse buys. Enemy: hype economy. (RED8C85A144C83670B,RE59183CE3376BE47A)\",\n        \"mechanism_why\": \"Evidence-graded remedy entries + \u201cquality / third-party test / red-flag claims\u201d checklists; customizable \u2018keep/skip\u2019 list.\",\n        \"belief_shift\": {\n          \"before\": \"More supplements = more progress. (REC7C81ACA0320D0B2,REE3C7ABC7A8450730)\",\n          \"after\": \"Fewer, higher-confidence basics + clear \u2018not worth it\u2019 calls. (REE3C7ABC7A8450730,RED8C85A144C83670B)\"\n        },\n        \"trigger\": \"Standing in the \u2018detox/energy\u2019 aisle or doomscrolling\u2014realizing you\u2019re overspending + still unsure what\u2019s real (REE3C7ABC7A8450730,RED8C85A144C83670B)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 314,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"REC7C81ACA0320D0B2\",\n            \"quote\": \"Everything was stable. Medication working. Supplements consistent. OCD manageable. Then suddenly\u2014everything spiralled. Intrusive thoughts louder. Compulsions harder to resist. She rang panicking: \\\"I'm failing.\\\" We investigated. No reported changes to her diet or lifestyle and blood tests all fine - all fine. I was\",\n            \"adjusted_score\": 7.7\n          },\n          {\n            \"voc_id\": \"REE3C7ABC7A8450730\",\n            \"quote\": \"Stop buying a \\\"bottle of hope\\\" every month. \ud83d\udc8a We\u2019ve all been there\u2014standing in the pharmacy aisle, overwhelmed by labels promising eternal energy and glowing skin. But with a $200 billion industry pushing products at us, how do we know what actually works? The reality is that many of us are overspending on supplements \",\n            \"adjusted_score\": 6.0\n          },\n          {\n            \"voc_id\": \"RED8C85A144C83670B\",\n            \"quote\": \"Our three-part blog series on African American Herbalism written by ethnobiologist Marc Williams, explores the resilience, wisdom, and continuity of African American herbal traditions across generations, with lessons that remain urgently relevant today. \u2060 \u2060 Here are a few of our favorite books that help preserve, docum\",\n            \"adjusted_score\": 4.2\n          },\n          {\n            \"voc_id\": \"RE59183CE3376BE47A\",\n            \"quote\": \"I have a few resources you can look up. They used to be books but the sizes of databases have increased so much that it is no longer feasible to print them out. They are both published by government agencies. Pretty trustworthy. https://medlineplus.gov/druginfo/herb_All.html https://www.efsa.europa.eu/en/data-report/co\",\n            \"adjusted_score\": 3.0\n          },\n          {\n            \"voc_id\": \"RED0B53562A6A87E73\",\n            \"quote\": \"The supplement industry made \u00a350+ billion last year. And women in perimenopause? We're a prime target. When you're exhausted, gaining weight, struggling to sleep, and feeling like your body turned against you\u2014you're desperate for something that might help. So you buy the magnesium. And the B-complex. And the collagen. \",\n            \"adjusted_score\": 2.7\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"ACCELERATING\",\n        \"contradiction_count\": 43\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Pharmacy aisle + \u201cdetox\u201d shelf + receipt total\",\n          \"opening_line\": \"Stop buying a bottle of hope every month.\",\n          \"lever\": \"Cut-the-noise checklist: what\u2019s worth it vs hype.\"\n        },\n        {\n          \"visual\": \"Amazon-style book cover blurred with \u201cAI?\u201d stamp\",\n          \"opening_line\": \"Worried your \u2018herbal\u2019 info is influencer fluff (or AI)?\",\n          \"lever\": \"Trust signals + sourcing/quality red flags.\"\n        },\n        {\n          \"visual\": \"Before/after: 12 bottles \u2192 3 basics\",\n          \"opening_line\": \"More supplements isn\u2019t a strategy.\",\n          \"lever\": \"Minimal \u2018keep/skip\u2019 list based on confidence.\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA06\",\n      \"angle_name\": \"Home Apothecary (No Clutter)\",\n      \"definition\": {\n        \"who\": \"DIY wellness learners building a home apothecary/medicine cabinet but overwhelmed by what to stock (RE4EB1E0BAE25D48D6,RE36B7415375D2F348)\",\n        \"pain_desire\": \"Random purchases turn into cabinet graveyard; wants a minimal kit with multipurpose items, storage/shelf-life notes, and quick lookup for common issues. (RE5D27AA4E9F6608AA,REB9A73E67BE7608A8)\",\n        \"mechanism_why\": \"Customizable apothecary builder: shopping list, prep methods (tea/tincture/salve), labeling, rotation dates, and safety flags.\",\n        \"belief_shift\": {\n          \"before\": \"I need a separate product for every symptom. (RE4EB1E0BAE25D48D6,RE36B7415375D2F348)\",\n          \"after\": \"A small, multipurpose kit + a lookup system beats chaos. (RE36B7415375D2F348,RE5D27AA4E9F6608AA)\"\n        },\n        \"trigger\": \"New home/baby/season change + \u201cwhat do I actually need on hand?\u201d (RE36B7415375D2F348,RE5D27AA4E9F6608AA)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 122,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"RE4EB1E0BAE25D48D6\",\n            \"quote\": \"If you\u2019re building a home apothecary but you don\u2019t know where to start, you\u2019re in the right place!! \ud83c\udfe1\ud83c\udf31 Let\u2019s take a moment to appreciate the beauty of home herbalism and how it can impact and serve you and your loved ones. It\u2019s for everyone and anyone. This is for the parents who desire a safe and clean approach to\",\n            \"adjusted_score\": 5.2\n          },\n          {\n            \"voc_id\": \"RE36B7415375D2F348\",\n            \"quote\": \"Make your own herbal medicine cabinet! \ud83c\udf31\u2728 Step-by-step herbal medicine cabinet guide for beginners and herbal medicine-making essentials. No confusion. No overwhelm. Just the basics you need to build a functional, easy-to-use, and practical herbal medicine cabinet at home. \ud83c\udfe1 \u2705 What herbs should I keep on hand? \u2705 What f\",\n            \"adjusted_score\": 4.5\n          },\n          {\n            \"voc_id\": \"RE5D27AA4E9F6608AA\",\n            \"quote\": \"What herbs should I keep in my herbal medicine cabinet? #herbalism #herbalmedicine #herbalapothecary #herbalremedies\",\n            \"adjusted_score\": 2.0\n          },\n          {\n            \"voc_id\": \"REB9A73E67BE7608A8\",\n            \"quote\": \"I love my home apothecary! It\u2019s stocked with all my favorite herbs, tinctures, and remedies and it\u2019s so beautiful. It\u2019s so fun and relaxing to create and you don\u2019t have to worry about going to the store as often. Comment HOME and I will send you the link!\",\n            \"adjusted_score\": 1.2\n          },\n          {\n            \"voc_id\": \"RE029F970F8E79FCC5\",\n            \"quote\": \"If you want to have all your remedies in one place, here are 7+ essential herbs to get you started \ud83c\udf3f\ud83d\udc9a\",\n            \"adjusted_score\": 0.2\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"ACCELERATING\",\n        \"contradiction_count\": 33\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Messy cabinet labeled \u201cgraveyard\u201d \u2192 labeled apothecary jars\",\n          \"opening_line\": \"If your cabinet is full, but you still don\u2019t know what to use\u2026\",\n          \"lever\": \"Minimal kit + quick lookup by symptom.\"\n        },\n        {\n          \"visual\": \"Shopping list with only 12 items + checkboxes\",\n          \"opening_line\": \"Build a home apothecary that actually gets used.\",\n          \"lever\": \"Multipurpose core items + storage/rotation dates.\"\n        },\n        {\n          \"visual\": \"Label maker + tincture dropper + \u201csafe use\u201d notes\",\n          \"opening_line\": \"Make it once. Label it. Know when to NOT use it.\",\n          \"lever\": \"Prep methods + contraindication flags.\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA07\",\n      \"angle_name\": \"Sensitive-Reactor Guardrails\",\n      \"definition\": {\n        \"who\": \"People who get side effects or allergic reactions from \u2018normal\u2019 herbs/supplements (RE88F5C3D41DA21029,RE13D86C11CDD13B9A)\",\n        \"pain_desire\": \"Wants natural support but can\u2019t risk another reaction; needs \u2018start low\u2019 steps, what to avoid, and when symptoms mean stop/seek care. Failed: self-experimenting. (RE548054D3A016DEFB,RE4782AECFFEE10AE2)\",\n        \"mechanism_why\": \"Sensitivity flags per entry + conservative titration guidance + cross-reactivity notes + clear stop-signs; customizable by known sensitivities.\",\n        \"belief_shift\": {\n          \"before\": \"If it\u2019s a common herb, it can\u2019t cause a real reaction. (RE88F5C3D41DA21029,RE13D86C11CDD13B9A)\",\n          \"after\": \"Sensitivity is real\u2014dose/form + contraindications matter. (RE13D86C11CDD13B9A,RE548054D3A016DEFB)\"\n        },\n        \"trigger\": \"A bad reaction (itch/hives/flare) makes them afraid to try anything again (RE13D86C11CDD13B9A,RE548054D3A016DEFB)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 14,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"RE88F5C3D41DA21029\",\n            \"quote\": \"Allergies can be sneaky, and they can show up in so many ways. From seasonal sniffles to digestive discomfort, skin irritation, and even fatigue\u2014your immune system may be reacting to something you\u2019re not even aware of. \ud83c\udf3f\u2728 In this video, I\u2019m sharing a gentle, herbal approach to supporting allergies naturally. We\u2019ll talk\",\n            \"adjusted_score\": 2.0\n          },\n          {\n            \"voc_id\": \"RE13D86C11CDD13B9A\",\n            \"quote\": \"Important Link- Pharmacokinetic and Pharmacodynamic- \u2022 Pharmacokinetic and Pharmacodynamic | Gene... Absorption- \u2022 Pharmacokinetic (Part 01) Absorption of Dr... Distribution- \u2022 Pharmacokinetic (Part-0) Distribution of Dr... Metabolism- \u2022 Pharmacokinetic (Part 03) Metabolism of Dr... Elimination- \u2022 Pharmacokinetic (Part\",\n            \"adjusted_score\": 2.0\n          },\n          {\n            \"voc_id\": \"RE548054D3A016DEFB\",\n            \"quote\": \"We all know chamomile is best known for helping sleep and calm but did you know it can also help with allergies? Such as hay fever, skin allergies and even acne! I have been drinking it to help relieve my allergies. I absolutely love it! It\u2019s also safe for kids.\",\n            \"adjusted_score\": 1.7\n          },\n          {\n            \"voc_id\": \"RE4782AECFFEE10AE2\",\n            \"quote\": \"Allergies? Skin irritation? Digestive discomfort? Let\u2019s talk about herbal support \ud83c\udf3f\u2728 If you\u2019re dealing with seasonal allergies, itchy skin, or food sensitivities, your body may be sending signals that it needs extra support. In this video, I\u2019m breaking down some gentle herbal remedies and supportive practices that can\",\n            \"adjusted_score\": 1.7\n          },\n          {\n            \"voc_id\": \"RE2CF93BC3687F6573\",\n            \"quote\": \"Tired of harsh chemicals in your daily deodorant? Say HELLO to nature\u2019s secret weapon! \ud83c\udf4b\u2728 Did you know that a simple slice of lime can help combat underarm smell naturally? \ud83e\udd2f The natural citric acid helps neutralize odor-causing bacteria right at the source! Plus, keeping a pre-sliced batch in the fridge makes for the\",\n            \"adjusted_score\": 0.7\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"ACCELERATING\",\n        \"contradiction_count\": 9\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Skin hives icon + \u201cnew herb\u201d arrow + stop sign\",\n          \"opening_line\": \"If \u2018normal\u2019 supplements keep giving you side effects\u2026\",\n          \"lever\": \"Sensitivity guardrails: start-low + stop/seek-care signs.\"\n        },\n        {\n          \"visual\": \"Checklist: \u201cIs this a histamine trigger?\u201d\",\n          \"opening_line\": \"Your body isn\u2019t \u2018being dramatic\u2019\u2014reactions happen.\",\n          \"lever\": \"Cross-reactivity notes + conservative alternatives.\"\n        },\n        {\n          \"visual\": \"Measuring dropper showing tiny dose + calendar\",\n          \"opening_line\": \"The safest dose is the one you can tolerate.\",\n          \"lever\": \"Titration steps by form (tea vs tincture vs capsule).\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA08\",\n      \"angle_name\": \"Dose & Form Decoder\",\n      \"definition\": {\n        \"who\": \"People with tinctures/teas/capsules asking \u2018how much, how often, how long?\u2019 (RE837B3CF4C8E115F3,RE433724E80277FC97)\",\n        \"pain_desire\": \"Fear of taking too much or wasting time with too little; wants form-based dosing ranges, timing, and \u201cif no change by X, stop\u201d rules. Failed: guessing. (RE503FD5B628D3C164,RE5A0E3BA3700F6C39)\",\n        \"mechanism_why\": \"Form-first dosage tables (tea vs tincture vs capsule), timing windows, and personalization notes; plus \u2018when to pause\u2019 cautions.\",\n        \"belief_shift\": {\n          \"before\": \"Directions online are universal for everyone. (RE837B3CF4C8E115F3,RE433724E80277FC97)\",\n          \"after\": \"Dose depends on form + goal + your context\u2014use a table, not comments. (RE433724E80277FC97,RE503FD5B628D3C164)\"\n        },\n        \"trigger\": \"Bought a tincture or tea blend but labels + online advice are vague/contradictory (RE433724E80277FC97,RE503FD5B628D3C164)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 12,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"RE837B3CF4C8E115F3\",\n            \"quote\": \"Which Teas are safe in pregnancy? 5 Pregnancy Safe Teas | Craving for soothing and comforting aromatic tea? But worried if it is safe to drink herbal teas ... safe in pregnancy, as we are concerned on ...Read more | Is Hrt Safe? + HRT at 50: How It Works & What to Expect - Evernow ... to say that other herbal remedies\",\n            \"adjusted_score\": 2.2\n          },\n          {\n            \"voc_id\": \"RE433724E80277FC97\",\n            \"quote\": \"The proper way to take tinctures \ud83d\udca7 I get asked this question all the time, so hopefully this helps! #herbalist #herbalmedicine #herbalism #tincture #herbalremedy #herbalremedies #healthtips #wellnesstips\",\n            \"adjusted_score\": 0.7\n          },\n          {\n            \"voc_id\": \"RE503FD5B628D3C164\",\n            \"quote\": \"How much tincture do I take? \ud83e\uddd0 This is one of the most common questions I get as an herbalist. Check the comments for my answers! #tincture #herbalism #herbalmedicine #herbalist #holistichealth #naturalmedicine\",\n            \"adjusted_score\": 0.7\n          },\n          {\n            \"voc_id\": \"RE5A0E3BA3700F6C39\",\n            \"quote\": \"How to dose tinctures? #herbalism #herbalist #tincture #naturalremedies #plantmedicine #herbalmedicine\",\n            \"adjusted_score\": -0.3\n          },\n          {\n            \"voc_id\": \"RE71428049EDAF2DCF\",\n            \"quote\": \"How much tincture do I take? #herbalism #herbalist #tincture #herbalmedicine\",\n            \"adjusted_score\": -0.3\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"ACCELERATING\",\n        \"contradiction_count\": 5\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Tincture bottle label zoom + \u201cHow many drops?\u201d\",\n          \"opening_line\": \"Bought a tincture\u2026 and now you\u2019re stuck on dosing.\",\n          \"lever\": \"Form-first dosage tables + timing windows.\"\n        },\n        {\n          \"visual\": \"Three columns: tea / tincture / capsule\",\n          \"opening_line\": \"Same herb. Different form. Different dose.\",\n          \"lever\": \"Convert \u2018folk advice\u2019 into usable ranges.\"\n        },\n        {\n          \"visual\": \"Sticky note: \u201cIf no change by day X\u2026\u201d\",\n          \"opening_line\": \"Not sure when to stop or switch?\",\n          \"lever\": \"Simple duration rules + caution flags.\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA09\",\n      \"angle_name\": \"Herbal First-Aid (Realistic)\",\n      \"definition\": {\n        \"who\": \"Hikers/campers/parents who want herbal first-aid options in their kit\u2014not doomsday prepping (RE566BED03B45D2E72,RED829431832977082)\",\n        \"pain_desire\": \"Not sure what belongs in an herbal kit or what\u2019s unsafe; wants a small \u2018field-tested\u2019 list + clear limits on when to seek medical help. (RE73BF9901699E0B4F,REB8FAAD87C331E689)\",\n        \"mechanism_why\": \"First-aid module: kit checklist, quick recipes, storage, and \u2018do not use / get stitches / urgent care\u2019 thresholds; customizable by trip type.\",\n        \"belief_shift\": {\n          \"before\": \"An herbal kit should replace modern first aid. (RE566BED03B45D2E72,RED829431832977082)\",\n          \"after\": \"Herbal + modern together, with clear escalation rules. (RED829431832977082,RE73BF9901699E0B4F)\"\n        },\n        \"trigger\": \"Trip/storm season + realizing you might be far from care; want confidence for common cuts/bumps (RED829431832977082,RE73BF9901699E0B4F)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 21,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"RE566BED03B45D2E72\",\n            \"quote\": \"\ud83c\udf32 Adventure is unpredictable. Are you ready when things don\u2019t go as planned? When you\u2019re miles away from the nearest clinic, knowing Wilderness First Aid could make all the difference. \ud83c\udfd5\ufe0f Learn how to: \u2714\ufe0f Care for common outdoor injuries & illnesses \u2714\ufe0f Respond to emergencies with confidence \u2714\ufe0f Use both modern & herbal\",\n            \"adjusted_score\": 3.2\n          },\n          {\n            \"voc_id\": \"RED829431832977082\",\n            \"quote\": \"There are so many delicious smells wafting in my garden at present and Chamomile is one of them. . Chamomile is so quick and easy to grow with many medicinal benefits. Chamomile goodness I\u2019m currently making\u2026 ~ Chamomile infused oil for my baby products. ~ Chamomile infused lollipops ~ Chamomile infused honey ~ Chamom\",\n            \"adjusted_score\": 2.5\n          },\n          {\n            \"voc_id\": \"RE73BF9901699E0B4F\",\n            \"quote\": \"\u201cThe Illustrated Forager's Harvest Guide: Foraging for Edible Wild Plants, Mushrooms and Insects for Self-Sufficiency and Survival\u201d is one. It has numerous errors, but the worst: An image of what looks like POISON HEMLOCK is identified as yarrow. This information could easily kill someone. Use caution with herbal reso\",\n            \"adjusted_score\": 2.0\n          },\n          {\n            \"voc_id\": \"REB8FAAD87C331E689\",\n            \"quote\": \"The 5-Day Core Basic is coming up, March, 2020 at The Human Path. Primitive skills, knots, foraging, herbal first aid, wilderness medicine, self-defense, tactics, reconnaissance, camp cooking, teamwork, mission planning and much more! More information at http://thehumanpath.com\",\n            \"adjusted_score\": 1.0\n          },\n          {\n            \"voc_id\": \"REF18062689181339D\",\n            \"quote\": \"\ud83c\udf3fFirst Aid Herbal Powder\ud83c\udf3f . This herbal styptic powder is a must have in your first aid kit and home apothecary. A soothing blend of Yarrow, Plantain and Neem, it helps to stop wound bleeding, encourages healing, preventing infection with its anti-bacterial, anti-inflammatory and anti-fungal properties. It can be used\",\n            \"adjusted_score\": 0.0\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"STEADY\",\n        \"contradiction_count\": 8\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Daypack dump: bandages + herbs + checklist\",\n          \"opening_line\": \"Want herbal first-aid\u2014but still be realistic?\",\n          \"lever\": \"Kit checklist + clear limits + when to seek care.\"\n        },\n        {\n          \"visual\": \"Trail map + \u201cmiles from clinic\u201d + calm plan\",\n          \"opening_line\": \"When you\u2019re far from help, confidence beats panic.\",\n          \"lever\": \"Modern + herbal together, with escalation rules.\"\n        },\n        {\n          \"visual\": \"Small tin labeled \u201cfield kit\u201d with 6 items\",\n          \"opening_line\": \"Skip the doomsday kit. Build the \u2018actually useful\u2019 kit.\",\n          \"lever\": \"Multipurpose herbs + storage + quick recipes.\"\n        }\n      ]\n    },\n    {\n      \"angle_id\": \"POA10\",\n      \"angle_name\": \"Skin & Gut \u2018Small Fixes\u2019\",\n      \"definition\": {\n        \"who\": \"People dealing with recurring rashes/eczema/acne or nausea/GERD who want gentler options (RE022EC008C04F1182,RE674ABD33E74A685B)\",\n        \"pain_desire\": \"Trial-and-error products waste money; wants simple first steps (topical/tea), patch-test notes, and \u2018stop/seek care\u2019 red flags. Enemy: \u2018stack culture\u2019. (RE0A28577CF2722392,RE8158D16C02C98ECB)\",\n        \"mechanism_why\": \"Symptom quick pages: simplest topical/tea options, contraindication flags, and step-up ladder; customizable by sensitivity and meds.\",\n        \"belief_shift\": {\n          \"before\": \"Natural care means a long, complicated protocol. (RE022EC008C04F1182,RE674ABD33E74A685B)\",\n          \"after\": \"Start with the simplest safe option + clear stop rules. (RE674ABD33E74A685B,RE0A28577CF2722392)\"\n        },\n        \"trigger\": \"Flare-up hits + they don\u2019t want a 12-supplement protocol or harsh meds (RE674ABD33E74A685B,RE0A28577CF2722392)\"\n      },\n      \"evidence\": {\n        \"supporting_voc_count\": 71,\n        \"top_quotes\": [\n          {\n            \"voc_id\": \"RE022EC008C04F1182\",\n            \"quote\": \"We actually started Iwilla Remedy with herbal body care. Who remembers our I Love My Armpits deodorant? To his day, my aunt still texts me \u2014 upset \u2014 that we stopped making our Skin Spirit face oil. I am so honored by how many people have loved our herbal body care. There is so much intention and integrity in each one. \",\n            \"adjusted_score\": 3.0\n          },\n          {\n            \"voc_id\": \"RE674ABD33E74A685B\",\n            \"quote\": \"Give me painkillers now please! This is the worst pain I\u2019ve ever had. I\u2019m a wimp but I feel like I\u2019m not. Holy cow. I can\u2019t even type. I have endo and I\u2019ve never felt this much pain. It\u2019s in my stomach / pelvic area and I\u2019m having diarrhea. I can\u2019t even walk and my kids are crying. I took pepto. I took garlic and\",\n            \"adjusted_score\": 3.0\n          },\n          {\n            \"voc_id\": \"RE0A28577CF2722392\",\n            \"quote\": \"What can I use for my eczema? \ud83d\ude29 Here's a few suggestions: If your eczema is weeping or inflamed, use: \u26aa\ufe0f white clay (kaolin) \ud83d\udc9b turmeric powder \ud83c\udf3e rolled oats If your eczema is dry/flaky, use: \ud83c\udf3f olive oil \ud83e\udd65 coconut oil \ud83c\udf3e oat flour #eczema #eczemarelief #eczemaawareness #naturalremedies #plantmedicine #holistichealth\",\n            \"adjusted_score\": 1.2\n          },\n          {\n            \"voc_id\": \"RE8158D16C02C98ECB\",\n            \"quote\": \"Peppermint tea is a game-changer for stomach issues! \ud83c\udf3f It\u2019s known for its soothing properties and can help relieve nausea and indigestion. Plus, it\u2019s super refreshing! \ud83d\ude0c\u2728\",\n            \"adjusted_score\": 0.2\n          },\n          {\n            \"voc_id\": \"RE18E0B96D023BF727\",\n            \"quote\": \"Ask The Herbalist - Calming (and Healing) Herb For the Gut! #natural #herbalism #guthealth #herbalremedies #healing #gut\",\n            \"adjusted_score\": -0.3\n          }\n        ],\n        \"triangulation_status\": \"MULTI\",\n        \"velocity_status\": \"ACCELERATING\",\n        \"contradiction_count\": 28\n      },\n      \"hook_starters\": [\n        {\n          \"visual\": \"Eczema flare photo blurred + \u201cstart here\u201d ladder\",\n          \"opening_line\": \"For flare-ups, you don\u2019t need a 12-step protocol.\",\n          \"lever\": \"Simplest safe topical/tea first + step-up ladder.\"\n        },\n        {\n          \"visual\": \"Price tags on 5 skincare products crossed out\",\n          \"opening_line\": \"Tired of buying products that don\u2019t help?\",\n          \"lever\": \"Evidence-graded options + patch-test notes.\"\n        },\n        {\n          \"visual\": \"Stomach icon + mug of tea + \u201cwhat to try first\u201d card\",\n          \"opening_line\": \"When your gut is off, start gentle.\",\n          \"lever\": \"Simple tea options + contraindication flags.\"\n        }\n      ]\n    }\n  ]\n}"
+        }
+      ],
+      "role": "assistant"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "presence_penalty": 0.0,
+  "previous_response_id": null,
+  "prompt_cache_key": null,
+  "prompt_cache_retention": null,
+  "reasoning": {
+    "effort": "medium",
+    "summary": null
+  },
+  "safety_identifier": null,
+  "service_tier": "default",
+  "store": true,
+  "temperature": 1.0,
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "description": null,
+      "name": "strategy_v2_voc_agent03",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "angle_observations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 24,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "angle_id": {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                "angle_name": {
+                  "type": "string",
+                  "maxLength": 280
+                },
+                "competitor_angle_overlap": {
+                  "type": "string",
+                  "enum": [
+                    "Y",
+                    "N",
+                    "CANNOT_DETERMINE"
+                  ]
+                }
+              },
+              "required": [
+                "angle_id",
+                "angle_name",
+                "competitor_angle_overlap"
+              ]
+            }
+          },
+          "angle_candidates": {
+            "type": "array",
+            "minItems": 10,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "angle_id": {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                "angle_name": {
+                  "type": "string",
+                  "maxLength": 280
+                },
+                "definition": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "who": {
+                      "type": "string",
+                      "maxLength": 280
+                    },
+                    "pain_desire": {
+                      "type": "string",
+                      "maxLength": 280
+                    },
+                    "mechanism_why": {
+                      "type": "string",
+                      "maxLength": 280
+                    },
+                    "belief_shift": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "before": {
+                          "type": "string",
+                          "maxLength": 280
+                        },
+                        "after": {
+                          "type": "string",
+                          "maxLength": 280
+                        }
+                      },
+                      "required": [
+                        "before",
+                        "after"
+                      ]
+                    },
+                    "trigger": {
+                      "type": "string",
+                      "maxLength": 280
+                    }
+                  },
+                  "required": [
+                    "who",
+                    "pain_desire",
+                    "mechanism_why",
+                    "belief_shift",
+                    "trigger"
+                  ]
+                },
+                "evidence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "supporting_voc_count": {
+                      "type": "integer"
+                    },
+                    "top_quotes": {
+                      "type": "array",
+                      "minItems": 5,
+                      "maxItems": 5,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "voc_id": {
+                            "type": "string",
+                            "maxLength": 64
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 320
+                          },
+                          "adjusted_score": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "voc_id",
+                          "quote",
+                          "adjusted_score"
+                        ]
+                      }
+                    },
+                    "triangulation_status": {
+                      "type": "string",
+                      "enum": [
+                        "SINGLE",
+                        "DUAL",
+                        "MULTI"
+                      ]
+                    },
+                    "velocity_status": {
+                      "type": "string",
+                      "enum": [
+                        "ACCELERATING",
+                        "STEADY",
+                        "DECELERATING"
+                      ]
+                    },
+                    "contradiction_count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "supporting_voc_count",
+                    "top_quotes",
+                    "triangulation_status",
+                    "velocity_status",
+                    "contradiction_count"
+                  ]
+                },
+                "hook_starters": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "visual": {
+                        "type": "string",
+                        "maxLength": 280
+                      },
+                      "opening_line": {
+                        "type": "string",
+                        "maxLength": 280
+                      },
+                      "lever": {
+                        "type": "string",
+                        "maxLength": 280
+                      }
+                    },
+                    "required": [
+                      "visual",
+                      "opening_line",
+                      "lever"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "angle_id",
+                "angle_name",
+                "definition",
+                "evidence",
+                "hook_starters"
+              ]
+            }
+          }
+        },
+        "required": [
+          "angle_observations",
+          "angle_candidates"
+        ]
+      },
+      "strict": true
+    },
+    "verbosity": "medium"
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "code_interpreter",
+      "container": {
+        "type": "auto",
+        "file_ids": [
+          "file-PfdMw3WPLwSV2RUGdJyL79",
+          "file-Geog7Hf2yAb1frW29PDTzZ",
+          "file-MGPjBw3JvJorgDNnQGqYvj",
+          "file-Ci56CMQUC6WanYNGoudMRx",
+          "file-M5MEecJGkbLnhsVrBZXesd",
+          "file-BGqHiPvqEF3V1f7ZhZwxdG",
+          "file-YXjghwpcS4C2Y16vQ4i47B",
+          "file-EqdciZv7W5mbbndQENiXFH",
+          "file-SNBXfzgZKweSmBsRQujifT",
+          "file-8kLMTE8kmc7nUvrLCXicqw",
+          "file-X1qFen75pZJCAG6HEiKmPc"
+        ]
+      }
+    },
+    {
+      "type": "web_search",
+      "filters": null,
+      "search_context_size": "medium",
+      "user_location": {
+        "type": "approximate",
+        "city": null,
+        "country": "US",
+        "region": null,
+        "timezone": null
+      }
+    }
+  ],
+  "top_logprobs": 0,
+  "top_p": 0.98,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 71688,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 40072,
+    "output_tokens_details": {
+      "reasoning_tokens": 28971
+    },
+    "total_tokens": 111760
+  },
+  "user": null,
+  "metadata": {}
+}

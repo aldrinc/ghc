@@ -1,0 +1,29 @@
+{
+  "description": "Rows contain deterministic evidence_id keyed VOC evidence for Agent 3 raw-evidence fallback.",
+  "required_fields": [
+    "evidence_id",
+    "source_type",
+    "source_url",
+    "author",
+    "date",
+    "context",
+    "verbatim",
+    "evidence_ref"
+  ],
+  "counts": {
+    "evidence_rows": 5342,
+    "manifest_rows": 5342
+  },
+  "evidence_diagnostics": {
+    "existing_rows_in": 80,
+    "merged_rows_in": 3067,
+    "existing_rows_skipped_due_merged_superset": 80,
+    "existing_rows_used": 0,
+    "merged_rows_used": 3067,
+    "scraped_rows_in": 2791,
+    "accepted_rows": 5342,
+    "rows_rejected_missing_source_url_or_verbatim": 516,
+    "base_rows_rejected_missing_source_url_or_verbatim": 0,
+    "scraped_rows_rejected_missing_source_url_or_verbatim": 516
+  }
+}

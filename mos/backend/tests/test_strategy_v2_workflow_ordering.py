@@ -53,7 +53,7 @@ def test_strategy_v2_workflow_does_not_execute_precanon_child(monkeypatch) -> No
     monkeypatch.setattr(strategy_v2_workflow_module.workflow, "execute_child_workflow", _fake_execute_child_workflow)
     monkeypatch.setattr(strategy_v2_workflow_module.workflow, "info", lambda: _Info())
 
-    with pytest.raises(RuntimeError, match="stop_after_foundational_activity"):
+    with pytest.raises(strategy_v2_workflow_module.ApplicationError, match="stop_after_foundational_activity"):
         asyncio.run(
             StrategyV2Workflow().run(
                 StrategyV2Input(
@@ -160,8 +160,30 @@ def test_strategy_v2_workflow_stage2b_runs_as_checkpoint_activities(monkeypatch)
             }
         if activity_name == "run_strategy_v2_voc_agent2_extraction_activity":
             return {
+                "agent02_output": {
+                    "mode": "FRESH",
+                    "input_count": 0,
+                    "output_count": 0,
+                    "voc_observations": [],
+                    "rejected_items": [],
+                    "validation_errors": [],
+                },
+                "agent02_input_manifest": {"input_count": 0, "rows": []},
+                "agent02_prompt_provenance": {},
+                "agent02_raw_output": "{}",
+                "evidence_rows": [],
+                "evidence_diagnostics": {},
+                "prompt_corpus_count": 0,
+                "merged_corpus_count": 0,
+                "external_corpus_count": 0,
+                "corpus_selection_summary": {},
+                "proof_asset_candidates": [],
+                "step_payload_artifact_id": "artifact-step-v2-05a",
+            }
+        if activity_name == "run_strategy_v2_voc_agent2_qa_activity":
+            return {
                 "voc_observations": [],
-                "voc_scored": {"items": []},
+                "voc_scored": {"items": [{"zero_evidence_gate": False, "adjusted_score": 1.0}]},
                 "proof_asset_candidates": [],
                 "step_payload_artifact_id": "artifact-step-v2-05",
             }
@@ -181,6 +203,28 @@ def test_strategy_v2_workflow_stage2b_runs_as_checkpoint_activities(monkeypatch)
                 "pair_scoring": {"ranked_pairs": [{"pair_id": "pair-1"}]},
                 "proof_asset_candidates": [],
                 "step_payload_artifact_id": "artifact-step-v2-08",
+            }
+        if activity_name == "validate_strategy_v2_offer_data_readiness_activity":
+            return {
+                "status": "ready",
+                "missing_fields": [],
+                "inconsistent_fields": [],
+                "context": {
+                    "offer_format": "DISCOUNT_PLUS_3_BONUSES_V1",
+                    "product_type": "digital",
+                    "core_product": {"product_id": "product-1", "title": "Product Name"},
+                    "offer_id": "offer-1",
+                    "offer_name": "Default Offer",
+                    "bonus_items": [
+                        {"bonus_id": "bonus-1", "linked_product_id": "b1", "title": "Bonus 1", "position": 1},
+                        {"bonus_id": "bonus-2", "linked_product_id": "b2", "title": "Bonus 2", "position": 2},
+                        {"bonus_id": "bonus-3", "linked_product_id": "b3", "title": "Bonus 3", "position": 3},
+                    ],
+                    "pricing_metadata": {"list_price_cents": 9900, "offer_price_cents": 4900},
+                    "savings_metadata": {"savings_amount_cents": 5000, "savings_percent": 50.5, "savings_basis": "vs_list_price"},
+                    "bundle_contents": {"core_product": {"product_id": "product-1", "title": "Product Name"}},
+                },
+                "step_payload_artifact_id": "artifact-step-v2-08a",
             }
         if activity_name == "build_strategy_v2_offer_variants_activity":
             return {
@@ -260,7 +304,6 @@ def test_strategy_v2_workflow_stage2b_runs_as_checkpoint_activities(monkeypatch)
         "run_strategy_v2_voc_agent0b_apify_collection_activity",
         "run_strategy_v2_voc_agent0b_apify_ingestion_activity",
         "run_strategy_v2_voc_agent1_habitat_qualifier_activity",
-        "run_strategy_v2_voc_agent2_extraction_activity",
         "run_strategy_v2_voc_agent3_synthesis_activity",
     ]:
         assert activity_name in calls
@@ -351,7 +394,10 @@ def test_strategy_v2_workflow_fails_when_v2_03b_counters_missing(monkeypatch) ->
     monkeypatch.setattr(strategy_v2_workflow_module.workflow, "info", lambda: _Info())
     monkeypatch.setattr(strategy_v2_workflow_module.workflow, "patched", lambda _id: True)
 
-    with pytest.raises(RuntimeError, match="must return explicit strategy/planned/executed/failed actor run counters"):
+    with pytest.raises(
+        strategy_v2_workflow_module.ApplicationError,
+        match="must return explicit strategy/planned/executed/failed actor run counters",
+    ):
         asyncio.run(
             StrategyV2Workflow().run(
                 StrategyV2Input(

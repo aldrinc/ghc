@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
+import os
 from typing import Any
 
 from temporalio import workflow
@@ -24,6 +25,7 @@ with workflow.unsafe.imports_passed_through():
         finalize_strategy_v2_offer_winner_activity,
         run_strategy_v2_copy_pipeline_activity,
         run_strategy_v2_offer_pipeline_activity,
+        validate_strategy_v2_offer_data_readiness_activity,
     )
     from app.temporal.activities.strategy_v2_launch_activities import (
         create_strategy_v2_launch_artifacts_activity,
@@ -43,6 +45,10 @@ _RETRY_POLICY = RetryPolicy(
     maximum_interval=timedelta(seconds=30),
     maximum_attempts=1,
 )
+_COPY_WORKFLOW_GENERATION_MODE = os.getenv(
+    "STRATEGY_V2_COPY_WORKFLOW_GENERATION_MODE",
+    os.getenv("STRATEGY_V2_COPY_GENERATION_MODE", "template_payload_only"),
+).strip()
 
 
 def _require_nonempty_string(value: Any, *, field_name: str) -> str:
@@ -208,7 +214,7 @@ def _build_pair_decision(
         ],
         "reviewed_candidate_ids": [pair_id],
         "attestation": _build_attestation_payload(),
-        "operator_note": "Workflow automation selected a UMS pair for deterministic launch branch execution.",
+        "operator_note": "Selected this UMS pair after reviewing ranked candidates and supporting evidence.",
     }
 
 
@@ -229,7 +235,7 @@ def _build_offer_winner_decision(
         ],
         "reviewed_candidate_ids": [variant_id],
         "attestation": _build_attestation_payload(),
-        "operator_note": "Workflow automation selected the highest-scoring offer variant for launch branch execution.",
+        "operator_note": "Selected this offer variant after reviewing variant scores and evaluation outputs.",
     }
 
 
@@ -244,7 +250,7 @@ def _build_final_copy_decision(
         "approved": True,
         "reviewed_candidate_ids": [reviewed_candidate_id],
         "attestation": _build_attestation_payload(),
-        "operator_note": "Workflow automation approved final copy for launch execution after deterministic contract checks.",
+        "operator_note": "Approved final copy after reviewing contract checks and launch readiness criteria.",
     }
 
 
@@ -408,7 +414,7 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                             ],
                             "reviewed_candidate_ids": [angle_id],
                             "attestation": _build_attestation_payload(),
-                            "operator_note": "Workflow automation selected an eligible additional angle for launch.",
+                            "operator_note": "Selected this additional angle after reviewing ranked evidence and launch fit.",
                         },
                         "ranked_angle_candidates": ranked_candidates,
                     },
@@ -461,6 +467,31 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                     retry_policy=_RETRY_POLICY,
                 )
                 offer_pipeline_payload = _require_dict(offer_pipeline_result, field_name="offer_pipeline_result")
+                offer_data_readiness_result = await workflow.execute_activity(
+                    validate_strategy_v2_offer_data_readiness_activity,
+                    {
+                        "org_id": input.org_id,
+                        "client_id": input.client_id,
+                        "product_id": input.product_id,
+                        "campaign_id": None,
+                        "workflow_run_id": workflow_run_id,
+                        "onboarding_payload_id": input.onboarding_payload_id,
+                        "offer_pipeline_output": offer_pipeline_payload,
+                    },
+                    schedule_to_close_timeout=timedelta(minutes=10),
+                    retry_policy=_RETRY_POLICY,
+                )
+                offer_data_readiness_payload = _require_dict(
+                    offer_data_readiness_result,
+                    field_name="offer_data_readiness_result",
+                )
+                readiness_status = str(offer_data_readiness_payload.get("status") or "").strip().lower()
+                if readiness_status != "ready":
+                    raise RuntimeError(
+                        "Offer data readiness blocked launch workflow additional-angle generation. "
+                        f"missing_fields={offer_data_readiness_payload.get('missing_fields')}; "
+                        f"inconsistent_fields={offer_data_readiness_payload.get('inconsistent_fields')}"
+                    )
                 pair_scoring = _require_dict(
                     offer_pipeline_payload.get("pair_scoring"),
                     field_name="offer_pipeline_result.pair_scoring",
@@ -482,6 +513,7 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                         "workflow_run_id": workflow_run_id,
                         "stage2": stage2,
                         "offer_pipeline_output": offer_pipeline_payload,
+                        "offer_data_readiness": offer_data_readiness_payload,
                         "ump_ums_selection_decision": _build_pair_decision(
                             operator_user_id=input.operator_user_id,
                             pair_id=selected_pair_id,
@@ -561,6 +593,7 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                         "stage3": stage3_payload,
                         "copy_context": copy_context_payload,
                         "operator_user_id": input.operator_user_id,
+                        "copy_generation_mode": _COPY_WORKFLOW_GENERATION_MODE,
                     },
                     schedule_to_close_timeout=timedelta(minutes=35),
                     retry_policy=_RETRY_POLICY,
@@ -715,7 +748,7 @@ class StrategyV2AngleCampaignLaunchWorkflow:
                     "actor_user_id": input.operator_user_id,
                     "generate_ai_drafts": True,
                     "generate_testimonials": True,
-                    "async_media_enrichment": True,
+                    "async_media_enrichment": False,
                     "temporal_workflow_id": workflow_id,
                     "temporal_run_id": workflow.info().run_id,
                     "strategy_v2_packet": strategy_v2_packet,
@@ -817,7 +850,7 @@ class StrategyV2AngleIterationWorkflow:
                     ],
                     "reviewed_candidate_ids": [angle_id],
                     "attestation": _build_attestation_payload(),
-                    "operator_note": "Workflow automation replayed selected angle for additional UMS branch execution.",
+                    "operator_note": "Replayed the selected angle to run this additional UMS branch with reviewed evidence.",
                 },
                 "ranked_angle_candidates": ranked_candidates,
             },
@@ -825,6 +858,31 @@ class StrategyV2AngleIterationWorkflow:
             retry_policy=_RETRY_POLICY,
         )
         stage2 = _require_dict(stage2_result.get("stage2"), field_name="stage2_result.stage2")
+        offer_data_readiness_result = await workflow.execute_activity(
+            validate_strategy_v2_offer_data_readiness_activity,
+            {
+                "org_id": input.org_id,
+                "client_id": input.client_id,
+                "product_id": input.product_id,
+                "campaign_id": input.campaign_id,
+                "workflow_run_id": workflow_run_id,
+                "onboarding_payload_id": input.onboarding_payload_id,
+                "offer_pipeline_output": offer_pipeline_payload,
+            },
+            schedule_to_close_timeout=timedelta(minutes=10),
+            retry_policy=_RETRY_POLICY,
+        )
+        offer_data_readiness_payload = _require_dict(
+            offer_data_readiness_result,
+            field_name="offer_data_readiness_result",
+        )
+        readiness_status = str(offer_data_readiness_payload.get("status") or "").strip().lower()
+        if readiness_status != "ready":
+            raise RuntimeError(
+                "Offer data readiness blocked angle iteration launch. "
+                f"missing_fields={offer_data_readiness_payload.get('missing_fields')}; "
+                f"inconsistent_fields={offer_data_readiness_payload.get('inconsistent_fields')}"
+            )
 
         campaign_ids: list[str] = [input.campaign_id]
         launch_records: list[dict[str, Any]] = []
@@ -857,6 +915,7 @@ class StrategyV2AngleIterationWorkflow:
                     "workflow_run_id": workflow_run_id,
                     "stage2": stage2,
                     "offer_pipeline_output": offer_pipeline_payload,
+                    "offer_data_readiness": offer_data_readiness_payload,
                     "ump_ums_selection_decision": _build_pair_decision(
                         operator_user_id=input.operator_user_id,
                         pair_id=pair_id,
@@ -936,6 +995,7 @@ class StrategyV2AngleIterationWorkflow:
                     "stage3": stage3_payload,
                     "copy_context": copy_context_payload,
                     "operator_user_id": input.operator_user_id,
+                    "copy_generation_mode": _COPY_WORKFLOW_GENERATION_MODE,
                 },
                 schedule_to_close_timeout=timedelta(minutes=35),
                 retry_policy=_RETRY_POLICY,
@@ -1060,7 +1120,7 @@ class StrategyV2AngleIterationWorkflow:
                     "actor_user_id": input.operator_user_id,
                     "generate_ai_drafts": True,
                     "generate_testimonials": True,
-                    "async_media_enrichment": True,
+                    "async_media_enrichment": False,
                     "temporal_workflow_id": workflow_id,
                     "temporal_run_id": workflow.info().run_id,
                     "strategy_v2_packet": strategy_v2_packet,

@@ -74,7 +74,7 @@
   --line: 1.6;
   --heading-size: clamp(35px, 4.5vw, 50px);
   --heading-size-mobile: clamp(30px, 4.5vw, 35px);
-  --heading-line: 1.4;
+  --heading-line: 1.2;
   --heading-weight: 500;
 
   /* Colors */
@@ -83,6 +83,7 @@
   --color-bg: #ffffff;
 
   --color-text: var(--color-brand);
+  --heading-color: var(--color-brand);
   --color-muted: rgba(6, 26, 112, 0.76);
 
   --color-border: rgba(6, 26, 112, 0.18);
@@ -103,7 +104,8 @@
   /* Layout */
   --container-max: 1240px;
   --container-pad: 24px;
-  --section-pad-y: 80px;
+  --section-pad-y: 72px;
+  --section-pad-y-mobile: 48px;
 
   /* Spacing */
   --space-1: 4px;
@@ -123,34 +125,38 @@
 
   /* Hero */
   --hero-bg: #e9fbff;
-  --hero-min-height: 520px;
-  --hero-pad-x: clamp(24px, 6vw, 92px);
-  --hero-pad-y: clamp(28px, 5vw, 70px);
-  --hero-title-max: none;
-  --hero-subtitle-max: none;
+  --hero-min-height: clamp(360px, 28vw, 480px);
+  --hero-min-height-mobile: 180px;
+  --hero-pad-x: clamp(40px, 6vw, 88px);
+  --hero-pad-y: clamp(18px, 2.6vw, 36px);
+  --hero-copy-pad-right: clamp(10px, 1.25vw, 18px);
+  --hero-title-max: clamp(560px, 42vw, 760px);
+  --hero-subtitle-max: clamp(560px, 44vw, 820px);
+  --hero-media-frame-size: clamp(360px, 26vw, 500px);
+  --hero-media-frame-size-mobile: 200px;
   --hero-title-size: var(--heading-size);
   --hero-title-weight: var(--heading-weight);
   --hero-title-letter-spacing: 0;
   --hero-title-line: 1.1;
-  --hero-subtitle-size: clamp(18px, 2.6vw, 25px);
+  --hero-subtitle-size: clamp(18px, 1.55vw, 21px);
   --hero-subtitle-weight: 500;
-  --hero-subtitle-line: 1.2;
-  --hero-subtitle-gap: 16px;
+  --hero-subtitle-line: 1.28;
+  --hero-subtitle-gap: 18px;
   --hero-media-placeholder-bg: rgba(0, 0, 0, 0.06);
 
   /* Badge strip (under hero) */
   --badge-strip-bg: var(--hero-bg);
-  --badge-strip-border: 1px solid var(--color-border);
-  --badge-strip-pad-y: clamp(30px, 4vw, 40px);
-  --badge-strip-gap: clamp(22px, 4vw, 64px);
+  --badge-strip-border: 1px solid var(--color-brand);
+  --badge-strip-pad-y: clamp(20px, 2.6vw, 28px);
+  --badge-strip-gap: clamp(16px, 2.4vw, 28px);
 
-  --badge-icon-size: 60px;
+  --badge-icon-size: 42px;
   --badge-icon-radius: 10px;
   --badge-icon-zoom: 1;
   --badge-text-color: var(--color-brand);
   --badge-text-weight: 600;
-  --badge-value-size: clamp(14px, 1.7vw, 25px);
-  --badge-label-size: clamp(14px, 1.7vw, 25px);
+  --badge-value-size: clamp(12px, 1vw, 14px);
+  --badge-label-size: clamp(11px, 0.95vw, 13px);
   --badge-text-size: var(--badge-label-size);
   --badge-letter-spacing: 0;
 
@@ -164,16 +170,21 @@
   --marquee-font-weight: 900;
   --marquee-letter-spacing: 0.03em;
   --marquee-gap: clamp(50px, 8vw, 80px);
+  --marquee-pad-y: clamp(10px, 1.4vw, 16px);
   --marquee-pad-x: 0px;
 
   /* Listicle (Reasons) */
-  --listicle-card-gap: 40px;
+  --listicle-card-gap: 20px;
   --listicle-card-radius: 5px;
   --listicle-card-border: 0.5px solid var(--color-brand);
 
-  --listicle-media-width: 320px;
+  --listicle-media-width: clamp(320px, 28vw, 360px);
   --listicle-media-min-height: 300px;
-  --listicle-media-min-height-mobile: 220px;
+  --listicle-media-min-height-mobile: 240px;
+  --listicle-media-frame-height: 300px;
+  --listicle-media-frame-height-mobile: 240px;
+  --listicle-media-max-width: 224px;
+  --listicle-media-max-height: 286px;
   --listicle-media-placeholder-bg: rgba(6, 26, 112, 0.08);
 
   --listicle-number-size: 50px;
@@ -182,22 +193,22 @@
   --listicle-number-fg: var(--color-cta-text);
   --listicle-number-font-size: 32px;
 
-  --listicle-content-pad-x: 40px;
-  --listicle-content-pad-y: 40px;
+  --listicle-content-pad-x: 32px;
+  --listicle-content-pad-y: 30px;
   --listicle-content-pad-x-mobile: 20px;
-  --listicle-content-pad-y-mobile: 30px;
+  --listicle-content-pad-y-mobile: 24px;
 
-  --listicle-title-font: AwesomeSerif-MediumExtraTall, serif;
-  --listicle-title-size: 40px;
-  --listicle-title-size-mobile: 40px;
+  --listicle-title-font: var(--font-heading);
+  --listicle-title-size: 34px;
+  --listicle-title-size-mobile: 30px;
   --listicle-title-line: 1.2;
-  --listicle-title-color: rgb(0, 27, 116);
+  --listicle-title-color: var(--heading-color);
   --listicle-title-margin-bottom: 20px;
   --listicle-title-letter-spacing: 0.015em;
 
-  --listicle-body-size: clamp(16px, 2.3vw, 20px);
+  --listicle-body-size: clamp(16px, 1.55vw, 18px);
   --listicle-body-line: 1.5;
-  --listicle-body-gap: 18px;
+  --listicle-body-gap: 14px;
 
   /* Reviews carousel (under listicle) */
   --reviews-pad-y: 64px;
@@ -248,17 +259,17 @@
 
   /* Pitch section (under marquee) */
   --pitch-bg: #e9fbff;
-  --pitch-pad-y: 80px;
-  --pitch-gap: 60px;
-  --pitch-content-max: 560px;
-  --pitch-title-size: clamp(35px, 2.2vw, 50px);
-  --pitch-title-line: var(--heading-line);
-  --pitch-title-color: var(--color-brand);
-  --pitch-title-letter-spacing: 0;
-  --pitch-title-weight: var(--heading-weight);
-  --pitch-bullets-top: 28px;
-  --pitch-bullets-bottom: 30px;
-  --pitch-bullet-gap: 18px;
+  --pitch-pad-y: 48px;
+  --pitch-gap: clamp(24px, 2.6vw, 40px);
+  --pitch-content-max: 640px;
+  --pitch-title-size: clamp(40px, 2.8vw, 56px);
+  --pitch-title-line: 1.02;
+  --pitch-title-color: var(--heading-color);
+  --pitch-title-letter-spacing: -0.02em;
+  --pitch-title-weight: 700;
+  --pitch-bullets-top: 20px;
+  --pitch-bullets-bottom: 8px;
+  --pitch-bullet-gap: 12px;
   --pitch-bullet-size: 16px;
   --pitch-bullet-line: 1.4;
   --pitch-bullet-strong-weight: 600;
@@ -271,7 +282,12 @@
   --pitch-check-icon-size: 14px;
   --pitch-check-color: var(--color-brand);
 
-  --pitch-media-max: 560px;
+  --pitch-media-max: 420px;
+  --pitch-media-frame-height: 360px;
+  --pitch-media-frame-height-mobile: 320px;
+  --pitch-media-image-max-width: 248px;
+  --pitch-media-image-max-height: 332px;
+  --pitch-media-image-scale: 1.5;
   --pitch-media-radius: 4px;
   --pitch-media-border: 1px solid rgba(6, 26, 112, 0.55);
   --pitch-media-bg: rgba(255, 255, 255, 0.25);
@@ -315,7 +331,7 @@
   --cta-icon-size-sm: 14px;
 
   /* Review wall */
-  --wall-pad-y: 80px;
+  --wall-pad-y: 56px;
   --wall-pad-top: var(--wall-pad-y);
   --wall-title-size: var(--hero-title-size);
   --wall-title-line: var(--hero-title-line);
@@ -329,7 +345,7 @@
   --wall-button-pad: 8px 20px;
   --wall-button-radius: 999px;
 
-  --wall-height: clamp(500px, 70vh, 600px);
+  --wall-height: clamp(420px, 62vh, 540px);
   --wall-scroll-duration: 60s;
   --wall-gap: clamp(8px, 1.2vw, 15px);
   --wall-pad-x: clamp(8px, 1.1vw, 10px);
@@ -357,12 +373,15 @@
   /* Footer (logo + big CTA) */
   --footer-bg: var(--pitch-bg);
   --footer-border: 1px solid var(--color-brand);
-  --footer-pad-y: 48px;
+  --footer-text: var(--color-brand);
+  --footer-link: var(--footer-text);
+  --footer-link-hover: var(--footer-link);
+  --footer-pad-y: 32px;
   --footer-logo-height: 54px;
-  --footer-gap: 18px;
+  --footer-gap: 14px;
 
   /* Floating CTA */
-  --floating-cta-bottom: 18px;
+  --floating-cta-bottom: 16px;
   --floating-cta-z: 50;
 }
 
@@ -374,4 +393,12 @@
   --color-border: rgba(231, 240, 255, 0.18);
   --color-soft: rgba(231, 240, 255, 0.06);
   --shadow-sm: 0 2px 18px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 980px) {
+  .root {
+    --section-pad-y: var(--section-pad-y-mobile);
+    --hero-pad-x: var(--container-pad);
+    --footer-pad-y: 34px;
+  }
 }

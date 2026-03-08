@@ -37,3 +37,11 @@ def test_swipe_request_accepts_render_model_id_override() -> None:
     parsed = SwipeImageAdGenerateRequest.model_validate(payload)
     assert parsed.model == "gemini-2.5-flash"
     assert parsed.render_model_id == "gemini-3-pro-image-preview"
+
+
+def test_swipe_request_accepts_swipe_requires_product_image_flag() -> None:
+    payload = _base_payload()
+    payload["swipeRequiresProductImage"] = False
+
+    parsed = SwipeImageAdGenerateRequest.model_validate(payload)
+    assert parsed.swipe_requires_product_image is False

@@ -1,8 +1,12 @@
 from app.temporal.activities.asset_activities import (
-    _ProductReferenceAsset,
-    _build_image_reference_text,
+    _DefaultSwipeSource,
+    _build_creative_generation_plan_items,
+    _extract_source_filename,
     _extract_requirement_swipe_source,
+    _extract_requirement_swipe_requires_product_image,
     _extract_remote_reference_asset_id,
+    _extract_swipe_requires_product_image_from_tags,
+    _normalize_requirement_format,
     _split_requirement_asset_counts,
 )
 
@@ -43,19 +47,13 @@ def test_extract_remote_reference_asset_id() -> None:
     )
 
 
-def test_build_image_reference_text_includes_urls() -> None:
-    text = _build_image_reference_text(
-        [
-            _ProductReferenceAsset(
-                local_asset_id="asset-1",
-                primary_url="https://example.com/asset-1.png",
-                title="Hero Product",
-                remote_asset_id="remote-1",
-            )
-        ]
-    )
-    assert "Hero Product" in text
-    assert "https://example.com/asset-1.png" in text
+def test_normalize_requirement_format_aliases() -> None:
+    assert _normalize_requirement_format("image") == "image"
+    assert _normalize_requirement_format("image_ad") == "image"
+    assert _normalize_requirement_format("image-ad") == "image"
+    assert _normalize_requirement_format("video") == "video"
+    assert _normalize_requirement_format("video_ad") == "video"
+    assert _normalize_requirement_format("video-ad") == "video"
 
 
 def test_extract_requirement_swipe_source_prefers_explicit_keys() -> None:
@@ -90,3 +88,109 @@ def test_extract_requirement_swipe_source_rejects_ambiguous_payload() -> None:
         assert "exactly one swipe source" in str(exc)
     else:  # pragma: no cover
         raise AssertionError("Expected ValueError when both company swipe id and swipe image url are provided.")
+
+
+def test_extract_requirement_swipe_requires_product_image() -> None:
+    assert _extract_requirement_swipe_requires_product_image({}) is None
+    assert _extract_requirement_swipe_requires_product_image({"swipeRequiresProductImage": True}) is True
+    assert _extract_requirement_swipe_requires_product_image({"swipe_requires_product_image": False}) is False
+
+    try:
+        _extract_requirement_swipe_requires_product_image({"swipeRequiresProductImage": "true"})
+    except ValueError as exc:
+        assert "must be a boolean" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected ValueError for non-boolean swipeRequiresProductImage")
+
+
+def test_extract_source_filename_decodes_percent_encoded_swipe_labels() -> None:
+    assert _extract_source_filename("http://127.0.0.1:8099/Static%20%231.png") == "Static #1.png"
+
+
+def test_extract_swipe_requires_product_image_from_tags() -> None:
+    assert _extract_swipe_requires_product_image_from_tags([]) is None
+    assert _extract_swipe_requires_product_image_from_tags(["swipe:requires_product_image"]) is True
+    assert _extract_swipe_requires_product_image_from_tags(["swipe:no_product_image"]) is False
+
+    try:
+        _extract_swipe_requires_product_image_from_tags(
+            ["swipe:requires_product_image", "swipe:no_product_image"]
+        )
+    except ValueError as exc:
+        assert "conflicting product image policy tags" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected ValueError for conflicting swipe product image tags")
+
+
+def test_build_creative_generation_plan_items_expands_all_default_swipes_deterministically() -> None:
+    requirements = [
+        {
+            "channel": "facebook",
+            "format": "image_ad",
+            "funnelStage": "top-of-funnel",
+            "angle": "Structured triage",
+            "hook": "A better way to screen interactions",
+        },
+        {
+            "channel": "facebook",
+            "format": "video_ad",
+            "funnelStage": "top-of-funnel",
+        },
+        {
+            "channel": "facebook",
+            "format": "image_ad",
+            "funnelStage": "middle-of-funnel",
+            "angle": "Workflow clarity",
+            "hook": "Stop guessing",
+        },
+    ]
+    default_swipes = [
+        _DefaultSwipeSource(
+            company_swipe_id="swipe-a",
+            source_label="10.png",
+            source_media_url="https://example.com/10.png",
+            product_image_policy=False,
+        ),
+        _DefaultSwipeSource(
+            company_swipe_id="swipe-b",
+            source_label="11.png",
+            source_media_url="https://example.com/11.png",
+            product_image_policy=True,
+        ),
+    ]
+
+    first = _build_creative_generation_plan_items(
+        asset_brief_id="brief-123",
+        batch_id="batch-1",
+        requirements=requirements,
+        default_swipes=default_swipes,
+        copy_pack_ids_by_requirement={0: "copy-0", 2: "copy-2"},
+    )
+    second = _build_creative_generation_plan_items(
+        asset_brief_id="brief-123",
+        batch_id="batch-1",
+        requirements=requirements,
+        default_swipes=default_swipes,
+        copy_pack_ids_by_requirement={0: "copy-0", 2: "copy-2"},
+    )
+
+    assert [item.id for item in first] == [item.id for item in second]
+    assert len(first) == 4
+    assert [item.requirement_index for item in first] == [0, 0, 2, 2]
+    assert [item.source_label for item in first] == ["10.png", "11.png", "10.png", "11.png"]
+    assert [item.copy_pack_id for item in first] == ["copy-0", "copy-0", "copy-2", "copy-2"]
+
+
+def test_build_creative_generation_plan_items_errors_when_image_requirement_has_no_copy_pack() -> None:
+    try:
+        _build_creative_generation_plan_items(
+            asset_brief_id="brief-123",
+            batch_id="batch-1",
+            requirements=[{"channel": "facebook", "format": "image_ad"}],
+            default_swipes=[],
+            copy_pack_ids_by_requirement={},
+        )
+    except ValueError as exc:
+        assert "missing_requirement_index=0" in str(exc)
+    else:  # pragma: no cover
+        raise AssertionError("Expected ValueError when an image requirement has no copy pack id.")

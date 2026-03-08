@@ -6,7 +6,7 @@ This doc captures what is required to ship the current stack (FastAPI + Temporal
 - Postgres 16 reachable by the API and worker (migrations live in `mos/backend/alembic`).
 - Temporal server/UI reachable by the worker and API; default dev compose exposes `temporal:7233` inside the network and `localhost:7234` on the host.
 - Clerk instance with an org-bearing JWT template (used by backend auth and frontend).
-- LLM providers: OpenAI (required), Anthropic/Gemini (optional but used by several activities).
+- LLM providers: OpenAI (required), Anthropic/Gemini/Baseten (optional but used by several activities).
 - Google Drive access for research artifacts (service account or OAuth) and Apify token for ads ingestion.
 
 ## Environment configuration
@@ -18,7 +18,8 @@ This doc captures what is required to ship the current stack (FastAPI + Temporal
 - Shopify bridge integration (required for Shopify connection/product mapping/checkout): `SHOPIFY_APP_BASE_URL`, `SHOPIFY_INTERNAL_API_TOKEN`, optional `SHOPIFY_ORDER_WEBHOOK_SECRET`.
   - `SHOPIFY_APP_BASE_URL` should point to your deployed `shopify-funnel-app` host (for example `https://app.moshq.app`).
   - `SHOPIFY_INTERNAL_API_TOKEN` must match the token configured on `shopify-funnel-app`.
-- LLM providers: `ANTHROPIC_API_KEY`, `ANTHROPIC_API_BASE_URL` (optional), `GEMINI_API_KEY`, `OPENAI_BASE_URL` (optional).
+- LLM providers: `OPENAI_API_KEY`, `OPENAI_BASE_URL` (optional), `BASETEN_API_KEY`, `BASETEN_BASE_URL` (optional), `ANTHROPIC_API_KEY`, `ANTHROPIC_API_BASE_URL` (optional), `GEMINI_API_KEY`.
+  - Provider-prefixed model IDs are supported for the backend LLM client, for example `baseten:moonshotai/Kimi-K2.5`.
 - Unsplash: `UNSPLASH_ACCESS_KEY` for stock image lookups during funnel image generation.
 - Frontend: set `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_API_BASE_URL` (point to deployed backend), and `VITE_CLERK_JWT_TEMPLATE` (defaults to `backend`).
 - Secrets live in `.env` locally; move them to your deployment secret manager and keep `.env` files out of images/artifacts.

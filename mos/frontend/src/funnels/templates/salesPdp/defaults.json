@@ -137,7 +137,7 @@
           }
         ],
         "size": {
-          "title": "1. Select Your Size:",
+          "title": "Select Your Size",
           "helpLinkLabel": "Unsure What Size To Get?",
           "shippingDelayLabel": "Please Allow An Additional 5 Days For Shipping This Color & Size Due To High Demand",
           "options": [
@@ -162,7 +162,7 @@
           ]
         },
         "color": {
-          "title": "2. Select Your Color:",
+          "title": "Select Your Color",
           "outOfStockTitle": "This color in this size is currently out of stock.",
           "outOfStockBody": "Please try a different color or size.",
           "options": [
@@ -189,9 +189,9 @@
           ]
         },
         "offer": {
-          "title": "3. Select Your Offer:",
+          "title": "Select Your Offer",
           "helperText": "Most customers go for the Buy 3 Get 3 Free offer.",
-          "seeWhyLabel": "Click to see why.",
+          "seeWhyLabel": "",
           "options": [
             {
               "id": "1",
@@ -369,7 +369,7 @@
       "id": "comparison",
       "badge": "VOTED #1 PEE PAD BY DOGS TODAY",
       "title": "PuppyPad Vs. Disposable Pee Pads",
-      "swipeHint": "Swipe Right To See Comparison →",
+      "swipeHint": "Swipe right to see comparison →",
       "columns": {
         "pup": "THE PUPPYPAD",
         "disposable": "DISPOSABLE PEE PADS"
@@ -638,7 +638,9 @@
         "src": "/assets/puppypad-logo.svg",
         "alt": "Brand logo"
       },
-      "copyright": "© All rights reserved."
+      "copyright": "© 2025 PuppyPad",
+      "links": [],
+      "paymentIcons": []
     },
     "modals": {
       "sizeChart": {

@@ -188,6 +188,15 @@ def test_enforce_strict_openai_json_schema_preserves_explicit_object_constraints
     assert normalized["required"] == ["dimensions"]
 
 
+def test_template_payload_validation_errors_remain_retryable() -> None:
+    assert (
+        strategy_v2_activities._is_non_retryable_sales_payload_failure(
+            "TEMPLATE_PAYLOAD_VALIDATION: template_id=sales-pdp; errors=problem.title: String should have at least 1 character"
+        )
+        is False
+    )
+
+
 def test_offer_step05_response_schema_enforces_bounded_compact_contract() -> None:
     schema = strategy_v2_activities._offer_step05_response_schema()
     revision_notes = schema["properties"]["revision_notes"]
@@ -382,7 +391,13 @@ def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.Mon
     monkeypatch.setattr(
         strategy_v2_activities,
         "_upload_openai_prompt_json_files",
-        lambda **_kwargs: ({"EVIDENCE_ROWS_JSON": "file_test_123"}, ["file_test_123"]),
+        lambda **_kwargs: (
+            {
+                "EVIDENCE_ROWS_JSON": "file_test_123",
+                "AGENT2_INPUT_MANIFEST_JSON": "file_test_manifest_123",
+            },
+            ["file_test_123", "file_test_manifest_123"],
+        ),
     )
     monkeypatch.setattr(
         strategy_v2_activities,
@@ -399,7 +414,8 @@ def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.Mon
                 "output_count": 2,
                 "voc_observations": [
                     {
-                        "source_type": "REDDIT_THREAD",
+                        "evidence_id": "E1111111111111111",
+                        "source_type": "REDDIT",
                         "source_url": "https://example.com/post/1",
                         "source_author": "user-1",
                         "source_date": "2026-02-01",
@@ -423,11 +439,11 @@ def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.Mon
         mode="DUAL",
         evidence_rows=[
             {
-                "evidence_id": "EVIDENCE-001",
-                "source_type": "REDDIT_THREAD",
+                "evidence_id": "E1111111111111111",
+                "source_type": "REDDIT",
                 "source_url": "https://example.com/post/1",
-                "source_author": "user-1",
-                "source_date": "2026-02-01",
+                "author": "user-1",
+                "date": "2026-02-01",
                 "context": "Example context",
                 "verbatim": "I need safer guidance.",
                 "evidence_ref": "row-1",
@@ -450,7 +466,8 @@ def test_run_agent2_extractor_accepts_single_pass_output(monkeypatch: pytest.Mon
     assert result["mode"] == "DUAL"
     assert len(result["voc_observations"]) == 1
     assert result["voc_observations"][0]["voc_id"] == "V0001"
-    assert result["voc_observations"][0]["source"] == "REDDIT_THREAD | https://example.com/post/1"
+    assert result["voc_observations"][0]["source"] == "REDDIT::https://example.com/post/1"
+    assert result["voc_observations"][0]["evidence_id"] == "E1111111111111111"
     assert result["extraction_summary"]["input_count"] == 1
     assert result["extraction_summary"]["output_count"] == 1
 
@@ -679,7 +696,7 @@ def test_resolve_price_from_reference_urls_prefers_offer_price_over_shipping(mon
     assert price == "$37"
 
 
-def test_map_offer_pipeline_input_with_price_resolution_retries_when_price_is_tbd(
+def test_map_offer_pipeline_input_with_price_resolution_fails_when_price_is_tbd(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
@@ -687,38 +704,31 @@ def test_map_offer_pipeline_input_with_price_resolution_retries_when_price_is_tb
     def _fake_map_offer_pipeline_input(**kwargs):
         stage2 = kwargs["stage2"]
         calls.append(stage2.price)
-        if stage2.price == "TBD":
-            raise StrategyV2MissingContextError(
-                "Unable to parse numeric price for Offer pipeline input mapping. "
-                "Remediation: provide stage2.price in a parseable format like '$49' or '49.99'."
-            )
         return {"price_used": stage2.price}
 
     monkeypatch.setattr(strategy_v2_activities, "map_offer_pipeline_input", _fake_map_offer_pipeline_input)
-    monkeypatch.setattr(
-        strategy_v2_activities,
-        "_resolve_price_from_reference_urls",
-        lambda *, urls: "$37",
-    )
 
     stage2 = _build_stage2_with_price("TBD")
-    result = strategy_v2_activities._map_offer_pipeline_input_with_price_resolution(
-        stage2=stage2,
-        selected_angle_payload=stage2.selected_angle.model_dump(mode="python"),
-        competitor_teardowns="{}",
-        voc_research="{}",
-        purple_ocean_research="{}",
-        business_model="info-product",
-        funnel_position="top",
-        target_platforms=["meta"],
-        target_regions=["US"],
-        existing_proof_assets=["ugc"],
-        brand_voice_notes="direct and practical",
-        compliance_sensitivity="medium",
-        llm_model="gpt-5.2-2025-12-11",
-        max_iterations=2,
-        score_threshold=5.5,
-    )
+    with pytest.raises(
+        StrategyV2MissingContextError,
+        match="fallback price scraping is disabled",
+    ):
+        strategy_v2_activities._map_offer_pipeline_input_with_price_resolution(
+            stage2=stage2,
+            selected_angle_payload=stage2.selected_angle.model_dump(mode="python"),
+            competitor_teardowns="{}",
+            voc_research="{}",
+            purple_ocean_research="{}",
+            business_model="info-product",
+            funnel_position="top",
+            target_platforms=["meta"],
+            target_regions=["US"],
+            existing_proof_assets=["ugc"],
+            brand_voice_notes="direct and practical",
+            compliance_sensitivity="medium",
+            llm_model="gpt-5.2-2025-12-11",
+            max_iterations=2,
+            score_threshold=5.5,
+        )
 
-    assert calls == ["TBD", "$37"]
-    assert result == {"price_used": "$37"}
+    assert calls == []

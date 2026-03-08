@@ -79,6 +79,12 @@ export type PublicFunnelPage = {
   puckData: unknown;
   pageMap: Record<string, string>;
   designSystemTokens?: DesignSystemTokens | null;
+  metadata?: {
+    title: string;
+    description: string;
+    lang: string;
+    brandName?: string | null;
+  };
   nextPageId?: string | null;
   redirectToSlug?: string;
 };

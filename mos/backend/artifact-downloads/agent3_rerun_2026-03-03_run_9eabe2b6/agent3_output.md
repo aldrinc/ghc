@@ -1,0 +1,696 @@
+{
+  "angle_observations": [
+    {
+      "angle_id": "POA01",
+      "angle_name": "Interaction-Safe Add‑Ons",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA02",
+      "angle_name": "2am Kid Remedy Triage",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA03",
+      "angle_name": "Pregnancy Tea Panic Filter",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA04",
+      "angle_name": "Menopause/HRT Supplement Cross‑Check",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA05",
+      "angle_name": "Stop Buying ‘Bottles of Hope’",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA06",
+      "angle_name": "Home Apothecary (No Clutter)",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA07",
+      "angle_name": "Sensitive-Reactor Guardrails",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA08",
+      "angle_name": "Dose & Form Decoder",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA09",
+      "angle_name": "Herbal First-Aid (Realistic)",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    },
+    {
+      "angle_id": "POA10",
+      "angle_name": "Skin & Gut ‘Small Fixes’",
+      "competitor_angle_overlap": "CANNOT_DETERMINE"
+    }
+  ],
+  "angle_candidates": [
+    {
+      "angle_id": "POA01",
+      "angle_name": "Interaction-Safe Add‑Ons",
+      "definition": {
+        "who": "Adults on prescriptions/HRT adding herbs or supplements but fear interactions (REC7C81ACA0320D0B2,REA656374C0620FE74)",
+        "pain_desire": "Conflicting advice + unregulated bottles; fear making symptoms/anxiety worse; wants a clear avoid/caution/OK list + timing + when to ask clinician. Failed: guessing, Googling. (REC7C81ACA0320D0B2,REA656374C0620FE74)",
+        "mechanism_why": "Handbook cross-checks meds↔herbs with contraindication flags, timing tips, and “when to seek care” prompts; customizable to your med list.",
+        "belief_shift": {
+          "before": "OTC/natural means it’s safe to combine. (REC7C81ACA0320D0B2,REA656374C0620FE74)",
+          "after": "Natural still needs interaction guardrails + a go/no‑go check. (REA656374C0620FE74,RED8BF681B3DA667CD)"
+        },
+        "trigger": "New Rx/HRT + want to keep/start herbs; ask “is this safe together?” (REA656374C0620FE74,RED8BF681B3DA667CD)"
+      },
+      "evidence": {
+        "supporting_voc_count": 91,
+        "top_quotes": [
+          {
+            "voc_id": "REC7C81ACA0320D0B2",
+            "quote": "Everything was stable. Medication working. Supplements consistent. OCD manageable. Then suddenly—everything spiralled. Intrusive thoughts louder. Compulsions harder to resist. She rang panicking: \"I'm failing.\" We investigated. No reported changes to her diet or lifestyle and blood tests all fine - all fine. I was",
+            "adjusted_score": 7.7
+          },
+          {
+            "voc_id": "REA656374C0620FE74",
+            "quote": "TL,DR: My doctor can't say what supplements should not be taken while on HRT...? I've only been on HRT two weeks, but as soon as I got my script, I emailed my doctor the list of supplements I take, and asked if I should stop taking any. This was the non-answer response: \"It's not possible to say that oth",
+            "adjusted_score": 6.7
+          },
+          {
+            "voc_id": "RED8BF681B3DA667CD",
+            "quote": "How to go full-time as smoothly as possible before taking ... | In fact, I started taking estrogen supplements without ... How long does it take for the effects of HRT (MTF) to become visible?Read more | Are natural supplements safe for everyone during ... | While natural supplements can be beneficial for some ind",
+            "adjusted_score": 5.2
+          },
+          {
+            "voc_id": "RE46D57BC1B0D7BF52",
+            "quote": "Have you ever felt anxious about giving herbs to someone who's already taking medications? Many herbalists feel hesitant to help people taking prescribed drugs because of concerns about herb-drug interactions. But how much do we really need to worry about this? Herbs can impact how drugs are absorbed and metaboli",
+            "adjusted_score": 5.2
+          },
+          {
+            "voc_id": "RE78D2D127C65FC427",
+            "quote": "Read Full Article: https://earthycures.com/why-so-many-people-are-turning-to-natural-remedies-after-conventional-medicine-falls-short/ Have you ever found yourself scrolling at 1 a.m. asking, \"Why does my body hate me?\" after a doctor’s appointment left you feeling dismissed? You aren't alone. In this video, w",
+            "adjusted_score": 4.0
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "ACCELERATING",
+        "contradiction_count": 39
+      },
+      "hook_starters": [
+        {
+          "visual": "Split-screen: pill organizer + herbal tea jar + “Can these mix?” checklist",
+          "opening_line": "On prescriptions and still want herbs? Don’t guess—cross-check first.",
+          "lever": "Interaction “red/yellow/green” page + timing rules."
+        },
+        {
+          "visual": "Screenshot-style: “My doctor can’t say…” email excerpt",
+          "opening_line": "When your clinician won’t (or can’t) confirm supplements with HRT…",
+          "lever": "Bring-a-list questions + conservative stop/ask flags."
+        },
+        {
+          "visual": "Calendar + symptom spike arrow after “new supplement”",
+          "opening_line": "If a new supplement made you feel worse, it might be the combo.",
+          "lever": "Go/no-go screening by med class + common culprit herbs."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA02",
+      "angle_name": "2am Kid Remedy Triage",
+      "definition": {
+        "who": "Exhausted parents of teething/sick babies trying to stay “natural” without harming their kid (REE17F7351E52B1080,RE7BC66D367EA97727)",
+        "pain_desire": "Tried drops/gels/frozen tricks—nothing lasts; fear unsafe teething products + fear meds. Outcome: safe comfort steps + when OTC is reasonable + red flags. Enemy: internet guilt wars. (REBB41B0CE8D583BF5,RE1E813C24634DA100)",
+        "mechanism_why": "Symptom-first kid pages: age/weight notes, comfort options, what to avoid, when to use OTC, and “call/seek care” cutoffs—fast lookup.",
+        "belief_shift": {
+          "before": "If it’s ‘natural’ it must be safer for babies. (REE17F7351E52B1080,RE7BC66D367EA97727)",
+          "after": "Baby-safe = specific guardrails + escalation cues, not vibes. (RE7BC66D367EA97727,REBB41B0CE8D583BF5)"
+        },
+        "trigger": "3am pain/fever + guilt about Tylenol/Nurofen + “what else can I try tonight?” (RE7BC66D367EA97727,REBB41B0CE8D583BF5)"
+      },
+      "evidence": {
+        "supporting_voc_count": 12,
+        "top_quotes": [
+          {
+            "voc_id": "REE17F7351E52B1080",
+            "quote": "If it helps at all, we were worried about over using Tylenol and talked to our pediatrician about it at her last well visit. We had been giving it mostly before naps and bedtime because teething really seems to affect her sleep. Our pediatrician gave us her blessing to use Tylenol when we think she needs it. She said i",
+            "adjusted_score": 7.7
+          },
+          {
+            "voc_id": "RE7BC66D367EA97727",
+            "quote": "This is a rant but also advice needed if it’s different than what’s already out there. My baby boy started teething at 3-4 months. He just turned 5 months and cut his first tooth with the other currently trailing behind. He is often in a lot of pain. I have purchased every single alternative to Tylenol - frozen tethers",
+            "adjusted_score": 7.7
+          },
+          {
+            "voc_id": "REBB41B0CE8D583BF5",
+            "quote": "There’s nothing world with giving your teething baby Tylenol when he’s in pain….some of those other options you’ve tried like the gels and numbing pills aren’t recommended anyway. There should be no guilt involved here, but I understand!! I would try and honestly assess where you believe the guilt is coming from. Do yo",
+            "adjusted_score": 7.2
+          },
+          {
+            "voc_id": "RE1E813C24634DA100",
+            "quote": "Are you in the US? I know you requested natural remedies but unfortunately anything labeled such as teething relief here is pretty unsafe and not FDA tested or approved. You're better off giving infant Tylenol when baby is obviously struggling and uncomfy. I usually can tell with my girl when she's extra extra drooly,",
+            "adjusted_score": 5.5
+          },
+          {
+            "voc_id": "RE8B2D50335B1E1BC5",
+            "quote": "How Often Can You Give Tylenol For Infants? When caring for infants, knowing how to manage discomfort effectively is essential for parents. In this informative video, we’ll discuss the important considerations for administering Tylenol, a common medication used to alleviate symptoms such as fever and teething pain. We’",
+            "adjusted_score": 0.0
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "DECELERATING",
+        "contradiction_count": 4
+      },
+      "hook_starters": [
+        {
+          "visual": "Dark room + 3am clock + teething baby + “What now?” flowchart",
+          "opening_line": "It’s 3am. Baby’s in pain. You want natural—but safe.",
+          "lever": "Fast comfort menu + what to avoid + when OTC is OK."
+        },
+        {
+          "visual": "Pile of “teething” products crossed out + one simple checklist",
+          "opening_line": "Tried every ‘natural’ teething trick and nothing lasts?",
+          "lever": "Shortlist of safer options + red flags for unsafe gels/drops."
+        },
+        {
+          "visual": "“Tylenol guilt” word cloud vs “relief + safety” checklist",
+          "opening_line": "The guilt isn’t a plan. Here’s a plan.",
+          "lever": "Decision tree: comfort → monitor → escalate."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA03",
+      "angle_name": "Pregnancy Tea Panic Filter",
+      "definition": {
+        "who": "Pregnant/nursing people who want natural relief but worry every herb/tea is risky (REA47DB03D2D9C82D3,REEDB164A4D53E6AB2)",
+        "pain_desire": "“Most herbal teas aren’t considered safe” + conflicting sources; wants trimester/breastfeeding-safe lists + clear ‘avoid’ reasons + when to ask provider. Failed: Google roulette. (REDFB127C0A7FEAB5A,RE8FC41C62A0DCEC62)",
+        "mechanism_why": "Pregnancy/breastfeeding filter + evidence-graded entries, common ingredients cross-check, and conservative ‘stop/ask’ flags.",
+        "belief_shift": {
+          "before": "If it’s sold as tea, it’s automatically pregnancy-safe. (REA47DB03D2D9C82D3,REEDB164A4D53E6AB2)",
+          "after": "Pregnancy-safe depends on herb + dose + stage; use a vetted list. (REEDB164A4D53E6AB2,REDFB127C0A7FEAB5A)"
+        },
+        "trigger": "Realize a favorite tea/herb may be unsafe; panic + confusion from mixed lists (REEDB164A4D53E6AB2,REDFB127C0A7FEAB5A)"
+      },
+      "evidence": {
+        "supporting_voc_count": 14,
+        "top_quotes": [
+          {
+            "voc_id": "REA47DB03D2D9C82D3",
+            "quote": "Hi! I just found that my favorite Lemon &amp; Ginger tea has some lemongrass in it, which may not be safe in pregnancy. I’ve had 1-2 cups of this tea daily during my first trimester. Has anyone else drank tea with lemongrass in their pregnancy? It gets very confusing, as most of herbal teas are not considered safe in p",
+            "adjusted_score": 4.2
+          },
+          {
+            "voc_id": "REEDB164A4D53E6AB2",
+            "quote": "What is the best natural remedy for toothache during pregnancy? Basic information about toothache during pregnancy. Pregnant women can also experience swollen gums, bleeding from gums and other oral health problems. These conditions are caused by hormonal changes during pregnancy. A toothache can be a sign of a dental",
+            "adjusted_score": 2.7
+          },
+          {
+            "voc_id": "REDFB127C0A7FEAB5A",
+            "quote": "🌿 Herbal Wisdom Wednesday 🌿 Myth-Buster: \"Are Herbal Remedies Safe with Medications?\" As a Registered Nurse with 40+ years of experience AND a certified clinical herbalist, this is one of the most important questions I get asked. The answer? It depends! Here's what you need to know: ✅ Some herbs can interact with medic",
+            "adjusted_score": 1.7
+          },
+          {
+            "voc_id": "RE8FC41C62A0DCEC62",
+            "quote": "✨Postpartum Depletion✨ . Postpartum depletion often raises its ugly head within the first few months after giving birth, when most women are still recovering as well as finding their feet with the new demands of motherhood. It can affect a woman’s mental, emotional, physical, spiritual and social wellbeing AND can last",
+            "adjusted_score": 1.5
+          },
+          {
+            "voc_id": "REBD91E20327D0FC09",
+            "quote": "What can pregnant moms drink if they don’t like water? – The ... | Though its caffeine content may be a bit high for daily use, it is a healthy pregnancy drink. Many women find that herbal teas help ...Read more | What Herbal Teas Are Safe During Pregnancy? - Parents | “Ginger and peppermint teas are often recommended”",
+            "adjusted_score": 0.2
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "ACCELERATING",
+        "contradiction_count": 7
+      },
+      "hook_starters": [
+        {
+          "visual": "Tea box flipped over to ingredient list + “Is this safe?” highlight",
+          "opening_line": "Pregnant and realizing your ‘ginger tea’ has extra herbs?",
+          "lever": "Ingredient cross-check + trimester/breastfeeding filters."
+        },
+        {
+          "visual": "Two Google tabs: “safe” vs “unsafe”",
+          "opening_line": "Google says yes. Google says no. Now what?",
+          "lever": "Conservative safe-list + clear ‘avoid/ask’ reasons."
+        },
+        {
+          "visual": "Checklist titled “Ask your provider” with 5 questions",
+          "opening_line": "Want natural relief without gambling in pregnancy?",
+          "lever": "Bring-to-appointment script + stop-sign symptoms."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA04",
+      "angle_name": "Menopause/HRT Supplement Cross‑Check",
+      "definition": {
+        "who": "Peri/menopause buyers starting HRT or symptom stacks who still want botanicals—but safely (REA656374C0620FE74,RED8BF681B3DA667CD)",
+        "pain_desire": "Doctor can’t confirm safety; overwhelmed by hot-flash/sleep/mood stacks. Outcome: what to pause, what’s low-risk, what to monitor, and when to escalate. (RE4AB03AEEAE4DD178,RE33AD7EFF82413B62)",
+        "mechanism_why": "HRT-aware checklists: interaction red/yellow/green, symptom-support options, and a “questions to bring to clinician” page.",
+        "belief_shift": {
+          "before": "I can just keep all my usual supplements when I start HRT. (REA656374C0620FE74,RED8BF681B3DA667CD)",
+          "after": "HRT + herbs = plan + monitoring + interaction screen. (RED8BF681B3DA667CD,RE4AB03AEEAE4DD178)"
+        },
+        "trigger": "Start HRT + can’t get clear answers on supplements/herbs; doesn’t want to “mess it up” (RED8BF681B3DA667CD,RE4AB03AEEAE4DD178)"
+      },
+      "evidence": {
+        "supporting_voc_count": 17,
+        "top_quotes": [
+          {
+            "voc_id": "REA656374C0620FE74",
+            "quote": "TL,DR: My doctor can't say what supplements should not be taken while on HRT...? I've only been on HRT two weeks, but as soon as I got my script, I emailed my doctor the list of supplements I take, and asked if I should stop taking any. This was the non-answer response: \"It's not possible to say that oth",
+            "adjusted_score": 6.7
+          },
+          {
+            "voc_id": "RED8BF681B3DA667CD",
+            "quote": "How to go full-time as smoothly as possible before taking ... | In fact, I started taking estrogen supplements without ... How long does it take for the effects of HRT (MTF) to become visible?Read more | Are natural supplements safe for everyone during ... | While natural supplements can be beneficial for some ind",
+            "adjusted_score": 5.2
+          },
+          {
+            "voc_id": "RE4AB03AEEAE4DD178",
+            "quote": "I've been having so many conversations about perimenopause, privately, in classes, and on stages, that I wanted to offer support to our wider community on how to navigate this time with confidence and grace. If your body, like mine 😵‍💫, has been whispering, or speaking loudly, that something is changing, then welcome",
+            "adjusted_score": 3.5
+          },
+          {
+            "voc_id": "RE33AD7EFF82413B62",
+            "quote": "Ashwagandha has been a lovely addition to my perimenopause protocol. Everyone talks about the stress relief. Fewer people talk about the emotional flatness some experience. Is it the herb? The dose? Your nervous system? Watch the full video to understand what’s really happening and how to use it wisely. And don’t forge",
+            "adjusted_score": 2.0
+          },
+          {
+            "voc_id": "RE55EF8E6F85E99B71",
+            "quote": "Finding balance through hormonal changes doesn't have to be overwhelming. 🌸Nature provides incredible botanical allies! ✨ Here is your Women's Health Cheat Sheet for navigating PMS, stress, and menopause: 🌿 Ashwagandha Regulates stress hormones (cortisol) & fights fatigue. Add powder to smoothies for long-term calm. 💜",
+            "adjusted_score": -0.3
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "ACCELERATING",
+        "contradiction_count": 1
+      },
+      "hook_starters": [
+        {
+          "visual": "HRT patch + supplement bottles + “Can I keep these?” note",
+          "opening_line": "Starting HRT and your doctor can’t answer supplement questions?",
+          "lever": "HRT cross-check page: pause/monitor/ask."
+        },
+        {
+          "visual": "Hot flash icon + sleep icon + “stack” of pills",
+          "opening_line": "Perimenopause stacks get out of hand fast.",
+          "lever": "Evidence-graded shortlist + what to track weekly."
+        },
+        {
+          "visual": "Red/yellow/green traffic light over common herbs",
+          "opening_line": "Herbs aren’t ‘no big deal’ when hormones shift.",
+          "lever": "Interaction screening + conservative escalation rules."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA05",
+      "angle_name": "Stop Buying ‘Bottles of Hope’",
+      "definition": {
+        "who": "Natural-curious shoppers burned by influencer trends & sketchy supplement claims (REC7C81ACA0320D0B2,REE3C7ABC7A8450730)",
+        "pain_desire": "Can’t trust labels/AI-ish books; hates woo but wants options. Outcome: a simple evidence-graded shortlist + how to vet quality. Failed: impulse buys. Enemy: hype economy. (RED8C85A144C83670B,RE59183CE3376BE47A)",
+        "mechanism_why": "Evidence-graded remedy entries + “quality / third-party test / red-flag claims” checklists; customizable ‘keep/skip’ list.",
+        "belief_shift": {
+          "before": "More supplements = more progress. (REC7C81ACA0320D0B2,REE3C7ABC7A8450730)",
+          "after": "Fewer, higher-confidence basics + clear ‘not worth it’ calls. (REE3C7ABC7A8450730,RED8C85A144C83670B)"
+        },
+        "trigger": "Standing in the ‘detox/energy’ aisle or doomscrolling—realizing you’re overspending + still unsure what’s real (REE3C7ABC7A8450730,RED8C85A144C83670B)"
+      },
+      "evidence": {
+        "supporting_voc_count": 314,
+        "top_quotes": [
+          {
+            "voc_id": "REC7C81ACA0320D0B2",
+            "quote": "Everything was stable. Medication working. Supplements consistent. OCD manageable. Then suddenly—everything spiralled. Intrusive thoughts louder. Compulsions harder to resist. She rang panicking: \"I'm failing.\" We investigated. No reported changes to her diet or lifestyle and blood tests all fine - all fine. I was",
+            "adjusted_score": 7.7
+          },
+          {
+            "voc_id": "REE3C7ABC7A8450730",
+            "quote": "Stop buying a \"bottle of hope\" every month. 💊 We’ve all been there—standing in the pharmacy aisle, overwhelmed by labels promising eternal energy and glowing skin. But with a $200 billion industry pushing products at us, how do we know what actually works? The reality is that many of us are overspending on supplements ",
+            "adjusted_score": 6.0
+          },
+          {
+            "voc_id": "RED8C85A144C83670B",
+            "quote": "Our three-part blog series on African American Herbalism written by ethnobiologist Marc Williams, explores the resilience, wisdom, and continuity of African American herbal traditions across generations, with lessons that remain urgently relevant today. ⁠ ⁠ Here are a few of our favorite books that help preserve, docum",
+            "adjusted_score": 4.2
+          },
+          {
+            "voc_id": "RE59183CE3376BE47A",
+            "quote": "I have a few resources you can look up. They used to be books but the sizes of databases have increased so much that it is no longer feasible to print them out. They are both published by government agencies. Pretty trustworthy. https://medlineplus.gov/druginfo/herb_All.html https://www.efsa.europa.eu/en/data-report/co",
+            "adjusted_score": 3.0
+          },
+          {
+            "voc_id": "RED0B53562A6A87E73",
+            "quote": "The supplement industry made £50+ billion last year. And women in perimenopause? We're a prime target. When you're exhausted, gaining weight, struggling to sleep, and feeling like your body turned against you—you're desperate for something that might help. So you buy the magnesium. And the B-complex. And the collagen. ",
+            "adjusted_score": 2.7
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "ACCELERATING",
+        "contradiction_count": 43
+      },
+      "hook_starters": [
+        {
+          "visual": "Pharmacy aisle + “detox” shelf + receipt total",
+          "opening_line": "Stop buying a bottle of hope every month.",
+          "lever": "Cut-the-noise checklist: what’s worth it vs hype."
+        },
+        {
+          "visual": "Amazon-style book cover blurred with “AI?” stamp",
+          "opening_line": "Worried your ‘herbal’ info is influencer fluff (or AI)?",
+          "lever": "Trust signals + sourcing/quality red flags."
+        },
+        {
+          "visual": "Before/after: 12 bottles → 3 basics",
+          "opening_line": "More supplements isn’t a strategy.",
+          "lever": "Minimal ‘keep/skip’ list based on confidence."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA06",
+      "angle_name": "Home Apothecary (No Clutter)",
+      "definition": {
+        "who": "DIY wellness learners building a home apothecary/medicine cabinet but overwhelmed by what to stock (RE4EB1E0BAE25D48D6,RE36B7415375D2F348)",
+        "pain_desire": "Random purchases turn into cabinet graveyard; wants a minimal kit with multipurpose items, storage/shelf-life notes, and quick lookup for common issues. (RE5D27AA4E9F6608AA,REB9A73E67BE7608A8)",
+        "mechanism_why": "Customizable apothecary builder: shopping list, prep methods (tea/tincture/salve), labeling, rotation dates, and safety flags.",
+        "belief_shift": {
+          "before": "I need a separate product for every symptom. (RE4EB1E0BAE25D48D6,RE36B7415375D2F348)",
+          "after": "A small, multipurpose kit + a lookup system beats chaos. (RE36B7415375D2F348,RE5D27AA4E9F6608AA)"
+        },
+        "trigger": "New home/baby/season change + “what do I actually need on hand?” (RE36B7415375D2F348,RE5D27AA4E9F6608AA)"
+      },
+      "evidence": {
+        "supporting_voc_count": 122,
+        "top_quotes": [
+          {
+            "voc_id": "RE4EB1E0BAE25D48D6",
+            "quote": "If you’re building a home apothecary but you don’t know where to start, you’re in the right place!! 🏡🌱 Let’s take a moment to appreciate the beauty of home herbalism and how it can impact and serve you and your loved ones. It’s for everyone and anyone. This is for the parents who desire a safe and clean approach to",
+            "adjusted_score": 5.2
+          },
+          {
+            "voc_id": "RE36B7415375D2F348",
+            "quote": "Make your own herbal medicine cabinet! 🌱✨ Step-by-step herbal medicine cabinet guide for beginners and herbal medicine-making essentials. No confusion. No overwhelm. Just the basics you need to build a functional, easy-to-use, and practical herbal medicine cabinet at home. 🏡 ✅ What herbs should I keep on hand? ✅ What f",
+            "adjusted_score": 4.5
+          },
+          {
+            "voc_id": "RE5D27AA4E9F6608AA",
+            "quote": "What herbs should I keep in my herbal medicine cabinet? #herbalism #herbalmedicine #herbalapothecary #herbalremedies",
+            "adjusted_score": 2.0
+          },
+          {
+            "voc_id": "REB9A73E67BE7608A8",
+            "quote": "I love my home apothecary! It’s stocked with all my favorite herbs, tinctures, and remedies and it’s so beautiful. It’s so fun and relaxing to create and you don’t have to worry about going to the store as often. Comment HOME and I will send you the link!",
+            "adjusted_score": 1.2
+          },
+          {
+            "voc_id": "RE029F970F8E79FCC5",
+            "quote": "If you want to have all your remedies in one place, here are 7+ essential herbs to get you started 🌿💚",
+            "adjusted_score": 0.2
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "ACCELERATING",
+        "contradiction_count": 33
+      },
+      "hook_starters": [
+        {
+          "visual": "Messy cabinet labeled “graveyard” → labeled apothecary jars",
+          "opening_line": "If your cabinet is full, but you still don’t know what to use…",
+          "lever": "Minimal kit + quick lookup by symptom."
+        },
+        {
+          "visual": "Shopping list with only 12 items + checkboxes",
+          "opening_line": "Build a home apothecary that actually gets used.",
+          "lever": "Multipurpose core items + storage/rotation dates."
+        },
+        {
+          "visual": "Label maker + tincture dropper + “safe use” notes",
+          "opening_line": "Make it once. Label it. Know when to NOT use it.",
+          "lever": "Prep methods + contraindication flags."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA07",
+      "angle_name": "Sensitive-Reactor Guardrails",
+      "definition": {
+        "who": "People who get side effects or allergic reactions from ‘normal’ herbs/supplements (RE88F5C3D41DA21029,RE13D86C11CDD13B9A)",
+        "pain_desire": "Wants natural support but can’t risk another reaction; needs ‘start low’ steps, what to avoid, and when symptoms mean stop/seek care. Failed: self-experimenting. (RE548054D3A016DEFB,RE4782AECFFEE10AE2)",
+        "mechanism_why": "Sensitivity flags per entry + conservative titration guidance + cross-reactivity notes + clear stop-signs; customizable by known sensitivities.",
+        "belief_shift": {
+          "before": "If it’s a common herb, it can’t cause a real reaction. (RE88F5C3D41DA21029,RE13D86C11CDD13B9A)",
+          "after": "Sensitivity is real—dose/form + contraindications matter. (RE13D86C11CDD13B9A,RE548054D3A016DEFB)"
+        },
+        "trigger": "A bad reaction (itch/hives/flare) makes them afraid to try anything again (RE13D86C11CDD13B9A,RE548054D3A016DEFB)"
+      },
+      "evidence": {
+        "supporting_voc_count": 14,
+        "top_quotes": [
+          {
+            "voc_id": "RE88F5C3D41DA21029",
+            "quote": "Allergies can be sneaky, and they can show up in so many ways. From seasonal sniffles to digestive discomfort, skin irritation, and even fatigue—your immune system may be reacting to something you’re not even aware of. 🌿✨ In this video, I’m sharing a gentle, herbal approach to supporting allergies naturally. We’ll talk",
+            "adjusted_score": 2.0
+          },
+          {
+            "voc_id": "RE13D86C11CDD13B9A",
+            "quote": "Important Link- Pharmacokinetic and Pharmacodynamic- • Pharmacokinetic and Pharmacodynamic | Gene... Absorption- • Pharmacokinetic (Part 01) Absorption of Dr... Distribution- • Pharmacokinetic (Part-0) Distribution of Dr... Metabolism- • Pharmacokinetic (Part 03) Metabolism of Dr... Elimination- • Pharmacokinetic (Part",
+            "adjusted_score": 2.0
+          },
+          {
+            "voc_id": "RE548054D3A016DEFB",
+            "quote": "We all know chamomile is best known for helping sleep and calm but did you know it can also help with allergies? Such as hay fever, skin allergies and even acne! I have been drinking it to help relieve my allergies. I absolutely love it! It’s also safe for kids.",
+            "adjusted_score": 1.7
+          },
+          {
+            "voc_id": "RE4782AECFFEE10AE2",
+            "quote": "Allergies? Skin irritation? Digestive discomfort? Let’s talk about herbal support 🌿✨ If you’re dealing with seasonal allergies, itchy skin, or food sensitivities, your body may be sending signals that it needs extra support. In this video, I’m breaking down some gentle herbal remedies and supportive practices that can",
+            "adjusted_score": 1.7
+          },
+          {
+            "voc_id": "RE2CF93BC3687F6573",
+            "quote": "Tired of harsh chemicals in your daily deodorant? Say HELLO to nature’s secret weapon! 🍋✨ Did you know that a simple slice of lime can help combat underarm smell naturally? 🤯 The natural citric acid helps neutralize odor-causing bacteria right at the source! Plus, keeping a pre-sliced batch in the fridge makes for the",
+            "adjusted_score": 0.7
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "ACCELERATING",
+        "contradiction_count": 9
+      },
+      "hook_starters": [
+        {
+          "visual": "Skin hives icon + “new herb” arrow + stop sign",
+          "opening_line": "If ‘normal’ supplements keep giving you side effects…",
+          "lever": "Sensitivity guardrails: start-low + stop/seek-care signs."
+        },
+        {
+          "visual": "Checklist: “Is this a histamine trigger?”",
+          "opening_line": "Your body isn’t ‘being dramatic’—reactions happen.",
+          "lever": "Cross-reactivity notes + conservative alternatives."
+        },
+        {
+          "visual": "Measuring dropper showing tiny dose + calendar",
+          "opening_line": "The safest dose is the one you can tolerate.",
+          "lever": "Titration steps by form (tea vs tincture vs capsule)."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA08",
+      "angle_name": "Dose & Form Decoder",
+      "definition": {
+        "who": "People with tinctures/teas/capsules asking ‘how much, how often, how long?’ (RE837B3CF4C8E115F3,RE433724E80277FC97)",
+        "pain_desire": "Fear of taking too much or wasting time with too little; wants form-based dosing ranges, timing, and “if no change by X, stop” rules. Failed: guessing. (RE503FD5B628D3C164,RE5A0E3BA3700F6C39)",
+        "mechanism_why": "Form-first dosage tables (tea vs tincture vs capsule), timing windows, and personalization notes; plus ‘when to pause’ cautions.",
+        "belief_shift": {
+          "before": "Directions online are universal for everyone. (RE837B3CF4C8E115F3,RE433724E80277FC97)",
+          "after": "Dose depends on form + goal + your context—use a table, not comments. (RE433724E80277FC97,RE503FD5B628D3C164)"
+        },
+        "trigger": "Bought a tincture or tea blend but labels + online advice are vague/contradictory (RE433724E80277FC97,RE503FD5B628D3C164)"
+      },
+      "evidence": {
+        "supporting_voc_count": 12,
+        "top_quotes": [
+          {
+            "voc_id": "RE837B3CF4C8E115F3",
+            "quote": "Which Teas are safe in pregnancy? 5 Pregnancy Safe Teas | Craving for soothing and comforting aromatic tea? But worried if it is safe to drink herbal teas ... safe in pregnancy, as we are concerned on ...Read more | Is Hrt Safe? + HRT at 50: How It Works & What to Expect - Evernow ... to say that other herbal remedies",
+            "adjusted_score": 2.2
+          },
+          {
+            "voc_id": "RE433724E80277FC97",
+            "quote": "The proper way to take tinctures 💧 I get asked this question all the time, so hopefully this helps! #herbalist #herbalmedicine #herbalism #tincture #herbalremedy #herbalremedies #healthtips #wellnesstips",
+            "adjusted_score": 0.7
+          },
+          {
+            "voc_id": "RE503FD5B628D3C164",
+            "quote": "How much tincture do I take? 🧐 This is one of the most common questions I get as an herbalist. Check the comments for my answers! #tincture #herbalism #herbalmedicine #herbalist #holistichealth #naturalmedicine",
+            "adjusted_score": 0.7
+          },
+          {
+            "voc_id": "RE5A0E3BA3700F6C39",
+            "quote": "How to dose tinctures? #herbalism #herbalist #tincture #naturalremedies #plantmedicine #herbalmedicine",
+            "adjusted_score": -0.3
+          },
+          {
+            "voc_id": "RE71428049EDAF2DCF",
+            "quote": "How much tincture do I take? #herbalism #herbalist #tincture #herbalmedicine",
+            "adjusted_score": -0.3
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "ACCELERATING",
+        "contradiction_count": 5
+      },
+      "hook_starters": [
+        {
+          "visual": "Tincture bottle label zoom + “How many drops?”",
+          "opening_line": "Bought a tincture… and now you’re stuck on dosing.",
+          "lever": "Form-first dosage tables + timing windows."
+        },
+        {
+          "visual": "Three columns: tea / tincture / capsule",
+          "opening_line": "Same herb. Different form. Different dose.",
+          "lever": "Convert ‘folk advice’ into usable ranges."
+        },
+        {
+          "visual": "Sticky note: “If no change by day X…”",
+          "opening_line": "Not sure when to stop or switch?",
+          "lever": "Simple duration rules + caution flags."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA09",
+      "angle_name": "Herbal First-Aid (Realistic)",
+      "definition": {
+        "who": "Hikers/campers/parents who want herbal first-aid options in their kit—not doomsday prepping (RE566BED03B45D2E72,RED829431832977082)",
+        "pain_desire": "Not sure what belongs in an herbal kit or what’s unsafe; wants a small ‘field-tested’ list + clear limits on when to seek medical help. (RE73BF9901699E0B4F,REB8FAAD87C331E689)",
+        "mechanism_why": "First-aid module: kit checklist, quick recipes, storage, and ‘do not use / get stitches / urgent care’ thresholds; customizable by trip type.",
+        "belief_shift": {
+          "before": "An herbal kit should replace modern first aid. (RE566BED03B45D2E72,RED829431832977082)",
+          "after": "Herbal + modern together, with clear escalation rules. (RED829431832977082,RE73BF9901699E0B4F)"
+        },
+        "trigger": "Trip/storm season + realizing you might be far from care; want confidence for common cuts/bumps (RED829431832977082,RE73BF9901699E0B4F)"
+      },
+      "evidence": {
+        "supporting_voc_count": 21,
+        "top_quotes": [
+          {
+            "voc_id": "RE566BED03B45D2E72",
+            "quote": "🌲 Adventure is unpredictable. Are you ready when things don’t go as planned? When you’re miles away from the nearest clinic, knowing Wilderness First Aid could make all the difference. 🏕️ Learn how to: ✔️ Care for common outdoor injuries & illnesses ✔️ Respond to emergencies with confidence ✔️ Use both modern & herbal",
+            "adjusted_score": 3.2
+          },
+          {
+            "voc_id": "RED829431832977082",
+            "quote": "There are so many delicious smells wafting in my garden at present and Chamomile is one of them. . Chamomile is so quick and easy to grow with many medicinal benefits. Chamomile goodness I’m currently making… ~ Chamomile infused oil for my baby products. ~ Chamomile infused lollipops ~ Chamomile infused honey ~ Chamom",
+            "adjusted_score": 2.5
+          },
+          {
+            "voc_id": "RE73BF9901699E0B4F",
+            "quote": "“The Illustrated Forager's Harvest Guide: Foraging for Edible Wild Plants, Mushrooms and Insects for Self-Sufficiency and Survival” is one. It has numerous errors, but the worst: An image of what looks like POISON HEMLOCK is identified as yarrow. This information could easily kill someone. Use caution with herbal reso",
+            "adjusted_score": 2.0
+          },
+          {
+            "voc_id": "REB8FAAD87C331E689",
+            "quote": "The 5-Day Core Basic is coming up, March, 2020 at The Human Path. Primitive skills, knots, foraging, herbal first aid, wilderness medicine, self-defense, tactics, reconnaissance, camp cooking, teamwork, mission planning and much more! More information at http://thehumanpath.com",
+            "adjusted_score": 1.0
+          },
+          {
+            "voc_id": "REF18062689181339D",
+            "quote": "🌿First Aid Herbal Powder🌿 . This herbal styptic powder is a must have in your first aid kit and home apothecary. A soothing blend of Yarrow, Plantain and Neem, it helps to stop wound bleeding, encourages healing, preventing infection with its anti-bacterial, anti-inflammatory and anti-fungal properties. It can be used",
+            "adjusted_score": 0.0
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "STEADY",
+        "contradiction_count": 8
+      },
+      "hook_starters": [
+        {
+          "visual": "Daypack dump: bandages + herbs + checklist",
+          "opening_line": "Want herbal first-aid—but still be realistic?",
+          "lever": "Kit checklist + clear limits + when to seek care."
+        },
+        {
+          "visual": "Trail map + “miles from clinic” + calm plan",
+          "opening_line": "When you’re far from help, confidence beats panic.",
+          "lever": "Modern + herbal together, with escalation rules."
+        },
+        {
+          "visual": "Small tin labeled “field kit” with 6 items",
+          "opening_line": "Skip the doomsday kit. Build the ‘actually useful’ kit.",
+          "lever": "Multipurpose herbs + storage + quick recipes."
+        }
+      ]
+    },
+    {
+      "angle_id": "POA10",
+      "angle_name": "Skin & Gut ‘Small Fixes’",
+      "definition": {
+        "who": "People dealing with recurring rashes/eczema/acne or nausea/GERD who want gentler options (RE022EC008C04F1182,RE674ABD33E74A685B)",
+        "pain_desire": "Trial-and-error products waste money; wants simple first steps (topical/tea), patch-test notes, and ‘stop/seek care’ red flags. Enemy: ‘stack culture’. (RE0A28577CF2722392,RE8158D16C02C98ECB)",
+        "mechanism_why": "Symptom quick pages: simplest topical/tea options, contraindication flags, and step-up ladder; customizable by sensitivity and meds.",
+        "belief_shift": {
+          "before": "Natural care means a long, complicated protocol. (RE022EC008C04F1182,RE674ABD33E74A685B)",
+          "after": "Start with the simplest safe option + clear stop rules. (RE674ABD33E74A685B,RE0A28577CF2722392)"
+        },
+        "trigger": "Flare-up hits + they don’t want a 12-supplement protocol or harsh meds (RE674ABD33E74A685B,RE0A28577CF2722392)"
+      },
+      "evidence": {
+        "supporting_voc_count": 71,
+        "top_quotes": [
+          {
+            "voc_id": "RE022EC008C04F1182",
+            "quote": "We actually started Iwilla Remedy with herbal body care. Who remembers our I Love My Armpits deodorant? To his day, my aunt still texts me — upset — that we stopped making our Skin Spirit face oil. I am so honored by how many people have loved our herbal body care. There is so much intention and integrity in each one. ",
+            "adjusted_score": 3.0
+          },
+          {
+            "voc_id": "RE674ABD33E74A685B",
+            "quote": "Give me painkillers now please! This is the worst pain I’ve ever had. I’m a wimp but I feel like I’m not. Holy cow. I can’t even type. I have endo and I’ve never felt this much pain. It’s in my stomach / pelvic area and I’m having diarrhea. I can’t even walk and my kids are crying. I took pepto. I took garlic and",
+            "adjusted_score": 3.0
+          },
+          {
+            "voc_id": "RE0A28577CF2722392",
+            "quote": "What can I use for my eczema? 😩 Here's a few suggestions: If your eczema is weeping or inflamed, use: ⚪️ white clay (kaolin) 💛 turmeric powder 🌾 rolled oats If your eczema is dry/flaky, use: 🌿 olive oil 🥥 coconut oil 🌾 oat flour #eczema #eczemarelief #eczemaawareness #naturalremedies #plantmedicine #holistichealth",
+            "adjusted_score": 1.2
+          },
+          {
+            "voc_id": "RE8158D16C02C98ECB",
+            "quote": "Peppermint tea is a game-changer for stomach issues! 🌿 It’s known for its soothing properties and can help relieve nausea and indigestion. Plus, it’s super refreshing! 😌✨",
+            "adjusted_score": 0.2
+          },
+          {
+            "voc_id": "RE18E0B96D023BF727",
+            "quote": "Ask The Herbalist - Calming (and Healing) Herb For the Gut! #natural #herbalism #guthealth #herbalremedies #healing #gut",
+            "adjusted_score": -0.3
+          }
+        ],
+        "triangulation_status": "MULTI",
+        "velocity_status": "ACCELERATING",
+        "contradiction_count": 28
+      },
+      "hook_starters": [
+        {
+          "visual": "Eczema flare photo blurred + “start here” ladder",
+          "opening_line": "For flare-ups, you don’t need a 12-step protocol.",
+          "lever": "Simplest safe topical/tea first + step-up ladder."
+        },
+        {
+          "visual": "Price tags on 5 skincare products crossed out",
+          "opening_line": "Tired of buying products that don’t help?",
+          "lever": "Evidence-graded options + patch-test notes."
+        },
+        {
+          "visual": "Stomach icon + mug of tea + “what to try first” card",
+          "opening_line": "When your gut is off, start gentle.",
+          "lever": "Simple tea options + contraindication flags."
+        }
+      ]
+    }
+  ]
+}

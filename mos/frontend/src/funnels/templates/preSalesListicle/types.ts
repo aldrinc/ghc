@@ -1,7 +1,10 @@
+import type { FooterLink, PaymentIconKey } from "../shared/footerTypes"
+
 export type ImageAsset = {
   src: string
   alt: string
   assetPublicId?: string
+  referenceAssetPublicId?: string
 }
 
 export type FunnelLink = {
@@ -14,6 +17,7 @@ export type Badge = {
   iconSrc: string
   iconAlt: string
   iconAssetPublicId?: string
+  referenceAssetPublicId?: string
   value?: string
   label: string
 }
@@ -24,6 +28,7 @@ export type HeroMedia =
       src: string
       alt: string
       assetPublicId?: string
+      referenceAssetPublicId?: string
     }
   | {
       type: 'video'
@@ -82,6 +87,9 @@ export type ReviewsWall = {
 
 export type Footer = {
   logo: ImageAsset
+  copyright?: string
+  links?: FooterLink[]
+  paymentIcons?: PaymentIconKey[]
 }
 
 export type FloatingCta = {
@@ -105,7 +113,7 @@ export type ListicleConfig = {
   reasons: Reason[]
   marquee: string[]
   pitch: Pitch
-  reviews: Reviews
+  reviews?: Reviews
   reviewsWall: ReviewsWall
   footer: Footer
   floatingCta: FloatingCta

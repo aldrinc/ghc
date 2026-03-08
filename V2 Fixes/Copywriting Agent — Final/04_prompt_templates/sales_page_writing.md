@@ -3,6 +3,14 @@
 ## When to Use
 When writing a sales page (the page that receives traffic from a presell advertorial and converts to purchase). Builds beliefs B5-B8.
 
+## Strategy V2 Runtime Contract Override (Mandatory)
+When this prompt is executed by `strategy_v2.run_copy_pipeline`, follow this output contract and ignore any alternate architecture format:
+
+- Return exactly one JSON object with keys `markdown` and `template_payload_json`.
+- `template_payload_json` must be a JSON-serialized object string (no markdown code fences).
+- `template_payload_json` top-level keys must be exactly: `hero`, `problem`, `mechanism`, `social_proof`, `whats_inside`, `bonus`, `guarantee`, `faq`, `faq_pills`, `marquee_items`, `urgency_message`, `cta_close`.
+- Do not emit alternative schema keys such as: `schema`, `template_id`, `product_name`, `product_subtitle`, `problem_recap`, `cta_primary`, `pricing`, `legal_disclaimer`.
+
 ## Required Inputs
 
 | Input | Source | Required? |
@@ -97,3 +105,14 @@ python3 03_scorers/headline_body_congruency.py sales_page.md promise_contract.js
 - **Markdown (.md)** — for copy review and scorer input
 - **Word doc (.docx)** — for Google Drive review (use python-docx)
 - **JSON (.json)** — if using PDP schema architecture (Option B)
+
+## Purchase-Module Bullet Style
+For the 4 checkmark bullets under the purchase title:
+
+- Write exactly 4 bullets.
+- Make each bullet outcome-based, one-bite, and action-focused.
+- Keep each bullet to 2-6 words.
+- Emphasize the result, ease, or friction removed, not the internal asset name.
+- Do not end bullets on feature labels such as workflow, guide, reference, checklist, worksheet, pages, notes, prompts, or scripts.
+- Do not use parentheses, arrows, colons, or explanatory clauses.
+- Preferred style: `Ask Better Questions`, `Spot Red Flags Fast`, `Check Interactions First`, `Feel Safer Starting`.

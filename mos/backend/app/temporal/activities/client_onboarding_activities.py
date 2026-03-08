@@ -293,6 +293,12 @@ def build_design_system_activity(params: Dict[str, Any]) -> Dict[str, Any]:
                     if isinstance(key, str) and isinstance(value, str) and key.strip() and value.strip():
                         step_summaries[key.strip()] = value.strip()
 
+        product_category = (
+            str(payload_data.get("product_category") or "").strip()
+            if isinstance(payload_data.get("product_category"), str)
+            else ""
+        )
+
         gen_ctx = DesignSystemGenerationContext(
             org_id=org_id,
             client_id=client_id,
@@ -302,7 +308,7 @@ def build_design_system_activity(params: Dict[str, Any]) -> Dict[str, Any]:
             brand_story=brand_story.strip(),
             product_name=str(product.title),
             product_description=str(product.description) if product.description else None,
-            product_category=str(product.product_type) if product.product_type else None,
+            product_category=product_category or (str(product.product_type) if product.product_type else None),
             primary_benefits=list(product.primary_benefits or []),
             feature_bullets=list(product.feature_bullets or []),
             guarantee_text=str(product.guarantee_text) if product.guarantee_text else None,

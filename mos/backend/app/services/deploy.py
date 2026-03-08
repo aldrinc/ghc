@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import copy
 import hashlib
 import io
 import json
@@ -18,6 +19,7 @@ from uuid import UUID, uuid4
 import httpx
 
 from app.config import settings
+from app.services.funnel_metadata import build_public_page_metadata_for_context
 from app.services import namecheap_dns as namecheap_dns_service
 
 
@@ -549,6 +551,211 @@ def _walk_json_dicts(node: Any):
             yield from _walk_json_dicts(item)
 
 
+def _resolve_design_system_brand_logo_override(
+    *,
+    design_system_tokens: dict[str, Any] | None,
+) -> tuple[str, str | None] | None:
+    if not isinstance(design_system_tokens, dict):
+        return None
+    brand = design_system_tokens.get("brand")
+    if not isinstance(brand, dict):
+        return None
+
+    raw_asset_public_id = brand.get("logoAssetPublicId")
+    if not isinstance(raw_asset_public_id, str) or not raw_asset_public_id.strip():
+        return None
+    asset_public_id = raw_asset_public_id.strip()
+
+    alt: str | None = None
+    raw_logo_alt = brand.get("logoAlt")
+    if isinstance(raw_logo_alt, str) and raw_logo_alt.strip():
+        alt = raw_logo_alt.strip()
+    else:
+        raw_brand_name = brand.get("name")
+        if isinstance(raw_brand_name, str) and raw_brand_name.strip():
+            alt = raw_brand_name.strip()
+
+    return asset_public_id, alt
+
+
+def _parse_json_object_string(raw_value: Any) -> dict[str, Any] | None:
+    if not isinstance(raw_value, str) or not raw_value.strip():
+        return None
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    return parsed
+
+
+def _apply_brand_logo_override_to_logo_node(
+    logo_node: Any,
+    *,
+    asset_public_id: str,
+    alt: str | None,
+) -> bool:
+    if not isinstance(logo_node, dict):
+        return False
+
+    changed = False
+    if logo_node.get("assetPublicId") != asset_public_id:
+        logo_node["assetPublicId"] = asset_public_id
+        changed = True
+
+    if "referenceAssetPublicId" in logo_node:
+        logo_node.pop("referenceAssetPublicId", None)
+        changed = True
+
+    if alt and logo_node.get("alt") != alt:
+        logo_node["alt"] = alt
+        changed = True
+
+    return changed
+
+
+def _apply_brand_logo_override_to_path(
+    root: Any,
+    *,
+    path: tuple[str, ...],
+    asset_public_id: str,
+    alt: str | None,
+) -> bool:
+    node = root
+    for segment in path:
+        if not isinstance(node, dict):
+            return False
+        node = node.get(segment)
+    return _apply_brand_logo_override_to_logo_node(
+        node,
+        asset_public_id=asset_public_id,
+        alt=alt,
+    )
+
+
+def _materialize_design_system_brand_logo_in_puck_data(
+    *,
+    puck_data: dict[str, Any],
+    design_system_tokens: dict[str, Any] | None,
+) -> dict[str, Any]:
+    override = _resolve_design_system_brand_logo_override(design_system_tokens=design_system_tokens)
+    if override is None:
+        return puck_data
+
+    asset_public_id, alt = override
+    cloned = copy.deepcopy(puck_data)
+
+    def walk(node: Any) -> None:
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        block_type = node.get("type")
+        props = node.get("props")
+        if isinstance(block_type, str) and isinstance(props, dict):
+            config = props.get("config")
+            if isinstance(config, dict):
+                if block_type == "SalesPdpHeader":
+                    _apply_brand_logo_override_to_path(
+                        config,
+                        path=("logo",),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                elif block_type == "SalesPdpHero":
+                    _apply_brand_logo_override_to_path(
+                        config,
+                        path=("header", "logo"),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                elif block_type in {"SalesPdpFooter", "PreSalesFooter"}:
+                    _apply_brand_logo_override_to_path(
+                        config,
+                        path=("logo",),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                elif block_type == "SalesPdpTemplate":
+                    _apply_brand_logo_override_to_path(
+                        config,
+                        path=("hero", "header", "logo"),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                    _apply_brand_logo_override_to_path(
+                        config,
+                        path=("footer", "logo"),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                elif block_type == "PreSalesTemplate":
+                    _apply_brand_logo_override_to_path(
+                        config,
+                        path=("footer", "logo"),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+
+            parsed_config_json = _parse_json_object_string(props.get("configJson"))
+            if parsed_config_json is not None:
+                changed_json = False
+                if block_type == "SalesPdpHeader":
+                    changed_json = _apply_brand_logo_override_to_path(
+                        parsed_config_json,
+                        path=("logo",),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                elif block_type == "SalesPdpHero":
+                    changed_json = _apply_brand_logo_override_to_path(
+                        parsed_config_json,
+                        path=("header", "logo"),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                elif block_type in {"SalesPdpFooter", "PreSalesFooter"}:
+                    changed_json = _apply_brand_logo_override_to_path(
+                        parsed_config_json,
+                        path=("logo",),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                elif block_type == "SalesPdpTemplate":
+                    changed_json = _apply_brand_logo_override_to_path(
+                        parsed_config_json,
+                        path=("hero", "header", "logo"),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                    changed_json |= _apply_brand_logo_override_to_path(
+                        parsed_config_json,
+                        path=("footer", "logo"),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+                elif block_type == "PreSalesTemplate":
+                    changed_json = _apply_brand_logo_override_to_path(
+                        parsed_config_json,
+                        path=("footer", "logo"),
+                        asset_public_id=asset_public_id,
+                        alt=alt,
+                    )
+
+                if changed_json:
+                    props["configJson"] = json.dumps(parsed_config_json, ensure_ascii=False)
+
+        for value in node.values():
+            walk(value)
+
+    walk(cloned)
+    return cloned
+
+
 def _extract_public_asset_id_from_url(raw_value: str) -> str | None:
     value = str(raw_value or "").strip()
     if not value:
@@ -921,11 +1128,22 @@ def build_client_funnel_runtime_artifact_payload(
                 funnel=client_funnel,
                 page=page,
             )
+            materialized_puck_data = _materialize_design_system_brand_logo_in_puck_data(
+                puck_data=version.puck_data,
+                design_system_tokens=tokens if isinstance(tokens, dict) else None,
+            )
+            metadata = build_public_page_metadata_for_context(
+                session=session,
+                org_id=str(client_funnel.org_id),
+                funnel=client_funnel,
+                page=page,
+                puck_data=version.puck_data,
+            )
             page_context_label = (
                 f"Funnel '{client_funnel.id}' page '{page_id}' ({product_slug}/{route_slug}/{artifact_slug})"
             )
             page_asset_public_ids = _extract_embedded_asset_public_ids(
-                puck_data=version.puck_data,
+                puck_data=materialized_puck_data,
                 design_system_tokens=tokens if isinstance(tokens, dict) else None,
                 context_label=page_context_label,
             )
@@ -937,9 +1155,10 @@ def build_client_funnel_runtime_artifact_payload(
                 "publicationId": active_publication_id,
                 "pageId": page_id,
                 "slug": artifact_slug,
-                "puckData": version.puck_data,
+                "puckData": materialized_puck_data,
                 "pageMap": page_map,
                 "designSystemTokens": tokens,
+                "metadata": metadata,
                 "nextPageId": str(page.next_page_id) if page and page.next_page_id else None,
             }
 

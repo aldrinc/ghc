@@ -142,6 +142,7 @@ from app.services.shopify_theme_copy_agent import (
 from app.services.shopify_theme_content_planner import (
     plan_shopify_theme_component_content,
 )
+from app.services.product_types import canonical_product_type
 from app.testimonial_renderer.renderer import ThreadedTestimonialRenderer
 from app.testimonial_renderer.validate import TestimonialRenderError
 from app.strategy_v2.downstream import require_strategy_v2_outputs_if_enabled
@@ -4889,7 +4890,12 @@ def _prepare_shopify_theme_template_build_data(
     quota_exhausted_slot_paths: list[str] = []
     slot_error_by_path: dict[str, str] = {}
     product_reference_image: dict[str, Any] | None = None
-    if requested_product_id and resolved_product is not None and planner_image_slots:
+    if (
+        requested_product_id
+        and resolved_product is not None
+        and planner_image_slots
+        and _is_gemini_image_references_enabled()
+    ):
         product_reference_image = _resolve_theme_sync_product_reference_image(
             session=session,
             org_id=auth.org_id,
@@ -6341,12 +6347,14 @@ def _generate_shopify_theme_template_draft_images(
             )
             effective_general_context = default_general_context
             effective_slot_context_by_path = dict(default_slot_context_by_path)
-            product_reference_image = _resolve_theme_sync_product_reference_image(
-                session=session,
-                org_id=auth.org_id,
-                client_id=client_id,
-                product=resolved_product,
-            )
+            product_reference_image: dict[str, Any] | None = None
+            if _is_gemini_image_references_enabled():
+                product_reference_image = _resolve_theme_sync_product_reference_image(
+                    session=session,
+                    org_id=auth.org_id,
+                    client_id=client_id,
+                    product=resolved_product,
+                )
 
             _emit_theme_sync_progress(
                 {
@@ -6384,10 +6392,18 @@ def _generate_shopify_theme_template_draft_images(
                 slot_prompt_context_by_path=effective_slot_context_by_path,
                 max_concurrency=image_generation_max_concurrency,
                 stop_on_quota_exhausted=True,
-                reference_image_bytes=product_reference_image["imageBytes"],
-                reference_image_mime_type=product_reference_image["mimeType"],
-                reference_asset_public_id=product_reference_image["assetPublicId"],
-                reference_asset_id=product_reference_image["assetId"],
+                reference_image_bytes=(
+                    product_reference_image["imageBytes"] if product_reference_image else None
+                ),
+                reference_image_mime_type=(
+                    product_reference_image["mimeType"] if product_reference_image else None
+                ),
+                reference_asset_public_id=(
+                    product_reference_image["assetPublicId"] if product_reference_image else None
+                ),
+                reference_asset_id=(
+                    product_reference_image["assetId"] if product_reference_image else None
+                ),
             )
             rate_limited_slot_paths = sorted(
                 {
@@ -9831,8 +9847,13 @@ async def start_client_onboarding(
     product_fields: dict[str, object] = {"title": payload.product_name}
     if payload.product_description is not None:
         product_fields["description"] = payload.product_description
-    if payload.product_category is not None:
-        product_fields["product_type"] = payload.product_category
+    normalized_product_type = canonical_product_type(payload.product_type)
+    if not normalized_product_type:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="product_type is required.",
+        )
+    product_fields["product_type"] = normalized_product_type
     if payload.primary_benefits is not None:
         product_fields["primary_benefits"] = payload.primary_benefits
     if payload.feature_bullets is not None:
@@ -9867,6 +9888,7 @@ async def start_client_onboarding(
     )
 
     payload_data = payload.model_dump()
+    payload_data["product_type"] = normalized_product_type
     payload_data["product_id"] = str(product.id)
     payload_data["default_offer_id"] = str(default_offer.id)
 

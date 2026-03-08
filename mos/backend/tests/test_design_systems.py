@@ -4,13 +4,40 @@ from uuid import uuid4
 from fastapi.testclient import TestClient
 
 from app.db.enums import AssetSourceEnum, AssetStatusEnum
-from app.db.models import Asset
+from app.db.models import Asset, DesignSystem
 from app.routers import design_systems as design_systems_router
 from app.services.design_system_generation import load_base_tokens_template
 
 
 def _base_tokens() -> dict:
     return deepcopy(load_base_tokens_template())
+
+
+def _legacy_partial_tokens() -> dict:
+    tokens = _base_tokens()
+    return {
+        "dataTheme": tokens["dataTheme"],
+        "fontUrls": tokens["fontUrls"],
+        "fontCss": tokens.get("fontCss"),
+        "cssVars": {
+            "--color-page-bg": tokens["cssVars"]["--color-page-bg"],
+            "--color-bg": tokens["cssVars"]["--color-bg"],
+            "--color-brand": tokens["cssVars"]["--color-brand"],
+            "--color-text": tokens["cssVars"]["--color-text"],
+            "--color-cta": tokens["cssVars"]["--color-cta"],
+            "--color-cta-text": tokens["cssVars"]["--color-cta-text"],
+            "--color-cta-shell": tokens["cssVars"]["--color-cta-shell"],
+            "--color-cta-icon": tokens["cssVars"]["--color-cta-icon"],
+            "--hero-bg": tokens["cssVars"]["--hero-bg"],
+            "--pitch-bg": tokens["cssVars"]["--pitch-bg"],
+        },
+        "funnelDefaults": tokens["funnelDefaults"],
+        "brand": {
+            "name": "Legacy Brand",
+            "logoAssetPublicId": str(uuid4()),
+            "logoAlt": "Legacy Brand logo",
+        },
+    }
 
 
 def test_first_design_system_sets_client_default(api_client: TestClient):
@@ -126,6 +153,32 @@ def test_update_design_system_allows_layout_token_updates(api_client: TestClient
     assert update_resp.status_code == 200
 
 
+def test_update_design_system_materializes_missing_template_keys(api_client: TestClient):
+    client_resp = api_client.post(
+        "/clients", json={"name": "Design System Client", "industry": "SaaS"}
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    create_resp = api_client.post(
+        "/design-systems",
+        json={"name": "Valid DS", "tokens": _base_tokens(), "clientId": client_id},
+    )
+    assert create_resp.status_code == 201
+    design_system_id = create_resp.json()["id"]
+
+    legacy_tokens = _legacy_partial_tokens()
+    update_resp = api_client.patch(
+        f"/design-systems/{design_system_id}",
+        json={"tokens": legacy_tokens},
+    )
+    assert update_resp.status_code == 200
+    body = update_resp.json()
+    assert body["tokens"]["cssVars"]["--color-brand"] == legacy_tokens["cssVars"]["--color-brand"]
+    assert "--badge-icon-size" in body["tokens"]["cssVars"]
+    assert body["tokens"]["brand"]["logoAssetPublicId"] == legacy_tokens["brand"]["logoAssetPublicId"]
+
+
 def test_upload_design_system_logo_updates_brand_logo_token(api_client: TestClient, monkeypatch):
     client_resp = api_client.post(
         "/clients", json={"name": "Design System Client", "industry": "SaaS"}
@@ -191,6 +244,82 @@ def test_upload_design_system_logo_updates_brand_logo_token(api_client: TestClie
     assert body["publicId"] == str(fake_public_id)
     assert body["url"] == f"/public/assets/{fake_public_id}"
     assert body["designSystem"]["tokens"]["brand"]["logoAssetPublicId"] == str(fake_public_id)
+
+
+def test_upload_design_system_logo_updates_legacy_partial_tokens(
+    api_client: TestClient,
+    db_session,
+    monkeypatch,
+):
+    client_resp = api_client.post(
+        "/clients", json={"name": "Design System Client", "industry": "SaaS"}
+    )
+    assert client_resp.status_code == 201
+    client_id = client_resp.json()["id"]
+
+    create_resp = api_client.post(
+        "/design-systems",
+        json={"name": "Valid DS", "tokens": _base_tokens(), "clientId": client_id},
+    )
+    assert create_resp.status_code == 201
+    design_system_id = create_resp.json()["id"]
+
+    design_system = db_session.get(DesignSystem, design_system_id)
+    assert design_system is not None
+    design_system.tokens = _legacy_partial_tokens()
+    db_session.commit()
+
+    fake_public_id = uuid4()
+
+    def _fake_upload(
+        *,
+        session,
+        org_id: str,
+        client_id: str,
+        content_bytes: bytes,
+        filename: str | None,
+        content_type: str,
+        tags: list[str] | None = None,
+        alt: str | None = None,
+    ):
+        _ = content_bytes
+        _ = filename
+        asset = Asset(
+            org_id=org_id,
+            client_id=client_id,
+            source_type=AssetSourceEnum.upload,
+            status=AssetStatusEnum.approved,
+            asset_kind="image",
+            channel_id="brand",
+            format="image",
+            content={},
+            public_id=fake_public_id,
+            storage_key="assets/fake-logo.png",
+            content_type=content_type,
+            size_bytes=123,
+            width=128,
+            height=48,
+            alt=alt,
+            file_source="upload",
+            file_status="ready",
+            tags=tags or [],
+        )
+        session.add(asset)
+        session.commit()
+        session.refresh(asset)
+        return asset
+
+    monkeypatch.setattr(design_systems_router, "create_client_logo_upload_asset", _fake_upload)
+
+    upload_resp = api_client.post(
+        f"/design-systems/{design_system_id}/logo",
+        files=[("file", ("logo.png", b"fake-image-bytes", "image/png"))],
+    )
+    assert upload_resp.status_code == 201
+    body = upload_resp.json()
+    assert body["publicId"] == str(fake_public_id)
+    assert body["designSystem"]["tokens"]["brand"]["logoAssetPublicId"] == str(fake_public_id)
+    assert "--badge-icon-size" in body["designSystem"]["tokens"]["cssVars"]
 
 
 def test_upload_design_system_logo_rejects_unsupported_file_type(api_client: TestClient):

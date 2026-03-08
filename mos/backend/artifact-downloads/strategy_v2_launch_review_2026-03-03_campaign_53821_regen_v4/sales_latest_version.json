@@ -1,0 +1,1389 @@
+{
+  "page": {
+    "id": "e55263fe-a957-47fd-9cd3-920f5dda0091",
+    "name": "Sales",
+    "slug": "sales",
+    "template_id": "sales-pdp",
+    "review_status": "review"
+  },
+  "latest_version": {
+    "id": "ec795a1c-6451-4434-8053-a77fb0c72ed7",
+    "source": "ai",
+    "status": "draft",
+    "created_at": "2026-03-03T17:34:39.410222+00:00"
+  },
+  "copy_text_samples": [
+    "The Honest Herbalist Handbook — Sales Page",
+    "A safety-first, quick-reference way to choose a gentle calming herb option after gabapentin or HRT made your anxiety worse — without guessing.",
+    "SalesPdpPage",
+    "sales-pdp-page",
+    "top",
+    "SalesPdpHeader",
+    "sales-pdp-header",
+    "#offer",
+    "Yes, I want the safety-screened handbook →",
+    "#how-it-works",
+    "How It Works",
+    "#guarantee",
+    "Guarantee",
+    "#faq",
+    "FAQ",
+    "#reviews",
+    "Reviews",
+    "The Honest Herbalist - Clinical Grade Botanicals",
+    "#top",
+    "74772eba-9822-424e-a260-92a92095fd0f",
+    "SalesPdpHero",
+    "sales-pdp-hero",
+    "Close dialog",
+    "Dialog window",
+    "{rating} out of five stars",
+    "Review navigation",
+    "Customer reviews",
+    "Next review",
+    "Previous review",
+    "Go to review {index}",
+    "Verified",
+    "The Honest Herbalist Handbook — Anxiety-After-Meds/HRT Quick-Reference Edition cover",
+    "Flat-lay product shot of a clean, modern wellness handbook titled The Honest Herbalist Handbook on a light linen surface with a few dried botanical sprigs nearby. Soft natural light, calm and trustworthy aesthetic.",
+    "ai",
+    "6ea833db-9a77-4131-87ea-5b6b2251b35d",
+    "Contraindication Quick-Scan Tables inside the handbook — Green Yellow Red flag system",
+    "Close-up of an open reference handbook showing a clean color-coded table with green, yellow, and red flag columns. Minimalist design, soft natural light, wellness aesthetic. No faces.",
+    "Person calmly reviewing a printed herb safety checklist at a kitchen table",
+    "A calm woman in her 40s sitting at a bright kitchen table reviewing a printed checklist with a cup of herbal tea nearby. Soft morning light, relaxed and reassured expression. Lifestyle wellness photography.",
+    "unsplash",
+    "Patch/Pill Change Tracker log sheet — simple pattern-spotting tool",
+    "Flat-lay of a simple wellness tracking log sheet on a white desk with a pen and a small plant. Clean, minimal, organized aesthetic. No faces.",
+    "Med/HRT Conversation Pack — printable questions for your next appointment",
+    "Flat-lay of a printed one-page checklist titled 'Questions for My Next Appointment' on a clipboard, with a pen and a small succulent. Bright, clean, clinical-meets-wellness aesthetic.",
+    "Wallet-size safety cards PDF — quick herb lookup cues",
+    "Flat-lay of small printed wallet-size reference cards fanned out on a white surface. Clean, minimal design with subtle green accents. Wellness and safety aesthetic.",
+    "Bonus #1: 'Is It Safe?' Printable Quick-Scan Sheets — 1-page summaries from the Contraindication Tables. Bonus #2: Med/HRT Conversation Pack — what to track and what to say at your next appointment. Bonus #3: 'Common Interaction Tripwires' Checklist — sedating herbs, alcohol, and common anxiety/sleep meds. Bonus #4: Patch/Pill Change Tracker — spot patterns after a med or hormone change. All included free today.",
+    "Four Free Bonuses Included With Your Order",
+    "Preview Bonuses",
+    "Free bonus gifts included with the handbook",
+    "High-quality flat design icon of a gift box with a botanical leaf accent. Minimalist vector style with subtle depth. Clean thick lines, soft pastel colors, flat lighting with a very subtle long shadow to add dimension. Full-bleed composition where the icon symbol occupies nearly the entire frame with minimal padding. Do not place the icon inside a badge, circle, tile, button, sticker, or any container shape. Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.",
+    "SEE INSIDE THE HANDBOOK",
+    "The Honest Herbalist Handbook — Anxiety-After-Meds/HRT Quick-Reference Edition",
+    "We are selling out more than expected. Order now before we run out again.",
+    "muted",
+    "FEBRUARY",
+    "Sold Out (4,780 The Honest Herbalist Handbooks Were Sold)",
+    "highlight",
+    "MARCH",
+    "99% Sold (5,346 out of 5,400 The Honest Herbalist Handbooks)",
+    "Edition:",
+    "What's included?",
+    "__default_size",
+    "Quick-Reference Edition",
+    "Instant Download",
+    "Digital PDF",
+    "Format:",
+    "Please check back soon.",
+    "Currently unavailable.",
+    "__default_color",
+    "#4A7C59",
+    "Your Order:",
+    "Everything is designed to be used in under five minutes. Look up your situation, run the Quick-Scan, check the flags, make a more informed decision. Educational reference only — not medical advice.",
+    "See what's included →",
+    "variant_a",
+    "The Honest Herbalist Handbook + All Four Bonuses",
+    "Package option product image. Use the referenced product image as the exact same product identity, materials, colorway, and branding. Show the product clearly and only vary quantity/composition for this offer. Offer: the honest herbalist handbook + all four bonuses. Do not include any text, words, letters, numbers, captions, labels, logos, watermarks, signatures, or UI elements anywhere in the image.",
+    "Symptom-to-options index organized by your situation, not just by plant",
+    "Contraindication Quick-Scan Tables — Green/Yellow/Red flag system built into every herb entry",
+    "Conservative dosage guidance adjusted for post-medication and post-HRT contexts",
+    "'When to avoid' plain-language notes including specific drug classes (gabapentin, benzodiazepines, SSRIs, HRT)",
+    "'When to seek care' triage guidance — know when herbs aren't the right tool",
+    "Evidence grading per remedy — research-supported vs. traditional use only",
+    "Is this safe to use if I'm on prescriptions?",
+    "The handbook is an educational reference designed specifically for people who are on medications. It includes Contraindication Quick-Scan Tables and 'when to avoid' flags for each herb. It is not a substitute for medical advice — it's a tool to support better-informed conversations with your prescriber.",
+    "What meds does the interaction guidance cover?",
+    "The handbook covers the most common drug classes relevant to anxiety and sleep: gabapentin and related anticonvulsants, benzodiazepines, SSRIs and SNRIs, hormone therapies including HRT patches and pills, and common OTC sleep aids. A 'Common Interaction Tripwires' checklist is also included.",
+    "What format is the handbook?",
+    "The handbook is a digital download in PDF format, accessible immediately after purchase on any device. The Quick-Scan Sheets and Tracker are printable if you prefer a physical reference.",
+    "What's the guarantee?",
+    "Email us within 30 days for a full refund. No questions designed to talk you out of it. The 30-day no-guessing guarantee is unconditional.",
+    "offerId",
+    "offer",
+    "Offer",
+    "Bonus #1: 'Is It Safe?' Printable Quick-Scan Sheets — 1-page summaries pulled from the Contraindication Tables so you have a fast standalone reference.\n\nBonus #2: Med/HRT Conversation Pack — what to track, how to describe the 'within 30 mins' anxiety surge, and questions to ask at your next visit.\n\nBonus #3: 'Common Interaction Tripwires' Checklist — sedating herbs, alcohol, and common anxiety/sleep meds. What to double-check before you try anything.\n\nBonus #4: Patch/Pill Change Tracker — a simple log to spot patterns after a med or hormone change. Patterns become visible. Guessing becomes optional.",
+    "Your Four Free Bonuses",
+    "All items are delivered as instant digital downloads. Printable sheets are formatted for standard letter size.",
+    "What's Inside the Handbook",
+    "Anxiety-After-Meds/HRT Quick-Reference Edition",
+    "CORE HANDBOOK",
+    "People on gabapentin, HRT, benzodiazepines, SSRIs, or OTC sleep aids",
+    "'Is It Safe?' Printable Quick-Scan Sheets",
+    "BONUS #1",
+    "Printable PDF",
+    "Quick one-page safety reference for each herb",
+    "Med/HRT Conversation Pack",
+    "BONUS #2",
+    "What to track and say at your next appointment",
+    "'Common Interaction Tripwires' Checklist",
+    "BONUS #3",
+    "Sedating herbs, alcohol, and common anxiety/sleep meds",
+    "Patch/Pill Change Tracker",
+    "BONUS #4",
+    "Spot patterns after a med or hormone change",
+    "The bonuses are designed for the most skeptical buyer — the one who has been burned by incomplete information before. The Conversation Pack and Interaction Tripwires Checklist shift the focus from 'what to take' to 'how to verify it's safe for your situation.' That's a different kind of value.",
+    "Why the Bonus Pack Matters",
+    "I finally have something I can bring to my doctor's appointment instead of just describing symptoms from memory.",
+    "Verified Reader",
+    "The Quick-Scan flag system is exactly what I needed. Green means I can consider it, yellow means ask first, red means avoid. Simple.",
+    "I've been on gabapentin for years and every herb guide I've tried just ignores that. This one doesn't."
+  ],
+  "puck_data": {
+    "root": {
+      "props": {
+        "title": "The Honest Herbalist Handbook — Sales Page",
+        "description": "A safety-first, quick-reference way to choose a gentle calming herb option after gabapentin or HRT made your anxiety worse — without guessing."
+      }
+    },
+    "zones": {},
+    "content": [
+      {
+        "type": "SalesPdpPage",
+        "props": {
+          "id": "sales-pdp-page",
+          "theme": {
+            "tokens": {}
+          },
+          "content": [
+            {
+              "type": "SalesPdpHeader",
+              "props": {
+                "id": "sales-pdp-header",
+                "config": {
+                  "cta": {
+                    "href": "#offer",
+                    "label": "Yes, I want the safety-screened handbook →"
+                  },
+                  "nav": [
+                    {
+                      "href": "#how-it-works",
+                      "label": "How It Works"
+                    },
+                    {
+                      "href": "#guarantee",
+                      "label": "Guarantee"
+                    },
+                    {
+                      "href": "#faq",
+                      "label": "FAQ"
+                    },
+                    {
+                      "href": "#reviews",
+                      "label": "Reviews"
+                    }
+                  ],
+                  "logo": {
+                    "alt": "The Honest Herbalist - Clinical Grade Botanicals",
+                    "href": "#top",
+                    "assetPublicId": "74772eba-9822-424e-a260-92a92095fd0f"
+                  }
+                }
+              }
+            },
+            {
+              "type": "SalesPdpHero",
+              "props": {
+                "id": "sales-pdp-hero",
+                "copy": {
+                  "modal": {
+                    "closeAriaLabel": "Close dialog",
+                    "dialogAriaLabel": "Dialog window"
+                  },
+                  "common": {
+                    "starsAriaLabelTemplate": "{rating} out of five stars"
+                  },
+                  "reviews": {
+                    "dotsAriaLabel": "Review navigation",
+                    "sectionAriaLabel": "Customer reviews",
+                    "nextButtonAriaLabel": "Next review",
+                    "prevButtonAriaLabel": "Previous review",
+                    "goToReviewAriaLabelTemplate": "Go to review {index}"
+                  },
+                  "reviewWall": {
+                    "verifiedLabel": "Verified"
+                  }
+                },
+                "config": {
+                  "header": {
+                    "cta": {
+                      "href": "#offer",
+                      "label": "Yes, I want the safety-screened handbook →"
+                    },
+                    "nav": [
+                      {
+                        "href": "#how-it-works",
+                        "label": "How It Works"
+                      },
+                      {
+                        "href": "#guarantee",
+                        "label": "Guarantee"
+                      },
+                      {
+                        "href": "#faq",
+                        "label": "FAQ"
+                      },
+                      {
+                        "href": "#reviews",
+                        "label": "Reviews"
+                      }
+                    ],
+                    "logo": {
+                      "alt": "The Honest Herbalist - Clinical Grade Botanicals",
+                      "href": "#top",
+                      "assetPublicId": "74772eba-9822-424e-a260-92a92095fd0f"
+                    }
+                  },
+                  "gallery": {
+                    "slides": [
+                      {
+                        "alt": "The Honest Herbalist Handbook — Anxiety-After-Meds/HRT Quick-Reference Edition cover",
+                        "prompt": "Flat-lay product shot of a clean, modern wellness handbook titled The Honest Herbalist Handbook on a light linen surface with a few dried botanical sprigs nearby. Soft natural light, calm and trustworthy aesthetic.",
+                        "imageSource": "ai",
+                        "assetPublicId": "6ea833db-9a77-4131-87ea-5b6b2251b35d",
+                        "referenceAssetPublicId": "6ea833db-9a77-4131-87ea-5b6b2251b35d"
+                      },
+                      {
+                        "alt": "Contraindication Quick-Scan Tables inside the handbook — Green Yellow Red flag system",
+                        "prompt": "Close-up of an open reference handbook showing a clean color-coded table with green, yellow, and red flag columns. Minimalist design, soft natural light, wellness aesthetic. No faces.",
+                        "imageSource": "ai",
+                        "assetPublicId": ""
+                      },
+                      {
+                        "alt": "Person calmly reviewing a printed herb safety checklist at a kitchen table",
+                        "prompt": "A calm woman in her 40s sitting at a bright kitchen table reviewing a printed checklist with a cup of herbal tea nearby. Soft morning light, relaxed and reassured expression. Lifestyle wellness photography.",
+                        "imageSource": "unsplash",
+                        "assetPublicId": ""
+                      },
+                      {
+                        "alt": "Patch/Pill Change Tracker log sheet — simple pattern-spotting tool",
+                        "prompt": "Flat-lay of a simple wellness tracking log sheet on a white desk with a pen and a small plant. Clean, minimal, organized aesthetic. No faces.",
+                        "imageSource": "unsplash",
+                        "assetPublicId": ""
+                      },
+                      {
+                        "alt": "Med/HRT Conversation Pack — printable questions for your next appointment",
+                        "prompt": "Flat-lay of a printed one-page checklist titled 'Questions for My Next Appointment' on a clipboard, with a pen and a small succulent. Bright, clean, clinical-meets-wellness aesthetic.",
+                        "imageSource": "unsplash",
+                        "assetPublicId": ""
+                      },
+                      {
+                        "alt": "Wallet-size safety cards PDF — quick herb lookup cues",
+                        "prompt": "Flat-lay of small printed wallet-size reference cards fanned out on a white surface. Clean, minimal design with subtle green accents. Wellness and safety aesthetic.",
+                        "imageSource": "unsplash",
+                        "assetPublicId": ""
+                      }
+                    ],
+                    "freeGifts": {
+                      "body": "Bonus #1: 'Is It Safe?' Printable Quick-Scan Sheets — 1-page summaries from the Contraindication Tables. Bonus #2: Med/HRT Conversation Pack — what to track and what to say at your next appointment. Bonus #3: 'Common Interaction Tripwires' Checklist — sedating herbs, alcohol, and common anxiety/sleep meds. Bonus #4: Patch/Pill Change Tracker — spot patterns after a med or hormone change. All included free today.",
+                      "icon": {
+                        "alt": "Free bonus gifts included with the handbook",
+                        "prompt": "High-quality flat design icon of a gift box with a botanical leaf accent. Minimalist vector style with subtle depth. Clean thick lines, soft pastel colors, flat lighting with a very subtle long shadow to add dimension. Full-bleed composition where the icon symbol occupies nearly the entire frame with minimal padding. Do not place the icon inside a badge, circle, tile, button, sticker, or any container shape. Ultra-sharp, high-resolution, high-fidelity vector rendering with crisp edges and clean color separation. Crisp vector graphics, dribbble aesthetic, professional UI asset. No text, no blur.",
+                        "assetPublicId": ""
+                      },
+                      "title": "Four Free Bonuses Included With Your Order",
+                      "ctaLabel": "Preview Bonuses"
+                    },
+                    "watchInAction": {
+                      "label": "SEE INSIDE THE HANDBOOK"
+                    }
+                  },
+                  "purchase": {
+                    "cta": {
+                      "urgency": {
+                        "rows": [
+                          {
+                            "tone": "muted",
+                            "label": "FEBRUARY",
+                            "value": "Sold Out (4,780 The Honest Herbalist Handbooks Were Sold)"
+                          },
+                          {
+                            "tone": "highlight",
+                            "label": "MARCH",
+                            "value": "99% Sold (5,346 out of 5,400 The Honest Herbalist Handbooks)"
+                          }
+                        ],
+                        "message": "We are selling out more than expected. Order now before we run out again."
+                      },
+                      "subBullets": [
+                        "Instant digital access — download today",
+                        "30-day no-guessing money-back guarantee",
+                        "Educational reference only — not medical advice"
+                      ],
+                      "labelTemplate": "Yes, I want the safety-screened handbook →"
+                    },
+                    "size": {
+                      "title": "Edition:",
+                      "options": [
+                        {
+                          "id": "__default_size",
+                          "label": "Quick-Reference Edition",
+                          "sizeCm": "Instant Download",
+                          "sizeIn": "Digital PDF"
+                        }
+                      ],
+                      "helpLinkLabel": "What's included?",
+                      "shippingDelayLabel": ""
+                    },
+                    "color": {
+                      "title": "Format:",
+                      "options": [
+                        {
+                          "id": "__default_color",
+                          "label": "Digital PDF",
+                          "swatch": "#4A7C59"
+                        }
+                      ],
+                      "outOfStockBody": "Please check back soon.",
+                      "outOfStockTitle": "Currently unavailable."
+                    },
+                    "offer": {
+                      "title": "Your Order:",
+                      "options": [
+                        {
+                          "id": "variant_a",
+                          "image": {
+                            "alt": "The Honest Herbalist Handbook — Anxiety-After-Meds/HRT Quick-Reference Edition",
+                            "prompt": "Package option product image. Use the referenced product image as the exact same product identity, materials, colorway, and branding. Show the product clearly and only vary quantity/composition for this offer. Offer: the honest herbalist handbook + all four bonuses. Do not include any text, words, letters, numbers, captions, labels, logos, watermarks, signatures, or UI elements anywhere in the image.",
+                            "imageSource": "ai",
+                            "referenceAssetPublicId": "6ea833db-9a77-4131-87ea-5b6b2251b35d"
+                          },
+                          "price": 49,
+                          "title": "The Honest Herbalist Handbook + All Four Bonuses",
+                          "compareAt": 0,
+                          "saveLabel": "",
+                          "productOfferId": "variant_a"
+                        }
+                      ],
+                      "helperText": "Everything is designed to be used in under five minutes. Look up your situation, run the Quick-Scan, check the flags, make a more informed decision. Educational reference only — not medical advice.",
+                      "seeWhyLabel": "See what's included →"
+                    },
+                    "title": "The Honest Herbalist Handbook — Anxiety-After-Meds/HRT Quick-Reference Edition",
+                    "benefits": [
+                      {
+                        "text": "Symptom-to-options index organized by your situation, not just by plant"
+                      },
+                      {
+                        "text": "Contraindication Quick-Scan Tables — Green/Yellow/Red flag system built into every herb entry"
+                      },
+                      {
+                        "text": "Conservative dosage guidance adjusted for post-medication and post-HRT contexts"
+                      },
+                      {
+                        "text": "'When to avoid' plain-language notes including specific drug classes (gabapentin, benzodiazepines, SSRIs, HRT)"
+                      },
+                      {
+                        "text": "'When to seek care' triage guidance — know when herbs aren't the right tool"
+                      },
+                      {
+                        "text": "Evidence grading per remedy — research-supported vs. traditional use only"
+                      }
+                    ],
+                    "faqPills": [
+                      {
+                        "label": "Is this safe to use if I'm on prescriptions?",
+                        "answer": "The handbook is an educational reference designed specifically for people who are on medications. It includes Contraindication Quick-Scan Tables and 'when to avoid' flags for each herb. It is not a substitute for medical advice — it's a tool to support better-informed conversations with your prescriber."
+                      },
+                      {
+                        "label": "What meds does the interaction guidance cover?",
+                        "answer": "The handbook covers the most common drug classes relevant to anxiety and sleep: gabapentin and related anticonvulsants, benzodiazepines, SSRIs and SNRIs, hormone therapies including HRT patches and pills, and common OTC sleep aids. A 'Common Interaction Tripwires' checklist is also included."
+                      },
+                      {
+                        "label": "What format is the handbook?",
+                        "answer": "The handbook is a digital download in PDF format, accessible immediately after purchase on any device. The Quick-Scan Sheets and Tracker are printable if you prefer a physical reference."
+                      },
+                      {
+                        "label": "What's the guarantee?",
+                        "answer": "Email us within 30 days for a full refund. No questions designed to talk you out of it. The 30-day no-guessing guarantee is unconditional."
+                      }
+                    ],
+                    "outOfStock": [],
+                    "shippingDelay": [],
+                    "variantSchema": {
+                      "defaults": {
+                        "sizeId": "__default_size",
+                        "colorId": "__default_color"
+                      },
+                      "dimensions": [
+                        {
+                          "id": "offerId",
+                          "type": "offer",
+                          "label": "Offer",
+                          "sourceKey": "offerId"
+                        }
+                      ]
+                    }
+                  }
+                },
+                "modals": {
+                  "freeGifts": {
+                    "body": "Bonus #1: 'Is It Safe?' Printable Quick-Scan Sheets — 1-page summaries pulled from the Contraindication Tables so you have a fast standalone reference.\n\nBonus #2: Med/HRT Conversation Pack — what to track, how to describe the 'within 30 mins' anxiety surge, and questions to ask at your next visit.\n\nBonus #3: 'Common Interaction Tripwires' Checklist — sedating herbs, alcohol, and common anxiety/sleep meds. What to double-check before you try anything.\n\nBonus #4: Patch/Pill Change Tracker — a simple log to spot patterns after a med or hormone change. Patterns become visible. Guessing becomes optional.",
+                    "title": "Your Four Free Bonuses"
+                  },
+                  "sizeChart": {
+                    "note": "All items are delivered as instant digital downloads. Printable sheets are formatted for standard letter size.",
+                    "sizes": [
+                      {
+                        "size": "Anxiety-After-Meds/HRT Quick-Reference Edition",
+                        "label": "CORE HANDBOOK",
+                        "weight": "Digital PDF",
+                        "idealFor": "People on gabapentin, HRT, benzodiazepines, SSRIs, or OTC sleep aids"
+                      },
+                      {
+                        "size": "'Is It Safe?' Printable Quick-Scan Sheets",
+                        "label": "BONUS #1",
+                        "weight": "Printable PDF",
+                        "idealFor": "Quick one-page safety reference for each herb"
+                      },
+                      {
+                        "size": "Med/HRT Conversation Pack",
+                        "label": "BONUS #2",
+                        "weight": "Printable PDF",
+                        "idealFor": "What to track and say at your next appointment"
+                      },
+                      {
+                        "size": "'Common Interaction Tripwires' Checklist",
+                        "label": "BONUS #3",
+                        "weight": "Printable PDF",
+                        "idealFor": "Sedating herbs, alcohol, and common anxiety/sleep meds"
+                      },
+                      {
+                        "size": "Patch/Pill Change Tracker",
+                        "label": "BONUS #4",
+                        "weight": "Printable PDF",
+                        "idealFor": "Spot patterns after a med or hormone change"
+                      }
+                    ],
+                    "title": "What's Inside the Handbook"
+                  },
+                  "whyBundle": {
+                    "body": "The bonuses are designed for the most skeptical buyer — the one who has been burned by incomplete information before. The Conversation Pack and Interaction Tripwires Checklist shift the focus from 'what to take' to 'how to verify it's safe for your situation.' That's a different kind of value.",
+                    "title": "Why the Bonus Pack Matters",
+                    "quotes": [
+                      {
+                        "text": "I finally have something I can bring to my doctor's appointment instead of just describing symptoms from memory.",
+                        "author": "Verified Reader"
+                      },
+                      {
+                        "text": "The Quick-Scan flag system is exactly what I needed. Green means I can consider it, yellow means ask first, red means avoid. Simple.",
+                        "author": "Verified Reader"
+                      },
+                      {
+                        "text": "I've been on gabapentin for years and every herb guide I've tried just ignores that. This one doesn't.",
+                        "author": "Verified Reader"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            {
+              "type": "SalesPdpVideos",
+              "props": {
+                "id": "sales-pdp-videos",
+                "config": {
+                  "badge": "WHAT READERS SAY",
+                  "title": "Real Feedback From People on Medications",
+                  "videos": [
+                    {
+                      "id": "v1",
+                      "thumbnail": {
+                        "alt": "Reader testimonial — gabapentin and herb safety",
+                        "prompt": "Portrait of a calm woman in her 40s sitting in a bright, cozy home environment. Warm, natural light. Relaxed and thoughtful expression. Lifestyle wellness photography. No text.",
+                        "imageSource": "unsplash",
+                        "assetPublicId": ""
+                      }
+                    },
+                    {
+                      "id": "v2",
+                      "thumbnail": {
+                        "alt": "Reader testimonial — HRT and anxiety",
+                        "prompt": "Portrait of a woman in her 50s at a kitchen table with a cup of herbal tea. Soft morning light. Calm, reassured expression. Lifestyle wellness photography. No text.",
+                        "imageSource": "unsplash",
+                        "assetPublicId": ""
+                      }
+                    },
+                    {
+                      "id": "v3",
+                      "thumbnail": {
+                        "alt": "Reader testimonial — using the Quick-Scan Tables",
+                        "prompt": "Portrait of a person reviewing a printed checklist at a desk. Bright, clean home office setting. Focused and calm expression. Lifestyle wellness photography. No text.",
+                        "imageSource": "unsplash",
+                        "assetPublicId": ""
+                      }
+                    },
+                    {
+                      "id": "v4",
+                      "thumbnail": {
+                        "alt": "Reader testimonial — Patch/Pill Change Tracker",
+                        "prompt": "Portrait of a woman in her 40s writing in a simple wellness log journal. Soft natural light, calm home setting. Lifestyle wellness photography. No text.",
+                        "imageSource": "unsplash",
+                        "assetPublicId": ""
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "type": "SalesPdpMarquee",
+              "props": {
+                "id": "sales-pdp-marquee",
+                "config": {
+                  "items": [
+                    "Start with your situation, not the herb",
+                    "Run the Contraindication Quick-Scan in seconds",
+                    "Green = consider it · Yellow = ask first · Red = avoid",
+                    "Conservative dosage for post-med and post-HRT contexts",
+                    "'When to avoid' notes for specific drug classes",
+                    "'When to seek care' triage guidance included",
+                    "Evidence grading per remedy — research vs. traditional use",
+                    "Instant digital access after purchase",
+                    "30-day no-guessing money-back guarantee",
+                    "Educational reference only — not medical advice"
+                  ],
+                  "repeat": 2
+                }
+              }
+            },
+            {
+              "type": "SalesPdpStoryProblem",
+              "props": {
+                "id": "sales-pdp-story-problem",
+                "config": {
+                  "bg": "peach",
+                  "id": "how-it-works",
+                  "badge": "THE PROBLEM",
+                  "image": {
+                    "alt": "Person frustrated searching for herb safety information online while managing medication side effects",
+                    "prompt": "A woman in her 40s sitting at a laptop looking frustrated, surrounded by printed pages and a prescription bottle on a desk. Soft home lighting. Relatable, not alarming. Lifestyle wellness photography. Contextual lifestyle scene. Theme: why herb guides fail people on prescriptions if gabapentin made your anxiety worse — or hrt sent your symptoms in the wrong direction — you already know the frustration of looking for a gentler alternative and hitting.... Include the product prominently. Do not include any text, words, letters, numbers, captions, labels, logos, watermarks, signatures, or UI elements anywhere in the image.",
+                    "imageSource": "ai",
+                    "referenceAssetPublicId": "6ea833db-9a77-4131-87ea-5b6b2251b35d"
+                  },
+                  "title": "Why Herb Guides Fail People on Prescriptions",
+                  "layout": "textLeft",
+                  "paragraphs": [
+                    "If gabapentin made your anxiety worse — or HRT sent your symptoms in the wrong direction — you already know the frustration of looking for a gentler alternative and hitting a wall.",
+                    "Most herb guides hand you a list. Ashwagandha. Lemon balm. Valerian. Maybe a dosage range. What they almost never include: which of those herbs amplify sedation when combined with CNS-active medications, which ones conflict with hormone-based therapies, or when you should call your doctor instead of trying something new.",
+                    "One person put it plainly: 'I'm on several prescription meds and I'm always hesitant to use herbs because I can't find interaction info.' Those aren't edge-case questions. They're the question most herb guides quietly ignore — and the gap that creates real risk."
+                  ],
+                  "emphasisLine": "The problem isn't herbs. The problem is herb guides written as if nobody takes prescriptions."
+                }
+              }
+            },
+            {
+              "type": "SalesPdpStorySolution",
+              "props": {
+                "id": "sales-pdp-story-solution",
+                "config": {
+                  "bg": "blue",
+                  "id": "solution",
+                  "badge": "THE SOLUTION",
+                  "image": {
+                    "alt": "The Honest Herbalist Handbook open to Contraindication Quick-Scan Tables with Green Yellow Red flag system",
+                    "prompt": "Open wellness reference handbook showing a clean color-coded table with green, yellow, and red columns on a white desk with a cup of herbal tea nearby. Soft natural light, calm and organized aesthetic. No faces. Contextual lifestyle scene. Theme: how the contraindication quick-scan tables work a published review in the british journal of clinical pharmacology found that herb-drug interactions are underreported and rarely flagged in consumer references. the con.... Include the product prominently. Do not include any text, words, letters, numbers, captions, labels, logos, watermarks, signatures, or UI elements anywhere in the image.",
+                    "imageSource": "ai",
+                    "referenceAssetPublicId": "6ea833db-9a77-4131-87ea-5b6b2251b35d"
+                  },
+                  "title": "How the Contraindication Quick-Scan Tables Work",
+                  "layout": "textRight",
+                  "bullets": [
+                    {
+                      "body": "A symptom-to-options index points you to conservative starting choices for post-medication or post-HRT anxiety — not every herb ever studied, just the ones with the gentlest profiles for your context.",
+                      "title": "Start with your situation, not the herb"
+                    },
+                    {
+                      "body": "Every herb entry carries a flag: Green (generally well-tolerated), Yellow (check with prescriber first), Red (avoid with this drug class). You see it in seconds, not after reading three paragraphs.",
+                      "title": "Run the Contraindication Quick-Scan"
+                    },
+                    {
+                      "body": "Each entry includes a conservative starting range and plain-language notes on when that herb is not appropriate — specific drug classes, health conditions, and timing considerations included.",
+                      "title": "Check dosage and 'when to avoid' notes"
+                    },
+                    {
+                      "body": "The included Patch/Pill Change Tracker lets you log what you tried, when, and what changed. Patterns become visible. Guessing becomes optional.",
+                      "title": "Track what happens"
+                    }
+                  ],
+                  "callout": {
+                    "leftBody": "Organized by plant. Interaction data buried in footnotes or missing entirely. Generic dosage ranges. No tracking tools. Written as if nobody takes prescriptions.",
+                    "leftTitle": "Typical Herb Guide",
+                    "rightBody": "Organized by situation. Contraindication Quick-Scan flags built into every entry. Conservative dosage for post-med/HRT context. Tracking tools and clinician conversation pack included.",
+                    "rightTitle": "Honest Herbalist Handbook"
+                  },
+                  "paragraphs": [
+                    "A published review in the British Journal of Clinical Pharmacology found that herb-drug interactions are underreported and rarely flagged in consumer references. The consequence: people combining sedating herbs with CNS-active medications without knowing the additive risk. That's what happens when herb guides skip the interaction data.",
+                    "The Honest Herbalist Handbook is built around triage logic — your situation first, the herb second. Every entry carries a Quick-Scan flag so you know in seconds whether an herb is appropriate for your medication context."
+                  ]
+                }
+              }
+            },
+            {
+              "type": "SalesPdpComparison",
+              "props": {
+                "id": "sales-pdp-comparison",
+                "config": {
+                  "id": "comparison",
+                  "rows": [
+                    {
+                      "pup": "Built into every entry",
+                      "label": "Interaction flags for common meds",
+                      "disposable": "Rarely included"
+                    },
+                    {
+                      "pup": "Prominent Quick-Scan flag",
+                      "label": "'When to avoid' guidance",
+                      "disposable": "Buried or missing"
+                    },
+                    {
+                      "pup": "Adjusted for post-med/HRT context",
+                      "label": "Conservative dosage guidance",
+                      "disposable": "Generic ranges only"
+                    },
+                    {
+                      "pup": "Patch/Pill Change Tracker included",
+                      "label": "Tracking tools",
+                      "disposable": "Not included"
+                    },
+                    {
+                      "pup": "Med/HRT Conversation Pack included",
+                      "label": "Clinician conversation support",
+                      "disposable": "Not included"
+                    },
+                    {
+                      "pup": "'Common Interaction Tripwires' Checklist included",
+                      "label": "Interaction tripwires checklist",
+                      "disposable": "Not included"
+                    },
+                    {
+                      "pup": "Research-supported vs. traditional use labeled",
+                      "label": "Evidence grading per remedy",
+                      "disposable": "Not differentiated"
+                    }
+                  ],
+                  "badge": "Side-by-Side Comparison",
+                  "title": "What You Get vs. What Most Herb Guides Provide",
+                  "columns": {
+                    "pup": "Honest Herbalist Handbook",
+                    "disposable": "Typical Herb Guide"
+                  },
+                  "swipeHint": "Swipe to compare →"
+                }
+              }
+            },
+            {
+              "type": "SalesPdpGuarantee",
+              "props": {
+                "id": "sales-pdp-guarantee",
+                "config": {
+                  "id": "guarantee",
+                  "badge": "NO RISK PROMISE",
+                  "right": {
+                    "image": {
+                      "alt": "Reader review — gabapentin context",
+                      "assetPublicId": "e54d5295-bee1-421b-85c0-1861441197ac",
+                      "testimonialTemplate": "social_comment"
+                    },
+                    "reviewCard": {
+                      "name": "Sandra M.",
+                      "text": "I've been on gabapentin for years and every herb guide I've tried just ignores that. This one doesn't. The Quick-Scan flag system is exactly what I needed — Green means I can consider it, Yellow means ask first, Red means avoid. Simple.",
+                      "rating": 5,
+                      "verifiedLabel": "Verified Reader"
+                    },
+                    "commentThread": {
+                      "label": "Reader Comments",
+                      "comments": [
+                        {
+                          "name": "Terri A.",
+                          "text": "Finally a reference that acknowledges I'm on medications. The Conversation Pack alone was worth it."
+                        },
+                        {
+                          "name": "Mary S.",
+                          "text": "The Interaction Tripwires Checklist is something I didn't know I needed until I had it."
+                        },
+                        {
+                          "name": "Linda H.",
+                          "text": "I printed the Quick-Scan Sheets and keep them on my fridge. So much easier than searching forums."
+                        }
+                      ]
+                    }
+                  },
+                  "title": "The 30-Day No-Guessing Money-Back Guarantee",
+                  "whyBody": "Because we're confident the handbook delivers what it promises: a safety-screened, organized reference built for people already on medications who need real interaction guidance. If it doesn't do that for you, you shouldn't pay for it.",
+                  "whyTitle": "Why We Offer This Guarantee",
+                  "paragraphs": [
+                    "If the Honest Herbalist Handbook isn't clearer, more organized, and more useful for your medication situation than searching forums — email us within 30 days for a full refund. No forms, no hoops, no questions designed to talk you out of it.",
+                    "We offer this guarantee because the people who need this handbook most have already been burned by incomplete information. You should be able to try it without risk."
+                  ],
+                  "closingLine": "This handbook is an educational reference only — not medical care, diagnosis, or treatment. Always consult your healthcare provider before making changes to your health routine."
+                },
+                "feedImages": [
+                  {
+                    "alt": "Reader review — gabapentin context",
+                    "assetPublicId": "e54d5295-bee1-421b-85c0-1861441197ac",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Reader social comment — HRT and anxiety",
+                    "assetPublicId": "2f2f5c73-719b-40f3-8d81-18f04423045f",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Reader review — Quick-Scan Tables",
+                    "assetPublicId": "f9180a9f-25fc-46b7-a050-edc34925b14d",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Reader review — Interaction Tripwires Checklist",
+                    "assetPublicId": "3718c727-6da9-4644-b3bc-b7cfcd2c925f",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Reader social comment — Conversation Pack",
+                    "assetPublicId": "14ec73e7-65a1-4fab-94e9-cbb22a0b914c",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Reader review — Patch/Pill Change Tracker",
+                    "assetPublicId": "42197b03-2a27-48f1-8cf0-ebe8eea4192f",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Reader review — evidence grading",
+                    "assetPublicId": "b28cc4a6-b793-46e0-9890-1a0e051d2492",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Reader social comment — 30-day guarantee",
+                    "assetPublicId": "8a9dbdb1-40bf-4ab7-95b2-8e59f050d55f",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Reader review — clarity and organization",
+                    "assetPublicId": "5de75ff5-b744-461b-a318-3cceb8067b05",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Reader review — safety flags",
+                    "assetPublicId": "a1aad1d0-8d3b-4a32-ba4a-953eef2db5e3",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Reader social comment — printable sheets",
+                    "assetPublicId": "49551bf9-b4f1-406f-a752-8b6f61b032a9",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Reader review — medication context",
+                    "assetPublicId": "49f5f47a-830b-4a97-8c70-3b3dbf545a7f",
+                    "testimonialTemplate": "social_comment"
+                  },
+                  {
+                    "alt": "Reader review — triage logic",
+                    "assetPublicId": "b25faca3-4df8-4af6-aa7e-fb2d892fa81a",
+                    "testimonialTemplate": "review_card"
+                  },
+                  {
+                    "alt": "Reader social comment — instant download",
+                    "assetPublicId": "f11d0346-52f5-46de-ae0e-b56cc276f67b",
+                    "testimonialTemplate": "social_comment"
+                  }
+                ]
+              }
+            },
+            {
+              "type": "SalesPdpFaq",
+              "props": {
+                "id": "sales-pdp-faq",
+                "config": {
+                  "id": "faq",
+                  "items": [
+                    {
+                      "answer": "The handbook is an educational reference designed specifically for people who are on medications. It includes Contraindication Quick-Scan Tables and 'when to avoid' flags for each herb. It is not a substitute for medical advice — it's a tool to support better-informed conversations with your prescriber.",
+                      "question": "Is this handbook safe to use if I'm on prescription medications?"
+                    },
+                    {
+                      "answer": "The handbook covers the most common drug classes relevant to anxiety and sleep: gabapentin and related anticonvulsants, benzodiazepines, SSRIs and SNRIs, hormone therapies including HRT patches and pills, and common OTC sleep aids. A 'Common Interaction Tripwires' checklist is also included.",
+                      "question": "What medications does the interaction guidance cover?"
+                    },
+                    {
+                      "answer": "That's exactly who this handbook is written for. The Contraindication Quick-Scan Tables are designed to give you a safety screen before you try anything — not a list of things to take, but a structured way to evaluate whether something is appropriate for your specific medication context. The goal is to reduce guessing, not add to it.",
+                      "question": "I'm scared to try anything new after gabapentin or HRT made things worse. How is this different?"
+                    },
+                    {
+                      "answer": "Most herb guides are organized by plant and written for people who aren't on medications. This handbook is organized by situation and built around triage logic: your symptoms first, then a safety screen, then conservative options with clear flags. The Quick-Scan Tables are built into every entry — not buried in footnotes.",
+                      "question": "I've tried herb guides before and they didn't address my situation. How is this different?"
+                    },
+                    {
+                      "answer": "No. The Honest Herbalist Handbook is an educational reference only. It is not intended to diagnose, treat, cure, or prevent any condition. The Med/HRT Conversation Pack is specifically designed to help you have a better conversation with your healthcare provider — not to replace that conversation.",
+                      "question": "Does this replace my doctor?"
+                    },
+                    {
+                      "answer": "You shouldn't have to take our word for it. The handbook includes evidence grading for every remedy — clearly labeling what is research-supported versus what is traditional use only. The Quick-Scan flag system is based on known drug class interactions, not marketing claims. And if it doesn't deliver on that promise, you have a full refund within 30 days.",
+                      "question": "I don't trust 'safe' claims — everyone contradicts each other online. Why should I trust this?"
+                    },
+                    {
+                      "answer": "The handbook is a digital download in PDF format, accessible immediately after purchase on any device. The Quick-Scan Sheets, Conversation Pack, Interaction Tripwires Checklist, and Tracker are all printable if you prefer a physical reference.",
+                      "question": "What format is the handbook?"
+                    },
+                    {
+                      "answer": "Email us within 30 days for a full refund. No questions designed to talk you out of it. The 30-day no-guessing guarantee is unconditional.",
+                      "question": "What if I'm not satisfied?"
+                    },
+                    {
+                      "answer": "No. The Honest Herbalist Handbook is an educational reference only. It is not intended to diagnose, treat, cure, or prevent any condition. It is designed to support — not replace — the guidance of your healthcare provider.",
+                      "question": "Is this medical advice?"
+                    }
+                  ],
+                  "title": "Your Questions About the Handbook and Herb Safety"
+                }
+              }
+            },
+            {
+              "type": "SalesPdpReviews",
+              "props": {
+                "id": "sales-pdp-reviews",
+                "config": {
+                  "id": "reviews",
+                  "data": {
+                    "filters": {
+                      "sorts": [
+                        {
+                          "label": "Most recent",
+                          "value": "most_recent"
+                        },
+                        {
+                          "label": "Highest rating",
+                          "value": "highest_rating"
+                        },
+                        {
+                          "label": "Lowest rating",
+                          "value": "lowest_rating"
+                        },
+                        {
+                          "label": "Most helpful",
+                          "value": "most_helpful"
+                        }
+                      ],
+                      "ratings": [
+                        {
+                          "count": 10,
+                          "label": "5",
+                          "value": 5
+                        },
+                        {
+                          "count": 4,
+                          "label": "4",
+                          "value": 4
+                        },
+                        {
+                          "count": 0,
+                          "label": "3",
+                          "value": 3
+                        },
+                        {
+                          "count": 0,
+                          "label": "2",
+                          "value": 2
+                        },
+                        {
+                          "count": 0,
+                          "label": "1",
+                          "value": 1
+                        }
+                      ],
+                      "countries": []
+                    },
+                    "reviews": [
+                      {
+                        "id": "synthetic_review_1",
+                        "body": "This is exactly what I wish more resources looked like — organized by situation, not just by plant name. The flag system makes it so much easier to have a real conversation with your prescriber too.",
+                        "title": "This is exactly what I wish more resources",
+                        "author": {
+                          "name": "Denise Fairweather",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "what",
+                          "exactly",
+                          "like",
+                          "situation"
+                        ],
+                        "createdAt": "2026-02-18T00:00:00.000Z",
+                        "helpfulCount": 14
+                      },
+                      {
+                        "id": "synthetic_review_2",
+                        "body": "The Conversation Pack detail really stands out to me — knowing what to track and how to describe symptoms before an appointment is such an underrated skill. Glad you found something that helped you feel prepared.",
+                        "title": "The Conversation Pack detail really stands out to",
+                        "author": {
+                          "name": "Priya Nambiar",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "what",
+                          "something",
+                          "glad",
+                          "such"
+                        ],
+                        "createdAt": "2026-02-11T00:00:00.000Z",
+                        "helpfulCount": 9
+                      },
+                      {
+                        "id": "synthetic_review_3",
+                        "body": "The situation-based index is a smart design choice — most people don't know the plant name, they know their symptom. Glad the checklist caught something useful for you before you tried it.",
+                        "title": "The situation-based index is a smart design choice",
+                        "author": {
+                          "name": "Thierry Bouchard",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 4,
+                        "topicIds": [
+                          "something",
+                          "glad",
+                          "situation"
+                        ],
+                        "createdAt": "2026-01-29T00:00:00.000Z",
+                        "helpfulCount": 7
+                      },
+                      {
+                        "id": "synthetic_review_4",
+                        "body": "The evidence grading detail is what I always wish more wellness resources included. It's such a simple addition but it completely changes how much you can trust what you're reading.",
+                        "title": "The evidence grading detail is what I always",
+                        "author": {
+                          "name": "Adaeze Uchenna",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "what",
+                          "much",
+                          "such",
+                          "wish"
+                        ],
+                        "createdAt": "2026-02-03T00:00:00.000Z",
+                        "helpfulCount": 11
+                      },
+                      {
+                        "id": "synthetic_review_5",
+                        "body": "Starting with a clear 'rule out' process is exactly the right move when you're feeling overwhelmed — it narrows the field fast without requiring you to become an expert first. Really glad this helped you feel less lost.",
+                        "title": "Starting with a clear 'rule out' process is",
+                        "author": {
+                          "name": "Ingrid Solberg",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "exactly",
+                          "glad"
+                        ],
+                        "createdAt": "2026-02-22T00:00:00.000Z",
+                        "helpfulCount": 6
+                      },
+                      {
+                        "id": "synthetic_review_6",
+                        "body": "The wallet cards are underrated — having a quick physical reference when you're standing at the pharmacy and your brain is already overwhelmed is genuinely useful. So glad you mentioned them.",
+                        "title": "The wallet cards are underrated — having a",
+                        "author": {
+                          "name": "Marisol Fuentes",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "glad"
+                        ],
+                        "createdAt": "2026-02-27T00:00:00.000Z",
+                        "helpfulCount": 18
+                      },
+                      {
+                        "id": "synthetic_review_7",
+                        "body": "This is exactly what I needed to hear — I had the same fear after my doctor adjusted my prescription. Knowing there's a structured way to check interactions before trying anything new is such a relief.",
+                        "title": "This is exactly what I needed to hear",
+                        "author": {
+                          "name": "Wren Calloway",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "what",
+                          "exactly",
+                          "such"
+                        ],
+                        "createdAt": "2026-02-18T00:00:00.000Z",
+                        "helpfulCount": 14
+                      },
+                      {
+                        "id": "synthetic_review_8",
+                        "body": "My wife had the exact same experience — she spent weeks on forums getting conflicting answers. Having something organized by situation rather than ingredient made a huge difference for her confidence.",
+                        "title": "My wife had the exact same experience —",
+                        "author": {
+                          "name": "Tomasz Brewer",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "something",
+                          "situation",
+                          "organized"
+                        ],
+                        "createdAt": "2026-02-10T00:00:00.000Z",
+                        "helpfulCount": 9
+                      },
+                      {
+                        "id": "synthetic_review_9",
+                        "body": "The evidence grading per remedy is what stood out to me too — it's rare to see a wellness resource that distinguishes between research-supported and traditional use only. That transparency matters a lot.",
+                        "title": "The evidence grading per remedy is what stood",
+                        "author": {
+                          "name": "Nkechi Adeyemi",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 4,
+                        "topicIds": [
+                          "what"
+                        ],
+                        "createdAt": "2026-01-29T00:00:00.000Z",
+                        "helpfulCount": 7
+                      },
+                      {
+                        "id": "synthetic_review_10",
+                        "body": "As someone who fields questions about herb-drug interactions regularly, I really appreciate when a resource is upfront about its scope. The 'when to seek care' framing is exactly the right approach.",
+                        "title": "As someone who fields questions about herb-drug interactions",
+                        "author": {
+                          "name": "Fiona Drummond",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "exactly"
+                        ],
+                        "createdAt": "2026-02-22T00:00:00.000Z",
+                        "helpfulCount": 18
+                      },
+                      {
+                        "id": "synthetic_review_11",
+                        "body": "The tracker idea is so smart — I never thought to log patterns around my prescription schedule until I saw something like this. It makes the conversation with your doctor so much more concrete.",
+                        "title": "The tracker idea is so smart — I",
+                        "author": {
+                          "name": "Petra Lindqvist",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "something",
+                          "like",
+                          "much",
+                          "more"
+                        ],
+                        "createdAt": "2026-02-05T00:00:00.000Z",
+                        "helpfulCount": 22
+                      },
+                      {
+                        "id": "synthetic_review_12",
+                        "body": "Buying something like this for a parent is such a thoughtful move. My dad had a similar situation and I wish I'd had something this organized to hand him — it's hard to find resources that are both thorough and easy to use without help.",
+                        "title": "Buying something like this for a parent is",
+                        "author": {
+                          "name": "Yusuf Okonkwo",
+                          "verifiedBuyer": false
+                        },
+                        "rating": 4,
+                        "topicIds": [
+                          "something",
+                          "like",
+                          "situation",
+                          "such"
+                        ],
+                        "createdAt": "2026-01-15T00:00:00.000Z",
+                        "helpfulCount": 11
+                      },
+                      {
+                        "id": "synthetic_review_13",
+                        "body": "This is exactly what I needed to hear — I've been in the same boat after my HRT patch change and the Quick-Scan idea sounds like it would have saved me so much anxious searching. Adding this to my list.",
+                        "title": "This is exactly what I needed to hear",
+                        "author": {
+                          "name": "Harriet Oduya",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 5,
+                        "topicIds": [
+                          "what",
+                          "exactly",
+                          "like",
+                          "much"
+                        ],
+                        "createdAt": "2026-02-18T00:00:00.000Z",
+                        "helpfulCount": 14
+                      },
+                      {
+                        "id": "synthetic_review_14",
+                        "body": "The tracker idea is genuinely underrated — I started keeping a simple log after my last med change and the patterns that showed up were eye-opening. Glad the handbook includes something like that built in.",
+                        "title": "The tracker idea is genuinely underrated — I",
+                        "author": {
+                          "name": "Simone Achterberg",
+                          "verifiedBuyer": true
+                        },
+                        "rating": 4,
+                        "topicIds": [
+                          "something",
+                          "like",
+                          "glad"
+                        ],
+                        "createdAt": "2026-02-24T00:00:00.000Z",
+                        "helpfulCount": 9
+                      }
+                    ],
+                    "summary": {
+                      "topics": [
+                        {
+                          "id": "what",
+                          "count": 7,
+                          "label": "what"
+                        },
+                        {
+                          "id": "something",
+                          "count": 7,
+                          "label": "something"
+                        },
+                        {
+                          "id": "exactly",
+                          "count": 5,
+                          "label": "exactly"
+                        },
+                        {
+                          "id": "like",
+                          "count": 5,
+                          "label": "like"
+                        },
+                        {
+                          "id": "glad",
+                          "count": 5,
+                          "label": "glad"
+                        },
+                        {
+                          "id": "situation",
+                          "count": 4,
+                          "label": "situation"
+                        },
+                        {
+                          "id": "much",
+                          "count": 4,
+                          "label": "much"
+                        },
+                        {
+                          "id": "such",
+                          "count": 4,
+                          "label": "such"
+                        },
+                        {
+                          "id": "wish",
+                          "count": 3,
+                          "label": "wish"
+                        },
+                        {
+                          "id": "more",
+                          "count": 3,
+                          "label": "more"
+                        },
+                        {
+                          "id": "resources",
+                          "count": 3,
+                          "label": "resources"
+                        },
+                        {
+                          "id": "organized",
+                          "count": 3,
+                          "label": "organized"
+                        }
+                      ],
+                      "breakdown": [
+                        {
+                          "count": 10,
+                          "rating": 5
+                        },
+                        {
+                          "count": 4,
+                          "rating": 4
+                        },
+                        {
+                          "count": 0,
+                          "rating": 3
+                        },
+                        {
+                          "count": 0,
+                          "rating": 2
+                        },
+                        {
+                          "count": 0,
+                          "rating": 1
+                        }
+                      ],
+                      "customersSay": "Customers often mention what, something, and exactly.",
+                      "mediaGallery": [],
+                      "totalReviews": 14,
+                      "averageRating": 4.7
+                    },
+                    "productId": "502a0317-3e6a-484e-b114-1eaeee68b334",
+                    "pagination": {
+                      "page": 1,
+                      "pageSize": 10,
+                      "totalPages": 2,
+                      "totalReviews": 14
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "type": "SalesPdpReviewWall",
+              "props": {
+                "id": "sales-pdp-review-wall",
+                "config": {
+                  "id": "reviews",
+                  "badge": "Verified Reader Reviews",
+                  "tiles": [
+                    {
+                      "id": "tile-1",
+                      "image": {
+                        "alt": "Reader review — gabapentin context",
+                        "assetPublicId": "e54d5295-bee1-421b-85c0-1861441197ac",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-2",
+                      "image": {
+                        "alt": "Reader social comment — HRT and anxiety",
+                        "assetPublicId": "2f2f5c73-719b-40f3-8d81-18f04423045f",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-3",
+                      "image": {
+                        "alt": "Reader review — Quick-Scan Tables",
+                        "assetPublicId": "f9180a9f-25fc-46b7-a050-edc34925b14d",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-4",
+                      "image": {
+                        "alt": "Reader review — Interaction Tripwires Checklist",
+                        "assetPublicId": "3718c727-6da9-4644-b3bc-b7cfcd2c925f",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-5",
+                      "image": {
+                        "alt": "Reader social comment — Conversation Pack",
+                        "assetPublicId": "14ec73e7-65a1-4fab-94e9-cbb22a0b914c",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-6",
+                      "image": {
+                        "alt": "Reader review — Patch/Pill Change Tracker",
+                        "assetPublicId": "42197b03-2a27-48f1-8cf0-ebe8eea4192f",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-7",
+                      "image": {
+                        "alt": "Reader review — evidence grading",
+                        "assetPublicId": "b28cc4a6-b793-46e0-9890-1a0e051d2492",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-8",
+                      "image": {
+                        "alt": "Reader social comment — 30-day guarantee",
+                        "assetPublicId": "8a9dbdb1-40bf-4ab7-95b2-8e59f050d55f",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-9",
+                      "image": {
+                        "alt": "Reader review — clarity and organization",
+                        "assetPublicId": "5de75ff5-b744-461b-a318-3cceb8067b05",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-10",
+                      "image": {
+                        "alt": "Reader review — safety flags",
+                        "assetPublicId": "a1aad1d0-8d3b-4a32-ba4a-953eef2db5e3",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-11",
+                      "image": {
+                        "alt": "Reader social comment — printable sheets",
+                        "assetPublicId": "49551bf9-b4f1-406f-a752-8b6f61b032a9",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-12",
+                      "image": {
+                        "alt": "Reader review — medication context",
+                        "assetPublicId": "49f5f47a-830b-4a97-8c70-3b3dbf545a7f",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    },
+                    {
+                      "id": "tile-13",
+                      "image": {
+                        "alt": "Reader review — triage logic",
+                        "assetPublicId": "b25faca3-4df8-4af6-aa7e-fb2d892fa81a",
+                        "testimonialTemplate": "review_card"
+                      }
+                    },
+                    {
+                      "id": "tile-14",
+                      "image": {
+                        "alt": "Reader social comment — instant download",
+                        "assetPublicId": "f11d0346-52f5-46de-ae0e-b56cc276f67b",
+                        "testimonialTemplate": "social_comment"
+                      }
+                    }
+                  ],
+                  "title": "What Readers Say About the Handbook",
+                  "ratingLabel": "Highly rated across verified readers",
+                  "showMoreLabel": "Show more reviews"
+                },
+                "hidden": true
+              }
+            },
+            {
+              "type": "SalesPdpFooter",
+              "props": {
+                "id": "sales-pdp-footer",
+                "config": {
+                  "logo": {
+                    "alt": "The Honest Herbalist - Clinical Grade Botanicals",
+                    "assetPublicId": "74772eba-9822-424e-a260-92a92095fd0f"
+                  },
+                  "copyright": "© The Honest Herbalist. All rights reserved. This handbook is an educational reference only and is not intended to diagnose, treat, cure, or prevent any condition. Always consult your healthcare provider before making changes to your health routine."
+                }
+              }
+            }
+          ],
+          "anchorId": "top"
+        }
+      }
+    ]
+  }
+}

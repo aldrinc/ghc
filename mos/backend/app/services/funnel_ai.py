@@ -33,11 +33,13 @@ from app.db.repositories.claude_context_files import ClaudeContextFilesRepositor
 from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.claude_files import CLAUDE_DEFAULT_MODEL, build_document_blocks, call_claude_structured_message
 from app.services.design_systems import resolve_design_system_tokens
+from app.services.funnel_metadata import normalize_public_page_metadata_for_context
 from app.services.funnels import default_puck_data
 from app.services.funnels import _walk_json as walk_json  # reuse internal helper
 from app.services.funnels import create_funnel_image_asset, create_funnel_unsplash_asset
 from app.services.funnel_templates import get_funnel_template
 from app.services.media_storage import MediaStorage
+from app.services.product_types import canonical_product_type
 
 
 _ASSISTANT_MESSAGE_MAX_CHARS = 600
@@ -69,6 +71,10 @@ _PLACEHOLDER_SRC_MARKERS = ("/assets/ph-", "/assets/placeholder")
 _URGENCY_SOLD_OUT_PATTERN = re.compile(r"\bsold\s*out\b", re.IGNORECASE)
 _URGENCY_NEARLY_SOLD_PATTERN = re.compile(r"\b\d{1,3}%\s*sold\b", re.IGNORECASE)
 _URGENCY_SELLING_OUT_PATTERN = re.compile(r"\bselling\s+out\b", re.IGNORECASE)
+_LEGACY_URGENCY_PRODUCT_PATTERN = re.compile(
+    r"\b(?:puppypad(?:s)?|sauna[\s-]*blanket(?:s)?|infrared[\s-]*sauna[\s-]*blanket(?:s)?)\b",
+    re.IGNORECASE,
+)
 _PRE_SALES_CTA_LINK_TYPE_CANONICAL: dict[str, str] = {
     "nextpage": "nextPage",
     "funnelpage": "funnelPage",
@@ -84,6 +90,17 @@ _ICON_COLOR_TOKEN_KEYS: tuple[tuple[str, str], ...] = (
     ("background", "--color-bg"),
 )
 _ICON_REQUIRED_COLOR_ROLES: frozenset[str] = frozenset({"primary", "accent", "background"})
+_ALLOWED_FOOTER_PAYMENT_ICON_KEYS: frozenset[str] = frozenset(
+    {
+        "american_express",
+        "apple_pay",
+        "google_pay",
+        "maestro",
+        "mastercard",
+        "paypal",
+        "visa",
+    }
+)
 
 
 @dataclass
@@ -324,6 +341,51 @@ def _validate_pre_sales_listicle_component_configs(puck_data: dict[str, Any]) ->
                 raise ValueError(
                     f"PreSalesFooter.{source}.logo must be an object with string alt{id_suffix}. Received {_describe_value(logo)}."
                 )
+            copyright_text = config.get("copyright")
+            if copyright_text is not None and not isinstance(copyright_text, str):
+                raise ValueError(
+                    f"PreSalesFooter.{source}.copyright must be a string when provided{id_suffix}. "
+                    f"Received {_describe_value(copyright_text)}."
+                )
+            links = config.get("links")
+            if links is not None:
+                if not isinstance(links, list):
+                    raise ValueError(
+                        f"PreSalesFooter.{source}.links must be a list when provided{id_suffix}. "
+                        f"Received {_describe_value(links)}."
+                    )
+                for idx, link in enumerate(links):
+                    if not isinstance(link, dict):
+                        raise ValueError(
+                            f"PreSalesFooter.{source}.links[{idx}] must be an object{id_suffix}. "
+                            f"Received {_describe_value(link)}."
+                        )
+                    if not isinstance(link.get("label"), str) or not link.get("label").strip():
+                        raise ValueError(
+                            f"PreSalesFooter.{source}.links[{idx}].label must be a non-empty string{id_suffix}."
+                        )
+                    if not isinstance(link.get("href"), str) or not link.get("href").strip():
+                        raise ValueError(
+                            f"PreSalesFooter.{source}.links[{idx}].href must be a non-empty string{id_suffix}."
+                        )
+            payment_icons = config.get("paymentIcons")
+            if payment_icons is not None:
+                if not isinstance(payment_icons, list):
+                    raise ValueError(
+                        f"PreSalesFooter.{source}.paymentIcons must be a list when provided{id_suffix}. "
+                        f"Received {_describe_value(payment_icons)}."
+                    )
+                for idx, icon_key in enumerate(payment_icons):
+                    if not isinstance(icon_key, str):
+                        raise ValueError(
+                            f"PreSalesFooter.{source}.paymentIcons[{idx}] must be a string{id_suffix}. "
+                            f"Received {_describe_value(icon_key)}."
+                        )
+                    if icon_key not in _ALLOWED_FOOTER_PAYMENT_ICON_KEYS:
+                        raise ValueError(
+                            f"PreSalesFooter.{source}.paymentIcons[{idx}] is invalid{id_suffix}. "
+                            f"Allowed: {sorted(_ALLOWED_FOOTER_PAYMENT_ICON_KEYS)}."
+                        )
         elif comp_type == "PreSalesFloatingCta":
             if not isinstance(config, dict):
                 raise ValueError(
@@ -934,6 +996,45 @@ def _validate_sales_pdp_component_configs(puck_data: dict[str, Any]) -> None:
                 raise ValueError(
                     f"SalesPdpFooter.{source}.copyright must be a string{id_suffix}. Received {_describe_value(copyright_text)}."
                 )
+            links = config.get("links")
+            if links is not None:
+                if not isinstance(links, list):
+                    raise ValueError(
+                        f"SalesPdpFooter.{source}.links must be a list when provided{id_suffix}. "
+                        f"Received {_describe_value(links)}."
+                    )
+                for idx, link in enumerate(links):
+                    if not isinstance(link, dict):
+                        raise ValueError(
+                            f"SalesPdpFooter.{source}.links[{idx}] must be an object{id_suffix}. "
+                            f"Received {_describe_value(link)}."
+                        )
+                    if not isinstance(link.get("label"), str) or not link.get("label").strip():
+                        raise ValueError(
+                            f"SalesPdpFooter.{source}.links[{idx}].label must be a non-empty string{id_suffix}."
+                        )
+                    if not isinstance(link.get("href"), str) or not link.get("href").strip():
+                        raise ValueError(
+                            f"SalesPdpFooter.{source}.links[{idx}].href must be a non-empty string{id_suffix}."
+                        )
+            payment_icons = config.get("paymentIcons")
+            if payment_icons is not None:
+                if not isinstance(payment_icons, list):
+                    raise ValueError(
+                        f"SalesPdpFooter.{source}.paymentIcons must be a list when provided{id_suffix}. "
+                        f"Received {_describe_value(payment_icons)}."
+                    )
+                for idx, icon_key in enumerate(payment_icons):
+                    if not isinstance(icon_key, str):
+                        raise ValueError(
+                            f"SalesPdpFooter.{source}.paymentIcons[{idx}] must be a string{id_suffix}. "
+                            f"Received {_describe_value(icon_key)}."
+                        )
+                    if icon_key not in _ALLOWED_FOOTER_PAYMENT_ICON_KEYS:
+                        raise ValueError(
+                            f"SalesPdpFooter.{source}.paymentIcons[{idx}] is invalid{id_suffix}. "
+                            f"Allowed: {sorted(_ALLOWED_FOOTER_PAYMENT_ICON_KEYS)}."
+                        )
 
         elif comp_type == "SalesPdpReviewSlider":
             if not isinstance(config, dict):
@@ -1581,6 +1682,7 @@ def _normalize_sales_pdp_variant_option_values(
                 "variantId": variant.get("id"),
                 "title": variant.get("title"),
                 "amount_cents": variant.get("amount_cents"),
+                "compare_at_cents": variant.get("compare_at_cents"),
                 "option_values": normalized_option_values,
             }
         )
@@ -1712,6 +1814,7 @@ def _normalize_sales_pdp_variant_option_values(
             "variantIndex": variant["variantIndex"],
             "title": variant.get("title"),
             "amount_cents": variant.get("amount_cents"),
+            "compare_at_cents": variant.get("compare_at_cents"),
             "sizeId": size_id,
             "colorId": color_id,
             "offerId": offer_id,
@@ -1777,7 +1880,7 @@ def _align_sales_pdp_purchase_options_to_variants(
     size_ids: list[str] = []
     color_ids: list[str] = []
     offer_ids: list[str] = []
-    offer_variant_defaults: dict[str, tuple[str | None, float | None]] = {}
+    offer_variant_defaults: dict[str, tuple[str | None, float | None, float | None]] = {}
 
     for idx, variant in enumerate(normalized_variants):
         if not isinstance(variant, dict):
@@ -1802,7 +1905,11 @@ def _align_sales_pdp_purchase_options_to_variants(
             price_value: float | None = None
             if isinstance(amount_cents, (int, float)):
                 price_value = round(float(amount_cents) / 100.0, 2)
-            offer_variant_defaults[offer_id] = (title, price_value)
+            compare_at_cents = variant.get("compare_at_cents")
+            compare_at_value: float | None = None
+            if isinstance(compare_at_cents, (int, float)):
+                compare_at_value = round(float(compare_at_cents) / 100.0, 2)
+            offer_variant_defaults[offer_id] = (title, price_value, compare_at_value)
 
     size_cfg = purchase.get("size")
     color_cfg = purchase.get("color")
@@ -1897,17 +2004,29 @@ def _align_sales_pdp_purchase_options_to_variants(
         option = dict(source) if isinstance(source, dict) else {}
         option["id"] = offer_id
 
-        default_title, default_price = offer_variant_defaults.get(offer_id, (None, None))
+        default_title, default_price, default_compare_at = offer_variant_defaults.get(
+            offer_id,
+            (None, None, None),
+        )
         title = _clean_non_empty_string(option.get("title"))
         if (not title) or (not matched_existing_id):
             option["title"] = default_title or _humanize_option_id(offer_id)
 
-        if not isinstance(option.get("price"), (int, float)):
-            if default_price is None:
+        if default_price is None:
+            if not isinstance(option.get("price"), (int, float)):
                 raise ValueError(
                     f"SalesPdpHero.purchase.offer.options entry for offerId={offer_id} is missing numeric price."
                 )
+        else:
             option["price"] = default_price
+        resolved_price = float(option["price"])
+        if default_compare_at is not None and default_compare_at > resolved_price:
+            option["compareAt"] = default_compare_at
+            savings_value = round(float(default_compare_at) - resolved_price, 2)
+            option["saveLabel"] = f"SAVE {_format_sales_pdp_money(savings_value)}"
+        else:
+            option["compareAt"] = 0
+            option["saveLabel"] = ""
 
         image = option.get("image")
         if not isinstance(image, dict):
@@ -1948,8 +2067,44 @@ def _enforce_sales_pdp_urgency_month_rows(
     *,
     puck_data: dict[str, Any],
     reference_puck_data: dict[str, Any] | None,
+    product_title: str | None = None,
     now: datetime | None = None,
 ) -> None:
+    def pluralize_phrase(phrase: str) -> str:
+        text = phrase.strip()
+        if not text:
+            return text
+        if text.lower().endswith("s"):
+            return text
+        return f"{text}s"
+
+    def normalize_row_value(value: str, *, row_kind: str, id_suffix: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            return cleaned
+        if not _LEGACY_URGENCY_PRODUCT_PATTERN.search(cleaned):
+            return cleaned
+        normalized_product = _clean_non_empty_string(product_title)
+        if not normalized_product:
+            raise ValueError(
+                "SalesPdpHero.purchase.cta.urgency.rows contains legacy template product copy "
+                f"('{cleaned}') but no product title is available for replacement{id_suffix}."
+            )
+
+        def replace_match(match: re.Match[str]) -> str:
+            matched = match.group(0)
+            if matched.lower().endswith("s"):
+                return pluralize_phrase(normalized_product)
+            return normalized_product
+
+        replaced = _LEGACY_URGENCY_PRODUCT_PATTERN.sub(replace_match, cleaned)
+        if _LEGACY_URGENCY_PRODUCT_PATTERN.search(replaced):
+            raise ValueError(
+                "SalesPdpHero.purchase.cta.urgency.rows still contains legacy product labels after normalization "
+                f"for {row_kind}{id_suffix}: {replaced!r}."
+            )
+        return replaced
+
     previous_month_label, current_month_label = _resolve_sales_pdp_urgency_month_labels(now)
 
     reference_rows_by_id: dict[str, list[dict[str, Any]]] = {}
@@ -2043,6 +2198,8 @@ def _enforce_sales_pdp_urgency_month_rows(
                 "SalesPdpHero.purchase.cta.urgency.rows must include one 'Sold Out' value and one "
                 f"'99% Sold' style value with percentages{id_suffix}."
             )
+        sold_out_value = normalize_row_value(sold_out_value, row_kind="sold_out", id_suffix=id_suffix)
+        nearly_sold_value = normalize_row_value(nearly_sold_value, row_kind="nearly_sold", id_suffix=id_suffix)
 
         urgency["rows"] = [
             {"label": previous_month_label, "value": sold_out_value, "tone": "muted"},
@@ -2302,8 +2459,15 @@ def _text_mentions_product(text: str | None) -> bool:
 def _normalize_product_type(product: Product | None) -> str | None:
     if not product or not isinstance(product.product_type, str):
         return None
-    normalized = product.product_type.strip().lower()
+    normalized = canonical_product_type(product.product_type)
     return normalized or None
+
+
+def _format_sales_pdp_money(value: float) -> str:
+    rounded = round(float(value), 2)
+    if rounded.is_integer():
+        return f"${int(rounded)}"
+    return f"${rounded:.2f}".rstrip("0").rstrip(".")
 
 
 def _product_prompt_mentions_devices(prompt: str | None) -> bool:
@@ -2382,6 +2546,21 @@ def _build_product_context_prompt(text: str, product_type: str | None) -> str:
     if product_type == "book":
         base = f"{base} {_book_prompt_suffix()}"
     return base
+
+
+def _build_editorial_context_prompt(text: str) -> str:
+    cleaned = " ".join(text.split()).lower()
+    if len(cleaned) > 220:
+        cleaned = cleaned[:217].rstrip() + "..."
+    base = "Editorial article image"
+    if cleaned:
+        base = f"{base}. Theme: {cleaned}."
+    return (
+        f"{base} Support the article topic with a contextual lifestyle or conceptual scene. "
+        "Treat this as editorial imagery, not a product shot. "
+        "Do not use the product reference image, packaging, branded product identity, or sales collateral. "
+        f"{_NO_TEXT_IMAGE_DIRECTIVE}"
+    )
 
 
 def _build_sales_pdp_offer_option_prompt(option_title: str | None, *, product_type: str | None) -> str:
@@ -2525,6 +2704,36 @@ def _apply_product_prompt(
             prompt = prompt_hint
         if "book" not in prompt.lower():
             prompt = f"{prompt} {_book_prompt_suffix()}"
+    image["prompt"] = prompt
+    if alt and not image.get("alt"):
+        image["alt"] = alt
+
+
+def _apply_editorial_prompt(
+    image: dict[str, Any],
+    *,
+    prompt_hint: str,
+    alt: str | None = None,
+) -> None:
+    image.pop("assetPublicId", None)
+    image.pop("referenceAssetPublicId", None)
+    image.pop("reference_asset_public_id", None)
+    image["imageSource"] = "ai"
+    prompt = image.get("prompt")
+    if not isinstance(prompt, str) or not prompt.strip():
+        prompt = prompt_hint
+    else:
+        prompt = prompt.strip()
+        if _prompt_mentions_product_terms(prompt) or any(
+            keyword in prompt.lower() for keyword in _PRODUCT_EXACTNESS_KEYWORDS
+        ):
+            prompt = prompt_hint
+        elif "editorial article image" not in prompt.lower():
+            prompt = (
+                f"{prompt} Treat this as editorial imagery, not a product shot. "
+                "Do not use the product reference image, packaging, branded product identity, or sales collateral."
+            )
+            prompt = _append_no_text_directive(prompt)
     image["prompt"] = prompt
     if alt and not image.get("alt"):
         image["alt"] = alt
@@ -2695,17 +2904,6 @@ def _apply_product_image_overrides_for_ai(
         for comp_type, config, ctx in iter_component_configs({"SalesPdpHero", "SalesPdpStoryProblem", "SalesPdpStorySolution"}):
             if comp_type == "SalesPdpHero":
                 hero = config
-                gallery = hero.get("gallery") if isinstance(hero, dict) else None
-                slides = gallery.get("slides") if isinstance(gallery, dict) else None
-                if isinstance(slides, list) and slides:
-                    for idx, slide in enumerate(slides):
-                        if not isinstance(slide, dict):
-                            continue
-                        _assign_product_asset(
-                            slide,
-                            public_id=product_public_ids[idx % len(product_public_ids)],
-                            alt="Product image",
-                        )
                 purchase = hero.get("purchase") if isinstance(hero, dict) else None
                 offer = purchase.get("offer") if isinstance(purchase, dict) else None
                 offer_options = offer.get("options") if isinstance(offer, dict) else None
@@ -2754,10 +2952,17 @@ def _apply_product_image_overrides_for_ai(
                 hero = config.get("hero") if isinstance(config, dict) else None
                 media = hero.get("media") if isinstance(hero, dict) else None
                 if isinstance(media, dict) and media.get("type") == "image":
-                    _assign_product_asset(
+                    title = hero.get("title") if isinstance(hero, dict) else None
+                    subtitle = hero.get("subtitle") if isinstance(hero, dict) else None
+                    text = " ".join([str(title or ""), str(subtitle or "")]).strip()
+                    if not text:
+                        text = "article lead visual"
+                    media["aspectRatio"] = "1:1"
+                    prompt_hint = _build_editorial_context_prompt(text)
+                    _apply_editorial_prompt(
                         media,
-                        public_id=product_public_ids[0],
-                        alt="Product image",
+                        prompt_hint=prompt_hint,
+                        alt="Editorial article image",
                     )
                     if ctx:
                         ctx.dirty = True
@@ -2776,18 +2981,12 @@ def _apply_product_image_overrides_for_ai(
                         body = reason.get("body")
                         text = " ".join([str(title or ""), str(body or "")]).strip()
                         if not text:
-                            text = str(product.title or "").strip()
-                        if not text:
-                            text = str(product.description or "").strip()
-                        if not text:
-                            text = "product lifestyle scene"
-                        prompt_hint = _build_product_context_prompt(text, product_type)
-                        _apply_product_reference_prompt(
+                            text = "editorial article support image"
+                        prompt_hint = _build_editorial_context_prompt(text)
+                        _apply_editorial_prompt(
                             image,
-                            public_id=product_public_ids[0],
                             prompt_hint=prompt_hint,
-                            product_type=product_type,
-                            alt="Product in use",
+                            alt="Editorial article image",
                         )
                     if ctx:
                         ctx.dirty = True
@@ -2799,17 +2998,22 @@ def _apply_product_image_overrides_for_ai(
                     title = config.get("title") if isinstance(config, dict) else None
                     bullets = config.get("bullets") if isinstance(config, dict) else None
                     text = " ".join([str(title or ""), " ".join(bullets or [])])
-                    if _text_mentions_product(text):
-                        prompt_hint = _build_product_context_prompt(text, product_type)
-                        _apply_product_reference_prompt(
-                            image,
-                            public_id=product_public_ids[0],
-                            prompt_hint=prompt_hint,
-                            product_type=product_type,
-                            alt="Product in use",
-                        )
-                        if ctx:
-                            ctx.dirty = True
+                    if not text.strip():
+                        text = str(product.title or "").strip()
+                    if not text.strip():
+                        text = str(product.description or "").strip()
+                    if not text.strip():
+                        text = "product lifestyle scene"
+                    prompt_hint = _build_product_context_prompt(text, product_type)
+                    _apply_product_reference_prompt(
+                        image,
+                        public_id=product_public_ids[0],
+                        prompt_hint=prompt_hint,
+                        product_type=product_type,
+                        alt="Product in use",
+                    )
+                    if ctx:
+                        ctx.dirty = True
 
     # Generic support for templates that use primitive Image components (not SalesPdp*/PreSales*).
     #
@@ -2861,6 +3065,115 @@ def _normalize_sales_pdp_testimonial_image(
             image.pop(key, None)
             changed = True
     return changed
+
+
+def _normalize_sales_pdp_carousel_image(image: dict[str, Any]) -> bool:
+    changed = False
+    # Sales PDP hero carousel imagery is rendered via the testimonials renderer
+    # (sales_pdp_carousel.generate_and_apply), never via generic AI/Unsplash prompt flows.
+    for key in (
+        "prompt",
+        "imageSource",
+        "image_source",
+        "referenceAssetPublicId",
+        "reference_asset_public_id",
+        "aspectRatio",
+        "aspect_ratio",
+    ):
+        if key in image:
+            image.pop(key, None)
+            changed = True
+    return changed
+
+
+def _enforce_sales_pdp_carousel_testimonial_only_images(
+    *,
+    puck_data: dict[str, Any],
+    config_contexts: list[_ConfigJsonContext],
+) -> None:
+    def normalize_carousel_config(config: dict[str, Any]) -> bool:
+        changed = False
+        hero = config.get("hero") if "hero" in config else config
+        if not isinstance(hero, dict):
+            return changed
+        gallery = hero.get("gallery")
+        if not isinstance(gallery, dict):
+            return changed
+        slides = gallery.get("slides")
+        if not isinstance(slides, list):
+            return changed
+        for slide in slides:
+            if not isinstance(slide, dict):
+                continue
+            if _normalize_sales_pdp_carousel_image(slide):
+                changed = True
+        return changed
+
+    for ctx in config_contexts:
+        if ctx.key != "configJson":
+            continue
+        if ctx.component_type not in {"SalesPdpHero", "SalesPdpTemplate"}:
+            continue
+        if isinstance(ctx.parsed, dict) and normalize_carousel_config(ctx.parsed):
+            ctx.dirty = True
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        if comp_type not in {"SalesPdpHero", "SalesPdpTemplate"}:
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        config = props.get("config")
+        if isinstance(config, dict):
+            normalize_carousel_config(config)
+
+
+def _collect_sales_pdp_carousel_image_ids(
+    *,
+    puck_data: dict[str, Any],
+    config_contexts: list[_ConfigJsonContext],
+) -> set[int]:
+    ids: set[int] = set()
+
+    def collect_from_config(config: dict[str, Any]) -> None:
+        hero = config.get("hero") if "hero" in config else config
+        if not isinstance(hero, dict):
+            return
+        gallery = hero.get("gallery")
+        if not isinstance(gallery, dict):
+            return
+        slides = gallery.get("slides")
+        if not isinstance(slides, list):
+            return
+        for slide in slides:
+            if isinstance(slide, dict):
+                ids.add(id(slide))
+
+    for ctx in config_contexts:
+        if ctx.key != "configJson":
+            continue
+        if ctx.component_type not in {"SalesPdpHero", "SalesPdpTemplate"}:
+            continue
+        if isinstance(ctx.parsed, dict):
+            collect_from_config(ctx.parsed)
+
+    for obj in walk_json(puck_data):
+        if not isinstance(obj, dict):
+            continue
+        comp_type = obj.get("type")
+        if comp_type not in {"SalesPdpHero", "SalesPdpTemplate"}:
+            continue
+        props = obj.get("props")
+        if not isinstance(props, dict):
+            continue
+        config = props.get("config")
+        if isinstance(config, dict):
+            collect_from_config(config)
+
+    return ids
 
 
 def _enforce_sales_pdp_guarantee_testimonial_only_images(
@@ -2980,9 +3293,15 @@ def _validate_required_template_images(
     config_contexts: list[_ConfigJsonContext],
 ) -> None:
     missing: list[str] = []
+    sales_carousel_image_ids = _collect_sales_pdp_carousel_image_ids(
+        puck_data=puck_data,
+        config_contexts=config_contexts,
+    )
 
     def check_tree(tree: Any, base_path: str) -> None:
         for path, obj, asset_key in _iter_image_nodes_for_validation(tree, base_path=base_path):
+            if id(obj) in sales_carousel_image_ids:
+                continue
             asset_public_id = obj.get(asset_key)
             if asset_public_id:
                 continue
@@ -3016,6 +3335,10 @@ def _collect_image_plans(
     # Sales PDP guarantee visuals are testimonial-rendered assets, not prompt-driven image slots.
     # Normalize them up front so all downstream image planning treats them as testimonial targets.
     _enforce_sales_pdp_guarantee_testimonial_only_images(
+        puck_data=puck_data,
+        config_contexts=config_contexts,
+    )
+    _enforce_sales_pdp_carousel_testimonial_only_images(
         puck_data=puck_data,
         config_contexts=config_contexts,
     )
@@ -4724,7 +5047,9 @@ def generate_funnel_page_draft(
             template_image_guidance += (
                 "Pre-sales listicle imagery:\n"
                 "- Reason images should use a square (1:1) aspect ratio.\n"
-                "- If copy references the product, include the product in the image.\n\n"
+                "- Hero and reason imagery before the marquee must stay editorial and non-salesy.\n"
+                "- Before the marquee, do not use the product reference image, packaging, branded product identity, or exact book/product cover match.\n"
+                "- The pitch section below the marquee is the first place where product-aware imagery may be introduced.\n\n"
             )
     template_config_guidance = ""
     if template_mode and template_kind == "sales-pdp":
@@ -4732,6 +5057,7 @@ def generate_funnel_page_draft(
             "Sales PDP config requirements:\n"
             "- SalesPdpReviews.config MUST include: id, data.\n"
             "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
+            "- SalesPdpHero.config.gallery.slides are owned by the Sales PDP testimonial carousel renderer; do NOT set prompt/imageSource/referenceAssetPublicId on slide items.\n"
             "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
             "- SalesPdpFaq.config MUST include: id, title, items[] (do not replace it with the primitive FAQ component).\n"
             "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
@@ -5136,6 +5462,7 @@ def generate_funnel_page_draft(
                 if template_mode and template is not None and isinstance(template.puck_data, dict)
                 else (base_puck if isinstance(base_puck, dict) else None)
             ),
+            product_title=product.title if isinstance(product, Product) else None,
         )
         _validate_sales_pdp_component_configs(puck_data)
 
@@ -5246,6 +5573,14 @@ def generate_funnel_page_draft(
     }
     if attachment_summaries:
         ai_metadata["attachedAssets"] = attachment_summaries
+
+    normalize_public_page_metadata_for_context(
+        session=session,
+        org_id=org_id,
+        funnel=funnel,
+        page=page,
+        puck_data=puck_data,
+    )
 
     version = FunnelPageVersion(
         page_id=page.id,
@@ -5476,7 +5811,9 @@ def stream_funnel_page_draft(
                     template_image_guidance += (
                         "Pre-sales listicle imagery:\n"
                         "- Reason images should use a square (1:1) aspect ratio.\n"
-                        "- If copy references the product, include the product in the image.\n\n"
+                        "- Hero and reason imagery before the marquee must stay editorial and non-salesy.\n"
+                        "- Before the marquee, do not use the product reference image, packaging, branded product identity, or exact book/product cover match.\n"
+                        "- The pitch section below the marquee is the first place where product-aware imagery may be introduced.\n\n"
                     )
         template_config_guidance = ""
         if template_mode and template_kind == "sales-pdp":
@@ -5484,6 +5821,7 @@ def stream_funnel_page_draft(
                 "Sales PDP config requirements:\n"
                 "- SalesPdpReviews.config MUST include: id, data.\n"
                 "- SalesPdpHero.config.gallery.freeGifts MUST be present (do not remove it).\n"
+                "- SalesPdpHero.config.gallery.slides are owned by the Sales PDP testimonial carousel renderer; do NOT set prompt/imageSource/referenceAssetPublicId on slide items.\n"
                 "- SalesPdpHero.modals MUST be present (sizeChart/whyBundle/freeGifts).\n"
                 "- SalesPdpFaq.config MUST include: id, title, items[] (do not replace it with the primitive FAQ component).\n"
                 "- SalesPdpReviewSlider.config MUST include: title, body, hint, toggle { auto, manual }, slides[].\n"
@@ -5869,6 +6207,7 @@ def stream_funnel_page_draft(
                     if template_mode and template is not None and isinstance(template.puck_data, dict)
                     else (base_puck if isinstance(base_puck, dict) else None)
                 ),
+                product_title=product.title if isinstance(product, Product) else None,
             )
             _validate_sales_pdp_component_configs(puck_data)
 
@@ -5964,6 +6303,14 @@ def stream_funnel_page_draft(
             except Exception as exc:  # noqa: BLE001
                 generated_images = [{"error": str(exc)}]
 
+        normalize_public_page_metadata_for_context(
+            session=session,
+            org_id=org_id,
+            funnel=funnel,
+            page=page,
+            puck_data=puck_data,
+        )
+
         version = FunnelPageVersion(
             page_id=page.id,
             status=FunnelPageVersionStatusEnum.draft,
@@ -5974,15 +6321,15 @@ def stream_funnel_page_draft(
                 "prompt": prompt,
                 "messages": conversation,
                 "model": model_id,
-                    "temperature": temperature,
-                    "generatedAt": datetime.now(timezone.utc).isoformat(),
-                    "generatedImages": generated_images,
-                    "imagePlans": image_plans,
-                    "requestedImageCount": requested_image_count,
-                    "appliedImageGenerationCap": _MAX_PAGE_IMAGE_GENERATIONS,
-                    "actorUserId": user_id,
-                },
-            )
+                "temperature": temperature,
+                "generatedAt": datetime.now(timezone.utc).isoformat(),
+                "generatedImages": generated_images,
+                "imagePlans": image_plans,
+                "requestedImageCount": requested_image_count,
+                "appliedImageGenerationCap": _MAX_PAGE_IMAGE_GENERATIONS,
+                "actorUserId": user_id,
+            },
+        )
         session.add(version)
         session.commit()
         session.refresh(version)

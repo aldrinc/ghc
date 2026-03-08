@@ -1,0 +1,1165 @@
+{
+  "id": "resp_0cbeeb69ccb613e50069a769bc28b08196b06297ac3efa3f67",
+  "object": "response",
+  "created_at": 1772579260,
+  "status": "completed",
+  "background": true,
+  "billing": {
+    "payer": "developer"
+  },
+  "completed_at": 1772579837,
+  "error": null,
+  "frequency_penalty": 0.0,
+  "incomplete_details": null,
+  "instructions": null,
+  "max_output_tokens": 64000,
+  "max_tool_calls": null,
+  "model": "gpt-5.2-2025-12-11",
+  "output": [
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769ccbbd0819697bb0f7819b2ca0b",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769cf3efc8196b477d716686fe77f",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "import json, pandas as pd, re, math, numpy as np, textwrap, os, itertools\npaths = {\n\"COMPETITOR_ANGLE_MAP_JSON\":\"/mnt/data/file-MgwUtRn4ALHb3akpxnZntS-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-competitor_angle_map_json.json\",\n\"KNOWN_SATURATED_ANGLES_JSON\":\"/mnt/data/file-DAhJwZEcWdYYT88qKzoTit-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-known_saturated_angles_json.json\",\n\"PRODUCT_BRIEF_JSON\":\"/mnt/data/file-TiKbqDzKdDLqm4WZmmAQQF-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-product_brief_json.json\",\n\"HABITAT_SCORED_JSON\":\"/mnt/data/file-XupZe16GysAyiQQYN5cDBu-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-habitat_scored_json.json\",\n\"AGENT1_HABITAT_OBSERVATIONS_JSON\":\"/mnt/data/file-BjtWb4cCGzqkPHtMsCZTqL-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent1_habitat_observations_json.json\",\n\"AGENT1_MINING_PLAN_JSON\":\"/mnt/data/file-3nDSEyP6bu3WmNikcFJE6C-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent1_mining_plan_json.json\",\n\"AVATAR_BRIEF_SUMMARY_JSON\":\"/mnt/data/file-QYJeMk6SRbhi6epHre4ngR-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-avatar_brief_summary_json.json\",\n\"FOUNDATIONAL_RESEARCH_DOCS_JSON\":\"/mnt/data/file-4JhrFk92Asr5uozqvsoQPL-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-foundational_research_docs_json.json\",\n\"VOC_EVIDENCE_ROWS_JSON\":\"/mnt/data/file-Xv3fiBtBrzZJYg5FxXft17-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-voc_evidence_rows_json.json\",\n\"AGENT2_INPUT_MANIFEST_JSON\":\"/mnt/data/file-52NfZTTvRLMCbUTJWTFnt3-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-agent2_input_manifest_json.json\",\n\"VOC_EVIDENCE_LAYOUT_JSON\":\"/mnt/data/file-DQWTVBdyMWF26AKnkrQxLN-strategy-v2-732c4f5c-7d12-42bf-8014-75c9-agent3-voc_evidence_layout_json.json\"\n}\ndata={}\nfor k,p in paths.items():\n    with open(p,'r') as f:\n        data[k]=json.load(f)\n{k: type(v) for k,v in data.items()}\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769dab71081969e0e74d219f1ec70",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769dae5a48196946e9b7a271b39a1",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "data[\"PRODUCT_BRIEF_JSON\"]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769dfcf20819686e3abd2bb0fb4fe",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769e059c88196866b34e5ece39566",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "data[\"AVATAR_BRIEF_SUMMARY_JSON\"]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769e3f5d481968134d06bcbd63136",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769e42f688196a5dec4e01bd5d2e5",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "voc = data[\"VOC_EVIDENCE_ROWS_JSON\"]\nlen(voc), voc[0].keys()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769e6cd148196a611ae1c73101d52",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769e706208196bdb9f5e2956ef6ea",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df = pd.DataFrame(voc)\ndf[['evidence_id','source_type','habitat_type','habitat_name','date']].head()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769ec3dc08196a339afc0e3544a37",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769ec9b30819692675c2df3fd8bfd",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "data[\"AGENT2_INPUT_MANIFEST_JSON\"].keys(), data[\"AGENT2_INPUT_MANIFEST_JSON\"]['canonical_voc_source']\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769f0acb881968a582f545c79b16e",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769f0e01c8196a268ce16860a4aa9",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "data[\"AGENT2_INPUT_MANIFEST_JSON\"]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769f70cbc8196b99101d92d998eee",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769f7d44c8196a9d56e217e86415c",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "man = data[\"AGENT2_INPUT_MANIFEST_JSON\"]\nman.keys()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a769fc8d6881969041dd65b762f28f",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a769fdba4881969a250d0bd9f09962",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df['source_type'].value_counts().head(20)\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a00e5ac819693e290949c367f23",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a024018819699af8c30e26eb458",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "hab_scored = data[\"HABITAT_SCORED_JSON\"]\nhab_scored.keys(), len(hab_scored.get('habitats',[]))\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a084d0081968411afffae64d202",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "hab_df = pd.DataFrame(hab_scored['habitats'])\nhab_df.columns, hab_df.sort_values('score', ascending=False).head(10)\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a0c1bb081968d648acd30f53cce",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a0c59d4819684413acb1535d588",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "hab_df.head()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a10426881969166e741fd1b6ce8",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a16a7d48196bcc203cd5acf7f92",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "sat = data[\"KNOWN_SATURATED_ANGLES_JSON\"]\nlen(sat), sat[0].keys(), sat[0]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a18e8f881968105339b59e9ac4a",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a1930ac81968df3b5839195b4e0",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "comp = data[\"COMPETITOR_ANGLE_MAP_JSON\"]\nlen(comp), comp[0].keys() if comp else None\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a1c483881968da13e989bd7216e",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "comp[0]['competitor_name'], len(comp[0]['assets']), comp[0]['assets'][0].keys()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a2074a48196ae97a43d516aca50",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "comp[0]['assets']\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a23ae188196b03d4eb9f236204c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a3562708196bfe5da1c26c31c45",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "layout = data[\"VOC_EVIDENCE_LAYOUT_JSON\"]\nlayout.keys(), layout.get('fields',[])[:5]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a39413881969240a12a183c0476",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "layout\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a3c817c819685d98c5c52785e20",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a3cf4d081968b169354a856db70",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "mp = data[\"AGENT1_MINING_PLAN_JSON\"]\nlen(mp), mp[0].keys()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a4029a481968b7b1bea0f08d1d7",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "mp[0]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a42bad881969f8828ac45bbd40a",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a47f3a88196b2ee85917fde1537",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def find_rows(patterns, source_types=None, n=5):\n    mask = pd.Series(True, index=df.index)\n    if source_types:\n        mask &= df['source_type'].isin(source_types)\n    txt = (df['verbatim'].fillna('') + ' ' + df['context'].fillna('')).str.lower()\n    m = pd.Series(False, index=df.index)\n    for pat in patterns:\n        m |= txt.str.contains(pat, regex=True)\n    res = df[mask & m].copy()\n    return res, res.head(n)[['evidence_id','source_type','source_url','verbatim']]\n\n# kids meds\nres, head = find_rows([r'\\btylenol\\b', r'\\bteeth|teething\\b', r'\\bnurofen\\b', r'\\bibuprofen\\b'], source_types=['REDDIT','FORUM'])\nlen(res), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a4e16f48196919059dcc1dcd703",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a4e699881969fcb35c813aff69b",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_hrt, head = find_rows([r'\\bhrt\\b', r'drug interaction', r'contraindicat', r'polypharmacy', r'medication'], source_types=['REDDIT','FORUM','YT_COMMENT','IG_COMMENT','VIDEO_HOOK'])\nlen(res_hrt), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a5194488196ada7a0c0a81d417c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a526be0819686bbbee87746241a",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_int, head = find_rows([r'herb.*drug', r'drug.*herb', r'supplement.*med', r'\\bcontraindicat', r'interaction'], source_types=None)\nlen(res_int), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a57e5308196a0ea9ab75e6434b3",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a58ab548196b9df2464b940bb59",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_int_rf, head = find_rows([r'herb', r'supplement', r'interaction', r'contraindicat', r'doctor'], source_types=['REDDIT','FORUM'])\nlen(res_int_rf), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a5b7e548196b5ae17ae24a68ee3",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a5bf7608196aa0959ee9b4d7bf6",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_doc, head = find_rows([r'doctor', r'pharm', r'training', r'fear', r'google.*mixed'], source_types=['REDDIT','FORUM'])\nhead, len(res_doc)\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a5efaa88196aac4e1d32bc1ed5c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a5f5a148196bdf937bfcc4d66c3",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_multi, head = find_rows([r'multiple medication', r'juggling multiple', r'\\bpolypharmacy\\b', r'\\bhrt\\b'], source_types=None)\nlen(res_multi), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a6270d48196baaf055c9385a063",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a6330288196b0f28fcbea35d0f7",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_supp, head = find_rows([r\"can't say what supplements\", r'what supplements should i stop', r'supplement.*hrt', r'herb.*hrt'], source_types=['REDDIT','FORUM'])\nlen(res_supp), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a6672948196aa804eca674c549d",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a683ff08196870a905c59e38a5f",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_woo, head = find_rows([r'woo', r'not.*woo', r'woo woo', r'energetics', r'spiritual'], source_types=['REDDIT','FORUM'])\nlen(res_woo), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a6b01d081969b6b6dfd7bec3e31",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a6be0d081969096d19e7d173c36",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_mix, head = find_rows([r'mixed results', r'one article.*safe.*next', r'conflicting', r'contradict'], source_types=['REDDIT','FORUM'])\nlen(res_mix), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a709c4881968d0a8b4d89204936",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a70f0788196b3d875fed2e2fb38",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_google, head = find_rows([r'\\bgoogle\\b', r'\\blook up\\b', r'\\bresearch\\b'], source_types=['REDDIT','FORUM'])\nlen(res_google), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a73fe248196a55ece94766ba286",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a746a1c81968aa9c4c575cf5610",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_ai, head = find_rows([r'\\bai\\b', r'chatgpt', r'generated', r'plague', r'fake book', r'counterfeit'], source_types=['REDDIT','FORUM'])\nlen(res_ai), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a782708819695f6f66b61c78b45",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a788da881968268f6511be3fdb5",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_apoth, head = find_rows([r'apothecary', r'home apothecary', r'herbalist.*start', r'get started'], source_types=['REDDIT','FORUM'])\nlen(res_apoth), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a7c45608196a229510c2939d12c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a7c843081968d762ec35bff2f08",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_comm, head = find_rows([r'provide to communit', r'become an herbalist', r'learn herbalism', r'herbalist'], source_types=['REDDIT','FORUM'])\nlen(res_comm), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a8000ac8196a9332655303f2a1e",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a80a9ac819699b5f0d1eae203d3",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_preg, head = find_rows([r'pregnan', r'breastfeed', r'postpartum'], source_types=['REDDIT','FORUM'])\nlen(res_preg), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a8921208196a62e78a307a6c4d1",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a8974c08196933cfb7e03676a7a",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_ecz, head = find_rows([r'eczema'], source_types=None)\nlen(res_ecz), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a8d3d1c8196becfb7ec2fc777fc",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a8db00c8196a0ba2da6d1039bb6",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_ecz_rf = df[df['verbatim'].str.lower().str.contains('eczema', na=False) & df['source_type'].isin(['REDDIT','FORUM'])]\nlen(res_ecz_rf), res_ecz_rf[['evidence_id','source_type','verbatim','source_url']].head()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a91e02c81969800cd91a21cc38d",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a93549c81969c574572b90bf4ac",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_pharm, head = find_rows([r'big pharma', r'\\bpharm\\b', r'pharma', r'corruption', r'weapon of division'], source_types=['REDDIT','FORUM','YT_COMMENT'])\nlen(res_pharm), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a9722f081968d3b61250d2912ed",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a986464819682d58ee14cb8811c",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_lib, head = find_rows([r'library of', r'rule of 3', r'multiple books', r'bottom shelf', r'demoted to the bottom shelf'], source_types=['REDDIT','FORUM'])\nlen(res_lib), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76a9cd82881969f365ffc1d0f1791",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76a9d416481969c2158d05e5ace85",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_bookrec, head = find_rows([r'book.*recommend', r'what book', r'book any good', r'herbalism book', r'bookcase'], source_types=['REDDIT','FORUM'])\nlen(res_bookrec), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76aa28d4081969a826dd141f2fba4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76aae420c8196a8b72fb5bbe45134",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "from datetime import datetime, timezone\ndef parse_date(d):\n    if not d or d=='Unknown': return None\n    try:\n        return datetime.fromisoformat(d.replace('Z','+00:00'))\n    except Exception:\n        return None\ndf['dt']=df['date'].apply(parse_date)\n\nsource_weight={'REDDIT':2.0,'FORUM':1.8,'YT_COMMENT':1.2,'IG_COMMENT':1.0,'VIDEO_HOOK':0.8}\ndef score_row(row, keywords):\n    text=(str(row['verbatim'])+' '+str(row.get('context',''))).lower()\n    kcount=sum(1 for kw in keywords if re.search(kw,text))\n    base=source_weight.get(row['source_type'],1.0)\n    length=min(len(row['verbatim'] or ''),320)/320\n    date_bonus=0.2 if row['dt'] is not None else 0.0\n    return base + 0.6*kcount + 0.4*length + date_bonus\n\ndef select_cluster(patterns, source_types=None):\n    txt=(df['verbatim'].fillna('')+' '+df['context'].fillna('')).str.lower()\n    m=pd.Series(False,index=df.index)\n    for pat in patterns:\n        m |= txt.str.contains(pat, regex=True)\n    sub=df[m].copy()\n    if source_types:\n        sub=sub[sub['source_type'].isin(source_types)]\n    return sub\n\nclusters={}\nclusters['A01_Cautious_Caregiver_NoTylenol']=select_cluster([r'\\btylenol\\b',r'\\bnurofen\\b',r'\\bteething\\b',r'\\bteeth\\b',r'\\bibuprofen\\b',r'\\bfever\\b'], source_types=['REDDIT','FORUM'])\nlen(clusters['A01_Cautious_Caregiver_NoTylenol'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76ab626948196873ba6f2fff3b052",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76ab65fe08196aa19e531d8b69038",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A02_Pregnancy_Tea_Safety']=select_cluster([r'pregnan',r'\\bob\\b',r'\\bmidwife\\b',r'\\btea\\b',r'breastfeed',r'postpartum'], source_types=['REDDIT','FORUM'])\nlen(clusters['A02_Pregnancy_Tea_Safety'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76aba1a388196bb1c6919dd9615d6",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76aba493081968ba97a0e7bda00d9",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A03_HRT_Supplement_Confusion']=select_cluster([r'\\bhrt\\b',r'\\bmenopaus',r'supplement',r'what supplements',r'starting hrt'], source_types=['REDDIT','FORUM'])\nlen(clusters['A03_HRT_Supplement_Confusion'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76abded588196b9d10ec8042a62df",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76abf20d481968d718c526e3a8b52",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A04_Drug_Herb_Interactions']=select_cluster([r'herb[- ]drug',r'drug[- ]herb',r'\\binteraction',r'contraindicat',r'not.*always.*safe'], source_types=None)\nlen(clusters['A04_Drug_Herb_Interactions'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76ac272a48196b9e2642d27f9c46b",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76ac36d8881969d8bbdb902a8b6fc",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A05_Not_Woo_Woo']=select_cluster([r'woo',r'woo woo',r'energetics',r'spiritual tea',r'not.*woo'], source_types=['REDDIT','FORUM'])\nlen(clusters['A05_Not_Woo_Woo'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76aca550c8196a88626b5a49b6f31",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76aca7ee88196ab43b5996fea2360",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A06_AI_Fake_Books']=select_cluster([r'\\bai\\b',r'chatgpt',r'plague',r'fake book',r'generated'], source_types=['REDDIT','FORUM'])\nlen(clusters['A06_AI_Fake_Books'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76ace53188196b1022e5757b6f614",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76ace81c08196b3cad602e4a702f3",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A07_Home_Apothecary_Starter']=select_cluster([r'apothecary',r'home apothecary',r'herbalism.*presented',r'get started',r'show us yours'], source_types=['REDDIT','FORUM'])\nlen(clusters['A07_Home_Apothecary_Starter'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76ad220f48196b9e858bbbe3e7df6",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76ad289dc8196a5c6487b9368f984",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A08_Rule_of_3_Reference']=select_cluster([r'rule of 3',r'multiple books',r'for reference',r'confirm a use',r'library of'], source_types=['REDDIT','FORUM'])\nlen(clusters['A08_Rule_of_3_Reference'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76ad5de208196b2b4e09228e016a4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76ad77f908196ae119f21a27db4c8",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A08_Which_Book_Is_Good']=select_cluster([r'book.*recommend',r'what book',r'book any good',r'herbalism book',r'good book'], source_types=['REDDIT','FORUM'])\nlen(clusters['A08_Which_Book_Is_Good'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76adb3098819682241d3c6f83b7bb",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76adbc4008196b3884934df9279c0",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A09_Community_Herbalist_Path']=select_cluster([r'become an herbalist',r'provide to communit',r'learn herbal',r'herbalist.*long term'], source_types=['REDDIT','FORUM'])\nlen(clusters['A09_Community_Herbalist_Path'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76adfee548196aec7f066772d4537",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76ae05c188196b50a22e28c200cc1",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A09_Community_Herbalist_Path']=select_cluster([r'become an herbalist',r'i want to become',r'want to become',r'herbalist',r'provide to communit'], source_types=['REDDIT','FORUM'])\nlen(clusters['A09_Community_Herbalist_Path'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76ae6150881968d7fefab647ac6c4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76ae7044c81968854f2bfe250b603",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A10_Doctors_Dont_Know_Herbs']=select_cluster([r'doctor',r'pharm',r'pharma',r'corruption',r'ignorant',r'go hand in hand'], source_types=['REDDIT','FORUM','YT_COMMENT'])\nlen(clusters['A10_Doctors_Dont_Know_Herbs'])\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76aea1fb081968851d4632406facc",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76aedfa108196a05d888de7fdc918",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "list(data[\"FOUNDATIONAL_RESEARCH_DOCS_JSON\"].keys())\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76af0e9e88196bc54d0081112f2ff",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "data[\"FOUNDATIONAL_RESEARCH_DOCS_JSON\"][\"step_summaries\"].keys()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76af77d9881969b2b8a01a7259f90",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "data[\"FOUNDATIONAL_RESEARCH_DOCS_JSON\"][\"step_summaries\"][\"03\"][:500]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76afc89988196a85fb81dc346383c",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76afed0e881969faae4d023e80a51",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def pick_top_quotes(sub, keywords, n=5):\n    sub = sub.copy()\n    sub['score']=sub.apply(lambda r: score_row(r, keywords), axis=1)\n    sub=sub.sort_values('score', ascending=False)\n    # ensure unique verbatim maybe\n    quotes=[]\n    seen=set()\n    for _,r in sub.iterrows():\n        q=str(r['verbatim']).strip()\n        if not q or q in seen: \n            continue\n        seen.add(q)\n        quotes.append((r['evidence_id'], q[:320], float(round(r['score'],2))))\n        if len(quotes)>=n: break\n    return quotes, sub\n\ndef count_habitats(sub):\n    return sub['habitat_type'].nunique()\n\ndef velocity_status(sub):\n    dated=sub.dropna(subset=['dt'])\n    if len(dated)<5:\n        return 'STEADY'\n    cutoff=datetime(2025,3,3,tzinfo=timezone.utc)\n    recent=(dated['dt']>=cutoff).sum()\n    old=(dated['dt']<cutoff).sum()\n    if old==0 and recent>0: \n        return 'ACCELERATING'\n    ratio=recent/(old+1e-9)\n    if ratio>=1.2: return 'ACCELERATING'\n    if ratio<=0.8: return 'DECELERATING'\n    return 'STEADY'\n\ndef triangulation_status(sub):\n    n= count_habitats(sub)\n    if n<=1: return 'SINGLE'\n    if n==2: return 'DUAL'\n    return 'MULTI'\n\ndef contradiction_count(sub, patterns):\n    if not patterns: return 0\n    txt=sub['verbatim'].fillna('').str.lower()\n    m=pd.Series(False,index=sub.index)\n    for pat in patterns:\n        m |= txt.str.contains(pat, regex=True)\n    return int(m.sum())\n\n# define angle specs\nangle_specs = {\n\"A01\":{\"name\":\"No-Tylenol-But-They're-In-Pain\",\"cluster\":\"A01_Cautious_Caregiver_NoTylenol\",\n       \"keywords\":[r'tylenol',r'teething',r'pain',r'give',r'fear',r'nurofen'],\n       \"who_pats\":[r'\\bmy (son|daughter|baby|girl|boy)\\b',r'\\b6 months\\b',r'\\bparent\\b',r'\\bhusband\\b'],\n       \"trig_pats\":[r'\\bteething\\b',r'\\bcry',r'\\bhours\\b',r'\\bnight\\b',r'\\b6 months\\b'],\n       \"contradict\":[r'just give',r'they do need',r'don\\'t feel guilty',r'are you in the us\\? i know you requested natural']\n      },\n\"A02\":{\"name\":\"Pregnancy Tea Panic\",\"cluster\":\"A02_Pregnancy_Tea_Safety\",\n       \"keywords\":[r'pregnan',r'tea',r'ob',r'safe',r'chamomile',r'approved'],\n       \"who_pats\":[r'\\bmy ob\\b',r'\\bpregnan',r'\\bmidwife\\b',r'\\bpostpartum\\b'],\n       \"trig_pats\":[r'just found',r'favorite',r'\\bapproved\\b',r'\\bavoid\\b'],\n       \"contradict\":[r'all tea is fine',r'wouldn’t worry too much',r'generally']\n      },\n\"A03\":{\"name\":\"HRT + Supplements: What Do I Stop?\",\"cluster\":\"A03_HRT_Supplement_Confusion\",\n       \"keywords\":[r'\\bhrt\\b',r'\\bmenopaus',r'supplement',r'doctor',r'can\\'t say',r'starting'],\n       \"who_pats\":[r'\\bstarting hrt\\b',r'\\bmenopaus',r'\\bperi',r'\\bdoctor\\b'],\n       \"trig_pats\":[r'\\bstarting\\b',r'\\ballowed me\\b',r'can\\'t say'],\n       \"contradict\":[r'ask your doctor',r'no issue',r'fine']\n      },\n\"A04\":{\"name\":\"Natural ≠ Automatically Safe (Interaction Checklist)\",\"cluster\":\"A04_Drug_Herb_Interactions\",\n       \"keywords\":[r'interaction',r'contraindicat',r'medication',r'not.*always.*safe',r'prescription',r'pharmac'],\n       \"who_pats\":[r'multiple medications',r'\\bpills\\b',r'\\bmedication\\b',r'\\bprescription\\b'],\n       \"trig_pats\":[r'juggling',r'starting',r'take.*with',r'avoid'],\n       \"contradict\":[r'natural remedies work',r'no side effects',r'cure',r'magic']\n      },\n\"A05\":{\"name\":\"Herbalism Without the Woo\",\"cluster\":\"A05_Not_Woo_Woo\",\n       \"keywords\":[r'woo',r'woo woo',r'not.*woo',r'energetics',r'this for that'],\n       \"who_pats\":[r'woo',r'not.*woo',r'skeptic',r'fond of your reference'],\n       \"trig_pats\":[r'suggestmeabook',r'reference',r'book'],\n       \"contradict\":[r'in intuition i trust',r'angelica has a natural connection',r'spiritual']\n      },\n\"A06\":{\"name\":\"AI Herbal Books Are a Plague\",\"cluster\":\"A06_AI_Fake_Books\",\n       \"keywords\":[r'\\bai\\b',r'plague',r'fake',r'amazon',r'crappy',r'generated'],\n       \"who_pats\":[r'amazon',r'book',r'list these',r'deterimine'],\n       \"trig_pats\":[r'new plague',r'can you list',r'how can you determine'],\n       \"contradict\":[r'in intuition i trust',r'doesn\\'t matter']\n      },\n\"A07\":{\"name\":\"Build Your Home Apothecary (Starter Path)\",\"cluster\":\"A07_Home_Apothecary_Starter\",\n       \"keywords\":[r'apothecary',r'home apothecary',r'get started',r'googled',r'boom'],\n       \"who_pats\":[r'home apothecary',r'introduced to herbalism',r'googled'],\n       \"trig_pats\":[r'heard the word',r'googled',r'boom',r'show us yours'],\n       \"contradict\":[r'i got it for christmas.*bottom shelf',r'don\\'t know anything']\n      },\n\"A08\":{\"name\":\"Which Herbal Book Is Actually Good?\",\"cluster\":\"A08_Which_Book_Is_Good\",\n       \"keywords\":[r'book',r'any good',r'recommend',r'good book',r'bottom shelf',r'reference'],\n       \"who_pats\":[r'what book',r'recommend',r'is this book any good',r'library'],\n       \"trig_pats\":[r'recommended to be',r'for christmas',r'what book would you recommend'],\n       \"contradict\":[r'i have a library of 10',r'great book',r'it\\'s a great book']\n      },\n\"A09\":{\"name\":\"I Want to Become an Herbalist (But Need a Map)\",\"cluster\":\"A09_Community_Herbalist_Path\",\n       \"keywords\":[r'become an herbalist',r'learn herbal',r'provide',r'community',r'get started'],\n       \"who_pats\":[r'want to become',r'become an herbalist',r'provide to communities'],\n       \"trig_pats\":[r'long term',r'provide',r'get started'],\n       \"contradict\":[r'you may have to do your own research',r'no training']\n      },\n\"A10\":{\"name\":\"Doctors Don’t Have Herb Training (DIY Research)\",\"cluster\":\"A10_Doctors_Dont_Know_Herbs\",\n       \"keywords\":[r'doctor',r'pharm',r'training',r'ignorant',r'hand in hand',r'google'],\n       \"who_pats\":[r'doctor',r'pharmacist',r'patient',r'my doctor'],\n       \"trig_pats\":[r'doctors advise',r'check on line',r'asked'],\n       \"contradict\":[r'ask your pharmacist',r'check with your doctors',r'approved']\n      }\n}\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b14b6d0819690b4520e6d339f35",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b16467c8196a82fd9499ac036f5",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def pick_ids(sub, patterns, k=2):\n    txt=sub['verbatim'].fillna('').str.lower()\n    m=pd.Series(False,index=sub.index)\n    for pat in patterns:\n        m |= txt.str.contains(pat, regex=True)\n    ids=sub[m]['evidence_id'].tolist()\n    if len(ids)<k:\n        # fallback to top scoring items\n        ids=sub['evidence_id'].tolist()\n    return ids[:k]\n\ndef truncate(s, n=280):\n    s=str(s)\n    return s if len(s)<=n else s[:n-1]\n\ncandidates=[]\nfor i,(aid,spec) in enumerate(angle_specs.items(), start=1):\n    sub=clusters[spec['cluster']]\n    quotes, scored = pick_top_quotes(sub, spec['keywords'], n=5)\n    who_ids=pick_ids(scored, spec['who_pats'], k=2)\n    trig_ids=pick_ids(scored, spec['trig_pats'], k=2)\n    # pain ids: top 2 quotes ids\n    pain_ids=[q[0] for q in quotes[:2]]\n    belief_before_id=quotes[0][0] if quotes else (scored['evidence_id'].iloc[0] if len(scored)>0 else '')\n    belief_after_id=quotes[1][0] if len(quotes)>1 else belief_before_id\n    \n    def ids_str(ids):\n        return \",\".join(ids[:3])\n    who = truncate(f\"{spec['name']} segment: {ids_str(who_ids)}\", 280)\n    trigger = truncate(f\"Why now: {ids_str(trig_ids)}\", 280)\n    pain_desire = truncate(f\"Pain/Outcome/Enemy/Failed fixes: see {ids_str(pain_ids)}\", 280)\n    # mechanism: use product brief\n    mech = truncate(\"Mechanism: customizable, safety-first lookup; quick remedy cards + contraindication & herb–drug/pregnancy notes; escalations/when-to-seek-care; 'honest' evidence grading.\",280)\n    belief_before=truncate(f\"Before: 'I’m unsure what’s safe / what to do' ({belief_before_id})\",280)\n    belief_after=truncate(f\"After: 'I can choose a safe next step & know when to escalate' ({belief_after_id})\",280)\n    contradiction=contradiction_count(scored, spec['contradict'])\n    cand={\n        \"angle_id\":aid,\n        \"angle_name\":spec['name'],\n        \"definition\":{\n            \"who\":who,\n            \"pain_desire\":pain_desire,\n            \"mechanism_why\":mech,\n            \"belief_shift\":{\"before\":belief_before,\"after\":belief_after},\n            \"trigger\":trigger\n        },\n        \"evidence\":{\n            \"supporting_voc_count\":int(len(sub)),\n            \"top_quotes\":[{\"voc_id\":qid,\"quote\":qt,\"adjusted_score\":sc} for qid,qt,sc in quotes],\n            \"triangulation_status\":triangulation_status(sub),\n            \"velocity_status\":velocity_status(sub),\n            \"contradiction_count\":contradiction\n        },\n        \"hook_starters\":[\n            {\"visual\":truncate(\"Screenshot of a cluttered medicine cabinet + herbal tea tin\",280),\n             \"opening_line\":truncate(\"If 'natural' feels safer but you’re scared to make the wrong call…\",280),\n             \"lever\":truncate(\"Risk-management: safe next step + red flags\",280)},\n            {\"visual\":truncate(\"Close-up: checklist page with 'contraindications' highlighted\",280),\n             \"opening_line\":truncate(\"Stop guessing—use a 60‑second safety check before you try any remedy.\",280),\n             \"lever\":truncate(\"Confidence via rules + lookup\",280)},\n            {\"visual\":truncate(\"Sticky note: 'What do I do tonight?' on fridge\",280),\n             \"opening_line\":truncate(\"When it’s 2am and you just need a sane plan…\",280),\n             \"lever\":truncate(\"Night-of trigger + fast lookup\",280)},\n        ]\n    }\n    candidates.append(cand)\ncandidates[0]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b243f1c8196b569d5b7c59732c4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b282c9c819681caef8d6960be71",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "df[df['evidence_id']=='E08FD59E444917411'][['habitat_type','habitat_name','source_type']].head()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b2d2f148196955535516f8b557e",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b2e036c8196a4591cb95ad64025",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "clusters['A01_Cautious_Caregiver_NoTylenol']['habitat_type'].value_counts()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b32858c8196a4f0bfd0cc5e4799",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b3707e48196bfa11f2fc62415d9",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes_A02,_=pick_top_quotes(clusters['A02_Pregnancy_Tea_Safety'], angle_specs['A02']['keywords'])\nquotes_A02\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b39c5a4819686dc9598c1c22c23",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b3a8ce48196a55145c6003a3f8d",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes_A03,_=pick_top_quotes(clusters['A03_HRT_Supplement_Confusion'], angle_specs['A03']['keywords'])\nquotes_A03\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b3e32dc81969f828f69feda0bd4",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b3f33a481969fc14c76c8bd1dc1",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "quotes_A04,scored_A04=pick_top_quotes(clusters['A04_Drug_Herb_Interactions'], angle_specs['A04']['keywords'])\nquotes_A04[:5]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b4351908196a774fad203f5d123",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b45874c81968628db41265c73c0",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "res_heavy, head = find_rows([r'heavy metal', r'lead', r'mercur', r'contamin'], source_types=None)\nlen(res_heavy), head\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b48eb148196944018cedefcf4b7",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b4cc9c88196a8414efd67f1c767",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def show_top(sub, keywords, n=8):\n    quotes, scored = pick_top_quotes(sub, keywords, n=n)\n    return quotes\nfor aid in ['A05','A06','A07','A08','A09','A10']:\n    spec=angle_specs[aid]\n    print(aid, spec['name'])\n    print(show_top(clusters[spec['cluster']], spec['keywords'], n=6))\n    print()\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b5170e88196b8abc6a308064a60",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b571674819685b539bbe84b2cb5",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def make_candidate(aid, spec, mech_text, who_text, trig_text, pain_text, before_text, after_text, contradictions_patterns):\n    sub=clusters[spec['cluster']]\n    quotes,_=pick_top_quotes(sub, spec['keywords'], n=5)\n    # compute contradiction\n    scored=sub.copy()\n    contradiction=contradiction_count(scored, contradictions_patterns)\n    cand={\n        \"angle_id\":aid,\n        \"angle_name\":spec['name'],\n        \"definition\":{\n            \"who\":truncate(who_text,280),\n            \"pain_desire\":truncate(pain_text,280),\n            \"mechanism_why\":truncate(mech_text,280),\n            \"belief_shift\":{\"before\":truncate(before_text,280),\"after\":truncate(after_text,280)},\n            \"trigger\":truncate(trig_text,280)\n        },\n        \"evidence\":{\n            \"supporting_voc_count\":int(len(sub)),\n            \"top_quotes\":[{\"voc_id\":qid,\"quote\":qt[:320],\"adjusted_score\":float(sc)} for qid,qt,sc in quotes],\n            \"triangulation_status\":triangulation_status(sub),\n            \"velocity_status\":velocity_status(sub),\n            \"contradiction_count\":int(contradiction)\n        },\n        \"hook_starters\":[\n            {\"visual\":truncate(\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",280),\n             \"opening_line\":truncate(\"You don’t need more remedies—you need a decision ladder.\",280),\n             \"lever\":truncate(\"Clarity under uncertainty\",280)},\n            {\"visual\":truncate(\"Split screen: Google results contradicting each other\",280),\n             \"opening_line\":truncate(\"One site says 'safe'… the next says 'never'—so what now?\",280),\n             \"lever\":truncate(\"Stops endless searching\",280)},\n            {\"visual\":truncate(\"Highlighter marking 'contraindications' and 'drug interactions'\",280),\n             \"opening_line\":truncate(\"Before you try any herb, run the 3-check safety scan.\",280),\n             \"lever\":truncate(\"Risk reduction + confidence\",280)},\n        ]\n    }\n    return cand\n\nmech_base=\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\"\n\ncand_list=[]\n\n# A01\ncand_list.append(make_candidate(\n\"A01\", angle_specs[\"A01\"], mech_base,\nwho_text=\"WHO: exhausted parents of teething infants who fear giving Tylenol/Motrin. (E08FD59E444917411,E7BC66D367EA97727)\",\ntrig_text=\"TRIGGER: 2–3am teething flare + no sleep + baby won’t settle. (E08FD59E444917411,E7BC66D367EA97727)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: baby pain + parent guilt/fear; wants safe relief + sleep. Enemy=unsafe 'teething relief' + guesswork. Tried frozen teethers/gels. (E08FD59E444917411,E7BC66D367EA97727,E1E813C24634DA100)\",\nbefore_text=\"Before: 'Natural feels safer but I’m scared to do the wrong thing.' (E08FD59E444917411)\",\nafter_text=\"After: 'I have a safe-first plan + clear red flags for meds/doctor.' (E1E813C24634DA100)\",\ncontradictions_patterns=angle_specs[\"A01\"][\"contradict\"]\n))\n\n# A02\ncand_list.append(make_candidate(\n\"A02\", angle_specs[\"A02\"], mech_base,\nwho_text=\"WHO: pregnant people trying to use tea/ginger for nausea/comfort but worried what’s safe. (EA47DB03D2D9C82D3,ECACE08E25F4DF2CA)\",\ntrig_text=\"TRIGGER: discover an ingredient (e.g., lemongrass) 'may not be safe' after weeks of drinking it. (EA47DB03D2D9C82D3,EE6287F027A61628E)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: confusing safety rules + 'not studied' gap; wants OB-aligned safe options. Enemy=uncertainty + conflicting guidance. (EA47DB03D2D9C82D3,ECACE08E25F4DF2CA,E6BB1308752D0F45B)\",\nbefore_text=\"Before: 'Herbal teas get iffy… I can’t tell what’s safe.' (EA47DB03D2D9C82D3)\",\nafter_text=\"After: 'I can pick low-risk teas and know what to avoid/ask about.' (ECACE08E25F4DF2CA)\",\ncontradictions_patterns=angle_specs[\"A02\"][\"contradict\"]\n))\n\n# A03\ncand_list.append(make_candidate(\n\"A03\", angle_specs[\"A03\"], mech_base,\nwho_text=\"WHO: perimenopause/menopause buyers starting HRT who already take supplements. (E0DED9F511FA41606,EC6BC00F960351E1F)\",\ntrig_text=\"TRIGGER: get HRT script, email supplement list, receive a 'non-answer'. (E0DED9F511FA41606,EC6BC00F960351E1F)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: doc can’t say what to stop; fear of bad interactions. Wants a clear keep/stop/ask list. Enemy=info gap. Failed fix=asking clinician. (E0DED9F511FA41606,E57987402253DC802)\",\nbefore_text=\"Before: 'If I just ask my doctor, I’ll get a clear yes/no list.' (E0DED9F511FA41606)\",\nafter_text=\"After: 'I need an interaction-first reference to discuss with a pro.' (EC6BC00F960351E1F)\",\ncontradictions_patterns=angle_specs[\"A03\"][\"contradict\"]\n))\n\n# A04\ncand_list.append(make_candidate(\n\"A04\", angle_specs[\"A04\"], mech_base,\nwho_text=\"WHO: 'natural wellness' shoppers who don’t want to accidentally mix herbs/supplements with meds. (E4D00E3036A56D65A,E531A0D1FA0B51E92)\",\ntrig_text=\"TRIGGER: see warnings like 'Natural doesn’t always mean safe' + 'serious drug interactions'. (E531A0D1FA0B51E92,E4D00E3036A56D65A)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: fear of interactions/contamination; wants a simple contraindication checklist. Enemy=trend-driven supplement stacks. Failed fix=buying popular supplements blindly. (E531A0D1FA0B51E92,E4AFABC0423877340)\",\nbefore_text=\"Before: 'If it’s natural, it’s basically safe.' (E4B2BF1627BC7EDC2)\",\nafter_text=\"After: 'I check interactions/contraindications first, then decide.' (E531A0D1FA0B51E92)\",\ncontradictions_patterns=angle_specs[\"A04\"][\"contradict\"]\n))\n\n# A05\ncand_list.append(make_candidate(\n\"A05\", angle_specs[\"A05\"], mech_base,\nwho_text=\"WHO: science-friendly beginners who want minor-ailment remedies but 'not woo woo' or anti-science. (E05569705578ABDCF,EF51BA8B89CD4DEFC)\",\ntrig_text=\"TRIGGER: searching for a reference book that isn’t 'super crunchy' or spiritual. (E05569705578ABDCF,E46A41159CA297AC0)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: hates woo + misinformation; wants practical, cautious remedies. Enemy=anti-science slant. Failed fix=buying random books. (E05569705578ABDCF,E471510CA86541721)\",\nbefore_text=\"Before: 'Herbalism books are either woo or fear-mongery.' (E05569705578ABDCF)\",\nafter_text=\"After: 'There’s a practical, evidence-respecting middle lane.' (EF51BA8B89CD4DEFC)\",\ncontradictions_patterns=angle_specs[\"A05\"][\"contradict\"]\n))\n\n# A06\ncand_list.append(make_candidate(\n\"A06\", angle_specs[\"A06\"], mech_base,\nwho_text=\"WHO: DIY remedy learners shopping Amazon who fear AI/fake herb books. (E37E8AB347B85267A,E185CC657267363E7)\",\ntrig_text=\"TRIGGER: notice multiple tincture books that look AI-written / copy-pasted. (E37E8AB347B85267A,E185CC657267363E7)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: misinfo can poison people; wants 'real herbalist' guidance. Enemy=crappy AI books + fake publishers. Failed fix=trusting Amazon listings. (E37E8AB347B85267A,EE80C9ED4557D7A84)\",\nbefore_text=\"Before: 'If it’s on Amazon, it’s probably vetted enough.' (E185CC657267363E7)\",\nafter_text=\"After: 'I need provenance + safety checks, not just reviews.' (E37E8AB347B85267A)\",\ncontradictions_patterns=angle_specs[\"A06\"][\"contradict\"]\n))\n\n# A07\ncand_list.append(make_candidate(\n\"A07\", angle_specs[\"A07\"], mech_base,\nwho_text=\"WHO: curious beginners who discover 'apothecary' and want a home system, not a course. (E489DC8F1CEB5470E,E357A19AAF54239C6)\",\ntrig_text=\"TRIGGER: hears 'apothecary' → Googles → wants to start immediately. (E489DC8F1CEB5470E,E414? )\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: overwhelmed by where to start; wants a starter map + what to buy/make first. Enemy=vast topic. Failed fix=search snippets. (E489DC8F1CEB5470E,E687D6EE8EE972D4)\",\nbefore_text=\"Before: 'I’ll just Google my way into an apothecary.' (E489DC8F1CEB5470E)\",\nafter_text=\"After: 'I need a curated path + safety rules.' (E7621630C905AB87C)\",\ncontradictions_patterns=angle_specs[\"A07\"][\"contradict\"]\n))\n\n# fix placeholder invalid id E414? Remove. We'll update later.\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b7776788196836170f4766e4e9a",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b7977e48196b35a507de233c560",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "# Replace A07 in list by popping last and recreating\ncand_list=cand_list[:-1]\ncand_list.append(make_candidate(\n\"A07\", angle_specs[\"A07\"], mech_base,\nwho_text=\"WHO: curious beginners who discover 'apothecary' and want to build a home remedy reference. (E489DC8F1CEB5470E,E357A19AAF54239C6)\",\ntrig_text=\"TRIGGER: hears 'apothecary' → Googles → 'BOOM… herbalism' moment. (E489DC8F1CEB5470E)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: overwhelmed by where to start; wants first 10 go-to remedies + what to stock. Enemy=too much info. Failed fix=searching/random books. (E489DC8F1CEB5470E,EF687D6EE8EE972D4)\",\nbefore_text=\"Before: 'I’ll piece it together from searches and random books.' (E489DC8F1CEB5470E)\",\nafter_text=\"After: 'A curated starter path beats scattered tips.' (E357A19AAF54239C6)\",\ncontradictions_patterns=angle_specs[\"A07\"][\"contradict\"]\n))\n\n# A08\ncand_list.append(make_candidate(\n\"A08\", angle_specs[\"A08\"], mech_base,\nwho_text=\"WHO: buyers asking 'is this book any good?' and 'what do you recommend?' (E54768838FBF36F86,E55881FBED7DE02E0)\",\ntrig_text=\"TRIGGER: gifted/recommended a book, then doubt it’s accurate/useful. (E471510CA86541721,E8CC83A21E6901EA3)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: fear of wrong plant pics/errors; wants a trustworthy, easy reference. Enemy=low-quality books & errors. Failed fix=buying 1 book. (E8CC83A21E6901EA3,EBA2FCB86942520D3)\",\nbefore_text=\"Before: 'Any herbal book should be fine for basics.' (ECCAA6981EF08182E)\",\nafter_text=\"After: 'Quality + cross-checking matters because mistakes are risky.' (E8CC83A21E6901EA3)\",\ncontradictions_patterns=angle_specs[\"A08\"][\"contradict\"]\n))\n\n# A09\ncand_list.append(make_candidate(\n\"A09\", angle_specs[\"A09\"], mech_base,\nwho_text=\"WHO: aspiring herbalists who want a learning path to help others/community. (E4C645FB6972D0460,EB1B673A33DE59ECE)\",\ntrig_text=\"TRIGGER: decide 'I want to become an herbalist' but don’t know what to learn first. (E4C645FB6972D0460,E6D322B23F471F8D9)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: overwhelmed by courses/books; wants a practical map + reputable sources. Enemy=low-trust info. Failed fix=buying random/cheap books. (EB1B673A33DE59ECE,E6DF015FA1CD05FB5)\",\nbefore_text=\"Before: 'I just need one course/book and I’ll be set.' (E6D322B23F471F8D9)\",\nafter_text=\"After: 'I need a curated set of fundamentals + safety rules.' (EB1B673A33DE59ECE)\",\ncontradictions_patterns=angle_specs[\"A09\"][\"contradict\"]\n))\n\n# A10\ncand_list.append(make_candidate(\n\"A10\", angle_specs[\"A10\"], mech_base,\nwho_text=\"WHO: people told 'don’t use herbs' by clinicians, then realize docs lack herb training. (E46CD90915768227E,E185212E82D98E4B9)\",\ntrig_text=\"TRIGGER: ask a doctor about herbs/supplements and get fear-based or vague guidance. (E46CD90915768227E,E0DED9F511FA41606)\",\npain_text=\"PAIN/OUTCOME/ENEMY/FAILED: forced into DIY research; wants trustworthy resources + interaction checks. Enemy=training gap + mixed info. Failed fix=asking only one doctor. (E46CD90915768227E,E59183CE3376BE47A)\",\nbefore_text=\"Before: 'My doctor will know herbs & interactions.' (E0DED9F511FA41606)\",\nafter_text=\"After: 'I bring a credible reference to the conversation.' (E59183CE3376BE47A)\",\ncontradictions_patterns=angle_specs[\"A10\"][\"contradict\"]\n))\n\nlen(cand_list), cand_list[-1]['angle_id']\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b8cc0348196a1a3f61f16df7bad",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b8cfce8819698f6fe51bf0ecdd4",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "def check_lengths(cands):\n    issues=[]\n    for c in cands:\n        for field in ['angle_id','angle_name']:\n            if len(str(c[field]))>280:\n                issues.append((c['angle_id'],field,len(str(c[field]))))\n        # definition\n        d=c['definition']\n        for field in ['who','pain_desire','mechanism_why','trigger']:\n            if len(d[field])>280:\n                issues.append((c['angle_id'],f'definition.{field}',len(d[field])))\n        for bf in ['before','after']:\n            if len(d['belief_shift'][bf])>280:\n                issues.append((c['angle_id'],f'belief_shift.{bf}',len(d['belief_shift'][bf])))\n        # hook starters\n        for j,h in enumerate(c['hook_starters']):\n            for f in ['visual','opening_line','lever']:\n                if len(h[f])>280:\n                    issues.append((c['angle_id'],f'hook{j}.{f}',len(h[f])))\n        # quotes\n        for q in c['evidence']['top_quotes']:\n            if len(q['quote'])>320:\n                issues.append((c['angle_id'],'quote',len(q['quote'])))\n    return issues\nissues=check_lengths(cand_list)\nissues[:20], len(issues)\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b929a748196b6d68c1da669304a",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b92f80c8196afa196bb0b853ad1",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "[(c['angle_id'], len(c['evidence']['top_quotes'])) for c in cand_list]\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b96155081969f3d45cc32b50fd9",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "ci_0cbeeb69ccb613e50069a76b99b084819696a5c722db0953e5",
+      "type": "code_interpreter_call",
+      "status": "completed",
+      "code": "angle_observations=[{\"angle_id\":c['angle_id'],\"angle_name\":c['angle_name'],\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"} for c in cand_list]\nout={\"angle_observations\":angle_observations,\"angle_candidates\":cand_list}\njson_str=json.dumps(out, ensure_ascii=False)\nlen(json_str)\n",
+      "container_id": "cntr_69a769c94934819082537197d303cc6c005f1b0cb7e050c7",
+      "outputs": null
+    },
+    {
+      "id": "rs_0cbeeb69ccb613e50069a76b9e48948196b8e421bfd46e2339",
+      "type": "reasoning",
+      "summary": []
+    },
+    {
+      "id": "msg_0cbeeb69ccb613e50069a76b9f7c948196bfcdaae5ebb92826",
+      "type": "message",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "annotations": [],
+          "logprobs": [],
+          "text": "{\"angle_observations\":[{\"angle_id\":\"A01\",\"angle_name\":\"No-Tylenol-But-They're-In-Pain\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A02\",\"angle_name\":\"Pregnancy Tea Panic\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A03\",\"angle_name\":\"HRT + Supplements: What Do I Stop?\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A04\",\"angle_name\":\"Natural ≠ Automatically Safe (Interaction Checklist)\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A05\",\"angle_name\":\"Herbalism Without the Woo\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A06\",\"angle_name\":\"AI Herbal Books Are a Plague\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A07\",\"angle_name\":\"Build Your Home Apothecary (Starter Path)\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A08\",\"angle_name\":\"Which Herbal Book Is Actually Good?\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A09\",\"angle_name\":\"I Want to Become an Herbalist (But Need a Map)\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"},{\"angle_id\":\"A10\",\"angle_name\":\"Doctors Don’t Have Herb Training (DIY Research)\",\"competitor_angle_overlap\":\"CANNOT_DETERMINE\"}],\"angle_candidates\":[{\"angle_id\":\"A01\",\"angle_name\":\"No-Tylenol-But-They're-In-Pain\",\"definition\":{\"who\":\"WHO: exhausted parents of teething infants who fear giving Tylenol/Motrin. (E08FD59E444917411,E7BC66D367EA97727)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: baby pain + parent guilt/fear; wants safe relief + sleep. Enemy=unsafe 'teething relief' + guesswork. Tried frozen teethers/gels. (E08FD59E444917411,E7BC66D367EA97727,E1E813C24634DA100)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'Natural feels safer but I’m scared to do the wrong thing.' (E08FD59E444917411)\",\"after\":\"After: 'I have a safe-first plan + clear red flags for meds/doctor.' (E1E813C24634DA100)\"},\"trigger\":\"TRIGGER: 2–3am teething flare + no sleep + baby won’t settle. (E08FD59E444917411,E7BC66D367EA97727)\"},\"evidence\":{\"supporting_voc_count\":22,\"top_quotes\":[{\"voc_id\":\"E08FD59E444917411\",\"quote\":\"In advance I’m sorry if there’s any spellings errors, it’s almost 3am and I am exhausted (auto correct hopefully pulls thru🤞). My little one is 6 months old and has been teething but his pain is obviously getting a lot worse. Please any advice that worked for you preferably natural because I have this fear of giving hi\",\"adjusted_score\":5.0},{\"voc_id\":\"E6B16CAA2FCFD34FF\",\"quote\":\"We had to use Tylenol when we could not get him to sleep or when he was so irritable during the day. It's okay to use Tylenol. You can call your pediatrician to confirm this but ours said you can offer Tylenol one hour before bedtime, then at bedtime give Motrin (it lasts longer) so it helps them sleep through the nigh\",\"adjusted_score\":5.0},{\"voc_id\":\"E1E813C24634DA100\",\"quote\":\"Are you in the US? I know you requested natural remedies but unfortunately anything labeled such as teething relief here is pretty unsafe and not FDA tested or approved. You're better off giving infant Tylenol when baby is obviously struggling and uncomfy. I usually can tell with my girl when she's extra extra drooly, \",\"adjusted_score\":5.0},{\"voc_id\":\"EBB41B0CE8D583BF5\",\"quote\":\"There’s nothing world with giving your teething baby Tylenol when he’s in pain….some of those other options you’ve tried like the gels and numbing pills aren’t recommended anyway. There should be no guilt involved here, but I understand!! I would try and honestly assess where you believe the guilt is coming from. Do yo\",\"adjusted_score\":4.4},{\"voc_id\":\"E7BC66D367EA97727\",\"quote\":\"This is a rant but also advice needed if it’s different than what’s already out there. My baby boy started teething at 3-4 months. He just turned 5 months and cut his first tooth with the other currently trailing behind. He is often in a lot of pain. I have purchased every single alternative to Tylenol - frozen tethers\",\"adjusted_score\":4.4}],\"triangulation_status\":\"DUAL\",\"velocity_status\":\"DECELERATING\",\"contradiction_count\":2},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A02\",\"angle_name\":\"Pregnancy Tea Panic\",\"definition\":{\"who\":\"WHO: pregnant people trying to use tea/ginger for nausea/comfort but worried what’s safe. (EA47DB03D2D9C82D3,ECACE08E25F4DF2CA)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: confusing safety rules + 'not studied' gap; wants OB-aligned safe options. Enemy=uncertainty + conflicting guidance. (EA47DB03D2D9C82D3,ECACE08E25F4DF2CA,E6BB1308752D0F45B)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'Herbal teas get iffy… I can’t tell what’s safe.' (EA47DB03D2D9C82D3)\",\"after\":\"After: 'I can pick low-risk teas and know what to avoid/ask about.' (ECACE08E25F4DF2CA)\"},\"trigger\":\"TRIGGER: discover an ingredient (e.g., lemongrass) 'may not be safe' after weeks of drinking it. (EA47DB03D2D9C82D3,EE6287F027A61628E)\"},\"evidence\":{\"supporting_voc_count\":24,\"top_quotes\":[{\"voc_id\":\"ECACE08E25F4DF2CA\",\"quote\":\"The only tea my OB has 100% approved is chamomile. They said mint and basil were ok once a day as well and generally most herbs aren't approved because they aren't studied so we just don't know for sure. They said anything commonly found at the grocery store except raspberry leaf (until later in pregnancy) would probab\",\"adjusted_score\":5.6},{\"voc_id\":\"EE6287F027A61628E\",\"quote\":\"What teas are safe to drink? : r/BabyBumps | Herbal teas can get iffy, especially in higher quantities. A cup ... safe in pregnancy. Unusual_Focus1905. • 2y ago. First ...Read more | TEAS WHILE PREGNANT - August 2024 Babies | Forums | So anything saying a tea might not be safe in pregnancy might be ... But overheard he\",\"adjusted_score\":4.8},{\"voc_id\":\"EA47DB03D2D9C82D3\",\"quote\":\"Hi! I just found that my favorite Lemon &amp; Ginger tea has some lemongrass in it, which may not be safe in pregnancy. I’ve had 1-2 cups of this tea daily during my first trimester. Has anyone else drank tea with lemongrass in their pregnancy? It gets very confusing, as most of herbal teas are not considered safe in p\",\"adjusted_score\":4.4},{\"voc_id\":\"E6BB1308752D0F45B\",\"quote\":\"Generally, all tea is fine to drink during pregnancy. You'd have to drink a gallon a day for a week for any negative effects to occur. Avoid herbal supplements because of much higher concentrations, but drinking a glass or two of tea is perfectly safe.\",\"adjusted_score\":4.32},{\"voc_id\":\"EEDB164A4D53E6AB2\",\"quote\":\"5 Herbs For Pregnancy (and How to Use them Safely) | During the first trimester, it's safest to avoid herbal medicines aside from certain herbal teas and gentle remedies like ginger root. After those ...Read more | Any teas that are pregnancy friendly? Bought everything to ... | Vanessa Joncas yes it is safe in pregnan\",\"adjusted_score\":4.2}],\"triangulation_status\":\"DUAL\",\"velocity_status\":\"STEADY\",\"contradiction_count\":13},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A03\",\"angle_name\":\"HRT + Supplements: What Do I Stop?\",\"definition\":{\"who\":\"WHO: perimenopause/menopause buyers starting HRT who already take supplements. (E0DED9F511FA41606,EC6BC00F960351E1F)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: doc can’t say what to stop; fear of bad interactions. Wants a clear keep/stop/ask list. Enemy=info gap. Failed fix=asking clinician. (E0DED9F511FA41606,E57987402253DC802)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'If I just ask my doctor, I’ll get a clear yes/no list.' (E0DED9F511FA41606)\",\"after\":\"After: 'I need an interaction-first reference to discuss with a pro.' (EC6BC00F960351E1F)\"},\"trigger\":\"TRIGGER: get HRT script, email supplement list, receive a 'non-answer'. (E0DED9F511FA41606,EC6BC00F960351E1F)\"},\"evidence\":{\"supporting_voc_count\":25,\"top_quotes\":[{\"voc_id\":\"E0DED9F511FA41606\",\"quote\":\"TL,DR: My doctor can't say what supplements should not be taken while on HRT...? I've only been on HRT two weeks, but as soon as I got my script, I emailed my doctor the list of supplements I take, and asked if I should stop taking any. This was the non-answer response: \\\"It's not possible to say that other herbal remed\",\"adjusted_score\":5.0},{\"voc_id\":\"EC6BC00F960351E1F\",\"quote\":\"TL,DR: My doctor can't say what supplements should not be taken while on HRT...?\",\"adjusted_score\":4.5},{\"voc_id\":\"E3E7C41F424AD66CE\",\"quote\":\"What vitamins or supplements do you take to avoid ... | There are no vitamins or supplements that will do the job of the hormones we lose at menopause and andropause. However, HRT normally refers to ...Read more | In MTF transition, is it okay to take iron cause I was ... | Any talk of supplements is quackery when it c\",\"adjusted_score\":4.2},{\"voc_id\":\"E57987402253DC802\",\"quote\":\"Perimenopause: Herbs, HRT, or Both? | Get Answers Now! | ... (HRT) and considering herbs like vitex (chaste tree), saffron, or sleep ... supplements have not been evaluated by the Food and Drug ... | Can you take magnesium supplements with HRT? | Yes in most cases you can take magnesium while on prescribed HRT. | Why T\",\"adjusted_score\":4.2},{\"voc_id\":\"E185212E82D98E4B9\",\"quote\":\"Sorry, but your doctor is immensely ignorant. MDs aren't taught anything about herbs and those who advise against them are just passing on ignorance. That can do more harm than good. There are times when virtually all of us need some kind of supplementation of vitamins, minerals, herbs, etc. Most of our agricultural so\",\"adjusted_score\":3.8}],\"triangulation_status\":\"SINGLE\",\"velocity_status\":\"STEADY\",\"contradiction_count\":0},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A04\",\"angle_name\":\"Natural ≠ Automatically Safe (Interaction Checklist)\",\"definition\":{\"who\":\"WHO: 'natural wellness' shoppers who don’t want to accidentally mix herbs/supplements with meds. (E4D00E3036A56D65A,E531A0D1FA0B51E92)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: fear of interactions/contamination; wants a simple contraindication checklist. Enemy=trend-driven supplement stacks. Failed fix=buying popular supplements blindly. (E531A0D1FA0B51E92,E4AFABC0423877340)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'If it’s natural, it’s basically safe.' (E4B2BF1627BC7EDC2)\",\"after\":\"After: 'I check interactions/contraindications first, then decide.' (E531A0D1FA0B51E92)\"},\"trigger\":\"TRIGGER: see warnings like 'Natural doesn’t always mean safe' + 'serious drug interactions'. (E531A0D1FA0B51E92,E4D00E3036A56D65A)\"},\"evidence\":{\"supporting_voc_count\":476,\"top_quotes\":[{\"voc_id\":\"ED201AC11545DD7EA\",\"quote\":\"I think this is a good opportunity to say-never trust a single sourcebook. With any form of information, but especially when looking to make identifications while wild harvesting. I don't personally agree with the idea that there was a cutoff date for reliable publications, but one still has to exercise discernment. Ye\",\"adjusted_score\":4.4},{\"voc_id\":\"E48739E99F03A151A\",\"quote\":\"More people are using cannabis but many are not sharing the use with their physician. Todd Vanderah, PhD, director of the U of A Health Sciences Center for Pain & Addiction, Regents Professor and department head of pharmacology at the U of A College of Medicine – Tucson, explains why it is critical to understand drug-t\",\"adjusted_score\":4.2},{\"voc_id\":\"E44449E438B3DEA06\",\"quote\":\"Where Can You Find Reliable Information On Herb-drug Interactions? Are you curious about how to find trustworthy information on herb-drug interactions? In this video, we'll guide you through the best sources to understand how herbal supplements may affect prescription medications. We’ll cover where to find peer-reviewe\",\"adjusted_score\":4.2},{\"voc_id\":\"E23EEF96134548C1F\",\"quote\":\"In this video, Sajah Popham discusses the concept of herb-drug interactions and explains several types, as well as dos and don’ts for working with clients who are taking prescription medications. Here’s what you’ll learn about: -What an herb-drug interaction is and how it works -What NOT to do — what you should never t\",\"adjusted_score\":4.2},{\"voc_id\":\"EC14A87ED137CBA37\",\"quote\":\"In this video, Sajah Popham discusses some subtypes of drug-herb interactions and puts the actual risk of herb-drug interactions into perspective. Here’s what you’ll learn about: -Drug metabolism: pharmacokinetics, pharmacodynamics, and how some herbs can affect the metabolism of drugs -What you need to know about drug\",\"adjusted_score\":4.2}],\"triangulation_status\":\"MULTI\",\"velocity_status\":\"ACCELERATING\",\"contradiction_count\":14},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A05\",\"angle_name\":\"Herbalism Without the Woo\",\"definition\":{\"who\":\"WHO: science-friendly beginners who want minor-ailment remedies but 'not woo woo' or anti-science. (E05569705578ABDCF,EF51BA8B89CD4DEFC)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: hates woo + misinformation; wants practical, cautious remedies. Enemy=anti-science slant. Failed fix=buying random books. (E05569705578ABDCF,E471510CA86541721)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'Herbalism books are either woo or fear-mongery.' (E05569705578ABDCF)\",\"after\":\"After: 'There’s a practical, evidence-respecting middle lane.' (EF51BA8B89CD4DEFC)\"},\"trigger\":\"TRIGGER: searching for a reference book that isn’t 'super crunchy' or spiritual. (E05569705578ABDCF,E46A41159CA297AC0)\"},\"evidence\":{\"supporting_voc_count\":15,\"top_quotes\":[{\"voc_id\":\"E05569705578ABDCF\",\"quote\":\"I’m a “take some ginger for a stomachache and clove for a toothache but also get vaccinated and go to the doctor” kind of person. I’d love to find a reference book of herbal remedies for minor ailments but I do not want one that has a super crunchy or anti-science slant. Thanks!\",\"adjusted_score\":4.35},{\"voc_id\":\"EF51BA8B89CD4DEFC\",\"quote\":\"I use the DK Encyclopedia of Herbal Medicine, a big coffee table book. It's not woo woo at all. Have found many good remedies that I use often, and great color pics.\",\"adjusted_score\":4.21},{\"voc_id\":\"E77A281EB06C95969\",\"quote\":\"Not sure exactly how woo woo it is, but Plants for the People by Erin Lovell Verinder? Very pretty herbalist reference book\",\"adjusted_score\":4.15},{\"voc_id\":\"E471510CA86541721\",\"quote\":\"I got it for Christmas from someone who doesn’t know anything about herbalism and it’s been demoted to the bottom shelf of my bookcase. It doesn’t speak to energetics at all, and has the feel of “this for that” herbalism, which I haven’t found to work very well. This author's ads have shown up on my feeds and something\",\"adjusted_score\":3.8},{\"voc_id\":\"E8FE1D79B31E8BF2E\",\"quote\":\"I have the same preferences with regard to herbal medicines, but I also like to read about historical uses that are not recommended (just because it’s interesting). I like *The New American Herbal* by Stephen Orr as a reference book, and have Rosemary Gladstar’s *Herbal Recipes for Vibrant Health* for recipes. Gladstar\",\"adjusted_score\":3.8}],\"triangulation_status\":\"SINGLE\",\"velocity_status\":\"STEADY\",\"contradiction_count\":0},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A06\",\"angle_name\":\"AI Herbal Books Are a Plague\",\"definition\":{\"who\":\"WHO: DIY remedy learners shopping Amazon who fear AI/fake herb books. (E37E8AB347B85267A,E185CC657267363E7)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: misinfo can poison people; wants 'real herbalist' guidance. Enemy=crappy AI books + fake publishers. Failed fix=trusting Amazon listings. (E37E8AB347B85267A,EE80C9ED4557D7A84)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'If it’s on Amazon, it’s probably vetted enough.' (E185CC657267363E7)\",\"after\":\"After: 'I need provenance + safety checks, not just reviews.' (E37E8AB347B85267A)\"},\"trigger\":\"TRIGGER: notice multiple tincture books that look AI-written / copy-pasted. (E37E8AB347B85267A,E185CC657267363E7)\"},\"evidence\":{\"supporting_voc_count\":17,\"top_quotes\":[{\"voc_id\":\"E37E8AB347B85267A\",\"quote\":\"There's a new plague going around and it is not viral rather it is a scourge of crappy AI herbalism books being pedaled on Amazon. I was just perusing Amazon and three books that I clicked on for tincture making were AI written. There was a recent case of someone poisoning themselves due to trusting in their identifica\",\"adjusted_score\":5.6},{\"voc_id\":\"EE80C9ED4557D7A84\",\"quote\":\"Lmfao Im sorry OP, not laughing at you, just at the fact that you posted complaining about ai generated books being full of misinfo, and the top comment is some jackass trying to sell you a book full of misinfo and complaining that newer sources arent legally allowed to spread misinfo like his favored old one was... Id\",\"adjusted_score\":4.4},{\"voc_id\":\"E185CC657267363E7\",\"quote\":\"It’s not just AI, Amazon has fake books in general. I bought a book on incense making a couple years ago and I also looked online. I started noticing errors in the book or things that didn’t make sense, then I recognized a picture from a totally unrelated website. Turns out the book was copy pasted from various website\",\"adjusted_score\":4.4},{\"voc_id\":\"EC753EED230FE0F15\",\"quote\":\"there is a scourge of crappy AI herbalism books being pedaled on Amazon.\",\"adjusted_score\":3.89},{\"voc_id\":\"E887B52E3DEE26679\",\"quote\":\"Every time I’m on YouTube I get these video ads that are some lady trying to sell some course about how to publish and sell books on Amazon making a lot of money using AI to write them. She specifically says you don’t need any knowledge on the topic of said book. Feel this is exactly that.\",\"adjusted_score\":3.76}],\"triangulation_status\":\"SINGLE\",\"velocity_status\":\"ACCELERATING\",\"contradiction_count\":0},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A07\",\"angle_name\":\"Build Your Home Apothecary (Starter Path)\",\"definition\":{\"who\":\"WHO: curious beginners who discover 'apothecary' and want to build a home remedy reference. (E489DC8F1CEB5470E,E357A19AAF54239C6)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: overwhelmed by where to start; wants first 10 go-to remedies + what to stock. Enemy=too much info. Failed fix=searching/random books. (E489DC8F1CEB5470E,EF687D6EE8EE972D4)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'I’ll piece it together from searches and random books.' (E489DC8F1CEB5470E)\",\"after\":\"After: 'A curated starter path beats scattered tips.' (E357A19AAF54239C6)\"},\"trigger\":\"TRIGGER: hears 'apothecary' → Googles → 'BOOM… herbalism' moment. (E489DC8F1CEB5470E)\"},\"evidence\":{\"supporting_voc_count\":15,\"top_quotes\":[{\"voc_id\":\"E489DC8F1CEB5470E\",\"quote\":\"I was introduced to herbalism when I heard the word ‘apothecary’ and googled what it was and then...BOOM...herbalism was presented to me.\",\"adjusted_score\":3.97},{\"voc_id\":\"E97950DE67A09DBE6\",\"quote\":\"The Lost Book of Herbal Remedies | The Lost Book of Herbal Remedies [Claude Davis, Nicole Apelian] on Amazon ... Editorial Reviews. This unique plant medicine book is written by Dr ...Read more | The Lost Book of Herbal Remedies: The Healing Power ... | The Lost Book of Herbal Remedies has color pictures of over 181 he\",\"adjusted_score\":3.6},{\"voc_id\":\"EF45DBE93204B1416\",\"quote\":\"Detection firm finds 82% of herbal remedy books on ... | Reviews of ancient remedies books. Alternacare reviews and complaints ... review text had at least some content drafted by AI. They ...Read more | The “Herbal Remedies Book” on TikTok is an obvious scam | Best ancient remedies books. Home apothecary book recommen\",\"adjusted_score\":3.6},{\"voc_id\":\"E357A19AAF54239C6\",\"quote\":\"Home Apothecary…show us yours!\",\"adjusted_score\":3.24},{\"voc_id\":\"E7621630C905AB87C\",\"quote\":\"Medical Herbalism sound like a great read. Natural herbs just like pharmaceuticals react in the body and with other substances in different ways. There's no \\\"one size fits all medicinal cheat to better health. It's important to make healthy choices as well. I appreciate everything I've seen in this thread. Most I've lo\",\"adjusted_score\":3.2}],\"triangulation_status\":\"SINGLE\",\"velocity_status\":\"STEADY\",\"contradiction_count\":0},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A08\",\"angle_name\":\"Which Herbal Book Is Actually Good?\",\"definition\":{\"who\":\"WHO: buyers asking 'is this book any good?' and 'what do you recommend?' (E54768838FBF36F86,E55881FBED7DE02E0)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: fear of wrong plant pics/errors; wants a trustworthy, easy reference. Enemy=low-quality books & errors. Failed fix=buying 1 book. (E8CC83A21E6901EA3,EBA2FCB86942520D3)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'Any herbal book should be fine for basics.' (ECCAA6981EF08182E)\",\"after\":\"After: 'Quality + cross-checking matters because mistakes are risky.' (E8CC83A21E6901EA3)\"},\"trigger\":\"TRIGGER: gifted/recommended a book, then doubt it’s accurate/useful. (E471510CA86541721,E8CC83A21E6901EA3)\"},\"evidence\":{\"supporting_voc_count\":22,\"top_quotes\":[{\"voc_id\":\"ECCAA6981EF08182E\",\"quote\":\"I bought it summer 2023, I reference it here and there. Good book to have and easy to understand.\",\"adjusted_score\":4.12},{\"voc_id\":\"EBA2FCB86942520D3\",\"quote\":\"The subject is vast, so no there isn't one book that I recommend. Here are some I have on my shelves: Thomas Bartram's Ecyclopedia of Herbal Medicine Maude Grieve A Modern Herbal Volume 1&amp;2 Herbal Emissaries \\\\~ Steven Foster and Sue Chongxi Herbal Medic\\\\~ Sam Coffman Medicinal Plants of the Desert and Canyon West\\\\~\",\"adjusted_score\":3.8},{\"voc_id\":\"E8CC83A21E6901EA3\",\"quote\":\"Page 50 lists boneset (Eupatorium perfolatum) but pictures Conoclinum coelestinum aka Blue Mistflower which is not used similarly to boneset at all and has an extremely poisonous look alike Ageratina altissma (white snake root) which since they didnt mean to use Conoclinum Coel... they didnt mention at all. Those 2 pla\",\"adjusted_score\":3.8},{\"voc_id\":\"E47F7AC3F812B196C\",\"quote\":\"Hello! It looks like your post is related to books, that's great! If you haven't already, please check our existing [herbalism book recommendations](https://www.reddit.com/r/herbalism/wiki/index/books/). If you have any specific questions or want to start a new discussion, feel free to do so! *I am a bot, and this acti\",\"adjusted_score\":3.8},{\"voc_id\":\"EC2212F81AD70DB6C\",\"quote\":\"I second this book- I have a copy and I appreciate the focus on \\\"micronutrients\\\" and her explanation of different properties. And her recipies are pretty simple. Almost any herbalist is going to be crunchy, but not are automatically anti-science. Also, keep in mind that science has not been very interested in researchi\",\"adjusted_score\":3.8}],\"triangulation_status\":\"DUAL\",\"velocity_status\":\"STEADY\",\"contradiction_count\":1},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A09\",\"angle_name\":\"I Want to Become an Herbalist (But Need a Map)\",\"definition\":{\"who\":\"WHO: aspiring herbalists who want a learning path to help others/community. (E4C645FB6972D0460,EB1B673A33DE59ECE)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: overwhelmed by courses/books; wants a practical map + reputable sources. Enemy=low-trust info. Failed fix=buying random/cheap books. (EB1B673A33DE59ECE,E6DF015FA1CD05FB5)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'I just need one course/book and I’ll be set.' (E6D322B23F471F8D9)\",\"after\":\"After: 'I need a curated set of fundamentals + safety rules.' (EB1B673A33DE59ECE)\"},\"trigger\":\"TRIGGER: decide 'I want to become an herbalist' but don’t know what to learn first. (E4C645FB6972D0460,E6D322B23F471F8D9)\"},\"evidence\":{\"supporting_voc_count\":32,\"top_quotes\":[{\"voc_id\":\"E4C645FB6972D0460\",\"quote\":\"I want to become an Herbalist... long term to provide to communities.\",\"adjusted_score\":3.29},{\"voc_id\":\"EF315EED887ACD6B7\",\"quote\":\"I don't have this book or know all that much about the author, but i know a bit of her story. She has multiple sclerosis, which she manages successfully with herbs. She's got a degree/degrees in biology. And she's a practicing herbalist. This book, I believe, is the first thing she's published, thus why you haven't hea\",\"adjusted_score\":3.2},{\"voc_id\":\"E6DF015FA1CD05FB5\",\"quote\":\"Herbal Academy Testimonials | The Herbal Academy is an excellent place to learn about herbs, the human body, and many, many other things! I highly recommend starting with the Introductory ...Read more | The Herbal Academy. Is it bullshit? : r/SASSWitches | I have tried Herbal Academy and I think it's good if you don't \",\"adjusted_score\":3.0},{\"voc_id\":\"E6D322B23F471F8D9\",\"quote\":\"What are good herbal groups for learning basics? | ... Herbalism For Beginners At Home - Medicinal Herbs and Herbalist Remedies ... Herbalism for Beginners at my local community center in Fenton, MI.Read more | Hi Everyone! This is my first time posting so not sure if ... | ... Herbalism for Beginners\\\" course. This cou\",\"adjusted_score\":3.0},{\"voc_id\":\"E1A8F7604FBF7A477\",\"quote\":\"I have lots of herbal books from a past life. I recently did a purge of books that I just don’t need to keep around. These are two that I can’t bring myself to get rid of: - Nourishing Traditions by Sally Fallon - Medical Herbalism by David Hoffman So, the first is definitely crunchy. However, it is packed with lots of\",\"adjusted_score\":2.6}],\"triangulation_status\":\"SINGLE\",\"velocity_status\":\"STEADY\",\"contradiction_count\":0},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]},{\"angle_id\":\"A10\",\"angle_name\":\"Doctors Don’t Have Herb Training (DIY Research)\",\"definition\":{\"who\":\"WHO: people told 'don’t use herbs' by clinicians, then realize docs lack herb training. (E46CD90915768227E,E185212E82D98E4B9)\",\"pain_desire\":\"PAIN/OUTCOME/ENEMY/FAILED: forced into DIY research; wants trustworthy resources + interaction checks. Enemy=training gap + mixed info. Failed fix=asking only one doctor. (E46CD90915768227E,E59183CE3376BE47A)\",\"mechanism_why\":\"Safety-first handbook: fast lookup + plain-language steps + contraindications/herb–drug & pregnancy notes + 'when to seek care'. Customizable pages keep it usable under stress.\",\"belief_shift\":{\"before\":\"Before: 'My doctor will know herbs & interactions.' (E0DED9F511FA41606)\",\"after\":\"After: 'I bring a credible reference to the conversation.' (E59183CE3376BE47A)\"},\"trigger\":\"TRIGGER: ask a doctor about herbs/supplements and get fear-based or vague guidance. (E46CD90915768227E,E0DED9F511FA41606)\"},\"evidence\":{\"supporting_voc_count\":166,\"top_quotes\":[{\"voc_id\":\"E46CD90915768227E\",\"quote\":\"A good herbalist could probably offer info., check on line, you may have to do your own research and then decide what you feel is best, doctors and pharm go hand in hand and very few have training about herbs and use fear as a reason not to use herbs.Countries such as Germany use herbs, unlike the U.S.. there are times\",\"adjusted_score\":5.0},{\"voc_id\":\"E185212E82D98E4B9\",\"quote\":\"Sorry, but your doctor is immensely ignorant. MDs aren't taught anything about herbs and those who advise against them are just passing on ignorance. That can do more harm than good. There are times when virtually all of us need some kind of supplementation of vitamins, minerals, herbs, etc. Most of our agricultural so\",\"adjusted_score\":4.4},{\"voc_id\":\"E59183CE3376BE47A\",\"quote\":\"I have a few resources you can look up. They used to be books but the sizes of databases have increased so much that it is no longer feasible to print them out. They are both published by government agencies. Pretty trustworthy. https://medlineplus.gov/druginfo/herb_All.html https://www.efsa.europa.eu/en/data-report/co\",\"adjusted_score\":3.8},{\"voc_id\":\"E0DED9F511FA41606\",\"quote\":\"TL,DR: My doctor can't say what supplements should not be taken while on HRT...? I've only been on HRT two weeks, but as soon as I got my script, I emailed my doctor the list of supplements I take, and asked if I should stop taking any. This was the non-answer response: \\\"It's not possible to say that other herbal remed\",\"adjusted_score\":3.8},{\"voc_id\":\"E8A28D40398ADD0C7\",\"quote\":\"It depends on the kind of doctor, real old MD’s sometimes do, ND’s will, real young MD’s sometimes do…there is a book for interactions. Hold on, I’ll find the link, I think it’s [this one](https://www.us.elsevierhealth.com/herb-nutrient-and-drug-interactions-9780323029643.html?utm_source=google&amp;utm_medium=surfaces&\",\"adjusted_score\":3.8}],\"triangulation_status\":\"MULTI\",\"velocity_status\":\"STEADY\",\"contradiction_count\":35},\"hook_starters\":[{\"visual\":\"Checklist page: 'safe', 'avoid', 'ask a professional' boxes\",\"opening_line\":\"You don’t need more remedies—you need a decision ladder.\",\"lever\":\"Clarity under uncertainty\"},{\"visual\":\"Split screen: Google results contradicting each other\",\"opening_line\":\"One site says 'safe'… the next says 'never'—so what now?\",\"lever\":\"Stops endless searching\"},{\"visual\":\"Highlighter marking 'contraindications' and 'drug interactions'\",\"opening_line\":\"Before you try any herb, run the 3-check safety scan.\",\"lever\":\"Risk reduction + confidence\"}]}]}"
+        }
+      ],
+      "role": "assistant"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "presence_penalty": 0.0,
+  "previous_response_id": null,
+  "prompt_cache_key": null,
+  "prompt_cache_retention": null,
+  "reasoning": {
+    "effort": "medium",
+    "summary": null
+  },
+  "safety_identifier": null,
+  "service_tier": "default",
+  "store": true,
+  "temperature": 1.0,
+  "text": {
+    "format": {
+      "type": "json_schema",
+      "description": null,
+      "name": "strategy_v2_voc_agent03",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "angle_observations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 24,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "angle_id": {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                "angle_name": {
+                  "type": "string",
+                  "maxLength": 280
+                },
+                "competitor_angle_overlap": {
+                  "type": "string",
+                  "enum": [
+                    "Y",
+                    "N",
+                    "CANNOT_DETERMINE"
+                  ]
+                }
+              },
+              "required": [
+                "angle_id",
+                "angle_name",
+                "competitor_angle_overlap"
+              ]
+            }
+          },
+          "angle_candidates": {
+            "type": "array",
+            "minItems": 10,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "angle_id": {
+                  "type": "string",
+                  "maxLength": 32
+                },
+                "angle_name": {
+                  "type": "string",
+                  "maxLength": 280
+                },
+                "definition": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "who": {
+                      "type": "string",
+                      "maxLength": 280
+                    },
+                    "pain_desire": {
+                      "type": "string",
+                      "maxLength": 280
+                    },
+                    "mechanism_why": {
+                      "type": "string",
+                      "maxLength": 280
+                    },
+                    "belief_shift": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "before": {
+                          "type": "string",
+                          "maxLength": 280
+                        },
+                        "after": {
+                          "type": "string",
+                          "maxLength": 280
+                        }
+                      },
+                      "required": [
+                        "before",
+                        "after"
+                      ]
+                    },
+                    "trigger": {
+                      "type": "string",
+                      "maxLength": 280
+                    }
+                  },
+                  "required": [
+                    "who",
+                    "pain_desire",
+                    "mechanism_why",
+                    "belief_shift",
+                    "trigger"
+                  ]
+                },
+                "evidence": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "supporting_voc_count": {
+                      "type": "integer"
+                    },
+                    "top_quotes": {
+                      "type": "array",
+                      "minItems": 5,
+                      "maxItems": 5,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "voc_id": {
+                            "type": "string",
+                            "maxLength": 64
+                          },
+                          "quote": {
+                            "type": "string",
+                            "maxLength": 320
+                          },
+                          "adjusted_score": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "voc_id",
+                          "quote",
+                          "adjusted_score"
+                        ]
+                      }
+                    },
+                    "triangulation_status": {
+                      "type": "string",
+                      "enum": [
+                        "SINGLE",
+                        "DUAL",
+                        "MULTI"
+                      ]
+                    },
+                    "velocity_status": {
+                      "type": "string",
+                      "enum": [
+                        "ACCELERATING",
+                        "STEADY",
+                        "DECELERATING"
+                      ]
+                    },
+                    "contradiction_count": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "supporting_voc_count",
+                    "top_quotes",
+                    "triangulation_status",
+                    "velocity_status",
+                    "contradiction_count"
+                  ]
+                },
+                "hook_starters": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "visual": {
+                        "type": "string",
+                        "maxLength": 280
+                      },
+                      "opening_line": {
+                        "type": "string",
+                        "maxLength": 280
+                      },
+                      "lever": {
+                        "type": "string",
+                        "maxLength": 280
+                      }
+                    },
+                    "required": [
+                      "visual",
+                      "opening_line",
+                      "lever"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "angle_id",
+                "angle_name",
+                "definition",
+                "evidence",
+                "hook_starters"
+              ]
+            }
+          }
+        },
+        "required": [
+          "angle_observations",
+          "angle_candidates"
+        ]
+      },
+      "strict": true
+    },
+    "verbosity": "medium"
+  },
+  "tool_choice": "auto",
+  "tools": [
+    {
+      "type": "code_interpreter",
+      "container": {
+        "type": "auto",
+        "file_ids": [
+          "file-MgwUtRn4ALHb3akpxnZntS",
+          "file-DAhJwZEcWdYYT88qKzoTit",
+          "file-TiKbqDzKdDLqm4WZmmAQQF",
+          "file-XupZe16GysAyiQQYN5cDBu",
+          "file-BjtWb4cCGzqkPHtMsCZTqL",
+          "file-3nDSEyP6bu3WmNikcFJE6C",
+          "file-QYJeMk6SRbhi6epHre4ngR",
+          "file-4JhrFk92Asr5uozqvsoQPL",
+          "file-Xv3fiBtBrzZJYg5FxXft17",
+          "file-52NfZTTvRLMCbUTJWTFnt3",
+          "file-DQWTVBdyMWF26AKnkrQxLN"
+        ]
+      }
+    },
+    {
+      "type": "web_search",
+      "filters": null,
+      "search_context_size": "medium",
+      "user_location": {
+        "type": "approximate",
+        "city": null,
+        "country": "US",
+        "region": null,
+        "timezone": null
+      }
+    }
+  ],
+  "top_logprobs": 0,
+  "top_p": 0.98,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 79143,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 26191,
+    "output_tokens_details": {
+      "reasoning_tokens": 17048
+    },
+    "total_tokens": 105334
+  },
+  "user": null,
+  "metadata": {}
+}

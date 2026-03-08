@@ -94,6 +94,20 @@ def test_health_endpoints():
     assert "db" in db_health.json()
 
 
+def test_health_options_allows_loopback_dev_origins():
+    with TestClient(app) as client:
+        resp = client.options(
+            "/health",
+            headers={
+                "Origin": "http://localhost:5276",
+                "Access-Control-Request-Method": "GET",
+            },
+        )
+
+    assert resp.status_code == 200
+    assert resp.headers.get("access-control-allow-origin") == "http://localhost:5276"
+
+
 def test_auth_creates_org_and_allows_client_create(db_session, monkeypatch):
     app.dependency_overrides.clear()
 
@@ -136,6 +150,7 @@ def test_onboarding_requires_strategy_v2_enabled(api_client):
             "business_type": "new",
             "brand_story": "Brand story for testing",
             "product_name": "Test Product",
+            "product_type": "book",
             "product_customizable": True,
             "business_model": "one_time",
             "funnel_position": "top_of_funnel",
@@ -168,6 +183,7 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
             "business_type": "new",
             "brand_story": "Brand story for testing",
             "product_name": "Test Product",
+            "product_type": "book",
             "product_customizable": True,
             "business_model": "one_time",
             "funnel_position": "top_of_funnel",
@@ -191,6 +207,7 @@ def test_clients_campaigns_and_workflows(api_client, fake_temporal, db_session, 
     assert product_detail.status_code == 200
     product_payload = product_detail.json()
     assert product_payload["title"] == "Test Product"
+    assert product_payload["product_type"] == "book"
     assert isinstance(product_payload.get("variants"), list)
 
     short_product_id = product_id.split("-", 1)[0]

@@ -1,0 +1,33 @@
+{
+  "workflow_id": "strategy-v2-0d3186be-2c4f-4d5d-a810-d87b3b35265e-dc897cce-ac0d-41d6-b857-66e7468080a5-502a0317-3e6a-484e-b114-1eaeee68b334-b206f2e3-0e28-4bec-b5f0-ab86f7a0ecf1",
+  "run_id": "f6f18abd-d1db-459e-852a-48a6c23c963c",
+  "response_id": "resp_0cbeeb69ccb613e50069a769bc28b08196b06297ac3efa3f67",
+  "exported_at_utc": "2026-03-03T23:20:28.329198+00:00",
+  "voc_input_mode": "raw_evidence_fallback",
+  "logical_input_keys": [
+    "AGENT1_HABITAT_OBSERVATIONS_JSON",
+    "AGENT1_MINING_PLAN_JSON",
+    "AGENT2_INPUT_MANIFEST_JSON",
+    "AVATAR_BRIEF_SUMMARY_JSON",
+    "COMPETITOR_ANGLE_MAP_JSON",
+    "FOUNDATIONAL_RESEARCH_DOCS_JSON",
+    "HABITAT_SCORED_JSON",
+    "KNOWN_SATURATED_ANGLES_JSON",
+    "PRODUCT_BRIEF_JSON",
+    "VOC_EVIDENCE_LAYOUT_JSON",
+    "VOC_EVIDENCE_ROWS_JSON"
+  ],
+  "counts": {
+    "logical_input_file_count": 11,
+    "voc_evidence_rows_count": 5342,
+    "manifest_rows_count": 5342
+  },
+  "files": {
+    "output_json": "/Users/aldrinclement/Documents/programming/marketi/mos/backend/artifact-downloads/agent3_rerun_2026-03-03_run_f6f18abd/agent3_output.json",
+    "output_md": "/Users/aldrinclement/Documents/programming/marketi/mos/backend/artifact-downloads/agent3_rerun_2026-03-03_run_f6f18abd/agent3_output.md",
+    "response_raw_json": "/Users/aldrinclement/Documents/programming/marketi/mos/backend/artifact-downloads/agent3_rerun_2026-03-03_run_f6f18abd/openai_response_raw.json",
+    "temporal_history_json": "/Users/aldrinclement/Documents/programming/marketi/mos/backend/artifact-downloads/agent3_rerun_2026-03-03_run_f6f18abd/temporal_history.json",
+    "input_params_json": "/Users/aldrinclement/Documents/programming/marketi/mos/backend/artifact-downloads/agent3_rerun_2026-03-03_run_f6f18abd/inputs_export/agent3_activity_params.json",
+    "inputs_dir": "/Users/aldrinclement/Documents/programming/marketi/mos/backend/artifact-downloads/agent3_rerun_2026-03-03_run_f6f18abd/inputs_export"
+  }
+}

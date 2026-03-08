@@ -11,7 +11,11 @@ from pathlib import Path
 from threading import Lock
 from types import ModuleType
 from typing import Callable, cast
+from urllib.parse import urlparse
 
+from anthropic import Anthropic
+
+from app.observability import get_openai_client_class
 from app.strategy_v2.errors import StrategyV2ScorerError
 
 
@@ -19,13 +23,23 @@ _MODULE_CACHE: dict[str, ModuleType] = {}
 _MODULE_CACHE_LOCK = Lock()
 _HEADLINE_QA_TRANSIENT_RETRY_ATTEMPTS = max(
     1,
-    int(os.getenv("STRATEGY_V2_HEADLINE_QA_TRANSIENT_RETRY_ATTEMPTS", "3")),
+    int(os.getenv("STRATEGY_V2_HEADLINE_QA_TRANSIENT_RETRY_ATTEMPTS", "6")),
 )
 _HEADLINE_QA_TRANSIENT_RETRY_BASE_SECONDS = max(
     0.0,
-    float(os.getenv("STRATEGY_V2_HEADLINE_QA_TRANSIENT_RETRY_BASE_SECONDS", "2.0")),
+    float(os.getenv("STRATEGY_V2_HEADLINE_QA_TRANSIENT_RETRY_BASE_SECONDS", "3.0")),
 )
 _HEADLINE_QA_REQUEST_ID_RE = re.compile(r"\breq_[A-Za-z0-9]+\b")
+_HEADLINE_QA_CALL_TIMEOUT_SECONDS = max(
+    1.0,
+    float(os.getenv("STRATEGY_V2_HEADLINE_QA_CALL_TIMEOUT_SECONDS", "90")),
+)
+_HEADLINE_QA_CALL_MAX_RETRIES = max(
+    0,
+    int(os.getenv("STRATEGY_V2_HEADLINE_QA_CALL_MAX_RETRIES", "2")),
+)
+_OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1"
+_BASETEN_DEFAULT_BASE_URL = "https://inference.baseten.co/v1"
 
 
 def _repo_root() -> Path:
@@ -127,6 +141,237 @@ def _unique_strings(value: object, *, limit: int = 25) -> list[str]:
         if len(cleaned) >= limit:
             break
     return cleaned
+
+
+def _validated_http_base_url(*, env_var_name: str, default_base_url: str) -> str:
+    configured = os.getenv(env_var_name, "")
+    normalized = configured.strip() if isinstance(configured, str) else ""
+    if not normalized:
+        return default_base_url
+    parsed = urlparse(normalized)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise StrategyV2ScorerError(
+            f"{env_var_name} must be a fully qualified http(s) URL, e.g. '{default_base_url}'."
+        )
+    return normalized
+
+
+def _resolve_headline_qa_model(model: str) -> tuple[str, str, str | None, str]:
+    cleaned_model = str(model or "").strip()
+    if not cleaned_model:
+        raise StrategyV2ScorerError("Headline QA loop requires an explicit model value.")
+
+    explicit_provider: str | None = None
+    provider_model = cleaned_model
+    if ":" in cleaned_model:
+        prefix, _, explicit_model = cleaned_model.partition(":")
+        if prefix in {"anthropic", "openai", "baseten"}:
+            explicit_provider = prefix
+            provider_model = explicit_model.strip()
+            if not provider_model:
+                raise StrategyV2ScorerError(
+                    f"Explicit provider model '{cleaned_model}' is missing the model name after '{prefix}:'."
+                )
+
+    if explicit_provider == "anthropic" or provider_model.startswith("claude"):
+        return ("anthropic", provider_model, None, "ANTHROPIC_API_KEY")
+    if explicit_provider == "openai" or provider_model.lower().startswith(("gpt-", "chatgpt-", "o", "omni-")):
+        return (
+            "openai",
+            provider_model,
+            _validated_http_base_url(env_var_name="OPENAI_BASE_URL", default_base_url=_OPENAI_DEFAULT_BASE_URL),
+            "OPENAI_API_KEY",
+        )
+    if explicit_provider == "baseten":
+        return (
+            "baseten",
+            provider_model,
+            _validated_http_base_url(env_var_name="BASETEN_BASE_URL", default_base_url=_BASETEN_DEFAULT_BASE_URL),
+            "BASETEN_API_KEY",
+        )
+
+    raise StrategyV2ScorerError(
+        "Headline QA loop supports Anthropic and OpenAI-compatible providers only. "
+        f"Use an explicit provider prefix for non-Claude models. Received model='{cleaned_model}'."
+    )
+
+
+def headline_qa_required_api_key_env(model: str) -> str:
+    return _resolve_headline_qa_model(model)[3]
+
+
+def _extract_openai_chat_text(completion: object) -> str | None:
+    choices = getattr(completion, "choices", None)
+    if not isinstance(choices, list) or not choices:
+        return None
+    message = getattr(choices[0], "message", None)
+    if message is None and isinstance(choices[0], dict):
+        message = choices[0].get("message")
+    if message is None:
+        return None
+    content = getattr(message, "content", None)
+    if content is None and isinstance(message, dict):
+        content = message.get("content")
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    if isinstance(content, list):
+        text_parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict):
+                item_text = item.get("text")
+                if isinstance(item_text, str) and item_text.strip():
+                    text_parts.append(item_text.strip())
+                continue
+            item_text = getattr(item, "text", None)
+            if isinstance(item_text, str) and item_text.strip():
+                text_parts.append(item_text.strip())
+        if text_parts:
+            return "".join(text_parts).strip()
+    return None
+
+
+def _extract_openai_chat_request_id(completion: object) -> str | None:
+    for attr_name in ("_request_id", "request_id"):
+        request_id = getattr(completion, attr_name, None)
+        if isinstance(request_id, str) and request_id.strip():
+            return request_id.strip()
+    if isinstance(completion, dict):
+        request_id = completion.get("request_id") or completion.get("_request_id")
+        if isinstance(request_id, str) and request_id.strip():
+            return request_id.strip()
+    return None
+
+
+def _extract_request_id_from_headers(headers: object) -> str | None:
+    if headers is None:
+        return None
+    for key in ("request-id", "x-request-id", "anthropic-request-id"):
+        value = headers.get(key) if hasattr(headers, "get") else None
+        if not value:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return None
+
+
+def _call_headline_qa_llm(prompt, api_key, model="claude-sonnet-4-20250514", messages=None):
+    provider, resolved_model, base_url, _api_key_env = _resolve_headline_qa_model(model)
+    message_payload = messages if messages is not None else [{"role": "user", "content": prompt}]
+
+    try:
+        if provider == "anthropic":
+            client = Anthropic(
+                api_key=api_key,
+                base_url=_validated_http_base_url(
+                    env_var_name="ANTHROPIC_API_BASE_URL",
+                    default_base_url="https://api.anthropic.com",
+                )
+                if os.getenv("ANTHROPIC_API_BASE_URL", "").strip()
+                else (
+                    _validated_http_base_url(
+                        env_var_name="ANTHROPIC_BASE_URL",
+                        default_base_url="https://api.anthropic.com",
+                    )
+                    if os.getenv("ANTHROPIC_BASE_URL", "").strip()
+                    else "https://api.anthropic.com"
+                ),
+                timeout=_HEADLINE_QA_CALL_TIMEOUT_SECONDS,
+                max_retries=_HEADLINE_QA_CALL_MAX_RETRIES,
+            )
+            raw_response = client.messages.with_raw_response.create(
+                model=resolved_model,
+                max_tokens=200,
+                messages=message_payload,
+                timeout=_HEADLINE_QA_CALL_TIMEOUT_SECONDS,
+            )
+            response = raw_response.parse()
+            text = None
+            content = getattr(response, "content", None)
+            if isinstance(content, list) and content:
+                first_block = content[0]
+                text = getattr(first_block, "text", None)
+                if text is None and isinstance(first_block, dict):
+                    text = first_block.get("text")
+            if not isinstance(text, str) or not text.strip():
+                raise StrategyV2ScorerError("Anthropic headline QA call returned no text content.")
+            request_id = getattr(raw_response, "request_id", None)
+            if not request_id:
+                http_response = getattr(raw_response, "http_response", None)
+                request_id = _extract_request_id_from_headers(getattr(http_response, "headers", None))
+            if not request_id:
+                request_id = getattr(response, "_request_id", None) or getattr(response, "request_id", None)
+            usage = getattr(response, "usage", None)
+            input_tokens = getattr(usage, "input_tokens", None) if usage is not None else None
+            output_tokens = getattr(usage, "output_tokens", None) if usage is not None else None
+            stop_reason = getattr(response, "stop_reason", None)
+            cleaned_text = text.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
+            print(
+                "  INFO: LLM call completed: "
+                f"request_id={request_id or 'missing'} input_tokens={input_tokens} output_tokens={output_tokens} "
+                f"stop_reason={stop_reason}"
+            )
+            return {
+                "text": cleaned_text,
+                "request_id": request_id,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "stop_reason": stop_reason,
+            }
+
+        openai_client_class = get_openai_client_class()
+        client = openai_client_class(
+            api_key=api_key,
+            base_url=base_url,
+            timeout=_HEADLINE_QA_CALL_TIMEOUT_SECONDS,
+            max_retries=_HEADLINE_QA_CALL_MAX_RETRIES,
+        )
+        completion_kwargs = {
+            "model": resolved_model,
+            "messages": message_payload,
+            "max_tokens": 200,
+        }
+        if provider == "baseten":
+            completion_kwargs["extra_body"] = {
+                "chat_template_args": {
+                    "enable_thinking": True,
+                }
+            }
+        completion = client.chat.completions.create(**completion_kwargs)
+        text = _extract_openai_chat_text(completion)
+        if not text:
+            raise StrategyV2ScorerError("OpenAI-compatible headline QA call returned no text content.")
+        request_id = _extract_openai_chat_request_id(completion)
+        usage = getattr(completion, "usage", None)
+        input_tokens = getattr(usage, "prompt_tokens", None) if usage is not None else None
+        output_tokens = getattr(usage, "completion_tokens", None) if usage is not None else None
+        choices = getattr(completion, "choices", None)
+        finish_reason = getattr(choices[0], "finish_reason", None) if isinstance(choices, list) and choices else None
+        cleaned_text = text.strip().strip('"').strip("'").strip("\u201c").strip("\u201d")
+        print(
+            "  INFO: LLM call completed: "
+            f"request_id={request_id or 'missing'} input_tokens={input_tokens} output_tokens={output_tokens} "
+            f"stop_reason={finish_reason}"
+        )
+        return {
+            "text": cleaned_text,
+            "request_id": request_id,
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+            "stop_reason": finish_reason,
+        }
+    except Exception as exc:  # noqa: BLE001
+        status_code = getattr(exc, "status_code", None)
+        error_response = getattr(exc, "response", None) or getattr(exc, "http_response", None)
+        request_id = _extract_request_id_from_headers(getattr(error_response, "headers", None))
+        extra_parts: list[str] = []
+        if status_code:
+            extra_parts.append(f"status={status_code}")
+        if request_id:
+            extra_parts.append(f"request_id={request_id}")
+        suffix = f" ({', '.join(extra_parts)})" if extra_parts else ""
+        print(f"  WARNING: LLM call failed: {exc}{suffix}")
+        return None
 
 
 def _collect_headline_qa_stdout_diagnostics(*, stdout_text: str) -> dict[str, object]:
@@ -354,9 +599,12 @@ def run_headline_qa_loop(
             "Headline QA loop requires a non-empty API key; refusing dry-run fallback."
         )
 
-    cleaned_model = model.strip()
-    if not cleaned_model:
-        raise StrategyV2ScorerError("Headline QA loop requires an explicit model value.")
+    requested_model = model.strip()
+    provider_name, cleaned_model, _base_url, _api_key_env = _resolve_headline_qa_model(model)
+
+    # Ensure external QA utility runs with resilient transient retry/timeouts.
+    os.environ["STRATEGY_V2_HEADLINE_QA_CALL_TIMEOUT_SECONDS"] = str(_HEADLINE_QA_CALL_TIMEOUT_SECONDS)
+    os.environ["STRATEGY_V2_HEADLINE_QA_CALL_MAX_RETRIES"] = str(_HEADLINE_QA_CALL_MAX_RETRIES)
 
     module = _load_module(
         "copy_headline_qa_loop",
@@ -364,6 +612,7 @@ def run_headline_qa_loop(
     )
     run_fn = _get_callable(module, "run_qa_loop")
     to_json_fn = _get_callable(module, "to_json")
+    setattr(module, "call_llm", _call_headline_qa_llm)
 
     # External QA loop utility reads Anthropic base URL from env and treats
     # an empty string as a real endpoint, which breaks requests. Normalize
@@ -384,7 +633,7 @@ def run_headline_qa_loop(
                 max_iterations,
                 min_tier,
                 cleaned_api_key,
-                cleaned_model,
+                requested_model,
                 False,
             )
         serialized = _require_dict_result(to_json_fn(raw_result), "headline_qa_loop.to_json")
@@ -401,7 +650,8 @@ def run_headline_qa_loop(
 
         aggregate_diagnostics = {
             "attempt_count": attempt_index,
-            "model": cleaned_model,
+            "model": requested_model,
+            "provider": provider_name,
             "max_iterations": max_iterations,
             "min_tier": min_tier,
             "call_timeout_seconds": qa_call_timeout_seconds,

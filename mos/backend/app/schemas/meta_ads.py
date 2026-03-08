@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class MetaAssetUploadRequest(BaseModel):
@@ -112,3 +112,34 @@ class MetaAdSetSpecCreateRequest(BaseModel):
     promotedObject: Optional[dict[str, Any]] = None
     conversionDomain: Optional[str] = None
     metadata: Optional[dict[str, Any]] = None
+
+
+class CampaignMetaReviewSetupRequest(BaseModel):
+    assetBriefIds: list[str] = Field(default_factory=list)
+    generationBatchId: str | None = None
+
+    @field_validator("assetBriefIds")
+    @classmethod
+    def _validate_asset_brief_ids(cls, value: list[str]) -> list[str]:
+        if not isinstance(value, list):
+            raise ValueError("assetBriefIds must be a list.")
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for entry in value:
+            if not isinstance(entry, str) or not entry.strip():
+                raise ValueError("assetBriefIds must contain non-empty strings.")
+            normalized = entry.strip()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            cleaned.append(normalized)
+        return cleaned
+
+    @field_validator("generationBatchId")
+    @classmethod
+    def _validate_generation_batch_id(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("generationBatchId must be a non-empty string when provided.")
+        return value.strip()

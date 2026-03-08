@@ -4,6 +4,7 @@ import mimetypes
 from collections import defaultdict
 from typing import Any, Optional
 from typing import Literal
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
@@ -40,6 +41,10 @@ from app.schemas.meta_ads import (
     MetaCreativeCreateRequest,
     MetaCreativePreviewRequest,
     MetaCreativeSpecCreateRequest,
+)
+from app.services.image_metadata import (
+    ImageMetadataSanitizationError,
+    strip_and_validate_image_metadata,
 )
 from app.services.media_storage import MediaStorage
 from app.services.meta_ads import MetaAdsClient, MetaAdsConfigError, MetaAdsError
@@ -168,6 +173,16 @@ def _asset_filename(asset_id: str, content_type: Optional[str]) -> str:
     return f"{asset_id}{ext}"
 
 
+def _meta_experiment_key(*, experiment_id: Optional[str], metadata_json: Any) -> str | None:
+    if isinstance(experiment_id, str) and experiment_id.strip():
+        return experiment_id.strip()
+    if isinstance(metadata_json, dict):
+        raw = metadata_json.get("experimentSpecId")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return None
+
+
 @router.post("/assets/{asset_id}/upload", status_code=status.HTTP_201_CREATED)
 def upload_meta_asset(
     asset_id: str,
@@ -212,6 +227,17 @@ def upload_meta_asset(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Asset must be an image or video with a valid content type.",
         )
+
+    if media_type == "image":
+        try:
+            sanitized = strip_and_validate_image_metadata(content=data, content_type=content_type)
+        except ImageMetadataSanitizationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Asset metadata sanitization failed: {exc}",
+            ) from exc
+        data = sanitized.content
+        content_type = sanitized.content_type
 
     client = _get_meta_client()
     filename = _asset_filename(str(asset.id), content_type)
@@ -843,7 +869,7 @@ def list_meta_pipeline_assets(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="clientId and productId are required together.",
         )
-    ad_account_id = _resolve_ad_account_id(adAccountId)
+    ad_account_id = adAccountId or settings.META_AD_ACCOUNT_ID
     assets_repo = AssetsRepository(session)
     resolved_statuses = _resolve_statuses(statuses)
     assets = assets_repo.list(
@@ -862,22 +888,26 @@ def list_meta_pipeline_assets(
     campaign_ids = {str(asset.campaign_id) for asset in assets if asset.campaign_id}
     experiment_ids = {str(asset.experiment_id) for asset in assets if asset.experiment_id}
 
-    uploads = session.scalars(
-        select(MetaAssetUpload).where(
-            MetaAssetUpload.org_id == auth.org_id,
-            MetaAssetUpload.ad_account_id == ad_account_id,
-            MetaAssetUpload.asset_id.in_(asset_ids),
-        )
-    ).all()
+    uploads = []
+    if ad_account_id:
+        uploads = session.scalars(
+            select(MetaAssetUpload).where(
+                MetaAssetUpload.org_id == auth.org_id,
+                MetaAssetUpload.ad_account_id == ad_account_id,
+                MetaAssetUpload.asset_id.in_(asset_ids),
+            )
+        ).all()
     upload_map = {str(upload.asset_id): upload for upload in uploads}
 
-    creatives = session.scalars(
-        select(MetaAdCreative).where(
-            MetaAdCreative.org_id == auth.org_id,
-            MetaAdCreative.ad_account_id == ad_account_id,
-            MetaAdCreative.asset_id.in_(asset_ids),
-        )
-    ).all()
+    creatives = []
+    if ad_account_id:
+        creatives = session.scalars(
+            select(MetaAdCreative).where(
+                MetaAdCreative.org_id == auth.org_id,
+                MetaAdCreative.ad_account_id == ad_account_id,
+                MetaAdCreative.asset_id.in_(asset_ids),
+            )
+        ).all()
     creative_map: dict[str, list[MetaAdCreative]] = defaultdict(list)
     creative_ids: list[str] = []
     for creative in creatives:
@@ -885,7 +915,7 @@ def list_meta_pipeline_assets(
         creative_ids.append(str(creative.meta_creative_id))
 
     ads_by_creative: dict[str, list[MetaAd]] = defaultdict(list)
-    if creative_ids:
+    if creative_ids and ad_account_id:
         ads = session.scalars(
             select(MetaAd).where(
                 MetaAd.org_id == auth.org_id,
@@ -903,9 +933,25 @@ def list_meta_pipeline_assets(
         )
     ).all()
     creative_spec_map = {str(spec.asset_id): spec for spec in creative_specs}
+    experiment_keys_from_specs = {
+        key
+        for key in (
+            _meta_experiment_key(experiment_id=str(spec.experiment_id) if spec.experiment_id else None, metadata_json=spec.metadata_json)
+            for spec in creative_specs
+        )
+        if key
+    }
+    experiment_ids.update(experiment_keys_from_specs)
 
     adset_specs = []
-    if experiment_ids:
+    if campaignId:
+        adset_specs = session.scalars(
+            select(MetaAdSetSpec).where(
+                MetaAdSetSpec.org_id == auth.org_id,
+                MetaAdSetSpec.campaign_id == campaignId,
+            )
+        ).all()
+    elif experiment_ids:
         adset_specs = session.scalars(
             select(MetaAdSetSpec).where(
                 MetaAdSetSpec.org_id == auth.org_id,
@@ -914,8 +960,12 @@ def list_meta_pipeline_assets(
         ).all()
     adset_spec_map: dict[str, list[MetaAdSetSpec]] = defaultdict(list)
     for spec in adset_specs:
-        if spec.experiment_id:
-            adset_spec_map[str(spec.experiment_id)].append(spec)
+        experiment_key = _meta_experiment_key(
+            experiment_id=str(spec.experiment_id) if spec.experiment_id else None,
+            metadata_json=spec.metadata_json,
+        )
+        if experiment_key:
+            adset_spec_map[experiment_key].append(spec)
 
     campaigns = []
     if campaign_ids:
@@ -927,18 +977,25 @@ def list_meta_pipeline_assets(
         ).all()
     campaign_map = {str(campaign.id): campaign for campaign in campaigns}
 
+    internal_experiment_ids: list[str] = []
+    for experiment_id in experiment_ids:
+        try:
+            internal_experiment_ids.append(str(UUID(experiment_id)))
+        except (TypeError, ValueError):
+            continue
+
     experiments = []
-    if experiment_ids:
+    if internal_experiment_ids:
         experiments = session.scalars(
             select(Experiment).where(
                 Experiment.org_id == auth.org_id,
-                Experiment.id.in_(list(experiment_ids)),
+                Experiment.id.in_(internal_experiment_ids),
             )
         ).all()
     experiment_map = {str(exp.id): exp for exp in experiments}
 
     meta_campaigns = []
-    if campaign_ids:
+    if campaign_ids and ad_account_id:
         meta_campaigns = session.scalars(
             select(MetaCampaign).where(
                 MetaCampaign.org_id == auth.org_id,
@@ -952,9 +1009,23 @@ def list_meta_pipeline_assets(
     for asset in assets:
         asset_id = str(asset.id)
         campaign_id = str(asset.campaign_id) if asset.campaign_id else None
-        experiment_id = str(asset.experiment_id) if asset.experiment_id else None
+        creative_spec = creative_spec_map.get(asset_id)
+        experiment_id = (
+            str(asset.experiment_id)
+            if asset.experiment_id
+            else _meta_experiment_key(
+                experiment_id=str(creative_spec.experiment_id) if creative_spec and creative_spec.experiment_id else None,
+                metadata_json=creative_spec.metadata_json if creative_spec else None,
+            )
+        )
         campaign = campaign_map.get(campaign_id) if campaign_id else None
         experiment = experiment_map.get(experiment_id) if experiment_id else None
+        creative_metadata = creative_spec.metadata_json if creative_spec and isinstance(creative_spec.metadata_json, dict) else {}
+        experiment_name = None
+        if experiment:
+            experiment_name = experiment.name
+        elif isinstance(creative_metadata.get("experimentName"), str) and creative_metadata.get("experimentName").strip():
+            experiment_name = creative_metadata.get("experimentName").strip()
         creative_list = creative_map.get(asset_id, [])
         ads_for_asset: list[MetaAd] = []
         for creative in creative_list:
@@ -979,6 +1050,7 @@ def list_meta_pipeline_assets(
                     "height": asset.height,
                     "created_at": asset.created_at,
                     "public_url": f"/public/assets/{asset.public_id}",
+                    "ai_metadata": asset.ai_metadata if isinstance(asset.ai_metadata, dict) else None,
                 },
                 "campaign": {
                     "id": str(campaign.id),
@@ -987,12 +1059,12 @@ def list_meta_pipeline_assets(
                 if campaign
                 else None,
                 "experiment": {
-                    "id": str(experiment.id),
-                    "name": experiment.name,
+                    "id": experiment_id,
+                    "name": experiment_name or experiment_id,
                 }
-                if experiment
+                if experiment_id
                 else None,
-                "creative_spec": creative_spec_map.get(asset_id),
+                "creative_spec": creative_spec,
                 "adset_specs": adset_spec_map.get(experiment_id, []) if experiment_id else [],
                 "meta": {
                     "upload": upload_map.get(asset_id),

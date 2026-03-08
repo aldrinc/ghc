@@ -5,6 +5,7 @@ const apiBaseUrl = resolvePublicApiBaseUrl();
 type AssetRef = {
   src?: string;
   assetPublicId?: string;
+  referenceAssetPublicId?: string;
 };
 
 function normalizeFallbackAssetSrc(fallback?: string): string | undefined {
@@ -31,5 +32,5 @@ export function resolveAssetSrc(assetPublicId?: string, fallback?: string): stri
 
 export function resolveImageSrc(image?: AssetRef | null): string | undefined {
   if (!image) return undefined;
-  return resolveAssetSrc(image.assetPublicId, image.src);
+  return resolveAssetSrc(image.assetPublicId ?? image.referenceAssetPublicId, image.src);
 }

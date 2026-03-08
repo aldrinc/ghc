@@ -1,0 +1,645 @@
+{
+  "habitats": [
+    {
+      "components": {
+        "buyer_density": 82.5,
+        "buyer_density_z": 1.11,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 100.0,
+        "emotional_depth_z": 1.31,
+        "language_quality": 68.9,
+        "language_quality_z": 0.98,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 90.0,
+        "specificity_z": 1.06,
+        "volume": 56.6,
+        "volume_z": 1.08
+      },
+      "confidence_range": [
+        84.9,
+        88.7
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 86.8,
+      "habitat_name": "apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json",
+      "habitat_type": "Social_Video",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 1,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "/apify_output/apify_instagram-scraper_eF9SCGU7LQJQCL0Q7.json",
+      "video_modifiers_applied": {
+        "applied": true,
+        "modifiers": {
+          "language_quality": 0.1,
+          "signal_to_noise": 0.07
+        }
+      },
+      "z_score": 1.3
+    },
+    {
+      "components": {
+        "buyer_density": 82.5,
+        "buyer_density_z": 1.11,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 100.0,
+        "emotional_depth_z": 1.31,
+        "language_quality": 56.2,
+        "language_quality_z": 0.43,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 90.0,
+        "specificity_z": 1.06,
+        "volume": 56.6,
+        "volume_z": 1.08
+      },
+      "confidence_range": [
+        83.1,
+        86.9
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 85.0,
+      "habitat_name": "apify_instagram-scraper_VqEmoxp38D3Au5qk3.json",
+      "habitat_type": "Social_Video",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 2,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "/apify_output/apify_instagram-scraper_VqEmoxp38D3Au5qk3.json",
+      "video_modifiers_applied": {
+        "applied": true,
+        "modifiers": {
+          "language_quality": 0.1,
+          "signal_to_noise": 0.07
+        }
+      },
+      "z_score": 1.19
+    },
+    {
+      "components": {
+        "buyer_density": 82.5,
+        "buyer_density_z": 1.11,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 100.0,
+        "emotional_depth_z": 1.31,
+        "language_quality": 62.9,
+        "language_quality_z": 0.72,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 90.0,
+        "specificity_z": 1.06,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        82.9,
+        86.7
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 84.8,
+      "habitat_name": "apify_instagram-scraper_9nnE3i6vUfvWhodB5.json",
+      "habitat_type": "Social_Video",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 3,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "/apify_output/apify_instagram-scraper_9nnE3i6vUfvWhodB5.json",
+      "video_modifiers_applied": {
+        "applied": true,
+        "modifiers": {
+          "language_quality": 0.1,
+          "signal_to_noise": 0.07
+        }
+      },
+      "z_score": 1.18
+    },
+    {
+      "components": {
+        "buyer_density": 82.5,
+        "buyer_density_z": 1.11,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 80.0,
+        "emotional_depth_z": 0.81,
+        "language_quality": 82.5,
+        "language_quality_z": 1.57,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 90.0,
+        "specificity_z": 1.06,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        82.0,
+        85.8
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 83.9,
+      "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "habitat_type": "Reddit",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 4,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": 1.13
+    },
+    {
+      "components": {
+        "buyer_density": 82.5,
+        "buyer_density_z": 1.11,
+        "competitor_whitespace": 90.0,
+        "competitor_whitespace_z": -3.47,
+        "emotional_depth": 100.0,
+        "emotional_depth_z": 1.31,
+        "language_quality": 12.2,
+        "language_quality_z": -1.47,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 90.0,
+        "specificity_z": 1.06,
+        "volume": 56.6,
+        "volume_z": 1.08
+      },
+      "confidence_range": [
+        76.3,
+        80.1
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 78.2,
+      "habitat_name": "streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json",
+      "habitat_type": "Social_Video",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 5,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "/apify_output/streamers_youtube-scraper_hXvLNYmqDyNlXFKu8.json",
+      "video_modifiers_applied": {
+        "applied": true,
+        "modifiers": {
+          "language_quality": 0.1,
+          "signal_to_noise": 0.07
+        }
+      },
+      "z_score": 0.8
+    },
+    {
+      "components": {
+        "buyer_density": 82.5,
+        "buyer_density_z": 1.11,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 60.0,
+        "emotional_depth_z": 0.32,
+        "language_quality": 65.0,
+        "language_quality_z": 0.82,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 90.0,
+        "specificity_z": 1.06,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        76.0,
+        79.8
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 77.9,
+      "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "habitat_type": "Reddit",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 6,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": 0.78
+    },
+    {
+      "components": {
+        "buyer_density": 2.5,
+        "buyer_density_z": -0.87,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 20.0,
+        "emotional_depth_z": -0.67,
+        "language_quality": 47.5,
+        "language_quality_z": 0.06,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 60.0,
+        "specificity_z": -0.65,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        51.7,
+        55.5
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 53.6,
+      "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "habitat_type": "Reddit",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 7,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": -0.62
+    },
+    {
+      "components": {
+        "buyer_density": 2.5,
+        "buyer_density_z": -0.87,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 20.0,
+        "emotional_depth_z": -0.67,
+        "language_quality": 47.5,
+        "language_quality_z": 0.06,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 60.0,
+        "specificity_z": -0.65,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        51.7,
+        55.5
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 53.6,
+      "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "habitat_type": "Reddit",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 8,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": -0.62
+    },
+    {
+      "components": {
+        "buyer_density": 2.5,
+        "buyer_density_z": -0.87,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 20.0,
+        "emotional_depth_z": -0.67,
+        "language_quality": 47.5,
+        "language_quality_z": 0.06,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 60.0,
+        "specificity_z": -0.65,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        51.7,
+        55.5
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 53.6,
+      "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "habitat_type": "Reddit",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 9,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": -0.62
+    },
+    {
+      "components": {
+        "buyer_density": 2.5,
+        "buyer_density_z": -0.87,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 20.0,
+        "emotional_depth_z": -0.67,
+        "language_quality": 47.5,
+        "language_quality_z": 0.06,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 60.0,
+        "specificity_z": -0.65,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        51.7,
+        55.5
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 53.6,
+      "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "habitat_type": "Reddit",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 10,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": -0.62
+    },
+    {
+      "components": {
+        "buyer_density": 2.5,
+        "buyer_density_z": -0.87,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 20.0,
+        "emotional_depth_z": -0.67,
+        "language_quality": 47.5,
+        "language_quality_z": 0.06,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 60.0,
+        "specificity_z": -0.65,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        51.7,
+        55.5
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 53.6,
+      "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "habitat_type": "Reddit",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 11,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": -0.62
+    },
+    {
+      "components": {
+        "buyer_density": 2.5,
+        "buyer_density_z": -0.87,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 20.0,
+        "emotional_depth_z": -0.67,
+        "language_quality": 47.5,
+        "language_quality_z": 0.06,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 60.0,
+        "specificity_z": -0.65,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        51.7,
+        55.5
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 53.6,
+      "habitat_name": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "habitat_type": "Reddit",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 12,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "https://www.reddit.com/r/herbalism/comments/12meomz?utm_source=openai",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": -0.62
+    },
+    {
+      "components": {
+        "buyer_density": 2.5,
+        "buyer_density_z": -0.87,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 0.0,
+        "emotional_depth_z": -1.17,
+        "language_quality": 13.6,
+        "language_quality_z": -1.41,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 100.0,
+        "signal_to_noise_z": 0.27,
+        "specificity": 60.0,
+        "specificity_z": -0.65,
+        "volume": 33.3,
+        "volume_z": -0.57
+      },
+      "confidence_range": [
+        43.4,
+        47.2
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 45.3,
+      "habitat_name": "clockworks_tiktok-scraper_Zfgak0CiSsqanx8pl.json",
+      "habitat_type": "Social_Video",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 13,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "/apify_output/clockworks_tiktok-scraper_Zfgak0CiSsqanx8pl.json",
+      "video_modifiers_applied": {
+        "applied": true,
+        "modifiers": {
+          "language_quality": 0.1
+        }
+      },
+      "z_score": -1.1
+    },
+    {
+      "components": {
+        "buyer_density": 15.0,
+        "buyer_density_z": -0.56,
+        "competitor_whitespace": 100.0,
+        "competitor_whitespace_z": 0.27,
+        "emotional_depth": 0.0,
+        "emotional_depth_z": -1.17,
+        "language_quality": 0.0,
+        "language_quality_z": -2.0,
+        "market_timing": 50.0,
+        "market_timing_z": 0.0,
+        "mining_feasibility": 100.0,
+        "mining_feasibility_z": 0.0,
+        "recency": 100.0,
+        "recency_z": 0.0,
+        "signal_to_noise": 0,
+        "signal_to_noise_z": -3.47,
+        "specificity": 40.0,
+        "specificity_z": -1.8,
+        "volume": 76.7,
+        "volume_z": 2.5
+      },
+      "confidence_range": [
+        35.5,
+        39.3
+      ],
+      "evidence_completeness": 0.9,
+      "final_score": 37.4,
+      "habitat_name": "streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json",
+      "habitat_type": "YouTube",
+      "lifecycle_stage": "UNKNOWN",
+      "mining_gate_applied": false,
+      "mining_gate_failures": [],
+      "rank": 14,
+      "reusability": "PATTERN_REUSABLE",
+      "url": "/apify_output/streamers_youtube-comments-scraper_zscCLIRGoYr5SHFGe.json",
+      "video_modifiers_applied": {
+        "applied": false,
+        "modifiers": {}
+      },
+      "z_score": -1.56
+    }
+  ],
+  "summary": {
+    "gates_applied": 0,
+    "habitat_type_entropy": 0.797,
+    "habitat_type_entropy_healthy": true,
+    "lifecycle_distribution": {
+      "UNKNOWN": 14
+    },
+    "max_score": 86.8,
+    "mean_score": 64.3,
+    "median_score": 53.6,
+    "min_score": 37.4,
+    "std_score": 17.3,
+    "total_habitats": 14,
+    "type_distribution": {
+      "Reddit": 8,
+      "Social_Video": 5,
+      "YouTube": 1
+    }
+  },
+  "z_score_interpretation": {
+    "average": "0 to 0.5",
+    "below_average": "z < 0",
+    "exceptional": "z > 1.5",
+    "strong": "z > 0.5"
+  }
+}

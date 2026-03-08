@@ -1,0 +1,60 @@
+{
+  "schema_version": "2.0.0",
+  "product_name": "The Honest Herbalist Handbook",
+  "description": "We sell a natural remedies handbook for $49.",
+  "price": "TBD",
+  "competitor_urls": [
+    "https://offer.ancientremediesrevived.com/c3-nb",
+    "https://chestnutherbs.com/online-herbal-classes/online-herbal-immersion-program/?utm_source=openai",
+    "https://www.similarweb.com/top-websites/united-kingdom/health/alternative-and-natural-medicine/trending/?utm_source=openai",
+    "https://www.thelostremedies.com/my-store/?utm_source=openai",
+    "https://ancientremedies.com/?utm_source=openai",
+    "https://shop.ancientremedies.com/g/m52-nbb/unique-offer?utm_source=openai",
+    "https://www.thelostremedies.com/?utm_source=openai",
+    "https://theherbalacademy.com/product/online-advanced-herbal-course/?utm_source=openai",
+    "https://www.evolutionaryherbalism.com/?utm_source=openai",
+    "https://www.iwillaremedy.com/everydayherbalism?utm_source=openai",
+    "https://herbalmedics.academy/on-demand-course-library/?utm_source=openai",
+    "https://www.similarweb.com/top-websites/united-states/health/alternative-and-natural-medicine/trending/?utm_source=openai",
+    "https://www.semrush.com/website/ancientremedies.com/overview/",
+    "https://www.trustpilot.com/review/ancientremedies.com?utm_source=openai",
+    "https://www.semrush.com/website/theherbalacademy.com/overview/?utm_source=openai",
+    "https://gripsintelligence.com/insights/retailers/theherbalacademy.com?utm_source=openai",
+    "https://www.evolutionaryherbalism.com/home/contact-us/?utm_source=openai",
+    "https://hypestat.com/info/iwillaremedy.com?utm_source=openai",
+    "https://www.scam-detector.com/validator/chestnutherbs-com-review/?utm_source=openai",
+    "https://www.iwillaremedy.com/?utm_source=openai",
+    "https://ancientremedies.com/products/sp-ancient-remedies-revived?utm_source=openai",
+    "https://theherbalacademy.com/contact-us/?utm_source=openai",
+    "https://www.evolutionaryherbalism.com/vitalist-herbalism-mini-course/program-details/?utm_source=openai",
+    "https://herbalmedics.academy/course/the-apothecarist-herbal-medicine-making-course-2025/?utm_source=openai"
+  ],
+  "product_customizable": true,
+  "stage": 1,
+  "category_niche": "Health & Wellness",
+  "product_category_keywords": [
+    "health & wellness",
+    "health",
+    "wellness",
+    "health wellness",
+    "honest",
+    "herbalist"
+  ],
+  "market_maturity_stage": "Maturity",
+  "primary_segment": {
+    "name": "“After a few hours of him crying... I reach for the Tylenol and he’s fine for like 3-5 hrs.” (Reddit r/NewParents)",
+    "size_estimate": "“Any magic tricks or do we just wait it out and expire from exhaustion?” (Reddit r/workingmoms)",
+    "key_differentiator": "“I have this fear of giving him any nurofen and he doesn’t need it” (Reddit r/NewParents)"
+  },
+  "bottleneck": ": Medication-Matrix Midlifers (HRT/Polypharmacy)** (S3 has highest computed score: **1024**)",
+  "positioning_gaps": [
+    "Strong safety/compliance framing: contraindications, drug–herb interaction checklists, “when to seek care” (gap suggested by heavy “remedies that outperform modern medicines” style claims elsewhere). ([ancientremedies.com](https://ancientremedies.com/?utm_source=openai))",
+    "**Mid-price ($49) handbook** positioned as: *personalizable + compliance-forward + “evidence-graded”* instead of urgency/survivalist framing. (Gap inferred from dominant captured funnels emphasizing urgency/discount and broad claims.) ([shop.ancientremedies.com](https://shop.ancientremedies.com/g/m52-nbb/unique-offer?utm_source=openai))"
+  ],
+  "competitor_count_validated": 23,
+  "primary_icps": [
+    "“After a few hours of him crying... I reach for the Tylenol and he’s fine for like 3-5 hrs.” (Reddit r/NewParents)",
+    "“Any magic tricks or do we just wait it out and expire from exhaustion?” (Reddit r/workingmoms)",
+    "“I have this fear of giving him any nurofen and he doesn’t need it” (Reddit r/NewParents)"
+  ]
+}

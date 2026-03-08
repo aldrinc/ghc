@@ -20,6 +20,7 @@ class SwipeImageAdInput:
     requirement_index: int = 0
     company_swipe_id: Optional[str] = None
     swipe_image_url: Optional[str] = None
+    swipe_requires_product_image: Optional[bool] = None
     model: Optional[str] = None
     render_model_id: Optional[str] = None
     max_output_tokens: Optional[int] = None
@@ -46,6 +47,7 @@ class SwipeImageAdWorkflow:
             "requirement_index": input.requirement_index,
             "company_swipe_id": input.company_swipe_id,
             "swipe_image_url": input.swipe_image_url,
+            "swipe_requires_product_image": input.swipe_requires_product_image,
             "model": input.model,
             "render_model_id": input.render_model_id,
             "max_output_tokens": input.max_output_tokens,
