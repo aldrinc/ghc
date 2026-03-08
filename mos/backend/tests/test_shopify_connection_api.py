@@ -47,24 +47,6 @@ def _set_theme_export_sales_page_path(
     return path
 
 
-def _mock_ready_shopify_status(monkeypatch, *, shop_domain: str = "example.myshopify.com") -> None:
-    def fake_status(*, client_id: str, selected_shop_domain: str | None = None):
-        _ = client_id
-        resolved_shop_domain = selected_shop_domain or shop_domain
-        return {
-            "state": "ready",
-            "message": "Shopify connection is ready.",
-            "shopDomain": resolved_shop_domain,
-            "shopDomains": [resolved_shop_domain],
-            "selectedShopDomain": selected_shop_domain,
-            "hasStorefrontAccessToken": True,
-            "missingScopes": [],
-            "installationState": "installed",
-        }
-
-    monkeypatch.setattr(clients_router, "get_client_shopify_connection_status", fake_status)
-
-
 def _seed_sales_page_for_product(
     db_session,
     *,
@@ -205,6 +187,25 @@ def test_normalize_theme_export_text_file_content_rewrites_catalog_product_links
     assert '<a href="{{ product_url }}" class="swatch-overflow">+2</a>' in normalized_content
 
 
+def test_normalize_theme_export_text_file_content_rewrites_catalog_product_title_with_product_dot_url():
+    sales_page_path = "/f/11111111/sales-funnel/sales"
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="snippets/product-card.liquid",
+        content=(
+            '<quick-view data-product-url="{{ product_url }}"></quick-view>\n'
+            '<a href="{{ product_url }}" class="media">Image</a>\n'
+            '<a href="{{ product_url }}" class="button">View product</a>\n'
+            '<a href="{{ product.url }}" class="title">Product title</a>\n'
+            '<a href="{{ product_url }}" class="swatch-overflow">+2</a>\n'
+        ),
+        sales_page_path=sales_page_path,
+    )
+
+    assert normalized_content.count(f'href="{sales_page_path}"') == 3
+    assert f'<a href="{sales_page_path}" class="title">Product title</a>' in normalized_content
+    assert '<a href="{{ product_url }}" class="swatch-overflow">+2</a>' in normalized_content
+
+
 def test_normalize_theme_export_text_file_content_removes_rich_text_footer_color_override():
     normalized_content = clients_router._normalize_theme_export_text_file_content(
         filename="sections/rich-text.liquid",
@@ -244,101 +245,6 @@ def test_normalize_theme_export_text_file_content_updates_header_track_order_lin
     assert 'href="/pages/contact"' in normalized_content
     assert "/pages/track-your-order" not in normalized_content
     assert "/pages/track-order" not in normalized_content
-
-
-def test_assert_draft_shop_matches_active_connection_raises_for_shop_mismatch():
-    try:
-        clients_router._assert_draft_shop_matches_active_connection(
-            status_payload={"shopDomain": "active.myshopify.com"},
-            draft_shop_domain="stale.myshopify.com",
-            action_label="template export",
-        )
-    except HTTPException as exc:
-        assert exc.status_code == 409
-        assert "targets stale.myshopify.com" in str(exc.detail)
-        assert "active.myshopify.com" in str(exc.detail)
-    else:
-        raise AssertionError("Expected draft/active shop mismatch to raise HTTPException")
-
-
-def test_assert_component_image_urls_exclude_localhost_raises():
-    try:
-        clients_router._assert_component_image_urls_exclude_localhost(
-            component_image_urls={
-                "templates/index.json.sections.hero.settings.image": "http://localhost:8008/public/assets/example"
-            }
-        )
-    except HTTPException as exc:
-        assert exc.status_code == 409
-        assert "localhost/loopback" in str(exc.detail)
-    else:
-        raise AssertionError("Expected localhost URL guard to raise HTTPException")
-
-
-def test_resolve_template_export_logo_url_returns_non_loopback_unchanged(monkeypatch):
-    observed: dict[str, object] = {}
-
-    def fake_resolve_to_shopify_files(
-        *,
-        client_id: str,
-        shop_domain: str,
-        component_image_urls: dict[str, str],
-    ) -> dict[str, str]:
-        observed["client_id"] = client_id
-        observed["shop_domain"] = shop_domain
-        observed["component_image_urls"] = component_image_urls
-        return dict(component_image_urls)
-
-    monkeypatch.setattr(
-        clients_router,
-        "_resolve_template_export_component_image_urls_to_shopify_files",
-        fake_resolve_to_shopify_files,
-    )
-
-    resolved = clients_router._resolve_template_export_logo_url(
-        client_id="client-123",
-        shop_domain="example.myshopify.com",
-        logo_url="https://assets.example.com/public/assets/logo-1",
-    )
-
-    assert resolved == "https://assets.example.com/public/assets/logo-1"
-    assert observed == {}
-
-
-def test_resolve_template_export_logo_url_resolves_loopback_to_shopify_file(monkeypatch):
-    observed: dict[str, object] = {}
-
-    def fake_resolve_to_shopify_files(
-        *,
-        client_id: str,
-        shop_domain: str,
-        component_image_urls: dict[str, str],
-    ) -> dict[str, str]:
-        observed["client_id"] = client_id
-        observed["shop_domain"] = shop_domain
-        observed["component_image_urls"] = component_image_urls
-        return {"brand.logoUrl": "shopify://shop_images/latest-logo.png"}
-
-    monkeypatch.setattr(
-        clients_router,
-        "_resolve_template_export_component_image_urls_to_shopify_files",
-        fake_resolve_to_shopify_files,
-    )
-
-    resolved = clients_router._resolve_template_export_logo_url(
-        client_id="client-123",
-        shop_domain="example.myshopify.com",
-        logo_url="http://localhost:8008/public/assets/latest-logo",
-    )
-
-    assert resolved == "shopify://shop_images/latest-logo.png"
-    assert observed == {
-        "client_id": "client-123",
-        "shop_domain": "example.myshopify.com",
-        "component_image_urls": {
-            "brand.logoUrl": "http://localhost:8008/public/assets/latest-logo"
-        },
-    }
 
 
 def test_normalize_theme_export_text_file_content_removes_footer_track_order_tab():
@@ -383,7 +289,7 @@ def test_normalize_theme_export_text_file_content_updates_footer_contact_support
                                 "settings": {
                                     "title": "Refund Request",
                                     "text": (
-                                        "<p>Need a refund? Contact our support team and we'll process your "
+                                        "<p>Need a refund? Contact our support team and we’ll process your "
                                         "request promptly.</p>"
                                     ),
                                 },
@@ -477,6 +383,124 @@ def test_normalize_theme_export_text_file_content_publishes_shoppable_video_cart
         )
         == normalized_content
     )
+
+
+def test_normalize_theme_export_text_file_content_updates_contact_template_from_compliance_values():
+    normalized_content = clients_router._normalize_theme_export_text_file_content(
+        filename="templates/page.contact.json",
+        content=json.dumps(
+            {
+                "sections": {
+                    "contact-form": {
+                        "type": "contact-form",
+                        "blocks": {
+                            "contact-address": {
+                                "type": "contact",
+                                "settings": {
+                                    "heading": "Address",
+                                    "text": "<p>Legacy address</p>",
+                                },
+                            },
+                            "contact-email": {
+                                "type": "contact",
+                                "settings": {
+                                    "heading": "Email",
+                                    "text": "<p>legacy@example.com</p>",
+                                },
+                            },
+                            "contact-phone": {
+                                "type": "contact",
+                                "settings": {
+                                    "heading": "Phone",
+                                    "text": "<p>+1-000-000-0000</p>",
+                                },
+                            },
+                        },
+                    }
+                }
+            }
+        ),
+        sales_page_path="/f/11111111/sales-funnel/sales",
+        contact_page_values={
+            "businessAddress": "123 Main St\nAustin, TX 78701",
+            "supportEmail": "compliance@acme.test",
+            "supportPhone": "+1 (555) 111-2222",
+            "supportHours": "Mon-Fri 9:00-17:00 CT",
+        },
+    )
+    parsed = json.loads(normalized_content)
+    blocks = parsed["sections"]["contact-form"]["blocks"]
+
+    assert (
+        blocks["contact-address"]["settings"]["text"]
+        == "<p>123 Main St<br/>Austin, TX 78701</p>"
+    )
+    assert (
+        blocks["contact-email"]["settings"]["text"]
+        == '<p><a href="mailto:compliance@acme.test">compliance@acme.test</a></p>'
+    )
+    assert (
+        blocks["contact-phone"]["settings"]["text"]
+        == '<p><a href="tel:+15551112222">+1 (555) 111-2222</a><br/>Mon-Fri 9:00-17:00 CT</p>'
+    )
+
+
+def test_normalize_theme_export_text_file_content_requires_contact_values_for_contact_templates():
+    try:
+        clients_router._normalize_theme_export_text_file_content(
+            filename="templates/page.contact.json",
+            content=json.dumps(
+                {
+                    "sections": {
+                        "contact-form": {
+                            "type": "contact-form",
+                            "blocks": {
+                                "address": {
+                                    "type": "contact",
+                                    "settings": {"heading": "Address", "text": "<p>x</p>"},
+                                },
+                                "email": {
+                                    "type": "contact",
+                                    "settings": {"heading": "Email", "text": "<p>x</p>"},
+                                },
+                                "phone": {
+                                    "type": "contact",
+                                    "settings": {"heading": "Phone", "text": "<p>x</p>"},
+                                },
+                            },
+                        }
+                    }
+                }
+            ),
+            sales_page_path="/f/11111111/sales-funnel/sales",
+            contact_page_values=None,
+        )
+        assert False, "Expected contact template normalization to require compliance contact values."
+    except HTTPException as exc:
+        assert exc.status_code == 502
+        assert "contact values were not provided" in str(exc.detail)
+
+
+def test_extract_contact_support_template_values_from_markdown():
+    values = clients_router._extract_contact_support_template_values_from_markdown(
+        markdown=(
+            "# Contact and Support\n\n"
+            "## Contact Channels\n"
+            "- Email: compliance@acme.test\n"
+            "- Phone: +1 (555) 111-2222\n\n"
+            "## Support Hours\n"
+            "Mon-Fri 9:00-17:00 CT\n\n"
+            "## Business Address\n"
+            "123 Main St, Austin, TX 78701\n"
+        )
+    )
+
+    assert values == {
+        "supportEmail": "compliance@acme.test",
+        "supportPhone": "+1 (555) 111-2222",
+        "supportHours": "Mon-Fri 9:00-17:00 CT",
+        "businessAddress": "123 Main St, Austin, TX 78701",
+    }
 
 
 def test_resolve_theme_export_sales_page_path_uses_first_workspace_product(db_session, api_client):
@@ -1320,87 +1344,6 @@ def test_build_theme_sync_slot_image_prompt_applies_feature_icon_constraints():
     assert "Feature context: We deliver worldwide Get your package anywhere!." in prompt
 
 
-def test_is_theme_testimonial_image_slot_path_matches_theme_testimonial_grid_paths():
-    testimonial_slot_path = (
-        "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image"
-    )
-    non_testimonial_slot_path = (
-        "templates/collection.json.sections.main-collection.blocks.promotion.settings.image"
-    )
-
-    assert clients_router._is_theme_testimonial_image_slot_path(testimonial_slot_path)
-    assert not clients_router._is_theme_testimonial_image_slot_path(non_testimonial_slot_path)
-
-
-def test_generate_theme_sync_ai_image_assets_routes_testimonial_slots_to_testimonial_service(
-    db_session, monkeypatch
-):
-    testimonial_slot_path = (
-        "templates/index.json.sections.ss_testimonial_6_mbn7JR.blocks.image_73JHNR.settings.image"
-    )
-    captured: dict[str, object] = {}
-    fake_public_id = str(uuid4())
-
-    def fake_generate_shopify_theme_testimonial_image_asset(**kwargs):
-        captured.update(kwargs)
-        return SimpleNamespace(
-            public_id=fake_public_id,
-            width=1080,
-            height=1080,
-            ai_metadata={"model": "gemini-testimonial", "source": "testimonial_service"},
-            file_source="testimonial_service",
-        )
-
-    def fail_create_funnel_image_asset(**kwargs):
-        raise AssertionError(
-            "Expected testimonial image slots to route through testimonial service generation."
-        )
-
-    monkeypatch.setattr(
-        clients_router,
-        "generate_shopify_theme_testimonial_image_asset",
-        fake_generate_shopify_theme_testimonial_image_asset,
-    )
-    monkeypatch.setattr(
-        clients_router,
-        "create_funnel_image_asset",
-        fail_create_funnel_image_asset,
-    )
-
-    (
-        generated_assets,
-        rate_limited_slot_paths,
-        generated_asset_by_slot_path,
-        quota_exhausted_slot_paths,
-        slot_error_by_path,
-    ) = clients_router._generate_theme_sync_ai_image_assets(
-        session=db_session,
-        org_id=str(uuid4()),
-        client_id=str(uuid4()),
-        product_id=None,
-        image_slots=[
-            {
-                "path": testimonial_slot_path,
-                "key": "image",
-                "role": "supporting",
-                "recommendedAspect": "square",
-            }
-        ],
-        text_slots=[],
-        max_concurrency=1,
-    )
-
-    assert len(generated_assets) == 1
-    assert generated_asset_by_slot_path[testimonial_slot_path].public_id == fake_public_id
-    assert rate_limited_slot_paths == []
-    assert quota_exhausted_slot_paths == []
-    assert slot_error_by_path == {}
-    assert captured["slot_path"] == testimonial_slot_path
-    assert captured["aspect_ratio"] == "1:1"
-    assert captured["direction_prompt"]
-    assert captured["usage_context"]["imageGenerationService"] == "testimonial"
-
-
 def test_build_theme_sync_default_general_prompt_context_includes_page_background_token():
     context = clients_router._build_theme_sync_default_general_prompt_context(
         draft_data=SimpleNamespace(
@@ -2225,11 +2168,77 @@ def test_update_shopify_theme_template_draft_creates_new_version(api_client, db_
     assert feature_highlights_payload["card4"] is None
 
 
+def test_list_shopify_theme_template_drafts_tolerates_legacy_latest_logo_url_key(
+    api_client, db_session
+):
+    client_id = _create_client(api_client, name="Acme Workspace")
+    client = db_session.scalar(select(Client).where(Client.id == client_id))
+    assert client is not None
+
+    draft = ShopifyThemeTemplateDraft(
+        org_id=client.org_id,
+        client_id=client.id,
+        design_system_id=None,
+        product_id=None,
+        shop_domain="example.myshopify.com",
+        theme_id="gid://shopify/OnlineStoreTheme/123",
+        theme_name="legacy-theme-name",
+        theme_role="MAIN",
+        status="draft",
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    db_session.flush()
+
+    version = ShopifyThemeTemplateDraftVersion(
+        draft_id=draft.id,
+        org_id=client.org_id,
+        client_id=client.id,
+        version_number=1,
+        source="build_job",
+        payload={
+            "shopDomain": "example.myshopify.com",
+            "workspaceName": "Acme Workspace",
+            "designSystemId": "design-system-1",
+            "designSystemName": "Acme DS",
+            "brandName": "Draft Snapshot Brand",
+            "logoAssetPublicId": str(uuid4()),
+            "logoUrl": "https://assets.example.com/public/assets/logo-1",
+            "latestLogoUrl": None,
+            "themeId": "gid://shopify/OnlineStoreTheme/123",
+            "themeName": "legacy-theme-name",
+            "themeRole": "MAIN",
+            "cssVars": {"--color-brand": "#123456"},
+            "fontUrls": [],
+            "dataTheme": "light",
+            "productId": None,
+            "componentImageAssetMap": {},
+            "componentTextValues": {},
+            "imageSlots": [],
+            "textSlots": [],
+            "metadata": {},
+        },
+        created_by_user_external_id="test-user",
+        created_at=datetime.now(timezone.utc),
+    )
+    db_session.add(version)
+    db_session.commit()
+
+    list_response = api_client.get(f"/clients/{client_id}/shopify/theme/brand/template/drafts")
+    assert list_response.status_code == 200
+    payload = list_response.json()
+    assert len(payload) == 1
+    assert payload[0]["latestVersion"]["data"]["logoUrl"] == (
+        "https://assets.example.com/public/assets/logo-1"
+    )
+
+
 def test_export_shopify_theme_template_zip_returns_archive(api_client, db_session, monkeypatch):
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
-    _mock_ready_shopify_status(monkeypatch)
     sales_page_path = _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -2344,6 +2353,12 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
                     "url": "https://example.myshopify.com/pages/privacy-policy",
                 }
             ],
+            "contactSupport": {
+                "businessAddress": "151 O'Connor Street, Ottawa ON K2P 2L8, Canada",
+                "supportEmail": "compliance@acme.test",
+                "supportPhone": "+1-555-444-7777",
+                "supportHours": "Mon - Fri: 09:00 - 17:00",
+            },
         }
 
     def fake_resolve_latest_snapshot(
@@ -2456,12 +2471,35 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
     exported_product_card = archive.read("snippets/product-card.liquid").decode("utf-8")
     assert exported_product_card.count(f'href="{sales_page_path}"') == 3
     assert 'data-product-url="{{ product_url }}"' in exported_product_card
+    exported_contact_template = json.loads(
+        archive.read("templates/page.contact.json").decode("utf-8")
+    )
+    contact_blocks = exported_contact_template["sections"]["contact-form"]["blocks"]
+    contact_text_by_heading = {
+        block["settings"]["heading"]: block["settings"]["text"]
+        for block in contact_blocks.values()
+        if block.get("type") == "contact"
+    }
+    assert (
+        contact_text_by_heading["Address"]
+        == "<p>151 O&#x27;Connor Street, Ottawa ON K2P 2L8, Canada</p>"
+    )
+    assert (
+        contact_text_by_heading["Email"]
+        == '<p><a href="mailto:compliance@acme.test">compliance@acme.test</a></p>'
+    )
+    assert (
+        contact_text_by_heading["Phone"]
+        == '<p><a href="tel:+15554447777">+1-555-444-7777</a><br/>Mon - Fri: 09:00 - 17:00</p>'
+    )
     exported_collection_template = json.loads(
         archive.read("templates/collection.json").decode("utf-8")
     )
     exported_footer_group_template = json.loads(
         archive.read("sections/footer-group.json").decode("utf-8")
     )
+    exported_ss_footer_4 = archive.read("sections/ss-footer-4.liquid").decode("utf-8")
+    exported_a_ss_footer_4 = archive.read("sections/a-ss-footer-4.liquid").decode("utf-8")
     exported_header_group_template = json.loads(
         archive.read("sections/header-group.json").decode("utf-8")
     )
@@ -2501,6 +2539,20 @@ def test_export_shopify_theme_template_zip_returns_archive(api_client, db_sessio
         None,
     )
     assert track_order_tab is None
+    refund_tab_text = footer_blocks["tab_AaWBPg"]["settings"]["text"]
+    questions_tab_text = footer_blocks["tab_tcYLPr"]["settings"]["text"]
+    assert (
+        '<a href="/pages/contact"><strong><u>Contact our support team</u></strong></a>'
+        in refund_tab_text
+    )
+    assert (
+        'Our team is here to help. <a href="/pages/contact"><strong><u>Contact us</u></strong></a>.'
+        in questions_tab_text
+    )
+    assert ".footer-tab-text-{{ section.id }} a," in exported_ss_footer_4
+    assert "text-decoration: underline !important;" in exported_ss_footer_4
+    assert ".footer-tab-text-{{ section.id }} a," in exported_a_ss_footer_4
+    assert "text-decoration: underline !important;" in exported_a_ss_footer_4
     assert (
         exported_header_group_template["sections"]["header"]["type"] == "a-header"
     )
@@ -2531,7 +2583,6 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
-    _mock_ready_shopify_status(monkeypatch)
     _set_theme_export_sales_page_path(monkeypatch)
     monkeypatch.setattr(
         clients_router.settings, "PUBLIC_ASSET_BASE_URL", "https://assets.example.com"
@@ -2630,6 +2681,12 @@ def test_export_shopify_theme_template_zip_uses_cached_shopify_file_url(
             "pages": [],
             "updatedProfileUrls": {},
             "renderedPages": [],
+            "contactSupport": {
+                "businessAddress": "123 Main St, Austin, TX 78701",
+                "supportEmail": "support@acme.test",
+                "supportPhone": "+1-555-111-2222",
+                "supportHours": "Mon-Fri 9:00-17:00 CT",
+            },
         }
 
     def fake_resolve_latest_snapshot(
@@ -2705,7 +2762,6 @@ def test_export_shopify_theme_template_zip_requires_stored_component_image_urls(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
-    _mock_ready_shopify_status(monkeypatch)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -2777,6 +2833,12 @@ def test_export_shopify_theme_template_zip_requires_stored_component_image_urls(
             "pages": [],
             "updatedProfileUrls": {},
             "renderedPages": [],
+            "contactSupport": {
+                "businessAddress": "123 Main St, Austin, TX 78701",
+                "supportEmail": "support@acme.test",
+                "supportPhone": "+1-555-111-2222",
+                "supportHours": "Mon-Fri 9:00-17:00 CT",
+            },
         }
 
     monkeypatch.setattr(
@@ -2917,7 +2979,6 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
-    _mock_ready_shopify_status(monkeypatch)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -2984,6 +3045,12 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
             "pages": [],
             "updatedProfileUrls": {},
             "renderedPages": [],
+            "contactSupport": {
+                "businessAddress": "123 Main St, Austin, TX 78701",
+                "supportEmail": "support@acme.test",
+                "supportPhone": "+1-555-111-2222",
+                "supportHours": "Mon-Fri 9:00-17:00 CT",
+            },
         }
 
     def fake_resolve_latest_snapshot(
@@ -3041,152 +3108,12 @@ def test_export_shopify_theme_template_zip_writes_base64_file_payloads(
     )
 
 
-def test_export_shopify_theme_template_zip_resolves_loopback_logo_url(
-    api_client, db_session, monkeypatch
-):
-    client_id = _create_client(api_client, name="Acme Workspace")
-    client = db_session.scalar(select(Client).where(Client.id == client_id))
-    assert client is not None
-    _mock_ready_shopify_status(monkeypatch)
-    _set_theme_export_sales_page_path(monkeypatch)
-
-    draft = ShopifyThemeTemplateDraft(
-        org_id=client.org_id,
-        client_id=client.id,
-        design_system_id=None,
-        product_id=None,
-        shop_domain="example.myshopify.com",
-        theme_id="gid://shopify/OnlineStoreTheme/123",
-        theme_name="futrgroup2-0theme",
-        theme_role="MAIN",
-        status="draft",
-        created_by_user_external_id="test-user",
-        created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc),
-    )
-    db_session.add(draft)
-    db_session.flush()
-    db_session.add(
-        ShopifyThemeTemplateDraftVersion(
-            draft_id=draft.id,
-            org_id=client.org_id,
-            client_id=client.id,
-            version_number=1,
-            source="build_job",
-            payload={
-                "shopDomain": "example.myshopify.com",
-                "workspaceName": "Acme Workspace",
-                "designSystemId": "design-system-1",
-                "designSystemName": "Acme DS",
-                "brandName": "Draft Snapshot Brand",
-                "logoAssetPublicId": str(uuid4()),
-                "logoUrl": "https://assets.example.com/public/assets/logo-1",
-                "themeId": "gid://shopify/OnlineStoreTheme/123",
-                "themeName": "futrgroup2-0theme",
-                "themeRole": "MAIN",
-                "cssVars": {"--color-brand": "#123456"},
-                "fontUrls": [],
-                "dataTheme": "light",
-                "productId": None,
-                "componentImageAssetMap": {},
-                "componentTextValues": {},
-                "imageSlots": [],
-                "textSlots": [],
-                "metadata": {},
-            },
-            created_by_user_external_id="test-user",
-            created_at=datetime.now(timezone.utc),
-        )
-    )
-    db_session.commit()
-
-    observed_resolve_payload: dict[str, object] = {}
-
-    def fake_resolve_latest_snapshot(
-        *,
-        session,
-        org_id: str,
-        client_id: str,
-        design_system_id: str,
-    ):
-        return (
-            "Latest Brand Name",
-            "latest-logo",
-            "http://localhost:8008/public/assets/latest-logo",
-            {
-                "--color-brand": "#654321",
-                "--color-page-bg-secondary": "#f4efe7",
-            },
-            [],
-            "dark",
-        )
-
-    def fake_sync_compliance_for_export(
-        *,
-        client_id: str,
-        shop_domain: str | None,
-        auth,
-        session,
-        sync_to_shopify: bool = True,
-    ):
-        assert sync_to_shopify is False
-        return {
-            "rulesetVersion": "meta_tiktok_compliance_ruleset_v1",
-            "shopDomain": "example.myshopify.com",
-            "pages": [],
-            "updatedProfileUrls": {},
-            "renderedPages": [],
-        }
-
-    def fake_resolve_logo_url_to_shopify_file(
-        *,
-        client_id: str,
-        shop_domain: str,
-        component_image_urls: dict[str, str],
-    ) -> dict[str, str]:
-        observed_resolve_payload["client_id"] = client_id
-        observed_resolve_payload["shop_domain"] = shop_domain
-        observed_resolve_payload["component_image_urls"] = component_image_urls
-        return {"brand.logoUrl": "shopify://shop_images/latest-logo.png"}
-
-    monkeypatch.setattr(
-        clients_router,
-        "_resolve_latest_template_publish_design_system_snapshot",
-        fake_resolve_latest_snapshot,
-    )
-    monkeypatch.setattr(
-        clients_router,
-        "_sync_compliance_policy_pages_for_template_export",
-        fake_sync_compliance_for_export,
-    )
-    monkeypatch.setattr(
-        clients_router,
-        "_resolve_template_export_component_image_urls_to_shopify_files",
-        fake_resolve_logo_url_to_shopify_file,
-    )
-
-    response = api_client.post(
-        f"/clients/{client_id}/shopify/theme/brand/template/export-zip",
-        json={"draftId": str(draft.id)},
-    )
-
-    assert response.status_code == 200
-    assert observed_resolve_payload == {
-        "client_id": client_id,
-        "shop_domain": "example.myshopify.com",
-        "component_image_urls": {
-            "brand.logoUrl": "http://localhost:8008/public/assets/latest-logo"
-        },
-    }
-
-
 def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_page(
     api_client, db_session, monkeypatch
 ):
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
-    _mock_ready_shopify_status(monkeypatch)
 
     db_session.add(
         Product(
@@ -3261,6 +3188,12 @@ def test_export_shopify_theme_template_zip_allows_missing_first_product_sales_pa
             "pages": [],
             "updatedProfileUrls": {},
             "renderedPages": [],
+            "contactSupport": {
+                "businessAddress": "123 Main St, Austin, TX 78701",
+                "supportEmail": "support@acme.test",
+                "supportPhone": "+1-555-111-2222",
+                "supportHours": "Mon-Fri 9:00-17:00 CT",
+            },
         }
 
     def fake_resolve_latest_snapshot(
@@ -3320,7 +3253,6 @@ def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(
     client_id = _create_client(api_client, name="Acme Workspace")
     client = db_session.scalar(select(Client).where(Client.id == client_id))
     assert client is not None
-    _mock_ready_shopify_status(monkeypatch)
     _set_theme_export_sales_page_path(monkeypatch)
 
     draft = ShopifyThemeTemplateDraft(
@@ -3387,6 +3319,12 @@ def test_export_shopify_theme_template_zip_refreshes_slot_snapshot_when_changed(
             "pages": [],
             "updatedProfileUrls": {},
             "renderedPages": [],
+            "contactSupport": {
+                "businessAddress": "123 Main St, Austin, TX 78701",
+                "supportEmail": "support@acme.test",
+                "supportPhone": "+1-555-111-2222",
+                "supportHours": "Mon-Fri 9:00-17:00 CT",
+            },
         }
 
     def fake_resolve_latest_snapshot(

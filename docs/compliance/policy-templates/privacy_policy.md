@@ -1,45 +1,60 @@
 # Privacy Policy
 
-This Privacy Policy explains how {{legal_business_name}} ("{{brand_name}}", "we", "us") collects, uses, and shares personal information when you visit or make a purchase from {{website_url}}.
+## Privacy Policy for {{brand_name}}
 
-**Brand:** {{brand_name}}  
-**Operator:** {{legal_business_name}}  
-**Contact:** {{support_email}}  
-**Address:** {{company_address_text}}  
-**Effective date:** {{effective_date}}
+**Effective Date: {{effective_date}}**
 
-## Owner and Controller Identity
-{{legal_business_name}} is the data controller responsible for personal information handled for {{brand_name}}.
+{{legal_business_name}} ("{{brand_name}}", "we", "us", "our") is committed to safeguarding the privacy of users who interact with {{website_url}}.
 
-## Data We Collect
-We may collect order, account, support, payment-confirmation, device, and browsing information, including through cookies and similar technologies.
+This Privacy Policy explains what information we collect, how we use it, and the measures we take to protect it.
+
+By accessing or using our services, you agree to this Privacy Policy.
+
+## Information We Collect
+1. **Personal Information**
+We may collect personal information such as name, email address, shipping/billing details, and contact information when you place an order, create an account, or contact support.
+
+2. **Usage Information**
+We collect information about interactions with our website, including pages viewed, time on page, clicks, and conversion events.
+
+3. **Device Information**
+We may collect technical details about the device and browser used to access our services.
 
 {{privacy_data_collected}}
 
-## How We Use Data
-We use personal information to provide products/services, process transactions, fulfill orders, communicate with customers, prevent fraud, and improve site and marketing performance.
+## How We Use Your Information
+1. **To Provide Services**
+We use collected information to operate the store, process payments, fulfill orders, provide support, and improve customer experience.
+
+2. **Marketing and Communication**
+Where permitted, we may use your contact details to send promotional communications and updates.
+
+3. **Analytics and Improvement**
+We use analytics to understand usage behavior and improve website and service performance.
 
 {{privacy_data_usage}}
 
-## How We Share Data
-We share data only as needed to operate the business (for example: commerce platform, payment processor, shipping partners, analytics, and customer support providers) or when legally required.
+## Sharing Your Information
+We do not sell personal information. We may share data with service providers required to operate the business and as required by law.
 
 {{privacy_data_sharing}}
 
-## User Choices and Controls
-Depending on location, users may have rights to access, correct, delete, or opt out of certain data uses such as targeted advertising. Users can also manage cookie preferences and marketing subscriptions where available.
-
-{{privacy_user_choices}}
-
-## Security and Retention
-We apply reasonable technical and organizational safeguards and retain personal information only for as long as needed for legitimate business and legal purposes.
+## Security
+We apply reasonable safeguards to protect personal information from unauthorized access, alteration, disclosure, or destruction.
 
 {{privacy_security_retention}}
 
-## Privacy Contact
-For privacy questions or requests, contact {{support_email}}.
+## Your Choices
+You may request access, correction, or deletion of personal information where applicable, and you may opt out of marketing communications.
 
-## Policy Updates and Effective Date
+{{privacy_user_choices}}
+
+## Changes to This Privacy Policy
+We may update this Privacy Policy at any time. Updated versions are posted on this page.
+
 {{privacy_update_notice}}
 
-**Effective date:** {{effective_date}}
+## Contact Us
+If you have questions about this Privacy Policy, contact us at {{support_email}}.
+
+Business address: {{company_address_text}}

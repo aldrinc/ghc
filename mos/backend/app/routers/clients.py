@@ -13,7 +13,6 @@ import re
 import threading
 import time
 from typing import Any
-from urllib.parse import urlparse
 from uuid import UUID, uuid4
 import zipfile
 
@@ -110,10 +109,6 @@ from app.services.funnels import (
     create_funnel_unsplash_asset,
     resolve_funnel_image_model_config,
 )
-from app.services.funnel_testimonials import (
-    TestimonialGenerationError,
-    generate_shopify_theme_testimonial_image_asset,
-)
 from app.services.media_storage import MediaStorage
 from app.services.public_routing import require_product_route_slug
 from app.services.shopify_connection import (
@@ -177,19 +172,8 @@ _THEME_RICHTEXT_MARKUP_RE = re.compile(
     r"<(?:p|ul|ol|h[1-6]|li|br)\b",
     re.IGNORECASE,
 )
-_HTTP_URL_CANDIDATE_RE = re.compile(
-    r"https?://[^\s\"')>]+",
-    re.IGNORECASE,
-)
 _THEME_FEATURE_IMAGE_SLOT_PATH_RE = re.compile(
     r"^templates/index\.json\.sections\.ss_feature_1_pro_[^.]+\.blocks\.slide_[^.]+\.settings\.image$",
-    re.IGNORECASE,
-)
-_THEME_TESTIMONIAL_IMAGE_SLOT_PATH_RE = re.compile(
-    (
-        r"^templates/index\.json\.sections\.ss_testimonial(?:s)?_[^.]+"
-        r"\.blocks\.image_[^.]+\.settings\.image$"
-    ),
     re.IGNORECASE,
 )
 _THEME_FEATURE_HIGHLIGHT_CARD_SLOT_PATHS: dict[str, tuple[str, str]] = {
@@ -221,12 +205,16 @@ _THEME_HEADER_DRAWER_FILENAME = "snippets/header-drawer.liquid"
 _THEME_INDEX_TEMPLATE_FILENAME = "templates/index.json"
 _THEME_PRODUCT_CARD_SNIPPET_FILENAME = "snippets/product-card.liquid"
 _THEME_SHOPPABLE_VIDEO_SECTION_FILENAME = "sections/ss-shoppable-video.liquid"
-_THEME_FOOTER_TABS_SECTION_FILENAMES: frozenset[str] = frozenset(
-    {"sections/ss-footer-4.liquid", "sections/a-ss-footer-4.liquid"}
-)
 _THEME_MAIN_PAGE_BUTTON_LINK_KEYS: frozenset[str] = frozenset({"button_link", "button_url"})
+_THEME_PRODUCT_CARD_TITLE_PRODUCT_URL_HREF_RE = re.compile(
+    (
+        r'(<a\b(?=[^>]*\bclass="[^"]*(?:product-card__title|title)[^"]*")'
+        r'[^>]*\bhref=)"\{\{\s*product(?:_|\.)url\s*\}\}"'
+    ),
+    re.IGNORECASE,
+)
 _THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE = re.compile(
-    r'href="\{\{\s*product_url\s*\}\}"',
+    r'href="\{\{\s*product(?:_|\.)url\s*\}\}"',
     re.IGNORECASE,
 )
 _THEME_SHOPPABLE_VIDEO_CART_JSON_LINE_RE = re.compile(
@@ -252,6 +240,9 @@ _THEME_TRACK_ORDER_LINK_HREF_RE = re.compile(
     r'href\s*=\s*["\']/pages/(?:track-order|track-your-order)["\']',
     re.IGNORECASE,
 )
+_THEME_FOOTER_TABS_SECTION_FILENAMES: frozenset[str] = frozenset(
+    {"sections/ss-footer-4.liquid", "sections/a-ss-footer-4.liquid"}
+)
 _THEME_FOOTER_CONTACT_PAGE_PATH = "/pages/contact"
 _THEME_FOOTER_CONTACT_SUPPORT_LINK_HTML = (
     f'<a href="{_THEME_FOOTER_CONTACT_PAGE_PATH}"><strong><u>Contact our support team</u></strong></a>'
@@ -275,6 +266,14 @@ _THEME_FOOTER_TAB_LINK_STYLE_SNIPPET = (
     "    font-weight: 700;\n"
     "    cursor: pointer;\n"
     "  }\n\n"
+)
+_THEME_CONTACT_TEMPLATE_FILENAME_RE = re.compile(
+    r"^templates/page\.contact(?:-[a-z0-9]+)*\.json$",
+    re.IGNORECASE,
+)
+_THEME_CONTACT_EMAIL_VALUE_RE = re.compile(
+    r"^[A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,}$",
+    re.IGNORECASE,
 )
 _THEME_EXPORT_REQUIRED_TEMPLATE_FILES: tuple[str, ...] = (
     "templates/collection.json",
@@ -366,7 +365,6 @@ _LOCAL_SHOPIFY_THEME_CSS_IMPORT_URL_RE = re.compile(
     re.IGNORECASE,
 )
 _ASSET_SHOPIFY_FILE_URLS_CACHE_KEY = "shopifyFileUrlsByShopDomain"
-_TEMPLATE_EXPORT_LOGO_RESOLVE_KEY = "brand.logoUrl"
 _LOCAL_SHOPIFY_THEME_TEXT_ENUM_VALUES = {
     "adapt",
     "auto",
@@ -754,12 +752,26 @@ def _normalize_theme_export_catalog_product_card_links(
     if filename != _THEME_PRODUCT_CARD_SNIPPET_FILENAME:
         return content
 
+    normalized_content, rewritten_title_count = _THEME_PRODUCT_CARD_TITLE_PRODUCT_URL_HREF_RE.subn(
+        rf'\1"{sales_page_path}"',
+        content,
+        count=1,
+    )
+    if rewritten_title_count != 1:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export could not rewrite the catalog product title link "
+                "in snippets/product-card.liquid."
+            ),
+        )
+
     normalized_content, rewritten_link_count = _THEME_PRODUCT_CARD_PRODUCT_URL_HREF_RE.subn(
         f'href="{sales_page_path}"',
-        content,
-        count=3,
+        normalized_content,
+        count=2,
     )
-    if rewritten_link_count != 3:
+    if rewritten_link_count != 2:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=(
@@ -848,8 +860,7 @@ def _normalize_theme_export_track_order_links(
             text = settings.get("text")
             if isinstance(text, str) and text.strip():
                 if (
-                    "Need a refund?" in text
-                    and "Contact our support team" in text
+                    _THEME_FOOTER_REFUND_CONTACT_TEXT_RE.search(text)
                     and _THEME_FOOTER_CONTACT_PAGE_PATH not in text
                 ):
                     updated_text = _THEME_FOOTER_REFUND_CONTACT_TEXT_RE.sub(
@@ -860,23 +871,19 @@ def _normalize_theme_export_track_order_links(
                     if updated_text != text:
                         settings["text"] = updated_text
                         changed = True
+                        text = updated_text
 
-                text_after_refund_update = settings.get("text")
                 if (
-                    isinstance(text_after_refund_update, str)
-                    and "Our team is here to help" in text_after_refund_update
-                    and "Contact us" not in text_after_refund_update
-                    and _THEME_FOOTER_CONTACT_PAGE_PATH not in text_after_refund_update
+                    _THEME_FOOTER_QUESTIONS_HELP_SENTENCE_RE.search(text)
+                    and "Contact us" not in text
+                    and _THEME_FOOTER_CONTACT_PAGE_PATH not in text
                 ):
                     updated_text = _THEME_FOOTER_QUESTIONS_HELP_SENTENCE_RE.sub(
-                        (
-                            "Our team is here to help. "
-                            f"{_THEME_FOOTER_CONTACT_US_LINK_HTML}."
-                        ),
-                        text_after_refund_update,
+                        f"Our team is here to help. {_THEME_FOOTER_CONTACT_US_LINK_HTML}.",
+                        text,
                         count=1,
                     )
-                    if updated_text != text_after_refund_update:
+                    if updated_text != text:
                         settings["text"] = updated_text
                         changed = True
 
@@ -952,15 +959,184 @@ def _normalize_theme_export_footer_tab_link_styling(
     if ".footer-tab-text-{{ section.id }} a," in content:
         return content
 
-    media_query_marker = "  @media(min-width: 1024px) {"
+    media_query_marker = "@media(min-width: 1024px) {"
     if media_query_marker in content:
         return content.replace(
             media_query_marker,
             f"{_THEME_FOOTER_TAB_LINK_STYLE_SNIPPET}{media_query_marker}",
             1,
         )
-
     return f"{content.rstrip()}\n\n{_THEME_FOOTER_TAB_LINK_STYLE_SNIPPET}"
+
+
+def _build_theme_export_contact_multiline_html(*, text: str) -> str:
+    lines = [line.strip() for line in text.replace("\r", "\n").split("\n") if line.strip()]
+    if not lines:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Theme ZIP export contact rewrite received empty multiline text content.",
+        )
+    return f"<p>{'<br/>'.join(escape(line) for line in lines)}</p>"
+
+
+def _build_theme_export_contact_email_html(*, email: str) -> str:
+    normalized_email = email.strip()
+    if not normalized_email:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Theme ZIP export contact rewrite received an empty support email value.",
+        )
+    if not _THEME_CONTACT_EMAIL_VALUE_RE.match(normalized_email):
+        return _build_theme_export_contact_multiline_html(text=normalized_email)
+    escaped_email = escape(normalized_email)
+    return f'<p><a href="mailto:{escaped_email}">{escaped_email}</a></p>'
+
+
+def _build_theme_export_contact_phone_html(
+    *,
+    phone: str,
+    support_hours: str,
+) -> str:
+    normalized_phone = phone.strip()
+    normalized_hours = support_hours.strip()
+    if not normalized_phone:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Theme ZIP export contact rewrite received an empty support phone value.",
+        )
+    if not normalized_hours:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Theme ZIP export contact rewrite received empty support hours content.",
+        )
+
+    tel_value = re.sub(r"[^0-9+]", "", normalized_phone)
+    has_digits = any(char.isdigit() for char in tel_value)
+    escaped_phone = escape(normalized_phone)
+    escaped_hours = escape(normalized_hours)
+    if has_digits:
+        phone_line = f'<a href="tel:{escape(tel_value)}">{escaped_phone}</a>'
+    else:
+        phone_line = escaped_phone
+    return f"<p>{phone_line}<br/>{escaped_hours}</p>"
+
+
+def _normalize_theme_export_contact_page_template_content(
+    *,
+    filename: str,
+    content: str,
+    contact_page_values: dict[str, str] | None,
+) -> str:
+    if not _THEME_CONTACT_TEMPLATE_FILENAME_RE.match(filename):
+        return content
+    if not isinstance(contact_page_values, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because compliance "
+                "contact values were not provided."
+            ),
+        )
+
+    required_keys = (
+        "businessAddress",
+        "supportEmail",
+        "supportPhone",
+        "supportHours",
+    )
+    missing_or_invalid_keys: list[str] = []
+    normalized_contact_values: dict[str, str] = {}
+    for key in required_keys:
+        value = contact_page_values.get(key)
+        if not isinstance(value, str) or not value.strip():
+            missing_or_invalid_keys.append(key)
+            continue
+        normalized_contact_values[key] = value.strip()
+    if missing_or_invalid_keys:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because compliance "
+                "contact values are missing or invalid: "
+                + ", ".join(sorted(missing_or_invalid_keys))
+                + "."
+            ),
+        )
+
+    template_data = _parse_theme_export_template_json(
+        filename=filename,
+        content=content,
+    )
+    sections = template_data.get("sections")
+    if not isinstance(sections, dict):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because "
+                f"{filename}.sections is missing or invalid."
+            ),
+        )
+
+    contact_html_by_heading = {
+        "address": _build_theme_export_contact_multiline_html(
+            text=normalized_contact_values["businessAddress"]
+        ),
+        "email": _build_theme_export_contact_email_html(
+            email=normalized_contact_values["supportEmail"]
+        ),
+        "phone": _build_theme_export_contact_phone_html(
+            phone=normalized_contact_values["supportPhone"],
+            support_hours=normalized_contact_values["supportHours"],
+        ),
+    }
+    rewritten_headings: set[str] = set()
+    for section in sections.values():
+        if not isinstance(section, dict):
+            continue
+        section_type = section.get("type")
+        if not isinstance(section_type, str) or section_type not in {
+            "contact-form",
+            "contact-with-map",
+        }:
+            continue
+        blocks = section.get("blocks")
+        if not isinstance(blocks, dict):
+            continue
+        for block in blocks.values():
+            if not isinstance(block, dict):
+                continue
+            if block.get("type") != "contact":
+                continue
+            settings = block.get("settings")
+            if not isinstance(settings, dict):
+                continue
+            heading = settings.get("heading")
+            if not isinstance(heading, str) or not heading.strip():
+                continue
+            normalized_heading = heading.strip().lower()
+            if normalized_heading.startswith("address"):
+                settings["text"] = contact_html_by_heading["address"]
+                rewritten_headings.add("address")
+            elif normalized_heading.startswith("email"):
+                settings["text"] = contact_html_by_heading["email"]
+                rewritten_headings.add("email")
+            elif normalized_heading.startswith("phone"):
+                settings["text"] = contact_html_by_heading["phone"]
+                rewritten_headings.add("phone")
+
+    required_headings = {"address", "email", "phone"}
+    missing_headings = sorted(required_headings - rewritten_headings)
+    if missing_headings:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because "
+                f"{filename} is missing expected contact blocks: "
+                + ", ".join(missing_headings)
+                + "."
+            ),
+        )
+    return json.dumps(template_data, separators=(",", ":"))
 
 
 def _normalize_local_theme_shop_domain(*, shop_domain: str | None) -> str:
@@ -2096,6 +2272,7 @@ def _normalize_theme_export_text_file_content(
     filename: str,
     content: str,
     sales_page_path: str,
+    contact_page_values: dict[str, str] | None = None,
 ) -> str:
     normalized = content
     normalized = _normalize_theme_export_main_page_button_links(
@@ -2123,6 +2300,11 @@ def _normalize_theme_export_text_file_content(
     normalized = _normalize_theme_export_footer_tab_link_styling(
         filename=filename,
         content=normalized,
+    )
+    normalized = _normalize_theme_export_contact_page_template_content(
+        filename=filename,
+        content=normalized,
+        contact_page_values=contact_page_values,
     )
     return normalized
 
@@ -2681,87 +2863,6 @@ def _require_public_asset_base_url() -> str:
     return base_url.rstrip("/")
 
 
-def _is_localhost_http_url(*, value: str) -> bool:
-    cleaned_value = value.strip()
-    if not cleaned_value:
-        return False
-    try:
-        parsed = urlparse(cleaned_value)
-    except ValueError:
-        return False
-    if parsed.scheme not in {"http", "https"}:
-        return False
-    hostname = (parsed.hostname or "").strip().lower()
-    return hostname in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
-
-
-def _assert_non_localhost_http_url(*, value: str, field_label: str) -> None:
-    if _is_localhost_http_url(value=value):
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"{field_label} must not use localhost/loopback URLs for Shopify export. "
-                f"Received {value!r}."
-            ),
-        )
-
-
-def _assert_draft_shop_matches_active_connection(
-    *,
-    status_payload: dict[str, Any],
-    draft_shop_domain: str,
-    action_label: str,
-) -> None:
-    normalized_draft_shop = normalize_shop_domain(draft_shop_domain)
-    resolved_shop_domain = status_payload.get("shopDomain")
-    if not isinstance(resolved_shop_domain, str) or not resolved_shop_domain.strip():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"Shopify connection is ready for {action_label}, "
-                "but no active shopDomain was resolved."
-            ),
-        )
-    normalized_resolved_shop = normalize_shop_domain(resolved_shop_domain)
-    if normalized_resolved_shop != normalized_draft_shop:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                f"Shopify template draft targets {normalized_draft_shop}, "
-                f"but active Shopify connection is {normalized_resolved_shop}. "
-                f"Rebuild the draft for the active store before {action_label}."
-            ),
-        )
-
-
-def _assert_component_image_urls_exclude_localhost(
-    *,
-    component_image_urls: dict[str, str],
-) -> None:
-    offenders: list[str] = []
-    for setting_path, image_url in component_image_urls.items():
-        if not isinstance(setting_path, str) or not setting_path.strip():
-            continue
-        if not isinstance(image_url, str) or not image_url.strip():
-            continue
-        for candidate_url in _HTTP_URL_CANDIDATE_RE.findall(image_url):
-            if not _is_localhost_http_url(value=candidate_url):
-                continue
-            offenders.append(f"{setting_path.strip()}: {candidate_url}")
-            break
-        if len(offenders) >= 5:
-            break
-    if offenders:
-        joined_offenders = "; ".join(offenders)
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Template ZIP export cannot include localhost/loopback component image URLs. "
-                f"Offending references: {joined_offenders}."
-            ),
-        )
-
-
 def _get_client_user_pref(
     *, session: Session, org_id: str, client_id: str, user_external_id: str
 ) -> ClientUserPreference | None:
@@ -3211,10 +3312,6 @@ def _resolve_theme_sync_product_reference_image(
 
 def _is_theme_feature_image_slot_path(slot_path: str) -> bool:
     return bool(_THEME_FEATURE_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
-
-
-def _is_theme_testimonial_image_slot_path(slot_path: str) -> bool:
-    return bool(_THEME_TESTIMONIAL_IMAGE_SLOT_PATH_RE.fullmatch(slot_path.strip()))
 
 
 def _is_theme_feature_highlight_text_slot_path(slot_path: str) -> bool:
@@ -3835,72 +3932,34 @@ def _generate_theme_sync_ai_image_assets(
     ) -> dict[str, Any]:
         with SessionLocal() as slot_session:
             try:
-                if _is_theme_testimonial_image_slot_path(slot_path):
-                    generated_asset = generate_shopify_theme_testimonial_image_asset(
-                        org_id=org_id,
-                        client_id=client_id,
-                        slot_path=slot_path,
-                        direction_prompt=prompt,
-                        aspect_ratio=aspect_ratio,
-                        usage_context={
-                            "kind": "shopify_theme_sync_component_image",
-                            "slotPath": slot_path,
-                            "slotRole": slot_role,
-                            "recommendedAspect": slot_recommended_aspect,
-                            "imageGenerationService": "testimonial",
-                        },
-                        reference_image_bytes=reference_image_bytes,
-                        reference_image_mime_type=reference_image_mime_type,
-                        reference_asset_public_id=reference_asset_public_id,
-                        reference_asset_id=reference_asset_id,
-                        product_id=product_id,
-                        tags=[
-                            "shopify_theme_sync",
-                            "component_image",
-                            "testimonial",
-                            "ai_generated",
-                        ],
-                    )
-                    source_name = "testimonial_service"
-                else:
-                    generated_asset = create_funnel_image_asset(
-                        session=slot_session,
-                        org_id=org_id,
-                        client_id=client_id,
-                        prompt=prompt,
-                        aspect_ratio=aspect_ratio,
-                        usage_context={
-                            "kind": "shopify_theme_sync_component_image",
-                            "slotPath": slot_path,
-                            "slotRole": slot_role,
-                            "recommendedAspect": slot_recommended_aspect,
-                        },
-                        reference_image_bytes=reference_image_bytes,
-                        reference_image_mime_type=reference_image_mime_type,
-                        reference_asset_public_id=reference_asset_public_id,
-                        reference_asset_id=reference_asset_id,
-                        product_id=product_id,
-                        tags=["shopify_theme_sync", "component_image", "ai_generated"],
-                    )
-                    source_name = "ai"
+                generated_asset = create_funnel_image_asset(
+                    session=slot_session,
+                    org_id=org_id,
+                    client_id=client_id,
+                    prompt=prompt,
+                    aspect_ratio=aspect_ratio,
+                    usage_context={
+                        "kind": "shopify_theme_sync_component_image",
+                        "slotPath": slot_path,
+                        "slotRole": slot_role,
+                        "recommendedAspect": slot_recommended_aspect,
+                    },
+                    reference_image_bytes=reference_image_bytes,
+                    reference_image_mime_type=reference_image_mime_type,
+                    reference_asset_public_id=reference_asset_public_id,
+                    reference_asset_id=reference_asset_id,
+                    product_id=product_id,
+                    tags=["shopify_theme_sync", "component_image", "ai_generated"],
+                )
                 return {
                     "slotPath": slot_path,
                     "asset": generated_asset,
-                    "source": source_name,
+                    "source": "ai",
                     "rateLimited": False,
                     "quotaExhausted": False,
                     "error": None,
                 }
             except Exception as exc:  # noqa: BLE001
-                if isinstance(exc, TestimonialGenerationError):
-                    return {
-                        "slotPath": slot_path,
-                        "asset": None,
-                        "source": None,
-                        "rateLimited": False,
-                        "quotaExhausted": False,
-                        "error": str(exc),
-                    }
                 if _is_gemini_hard_quota_exhaustion_error(exc):
                     return {
                         "slotPath": slot_path,
@@ -4975,8 +5034,21 @@ def _serialize_shopify_theme_template_draft_version(
     version: Any,
 ) -> ShopifyThemeTemplateDraftVersionResponse:
     payload_raw = version.payload if isinstance(version.payload, dict) else {}
+    payload_normalized = dict(payload_raw)
+    if "latestLogoUrl" in payload_normalized:
+        legacy_latest_logo_url = payload_normalized.pop("latestLogoUrl")
+        current_logo_url = payload_normalized.get("logoUrl")
+        if (
+            (
+                not isinstance(current_logo_url, str)
+                or not current_logo_url.strip()
+            )
+            and isinstance(legacy_latest_logo_url, str)
+            and legacy_latest_logo_url.strip()
+        ):
+            payload_normalized["logoUrl"] = legacy_latest_logo_url.strip()
     try:
-        data = ShopifyThemeTemplateDraftData(**payload_raw)
+        data = ShopifyThemeTemplateDraftData(**payload_normalized)
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -5111,45 +5183,6 @@ def _resolve_template_export_component_image_urls_to_shopify_files(
             )
         resolved_component_image_urls[setting_path] = resolved_url.strip()
     return resolved_component_image_urls
-
-
-def _resolve_template_export_logo_url(
-    *,
-    client_id: str,
-    shop_domain: str,
-    logo_url: str,
-) -> str:
-    cleaned_logo_url = logo_url.strip()
-    if not cleaned_logo_url:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Template export logoUrl was empty after normalization.",
-        )
-    if not _is_localhost_http_url(value=cleaned_logo_url):
-        return cleaned_logo_url
-
-    resolved_logo_payload = _resolve_template_export_component_image_urls_to_shopify_files(
-        client_id=client_id,
-        shop_domain=shop_domain,
-        component_image_urls={_TEMPLATE_EXPORT_LOGO_RESOLVE_KEY: cleaned_logo_url},
-    )
-    resolved_logo_url = resolved_logo_payload.get(_TEMPLATE_EXPORT_LOGO_RESOLVE_KEY)
-    if not isinstance(resolved_logo_url, str) or not resolved_logo_url.strip():
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=(
-                "Shopify image URL resolver returned an invalid logoUrl payload for template ZIP export."
-            ),
-        )
-    normalized_resolved_logo_url = resolved_logo_url.strip()
-    if not normalized_resolved_logo_url.startswith("shopify://"):
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=(
-                "Shopify image URL resolver did not return a Shopify file URL for template ZIP export logoUrl."
-            ),
-        )
-    return normalized_resolved_logo_url
 
 
 def _read_asset_cached_shopify_file_url(
@@ -6549,11 +6582,6 @@ def _publish_shopify_theme_template_draft(
                 f"{status_payload['message']}"
             ),
         )
-    _assert_draft_shop_matches_active_connection(
-        status_payload=status_payload,
-        draft_shop_domain=draft_data.shopDomain,
-        action_label="template publish",
-    )
     _require_internal_install_for_advanced_shopify(
         status_payload=status_payload,
         action_label="template publish",
@@ -6583,10 +6611,6 @@ def _publish_shopify_theme_template_draft(
         org_id=auth.org_id,
         client_id=client_id,
         design_system_id=draft_data.designSystemId,
-    )
-    _assert_non_localhost_http_url(
-        value=latest_logo_url,
-        field_label="Template publish logoUrl",
     )
 
     _emit_theme_sync_progress(
@@ -6743,6 +6767,115 @@ def _select_compliance_page_keys_for_template_export(
     return selected_default
 
 
+def _extract_markdown_section_body(
+    *,
+    markdown: str,
+    section_title: str,
+) -> str:
+    section_pattern = re.compile(
+        rf"(?ms)^##\s+{re.escape(section_title)}\s*\n(?P<body>.*?)(?=^##\s+|\Z)"
+    )
+    match = section_pattern.search(markdown)
+    if not match:
+        raise ValueError(
+            f"Rendered contact_support policy markdown is missing section '{section_title}'."
+        )
+    body = match.group("body").strip()
+    if not body:
+        raise ValueError(
+            f"Rendered contact_support policy markdown has an empty section '{section_title}'."
+        )
+    return body
+
+
+def _extract_contact_support_template_values_from_markdown(
+    *,
+    markdown: str,
+) -> dict[str, str]:
+    channels_body = _extract_markdown_section_body(
+        markdown=markdown,
+        section_title="Contact Channels",
+    )
+    support_hours = _extract_markdown_section_body(
+        markdown=markdown,
+        section_title="Support Hours",
+    )
+    business_address = _extract_markdown_section_body(
+        markdown=markdown,
+        section_title="Business Address",
+    )
+
+    email_match = re.search(r"(?im)^\s*-\s*Email:\s*(?P<value>.+?)\s*$", channels_body)
+    if not email_match:
+        raise ValueError(
+            "Rendered contact_support policy markdown is missing the Email line in Contact Channels."
+        )
+    support_email = email_match.group("value").strip()
+    if not support_email:
+        raise ValueError(
+            "Rendered contact_support policy markdown has an empty Email value in Contact Channels."
+        )
+
+    phone_match = re.search(r"(?im)^\s*-\s*Phone:\s*(?P<value>.+?)\s*$", channels_body)
+    if not phone_match:
+        raise ValueError(
+            "Rendered contact_support policy markdown is missing the Phone line in Contact Channels."
+        )
+    support_phone = phone_match.group("value").strip()
+    if not support_phone:
+        raise ValueError(
+            "Rendered contact_support policy markdown has an empty Phone value in Contact Channels."
+        )
+
+    return {
+        "supportEmail": support_email,
+        "supportPhone": support_phone,
+        "supportHours": support_hours,
+        "businessAddress": business_address,
+    }
+
+
+def _resolve_theme_export_contact_page_values(
+    *,
+    policy_sync_payload: dict[str, Any],
+) -> dict[str, str]:
+    raw_contact_values = policy_sync_payload.get("contactSupport")
+    if not isinstance(raw_contact_values, dict):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because the "
+                "compliance sync payload is missing contactSupport values."
+            ),
+        )
+
+    required_keys = (
+        "businessAddress",
+        "supportEmail",
+        "supportPhone",
+        "supportHours",
+    )
+    missing_or_invalid_keys: list[str] = []
+    resolved_values: dict[str, str] = {}
+    for key in required_keys:
+        value = raw_contact_values.get(key)
+        if not isinstance(value, str) or not value.strip():
+            missing_or_invalid_keys.append(key)
+            continue
+        resolved_values[key] = value.strip()
+    if missing_or_invalid_keys:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "Theme ZIP export cannot rewrite contact template content because contactSupport "
+                "values from compliance sync are missing or invalid: "
+                + ", ".join(sorted(missing_or_invalid_keys))
+                + "."
+            ),
+        )
+    return resolved_values
+
+
 def _sync_compliance_policy_pages_for_template_export(
     *,
     client_id: str,
@@ -6791,6 +6924,18 @@ def _sync_compliance_policy_pages_for_template_export(
     website_url = _website_url_from_shop_domain(shop_domain=effective_shop_domain)
     if website_url is not None:
         placeholders["website_url"] = website_url
+
+    try:
+        contact_support_markdown = render_policy_template_markdown(
+            page_key="contact_support",
+            placeholder_values=placeholders,
+        )
+        contact_support_values = _extract_contact_support_template_values_from_markdown(
+            markdown=contact_support_markdown,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
     sync_pages_payload: list[dict[str, str]] = []
     rendered_pages_payload: list[dict[str, str]] = []
     for page_key in page_keys_to_sync:
@@ -6843,6 +6988,7 @@ def _sync_compliance_policy_pages_for_template_export(
             "pages": local_pages,
             "updatedProfileUrls": {},
             "renderedPages": rendered_pages_payload,
+            "contactSupport": contact_support_values,
         }
 
     sync_payload = upsert_client_shopify_policy_pages(
@@ -6892,6 +7038,7 @@ def _sync_compliance_policy_pages_for_template_export(
         "pages": synced_pages,
         "updatedProfileUrls": updated_profile_urls,
         "renderedPages": rendered_pages_payload,
+        "contactSupport": contact_support_values,
     }
 
 
@@ -6923,30 +7070,15 @@ def _build_shopify_theme_template_export_zip_response(
     serialized_version = _serialize_shopify_theme_template_draft_version(version=version)
     draft_data = serialized_version.data
 
-    status_payload = get_client_shopify_connection_status(
-        client_id=client_id,
-        selected_shop_domain=draft_data.shopDomain,
-    )
-    if status_payload["state"] != "ready":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Shopify connection is not ready for template export: "
-                f"{status_payload['message']}"
-            ),
-        )
-    _assert_draft_shop_matches_active_connection(
-        status_payload=status_payload,
-        draft_shop_domain=draft_data.shopDomain,
-        action_label="template export",
-    )
-
     policy_sync_payload = _sync_compliance_policy_pages_for_template_export(
         client_id=client_id,
         shop_domain=draft_data.shopDomain,
         auth=auth,
         session=session,
         sync_to_shopify=False,
+    )
+    contact_page_values = _resolve_theme_export_contact_page_values(
+        policy_sync_payload=policy_sync_payload
     )
 
     component_image_asset_map = _normalize_theme_template_component_image_asset_map(
@@ -6963,9 +7095,6 @@ def _build_shopify_theme_template_export_zip_response(
         for setting_path in component_image_asset_map
         if setting_path in stored_component_image_urls
     }
-    _assert_component_image_urls_exclude_localhost(
-        component_image_urls=component_image_urls,
-    )
     missing_component_image_url_paths = sorted(
         set(component_image_asset_map.keys()) - set(component_image_urls.keys())
     )
@@ -6999,15 +7128,6 @@ def _build_shopify_theme_template_export_zip_response(
         org_id=auth.org_id,
         client_id=client_id,
         design_system_id=draft_data.designSystemId,
-    )
-    latest_logo_url = _resolve_template_export_logo_url(
-        client_id=client_id,
-        shop_domain=draft_data.shopDomain,
-        logo_url=latest_logo_url,
-    )
-    _assert_non_localhost_http_url(
-        value=latest_logo_url,
-        field_label="Template export logoUrl",
     )
     resolved_theme_id, resolved_theme_name, default_theme_role = (
         _resolve_local_theme_selector(
@@ -7095,6 +7215,7 @@ def _build_shopify_theme_template_export_zip_response(
                     filename=filename,
                     content=content,
                     sales_page_path=sales_page_path,
+                    contact_page_values=contact_page_values,
                 )
                 normalized_text_files_by_filename[filename] = normalized_content
                 zip_file.writestr(filename, normalized_content)
