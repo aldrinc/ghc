@@ -1,5 +1,3 @@
-# Privacy Policy
-
 ## Privacy Policy for {{brand_name}}
 
 **Effective Date: {{effective_date}}**

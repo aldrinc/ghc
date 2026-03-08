@@ -471,7 +471,7 @@ _THEME_COMPONENT_STYLE_OVERRIDES_BY_NAME: dict[
             ),
         ),
         (
-            ".cart-drawer, cart-drawer, #CartDrawer, [id=\"CartDrawer\"], [data-cart-drawer], .drawer--cart, .cart-drawer .drawer__inner, .cart-drawer__inner, .cart-drawer .drawer__header, .cart-drawer .drawer__footer, .cart-drawer .cart-items, .cart-drawer .cart-item, cart-drawer .drawer__inner, cart-drawer .drawer__header, cart-drawer .drawer__footer, cart-drawer .cart-items, cart-drawer .cart-item, #CartDrawer .drawer__inner, #CartDrawer .drawer__header, #CartDrawer .drawer__footer, #CartDrawer .cart-items, #CartDrawer .cart-item",
+            ".cart-drawer .drawer__inner, .cart-drawer__inner, .cart-drawer .drawer__header, .cart-drawer .drawer__footer, .cart-drawer .cart-items, .cart-drawer .cart-item, cart-drawer .drawer__inner, cart-drawer .drawer__header, cart-drawer .drawer__footer, cart-drawer .cart-items, cart-drawer .cart-item, #CartDrawer .drawer__inner, #CartDrawer .drawer__header, #CartDrawer .drawer__footer, #CartDrawer .cart-items, #CartDrawer .cart-item, [data-cart-drawer] .drawer__inner, [data-cart-drawer] .drawer__header, [data-cart-drawer] .drawer__footer, .drawer--cart .drawer__inner, .drawer--cart .drawer__header, .drawer--cart .drawer__footer",
             (
                 ("background-color", "#ffffff"),
                 ("color", "var(--color-text)"),

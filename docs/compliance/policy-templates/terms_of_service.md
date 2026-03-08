@@ -1,5 +1,3 @@
-# Terms of Service
-
 ## Terms and Conditions {{brand_name}}
 **Effective Date: {{effective_date}}**
 

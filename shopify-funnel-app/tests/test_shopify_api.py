@@ -3247,7 +3247,7 @@ def test_sync_theme_brand_updates_layout_and_css():
             assert "fill: currentColor !important;" in css_content
             assert "stroke: currentColor !important;" in css_content
             assert (
-                '.cart-drawer, cart-drawer, #CartDrawer, [id="CartDrawer"], [data-cart-drawer], .drawer--cart,'
+                ".cart-drawer .drawer__inner, .cart-drawer__inner, .cart-drawer .drawer__header, .cart-drawer .drawer__footer,"
                 in css_content
             )
             assert "background-color: #ffffff !important;" in css_content

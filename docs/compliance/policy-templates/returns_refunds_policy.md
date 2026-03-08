@@ -1,5 +1,3 @@
-# Returns and Refunds Policy
-
 We have a return window for eligible purchases. Return eligibility, timelines, and processing rules are described below.
 
 ## Return Window

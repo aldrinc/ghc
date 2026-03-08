@@ -1,4 +1,3 @@
-# Shipping Policy
 
 ## Shipping Policy for {{brand_name}}
 
