@@ -869,7 +869,7 @@ def list_meta_pipeline_assets(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="clientId and productId are required together.",
         )
-    ad_account_id = _resolve_ad_account_id(adAccountId)
+    ad_account_id = adAccountId or settings.META_AD_ACCOUNT_ID
     assets_repo = AssetsRepository(session)
     resolved_statuses = _resolve_statuses(statuses)
     assets = assets_repo.list(
@@ -888,22 +888,26 @@ def list_meta_pipeline_assets(
     campaign_ids = {str(asset.campaign_id) for asset in assets if asset.campaign_id}
     experiment_ids = {str(asset.experiment_id) for asset in assets if asset.experiment_id}
 
-    uploads = session.scalars(
-        select(MetaAssetUpload).where(
-            MetaAssetUpload.org_id == auth.org_id,
-            MetaAssetUpload.ad_account_id == ad_account_id,
-            MetaAssetUpload.asset_id.in_(asset_ids),
-        )
-    ).all()
+    uploads = []
+    if ad_account_id:
+        uploads = session.scalars(
+            select(MetaAssetUpload).where(
+                MetaAssetUpload.org_id == auth.org_id,
+                MetaAssetUpload.ad_account_id == ad_account_id,
+                MetaAssetUpload.asset_id.in_(asset_ids),
+            )
+        ).all()
     upload_map = {str(upload.asset_id): upload for upload in uploads}
 
-    creatives = session.scalars(
-        select(MetaAdCreative).where(
-            MetaAdCreative.org_id == auth.org_id,
-            MetaAdCreative.ad_account_id == ad_account_id,
-            MetaAdCreative.asset_id.in_(asset_ids),
-        )
-    ).all()
+    creatives = []
+    if ad_account_id:
+        creatives = session.scalars(
+            select(MetaAdCreative).where(
+                MetaAdCreative.org_id == auth.org_id,
+                MetaAdCreative.ad_account_id == ad_account_id,
+                MetaAdCreative.asset_id.in_(asset_ids),
+            )
+        ).all()
     creative_map: dict[str, list[MetaAdCreative]] = defaultdict(list)
     creative_ids: list[str] = []
     for creative in creatives:
@@ -911,7 +915,7 @@ def list_meta_pipeline_assets(
         creative_ids.append(str(creative.meta_creative_id))
 
     ads_by_creative: dict[str, list[MetaAd]] = defaultdict(list)
-    if creative_ids:
+    if creative_ids and ad_account_id:
         ads = session.scalars(
             select(MetaAd).where(
                 MetaAd.org_id == auth.org_id,
@@ -991,7 +995,7 @@ def list_meta_pipeline_assets(
     experiment_map = {str(exp.id): exp for exp in experiments}
 
     meta_campaigns = []
-    if campaign_ids:
+    if campaign_ids and ad_account_id:
         meta_campaigns = session.scalars(
             select(MetaCampaign).where(
                 MetaCampaign.org_id == auth.org_id,

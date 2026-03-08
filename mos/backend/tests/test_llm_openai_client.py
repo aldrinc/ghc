@@ -1,7 +1,8 @@
 from types import SimpleNamespace
+import app.llm.client as llm_client_module
 import pytest
 
-from app.llm.client import LLMClient, LLMClientConfigError, LLMGenerationParams
+from app.llm.client import LLMClient, LLMGenerationParams
 from app.services.deep_research import extract_output_text
 
 
@@ -27,7 +28,10 @@ def test_openai_client_rejects_invalid_base_url(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_BASE_URL", "localhost:1234/v1")
 
     llm = LLMClient(default_model="gpt-5.2-2025-12-11")
-    with pytest.raises(LLMClientConfigError, match=r"OPENAI_BASE_URL must be a fully qualified http\(s\) URL"):
+    with pytest.raises(
+        llm_client_module.LLMClientConfigError,
+        match=r"OPENAI_BASE_URL must be a fully qualified http\(s\) URL",
+    ):
         llm._ensure_openai_client()
 
 

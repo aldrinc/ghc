@@ -1473,7 +1473,7 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                                 "required": ["alt", "prompt"],
                             },
                         },
-                        "required": ["label", "icon"],
+                        "required": ["label", "value", "icon"],
                     },
                 },
             },
@@ -1501,7 +1501,7 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                             "alt": {"type": "string", "minLength": 1, "maxLength": 240},
                             "prompt": {"type": "string", "minLength": 1, "maxLength": 420},
                         },
-                        "required": ["alt"],
+                        "required": ["alt", "prompt"],
                     },
                 },
                 "required": ["number", "title", "body", "image"],
@@ -1531,7 +1531,7 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                         "alt": {"type": "string", "minLength": 1, "maxLength": 240},
                         "prompt": {"type": "string", "minLength": 1, "maxLength": 420},
                     },
-                    "required": ["alt"],
+                    "required": ["alt", "prompt"],
                 },
             },
             "required": ["title", "bullets", "cta_label", "image"],
@@ -1548,7 +1548,7 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
                     "rating": {"type": "integer", "minimum": 1, "maximum": 5},
                     "verified": {"type": "boolean"},
                 },
-                "required": ["text", "author"],
+                "required": ["text", "author", "rating", "verified"],
             },
         },
         "review_wall": {
@@ -1569,7 +1569,7 @@ _PRE_SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
             "required": ["label"],
         },
     },
-    "required": ["hero", "reasons", "marquee", "pitch", "review_wall", "floating_cta"],
+    "required": ["hero", "reasons", "marquee", "pitch", "reviews", "review_wall", "floating_cta"],
 }
 _SALES_TEMPLATE_PAYLOAD_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -7290,14 +7290,8 @@ def _voc_agent00b_response_schema() -> dict[str, Any]:
                         "mode": {"type": "string", "minLength": 1},
                         "actor_id": {"type": "string", "minLength": 1},
                         "input": _APIFY_EXEC_INPUT_SCHEMA,
-                        "metadata": {
-                            "anyOf": [
-                                {"type": "object", "additionalProperties": False},
-                                {"type": "null"},
-                            ]
-                        },
                     },
-                    "required": ["config_id", "platform", "mode", "actor_id", "input", "metadata"],
+                    "required": ["config_id", "platform", "mode", "actor_id", "input"],
                 },
             },
             "handoff_block": {"type": "string"},
@@ -8541,15 +8535,11 @@ def _validate_agent1_output_source_file_grounding(
     coverage_union = observed_source_files | excluded_source_files
     if coverage_union != allowed_file_names:
         missing = sorted(allowed_file_names - coverage_union)
-        if not isinstance(agent01_output, dict):
-            raise StrategyV2SchemaValidationError(
-                "Agent 1 output must provide exact source-file coverage: "
-                "(habitat_observations.source_file U excluded_source_files) == SCRAPED_DATA_FILES_JSON.raw_scraped_data_files.file_name. "
-                f"Missing source_file entries: {missing[:8]}."
-            )
-        repaired_excluded = list(excluded_source_files_values)
-        repaired_excluded.extend(name for name in missing if name not in excluded_source_files)
-        agent01_output["excluded_source_files"] = repaired_excluded
+        raise StrategyV2SchemaValidationError(
+            "Agent 1 output must provide exact source-file coverage: "
+            "(habitat_observations.source_file U excluded_source_files) == SCRAPED_DATA_FILES_JSON.raw_scraped_data_files.file_name. "
+            f"Missing source_file entries: {missing[:8]}."
+        )
 
 
 def _normalize_voc_source_type(raw_value: object) -> str:
@@ -18166,6 +18156,23 @@ def _extract_copy_reason_codes(error_message: str, *, limit: int = 20) -> list[s
 
 def _is_non_retryable_sales_payload_failure(error_message: str) -> bool:
     lowered = error_message.lower()
+    if "template_payload_validation" in lowered:
+        return any(
+            signal in lowered
+            for signal in (
+                "field required",
+                "extra inputs are not permitted",
+                "input should be a valid",
+                "input should be an object",
+                "input should be a valid array",
+                "input should be a valid boolean",
+                "input should be a valid dictionary",
+                "input should be a valid integer",
+                "input should be a valid list",
+                "input should be a valid object",
+                "input should be a valid string",
+            )
+        )
     return (
         "sales template payload json parse failed" in lowered
         or "invalid template_payload object" in lowered

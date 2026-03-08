@@ -4890,7 +4890,12 @@ def _prepare_shopify_theme_template_build_data(
     quota_exhausted_slot_paths: list[str] = []
     slot_error_by_path: dict[str, str] = {}
     product_reference_image: dict[str, Any] | None = None
-    if requested_product_id and resolved_product is not None and planner_image_slots:
+    if (
+        requested_product_id
+        and resolved_product is not None
+        and planner_image_slots
+        and _is_gemini_image_references_enabled()
+    ):
         product_reference_image = _resolve_theme_sync_product_reference_image(
             session=session,
             org_id=auth.org_id,
@@ -6342,12 +6347,14 @@ def _generate_shopify_theme_template_draft_images(
             )
             effective_general_context = default_general_context
             effective_slot_context_by_path = dict(default_slot_context_by_path)
-            product_reference_image = _resolve_theme_sync_product_reference_image(
-                session=session,
-                org_id=auth.org_id,
-                client_id=client_id,
-                product=resolved_product,
-            )
+            product_reference_image: dict[str, Any] | None = None
+            if _is_gemini_image_references_enabled():
+                product_reference_image = _resolve_theme_sync_product_reference_image(
+                    session=session,
+                    org_id=auth.org_id,
+                    client_id=client_id,
+                    product=resolved_product,
+                )
 
             _emit_theme_sync_progress(
                 {
@@ -6385,10 +6392,18 @@ def _generate_shopify_theme_template_draft_images(
                 slot_prompt_context_by_path=effective_slot_context_by_path,
                 max_concurrency=image_generation_max_concurrency,
                 stop_on_quota_exhausted=True,
-                reference_image_bytes=product_reference_image["imageBytes"],
-                reference_image_mime_type=product_reference_image["mimeType"],
-                reference_asset_public_id=product_reference_image["assetPublicId"],
-                reference_asset_id=product_reference_image["assetId"],
+                reference_image_bytes=(
+                    product_reference_image["imageBytes"] if product_reference_image else None
+                ),
+                reference_image_mime_type=(
+                    product_reference_image["mimeType"] if product_reference_image else None
+                ),
+                reference_asset_public_id=(
+                    product_reference_image["assetPublicId"] if product_reference_image else None
+                ),
+                reference_asset_id=(
+                    product_reference_image["assetId"] if product_reference_image else None
+                ),
             )
             rate_limited_slot_paths = sorted(
                 {
